@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -c %S/Inputs/inline-static-member-var.cpp -I %S/Inputs -o %t/inline-static-member-var.o -std=c++17
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/inline-static-member-var.o -Xfrontend -enable-cxx-interop -Xcc -std=c++17
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/inline-static-member-var.o -Xfrontend -enable-cxx-interop
 // RUN: %target-codesign %t/statics
 // RUN: %target-run %t/statics 2&>1
 //

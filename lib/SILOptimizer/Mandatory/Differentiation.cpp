@@ -158,8 +158,7 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
 /// flow unsupported" error at appropriate source locations. Returns true if
 /// error is emitted.
 ///
-/// Update as control flow support is added. Currently, branching terminators
-/// other than `br`, `cond_br`, `switch_enum` are not supported.
+/// Update as control flow support is added.
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
                                            DifferentiationInvoker invoker) {
@@ -173,7 +172,7 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
         isa<CheckedCastBranchInst>(term) ||
         isa<CheckedCastValueBranchInst>(term) ||
-        isa<CheckedCastAddrBranchInst>(term))
+        isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
@@ -324,7 +323,9 @@ static void copyParameterArgumentsForApply(
     // Copy the argument if it's to be owned by the newly created closure.
     // Objects are to be retained.
     if (arg->getType().isObject()) {
-      auto newArg = copyBuilder.emitCopyValueOperation(loc, arg);
+      auto newArg = arg;
+      if (newArg.getOwnershipKind() != ValueOwnershipKind::None)
+        newArg = copyBuilder.emitCopyValueOperation(loc, arg);
       collectNewArg(newArg);
       continue;
     }
@@ -499,8 +500,9 @@ emitDerivativeFunctionReference(
           builder.emitBeginBorrowOperation(original.getLoc(), original);
       SILValue derivativeFn = builder.createDifferentiableFunctionExtract(
           borrowedDiffFunc.getLoc(), kind, borrowedDiffFunc);
-      derivativeFn =
-          builder.emitCopyValueOperation(original.getLoc(), derivativeFn);
+      if (derivativeFn.getOwnershipKind() != ValueOwnershipKind::None)
+        derivativeFn =
+            builder.emitCopyValueOperation(original.getLoc(), derivativeFn);
       builder.emitEndBorrowOperation(original.getLoc(), borrowedDiffFunc);
       return std::make_pair(derivativeFn, desiredIndices);
     }
@@ -1209,9 +1211,11 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
   for (auto *buf : llvm::reverse(newBuffersToDealloc))
     builder.createDeallocStack(loc, buf);
 
-  auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
+  // If our original copy does not have none ownership, copy it.
+  if (origFnOperand.getOwnershipKind() != ValueOwnershipKind::None)
+    origFnOperand = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newDiffFn = context.createDifferentiableFunction(
-      builder, loc, parameterIndices, resultIndices, origFnCopy,
+      builder, loc, parameterIndices, resultIndices, origFnOperand,
       std::make_pair(derivativeFns[0], derivativeFns[1]));
   context.getDifferentiableFunctionInstWorklist().push_back(dfi);
   return newDiffFn;
@@ -1224,7 +1228,8 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   // with an undef transpose function operand. Eventually, a legitimate
   // transpose function operand should be created and used.
   auto origFnOperand = lfi->getOriginalFunction();
-  auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
+  if (origFnOperand.getOwnershipKind() != ValueOwnershipKind::None)
+    origFnOperand = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *parameterIndices = lfi->getParameterIndices();
   auto originalType = origFnOperand->getType().castTo<SILFunctionType>();
   auto transposeFnType = originalType->getAutoDiffTransposeFunctionType(
@@ -1233,7 +1238,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
   auto transposeFn = SILUndef::get(transposeType, builder.getFunction());
   auto *newLinearFn = context.createLinearFunction(
-      builder, loc, parameterIndices, origFnCopy, SILValue(transposeFn));
+      builder, loc, parameterIndices, origFnOperand, SILValue(transposeFn));
   context.getLinearFunctionInstWorklist().push_back(lfi);
   return newLinearFn;
 }
@@ -1330,7 +1335,7 @@ bool DifferentiationTransformer::processLinearFunctionInst(
                                    cast<SILInstruction>(lfi));
   PrettyStackTraceSILFunction fnTrace("...in", lfi->getFunction());
   LLVM_DEBUG({
-    auto &s = getADDebugStream() << "Processing LinearFunctoinInst:\n";
+    auto &s = getADDebugStream() << "Processing LinearFunctionInst:\n";
     lfi->printInContext(s);
   });
 
@@ -1385,8 +1390,8 @@ void Differentiation::run() {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i)) {
           context.getDifferentiableFunctionInstWorklist().push_back(dfi);
         } else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
-          // If linear map transposition is not enable and an uncanonical
-          // `linear_function` instruction is encounter, emit a diagnostic.
+          // If linear map transposition is not enabled and an uncanonical
+          // `linear_function` instruction is encountered, emit a diagnostic.
           // FIXME(SR-11850): Finish support for linear map transposition.
           if (!EnableExperimentalLinearMapTransposition) {
             if (!lfi->hasTransposeFunction()) {

@@ -46,11 +46,12 @@ function xcrun_find_tool() {
 # Run dsymutil on executables and shared libraries.
 #
 # Exclude shell scripts.
+# Run sequentially -- dsymutil is multithreaded and can be memory intensive
 (cd "${INSTALL_SYMROOT}" &&
  find ./"${INSTALL_PREFIX}" -perm -0111 -type f -print | \
    grep -v crashlog.py | \
    grep -v symbolication.py | \
-   xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
+   xargs -n 1 -P 1 $(xcrun_find_tool dsymutil))
 
 # Strip executables, shared libraries and static libraries in INSTALL_DIR.
 find "${INSTALL_DIR}${INSTALL_PREFIX}/" \

@@ -16,16 +16,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CSFix.h"
 #include "CSDiagnostics.h"
-#include "ConstraintLocator.h"
-#include "ConstraintSystem.h"
-#include "OverloadChoice.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSFix.h"
+#include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -534,22 +534,22 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 
 bool UsePropertyWrapper::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousPropertyWrapperUnwrapFailure failure(
-      solution, Wrapped, UsingStorageWrapper, Base, Wrapper, getLocator());
+      solution, Wrapped, UsingProjection, Base, Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
 
 UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
                                                VarDecl *wrapped,
-                                               bool usingStorageWrapper,
+                                               bool usingProjection,
                                                Type base, Type wrapper,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) UsePropertyWrapper(
-      cs, wrapped, usingStorageWrapper, base, wrapper, locator);
+      cs, wrapped, usingProjection, base, wrapper, locator);
 }
 
 bool UseWrappedValue::diagnose(const Solution &solution, bool asNote) const {
   MissingPropertyWrapperUnwrapFailure failure(solution, PropertyWrapper,
-                                              usingStorageWrapper(), Base,
+                                              usingProjection(), Base,
                                               Wrapper, getLocator());
   return failure.diagnose(asNote);
 }
@@ -748,9 +748,9 @@ bool AddMissingArguments::diagnose(const Solution &solution,
 
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs,
-                            ArrayRef<SynthesizedParam> synthesizedArgs,
+                            ArrayRef<SynthesizedArg> synthesizedArgs,
                             ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<SynthesizedParam>(synthesizedArgs.size());
+  unsigned size = totalSizeToAlloc<SynthesizedArg>(synthesizedArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
   return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
 }
@@ -1003,18 +1003,18 @@ DefaultGenericArgument::create(ConstraintSystem &cs, GenericTypeParamType *param
   return new (cs.getAllocator()) DefaultGenericArgument(cs, param, locator);
 }
 
-SkipUnhandledConstructInFunctionBuilder *
-SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
+SkipUnhandledConstructInResultBuilder *
+SkipUnhandledConstructInResultBuilder::create(ConstraintSystem &cs,
                                                 UnhandledNode unhandled,
                                                 NominalTypeDecl *builder,
                                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
-    SkipUnhandledConstructInFunctionBuilder(cs, unhandled, builder, locator);
+    SkipUnhandledConstructInResultBuilder(cs, unhandled, builder, locator);
 }
 
-bool SkipUnhandledConstructInFunctionBuilder::diagnose(const Solution &solution,
+bool SkipUnhandledConstructInResultBuilder::diagnose(const Solution &solution,
                                                        bool asNote) const {
-  SkipUnhandledConstructInFunctionBuilderFailure failure(solution, unhandled,
+  SkipUnhandledConstructInResultBuilderFailure failure(solution, unhandled,
                                                          builder, getLocator());
   return failure.diagnose(asNote);
 }
@@ -1538,4 +1538,92 @@ SpecifyLabelToAssociateTrailingClosure::create(ConstraintSystem &cs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
       SpecifyLabelToAssociateTrailingClosure(cs, locator);
+}
+
+bool AllowKeyPathWithoutComponents::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  InvalidEmptyKeyPathFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowKeyPathWithoutComponents *
+AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowKeyPathWithoutComponents(cs, locator);
+}
+
+bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
+                                                bool asNote) const {
+  switch (Phase) {
+  // Handled below
+  case ErrorInPhase::PreCheck:
+    break;
+  case ErrorInPhase::ConstraintGeneration:
+    return true; // Already diagnosed by `matchResultBuilder`.
+  }
+
+  auto *S = getAnchor().get<Stmt *>();
+
+  class PreCheckWalker : public ASTWalker {
+    DeclContext *DC;
+    DiagnosticTransaction Transaction;
+
+  public:
+    PreCheckWalker(DeclContext *dc)
+        : DC(dc), Transaction(dc->getASTContext().Diags) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      auto hasError = ConstraintSystem::preCheckExpression(
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
+      return std::make_pair(false, hasError ? nullptr : E);
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return std::make_pair(true, S);
+    }
+
+    // Ignore patterns because result builder pre-check does so as well.
+    std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+      return std::make_pair(false, P);
+    }
+
+    bool diagnosed() const {
+      return Transaction.hasErrors();
+    }
+  };
+
+  PreCheckWalker walker(solution.getDC());
+  S->walk(walker);
+
+  return walker.diagnosed();
+}
+
+IgnoreInvalidResultBuilderBody *IgnoreInvalidResultBuilderBody::create(
+    ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreInvalidResultBuilderBody(cs, phase, locator);
+}
+
+bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  MissingContextualTypeForNil failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyContextualTypeForNil *
+SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
+}
+
+bool AllowRefToInvalidDecl::diagnose(const Solution &solution,
+                                     bool asNote) const {
+  ReferenceToInvalidDeclaration failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowRefToInvalidDecl *
+AllowRefToInvalidDecl::create(ConstraintSystem &cs,
+                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowRefToInvalidDecl(cs, locator);
 }

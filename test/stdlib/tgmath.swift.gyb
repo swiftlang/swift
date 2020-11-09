@@ -21,8 +21,10 @@
   import Darwin.C.tgmath
 #elseif canImport(Glibc)
   import Glibc
+#elseif os(WASI)
+  import WASILibc
 #elseif os(Windows)
-  import MSVCRT
+  import CRT
 #else
 #error("Unsupported platform")
 #endif
@@ -176,7 +178,7 @@ internal extension TGMath {
 % if T == 'Float80':
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 % elif T == 'CGFloat':
-#if canImport(CoreGraphics)
+#if _runtime(_ObjC) && canImport(CoreGraphics)
   import CoreGraphics
 % end
 

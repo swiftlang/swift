@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
 #include "CompatibilityOverride.h"
 
 #include "ImageInspection.h"
@@ -49,12 +51,7 @@ static_assert(std::is_pod<OverrideSection>::value,
 static OverrideSection *getOverrideSectionPtr() {
   static OverrideSection *OverrideSectionPtr;
   static swift_once_t Predicate;
-  // WebAssembly: hack
-#ifdef __wasm__
-  swift_once_real(&Predicate, [](void *) {
-#else
   swift_once(&Predicate, [](void *) {
-#endif
     size_t Size;
     OverrideSectionPtr = static_cast<OverrideSection *>(
                              lookupSection("__DATA", "__swift53_hooks", &Size));
@@ -73,3 +70,5 @@ static OverrideSection *getOverrideSectionPtr() {
     return Section->name;                                           \
   }
 #include "CompatibilityOverride.def"
+
+#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES

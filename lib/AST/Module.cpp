@@ -95,7 +95,7 @@ void BuiltinUnit::LookupCache::lookupValue(
        SmallVectorImpl<ValueDecl*> &Result) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
-  
+
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
@@ -170,14 +170,12 @@ class swift::SourceLookupCache {
   template<typename Range>
   void addToMemberCache(Range decls);
 public:
-  typedef ModuleDecl::AccessPathTy AccessPathTy;
-  
   SourceLookupCache(const SourceFile &SF);
   SourceLookupCache(const ModuleDecl &Mod);
 
   /// Throw away as much memory as possible.
   void invalidate();
-  
+
   void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result);
 
@@ -202,17 +200,17 @@ public:
   void lookupPrecedenceGroup(Identifier name,
                              TinyPtrVector<PrecedenceGroupDecl *> &results);
 
-  void lookupVisibleDecls(AccessPathTy AccessPath,
+  void lookupVisibleDecls(ImportPath::Access AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
-  
+
   void populateMemberCache(const SourceFile &SF);
   void populateMemberCache(const ModuleDecl &Mod);
 
-  void lookupClassMembers(AccessPathTy AccessPath,
+  void lookupClassMembers(ImportPath::Access AccessPath,
                           VisibleDeclConsumer &consumer);
-                          
-  void lookupClassMember(AccessPathTy accessPath,
+
+  void lookupClassMember(ImportPath::Access accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
@@ -312,6 +310,7 @@ SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "source-file-populate-cache");
   addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
+  addToUnqualifiedLookupCache(SF.getHoistedDecls(), false);
 }
 
 SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
@@ -322,8 +321,9 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
       addToUnqualifiedLookupCache(SFU->getTopLevelDecls(), false);
       continue;
     }
-    auto &SF = *cast<SourceFile>(file);
-    addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
+    auto *SF = cast<SourceFile>(file);
+    addToUnqualifiedLookupCache(SF->getTopLevelDecls(), false);
+    addToUnqualifiedLookupCache(SF->getHoistedDecls(), false);
   }
 }
 
@@ -331,7 +331,7 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
-  
+
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
@@ -370,7 +370,7 @@ void SourceLookupCache::lookupPrecedenceGroup(
     results.push_back(group);
 }
 
-void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
+void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
                                            VisibleDeclConsumer &Consumer,
                                            NLKind LookupKind) {
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
@@ -395,10 +395,10 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 }
 
-void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
+void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
   if (!accessPath.empty()) {
     for (auto &member : ClassMembers) {
       // Non-simple names are also stored under their simple name, so make
@@ -428,15 +428,15 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
   }
 }
 
-void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
+void SourceLookupCache::lookupClassMember(ImportPath::Access accessPath,
                                           DeclName name,
                                           SmallVectorImpl<ValueDecl*> &results) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
   auto iter = ClassMembers.find(name);
   if (iter == ClassMembers.end())
     return;
-  
+
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
       auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
@@ -484,15 +484,15 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsSystemModule = 0;
   Bits.ModuleDecl.IsNonSwiftModule = 0;
   Bits.ModuleDecl.IsMainModule = 0;
+  Bits.ModuleDecl.HasIncrementalInfo = 0;
 }
 
-ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
+ImplicitImportList ModuleDecl::getImplicitImports() const {
   auto &evaluator = getASTContext().evaluator;
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
                            {});
 }
-
 
 void ModuleDecl::addFile(FileUnit &newFile) {
   // If this is a LoadedFile, make sure it loaded without error.
@@ -702,7 +702,7 @@ void SourceFile::lookupValue(DeclName name, NLKind lookupKind,
   getCache().lookupValue(name, lookupKind, result);
 }
 
-void ModuleDecl::lookupVisibleDecls(AccessPathTy AccessPath,
+void ModuleDecl::lookupVisibleDecls(ImportPath::Access AccessPath,
                                     VisibleDeclConsumer &Consumer,
                                     NLKind LookupKind) const {
   if (isParsedModule(this))
@@ -712,13 +712,13 @@ void ModuleDecl::lookupVisibleDecls(AccessPathTy AccessPath,
   FORWARD(lookupVisibleDecls, (AccessPath, Consumer, LookupKind));
 }
 
-void SourceFile::lookupVisibleDecls(ModuleDecl::AccessPathTy AccessPath,
+void SourceFile::lookupVisibleDecls(ImportPath::Access AccessPath,
                                     VisibleDeclConsumer &Consumer,
                                     NLKind LookupKind) const {
   getCache().lookupVisibleDecls(AccessPath, Consumer, LookupKind);
 }
 
-void ModuleDecl::lookupClassMembers(AccessPathTy accessPath,
+void ModuleDecl::lookupClassMembers(ImportPath::Access accessPath,
                                     VisibleDeclConsumer &consumer) const {
   if (isParsedModule(this)) {
     auto &cache = getSourceLookupCache();
@@ -730,14 +730,14 @@ void ModuleDecl::lookupClassMembers(AccessPathTy accessPath,
   FORWARD(lookupClassMembers, (accessPath, consumer));
 }
 
-void SourceFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
+void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
                                     VisibleDeclConsumer &consumer) const {
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMembers(accessPath, consumer);
 }
 
-void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
+void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
@@ -756,7 +756,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
   FORWARD(lookupClassMember, (accessPath, name, results));
 }
 
-void SourceFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
+void SourceFile::lookupClassMember(ImportPath::Access accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   FrontendStatsTracer tracer(getASTContext().Stats,
@@ -1167,7 +1167,7 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 }
 
 void
-SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
+SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
   // FIXME: Ideally we should assert that the file has had its imports resolved
   // before calling this function. However unfortunately that can cause issues
@@ -1183,17 +1183,17 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
 
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
-    if (desc.importOptions.contains(ImportFlags::Exported))
-      requiredFilter |= ModuleDecl::ImportFilterKind::Public;
-    else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+    if (desc.options.contains(ImportFlags::Exported))
+      requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
+    else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    else if (desc.importOptions.contains(ImportFlags::SPIAccessControl))
+    else if (desc.options.contains(ImportFlags::SPIAccessControl))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
-      requiredFilter |= ModuleDecl::ImportFilterKind::Private;
+      requiredFilter |= ModuleDecl::ImportFilterKind::Default;
 
     if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
-      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
+      requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay;
 
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
@@ -1219,17 +1219,6 @@ void SourceFile::dumpSeparatelyImportedOverlays() const {
 void ModuleDecl::getImportedModulesForLookup(
     SmallVectorImpl<ImportedModule> &modules) const {
   FORWARD(getImportedModulesForLookup, (modules));
-}
-
-bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
-  using AccessPathElem = Located<Identifier>;
-  if (lhs.size() != rhs.size())
-    return false;
-  return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                    [](const AccessPathElem &lElem,
-                       const AccessPathElem &rElem) {
-    return lElem.Item == rElem.Item;
-  });
 }
 
 ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
@@ -1283,7 +1272,7 @@ ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
 }
 
 void
-ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
+ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
             [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
@@ -1292,11 +1281,10 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
           lhs.importedModule->getReverseFullModuleName(), {},
           rhs.importedModule->getReverseFullModuleName(), {});
     }
-    using AccessPathElem = Located<Identifier>;
     return std::lexicographical_compare(
         lhs.accessPath.begin(), lhs.accessPath.end(), rhs.accessPath.begin(),
         rhs.accessPath.end(),
-        [](const AccessPathElem &lElem, const AccessPathElem &rElem) {
+        [](const ImportPath::Element &lElem, const ImportPath::Element &rElem) {
           return lElem.Item.str() < rElem.Item.str();
         });
   });
@@ -1305,7 +1293,7 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
       [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
         if (lhs.importedModule != rhs.importedModule)
           return false;
-        return ModuleDecl::isSameAccessPath(lhs.accessPath, rhs.accessPath);
+        return lhs.accessPath.isSameAs(rhs.accessPath);
       });
   imports.erase(last, imports.end());
 }
@@ -1346,6 +1334,10 @@ bool ModuleDecl::isSwiftShimsModule() const {
 
 bool ModuleDecl::isOnoneSupportModule() const {
   return !getParent() && getName().str() == SWIFT_ONONE_SUPPORT;
+}
+
+bool ModuleDecl::isFoundationModule() const {
+  return !getParent() && getName() == getASTContext().Id_Foundation;
 }
 
 bool ModuleDecl::isBuiltinModule() const {
@@ -1454,11 +1446,11 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
-  SmallVector<ModuleDecl::ImportedModule, 32> stack;
+  SmallVector<ImportedModule, 32> stack;
 
   ModuleDecl::ImportFilter filter = {
-      ModuleDecl::ImportFilterKind::Public,
-      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::SPIAccessControl};
 
   auto *topLevel = getParentModule();
@@ -1468,9 +1460,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  auto topLevelModule =
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), topLevel};
-  stack.emplace_back(topLevelModule);
+  stack.emplace_back(ImportPath::Access(), topLevel);
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val().importedModule;
@@ -1688,11 +1678,11 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
   SmallPtrSet<ModuleDecl *, 16> seen;
-  SmallVector<ModuleDecl::ImportedModule, 16> imported;
-  SmallVector<ModuleDecl::ImportedModule, 16> furtherImported;
+  SmallVector<ImportedModule, 16> imported;
+  SmallVector<ImportedModule, 16> furtherImported;
   ModuleDecl *overlayModule = this;
 
-  getImportedModules(imported, ModuleDecl::ImportFilterKind::Public);
+  getImportedModules(imported, ModuleDecl::ImportFilterKind::Exported);
   while (!imported.empty()) {
     ModuleDecl *importedModule = imported.back().importedModule;
     imported.pop_back();
@@ -1718,7 +1708,7 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
     furtherImported.clear();
     importedModule->getImportedModules(furtherImported,
-                                       ModuleDecl::ImportFilterKind::Public);
+                                       ModuleDecl::ImportFilterKind::Exported);
     imported.append(furtherImported.begin(), furtherImported.end());
   }
 
@@ -1887,17 +1877,17 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
+void
+SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
 }
 
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
-  using ModuleDesc = SourceFile::ImportedModuleDesc;
-  return llvm::any_of(SF->getImports(), [](ModuleDesc desc) {
-    return desc.importOptions.contains(
-        SourceFile::ImportFlags::ImplementationOnly);
+  return llvm::any_of(SF->getImports(),
+                      [](AttributedImport<ImportedModule> desc) {
+    return desc.options.contains(ImportFlags::ImplementationOnly);
   });
 }
 
@@ -1918,20 +1908,19 @@ bool SourceFile::hasTestableOrPrivateImport(
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
     // decls).
-    return std::any_of(
-        Imports->begin(), Imports->end(),
-        [module, queryKind](ImportedModuleDesc desc) -> bool {
+    return llvm::any_of(*Imports,
+        [module, queryKind](AttributedImport<ImportedModule> desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
             return desc.module.importedModule == module &&
-                   (desc.importOptions.contains(ImportFlags::PrivateImport) ||
-                    desc.importOptions.contains(ImportFlags::Testable));
+                   (desc.options.contains(ImportFlags::PrivateImport) ||
+                    desc.options.contains(ImportFlags::Testable));
           else if (queryKind == ImportQueryKind::TestableOnly)
             return desc.module.importedModule == module &&
-                   desc.importOptions.contains(ImportFlags::Testable);
+                   desc.options.contains(ImportFlags::Testable);
           else {
             assert(queryKind == ImportQueryKind::PrivateOnly);
             return desc.module.importedModule == module &&
-                   desc.importOptions.contains(ImportFlags::PrivateImport);
+                   desc.options.contains(ImportFlags::PrivateImport);
           }
         });
   case AccessLevel::Open:
@@ -1961,13 +1950,12 @@ bool SourceFile::hasTestableOrPrivateImport(
   if (filename.empty())
     return false;
 
-  return std::any_of(Imports->begin(), Imports->end(),
-                     [module, filename](ImportedModuleDesc desc) -> bool {
-                       return desc.module.importedModule == module &&
-                              desc.importOptions.contains(
-                                  ImportFlags::PrivateImport) &&
-                              desc.filename == filename;
-                     });
+  return llvm::any_of(*Imports,
+      [module, filename](AttributedImport<ImportedModule> desc) {
+        return desc.module.importedModule == module &&
+              desc.options.contains(ImportFlags::PrivateImport) &&
+              desc.sourceFileArg == filename;
+      });
 }
 
 bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
@@ -1981,7 +1969,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
-    if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+    if (desc.options.contains(ImportFlags::ImplementationOnly))
       continue;
 
     // If the module is imported this way, it's not imported
@@ -1994,11 +1982,32 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+  auto &imports = getASTContext().getImportCache();
+
+  // Look through non-implementation-only imports to see if module is imported
+  // in some other way. Otherwise we assume it's implementation-only imported.
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilterKind::SPIAccessControl,
+    ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
+  SmallVector<ImportedModule, 4> results;
+  getImportedModules(results, filter);
+
+  for (auto &desc : results) {
+    if (imports.isImportedBy(module, desc.importedModule))
+      return false;
+  }
+
+  return true;
+}
+
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : *Imports) {
-    if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
+    if (import.options.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
       spiGroups.insert(importedSpis.begin(), importedSpis.end());
@@ -2021,15 +2030,38 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
+bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
+                                 const ValueDecl *targetDecl) const {
+  auto targetModule = targetDecl->getModuleContext();
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+  lookupImportedSPIGroups(targetModule, importedSPIGroups);
+  if (importedSPIGroups.empty()) return false;
+
+  auto declSPIGroups = attr->getSPIGroups();
+
+  for (auto declSPI : declSPIGroups)
+    if (importedSPIGroups.count(declSPI))
+      return true;
+
+  return false;
+}
+
+bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
+                                 const ModuleDecl *fromModule) const {
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+  lookupImportedSPIGroups(fromModule, importedSPIGroups);
+  if (importedSPIGroups.empty())
+    return false;
+  return importedSPIGroups.count(spiGroup);
+}
+
 bool Decl::isSPI() const {
   return !getSPIGroups().empty();
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  if (auto vd = dyn_cast<ValueDecl>(this)) {
-    if (vd->getFormalAccess() < AccessLevel::Public)
-      return ArrayRef<Identifier>();
-  } else if (!isa<ExtensionDecl>(this))
+  if (!isa<ValueDecl>(this) &&
+      !isa<ExtensionDecl>(this))
     return ArrayRef<Identifier>();
 
   return evaluateOrDefault(getASTContext().evaluator,
@@ -2040,10 +2072,8 @@ ArrayRef<Identifier> Decl::getSPIGroups() const {
 llvm::ArrayRef<Identifier>
 SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   // Applies only to public ValueDecls and ExtensionDecls.
-  if (auto vd = dyn_cast<ValueDecl>(decl))
-    assert(vd->getFormalAccess() >= AccessLevel::Public);
-  else
-    assert(isa<ExtensionDecl>(decl));
+  assert (isa<ValueDecl>(decl) ||
+          isa<ExtensionDecl>(decl));
 
   // First, look for local attributes.
   llvm::SetVector<Identifier> spiGroups;
@@ -2314,11 +2344,21 @@ bool SourceFile::hasDelayedBodyParsing() const {
   return true;
 }
 
+/// Add a hoisted declaration. See Decl::isHoisted().
+void SourceFile::addHoistedDecl(Decl *d) {
+  assert(d->isHoisted());
+  Hoisted.push_back(d);
+}
+
 ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
                            {}).TopLevelDecls;
+}
+
+ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
+  return Hoisted;
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
@@ -2330,7 +2370,7 @@ bool FileUnit::walk(ASTWalker &walker) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif
-    
+
     if (D->walk(walker))
       return true;
 
@@ -2387,7 +2427,7 @@ StringRef SourceFile::getFilename() const {
 
 ASTScope &SourceFile::getScope() {
   if (!Scope)
-    Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
+    Scope = new (getASTContext()) ASTScope(this);
   return *Scope.get();
 }
 
@@ -2469,7 +2509,7 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
   auto found = ValidatedOpaqueReturnTypes.find(MangledName);
   if (found != ValidatedOpaqueReturnTypes.end())
     return found->second;
-    
+
   // If there are unvalidated decls with opaque types, go through and validate
   // them now.
   (void) getOpaqueReturnTypeDecls();
@@ -2477,7 +2517,7 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
   found = ValidatedOpaqueReturnTypes.find(MangledName);
   if (found != ValidatedOpaqueReturnTypes.end())
     return found->second;
-  
+
   // Otherwise, we don't have a matching opaque decl.
   return nullptr;
 }
@@ -2657,14 +2697,14 @@ const clang::Module* ModuleEntity::getAsClangModule() const {
 // dependency.
 
 struct SourceFileTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const SourceFile *SF = static_cast<const SourceFile *>(Entity);
     OS << llvm::sys::path::filename(SF->getFilename());
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     // SourceFiles don't have SourceLocs of their own; they contain them.
   }
 };

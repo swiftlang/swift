@@ -711,7 +711,8 @@ checkAccessSummary(ApplySite Apply, AccessState &State,
 
     // A valid AccessedStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
-    const AccessedStorage &Storage = identifyCapturedStorage(Argument);
+    auto Storage = AccessedStorage::computeInScope(Argument);
+    assert(Storage && "captured address must have valid storage");
     auto AccessIt = State.Accesses->find(Storage);
 
     // Are there any accesses in progress at the time of the call?
@@ -745,7 +746,8 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
 
     // A valid AccessedStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
-    const AccessedStorage &Storage = identifyCapturedStorage(argOper.get());
+    auto Storage = AccessedStorage::computeInScope(argOper.get());
+    assert(Storage && "captured address must have valid storage");
 
     // Are there any accesses in progress at the time of the call?
     auto AccessIt = State.Accesses->find(Storage);
@@ -754,7 +756,7 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
 
     // The unknown argument access is considered a modify of the root subpath.
     auto argAccess = RecordedAccess(SILAccessKind::Modify, Apply.getLoc(),
-                                    State.ASA->getSubPathTrieRoot());
+                                    Apply.getModule().getIndexTrieRoot());
 
     // Construct a conflicting RecordedAccess if one doesn't already exist.
     const AccessInfo &info = AccessIt->getSecond();
@@ -964,20 +966,20 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 // Check that the given address-type operand is guarded by begin/end access
 // markers.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
-  SILValue address = getAddressAccess(memOper->get());
+  SILValue accessBegin = getAccessScope(memOper->get());
   SILInstruction *memInst = memOper->getUser();
 
-  auto error = [address, memInst]() {
+  auto error = [accessBegin, memInst]() {
     llvm::dbgs() << "Memory access not protected by begin_access:\n";
     memInst->printInContext(llvm::dbgs());
-    llvm::dbgs() << "Accessing: " << address;
+    llvm::dbgs() << "Accessing: " << accessBegin;
     llvm::dbgs() << "In function:\n";
     memInst->getFunction()->print(llvm::dbgs());
     abort();
   };
 
   // Check if this address is guarded by an access.
-  if (auto *BAI = dyn_cast<BeginAccessInst>(address)) {
+  if (auto *BAI = dyn_cast<BeginAccessInst>(accessBegin)) {
     if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
 
@@ -1017,13 +1019,12 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
       return;
   }
 
-  const AccessedStorage &storage = findAccessedStorage(address);
-  // findAccessedStorage may return an invalid storage object if the address
-  // producer is not recognized by its allowlist. For the purpose of
-  // verification, we assume that this can only happen for local
-  // initialization, not a formal memory access. The strength of
-  // verification rests on the completeness of the opcode list inside
-  // findAccessedStorage.
+  auto storage = AccessedStorage::compute(accessBegin);
+  // AccessedStorage::compute may return an invalid storage object if the
+  // address producer is not recognized by its allowlist. For the purpose of
+  // verification, we assume that this can only happen for local initialization,
+  // not a formal memory access. The strength of verification rests on the
+  // completeness of the opcode list inside AccessedStorage::compute.
   //
   // For the purpose of verification, an unidentified access is
   // unenforced. These occur in cases like global addressors and local buffers

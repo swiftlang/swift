@@ -103,6 +103,10 @@ DisableObjCInterop("disable-objc-interop",
                    llvm::cl::desc("Disable Objective-C interoperability."));
 
 static llvm::cl::opt<bool>
+EnableExperimentalConcurrency("enable-experimental-concurrency",
+                   llvm::cl::desc("Enable experimental concurrency model."));
+
+static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
@@ -202,10 +206,9 @@ static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<bool>
-EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
-                    llvm::cl::init(false),
-                    llvm::cl::desc("Sort Functions, VTables, Globals, "
-                                   "WitnessTables by name to ease diffing."));
+    EmitSortedSIL("emit-sorted-sil", llvm::cl::Hidden, llvm::cl::init(false),
+                  llvm::cl::desc("Sort Functions, VTables, Globals, "
+                                 "WitnessTables by name to ease diffing."));
 
 static llvm::cl::opt<bool>
 DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
@@ -277,6 +280,11 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+    IgnoreAlwaysInline("ignore-always-inline",
+                       llvm::cl::desc("Ignore [always_inline] attribute."),
+                       llvm::cl::init(false));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   auto &opts = Module->getOptions();
@@ -298,6 +306,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE  "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
@@ -336,9 +345,14 @@ int main(int argc, char **argv) {
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
+  Invocation.getLangOptions().DisableParserLookup = true;
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+  
+  Invocation.getLangOptions().EnableExperimentalConcurrency =
+    EnableExperimentalConcurrency;
+
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
     DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();
@@ -403,8 +417,11 @@ int main(int argc, char **argv) {
       break;
     }
   }
+  SILOpts.EmitVerboseSIL |= EmitVerboseSIL;
+  SILOpts.EmitSortedSIL |= EmitSortedSIL;
 
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
+  SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -531,7 +548,7 @@ int main(int argc, char **argv) {
                                    StringRef(OutputFilename) : "-";
     auto SILOpts = SILOptions();
     SILOpts.EmitVerboseSIL = EmitVerboseSIL;
-    SILOpts.EmitSortedSIL = EnableSILSortOutput;
+    SILOpts.EmitSortedSIL = EmitSortedSIL;
     if (OutputFile == "-") {
       SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {

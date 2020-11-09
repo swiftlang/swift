@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// XFAIL: OS=openbsd
 
 import StdlibUnittest
 

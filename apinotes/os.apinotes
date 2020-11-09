@@ -63,5 +63,5 @@ Functions:
   SwiftPrivate: true
   NullabilityOfRet: O
 - Name: _os_signpost_emit_with_name_impl
-  Availability: nonswift
-  AvailabilityMsg: 'Use os_signpost'
+  SwiftPrivate: true
+  NullabilityOfRet: O

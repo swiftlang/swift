@@ -1623,6 +1623,13 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
       if (auto ai = dyn_cast<ApplyInst>(&i)) {
         if (EA->canOptimizeArrayUninitializedCall(ai).isValid())
           continue;
+        // Ignore checking CGNode mapping for result of apply to a no return
+        // function that will have a null ReturnNode
+        if (auto *callee = ai->getReferencedFunctionOrNull()) {
+          if (EA->getFunctionInfo(callee)->isValid())
+            if (!EA->getConnectionGraph(callee)->getReturnNodeOrNull())
+              continue;
+        }
       }
       for (auto result : i.getResults()) {
         if (EA->getPointerBase(result))
@@ -1864,11 +1871,11 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
   // uses must be mapped to ConnectionGraph nodes by the client of this API.
   for (Operand *use : getNonDebugUses(ai)) {
     if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser())) {
-      if (tei->getFieldNo() == 0 && !call.arrayStruct) {
+      if (tei->getFieldIndex() == 0 && !call.arrayStruct) {
         call.arrayStruct = tei;
         continue;
       }
-      if (tei->getFieldNo() == 1 && !call.arrayElementPtr) {
+      if (tei->getFieldIndex() == 1 && !call.arrayElementPtr) {
         call.arrayElementPtr = tei;
         continue;
       }
@@ -1936,6 +1943,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       !isa<BeginApplyInst>(I)) {
     ArraySemanticsCall ASC(FAS.getInstruction());
     switch (ASC.getKind()) {
+      // TODO: Model ReserveCapacityForAppend, AppendContentsOf, AppendElement.
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
       case ArrayCallKind::kCheckSubscript:
       case ArrayCallKind::kCheckIndex:
@@ -2015,36 +2023,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       default:
         break;
       }
-
-    if (FAS.getReferencedFunctionOrNull() &&
-        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
-            "self_no_escaping_closure") &&
-        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3) ||
-         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2)) &&
-        FAS.hasSelfArgument()) {
-      // The programmer has guaranteed that the closure will not capture the
-      // self pointer passed to it or anything that is transitively reachable
-      // from the pointer.
-      auto Args = FAS.getArgumentsWithoutIndirectResults();
-      // The first not indirect result argument is the closure.
-      ConGraph->setEscapesGlobal(Args[0]);
-      return;
-    }
-
-    if (FAS.getReferencedFunctionOrNull() &&
-        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
-            "pair_no_escaping_closure") &&
-        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4) ||
-         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)) &&
-        FAS.hasSelfArgument()) {
-      // The programmer has guaranteed that the closure will not capture the
-      // self pointer passed to it or anything that is transitively reachable
-      // from the pointer.
-      auto Args = FAS.getArgumentsWithoutIndirectResults();
-      // The second not indirect result argument is the closure.
-      ConGraph->setEscapesGlobal(Args[1]);
-      return;
-    }
 
     if (RecursionDepth < MaxRecursionDepth) {
       CalleeList Callees = BCA->getCalleeList(FAS);

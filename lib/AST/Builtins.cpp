@@ -168,16 +168,10 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   auto *paramList = ParameterList::create(Context, params);
   
   DeclName Name(Context, Id, paramList);
-  auto FD = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
-                             StaticSpellingKind::None,
-                             /*FuncLoc=*/SourceLoc(),
-                             Name, /*NameLoc=*/SourceLoc(),
-                             /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
-                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                             /*GenericParams=*/nullptr,
-                             paramList,
-                             TypeLoc::withoutLoc(ResType), DC);
-  FD->setImplicit();
+  auto *const FD = FuncDecl::createImplicit(
+      Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false, /*Throws=*/false,
+      /*GenericParams=*/nullptr, paramList, ResType, DC);
   FD->setAccess(AccessLevel::Public);
   return FD;
 }
@@ -214,17 +208,11 @@ getBuiltinGenericFunction(Identifier Id,
   auto *paramList = ParameterList::create(Context, params);
 
   DeclName Name(Context, Id, paramList);
-  auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
-                               StaticSpellingKind::None,
-                               /*FuncLoc=*/SourceLoc(),
-                               Name, /*NameLoc=*/SourceLoc(),
-                               /*Async-*/false, /*AsyncLoc=*/SourceLoc(),
-                               /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
-                               GenericParams,
-                               paramList,
-                               TypeLoc::withoutLoc(ResType), DC);
+  auto *const func = FuncDecl::createImplicit(
+      Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/Rethrows, GenericParams, paramList, ResType, DC);
 
-  func->setImplicit();
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
   if (Rethrows)
@@ -1353,6 +1341,15 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   return builder.build(id);
 }
 
+static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
+}
+
+static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -1552,19 +1549,25 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
+  SmallVector<AnyFunctionType::Param, 1> CFuncParams;
+  swift::CanType ContextTy;
+  if (withContext) {
+    ContextTy = Context.TheRawPointerType;
+    auto ContextArg = FunctionType::Param(ContextTy);
+    CFuncParams.push_back(ContextArg);
+  }
+  auto Rep = FunctionTypeRepresentation::CFunctionPointer;
+  auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =
       FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::CFunctionPointer,
                                    /*throws*/ false)
+          .withClangFunctionType(ClangType)
           .build();
-  if (withContext) {
-    auto ContextTy = Context.TheRawPointerType;
-    auto ContextArg = FunctionType::Param(ContextTy);
-    auto BlockTy = FunctionType::get({ContextArg}, VoidTy, Thin);
-    return getBuiltinFunction(Id, {HandleTy, BlockTy, ContextTy}, VoidTy);
-  } else {
-    auto BlockTy = FunctionType::get({}, VoidTy, Thin);
-    return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
-  }
+  auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
+  SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
+  if (withContext)
+    ArgTypes.push_back(ContextTy);
+  return getBuiltinFunction(Id, ArgTypes, VoidTy);
 }
 
 static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
@@ -1759,12 +1762,12 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
+  case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
   case IITDescriptor::HalfVecArgument:
-  case IITDescriptor::ScalableVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecElementArgument:
@@ -1793,7 +1796,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width);
+    return makeVector(eltType, D.Vector_Width.Min);
   }
 
   // A pointer to an immediate type.
@@ -2472,6 +2475,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ConvertUnownedUnsafeToGuaranteed:
     return getConvertUnownedUnsafeToGuaranteed(Context, Id);
+
+  case BuiltinValueKind::GetCurrentAsyncTask:
+    return getGetCurrentAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CancelAsyncTask:
+    return getCancelAsyncTask(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

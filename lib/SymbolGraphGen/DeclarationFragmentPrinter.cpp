@@ -138,7 +138,15 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
   openFragment(FragmentKind::TypeIdentifier);
   printText(Name.str());
   USR.clear();
-  if (Name.str() != "Self") {
+
+  auto ShouldLink = Name.str() != "Self";
+  if (const auto *TD = T->getAnyNominal()) {
+    if (SG->isImplicitlyPrivate(TD)) {
+      ShouldLink = false;
+    }
+  }
+
+  if (ShouldLink) {
     llvm::raw_svector_ostream OS(USR);
     ide::printDeclUSR(RefTo, OS);
   }

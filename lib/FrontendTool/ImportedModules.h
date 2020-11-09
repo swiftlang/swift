@@ -20,8 +20,7 @@ class FrontendOptions;
 class ModuleDecl;
 
 /// Emit the names of the modules imported by \c mainModule.
-bool emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
-                         const FrontendOptions &opts);
+bool emitImportedModules(ModuleDecl *mainModule, const FrontendOptions &opts);
 } // end namespace swift
 
 #endif

@@ -17,6 +17,7 @@
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "llvm/ADT/None.h"
 
@@ -35,37 +36,31 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether to allow unspecified types within a pattern.
   AllowUnspecifiedTypes = 1 << 0,
 
-  /// Whether an unavailable protocol can be referenced.
-  AllowUnavailableProtocol = 1 << 1,
-
-  /// Whether we should allow references to unavailable types.
-  AllowUnavailable = 1 << 2,
-
   /// Whether the given type can override the type of a typed pattern.
-  OverrideType = 1 << 3,
+  OverrideType = 1 << 1,
 
   /// Whether we are validating the type for SIL.
   // FIXME: Move this flag to TypeResolverContext.
-  SILType = 1 << 4,
+  SILType = 1 << 2,
 
   /// Whether we are parsing a SIL file.  Not the same as SILType,
   /// because the latter is not set if we're parsing an AST type.
-  SILMode = 1 << 5,
+  SILMode = 1 << 3,
 
   /// Whether this is a resolution based on a non-inferred type pattern.
-  FromNonInferredPattern = 1 << 6,
-
-  /// Whether this type resolution is guaranteed not to affect downstream files.
-  KnownNonCascadingDependency = 1 << 7,
+  FromNonInferredPattern = 1 << 4,
 
   /// Whether we are at the direct base of a type expression.
-  Direct = 1 << 8,
+  Direct = 1 << 5,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 9,
+  SilenceErrors = 1 << 6,
 
   /// Whether to allow module declaration types.
-  AllowModule = 1 << 10
+  AllowModule = 1 << 7,
+
+  /// Make internal @usableFromInline and @inlinable decls visible.
+  AllowUsableFromInline = 1 << 8,
 };
 
 /// Type resolution contexts that require special handling.
@@ -371,9 +366,11 @@ public:
   /// to create a well-formed type.
   ///
   /// \param TyR The type representation to check.
+  /// \param silParams Used to look up generic parameters in SIL mode.
   ///
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR) const;
+  Type resolveType(TypeRepr *TyR,
+                   GenericParamList *silParams=nullptr) const;
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).
   bool usesArchetypes() const;

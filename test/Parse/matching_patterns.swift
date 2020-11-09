@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import
+// RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import -disable-parser-lookup
 
 import imported_enums
 
@@ -47,7 +47,7 @@ case 1 + (_): // expected-error{{'_' can only appear in a pattern or on the left
 }
 
 switch (x,x) {
-case (var a, var a): // expected-error {{definition conflicts with previous value}} expected-note {{previous definition of 'a' is here}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, var a): // expected-error {{invalid redeclaration of 'a'}} expected-note {{'a' previously declared here}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   fallthrough
 case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()

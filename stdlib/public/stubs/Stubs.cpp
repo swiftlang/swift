@@ -378,6 +378,28 @@ T _swift_strto(const char *nptr, char **endptr) {
   return ParsedValue;
 }
 
+#if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
+#define NEED_SWIFT_STRTOD_L
+#define strtod_l swift_strtod_l
+#define NEED_SWIFT_STRTOF_L
+#define strtof_l swift_strtof_l
+#define NEED_SWIFT_STRTOLD_L
+#define strtold_l swift_strtold_l
+#elif defined(__ANDROID__)
+#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
+#define NEED_SWIFT_STRTOLD_L
+#define strtold_l swift_strtold_l
+#endif
+
+#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
+#define NEED_SWIFT_STRTOD_L
+#define strtod_l swift_strtod_l
+#define NEED_SWIFT_STRTOF_L
+#define strtof_l swift_strtof_l
+#endif
+#endif
+
+#if defined(NEED_SWIFT_STRTOD_L)
 static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
   return _strtod_l(nptr, endptr, getCLocale());
@@ -387,7 +409,9 @@ static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
   return strtod(nptr, endptr);
 #endif
 }
+#endif
 
+#if defined(NEED_SWIFT_STRTOF_L)
 static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #if defined(_WIN32)
   return _strtof_l(nptr, endptr, getCLocale());
@@ -397,7 +421,9 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
   return strtof(nptr, endptr);
 #endif
 }
+#endif
 
+#if defined(NEED_SWIFT_STRTOLD_L)
 static long double swift_strtold_l(const char *nptr, char **endptr,
                                    locale_t loc) {
 #if defined(_WIN32)
@@ -410,21 +436,11 @@ static long double swift_strtold_l(const char *nptr, char **endptr,
   return strtold(nptr, endptr);
 #endif
 }
-
-#if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
-#define strtod_l swift_strtod_l
-#define strtof_l swift_strtof_l
-#define strtold_l swift_strtold_l
-#elif defined(__ANDROID__)
-#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
-#define strtold_l swift_strtold_l
 #endif
 
-#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
-#define strtod_l swift_strtod_l
-#define strtof_l swift_strtof_l
-#endif
-#endif
+#undef NEED_SWIFT_STRTOD_L
+#undef NEED_SWIFT_STRTOF_L
+#undef NEED_SWIFT_STRTOLD_L
 
 static inline void _swift_set_errno(int to) {
 #if defined(_WIN32)
@@ -452,10 +468,6 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   _swift_set_errno(0);
   const auto result = posixImpl(nptr, &EndPtr, getCLocale());
   *outResult = result;
-  if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
-      if (errno == ERANGE)
-          EndPtr = nullptr;
-  }
   return EndPtr;
 }
     
@@ -510,5 +522,9 @@ int _swift_stdlib_putc_stderr(int C) {
 }
 
 size_t _swift_stdlib_getHardwareConcurrency() {
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  return 1;
+#else
   return std::thread::hardware_concurrency();
+#endif
 }

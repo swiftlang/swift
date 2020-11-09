@@ -538,15 +538,17 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::GlobalConfiguration:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
-    if (Opts.OptimizeForIde.hasValue())
-      sourcekitd_request_dictionary_set_int64(
-          Req, KeyOptimizeForIDE,
-          static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
-    if (Opts.CompletionCheckDependencyInterval.hasValue())
-      sourcekitd_request_dictionary_set_int64(
-          Req, KeyCompletionCheckDependencyInterval,
-          static_cast<int64_t>(
-              Opts.CompletionCheckDependencyInterval.getValue()));
+
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      std::string KeyStr("key.");
+      KeyStr.append(KeyValue.first.str());
+      sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
+
+      int64_t Value = 0;
+      KeyValue.second.getAsInteger(0, Value);
+      sourcekitd_request_dictionary_set_int64(Req, Key, Value);
+    }
     break;
 
   case SourceKitRequest::ProtocolVersion:

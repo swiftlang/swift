@@ -79,7 +79,6 @@ enum mixed_redecl3 {} // expected-error {{invalid redeclaration}}
 // expected-note @-1 2{{found this candidate}}
 enum mixed_redecl3a : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 // expected-error@-1 {{an enum with no cases cannot declare a raw type}}
-// expected-error@-2 {{raw type}}
 class mixed_redecl3b : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 
 class mixed_redecl4 {} // expected-note {{previously declared here}}

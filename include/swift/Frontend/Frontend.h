@@ -30,7 +30,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -288,16 +287,6 @@ public:
     return FrontendOpts.ParseStdlib;
   }
 
-  void setInputKind(InputFileKind K) {
-    FrontendOpts.InputKind = K;
-  }
-
-  InputFileKind getInputKind() const {
-    return FrontendOpts.InputKind;
-  }
-
-  SourceFileKind getSourceFileKind() const;
-
   void setModuleName(StringRef Name) {
     FrontendOpts.ModuleName = Name.str();
     IRGenOpts.ModuleName = Name.str();
@@ -329,11 +318,6 @@ public:
     return CodeCompletionOffset != ~0U;
   }
 
-  /// Called from lldb, see rdar://53971116
-  void disableASTScopeLookup() {
-    LangOpts.EnableASTScopeLookup = false;
-  }
-
   /// Retrieve a module hash string that is suitable for uniquely
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
@@ -341,7 +325,7 @@ public:
 
   /// Retrieve the stdlib kind to implicitly import.
   ImplicitStdlibKind getImplicitStdlibKind() const {
-    if (getInputKind() == InputFileKind::SIL) {
+    if (FrontendOpts.InputMode == FrontendOptions::ParseInputMode::SIL) {
       return ImplicitStdlibKind::None;
     }
     if (getParseStdlib()) {
@@ -353,6 +337,10 @@ public:
   /// Whether the Swift -Onone support library should be implicitly imported.
   bool shouldImportSwiftONoneSupport() const;
 
+  /// Whether the Swift Concurrency support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftConcurrency() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
@@ -360,9 +348,6 @@ public:
   setUpInputForSILTool(StringRef inputFilename, StringRef moduleNameArg,
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
-  bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
-  }
 
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForAtMostOnePrimary() const;
@@ -448,9 +433,6 @@ class CompilerInstance {
   /// corresponding partial serialized module documentation files. This is
   /// \c mutable as it is consumed by \c loadPartialModulesAndImplicitImports.
   mutable std::vector<ModuleBuffers> PartialModules;
-
-  enum : unsigned { NO_SUCH_BUFFER = ~0U };
-  unsigned MainBufferID = NO_SUCH_BUFFER;
 
   /// Identifies the set of input buffers in the SourceManager that are
   /// considered primaries.
@@ -571,23 +553,12 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
-  bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::Swift;
-  }
-  bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::SIL;
-  }
-
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDiagnosticVerifierIfNeeded();
   void setupDependencyTrackerIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
-
-  /// Set up all state in the CompilerInstance to process the given input file.
-  /// Return true on error.
-  bool setUpForInput(const InputFile &input);
 
   /// Find a buffer for a given input file and ensure it is recorded in
   /// SourceMgr, PartialModules, or InputSourceCodeBufferIDs as appropriate.
@@ -621,7 +592,7 @@ public:
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.
-  void performParseAndResolveImportsOnly();
+  bool performParseAndResolveImportsOnly();
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.
@@ -632,12 +603,14 @@ private:
   /// Creates a new source file for the main module.
   SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
                                             SourceFileKind FileKind,
-                                            Optional<unsigned> BufferID) const;
+                                            Optional<unsigned> BufferID,
+                                            bool isMainBuffer = false) const;
 
   /// Creates all the files to be added to the main module, appending them to
   /// \p files. If a loading error occurs, returns \c true.
   bool createFilesForMainModule(ModuleDecl *mod,
                                 SmallVectorImpl<FileUnit *> &files) const;
+  SourceFile *computeMainSourceFileForModule(ModuleDecl *mod) const;
 
 public:
   void freeASTContext();

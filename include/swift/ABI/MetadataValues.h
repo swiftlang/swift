@@ -20,10 +20,10 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/ABI/KeyPath.h"
+#include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
-#include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -410,20 +410,6 @@ enum class SpecialProtocol: uint8_t {
   Error = 1,
 };
 
-/// Identifiers for protocol method dispatch strategies.
-enum class ProtocolDispatchStrategy: uint8_t {
-  /// Uses ObjC method dispatch.
-  ///
-  /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
-  ObjC = 0,
-  
-  /// Uses Swift protocol witness table dispatch.
-  ///
-  /// To invoke methods of this protocol, a pointer to a protocol witness table
-  /// corresponding to the protocol conformance must be available.
-  Swift = 1,
-};
-
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;
@@ -486,18 +472,7 @@ public:
   
   /// Does the protocol require a witness table for method dispatch?
   bool needsWitnessTable() const {
-    return needsWitnessTable(getDispatchStrategy());
-  }
-  
-  static bool needsWitnessTable(ProtocolDispatchStrategy strategy) {
-    switch (strategy) {
-    case ProtocolDispatchStrategy::ObjC:
-      return false;
-    case ProtocolDispatchStrategy::Swift:
-      return true;
-    }
-
-    swift_runtime_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
+    return swift::protocolRequiresWitnessTable(getDispatchStrategy());
   }
   
   /// Return the identifier if this is a special runtime-known protocol.
@@ -1177,6 +1152,19 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
+
+  /// Actor enqueue(partialTask:).
+  const uint16_t ActorEnqueuePartialTask = 0x8f3d;
+
+  /// Jobs, tasks, and continuations.
+  const uint16_t JobInvokeFunction = 0xcc64; // = 52324
+  const uint16_t TaskResumeFunction = 0x2c42; // = 11330
+  const uint16_t TaskResumeContext = 0x753a; // = 30010
+  const uint16_t AsyncContextParent = 0xbda2; // = 48546
+  const uint16_t AsyncContextResume = 0xd707; // = 55047
+  const uint16_t AsyncContextYield = 0xe207; // = 57863
+  const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
+  const uint16_t EscalationNotificationFunction = 0x5be4; // = 23524
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1326,6 +1314,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
+    /// Set if the type descriptor has a pointer to a list of canonical 
+    /// prespecializations.
+    HasCanonicalMetadataPrespecializations = 3,
+
     // Type-specific flags:
 
     /// The kind of reference that this class makes to its resilient superclass
@@ -1392,6 +1384,8 @@ public:
   }
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
@@ -1881,6 +1875,163 @@ public:
   static IntegerLiteralFlags getFromOpaqueValue(size_t value) {
     return IntegerLiteralFlags(value);
   }
+};
+
+/// Kinds of schedulable job.s
+enum class JobKind : size_t {
+  // There are 256 possible job kinds.
+
+  /// An AsyncTask.
+  Task = 0,
+
+  /// Job kinds >= 192 are private to the implementation.
+  First_Reserved = 192
+};
+
+/// The priority of a job.  Higher priorities are larger values.
+enum class JobPriority : size_t {
+  // This is modelled off of Dispatch.QoS, and the values are directly
+  // stolen from there.
+  UserInteractive = 0x21,
+  UserInitiated   = 0x19,
+  Default         = 0x15,
+  Utility         = 0x11,
+  Background      = 0x09,
+  Unspecified     = 0x00,
+};
+
+/// Flags for schedulable jobs.
+class JobFlags : public FlagSet<size_t> {
+public:
+  enum {
+    Kind           = 0,
+    Kind_width     = 8,
+
+    Priority       = 8,
+    Priority_width = 8,
+
+    // 8 bits reserved for more generic job flags.
+
+    // Kind-specific flags.
+
+    Task_IsChildTask  = 24,
+    Task_IsFuture     = 25
+  };
+
+  explicit JobFlags(size_t bits) : FlagSet(bits) {}
+  JobFlags(JobKind kind) { setKind(kind); }
+  constexpr JobFlags() {}
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, JobKind,
+                                 getKind, setKind)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Priority, Priority_width, JobPriority,
+                                 getPriority, setPriority)
+
+  bool isAsyncTask() const {
+    return getKind() == JobKind::Task;
+  }
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
+                                task_isChildTask,
+                                task_setIsChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsFuture,
+                                task_isFuture,
+                                task_setIsFuture)
+
+};
+
+/// Kinds of task status record.
+enum class TaskStatusRecordKind : uint8_t {
+  /// A DeadlineStatusRecord, which represents an active deadline.
+  Deadline = 0,
+
+  /// A ChildTaskStatusRecord, which represents the potential for
+  /// active child tasks.
+  ChildTask = 1,
+
+  /// A CancellationNotificationStatusRecord, which represents the
+  /// need to call a custom function when the task is cancelled.
+  CancellationNotification = 2,
+
+  /// An EscalationNotificationStatusRecord, which represents the
+  /// need to call a custom function when the task's priority is
+  /// escalated.
+  EscalationNotification = 3,
+
+  // Kinds >= 192 are private to the implementation.
+  First_Reserved = 192,
+  Private_RecordLock = 192
+};
+
+/// Flags for cancellation records.
+class TaskStatusRecordFlags : public FlagSet<size_t> {
+public:
+  enum {
+    Kind           = 0,
+    Kind_width     = 8,
+  };
+
+  explicit TaskStatusRecordFlags(size_t bits) : FlagSet(bits) {}
+  constexpr TaskStatusRecordFlags() {}
+  TaskStatusRecordFlags(TaskStatusRecordKind kind) {
+    setKind(kind);
+  }
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, TaskStatusRecordKind,
+                                 getKind, setKind)
+};
+
+/// Kinds of async context.
+enum class AsyncContextKind {
+  /// An ordinary asynchronous function.
+  Ordinary         = 0,
+
+  /// A context which can yield to its caller.
+  Yielding         = 1,
+
+  // Other kinds are reserved for interesting special
+  // intermediate contexts.
+
+  // Kinds >= 192 are private to the implementation.
+  First_Reserved = 192
+};
+
+/// Flags for async contexts.
+class AsyncContextFlags : public FlagSet<uint32_t> {
+public:
+  enum {
+    Kind                = 0,
+    Kind_width          = 8,
+
+    CanThrow            = 8,
+    ShouldNotDeallocate = 9
+  };
+
+  explicit AsyncContextFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr AsyncContextFlags() {}
+  AsyncContextFlags(AsyncContextKind kind) {
+    setKind(kind);
+  }
+
+  /// The kind of context this represents.
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, AsyncContextKind,
+                                 getKind, setKind)
+
+  /// Whether this context is permitted to throw.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
+
+  /// Whether a function should avoid deallocating its context before
+  /// returning.  It should still pass its caller's context to its
+  /// return continuation.
+  ///
+  /// This flag can be set in the caller to optimize context allocation,
+  /// e.g. if the callee's context size is known statically and simply
+  /// allocated as part of the caller's context, or if the callee will
+  /// be called multiple times.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldNotDeallocate,
+                                shouldNotDeallocateInCallee,
+                                setShouldNotDeallocateInCallee)
 };
 
 } // end namespace swift

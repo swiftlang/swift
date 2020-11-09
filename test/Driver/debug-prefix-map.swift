@@ -3,7 +3,7 @@
 // RUN: %target-swiftc_driver -### -debug-prefix-map old=n=ew %s 2>&1 | %FileCheck %s -check-prefix CHECK-COMPLEX
 // RUN: %target-swiftc_driver -### -debug-prefix-map old= %s 2>&1 | %FileCheck %s -check-prefix CHECK-EMPTY
 
-// CHECK-INVALID: error: invalid argument 'old' to -debug-prefix-map
+// CHECK-INVALID: error: values for '-debug-prefix-map' must be in the format 'original=remapped', but 'old' was provided
 // CHECK-SIMPLE: debug-prefix-map old=new
 // CHECK-COMPLEX: debug-prefix-map old=n=ew
 // CHECK-EMPTY: debug-prefix-map old=

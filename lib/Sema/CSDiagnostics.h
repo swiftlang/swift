@@ -16,9 +16,7 @@
 #ifndef SWIFT_SEMA_CSDIAGNOSTICS_H
 #define SWIFT_SEMA_CSDIAGNOSTICS_H
 
-#include "Constraint.h"
-#include "ConstraintSystem.h"
-#include "OverloadChoice.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
@@ -28,6 +26,8 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <tuple>
 
@@ -94,20 +94,26 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    if (!rawType->hasTypeVariable()) {
-      if (reconstituteSugar)
-        rawType = rawType->reconstituteSugar(/*recursive*/ true);
-      return wantRValue ? rawType->getRValueType() : rawType;
+    auto &cs = getConstraintSystem();
+
+    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+      rawType = rawType.transform([&](Type type) {
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
+          auto resolvedType = S.simplifyType(typeVar);
+          Type GP = typeVar->getImpl().getGenericParameter();
+          return resolvedType->is<UnresolvedType>() && GP
+                     ? GP
+                     : resolvedType;
+        }
+
+        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
+                              : type;
+      });
     }
 
-    auto &cs = getConstraintSystem();
-    return cs.simplifyTypeImpl(rawType, [&](TypeVariableType *typeVar) -> Type {
-      auto fixed = S.simplifyType(typeVar);
-      auto *genericParam = typeVar->getImpl().getGenericParameter();
-      if (fixed->isHole() && genericParam)
-        return genericParam;
-      return resolveType(fixed, reconstituteSugar, wantRValue);
-    });
+    if (reconstituteSugar)
+      rawType = rawType->reconstituteSugar(/*recursive*/ true);
+    return wantRValue ? rawType->getRValueType() : rawType;
   }
 
   template <typename... ArgTypes>
@@ -968,20 +974,20 @@ public:
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {
   VarDecl *Property;
-  bool UsingStorageWrapper;
+  bool UsingProjection;
 
 public:
   PropertyWrapperReferenceFailure(const Solution &solution, VarDecl *property,
-                                  bool usingStorageWrapper, Type base,
+                                  bool usingProjection, Type base,
                                   Type wrapper, ConstraintLocator *locator)
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
-        UsingStorageWrapper(usingStorageWrapper) {}
+        UsingProjection(usingProjection) {}
 
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
 
-  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+  bool usingProjection() const { return UsingProjection; }
 
   ValueDecl *getReferencedMember() const {
     auto *locator = getLocator();
@@ -1265,13 +1271,11 @@ public:
 };
 
 class MissingArgumentsFailure final : public FailureDiagnostic {
-  using SynthesizedParam = std::pair<unsigned, AnyFunctionType::Param>;
-
-  SmallVector<SynthesizedParam, 4> SynthesizedArgs;
+  SmallVector<SynthesizedArg, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(const Solution &solution,
-                          ArrayRef<SynthesizedParam> synthesizedArgs,
+                          ArrayRef<SynthesizedArg> synthesizedArgs,
                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
         SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
@@ -1692,8 +1696,6 @@ protected:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
-
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
 public:
@@ -1716,13 +1718,13 @@ public:
 
   bool diagnoseAsError() override;
 
-  bool diagnoseForAnchor(Anchor anchor,
+  bool diagnoseForAnchor(ASTNode anchor,
                          ArrayRef<GenericTypeParamType *> params) const;
 
-  bool diagnoseParameter(Anchor anchor, GenericTypeParamType *GP) const;
+  bool diagnoseParameter(ASTNode anchor, GenericTypeParamType *GP) const;
 
 private:
-  void emitGenericSignatureNote(Anchor anchor) const;
+  void emitGenericSignatureNote(ASTNode anchor) const;
 
   /// Retrieve representative locations for associated generic prameters.
   ///
@@ -1731,7 +1733,7 @@ private:
       llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
 };
 
-class SkipUnhandledConstructInFunctionBuilderFailure final
+class SkipUnhandledConstructInResultBuilderFailure final
     : public FailureDiagnostic {
 public:
   using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
@@ -1742,7 +1744,7 @@ public:
   void diagnosePrimary(bool asNote);
 
 public:
-  SkipUnhandledConstructInFunctionBuilderFailure(const Solution &solution,
+  SkipUnhandledConstructInResultBuilderFailure(const Solution &solution,
                                                  UnhandledNode unhandled,
                                                  NominalTypeDecl *builder,
                                                  ConstraintLocator *locator)
@@ -2013,7 +2015,7 @@ public:
                                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), MemberName(member) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferClosureParameterType final : public FailureDiagnostic {
@@ -2022,7 +2024,7 @@ public:
                                     ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferClosureReturnType final : public FailureDiagnostic {
@@ -2031,7 +2033,7 @@ public:
                                  ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 class UnableToInferProtocolLiteralType final : public FailureDiagnostic {
@@ -2065,7 +2067,7 @@ public:
                                       ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  bool diagnoseAsError() override;
 };
 
 /// Emits a warning about an attempt to use the 'as' operator as the 'as!'
@@ -2246,6 +2248,52 @@ public:
 private:
   void fixIt(InFlightDiagnostic &diagnostic,
              const FunctionArgApplyInfo &info) const;
+};
+
+/// Diagnose situations where we have a key path with no components.
+///
+/// \code
+/// let _ : KeyPath<A, B> = \A
+/// \endcode
+class InvalidEmptyKeyPathFailure final : public FailureDiagnostic {
+public:
+  InvalidEmptyKeyPathFailure(const Solution &solution,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where there is no context to determine a
+/// type of `nil` literal e.g.
+///
+/// \code
+/// let _ = nil
+/// let _ = try nil
+/// let _ = nil!
+/// \endcode
+class MissingContextualTypeForNil final : public FailureDiagnostic {
+public:
+  MissingContextualTypeForNil(const Solution &solution,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnostic situations where AST node references an invalid declaration.
+///
+/// \code
+/// let foo = doesntExist // or something invalid
+/// foo(42)
+/// \endcode
+class ReferenceToInvalidDeclaration final : public FailureDiagnostic {
+public:
+  ReferenceToInvalidDeclaration(const Solution &solution,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

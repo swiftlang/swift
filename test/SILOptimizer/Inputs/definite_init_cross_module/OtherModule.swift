@@ -41,3 +41,14 @@ public struct Empty {
 public struct GenericEmpty<T> {
   public init() {}
 }
+
+open class VisibleNoArgsDesignatedInit {
+  var x: Float
+  public init() { x = 0.0 }
+
+  // Add some designated inits the subclass cannot see.
+  private init(x: Float) { self.x = x }
+  fileprivate init(y: Float) { self.x = y }
+  internal init(z: Float) { self.x = z }
+}
+

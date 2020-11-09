@@ -78,7 +78,7 @@ struct ExtractInactiveRanges : public ASTWalker {
     ranges.push_back(charRange);
   }
 
-  bool walkToDeclPre(Decl *d) {
+  bool walkToDeclPre(Decl *d) override {
     auto icd = dyn_cast<IfConfigDecl>(d);
     if (!icd) return true;
 

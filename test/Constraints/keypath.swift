@@ -179,3 +179,11 @@ func key_path_root_mismatch<T>(_ base: KeyPathBase?, subBase: KeyPathBaseSubtype
   let _ : T = subBase[keyPath: kpa] // expected-error {{key path with root type 'AnotherBase' cannot be applied to a base of type 'KeyPathBaseSubtype?'}}
 
 }
+
+// SR-13442
+func SR13442<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
+
+func testSR13442() {
+  _ = SR13442(\.!.count) // OK
+  _ = SR13442(\String?.!.count) // OK
+}

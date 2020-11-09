@@ -166,7 +166,7 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
       SegmentData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
                          /*KeepEmpty=*/false);
       for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag);
+        LinkerFlags.push_back(Flag.str());
     }
   }
   return false;

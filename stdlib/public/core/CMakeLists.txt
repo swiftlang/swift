@@ -211,6 +211,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   DiscontiguousSlice.swift
   Diffing.swift
+  FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
@@ -273,7 +274,7 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL FREEBSD)
     ${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${SWIFT_PRIMARY_VARIANT_ARCH}.a)
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
   if(SWIFT_BUILD_STATIC_STDLIB)
-    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
+    list(APPEND swift_core_private_link_libraries)
   endif()
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp)
@@ -283,12 +284,10 @@ option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
 
-if(SWIFT_STDLIB_SIL_DEBUGGING)
-  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
+  list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 endif()
-
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
-list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()

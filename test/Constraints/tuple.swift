@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-parser-lookup
 
 // Test various tuple constraints.
 
@@ -305,6 +305,8 @@ if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{
 // expected-warning@-1 {{'if' condition is always true}}
 
 enum BishBash { case bar(foo: Int, foo: String) }
+// expected-error@-1 {{invalid redeclaration of 'foo'}}
+// expected-note@-2 {{'foo' previously declared here}}
 let enumLabelDup: BishBash = .bar(foo: 0, foo: "") // expected-error {{cannot create a tuple with a duplicate element label}}
 
 func dupLabelClosure(_ fn: () -> Void) {}

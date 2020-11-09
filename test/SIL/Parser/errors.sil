@@ -56,3 +56,11 @@ sil @test_formal_substituted_type : $@convention(thin) <X> (@owned Array<@substi
 entry(%0 : $Array<X>):
   return undef : $()
 }
+
+sil @instructions_after_terminator : $@convention(thin) () -> () {
+bb0:
+  unreachable
+  %0 = tuple () // expected-error {{expected basic block name or '}'}}
+  return %0 : $()
+}
+

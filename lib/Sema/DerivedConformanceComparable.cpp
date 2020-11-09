@@ -144,9 +144,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -255,17 +254,11 @@ deriveComparable_lt(
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto comparableDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Async*/ false, SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  comparableDecl->setImplicit();
+  auto *const comparableDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   comparableDecl->setUserAccessible(false);
 
   // Add the @_implements(Comparable, < (_:_:)) attribute

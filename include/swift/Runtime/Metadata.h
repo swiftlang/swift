@@ -19,6 +19,7 @@
 
 #include "swift/ABI/Metadata.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Runtime/Once.h"
 
 namespace swift {
 
@@ -339,6 +340,31 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) MetadataResponse
     swift_getCanonicalSpecializedMetadata(MetadataRequest request,
                                           const Metadata *candidate,
                                           const Metadata **cache);
+
+/// Fetch a uniqued metadata object for the generic nominal type described by
+/// the provided description and arguments, adding the canonical
+/// prespecializations attached to the type descriptor to the metadata cache on
+/// first run.
+///
+/// In contrast to swift_getGenericMetadata, this function is for use by
+/// metadata accessors for which canonical generic metadata has been specialized
+/// at compile time.
+///
+/// Runtime availability: Swift 5.4
+///
+/// \param request A specification of the metadata to be returned.
+/// \param arguments The generic arguments--metadata and witness tables--which
+///                  the returned metadata is to have been instantiated with.
+/// \param description The type descriptor for the generic type whose
+///                    generic metadata is to have been instantiated.
+/// \param token The token that ensures that prespecialized records are added to
+///              the metadata cache only once.
+/// \returns The canonical metadata for the specialized generic type described
+///          by the provided candidate metadata.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) MetadataResponse
+    swift_getCanonicalPrespecializedGenericMetadata(
+        MetadataRequest request, const void *const *arguments,
+        const TypeContextDescriptor *description, swift_once_t *token);
 
 /// Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -878,7 +904,10 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
+// For some reason, MSVC doesn't accept these declarations outside of
+// swiftCore.  TODO: figure out a reasonable way to declare them.
 #if defined(swiftCore_EXPORTS)
+
 /// Given a pointer to a borrowed value of type `Root` and a
 /// `KeyPath<Root, Value>`, project a pointer to a borrowed value of type
 /// `Value`.
@@ -900,7 +929,8 @@ swift_modifyAtWritableKeyPath;
 SWIFT_RUNTIME_EXPORT
 YieldOnceCoroutine<OpaqueValue* (const OpaqueValue *root, void *keyPath)>::type
 swift_modifyAtReferenceWritableKeyPath;
-#endif
+
+#endif // swiftCore_EXPORTS
 
 SWIFT_RUNTIME_EXPORT
 void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);

@@ -15,8 +15,10 @@ import SwiftPrivate
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif os(WASI)
+import WASILibc
 #elseif os(Windows)
-import MSVCRT
+import CRT
 #endif
 
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {

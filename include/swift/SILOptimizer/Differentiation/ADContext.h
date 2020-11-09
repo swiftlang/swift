@@ -273,7 +273,8 @@ ADContext::emitNondifferentiabilityError(SILValue value,
                                          Diag<T...> diag, U &&... args) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
-    getADDebugStream() << "For value:\n" << value;
+    auto &s = getADDebugStream() << "For value:\n";
+    value->printInContext(s);
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   // If instruction does not have a valid location, use the function location
@@ -290,7 +291,8 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                          Diag<T...> diag, U &&... args) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
-    getADDebugStream() << "For instruction:\n" << *inst;
+    auto &s = getADDebugStream() << "For instruction:\n";
+    inst->printInContext(s);
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   // If instruction does not have a valid location, use the function location

@@ -631,16 +631,98 @@ autorelease in the callee.
   type behaves like a non-generic type, as if the substitutions were
   actually applied to the underlying function type.
 
+Async Functions
+```````````````
+
+SIL function types may be ``@async``. ``@async`` functions run inside async
+tasks, and can have explicit *suspend points* where they suspend execution.
+``@async`` functions can only be called from other ``@async`` functions, but
+otherwise can be invoked with the normal ``apply`` and ``try_apply``
+instructions (or ``begin_apply`` if they are coroutines).
+
+In Swift, the ``withUnsafeContinuation`` primitive is used to implement
+primitive suspend points. In SIL, ``@async`` functions represent this
+abstraction using the ``get_async_continuation[_addr]`` and
+``await_async_continuation`` instructions. ``get_async_continuation[_addr]``
+accesses a *continuation* value that can be used to resume the coroutine after
+it suspends. The resulting continuation value can then be passed into a
+completion handler, registered with an event loop, or scheduled by some other
+mechanism. Operations on the continuation can resume the async function's
+execution by passing a value back to the async function, or passing in an error
+that propagates as an error in the async function's context.
+The ``await_async_continuation`` instruction suspends execution of
+the coroutine until the continuation is invoked to resume it.  A use of
+``withUnsafeContinuation`` in Swift::
+
+  func waitForCallback() async -> Int {
+    return await withUnsafeContinuation { cc in
+      registerCallback { cc.resume($0) }
+    }
+  }
+
+might lower to the following SIL::
+
+  sil @waitForCallback : $@convention(thin) @async () -> Int {
+  entry:
+    %cc = get_async_continuation $Int
+    %closure = function_ref @waitForCallback_closure
+      : $@convention(thin) (UnsafeContinuation<Int>) -> ()
+    apply %closure(%cc)
+    await_async_continuation %cc, resume resume_cc
+
+  resume_cc(%result : $Int):
+    return %result
+  }
+
+The closure may then be inlined into the ``waitForCallback`` function::
+
+  sil @waitForCallback : $@convention(thin) @async () -> Int {
+  entry:
+    %cc = get_async_continuation $Int
+    %registerCallback = function_ref @registerCallback
+      : $@convention(thin) (@convention(thick) () -> ()) -> ()
+    %callback_fn = function_ref @waitForCallback_callback
+    %callback = partial_apply %callback_fn(%cc)
+    apply %registerCallback(%callback)
+    await_async_continuation %cc, resume resume_cc
+
+  resume_cc(%result : $Int):
+    return %result
+  }
+
+Every continuation value must be used exactly once to resume its associated
+async coroutine once. It is undefined behavior to attempt to resume the same
+continuation more than once. On the flip side, failing to resume a continuation
+will leave the async task stuck in the suspended state, leaking any memory or
+other resources it owns.
+
 Coroutine Types
 ```````````````
 
 A coroutine is a function which can suspend itself and return control to
 its caller without terminating the function.  That is, it does not need to
-obey a strict stack discipline.
+obey a strict stack discipline. SIL coroutines have control flow that is
+tightly integrated with their callers, and they pass information back and forth
+between caller and callee in a structured way through yield points.
+*Generalized accessors* and *generators* in Swift fit this description: a
+``read`` or ``modify`` accessor coroutine projects a single value, yields
+ownership of that one value temporarily to the caller, and then takes ownership
+back when resumed, allowing the coroutine to clean up resources or otherwise
+react to mutations done by the caller. *Generators* similarly yield a stream of
+values one at a time to their caller, temporarily yielding ownership of each
+value in turn to the caller. The tight coupling of the caller's control flow
+with these coroutines allows the caller to *borrow* values produced by the
+coroutine, where a normal function return would need to transfer ownership of
+its return value, since a normal function's context ceases to exist and be able
+to maintain ownership of the value after it returns.
 
-SIL supports two kinds of coroutine: ``@yield_many`` and ``@yield_once``.
-Either of these attributes may be written before a function type to
-indicate that it is a coroutine type.
+To support these concepts, SIL supports two kinds of coroutine:
+``@yield_many`` and ``@yield_once``. Either of these attributes may be
+written before a function type to indicate that it is a coroutine type.
+``@yield_many`` and ``@yield_once`` coroutines are allowed to also be
+``@async``. (Note that ``@async`` functions are not themselves modeled
+explicitly as coroutines in SIL, although the implementation may use a coroutine
+lowering strategy.)
 
 A coroutine type may declare any number of *yielded values*, which is to
 say, values which are provided to the caller at a yield point.  Yielded
@@ -658,18 +740,12 @@ coroutine can be called with the ``begin_apply`` instruction.  There
 is no support yet for calling a throwing yield-once coroutine or for
 calling a yield-many coroutine of any kind.
 
-Coroutines may contain the special ``yield`` and ``unwind`` instructions.
+Coroutines may contain the special ``yield`` and ``unwind``
+instructions.
 
 A ``@yield_many`` coroutine may yield as many times as it desires.
 A ``@yield_once`` coroutine may yield exactly once before returning,
 although it may also ``throw`` before reaching that point.
-
-This coroutine representation is well-suited to coroutines whose control
-flow is tightly integrated with their callers and which intend to pass
-information back and forth.  This matches the needs of generalized
-accessor and generator features in Swift.  It is not a particularly good
-match for ``async``/``await``-style features; a simpler representation
-would probably do fine for that.
 
 Properties of Types
 ```````````````````
@@ -1674,7 +1750,7 @@ Owned
 Owned ownership models "move only" values. We require that each such value is
 consumed exactly once along all program paths. The IR verifier will flag values
 that are not consumed along a path as a leak and any double consumes as
-use-after-frees. We model move operations via "forwarding uses" such as casts
+use-after-frees. We model move operations via `forwarding uses`_ such as casts
 and transforming terminators (e.x.: `switch_enum`_, `checked_cast_br`_) that
 transform the input value, consuming it in the process, and producing a new
 transformed owned value as a result.
@@ -1729,7 +1805,7 @@ derived from the ARC object. As an example, consider the following Swift/SIL::
   }
 
 Notice how our individual copy (``%1``) threads its way through the IR using
-forwarding of ``@owned`` ownership. These forwarding operations partition the
+`forwarding uses`_ of ``@owned`` ownership. These `forwarding uses`_ partition the
 lifetime of the result of the copy_value into a set of disjoint individual owned
 lifetimes (``%2``, ``%3``, ``%5``).
 
@@ -1771,7 +1847,7 @@ optimizations that they can never shrink the lifetime of ``%0`` by moving
 `destroy_value`_ above ``%1``.
 
 Values with guaranteed ownership follow a dataflow rule that states that
-non-consuming "forwarding" uses of the guaranteed value are also guaranteed and
+non-consuming `forwarding uses`_ of the guaranteed value are also guaranteed and
 are recursively validated as being in the original values scope. This was a
 choice we made to reduce idempotent scopes in the IR::
 
@@ -1835,6 +1911,137 @@ This is a form of ownership that is used to model two different use cases:
   non-trivial value. As an example of this consider an unsafe bit cast of a
   trivial pointer to a class. In that case, since we have no reason to assume
   that the object will remain alive, we need to make a copy of the value.
+
+Forwarding Uses
+~~~~~~~~~~~~~~~
+
+NOTE: In the following, we assumed that one read the section above, `Value Ownership Kind`_.
+
+A subset of SIL instructions define the value ownership kind of their results in
+terms of the value ownership kind of their operands. Such an instruction is
+called a "forwarding instruction" and any use with such a user instruction a
+"forwarding use". This inference generally occurs upon instruction construction
+and as a result:
+
+* When manipulating forwarding instructions programatically, one must manually
+  update their forwarded ownership since most of the time the ownership is
+  stored in the instruction itself. Don't worry though because the SIL verifier
+  will catch this error for you if you forget to do so!
+
+* Textual SIL does not represent the ownership of forwarding instructions
+  explicitly. Instead, the instruction's ownership is inferred normally from the
+  parsed operand. Since the SILVerifier runs on Textual SIL after parsing, you
+  can feel confident that ownership constraints were inferred correctly.
+
+Forwarding has slightly different ownership semantics depending on the value
+ownership kind of the operand on construction and the result's type. We go
+through each below:
+
+* Given an ``@owned`` operand, the forwarding instruction is assumed to end the
+  lifetime of the operand and produce an ``@owned`` value if non-trivially typed
+  and ``@none`` if trivially typed. Example: This is used to represent the
+  semantics of casts::
+
+      sil @unsafelyCastToSubClass : $@convention(thin) (@owned Klass) -> @owned SubKlass {
+      bb0(%0 : @owned $Klass): // %0 is defined here.
+
+        // %0 is consumed here and can no longer be used after this point.
+        // %1 is defined here and after this point must be used to access the object
+        // passed in via %0.
+        %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+
+        // Then %1's lifetime ends here and we return the casted argument to our
+        // caller as an @owned result.
+        return %1 : $SubKlass
+      }
+
+* Given a ``@guaranteed`` operand, the forwarding instruction is assumed to
+  produce ``@guaranteed`` non-trivially typed values and ``@none`` trivially
+  typed values. Given the non-trivial case, the instruction is assumed to begin
+  a new implicit borrow scope for the incoming value. Since the borrow scope is
+  implicit, we validate the uses of the result as if they were uses of the
+  operand (recursively). This of course means that one should never see
+  end_borrows on any guaranteed forwarded results, the end_borrow is always on
+  the instruction that "introduces" the borrowed value. An example of a
+  guaranteed forwarding instruction is ``struct_extract``::
+
+     // In this function, I have a pair of Klasses and I want to grab some state
+     // and then call the hand off function for someone else to continue
+     // processing the pair.
+     sil @accessLHSStateAndHandOff : $@convention(thin) (@owned KlassPair) -> @owned State {
+     bb0(%0 : @owned $KlassPair): // %0 is defined here.
+
+       // Begin the borrow scope for %0. We want to access %1's subfield in a
+       // read only way that doesn't involve destructuring and extra copies. So
+       // we construct a guaranteed scope here so we can safely use a
+       // struct_extract.
+       %1 = begin_borrow %0 : $KlassPair
+
+       // Now we perform our struct_extract operation. This operation
+       // structurally grabs a value out of a struct without safety relying on
+       // the guaranteed ownership of its operand to know that %1 is live at all
+       // use points of %2, its result.
+       %2 = struct_extract %1 : $KlassPair, #KlassPair.lhs
+
+       // Then grab the state from our left hand side klass and copy it so we
+       // can pass off our klass pair to handOff for continued processing.
+       %3 = ref_element_addr %2 : $Klass, #Klass.state
+       %4 = load [copy] %3 : $*State
+
+       // Now that we have finished accessing %1, we end the borrow scope for %1.
+       end_borrow %1 : $KlassPair
+
+       %handOff = function_ref @handOff : $@convention(thin) (@owned KlassPair) -> ()
+       apply %handOff(%0) : $@convention(thin) (@owned KlassPair) -> ()
+
+       return %4 : $State
+     }
+
+* Given an ``@none`` operand, the result value must have ``@none`` ownership.
+
+* Given an ``@unowned`` operand, the result value will have ``@unowned``
+  ownership. It will be validated just like any other ``@unowned`` value, namely
+  that it must be copied before use.
+
+An additional wrinkle here is that even though the vast majority of forwarding
+instructions forward all types of ownership, this is not true in general. To see
+why this is necessary, lets compare/contrast `struct_extract`_ (which does not
+forward ``@owned`` ownership) and `unchecked_enum_data`_ (which can forward
+/all/ ownership kinds). The reason for this difference is that `struct_extract`_
+inherently can only extract out a single field of a larger object implying that
+the instruction could only represent consuming a sub-field of a value instead of
+the entire value at once. This violates our constraint that owned values can
+never be partially consumed: a value is either completely alive or completely
+dead. In contrast, enums always represent their payloads as elements in a single
+tuple value. This means that `unchecked_enum_data`_ when it extracts that
+payload from an enum, can consume the entire enum+payload.
+
+To handle cases where we want to use `struct_extract`_ in a consuming way, we
+instead are able to use the `destructure_struct`_ instruction that consumes the
+entire struct at once and gives one back the structs individual constituant
+parts::
+
+     struct KlassPair {
+       var fieldOne: Klass
+       var fieldTwo: Klass
+     }
+
+     sil @getFirstPairElt : $@convention(thin) (@owned KlassPair) -> @owned Klass {
+     bb0(%0 : @owned $KlassPair):
+       // If we were to just do this directly and consume KlassPair to access
+       // fieldOne... what would happen to fieldTwo? Would it be consumed?
+       //
+       // %1 = struct_extract %0 : $KlassPair, #KlassPair.fieldOne
+       //
+       // Instead we need to destructure to ensure we consume the entire owned value at once.
+       (%1, %2) = destructure_struct $KlassPair
+
+       // We only want to return %1, so we need to cleanup %2.
+       destroy_value %2 : $Klass
+
+       // Then return %1 to our caller
+       return %1 : $Klass
+     }
 
 Runtime Failure
 ---------------
@@ -2607,6 +2814,97 @@ Initialize the storage for a global variable. This instruction has
 undefined behavior if the global variable has already been initialized.
 
 The type operand must be a lowered object type.
+
+get_async_continuation
+``````````````````````
+
+::
+
+  sil-instruction ::= 'get_async_continuation' '[throws]'? sil-type
+
+  %0 = get_async_continuation $T
+  %0 = get_async_continuation [throws] $U
+
+Begins a suspension of an ``@async`` function. This instruction can only be
+used inside an ``@async`` function. The result of the instruction is an
+``UnsafeContinuation<T>`` value, where ``T`` is the formal type argument to the
+instruction, or an ``UnsafeThrowingContinuation<T>`` if the instruction
+carries the ``[throws]`` attribute. ``T`` must be a loadable type.
+The continuation must be consumed by a ``await_async_continuation`` terminator
+on all paths. Between ``get_async_continuation`` and
+``await_async_continuation``, the following restrictions apply:
+
+- The function cannot ``return``, ``throw``, ``yield``, or ``unwind``.
+- There cannot be nested suspend points; namely, the function cannot call
+  another ``@async`` function, nor can it initiate another suspend point with
+  ``get_async_continuation``.
+
+The function suspends execution when the matching ``await_async_continuation``
+terminator is reached, and resumes execution when the continuation is resumed.
+The continuation resumption operation takes a value of type ``T`` which is
+passed back into the function when it resumes execution in the ``await_async_continuation`` instruction's
+``resume`` successor block. If the instruction
+has the ``[throws]`` attribute, it can also be resumed in an error state, in
+which case the matching ``await_async_continuation`` instruction must also
+have an ``error`` successor.
+
+Within the enclosing SIL function, the result continuation is consumed by the
+``await_async_continuation``, and cannot be referenced after the
+``await_async_continuation`` executes. Dynamically, the continuation value must
+be resumed exactly once in the course of the program's execution; it is
+undefined behavior to resume the continuation more than once. Conversely,
+failing to resume the continuation will leave the suspended async coroutine
+hung in its suspended state, leaking any resources it may be holding.
+
+get_async_continuation_addr
+```````````````````````````
+
+::
+
+  sil-instruction ::= 'get_async_continuation_addr' '[throws]'? sil-type ',' sil-operand
+
+  %1 = get_async_continuation_addr $T, %0 : $*T
+  %1 = get_async_continuation_addr [throws] $U, %0 : $*U
+
+Begins a suspension of an ``@async`` function, like ``get_async_continuation``,
+additionally binding a specific memory location for receiving the value
+when the result continuation is resumed.  The operand must be an address whose
+type is the maximally-abstracted lowered type of the formal resume type. The
+memory must be uninitialized, and must remain allocated until the matching
+``await_async_continuation`` instruction(s) consuming the result continuation
+have executed. The behavior is otherwise the same as
+``get_async_continuation``, and the same restrictions apply on code appearing
+between ``get_async_continuation_addr`` and ``await_async_continuation`` as
+apply between ``get_async_continuation`` and ``await_async_continuation``.
+Additionally, the state of the memory referenced by the operand is indefinite
+between the execution of ``get_async_continuation_addr`` and
+``await_async_continuation``, and it is undefined behavior to read or modify
+the memory during this time. After the ``await_async_continuation`` resumes
+normally to its ``resume`` successor, the memory referenced by the operand is
+initialized with the resume value, and that value is then owned by the current
+function. If ``await_async_continuation`` instead resumes to its ``error``
+successor, then the memory remains uninitialized.
+
+hop_to_executor
+```````````````
+
+::
+
+  sil-instruction ::= 'hop_to_executor' sil-operand
+
+  hop_to_executor %0 : $T
+
+  // $T must conform to the Actor protocol
+
+Ensures that all instructions, which need to run on the actor's executor
+actually run on that executor.
+This instruction can only be used inside an ``@async`` function.
+
+Checks if the current executor is the one which is bound to the operand actor.
+If not, begins a suspension point and enqueues the continuation to the executor
+which is bound to the operand actor.
+
+The operand is a guaranteed operand, i.e. not consumed.
 
 dealloc_stack
 `````````````
@@ -6229,6 +6527,55 @@ destination (if it returns with ``throw``).
 ``%0`` must have a function type with an error result.
 
 The rules on generic substitutions are identical to those of ``apply``.
+
+await_async_continuation
+````````````````````````
+
+::
+
+  sil-terminator ::= 'await_async_continuation' sil-value
+                        ',' 'resume' sil-identifier
+                        (',' 'error' sil-identifier)?
+
+  await_async_continuation %0 : $UnsafeContinuation<T>, resume bb1
+  await_async_continuation %0 : $UnsafeThrowingContinuation<T>, resume bb1, error bb2
+
+  bb1(%1 : @owned $T):
+  bb2(%2 : @owned $Error):
+
+Suspends execution of an ``@async`` function until the continuation
+is resumed. The continuation must be the result of a
+``get_async_continuation`` or ``get_async_continuation_addr``
+instruction within the same function; see the documentation for
+``get_async_continuation`` for discussion of further constraints on the
+IR between ``get_async_continuation[_addr]`` and ``await_async_continuation``.
+This terminator can only appear inside an ``@async`` function. The
+instruction must always have a ``resume`` successor, but must have an
+``error`` successor if and only if the operand is an
+``UnsafeThrowingContinuation<T>``.
+
+If the operand is the result of a ``get_async_continuation`` instruction,
+then the ``resume`` successor block must take an argument whose type is the
+maximally-abstracted lowered type of ``T``, matching the type argument of the
+``Unsafe[Throwing]Continuation<T>`` operand. The value of the ``resume``
+argument is owned by the current function. If the operand is the result of a
+``get_async_continuation_addr`` instruction, then the ``resume`` successor
+block must *not* take an argument; the resume value will be written to the
+memory referenced by the operand to the ``get_async_continuation_addr``
+instruction, after which point the value in that memory becomes owned by the
+current function. With either variant, if the ``await_async_continuation``
+instruction has an ``error`` successor block, the ``error`` block must take a
+single ``Error`` argument, and that argument is owned by the enclosing
+function. The memory referenced by a ``get_async_continuation_addr``
+instruction remains uninitialized when ``await_async_continuation`` resumes on
+the ``error`` successor.
+
+It is possible for a continuation to be resumed before
+``await_async_continuation``.  In this case, the resume operation returns
+immediately to its caller. When the ``await_async_continuation`` instruction
+later executes, it then immediately transfers control to
+its ``resume`` or ``error`` successor block, using the resume or error value
+that the continuation was already resumed with.
 
 Differentiable Programming
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

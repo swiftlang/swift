@@ -774,6 +774,15 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
 }
 
 void Remangler::mangleCFunctionPointer(Node *node) {
+  if (node->getNumChildren() > 0 &&
+      node->getFirstChild()->getKind() == Node::Kind::ClangType) {
+    for (size_t Idx = node->getNumChildren() - 1; Idx >= 1; --Idx) {
+      mangleChildNode(node, Idx);
+    }
+    Buffer << "XzC";
+    mangleClangType(node->getFirstChild());
+    return;
+  }
   mangleChildNodesReversed(node); // argument tuple, result type
   Buffer << "XC";
 }
@@ -794,6 +803,11 @@ void Remangler::mangleConstructor(Node *node) {
 void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
   mangleChildNodes(node);
   Buffer << "TC";
+}
+
+void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tz";
 }
 
 void Remangler::mangleDeallocator(Node *node) {
@@ -1289,6 +1303,9 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   case Node::Kind::GenericSpecialization:
     Buffer << "Tg";
     break;
+  case Node::Kind::GenericSpecializationPrespecialized:
+    Buffer << "Ts";
+    break;
   case Node::Kind::GenericSpecializationNotReAbstracted:
     Buffer << "TG";
     break;
@@ -1303,6 +1320,10 @@ void Remangler::mangleGenericSpecialization(Node *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
       mangle(Child);
   }
+}
+
+void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
+  mangleGenericSpecialization(node);
 }
 
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
@@ -1340,6 +1361,7 @@ void Remangler::mangleGlobal(Node *node) {
     switch (Child->getKind()) {
       case Node::Kind::FunctionSignatureSpecialization:
       case Node::Kind::GenericSpecialization:
+      case Node::Kind::GenericSpecializationPrespecialized:
       case Node::Kind::GenericSpecializationNotReAbstracted:
       case Node::Kind::InlinedGenericFunction:
       case Node::Kind::GenericPartialSpecialization:
@@ -1436,6 +1458,37 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
   unreachable("handled inline");
 }
 
+void Remangler::mangleImplFunctionConvention(Node *node) {
+  StringRef text =
+      (node->getNumChildren() > 0 && node->getFirstChild()->hasText())
+          ? node->getFirstChild()->getText()
+          : "";
+  char FuncAttr = llvm::StringSwitch<char>(text)
+                      .Case("block", 'B')
+                      .Case("c", 'C')
+                      .Case("method", 'M')
+                      .Case("objc_method", 'O')
+                      .Case("closure", 'K')
+                      .Case("witness_method", 'W')
+                      .Default(0);
+  assert(FuncAttr && "invalid impl function convention");
+  if ((FuncAttr == 'B' || FuncAttr == 'C') && node->getNumChildren() > 1 &&
+      node->getChild(1)->getKind() == Node::Kind::ClangType) {
+    Buffer << 'z' << FuncAttr;
+    mangleClangType(node->getChild(1));
+    return;
+  }
+  Buffer << FuncAttr;
+}
+
+void Remangler::mangleImplFunctionConventionName(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleClangType(Node *node) {
+  Buffer << node->getText().size() << node->getText();
+}
+
 void Remangler::mangleImplInvocationSubstitutions(Node *node) {
   unreachable("handled inline");
 }
@@ -1487,8 +1540,14 @@ void Remangler::mangleImplFunctionType(Node *node) {
     mangle(PatternSubs->getChild(0));
     Buffer << 'y';
     mangleChildNodes(PatternSubs->getChild(1));
-    if (PatternSubs->getNumChildren() >= 3)
-      mangleRetroactiveConformance(PatternSubs->getChild(2));
+    if (PatternSubs->getNumChildren() >= 3) {
+      NodePointer retroactiveConf = PatternSubs->getChild(2);
+      if (retroactiveConf->getKind() == Node::Kind::TypeList) {
+        mangleChildNodes(retroactiveConf);
+      } else {
+        mangleRetroactiveConformance(retroactiveConf);
+      }
+    }
   }
 
   Buffer << 'I';
@@ -1521,16 +1580,15 @@ void Remangler::mangleImplFunctionType(Node *node) {
         Buffer << ConvCh;
         break;
       }
+      case Node::Kind::ImplFunctionConvention: {
+        mangleImplFunctionConvention(Child);
+        break;
+      }
       case Node::Kind::ImplFunctionAttribute: {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
-                        .Case("@convention(block)", 'B')
-                        .Case("@convention(c)", 'C')
-                        .Case("@convention(method)", 'M')
-                        .Case("@convention(objc_method)", 'O')
-                        .Case("@convention(closure)", 'K')
-                        .Case("@convention(witness_method)", 'W')
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
+                        .Case("@async", 'H')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
         Buffer << FuncAttr;
@@ -1776,6 +1834,15 @@ void Remangler::mangleObjCAttribute(Node *node) {
 }
 
 void Remangler::mangleObjCBlock(Node *node) {
+  if (node->getNumChildren() > 0 &&
+      node->getFirstChild()->getKind() == Node::Kind::ClangType) {
+    for (size_t Idx = node->getNumChildren() - 1; Idx >= 1; --Idx) {
+      mangleChildNode(node, Idx);
+    }
+    Buffer << "XzB";
+    mangleClangType(node->getFirstChild());
+    return;
+  }
   mangleChildNodesReversed(node);
   Buffer << "XB";
 }
@@ -2564,6 +2631,29 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
 void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MJ";
+}
+
+void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mz";
+}
+
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Wz";
+}
+
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "WZ";
+}
+
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
+    mangle(node->getChild(i));
+    Buffer << '_';
+  }
 }
 
 } // anonymous namespace

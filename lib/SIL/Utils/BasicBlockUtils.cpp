@@ -115,6 +115,37 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
       args.push_back(V);
     return;
   }
+      
+  case SILInstructionKind::AwaitAsyncContinuationInst: {
+    auto AACI = cast<AwaitAsyncContinuationInst>(T);
+    
+    switch (edgeIdx) {
+    case 0:
+      // resume BB. this takes the resume value argument if the operand is
+      // GetAsyncContinuation, or no argument if the operand is
+      // GetAsyncContinuationAddr
+      if (auto contOperand = dyn_cast<GetAsyncContinuationInst>(AACI->getOperand())) {
+        args.push_back(
+         newEdgeBB->createPhiArgument(contOperand->getLoweredResumeType(),
+                                      ValueOwnershipKind::Owned));
+      }
+      return;
+        
+    case 1: {
+      assert(AACI->getErrorBB());
+      auto &C = AACI->getFunction()->getASTContext();
+      auto errorTy = C.getErrorDecl()->getDeclaredType();
+      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy->getCanonicalType());
+      // error BB. this takes the error value argument
+      args.push_back(newEdgeBB->createPhiArgument(errorSILTy,
+                                                  ValueOwnershipKind::Owned));
+      return;
+    }
+        
+    default:
+      llvm_unreachable("only has at most two edges");
+    }
+  }
 
   case SILInstructionKind::SwitchValueInst: {
     auto SEI = cast<SwitchValueInst>(T);

@@ -8,7 +8,8 @@ import sys
 denylist = [
     "Kernel", "Ruby", "Tk",
     "DriverKit", "HIDDriverKit", "SkywalkDriverKit",  # has C++ code
-    "NetworkingDriverKit", "USBSerialDriverKit",  # has C++ code
+    "NetworkingDriverKit", "USBSerialDriverKit", "PCIDriverKit",  # has C++ code
+    "USBDriverKit",  # has C++ code
 ]
 
 
@@ -46,6 +47,8 @@ def get_frameworks(sdk_path, swift_frameworks_only):
     frameworks_path = sdk_path + "/System/Library/Frameworks"
     names = []
     for frame in os.listdir(frameworks_path):
+        if frame[0] == '_':
+            continue
         if frame.endswith(".framework"):
             name = frame[:-len(".framework")]
             header_dir_path = frameworks_path + '/' + frame + '/Headers'
@@ -105,8 +108,6 @@ def should_exclude_framework(frame_path):
         return False
     contents = open(module_map_path).read()
     if "requires !swift" in contents:
-        return True
-    if "requires unavailable" in contents:
         return True
 
     return False

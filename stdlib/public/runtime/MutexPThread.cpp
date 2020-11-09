@@ -15,7 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#endif
+
+#if defined(_POSIX_THREADS) && !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #include "swift/Runtime/Mutex.h"
 
 #include "swift/Runtime/Debug.h"

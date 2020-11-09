@@ -26,6 +26,14 @@
 // without a definition of NoneType.
 #include "llvm/ADT/None.h"
 
+// Don't pre-declare certain LLVM types in the runtime, which must
+// not put things in namespace llvm for ODR reasons.
+#if !defined(swiftCore_EXPORTS)
+#define SWIFT_LLVM_ODR_SAFE 1
+#else
+#define SWIFT_LLVM_ODR_SAFE 0
+#endif
+
 // Forward declarations.
 namespace llvm {
   // Containers.
@@ -34,18 +42,18 @@ namespace llvm {
   class Twine;
   template <typename T> class SmallPtrSetImpl;
   template <typename T, unsigned N> class SmallPtrSet;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   template <typename T> class SmallVectorImpl;
   template <typename T, unsigned N> class SmallVector;
 #endif
   template <unsigned N> class SmallString;
   template <typename T, unsigned N> class SmallSetVector;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
 #endif
   template<typename T> class TinyPtrVector;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   template<typename T> class Optional;
 #endif
   template <typename ...PTs> class PointerUnion;
@@ -56,7 +64,7 @@ namespace llvm {
   class raw_ostream;
   class APInt;
   class APFloat;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   template <typename Fn> class function_ref;
 #endif
 } // end namespace llvm
@@ -71,13 +79,13 @@ namespace swift {
   using llvm::cast_or_null;
 
   // Containers.
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   using llvm::ArrayRef;
   using llvm::MutableArrayRef;
 #endif
   using llvm::iterator_range;
   using llvm::None;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   using llvm::Optional;
 #endif
   using llvm::PointerUnion;
@@ -86,7 +94,7 @@ namespace swift {
   using llvm::SmallPtrSetImpl;
   using llvm::SmallSetVector;
   using llvm::SmallString;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   using llvm::SmallVector;
   using llvm::SmallVectorImpl;
 #endif
@@ -98,7 +106,7 @@ namespace swift {
   // Other common classes.
   using llvm::APFloat;
   using llvm::APInt;
-#if !defined(swiftCore_EXPORTS)
+#if SWIFT_LLVM_ODR_SAFE
   using llvm::function_ref;
 #endif
   using llvm::NoneType;

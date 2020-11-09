@@ -19,45 +19,37 @@
 using namespace swift;
 
 bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isiOS() &&
           !tripleIsMacCatalystEnvironment(triple) &&
-          // FIXME: transitional, this should eventually stop testing arch, and
-          // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() ||
-           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+          triple.isSimulatorEnvironment());
 }
 
 bool swift::tripleIsAppleTVSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
-  return (triple.isTvOS() &&
-          // FIXME: transitional, this should eventually stop testing arch, and
-          // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() ||
-           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+  return (triple.isTvOS() && triple.isSimulatorEnvironment());
 }
 
 bool swift::tripleIsWatchSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
-  return (triple.isWatchOS() &&
-          // FIXME: transitional, this should eventually stop testing arch, and
-          // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() ||
-           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
-}
-
-bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
-  // FIXME: transitional, this should eventually just use the -environment
-  // field.
-  return triple.isSimulatorEnvironment() ||
-    tripleIsiOSSimulator(triple) ||
-    tripleIsWatchSimulator(triple) ||
-    tripleIsAppleTVSimulator(triple);
+  return (triple.isWatchOS() && triple.isSimulatorEnvironment());
 }
 
 bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
   return triple.isiOS() && !triple.isTvOS() &&
       triple.getEnvironment() == llvm::Triple::MacABI;
+}
+
+bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
+  switch (triple.getOS()) {
+  case llvm::Triple::IOS:
+  case llvm::Triple::TvOS:
+  case llvm::Triple::WatchOS:
+    return !triple.hasEnvironment() &&
+        (triple.getArch() == llvm::Triple::x86 ||
+         triple.getArch() == llvm::Triple::x86_64) &&
+        !tripleIsMacCatalystEnvironment(triple);
+
+  default:
+    return false;
+  }
 }
 
 bool swift::triplesAreValidForZippering(const llvm::Triple &target,
@@ -310,14 +302,6 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
 static Optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
-
-  // If the environment is empty, infer a "simulator" environment based on the
-  // OS and architecture combination. This feature is deprecated and exists for
-  // backwards compatibility only; build systems should pass the "simulator"
-  // environment explicitly if they know they're building for a simulator.
-  if (tripleEnvironment == "" && swift::tripleIsAnySimulator(triple))
-    return StringRef("simulator");
-
   return llvm::StringSwitch<Optional<StringRef>>(tripleEnvironment)
               .Cases("unknown", "", None)
   // These values are also supported, but are handled by the default case below:
@@ -488,4 +472,48 @@ swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
   }
 
   return SDKVersion;
+}
+
+static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
+  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!BufOrErr) {
+    // FIXME: diagnose properly
+    return {};
+  }
+
+  std::string Key = "<key>";
+  Key += KeyName;
+  Key += "</key>";
+
+  StringRef Lines = BufOrErr.get()->getBuffer();
+  while (!Lines.empty()) {
+    StringRef CurLine;
+    std::tie(CurLine, Lines) = Lines.split('\n');
+    if (CurLine.find(Key) != StringRef::npos) {
+      std::tie(CurLine, Lines) = Lines.split('\n');
+      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
+      unsigned End = CurLine.find("</string>");
+      return CurLine.substr(Begin, End - Begin).str();
+    }
+  }
+
+  return {};
+}
+
+std::string swift::getSDKBuildVersionFromPlist(StringRef Path) {
+  return getPlistEntry(Path, "ProductBuildVersion");
+}
+
+std::string swift::getSDKBuildVersion(StringRef Path) {
+  return getSDKBuildVersionFromPlist((llvm::Twine(Path) +
+    "/System/Library/CoreServices/SystemVersion.plist").str());
+}
+
+std::string swift::getSDKName(StringRef Path) {
+  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
+                                   "CanonicalName");
+  if (Name.empty() && Path.endswith(".sdk")) {
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
+  }
+  return Name;
 }

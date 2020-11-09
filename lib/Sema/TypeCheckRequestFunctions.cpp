@@ -30,31 +30,27 @@ Type InheritedTypeRequest::evaluate(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index, TypeResolutionStage stage) const {
   // Figure out how to resolve types.
-  TypeResolutionOptions options = None;
   DeclContext *dc;
   if (auto typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = (DeclContext *)nominal;
-
-      options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
     }
   } else {
     dc = (DeclContext *)decl.get<const ExtensionDecl *>();
-    options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution =
-        TypeResolution::forStructural(dc, options, /*unboundTyOpener*/ nullptr);
+        TypeResolution::forStructural(dc, None, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
-        TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr);
+        TypeResolution::forInterface(dc, None, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual: {
@@ -93,6 +89,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       return proto->getGenericSignature()
           ->getSuperclassBound(proto->getSelfInterfaceType());
     }
+
+    if (!proto->getSuperclassDecl())
+      return Type();
+  } else if (auto classDecl = dyn_cast<ClassDecl>(nominalDecl)) {
+    if (!classDecl->getSuperclassDecl())
+      return Type();
   }
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
@@ -130,13 +132,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Type
-EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
-                             TypeResolutionStage stage) const {
+Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
+                                  EnumDecl *enumDecl) const {
   for (unsigned int idx : indices(enumDecl->getInherited())) {
-    auto inheritedTypeResult =
-      evaluator(InheritedTypeRequest{enumDecl, idx, stage});
-    
+    auto inheritedTypeResult = evaluator(
+        InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface});
+
     if (auto err = inheritedTypeResult.takeError()) {
       llvm::handleAllErrors(std::move(err),
         [](const CyclicalRequestError<InheritedTypeRequest> &E) {
@@ -160,7 +161,7 @@ EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
 }
 
 CustomAttr *
-AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
+AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *decl) const {
   ASTContext &ctx = decl->getASTContext();
   auto dc = decl->getDeclContext();
@@ -175,16 +176,16 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
     if (!nominal)
       continue;
 
-    // Return the first custom attribute that is a function builder type.
-    if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>())
+    // Return the first custom attribute that is a result builder type.
+    if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>())
       return mutableAttr;
   }
 
   return nullptr;
 }
 
-/// Attempt to infer the function builder type for a declaration.
-static Type inferFunctionBuilderType(ValueDecl *decl)  {
+/// Attempt to infer the result builder type for a declaration.
+static Type inferResultBuilderType(ValueDecl *decl)  {
   auto dc = decl->getDeclContext();
   if (!dc->isTypeContext() || isa<ProtocolDecl>(dc))
     return Type();
@@ -195,12 +196,12 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
     return Type();
 
   // Check whether there are any return statements in the function's body.
-  // If there are, the function builder transform will be disabled,
-  // so don't infer a function builder.
+  // If there are, the result builder transform will be disabled,
+  // so don't infer a result builder.
   if (!TypeChecker::findReturnStatements(funcDecl).empty())
     return Type();
 
-  // Only getters can have function builders. When we find one, look at
+  // Only getters can have result builders. When we find one, look at
   // the storage declaration for the purposes of witness matching.
   auto lookupDecl = decl;
   if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
@@ -210,7 +211,7 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
     lookupDecl = accessor->getStorage();
   }
 
-  // Find all of the potentially inferred function builder types.
+  // Find all of the potentially inferred result builder types.
   struct Match {
     enum Kind {
       Conformance,
@@ -226,26 +227,26 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
       ValueDecl *dynamicReplacement;
     };
 
-    Type functionBuilderType;
+    Type resultBuilderType;
 
     static Match forConformance(
         ProtocolConformance *conformance,
         ValueDecl *requirement,
-        Type functionBuilderType) {
+        Type resultBuilderType) {
       Match match;
       match.kind = Conformance;
       match.conformanceMatch.conformance = conformance;
       match.conformanceMatch.requirement = requirement;
-      match.functionBuilderType = functionBuilderType;
+      match.resultBuilderType = resultBuilderType;
       return match;
     }
 
     static Match forDynamicReplacement(
-        ValueDecl *dynamicReplacement, Type functionBuilderType) {
+        ValueDecl *dynamicReplacement, Type resultBuilderType) {
       Match match;
       match.kind = DynamicReplacement;
       match.dynamicReplacement = dynamicReplacement;
-      match.functionBuilderType = functionBuilderType;
+      match.resultBuilderType = resultBuilderType;
       return match;
     }
 
@@ -257,16 +258,17 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
       case DynamicReplacement:
         return dynamicReplacement->getName();
       }
+      llvm_unreachable("unhandled decl name kind!");
     }
   };
 
-  // The set of matches from which we can infer function builder types.
+  // The set of matches from which we can infer result builder types.
   SmallVector<Match, 2> matches;
 
   // Determine all of the conformances within the same context as
   // this declaration. If this declaration is a witness to any
-  // requirement within one of those protocols that has a function builder
-  // attached, use that function builder type.
+  // requirement within one of those protocols that has a result builder
+  // attached, use that result builder type.
   auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
     DeclContext *dc = lookupDecl->getDeclContext();
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
@@ -284,33 +286,33 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
         if (!requirement)
           continue;
 
-        Type functionBuilderType = requirement->getFunctionBuilderType();
-        if (!functionBuilderType)
+        Type resultBuilderType = requirement->getResultBuilderType();
+        if (!resultBuilderType)
           continue;
 
         auto witness = conformance->getWitnessDecl(requirement);
         if (witness != lookupDecl)
           continue;
 
-        // Substitute into the function builder type.
+        // Substitute into the result builder type.
         auto subs =
             conformance->getSubstitutions(lookupDecl->getModuleContext());
-        Type subFunctionBuilderType = functionBuilderType.subst(subs);
+        Type subResultBuilderType = resultBuilderType.subst(subs);
 
         matches.push_back(
             Match::forConformance(
-              conformance, requirement, subFunctionBuilderType));
+              conformance, requirement, subResultBuilderType));
       }
     }
   };
 
   addConformanceMatches(lookupDecl);
 
-  // Look for function builder types inferred through dynamic replacements.
+  // Look for result builder types inferred through dynamic replacements.
   if (auto replaced = lookupDecl->getDynamicallyReplacedDecl()) {
-    if (auto functionBuilderType = replaced->getFunctionBuilderType()) {
+    if (auto resultBuilderType = replaced->getResultBuilderType()) {
       matches.push_back(
-        Match::forDynamicReplacement(replaced, functionBuilderType));
+        Match::forDynamicReplacement(replaced, resultBuilderType));
     } else {
       addConformanceMatches(replaced);
     }
@@ -319,44 +321,44 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
   if (matches.size() == 0)
     return Type();
 
-  // Determine whether there is more than one actual function builder type.
-  Type functionBuilderType = matches[0].functionBuilderType;
+  // Determine whether there is more than one actual result builder type.
+  Type resultBuilderType = matches[0].resultBuilderType;
   for (const auto &match : matches) {
     // If the types were the same anyway, there's nothing to do.
-    Type otherFunctionBuilderType = match.functionBuilderType;
-    if (functionBuilderType->isEqual(otherFunctionBuilderType))
+    Type otherResultBuilderType = match.resultBuilderType;
+    if (resultBuilderType->isEqual(otherResultBuilderType))
       continue;
 
-    // We have at least two different function builder types.
+    // We have at least two different result builder types.
     // Diagnose the ambiguity and provide potential solutions.
     decl->diagnose(
-        diag::function_builder_infer_ambig, lookupDecl->getName(),
-        functionBuilderType, otherFunctionBuilderType);
-    decl->diagnose(diag::function_builder_infer_add_return)
+        diag::result_builder_infer_ambig, lookupDecl->getName(),
+        resultBuilderType, otherResultBuilderType);
+    decl->diagnose(diag::result_builder_infer_add_return)
       .fixItInsert(funcDecl->getBodySourceRange().End, "return <#expr#>\n");
     for (const auto &match : matches) {
       decl->diagnose(
-          diag::function_builder_infer_pick_specific,
-          match.functionBuilderType,
+          diag::result_builder_infer_pick_specific,
+          match.resultBuilderType,
           static_cast<unsigned>(match.kind),
           match.getSourceName())
         .fixItInsert(
           lookupDecl->getAttributeInsertionLoc(false),
-          "@" + match.functionBuilderType.getString() + " ");
+          "@" + match.resultBuilderType.getString() + " ");
     }
 
     return Type();
   }
 
-  return functionBuilderType;
+  return resultBuilderType;
 }
 
-Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
+Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
                                           ValueDecl *decl) const {
-  // Look for a function-builder custom attribute.
-  auto attr = decl->getAttachedFunctionBuilder();
+  // Look for a result-builder custom attribute.
+  auto attr = decl->getAttachedResultBuilder();
   if (!attr)
-    return inferFunctionBuilderType(decl);
+    return inferResultBuilderType(decl);
 
   // Resolve a type for the attribute.
   auto mutableAttr = const_cast<CustomAttr*>(attr);
@@ -384,7 +386,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     // Require the parameter to be an interface type.
     if (!paramFnType) {
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::function_builder_parameter_not_of_function_type,
+                         diag::result_builder_parameter_not_of_function_type,
                          nominal->getName());
       mutableAttr->setInvalid();
       return Type();
@@ -393,7 +395,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     // Forbid the parameter to be an autoclosure.
     if (param->isAutoClosure()) {
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::function_builder_parameter_autoclosure,
+                         diag::result_builder_parameter_autoclosure,
                          nominal->getName());
       mutableAttr->setInvalid();
       return Type();

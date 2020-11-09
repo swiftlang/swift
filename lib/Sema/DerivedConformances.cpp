@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -71,6 +73,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
     return canDeriveHashable(Nominal);
+  }
+
+  if (*derivableKind == KnownDerivableProtocolKind::Actor) {
+    return canDeriveActor(Nominal, DC);
   }
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
@@ -358,6 +364,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Hashable);
     }
 
+    // Actor.enqueue(partialTask: PartialTask)
+    if (FuncDecl::isEnqueuePartialTaskName(ctx, name)) {
+      return getRequirement(KnownProtocolKind::Actor);
+    }
+
     return nullptr;
   }
 
@@ -429,8 +440,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
-
-  Type propertyInterfaceType = property->getInterfaceType();
   
   auto getterDecl = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
@@ -438,7 +447,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
-    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+    property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();
   getterDecl->setIsTransparent(false);
 
@@ -457,7 +466,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
 
   VarDecl *propDecl = new (Context)
       VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
-              /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
+              SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
@@ -490,8 +499,27 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
     ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
+                              Nominal->getDescriptiveKind(), Nominal->getName(),
+                              synthesizing->getName(),
                               getProtocolType());
     Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+
+    // In editor mode, try to insert a stub.
+    if (Context.LangOpts.DiagnosticsEditorMode) {
+      auto Extension = cast<ExtensionDecl>(getConformanceContext());
+      auto FixitLocation = Extension->getBraces().Start;
+      llvm::SmallString<128> Text;
+      {
+        llvm::raw_svector_ostream SS(Text);
+        swift::printRequirementStub(synthesizing, Nominal,
+                                    Nominal->getDeclaredType(),
+                                    Extension->getStartLoc(), SS);
+        if (!Text.empty()) {
+          ConformanceDecl->diagnose(diag::missing_witnesses_general)
+            .fixItInsertAfter(FixitLocation, Text.str());
+        }
+      }
+    }
     return true;
   }
 
@@ -611,8 +639,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   Type intType = C.getIntDecl()->getDeclaredInterfaceType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                                  /*IsCaptureList*/false, SourceLoc(),
-                                  C.getIdentifier(indexName),
+                                  SourceLoc(), C.getIdentifier(indexName),
                                   funcDecl);
   indexVar->setInterfaceType(intType);
   indexVar->setImplicit();
@@ -782,10 +809,8 @@ VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type typ
   auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
 
   auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                 /*IsCaptureList*/true, SourceLoc(),
-                                 C.getIdentifier(indexStrRef),
+                                 SourceLoc(), C.getIdentifier(indexStrRef),
                                  varContext);
   varDecl->setInterfaceType(type);
-  varDecl->setHasNonPatternBindingInit(true);
   return varDecl;
 }

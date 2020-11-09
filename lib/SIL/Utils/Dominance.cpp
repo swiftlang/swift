@@ -119,7 +119,7 @@ void PostDominanceInfo::verify() const {
   //
   // Even though at the SIL level we have "one" return function, we can have
   // multiple exits provided by no-return functions.
-  auto *F = getRoots()[0]->getParent();
+  auto *F = (*root_begin())->getParent();
   PostDominanceInfo OtherDT(F);
 
   // And compare.

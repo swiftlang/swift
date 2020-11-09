@@ -41,6 +41,30 @@ public:
   ~ModuleDifferDiagsConsumer();
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 };
+
+class FilteringDiagnosticConsumer: public DiagnosticConsumer {
+  bool HasError = false;
+  std::unique_ptr<DiagnosticConsumer> subConsumer;
+  std::unique_ptr<llvm::StringSet<>> allowedBreakages;
+  bool shouldProceed(const DiagnosticInfo &Info);
+public:
+  FilteringDiagnosticConsumer(std::unique_ptr<DiagnosticConsumer> subConsumer,
+                              std::unique_ptr<llvm::StringSet<>> allowedBreakages):
+    subConsumer(std::move(subConsumer)),
+    allowedBreakages(std::move(allowedBreakages)) {}
+  ~FilteringDiagnosticConsumer() = default;
+
+  bool finishProcessing() override { return subConsumer->finishProcessing(); }
+  bool hasError() const { return HasError; }
+  void flush() override { subConsumer->flush(); }
+
+  void informDriverOfIncompleteBatchModeCompilation() override {
+    subConsumer->informDriverOfIncompleteBatchModeCompilation();
+  }
+
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override;
+};
 }
 }
 }

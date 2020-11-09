@@ -1211,7 +1211,7 @@ public protocol BinaryInteger :
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the quotient and remainder of this value
-  ///   divided by `rhs`. The remainder has the same sign as `rhs`.
+  ///   divided by `rhs`. The remainder has the same sign as `lhs`.
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
@@ -3010,9 +3010,10 @@ extension FixedWidthInteger {
     let minBitWidth = source.significandWidth
     let isExact = (minBitWidth <= exponent)
     let bitPattern = source.significandBitPattern
-    // `RawSignificand.bitWidth` is not available if `RawSignificand` does not
-    // conform to `FixedWidthInteger`; we can compute this value as follows if
-    // `source` is finite:
+    // Determine the actual number of fractional significand bits.
+    // `Source.significandBitCount` would not reflect the actual number of
+    // fractional significand bits if `Source` is not a fixed-width floating-point
+    // type; we can compute this value as follows if `source` is finite:
     let bitWidth = minBitWidth &+ bitPattern.trailingZeroBitCount
     let shift = exponent - Source.Exponent(bitWidth)
     // Use `Self.Magnitude` to prevent sign extension if `shift < 0`.

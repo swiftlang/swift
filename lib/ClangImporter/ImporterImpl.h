@@ -313,7 +313,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
+  Implementation(ASTContext &ctx,
                  DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
@@ -393,8 +393,6 @@ private:
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
 
-  /// Extra clang args specified via "-Xcc"
-  std::vector<std::string> ExtraClangArgs;
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
@@ -624,17 +622,17 @@ private:
 
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
-                              ArrayRef<Located<Identifier>> path);
+                              ImportPath::Module path);
   
   /// "Load" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
-                              ArrayRef<Located<Identifier>> path);
+                              ImportPath::Module path);
 
 public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<Located<Identifier>> path);
+                         ImportPath::Module path);
 
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
@@ -923,6 +921,9 @@ public:
   /// into the ASTContext.
   ModuleDecl *tryLoadFoundationModule();
 
+  /// Returns whether or not the "Foundation" module can be imported, without loading it.
+  bool canImportFoundationModule();
+
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying,
@@ -1079,13 +1080,11 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ImportedType
-  importFunctionParamsAndReturnType(DeclContext *dc,
-                                    const clang::FunctionDecl *clangDecl,
-                                    ArrayRef<const clang::ParmVarDecl *> params,
-                                    bool isVariadic, bool isFromSystemModule,
-                                    DeclName name,
-                                    ParameterList *&parameterList);
+  ImportedType importFunctionParamsAndReturnType(
+      DeclContext *dc, const clang::FunctionDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
+      ArrayRef<GenericTypeParamDecl *> genericParams);
 
   /// Import the given function return type.
   ///
@@ -1112,12 +1111,11 @@ public:
   /// \param argNames The argument names
   ///
   /// \returns The imported parameter list on success, or null on failure
-  ParameterList *
-  importFunctionParameterList(DeclContext *dc,
-                              const clang::FunctionDecl *clangDecl,
-                              ArrayRef<const clang::ParmVarDecl *> params,
-                              bool isVariadic, bool allowNSUIntegerAsInt,
-                              ArrayRef<Identifier> argNames);
+  ParameterList *importFunctionParameterList(
+      DeclContext *dc, const clang::FunctionDecl *clangDecl,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+      bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
+      ArrayRef<GenericTypeParamDecl *> genericParams);
 
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
@@ -1161,6 +1159,7 @@ public:
                                   bool isFromSystemModule,
                                   ParameterList **bodyParams,
                                   importer::ImportedName importedName,
+                                  Optional<ForeignAsyncConvention> &asyncConv,
                                   Optional<ForeignErrorConvention> &errorConv,
                                   SpecialMethodKind kind);
 
@@ -1301,6 +1300,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+                                    uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
                                 SmallVectorImpl<Requirement> &reqs) override {
     llvm_unreachable("unimplemented for ClangImporter");
@@ -1430,13 +1434,11 @@ bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx,
-                                  const ClangImporterOptions &importerOpts);
+                                  ASTContext &ctx);
 
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx,
-                                  const ClangImporterOptions &importerOpts);
+                                  ASTContext &ctx);
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>

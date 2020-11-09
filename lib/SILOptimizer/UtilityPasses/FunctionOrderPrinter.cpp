@@ -35,8 +35,8 @@ class FunctionOrderPrinterPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
     BCA = getAnalysis<BasicCalleeAnalysis>();
-    BottomUpFunctionOrder Orderer(BCA);
-    Orderer.computeBottomUpOrder(getModule());
+    auto &M = *getModule();
+    BottomUpFunctionOrder Orderer(M, BCA);
 
     llvm::outs() << "Bottom up function order:\n";
     auto SCCs = Orderer.getSCCs();

@@ -39,18 +39,16 @@ using namespace swift;
 
 STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
-llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
+llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 //                                Code Motion
 //===----------------------------------------------------------------------===//
 
-// This routine takes in the ARCMatchingSet \p MatchSet and inserts new
-// increments, decrements at the insertion points and adds the old increment,
-// decrements to the delete list. Sets changed to true if anything was moved or
-// deleted.
+// This routine takes in the ARCMatchingSet \p MatchSet and adds the increments
+// and decrements to the delete list.
 void ARCPairingContext::optimizeMatchingSet(
-    ARCMatchingSet &MatchSet, llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
+    ARCMatchingSet &MatchSet,
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   LLVM_DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
   // Add the old increments to the delete list.
@@ -71,7 +69,6 @@ void ARCPairingContext::optimizeMatchingSet(
 }
 
 bool ARCPairingContext::performMatching(
-    llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   bool MatchedPair = false;
 
@@ -99,10 +96,7 @@ bool ARCPairingContext::performMatching(
       for (auto *I : Set.Decrements)
         DecToIncStateMap.erase(I);
 
-      // Add the Set to the callback. *NOTE* No instruction destruction can
-      // happen here since we may remove instructions that are insertion points
-      // for other instructions.
-      optimizeMatchingSet(Set, NewInsts, DeadInsts);
+      optimizeMatchingSet(Set, DeadInsts);
     }
   }
 
@@ -136,7 +130,6 @@ void LoopARCPairingContext::runOnFunction(SILFunction *F) {
 bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
                                           bool FreezePostDomReleases,
                                           bool RecomputePostDomReleases) {
-  llvm::SmallVector<SILInstruction *, 8> NewInsts;
   llvm::SmallVector<SILInstruction *, 8> DeadInsts;
 
   // We have already summarized all subloops of this loop. Now summarize our
@@ -150,16 +143,7 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
   do {
     NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases,
                                           RecomputePostDomReleases);
-    MatchedPair = Context.performMatching(NewInsts, DeadInsts);
-
-    if (!NewInsts.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "Adding new interesting insts!\n");
-      do {
-        auto *I = NewInsts.pop_back_val();
-        LLVM_DEBUG(llvm::dbgs() << "    " << *I);
-        Evaluator.addInterestingInst(I);
-      } while (!NewInsts.empty());
-    }
+    MatchedPair = Context.performMatching(DeadInsts);
 
     if (!DeadInsts.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
@@ -172,6 +156,7 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
     }
 
     MadeChange |= MatchedPair;
+    Evaluator.saveMatchingInfo(Region);
     Evaluator.clearLoopState(Region);
     Context.DecToIncStateMap.clear();
     Context.IncToDecStateMap.clear();
@@ -199,7 +184,7 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
   // functions temporarily in order to unblock others. This should be removed.
-  if (F.getName().startswith("globalinit_"))
+  if (F.isGlobalInitOnceFunction())
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
@@ -247,7 +232,7 @@ static bool processFunctionWithLoopSupport(
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
   // functions temporarily in order to unblock others. This should be removed.
-  if (F.getName().startswith("globalinit_"))
+  if (F.isGlobalInitOnceFunction())
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");

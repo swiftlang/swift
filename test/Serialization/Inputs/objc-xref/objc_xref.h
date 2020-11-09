@@ -1,0 +1,2 @@
+@interface MyObject
+@end

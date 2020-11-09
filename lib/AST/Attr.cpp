@@ -589,32 +589,11 @@ static void printDifferentiableAttrArguments(
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
-    std::function<Type(Type)> getInterfaceType;
-    if (!original || !original->getGenericEnvironment()) {
-      getInterfaceType = [](Type Ty) -> Type { return Ty; };
-    } else {
-      // Use GenericEnvironment to produce user-friendly
-      // names instead of something like 't_0_0'.
-      auto *genericEnv = original->getGenericEnvironment();
-      assert(genericEnv);
-      getInterfaceType = [=](Type Ty) -> Type {
-        return genericEnv->getSugaredType(Ty);
-      };
-    }
     interleave(requirementsToPrint, [&](Requirement req) {
       if (const auto &originalGenSig = original->getGenericSignature())
         if (originalGenSig->isRequirementSatisfied(req))
           return;
-      auto FirstTy = getInterfaceType(req.getFirstType());
-      if (req.getKind() != RequirementKind::Layout) {
-        auto SecondTy = getInterfaceType(req.getSecondType());
-        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-        ReqWithDecls.print(stream, Options);
-      } else {
-        Requirement ReqWithDecls(req.getKind(), FirstTy,
-        req.getLayoutConstraint());
-        ReqWithDecls.print(stream, Options);
-      }
+      req.print(stream, Options);
     }, [&] {
       stream << ", ";
     });
@@ -654,15 +633,15 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
 
   CustomAttr *FuncBuilderAttr = nullptr;
   if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
-    FuncBuilderAttr = VD->getAttachedFunctionBuilder();
+    FuncBuilderAttr = VD->getAttachedResultBuilder();
   }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
-    // Always print function builder attribute.
-    bool isFunctionBuilderAttr = DA == FuncBuilderAttr;
+    // Always print result builder attribute.
+    bool isResultBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
-        !isFunctionBuilderAttr &&
+        !isResultBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
@@ -761,11 +740,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     if (!Options.IsForSwiftInterface)
       break;
-    // For Swift interface, we should print function builder attributes
+    // For Swift interface, we should print result builder attributes
     // on parameter decls and on protocol requirements.
     // Printing the attribute elsewhere isn't ABI relevant.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->getAttachedFunctionBuilder() == this) {
+      if (VD->getAttachedResultBuilder() == this) {
         if (!isa<ParamDecl>(D) &&
             !(isa<VarDecl>(D) && isa<ProtocolDecl>(D->getDeclContext())))
           return false;
@@ -790,8 +769,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_ActorIndependent:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
+    } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
+      // Use @_functionBuilder in Swift interfaces to maintain backward
+      // compatibility.
+      Printer.printSimpleAttr("_functionBuilder", /*needAt=*/true);
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
@@ -919,34 +903,35 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Specialize: {
-    Printer << "@" << getAttrName() << "(";
     auto *attr = cast<SpecializeAttr>(this);
+    // Don't print the _specialize attribute if it is marked spi and we are
+    // asked to skip SPI.
+    if (!Options.PrintSPIs && !attr->getSPIGroups().empty())
+      return false;
+
+    Printer << "@" << getAttrName() << "(";
     auto exported = attr->isExported() ? "true" : "false";
     auto kind = attr->isPartialSpecialization() ? "partial" : "full";
-
+    auto target = attr->getTargetFunctionName();
     Printer << "exported: "<<  exported << ", ";
+    for (auto id : attr->getSPIGroups()) {
+      Printer << "spi: " << id << ", ";
+    }
     Printer << "kind: " << kind << ", ";
+    if (target)
+      Printer << "target: " << target << ", ";
     SmallVector<Requirement, 4> requirementsScratch;
     ArrayRef<Requirement> requirements;
-    if (auto sig = attr->getSpecializedSgnature())
+    if (auto sig = attr->getSpecializedSignature())
       requirements = sig->getRequirements();
 
-    std::function<Type(Type)> GetInterfaceType;
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    if (!FnDecl || !FnDecl->getGenericEnvironment())
-      GetInterfaceType = [](Type Ty) -> Type { return Ty; };
-    else {
-      // Use GenericEnvironment to produce user-friendly
-      // names instead of something like t_0_0.
-      auto *GenericEnv = FnDecl->getGenericEnvironment();
-      assert(GenericEnv);
-      GetInterfaceType = [=](Type Ty) -> Type {
-        return GenericEnv->getSugaredType(Ty);
-      };
+    if (FnDecl && FnDecl->getGenericSignature()) {
+      auto genericSig = FnDecl->getGenericSignature();
 
-      if (auto sig = attr->getSpecializedSgnature()) {
+      if (auto sig = attr->getSpecializedSignature()) {
         requirementsScratch = sig->requirementsNotSatisfiedBy(
-            GenericEnv->getGenericSignature());
+            genericSig);
         requirements = requirementsScratch;
       }
     }
@@ -957,16 +942,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     interleave(requirements,
                [&](Requirement req) {
-                 auto FirstTy = GetInterfaceType(req.getFirstType());
-                 if (req.getKind() != RequirementKind::Layout) {
-                   auto SecondTy = GetInterfaceType(req.getSecondType());
-                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                   ReqWithDecls.print(Printer, Options);
-                 } else {
-                   Requirement ReqWithDecls(req.getKind(), FirstTy,
-                                            req.getLayoutConstraint());
-                   ReqWithDecls.print(Printer, Options);
-                 }
+                 req.print(Printer, Options);
                },
                [&] { Printer << ", "; });
 
@@ -1015,8 +991,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<TypeEraserAttr>(this);
     if (auto *repr = attr->getParsedTypeEraserTypeRepr())
       repr->print(Printer, Options);
-    else
-      attr->getTypeWithoutResolving()->print(Printer, Options);
+    else if (auto proto = dyn_cast<ProtocolDecl>(D))
+      attr->getResolvedType(proto)->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     Printer << ")";
     break;
@@ -1164,6 +1140,15 @@ StringRef DeclAttribute::getAttrName() const {
       return "inline(__always)";
     }
     llvm_unreachable("Invalid inline kind");
+  }
+  case DAK_ActorIndependent: {
+    switch (cast<ActorIndependentAttr>(this)->getKind()) {
+    case ActorIndependentKind::Safe:
+      return "actorIndependent";
+    case ActorIndependentKind::Unsafe:
+      return "actorIndependent(unsafe)";
+    }
+    llvm_unreachable("Invalid actorIndependent kind");
   }
   case DAK_Optimize: {
     switch (cast<OptimizeAttr>(this)->getMode()) {
@@ -1595,14 +1580,17 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
-                               TrailingWhereClause *clause,
-                               bool exported,
+                               TrailingWhereClause *clause, bool exported,
                                SpecializationKind kind,
-                               GenericSignature specializedSignature)
+                               GenericSignature specializedSignature,
+                               DeclNameRef targetFunctionName,
+                               ArrayRef<Identifier> spiGroups)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
-      trailingWhereClause(clause),
-      specializedSignature(specializedSignature) {
+      trailingWhereClause(clause), specializedSignature(specializedSignature),
+      targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()) {
+  std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
+                          getTrailingObjects<Identifier>());
   Bits.SpecializeAttr.exported = exported;
   Bits.SpecializeAttr.kind = unsigned(kind);
 }
@@ -1614,11 +1602,48 @@ TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
 SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TrailingWhereClause *clause,
-                                       bool exported,
-                                       SpecializationKind kind,
+                                       bool exported, SpecializationKind kind,
+                                       DeclNameRef targetFunctionName,
+                                       ArrayRef<Identifier> spiGroups,
                                        GenericSignature specializedSignature) {
-  return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
-                                  specializedSignature);
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
+  return new (mem)
+      SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
+                     targetFunctionName, spiGroups);
+}
+
+SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
+                                       SpecializationKind kind,
+                                       ArrayRef<Identifier> spiGroups,
+                                       GenericSignature specializedSignature,
+                                       DeclNameRef targetFunctionName) {
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
+  return new (mem)
+      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
+                     specializedSignature, targetFunctionName, spiGroups);
+}
+
+SpecializeAttr *SpecializeAttr::create(
+    ASTContext &ctx, bool exported, SpecializationKind kind,
+    ArrayRef<Identifier> spiGroups, GenericSignature specializedSignature,
+    DeclNameRef targetFunctionName, LazyMemberLoader *resolver, uint64_t data) {
+  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
+  auto *attr = new (mem)
+      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
+                     specializedSignature, targetFunctionName, spiGroups);
+  attr->resolver = resolver;
+  attr->resolverContextData = data;
+  return attr;
+}
+
+ValueDecl * SpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDecl) const {
+  return evaluateOrDefault(onDecl->getASTContext().evaluator,
+                           SpecializeAttrTargetDeclRequest{
+                               onDecl, const_cast<SpecializeAttr *>(this)},
+                           nullptr);
 }
 
 SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,

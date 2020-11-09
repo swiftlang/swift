@@ -286,6 +286,13 @@ class LinkEntity {
     /// The pointer is a AbstractStorageDecl*.
     DynamicallyReplaceableFunctionImpl,
 
+    /// The once token used by cacheCanonicalSpecializedMetadata, by way of
+    /// swift_getCanonicalSpecializedMetadata and
+    /// swift_getCanonicalPrespecializedGenericMetadata, to
+    /// ensure that canonical prespecialized generic records are only added to
+    /// the metadata cache once.
+    CanonicalPrespecializedGenericTypeCachingOnceToken,
+
     /// The pointer is a SILFunction*.
     DynamicallyReplaceableFunctionKey,
 
@@ -399,7 +406,7 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadata,
 
-    /// A cache variable for noncanonical specialized type metadata, to be 
+    /// A cache variable for noncanonical specialized type metadata, to be
     /// passed to swift_getCanonicalSpecializedMetadata.
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
@@ -411,7 +418,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::DynamicallyReplaceableFunctionImpl;
+    return k <= Kind::CanonicalPrespecializedGenericTypeCachingOnceToken;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -1040,6 +1047,14 @@ public:
   }
 
   static LinkEntity
+  forCanonicalPrespecializedGenericTypeCachingOnceToken(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::CanonicalPrespecializedGenericTypeCachingOnceToken,
+                      decl);
+    return entity;
+  }
+
+  static LinkEntity
   forSpecializedGenericSwiftMetaclassStub(CanType concreteType) {
     LinkEntity entity;
     entity.setForType(Kind::CanonicalSpecializedGenericSwiftMetaclassStub,
@@ -1231,7 +1246,7 @@ class ApplyIRLinkage {
   IRLinkage IRL;
 public:
   ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
-  void to(llvm::GlobalValue *GV) const {
+  void to(llvm::GlobalValue *GV, bool definition = true) const {
     llvm::Module *M = GV->getParent();
     const llvm::Triple Triple(M->getTargetTriple());
 
@@ -1253,11 +1268,14 @@ public:
       return;
     }
 
-    if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
-        IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
-      if (Triple.supportsCOMDAT())
-        if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
-          GO->setComdat(M->getOrInsertComdat(GV->getName()));
+    // COMDATs cannot be applied to declarations.  If we have a definition,
+    // apply the COMDAT.
+    if (definition)
+      if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
+          IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
+        if (Triple.supportsCOMDAT())
+          if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
+            GO->setComdat(M->getOrInsertComdat(GV->getName()));
   }
 };
 

@@ -52,6 +52,7 @@ TYPE("swiftmodule-summary", SwiftModuleSummaryFile,    "swiftmodule.summary", ""
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
 TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
 TYPE("private-swiftinterface", PrivateSwiftModuleInterfaceFile,  "private.swiftinterface",  "")
+TYPE("swiftmodulesummary",  SwiftModuleSummaryFile,    "swiftmodulesummary", "")
 TYPE("swiftsourceinfo",     SwiftSourceInfoFile,       "swiftsourceinfo", "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")

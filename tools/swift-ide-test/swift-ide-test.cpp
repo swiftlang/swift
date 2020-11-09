@@ -829,7 +829,7 @@ static bool doCodeCompletionImpl(
   CompletionInstance CompletionInst;
   auto isSuccess = CompletionInst.performOperation(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, /*EnableASTCaching=*/false, Error,
+      Offset, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         assert(!reusingASTContext && "reusing AST context without enabling it");
@@ -923,6 +923,7 @@ struct CompletionTestToken {
   StringRef Name;
   SmallVector<StringRef, 1> CheckPrefixes;
   StringRef Skip;
+  StringRef Xfail;
   Optional<bool> IncludeKeywords = None;
   Optional<bool> IncludeComments = None;
 
@@ -1001,6 +1002,10 @@ struct CompletionTestToken {
         }
         if (Key == "skip") {
           Result.Skip = Value;
+          continue;
+        }
+        if (Key == "xfail") {
+          Result.Xfail = Value;
           continue;
         }
         Error = "unknown option (" + Key.str() + ") for token";
@@ -1166,6 +1171,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
   // Process tokens.
   SmallVector<StringRef, 0> FailedTokens;
+  SmallVector<StringRef, 0> UPassTokens;
   for (const auto &Token : CCTokens) {
     if (!options::CodeCompletionToken.empty() &&
         options::CodeCompletionToken != Token.Name)
@@ -1183,6 +1189,11 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     if (!Token.Skip.empty()) {
       llvm::errs() << "Skipped: " << Token.Skip << "\n";
       continue;
+    }
+
+    bool failureExpected = !Token.Xfail.empty();
+    if (failureExpected) {
+      llvm::errs() << "Xfail: " << Token.Xfail << "\n";
     }
 
     auto IncludeKeywords = CodeCompletionKeywords;
@@ -1207,8 +1218,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     bool wasASTContextReused = false;
     bool isSuccess = CompletionInst.performOperation(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
-        /*EnableASTCaching=*/true, Error,
-        CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+        Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
         [&](CompilerInstance &CI, bool reusingASTContext) {
           // Create a CodeCompletionConsumer.
           std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -1292,23 +1302,37 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
       }
     }
 
-    if (isFileCheckFailed) {
+    if (isFileCheckFailed == failureExpected) {
+      // Success. The result may be huge. Remove the result if it's succeeded.
+      llvm::sys::fs::remove(resultFilename);
+    } else if (isFileCheckFailed) {
+      // Unexpectedly failed.
       FailedTokens.push_back(Token.Name);
     } else {
-      // The result may be huge. Remove the result if it's succeeded.
-      llvm::sys::fs::remove(resultFilename);
+      // Unexpectedly passed.
+      UPassTokens.push_back(Token.Name);
     }
   }
 
+  if (FailedTokens.empty() && UPassTokens.empty())
+    return 0;
+
+  llvm::errs() << "----\n";
   if (!FailedTokens.empty()) {
-    llvm::errs() << "----\n";
     llvm::errs() << "Unexpected failures: ";
     llvm::interleave(
         FailedTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
+    llvm::errs() << "\n";
   }
-
-  return !FailedTokens.empty();
+  if (!UPassTokens.empty()) {
+    llvm::errs() << "Unexpected passes: ";
+    llvm::interleave(
+        UPassTokens, [&](StringRef name) { llvm::errs() << name; },
+        [&]() { llvm::errs() << ", "; });
+    llvm::errs() << "\n";
+  }
+  return 1;
 }
 
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
@@ -1323,8 +1347,6 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::Swift);
-
   CompilerInstance CI;
 
   // Display diagnostics to stderr.
@@ -2112,22 +2134,14 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 //===----------------------------------------------------------------------===//
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
-  SmallVector<Located<Identifier>, 4>
-      AccessPath;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    AccessPath.push_back(
-        { Context.getIdentifier(SubModuleName), SourceLoc() });
-  }
-  ModuleDecl *Result = Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModuleByName(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  ModuleDecl *Result = Context.getModule({ Located<Identifier>(ModuleName,SourceLoc()) });
+  ModuleDecl *Result = Context.getModuleByIdentifier(ModuleName);
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
@@ -2167,8 +2181,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   if (MangledNameToFind.empty()) {
     ModuleDecl *M = CI.getMainModule();
-    M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
-                                                               Options);
+    M->getMainSourceFile().print(llvm::outs(), Options);
     return EXIT_SUCCESS;
   }
 
@@ -3188,7 +3201,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    SmallVector<ModuleDecl::ImportedModule, 16> scratch;
+    SmallVector<ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.importedModule->getName();
       if (next.importedModule->isNonSwiftModule())
@@ -3197,8 +3210,8 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
       scratch.clear();
       next.importedModule->getImportedModules(
-          scratch, ModuleDecl::ImportFilterKind::Public);
-      // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+          scratch, ModuleDecl::ImportFilterKind::Exported);
+      // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.importedModule->getName();
         for (auto accessPathPiece : import.accessPath) {
@@ -3800,8 +3813,6 @@ int main(int argc, char *argv[]) {
 
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
-  if (!options::InputFilenames.empty())
-    InitInvok.setInputKind(InputFileKind::SwiftLibrary);
 
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],

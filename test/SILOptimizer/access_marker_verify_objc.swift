@@ -12,14 +12,14 @@ import Foundation
 // --- initializer `let` of CFString.
 // The verifier should ignore this.
 
-// CHECK_LABEL: sil private @globalinit{{.*}} : $@convention(c) () -> () {
+// CHECK_LABEL: sil private @{{.*}}WZ : $@convention(c) () -> () {
 // CHECK: bb0:
 // CHECK:   alloc_global @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ
 // CHECK:   [[GA:%.*]] = global_addr @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ : $*CFString
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [init] [[GA]] : $*CFString
 // CHECK:   return %{{.*}} : $()                               
-// CHECK-LABEL: } // end sil function 'globalinit{{.*}}'
+// CHECK-LABEL: } // end sil function '{{.*}}WZ'
 class testCFString {
   public static let cfString: CFString = "" as CFString
 }

@@ -32,7 +32,6 @@
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Parse/SyntaxParserResult.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/References.h"
 #include "swift/Config.h"
@@ -50,6 +49,7 @@ namespace swift {
   class Lexer;
   class ParsedTypeSyntax;
   class PersistentParserState;
+  class RequirementRepr;
   class SILParserStateBase;
   class ScopeInfo;
   class SourceManager;
@@ -125,9 +125,6 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
-  /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
-  std::vector<Decl *> ContextSwitchedTopLevelDecls;
-
   /// The current token hash, or \c None if the parser isn't computing a hash
   /// for the token stream.
   Optional<llvm::MD5> CurrentTokenHash;
@@ -146,7 +143,6 @@ public:
   ArrayRef<VarDecl *> DisabledVars;
   Diag<> DisabledVarReason;
   
-  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
     /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
@@ -400,6 +396,22 @@ public:
   /// Current syntax parsing context where call backs should be directed to.
   SyntaxParsingContext *SyntaxContext;
 
+  /// Maps of macro name and version to availability specifications.
+  typedef llvm::DenseMap<llvm::VersionTuple,
+                         SmallVector<AvailabilitySpec *, 4>>
+                        AvailabilityMacroVersionMap;
+  typedef llvm::DenseMap<StringRef, AvailabilityMacroVersionMap>
+                        AvailabilityMacroMap;
+
+  /// Cache of the availability macros parsed from the command line arguments.
+  /// Organized as two nested \c DenseMap keyed first on the macro name then
+  /// the macro version. This structure allows to peek at macro names before
+  /// parsing a version tuple.
+  AvailabilityMacroMap AvailabilityMacros;
+
+  /// Has \c AvailabilityMacros been computed?
+  bool AvailabilityMacrosComputed = false;
+
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserStateBase *SIL, PersistentParserState *PersistentState,
@@ -554,8 +566,8 @@ public:
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
 
-    if (Tok.getText()[0] == '$' && !allowDollarIdentifier)
-      diagnoseDollarIdentifier(Tok);
+    if (Tok.getText()[0] == '$')
+      diagnoseDollarIdentifier(Tok, allowDollarIdentifier);
 
     return consumeToken();
   }
@@ -575,11 +587,22 @@ public:
 
   /// When we have a token that is an identifier starting with '$',
   /// diagnose it if not permitted in this mode.
-  void diagnoseDollarIdentifier(const Token &tok) {
+  void diagnoseDollarIdentifier(const Token &tok,
+                                bool allowDollarIdentifier = false) {
     assert(tok.getText()[0] == '$');
 
-    if (tok.getText().size() == 1 ||
-        Context.LangOpts.EnableDollarIdentifiers ||
+    // If '$' is not guarded by backticks, offer
+    // to replace it with '`$`'.
+    if (Tok.getRawText() == "$") {
+      diagnose(Tok.getLoc(), diag::standalone_dollar_identifier)
+          .fixItReplace(Tok.getLoc(), "`$`");
+      return;
+    }
+
+    if (allowDollarIdentifier)
+      return;
+
+    if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
         isInSILMode() || L->isSwiftInterface())
       return;
 
@@ -687,6 +710,19 @@ public:
   /// \param DiagText name for the string literal in the diagnostic.
   Optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
+  
+  /// Returns true when body elements are eligible as single-expression implicit returns.
+  ///
+  /// \param Body elements to search for implicit single-expression returns.
+  bool shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body); 
+
+  /// Returns true to indicate that experimental concurrency syntax should be
+  /// parsed if the parser is generating only a syntax tree or if the user has
+  /// passed the `-enable-experimental-concurrency` flag to the frontend.
+  bool shouldParseExperimentalConcurrency() const {
+    return Context.LangOpts.EnableExperimentalConcurrency ||
+      Context.LangOpts.ParseForSyntaxTreeOnly;
+  }
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -922,23 +958,6 @@ public:
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
-  // When compiling for the Debugger, some Decl's need to be moved from the
-  // current scope.  In which case although the Decl will be returned in the
-  // ParserResult, it should not be inserted into the Decl list for the current
-  // context.  markWasHandled asserts that the Decl is already where it
-  // belongs, and declWasHandledAlready is used to check this assertion.
-  // To keep the handled decl array small, we remove the Decl when it is
-  // checked, so you can only call declWasAlreadyHandled once for a given
-  // decl.
-
-  void markWasHandled(Decl *D) {
-    AlreadyHandledDecls.insert(D);
-  }
-
-  bool declWasHandledAlready(Decl *D) {
-    return AlreadyHandledDecls.erase(D);
-  }
-
   ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
@@ -999,14 +1018,22 @@ public:
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
-  bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
-                                SourceLoc Loc, SpecializeAttr *&Attr);
+  bool parseSpecializeAttribute(
+      swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
+      SpecializeAttr *&Attr,
+      llvm::function_ref<bool(Parser &)> parseSILTargetName =
+          [](Parser &) { return false; },
+      llvm::function_ref<bool(Parser &)> parseSILSIPModule =
+          [](Parser &) { return false; });
 
   /// Parse the arguments inside the @_specialize attribute
   bool parseSpecializeAttributeArguments(
       swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
       Optional<SpecializeAttr::SpecializationKind> &Kind,
-      TrailingWhereClause *&TrailingWhereClause);
+      TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
+      SmallVectorImpl<Identifier> &spiGroups,
+      llvm::function_ref<bool(Parser &)> parseSILTargetName,
+      llvm::function_ref<bool(Parser &)> parseSILSIPModule);
 
   /// Parse the @_implements attribute.
   /// \p Attr is where to store the parsed attribute
@@ -1109,7 +1136,7 @@ public:
                            ParsedAccessors &accessors,
                            AbstractStorageDecl *storage,
                            SourceLoc StaticLoc);
-  ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
+  ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
                                            StaticSpellingKind StaticSpelling,
@@ -1125,8 +1152,7 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
-  ParserResult<BraceStmt>
-  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
+  BraceStmt *parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
@@ -1165,15 +1191,12 @@ public:
   
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool HandleCodeCompletion = true,
                                    bool IsSILFuncDecl = false);
 
   ParserResult<TypeRepr>
-    parseTypeSimpleOrComposition(Diag<> MessageID,
-                                 bool HandleCodeCompletion = true);
+    parseTypeSimpleOrComposition(Diag<> MessageID);
 
-  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
-                                         bool HandleCodeCompletion = true);
+  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID);
 
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
@@ -1208,13 +1231,11 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr> parseTypeCollection();
+  ParserResult<TypeRepr> parseTypeCollection();
 
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr>
-  parseTypeOptional(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeOptional(TypeRepr *Base);
 
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr>
-  parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
@@ -1572,6 +1593,7 @@ public:
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,
           ParameterList *&params,
+          SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
@@ -1674,9 +1696,38 @@ public:
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
 
-  /// Parse a comma-separated list of availability specifications.
+  /// Parse a comma-separated list of availability specifications. Try to
+  /// expand availability macros when /p ParsingMacroDefinition is false.
   ParserStatus
-  parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs);
+  parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
+                            bool ParsingMacroDefinition = false);
+
+  /// Does the current matches an argument macro name? Parsing compiler
+  /// arguments as required without consuming tokens from the source file
+  /// parser.
+  bool peekAvailabilityMacroName();
+
+  /// Try to parse a reference to an availability macro and append its result
+  /// to \p Specs. If the current token doesn't match a macro name, return
+  /// a success without appending anything to \c Specs.
+  ParserStatus
+  parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
+
+  /// Parse the availability macros definitions passed as arguments.
+  void parseAllAvailabilityMacroArguments();
+
+  /// Result of parsing an availability macro definition.
+  struct AvailabilityMacroDefinition {
+    StringRef Name;
+    llvm::VersionTuple Version;
+    SmallVector<AvailabilitySpec *, 4> Specs;
+  };
+
+  /// Parse an availability macro definition from a command line argument.
+  /// This function should be called on a Parser set up on the command line
+  /// argument code.
+  ParserStatus
+  parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<PlatformVersionConstraintAvailabilitySpec>

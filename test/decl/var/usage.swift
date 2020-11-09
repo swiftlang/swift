@@ -242,6 +242,15 @@ func testBuildConfigs() {
 #endif
 }
 
+// same as above, but with a guard statement
+func testGuardWithPoundIf(x: Int?) {
+  guard let x = x else { return }
+
+#if false
+  _ = x
+#endif
+}
+
 // <rdar://problem/21091625> Bogus 'never mutated' warning when protocol variable is mutated only by mutating method
 protocol Fooable {
   mutating func mutFoo()

@@ -2135,18 +2135,21 @@ private:
 
     if (Mangled.nextIf('C')) {
       if (Mangled.nextIf('b'))
-        addImplFunctionAttribute(type, "@convention(block)");
+        addImplFunctionConvention(type, "block");
       else if (Mangled.nextIf('c'))
-        addImplFunctionAttribute(type, "@convention(c)");
+        addImplFunctionConvention(type, "c");
       else if (Mangled.nextIf('m'))
-        addImplFunctionAttribute(type, "@convention(method)");
+        addImplFunctionConvention(type, "method");
       else if (Mangled.nextIf('O'))
-        addImplFunctionAttribute(type, "@convention(objc_method)");
+        addImplFunctionConvention(type, "objc_method");
       else if (Mangled.nextIf('w'))
-        addImplFunctionAttribute(type, "@convention(witness_method)");
+        addImplFunctionConvention(type, "witness_method");
       else
         return nullptr;
     }
+
+    if (Mangled.nextIf('H'))
+      addImplFunctionAttribute(type, "@async");
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.
@@ -2229,6 +2232,14 @@ private:
   void addImplFunctionAttribute(NodePointer parent, StringRef attr,
                          Node::Kind kind = Node::Kind::ImplFunctionAttribute) {
     parent->addChild(Factory.createNode(kind, attr), Factory);
+  }
+
+  void addImplFunctionConvention(NodePointer parent, StringRef attr) {
+    auto attrNode = Factory.createNode(Node::Kind::ImplFunctionConvention);
+    attrNode->addChild(
+        Factory.createNode(Node::Kind::ImplFunctionConventionName, attr),
+        Factory);
+    parent->addChild(attrNode, Factory);
   }
 
   // impl-parameter ::= impl-convention type

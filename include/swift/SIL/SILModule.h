@@ -21,6 +21,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
@@ -171,9 +172,6 @@ private:
   /// but kept alive for debug info generation.
   FunctionListType zombieFunctions;
 
-  /// Stores the names of zombie functions.
-  llvm::BumpPtrAllocator zombieFunctionNames;
-
   /// Lookup table for SIL vtables from class decls.
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
@@ -259,12 +257,25 @@ private:
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
 
+  /// A trie of integer indices that gives pointer identity to a path of
+  /// projections, shared between all functions in the module.
+  std::unique_ptr<IndexTrieNode> indexTrieRoot;
+
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
   bool serialized;
+
+  /// Set if we have registered a deserialization notification handler for
+  /// lowering ownership in non transparent functions.
+  /// This gets set in NonTransparent OwnershipModelEliminator pass.
+  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
+  /// Set if we have registered a deserialization notification handler for
+  /// lowering ownership in transparent functions.
+  /// This gets set in OwnershipModelEliminator pass.
+  bool regDeserializationNotificationHandlerForAllFuncOME;
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
@@ -304,6 +315,19 @@ public:
     deserializationNotificationHandlers.erase(handler);
   }
 
+  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
+    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
+  }
+  bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
+    return regDeserializationNotificationHandlerForAllFuncOME;
+  }
+  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
+    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
+  }
+  void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
+    regDeserializationNotificationHandlerForAllFuncOME = true;
+  }
+
   /// Add a delete notification handler \p Handler to the module context.
   void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
 
@@ -340,7 +364,7 @@ public:
   /// Specialization can cause a function that was erased before by dead function
   /// elimination to become alive again. If this happens we need to remove it
   /// from the list of zombies.
-  void removeFromZombieList(StringRef Name);
+  SILFunction *removeFromZombieList(StringRef Name);
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
@@ -636,6 +660,8 @@ public:
     PGOReader = std::move(IPR);
   }
 
+  IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
+
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,
@@ -652,6 +678,19 @@ public:
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
+
+  /// Check if there are any leaking instructions.
+  ///
+  /// Aborts with an error if more instructions are allocated than contained in
+  /// the module.
+  void checkForLeaks() const;
+
+  /// Check if there are any leaking instructions after the SILModule is
+  /// destructed.
+  ///
+  /// The SILModule destructor already calls checkForLeaks(). This function is
+  /// useful to check if the destructor itself destroys all data structures.
+  static void checkForLeaksAfterDestruction();
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
@@ -671,8 +710,7 @@ public:
   /// \param Opts The SIL options, used to determine printing verbosity and
   ///        and sorting.
   /// \param PrintASTDecls If set to true print AST decls.
-  void print(raw_ostream& OS,
-             ModuleDecl *M = nullptr,
+  void print(raw_ostream &OS, ModuleDecl *M = nullptr,
              const SILOptions &Opts = SILOptions(),
              bool PrintASTDecls = true) const {
     SILPrintContext PrintCtx(OS, Opts);

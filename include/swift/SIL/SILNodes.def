@@ -713,6 +713,18 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
                     differentiability_witness_function,
                     SingleValueInstruction, None, DoesNotRelease)
+  
+  // Async
+  // TODO: The side effects declarations on this instruction could likely
+  // be tightened, though we want to be careful that passes that try to do
+  // code motion or eliminate this instruction don't do so without awareness of
+  // its structural requirements.
+  ABSTRACT_SINGLE_VALUE_INST(GetAsyncContinuationInstBase, SingleValueInstruction)
+    SINGLE_VALUE_INST(GetAsyncContinuationInst, get_async_continuation,
+                      GetAsyncContinuationInstBase, MayHaveSideEffects, MayRelease)
+    SINGLE_VALUE_INST(GetAsyncContinuationAddrInst, get_async_continuation_addr,
+                      GetAsyncContinuationInstBase, MayHaveSideEffects, MayRelease)
+    SINGLE_VALUE_INST_RANGE(GetAsyncContinuationInstBase, GetAsyncContinuationInst, GetAsyncContinuationAddrInst)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path
@@ -750,6 +762,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, MayRead, DoesNotRelease)
   TERMINATOR(DynamicMethodBranchInst, dynamic_method_br,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(AwaitAsyncContinuationInst, await_async_continuation,
+             TermInst, MayHaveSideEffects, MayRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastBranchInst, checked_cast_br,
              TermInst, None, DoesNotRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,
@@ -818,6 +832,9 @@ NON_VALUE_INST(BindMemoryInst, bind_memory,
 
 // FIXME: Is MayHaveSideEffects appropriate?
 NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+
+NON_VALUE_INST(HopToExecutorInst, hop_to_executor,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
 NON_VALUE_INST(DestroyValueInst, destroy_value,

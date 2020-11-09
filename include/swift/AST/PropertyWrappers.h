@@ -145,9 +145,9 @@ struct PropertyWrapperBackingPropertyInfo {
   /// The backing property.
   VarDecl *backingVar = nullptr;
 
-  /// The storage wrapper property, if any. When present, this takes the name
-  /// '$foo' from `backingVar`.
-  VarDecl *storageWrapperVar = nullptr;
+  /// The synthesized projection property, if any. When present, this takes the name
+  /// of the original wrapped property prefixed with \c $
+  VarDecl *projectionVar = nullptr;
 
   /// An expression that initializes the backing property from a value of
   /// the original property's type (e.g., via `init(wrappedValue:)`), or
@@ -161,10 +161,10 @@ struct PropertyWrapperBackingPropertyInfo {
   PropertyWrapperBackingPropertyInfo() { }
   
   PropertyWrapperBackingPropertyInfo(VarDecl *backingVar,
-                                     VarDecl *storageWrapperVar,
+                                     VarDecl *projectionVar,
                                      Expr *initializeFromOriginal,
                                      PropertyWrapperValuePlaceholderExpr *placeholder)
-    : backingVar(backingVar), storageWrapperVar(storageWrapperVar),
+    : backingVar(backingVar), projectionVar(projectionVar),
       initializeFromOriginal(initializeFromOriginal),
       wrappedValuePlaceholder(placeholder) { }
 

@@ -374,13 +374,7 @@ static bool printModuleInterfaceDecl(Decl *D,
 
 /// Sorts import declarations for display.
 static bool compareImports(ImportDecl *LHS, ImportDecl *RHS) {
-  auto LHSPath = LHS->getFullAccessPath();
-  auto RHSPath = RHS->getFullAccessPath();
-  for (unsigned i: range(std::min(LHSPath.size(), RHSPath.size()))) {
-    if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
-      return Ret < 0;
-  }
-  return false;
+  return LHS->getImportPath() < RHS->getImportPath();
 };
 
 /// Sorts Swift declarations for display.

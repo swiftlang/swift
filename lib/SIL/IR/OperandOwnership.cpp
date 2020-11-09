@@ -35,7 +35,6 @@ private:
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
 
   const Operand &op;
-  bool checkingSubObject;
 
 public:
   /// Create a new OperandOwnershipKindClassifier.
@@ -45,13 +44,8 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipKindClassifier(
-      SILModule &mod, const Operand &op,
-      bool checkingSubObject)
-      : mod(mod), op(op),
-        checkingSubObject(checkingSubObject) {}
-
-  bool isCheckingSubObject() const { return checkingSubObject; }
+  OperandOwnershipKindClassifier(SILModule &mod, const Operand &op)
+      : mod(mod), op(op) {}
 
   SILValue getValue() const { return op.get(); }
 
@@ -136,6 +130,8 @@ SHOULD_NEVER_VISIT_INST(Unwind)
 SHOULD_NEVER_VISIT_INST(ReleaseValue)
 SHOULD_NEVER_VISIT_INST(ReleaseValueAddr)
 SHOULD_NEVER_VISIT_INST(StrongRelease)
+SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
+
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
   SHOULD_NEVER_VISIT_INST(Name##Retain)
@@ -166,6 +162,7 @@ INTERIOR_POINTER_PROJECTION(RefTailAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBox)
+CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, HopToExecutor)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
@@ -174,6 +171,7 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, BeginCOWMutation)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndCOWMutation)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, AwaitAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
@@ -189,6 +187,7 @@ CONSTANT_OWNERSHIP_INST(None, MustBeLive, DestroyAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndAccess)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, IndexAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitBlockStorageHeader)
@@ -226,6 +225,7 @@ CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocValueBuffer)
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   CONSTANT_OWNERSHIP_INST(None, MustBeLive, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
@@ -547,15 +547,6 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitEndBorrowInst(EndBorrowInst *i) {
-  // If we are checking a subobject, make sure that we are from a guaranteed
-  // basic block argument.
-  if (isCheckingSubObject()) {
-    auto *phiArg = cast<SILPhiArgument>(op.get());
-    (void)phiArg;
-    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
-  }
-
   /// An end_borrow is modeled as invalidating the guaranteed value preventing
   /// any further uses of the value.
   return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
@@ -1028,7 +1019,17 @@ ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, MustBeLive, CancelAsyncTask)
+
 #undef CONSTANT_OWNERSHIP_BUILTIN
+
+#define SHOULD_NEVER_VISIT_BUILTIN(ID)                              \
+  OperandOwnershipKindMap OperandOwnershipKindBuiltinClassifier::visit##ID(    \
+      BuiltinInst *, StringRef) {                                              \
+    llvm_unreachable("Builtin should never be visited! E.x.: It may not have arguments"); \
+  }
+SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
+#undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see
 // them.
@@ -1049,10 +1050,7 @@ OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-OperandOwnershipKindMap
-Operand::getOwnershipKindMap(bool isForwardingSubValue) const {
-  OperandOwnershipKindClassifier classifier(
-      getUser()->getModule(), *this,
-      isForwardingSubValue);
+OperandOwnershipKindMap Operand::getOwnershipKindMap() const {
+  OperandOwnershipKindClassifier classifier(getUser()->getModule(), *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

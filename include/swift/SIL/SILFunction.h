@@ -71,7 +71,9 @@ public:
 
   static SILSpecializeAttr *create(SILModule &M,
                                    GenericSignature specializedSignature,
-                                   bool exported, SpecializationKind kind);
+                                   bool exported, SpecializationKind kind,
+                                   SILFunction *target, Identifier spiGroup,
+                                   const ModuleDecl *spiModule);
 
   bool isExported() const {
     return exported;
@@ -97,16 +99,32 @@ public:
     return F;
   }
 
+  SILFunction *getTargetFunction() const {
+    return targetFunction;
+  }
+
+  Identifier getSPIGroup() const {
+    return spiGroup;
+  }
+
+  const ModuleDecl *getSPIModule() const {
+    return spiModule;
+  }
+
   void print(llvm::raw_ostream &OS) const;
 
 private:
   SpecializationKind kind;
   bool exported;
   GenericSignature specializedSignature;
+  Identifier spiGroup;
+  const ModuleDecl *spiModule = nullptr;
   SILFunction *F = nullptr;
+  SILFunction *targetFunction = nullptr;
 
   SILSpecializeAttr(bool exported, SpecializationKind kind,
-                    GenericSignature specializedSignature);
+                    GenericSignature specializedSignature, SILFunction *target,
+                    Identifier spiGroup, const ModuleDecl *spiModule);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -121,6 +139,7 @@ public:
   enum class Purpose : uint8_t {
     None,
     GlobalInit,
+    GlobalInitOnceFunction,
     LazyPropertyGetter
   };
 
@@ -140,11 +159,11 @@ private:
   CanSILFunctionType LoweredType;
 
   /// The context archetypes of the function.
-  GenericEnvironment *GenericEnv;
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// The information about specialization.
   /// Only set if this function is a specialization of another function.
-  const GenericSpecializationInformation *SpecializationInfo;
+  const GenericSpecializationInformation *SpecializationInfo = nullptr;
 
   /// The forwarding substitution map, lazily computed.
   SubstitutionMap ForwardingSubMap;
@@ -157,10 +176,10 @@ private:
   ValueDecl *ClangNodeOwner = nullptr;
 
   /// The source location and scope of the function.
-  const SILDebugScope *DebugScope;
+  const SILDebugScope *DebugScope = nullptr;
 
   /// The AST decl context of the function.
-  DeclContext *DeclCtxt;
+  DeclContext *DeclCtxt = nullptr;
 
   /// The profiler for instrumentation based profiling, or null if profiling is
   /// disabled.
@@ -274,9 +293,6 @@ private:
   /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
   unsigned IsWithoutActuallyEscapingThunk : 1;
 
-  /// True if this function is an async function.
-  unsigned IsAsync : 1;
-
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   unsigned OptMode : NumOptimizationModeBits;
@@ -317,8 +333,7 @@ private:
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
               ProfileCounter entryCount, IsThunk_t isThunk,
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
-              EffectsKind E, SILFunction *insertBefore,
-              const SILDebugScope *debugScope,
+              EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass);
 
@@ -335,6 +350,18 @@ private:
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
+
+  void init(SILLinkage Linkage, StringRef Name,
+                         CanSILFunctionType LoweredType,
+                         GenericEnvironment *genericEnv,
+                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
+                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                         ProfileCounter entryCount, IsThunk_t isThunk,
+                         SubclassScope classSubclassScope,
+                         Inline_t inlineStrategy, EffectsKind E,
+                         const SILDebugScope *DebugScope,
+                         IsDynamicallyReplaceable_t isDynamic,
+                         IsExactSelfClass_t isExactSelfClass);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
@@ -504,9 +531,7 @@ public:
     IsWithoutActuallyEscapingThunk = val;
   }
 
-  bool isAsync() const { return IsAsync; }
-
-  void setAsync(bool val = true) { IsAsync = val; }
+  bool isAsync() const { return LoweredType->isAsync(); }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -562,15 +587,18 @@ public:
     return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
-  /// Returns true if this function either has a self metadata argument or
-  /// object that Self metadata may be derived from.
+  /// Returns true if this function ie either a class method, or a
+  /// closure that captures the 'self' value or its metatype.
+  ///
+  /// If this returns true, DynamicSelfType can be used in the body
+  /// of the function.
   ///
   /// Note that this is not the same as hasSelfParam().
   ///
-  /// For closures that capture DynamicSelfType, hasSelfMetadataParam()
+  /// For closures that capture DynamicSelfType, hasDynamicSelfMetadata()
   /// is true and hasSelfParam() is false. For methods on value types,
-  /// hasSelfParam() is true and hasSelfMetadataParam() is false.
-  bool hasSelfMetadataParam() const;
+  /// hasSelfParam() is true and hasDynamicSelfMetadata() is false.
+  bool hasDynamicSelfMetadata() const;
 
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
@@ -585,6 +613,9 @@ public:
 
   /// Returns true if this is a definition of a function defined in this module.
   bool isDefinition() const { return !isExternalDeclaration(); }
+
+  /// Returns true if there exist pre-specializations.
+  bool hasPrespecialization() const;
 
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
@@ -715,10 +746,18 @@ public:
   }
 
   /// Removes all specialize attributes from this function.
-  void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
+  void clearSpecializeAttrs() {
+    forEachSpecializeAttrTargetFunction(
+        [](SILFunction *targetFun) { targetFun->decrementRefCount(); });
+    SpecializeAttrSet.clear();
+  }
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
+  void removeSpecializeAttr(SILSpecializeAttr *attr);
+
+  void forEachSpecializeAttrTargetFunction(
+      llvm::function_ref<void(SILFunction *)> action);
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.
@@ -837,6 +876,10 @@ public:
   /// function itself does not need this attribute. It is private and only
   /// called within the addressor.
   bool isGlobalInit() const { return specialPurpose == Purpose::GlobalInit; }
+    
+  bool isGlobalInitOnceFunction() const {
+    return specialPurpose == Purpose::GlobalInitOnceFunction;
+  }
 
   bool isLazyPropertyGetter() const {
     return specialPurpose == Purpose::LazyPropertyGetter;
@@ -1044,8 +1087,8 @@ public:
     return getArguments().back();
   }
 
-  const SILArgument *getSelfMetadataArgument() const {
-    assert(hasSelfMetadataParam() && "This method can only be called if the "
+  const SILArgument *getDynamicSelfMetadata() const {
+    assert(hasDynamicSelfMetadata() && "This method can only be called if the "
            "SILFunction has a self-metadata parameter");
     return getArguments().back();
   }

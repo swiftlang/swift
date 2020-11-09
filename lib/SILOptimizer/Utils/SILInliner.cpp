@@ -374,7 +374,7 @@ SILInlineCloner::SILInlineCloner(
     SILOpenedArchetypesTracker &openedArchetypesTracker,
     SILInliner::DeletionFuncTy deletionCallback)
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
-              openedArchetypesTracker, /*Inlining=*/true),
+              openedArchetypesTracker, /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
       DeletionCallback(deletionCallback) {
 
@@ -688,6 +688,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
+  case SILInstructionKind::BindMemoryInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.
@@ -783,6 +784,17 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndCOWMutationInst:
     return InlineCost::Free;
 
+  // Turning the task reference into a continuation should be basically free.
+  // TODO(async): make sure this is true.
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+  case SILInstructionKind::GetAsyncContinuationInst:
+    return InlineCost::Free;
+
+  // Unconditional branch is free in empty blocks.
+  case SILInstructionKind::BranchInst:
+    return (I.getIterator() == I.getParent()->begin())
+      ? InlineCost::Free : InlineCost::Expensive;
+
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
@@ -792,13 +804,11 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocValueBufferInst:
-  case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
-  case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
@@ -884,6 +894,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::AwaitAsyncContinuationInst:
+  case SILInstructionKind::HopToExecutorInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

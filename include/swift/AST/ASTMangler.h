@@ -146,7 +146,8 @@ public:
 
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
-  std::string mangleGlobalInit(const VarDecl *decl, int counter,
+  std::string mangleGlobalInit(const PatternBindingDecl *decl,
+                               unsigned entry,
                                bool isInitFunc);
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
@@ -317,6 +318,9 @@ protected:
                       const ValueDecl *forDecl = nullptr);
   void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false,
                           const ValueDecl *forDecl = nullptr);
+  void appendClangType(AnyFunctionType *fn);
+  template <typename FnType>
+  void appendClangType(FnType *fn, llvm::raw_svector_ostream &os);
 
   void appendFunctionSignature(AnyFunctionType *fn,
                                const ValueDecl *forDecl = nullptr);

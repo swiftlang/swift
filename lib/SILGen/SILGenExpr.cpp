@@ -1773,14 +1773,14 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     // Source is native, so we can convert signature first.
-    destTy = adjustFunctionType(destRepTy,
-                                srcTy->getRepresentation());
+    destTy = adjustFunctionType(destRepTy, srcTy->getRepresentation(),
+                                srcTy->getClangTypeInfo());
     break;
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     // Source is foreign, so do the representation change first.
-    srcTy = adjustFunctionType(srcRepTy,
-                               destRepTy->getRepresentation());
+    srcTy = adjustFunctionType(srcRepTy, destRepTy->getRepresentation(),
+                               destRepTy->getClangTypeInfo());
   }
 
   auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
@@ -2515,7 +2515,7 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   resultInitArgs.add(E, std::move(interpolation));
 
   return SGF.emitApplyAllocatingInitializer(
-      E, E->getResultInit(), std::move(resultInitArgs), Type(), C);
+      E, E->getInitializer(), std::move(resultInitArgs), Type(), C);
 }
 
 RValue RValueEmitter::
@@ -3193,6 +3193,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           SGM.M, equatableSub, TypeExpansionContext(subSGF.F));
       auto equalsInfo = CalleeTypeInfo(equalsSubstTy,
                                        AbstractionPattern(boolTy), boolTy,
+                                       None,
                                        None,
                                        ImportAsMemberStatus());
       

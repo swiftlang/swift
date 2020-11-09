@@ -277,7 +277,6 @@ namespace sil_block {
                      BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // without_actually_escaping
-                     BCFixed<1>,  // async
                      BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
@@ -303,7 +302,10 @@ namespace sil_block {
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
                      BCFixed<1>, // exported
                      BCFixed<1>, // specialization kind
-                     GenericSignatureIDField // specialized signature
+                     GenericSignatureIDField, // specialized signature
+                     DeclIDField, // Target SILFunction name or 0.
+                     DeclIDField,  // SPIGroup or 0.
+                     DeclIDField // SPIGroup Module name id.
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

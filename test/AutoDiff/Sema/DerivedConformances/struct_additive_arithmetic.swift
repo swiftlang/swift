@@ -113,8 +113,12 @@ where T: AdditiveArithmetic {}
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+1 3 {{implementation of 'AdditiveArithmetic' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming: AdditiveArithmetic {}
+// expected-error @-1 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'zero' for protocol 'AdditiveArithmetic'}}
+// expected-error @-2 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of '+' for protocol 'AdditiveArithmetic'}}
+// expected-error @-3 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of '-' for protocol 'AdditiveArithmetic'}}
 
-// expected-error @+1 3 {{implementation of 'AdditiveArithmetic' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming: AdditiveArithmetic {}
+// expected-error @-1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'zero' for protocol 'AdditiveArithmetic'}}
+// expected-error @-2 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of '+' for protocol 'AdditiveArithmetic'}}
+// expected-error @-3 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of '-' for protocol 'AdditiveArithmetic'}}

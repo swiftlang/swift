@@ -30,11 +30,13 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
@@ -69,6 +71,7 @@
 #include "swift/Serialization/ModuleSummary.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -86,6 +89,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include <algorithm>
 #include <memory>
 #include <unordered_set>
 #include <utility>
@@ -138,6 +142,24 @@ swift::frontend::utils::escapeForMake(StringRef raw,
   return buffer.data();
 }
 
+/// This sorting function is used to stabilize the order in which dependencies
+/// are emitted into \c .d files that are consumed by external build systems.
+/// This serves to eliminate order as a source of non-determinism in these
+/// outputs.
+///
+/// The exact sorting predicate is not important. Currently, it is a
+/// lexicographic comparison that reverses the provided strings before applying
+/// the sorting predicate. This has the benefit of being somewhat
+/// invariant with respect to the installation location of various system
+/// components. e.g. on two systems, the same file identified by two different
+/// paths differing only in their relative install location such as
+///
+/// /Applications/MyXcode.app/Path/To/A/Framework/In/The/SDK/Header.h
+/// /Applications/Xcodes/AnotherXcode.app/Path/To/A/Framework/In/The/SDK/Header.h
+///
+/// should appear in roughly the same order relative to other paths. Ultimately,
+/// this makes it easier to test the contents of the emitted files with tools
+/// like FileCheck.
 static std::vector<std::string>
 reversePathSortedFilenames(const ArrayRef<std::string> elts) {
   std::vector<std::string> tmp(elts.begin(), elts.end());
@@ -180,14 +202,20 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
   for (auto const &path : inputPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   // Then print dependencies we've picked up during compilation.
   auto dependencyPaths =
     reversePathSortedFilenames(depTracker->getDependencies());
   for (auto const &path : dependencyPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+  }
+  auto incrementalDependencyPaths =
+      reversePathSortedFilenames(depTracker->getIncrementalDependencies());
+  for (auto const &path : incrementalDependencyPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
@@ -273,7 +301,7 @@ static bool isClangOverlayOf(ModuleDecl *potentialOverlay,
 }
 
 // TODO: Delete this once changes from https://reviews.llvm.org/D83449 land on
-// apple/llvm-project's swift/master branch.
+// apple/llvm-project's swift/main branch.
 template <typename SetLike, typename Item>
 static bool contains(const SetLike &setLike, Item item) {
   return setLike.find(item) != setLike.end();
@@ -286,16 +314,16 @@ static void getImmediateImports(
     ModuleDecl *module,
     SmallPtrSetImpl<ModuleDecl *> &imports,
     ModuleDecl::ImportFilter importFilter = {
-      ModuleDecl::ImportFilterKind::Public,
-      ModuleDecl::ImportFilterKind::Private,
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::ImplementationOnly,
       ModuleDecl::ImportFilterKind::SPIAccessControl,
-      ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay
+      ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay
     }) {
-  SmallVector<ModuleDecl::ImportedModule, 8> importList;
+  SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
 
-  for (ModuleDecl::ImportedModule &import : importList)
+  for (ImportedModule &import : importList)
     imports.insert(import.importedModule);
 }
 
@@ -343,6 +371,34 @@ class ABIDependencyEvaluator {
   /// Correct way to add entries to \c abiExportMap.
   void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
                            bool includeImportedModule = true);
+
+  /// Check if a Swift module is an overlay for some Clang module.
+  ///
+  /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
+  /// right API which we can use directly.
+  bool isOverlayOfClangModule(ModuleDecl *swiftModule);
+
+  /// Check for cases where we have a fake cycle through an overlay.
+  ///
+  /// Sometimes, we have fake cycles in the import graph due to the Clang
+  /// importer injecting overlays between Clang modules. These don't represent
+  /// an actual cycle in the build, so we should ignore them.
+  ///
+  /// We check this lazily after detecting a cycle because it is difficult to
+  /// determine at the point where we see the overlay whether it was incorrectly
+  /// injected by the Clang importer or whether any of its imports will
+  /// eventually lead to a cycle.
+  ///
+  /// For more details, see [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
+  ///
+  /// \param startOfCycle A pointer to the element of \c searchStack where
+  ///        the module \em first appeared.
+  ///
+  /// \pre The module on top of \c searchStack is the same module as
+  ///      *startOfCycle.
+  ///
+  /// \pre searchStack.begin() <= startOfCycle < searchStack.end()
+  bool isFakeCycleThroughOverlay(ModuleDecl **startOfCycle);
 
   /// Recursive step in computing ABI dependencies.
   ///
@@ -455,13 +511,116 @@ void ABIDependencyEvaluator::reexposeImportedABI(
     addToABIExportMap(module, reexportedModule);
 }
 
+bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
+  assert(!swiftModule->isNonSwiftModule());
+
+  llvm::SmallPtrSet<ModuleDecl *, 8> importList;
+  ::getImmediateImports(swiftModule, importList,
+                        {ModuleDecl::ImportFilterKind::Exported});
+  bool isOverlay =
+      llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
+        return isClangOverlayOf(swiftModule, importedModule);
+      });
+  return isOverlay;
+}
+
+// [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
+//
+// First, let's consider a concrete example.
+// - In Clang-land, ToyKit #imports CoreDoll.
+// - The Swift overlay for CoreDoll imports both CoreDoll and ToyKit.
+// Importing ToyKit from CoreDoll's overlay informally violates the layering
+// of frameworks, but it doesn't actually create any cycles in the build
+// dependencies.
+//                        ┌───────────────────────────┐
+//                    ┌───│    CoreDoll.swiftmodule   │
+//                    │   └───────────────────────────┘
+//                    │                 │
+//              import ToyKit     @_exported import CoreDoll
+//                    │                 │
+//                    │                 │
+//                    ▼                 │
+//      ┌──────────────────────────┐    │
+//      │ ToyKit (ToyKit/ToyKit.h) │    │
+//      └──────────────────────────┘    │
+//                    │                 │
+//       #import <CoreDoll/CoreDoll.h>  │
+//                    │                 │
+//                    ▼                 │
+//   ┌──────────────────────────────┐   │
+//   │CoreDoll (CoreDoll/CoreDoll.h)│◀──┘
+//   └──────────────────────────────┘
+//
+// Say we are trying to build a Swift module that imports ToyKit. Due to how
+// module loading works, the Clang importer inserts the CoreDoll overlay
+// between the ToyKit and CoreDoll Clang modules, creating a cycle in the
+// import graph.
+//
+//   ┌──────────────────────────┐
+//   │ ToyKit (ToyKit/ToyKit.h) │◀──────────┐
+//   └──────────────────────────┘           │
+//                 │                        │
+//    #import <CoreDoll/CoreDoll.h>    import ToyKit
+//                 │                        │
+//                 ▼                        │
+//   ┌────────────────────────────┐         │
+//   │    CoreDoll.swiftmodule    │─────────┘
+//   └────────────────────────────┘
+//                 │
+//     @_exported import CoreDoll
+//                 │
+//                 ▼
+//   ┌──────────────────────────────┐
+//   │CoreDoll (CoreDoll/CoreDoll.h)│
+//   └──────────────────────────────┘
+//
+// This means that, at some point, searchStack will look like:
+//
+//   [others] → ToyKit → CoreDoll (overlay) → ToyKit
+//
+// In the general case, there may be arbitrarily many modules in the cycle,
+// including submodules.
+//
+//   [others] → ToyKit → [others] → CoreDoll (overlay) → [others] → ToyKit
+//
+// where "[others]" indicates 0 or more modules of any kind.
+//
+// To detect this, we check that the start of the cycle is a Clang module and
+// that there is at least one overlay between it and its recurrence at the end
+// of the searchStack. If so, we assume we have detected a benign cycle which
+// can be safely ignored.
+
+bool ABIDependencyEvaluator::isFakeCycleThroughOverlay(
+    ModuleDecl **startOfCycle) {
+  assert(startOfCycle >= searchStack.begin() &&
+         startOfCycle < searchStack.end() &&
+         "startOfCycleIter points to an element in searchStack");
+  // The startOfCycle module must be a Clang module.
+  if (!(*startOfCycle)->isNonSwiftModule())
+    return false;
+  // Next, we must have zero or more modules followed by a Swift overlay for a
+  // Clang module.
+  return std::any_of(startOfCycle + 1, searchStack.end(),
+                     [this](ModuleDecl *module) {
+                       return !module->isNonSwiftModule() &&
+                              isOverlayOfClangModule(module);
+                     });
+}
+
 void ABIDependencyEvaluator::computeABIDependenciesForModule(
     ModuleDecl *module) {
-  if (llvm::find(searchStack, module) != searchStack.end()) {
+  auto moduleIter = llvm::find(searchStack, module);
+  if (moduleIter != searchStack.end()) {
+    if (isFakeCycleThroughOverlay(moduleIter))
+      return;
     crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
       os << "unexpected cycle in import graph!\n";
       for (auto m: searchStack) {
-        printModule(m, os); os << "\ndepends on ";
+        printModule(m, os);
+        if (!m->isNonSwiftModule()) {
+          os << " (isOverlay = " << isOverlayOfClangModule(m) << ")";
+        }
+        os << "\ndepends on ";
       }
       printModule(module, os); os << '\n';
     });
@@ -492,7 +651,7 @@ void ABIDependencyEvaluator::computeABIDependenciesForSwiftModule(
 
   SmallPtrSet<ModuleDecl *, 32> reexportedImports;
   ::getImmediateImports(module, reexportedImports,
-                        {ModuleDecl::ImportFilterKind::Public});
+                        {ModuleDecl::ImportFilterKind::Exported});
   for (auto reexportedImport: reexportedImports) {
     reexposeImportedABI(module, reexportedImport);
   }
@@ -512,6 +671,10 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
     //    In practice, this case is hit for
     //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
+    //    We may also hit this in a slightly different direction, in case
+    //    the module directly imports SwiftOverlayShims:
+    //      SwiftOverlayShims -> Darwin (Swift) -> SwiftOverlayShims
+    //    The latter is handled later by isFakeCycleThroughOverlay.
     // 3. [NOTE: Intra-module-leafwards-traversal]
     //    Cycles within the same top-level module.
     //    These don't matter for us, since we only care about the dependency
@@ -521,15 +684,15 @@ void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
     if (import->isStdlibModule()) {
       continue;
     }
-    if (!import->isNonSwiftModule()
-        && import->findUnderlyingClangModule() != nullptr
-        && llvm::find(searchStack, import) != searchStack.end()) {
+    if (!import->isNonSwiftModule() && isOverlayOfClangModule(import) &&
+        llvm::find(searchStack, import) != searchStack.end()) {
       continue;
     }
     if (import->isNonSwiftModule()
         && module->getTopLevelModule() == import->getTopLevelModule()
-        && !import->findUnderlyingClangModule()
-                  ->isSubModuleOf(module->findUnderlyingClangModule())) {
+        && (module == import
+            || !import->findUnderlyingClangModule()
+                      ->isSubModuleOf(module->findUnderlyingClangModule()))) {
       continue;
     }
     computeABIDependenciesForModule(import);
@@ -836,12 +999,12 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
-  auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
+static bool emitSyntax(SourceFile &SF, StringRef OutputFilename) {
+  auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
   if (!os) return true;
 
   json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
-  auto Root = SF->getSyntaxRoot().getRaw();
+  auto Root = SF.getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";
   return false;
@@ -1021,6 +1184,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
+    C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
@@ -1168,38 +1332,37 @@ static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
-static void dumpAndPrintScopeMap(const CompilerInstance &Instance,
-                                 SourceFile *SF) {
+static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
+                                 SourceFile &SF) {
   // Not const because may require reexpansion
-  ASTScope &scope = SF->getScope();
+  ASTScope &scope = SF.getScope();
 
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   if (opts.DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";
     scope.buildFullyExpandedTree();
     scope.print(llvm::errs());
-    return;
+    return Instance.getASTContext().hadError();
   }
   // Probe each of the locations, and dump what we find.
   for (auto lineColumn : opts.DumpScopeMapLocations) {
     scope.buildFullyExpandedTree();
     scope.dumpOneScopeMapLocation(lineColumn);
   }
+  return Instance.getASTContext().hadError();
 }
 
-static SourceFile *
+static SourceFile &
 getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
-  SourceFile *SF = Instance.getPrimarySourceFile();
-  if (!SF) {
-    SourceFileKind Kind = Instance.getInvocation().getSourceFileKind();
-    SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+  if (SourceFile *SF = Instance.getPrimarySourceFile()) {
+    return *SF;
   }
-  return SF;
+  return Instance.getMainModule()->getMainSourceFile();
 }
 
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
-static void dumpAST(CompilerInstance &Instance) {
+static bool dumpAST(CompilerInstance &Instance) {
   auto primaryFiles = Instance.getPrimarySourceFiles();
   if (!primaryFiles.empty()) {
     for (SourceFile *sourceFile: primaryFiles) {
@@ -1211,58 +1374,39 @@ static void dumpAST(CompilerInstance &Instance) {
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    auto *SF = getPrimaryOrMainSourceFile(Instance);
-    SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
+    auto &SF = getPrimaryOrMainSourceFile(Instance);
+    SF.dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
+  return Instance.getASTContext().hadError();
 }
 
-/// We may have been told to dump the AST (either after parsing or
-/// type-checking, which is already differentiated in
-/// CompilerInstance::performSema()), so dump or print the main source file and
-/// return.
+static bool emitReferenceDependencies(CompilerInstance &Instance,
+                                      SourceFile *const SF,
+                                      StringRef outputPath) {
+  const auto alsoEmitDotFile = Instance.getInvocation()
+                                   .getLangOptions()
+                                   .EmitFineGrainedDependencySourcefileDotFiles;
 
-static Optional<bool> dumpASTIfNeeded(CompilerInstance &Instance) {
-  const auto &opts = Instance.getInvocation().getFrontendOptions();
-  const FrontendOptions::ActionType Action = opts.RequestedAction;
-  ASTContext &Context = Instance.getASTContext();
-  switch (Action) {
-  default:
-    return None;
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
 
-  case FrontendOptions::ActionType::PrintAST:
-    getPrimaryOrMainSourceFile(Instance)
-        ->print(llvm::outs(), PrintOptions::printEverything());
-    break;
+  using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
+  return fine_grained_dependencies::withReferenceDependencies(
+      SF, *Instance.getDependencyTracker(), outputPath, alsoEmitDotFile,
+      [&](SourceFileDepGraph &&g) -> bool {
+        const bool hadError =
+            fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
+                Instance.getDiags(), outputPath, g);
 
-  case FrontendOptions::ActionType::DumpScopeMaps:
-    dumpAndPrintScopeMap(Instance, getPrimaryOrMainSourceFile(Instance));
-    break;
+        // If path is stdout, cannot read it back, so check for "-"
+        assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
 
-  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    getPrimaryOrMainSourceFile(Instance)
-        ->getTypeRefinementContext()
-        ->dump(llvm::errs(), Context.SourceMgr);
-    break;
-
-  case FrontendOptions::ActionType::DumpInterfaceHash:
-    getPrimaryOrMainSourceFile(Instance)->dumpInterfaceHash(llvm::errs());
-    break;
-
-  case FrontendOptions::ActionType::EmitSyntax:
-    emitSyntax(getPrimaryOrMainSourceFile(Instance),
-               opts.InputsAndOutputs.getSingleOutputFilename());
-    break;
-
-  case FrontendOptions::ActionType::DumpParse:
-  case FrontendOptions::ActionType::DumpAST:
-    dumpAST(Instance);
-    break;
-
-  case FrontendOptions::ActionType::EmitImportedModules:
-    emitImportedModules(Context, Instance.getMainModule(), opts);
-    break;
-  }
-  return Context.hadError();
+        if (alsoEmitDotFile)
+          g.emitDotFile(outputPath, Instance.getDiags());
+        return hadError;
+      });
 }
 
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
@@ -1279,13 +1423,11 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
-    if (!referenceDependenciesFilePath.empty()) {
-      const auto LangOpts = Invocation.getLangOptions();
-      (void)fine_grained_dependencies::emitReferenceDependencies(
-          Instance.getDiags(), SF, *Instance.getDependencyTracker(),
-          referenceDependenciesFilePath,
-          LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
+    if (referenceDependenciesFilePath.empty()) {
+      continue;
     }
+
+    emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
   }
 }
 static void
@@ -1509,7 +1651,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
           llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
-        BridgingHeaderPathForPrint = Buffer.str();
+        BridgingHeaderPathForPrint = (std::string)Buffer;
       } else {
         // By default, include the given bridging header path directly.
         BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
@@ -1639,6 +1781,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // it's -emit-imported-modules, which can load modules.
   auto action = opts.RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
+      !ctx.getLoadedModules().empty() &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
     assert(ctx.getNumLoadedModules() == 1 &&
            "Loaded a module during parse-only");
@@ -1675,9 +1818,15 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
-  // Emit dependencies and index data.
+  // FIXME: This predicate matches the status quo, but there's no reason
+  // indexing cannot run for actions that do not require stdlib e.g. to better
+  // facilitate tests.
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
+    emitIndexData(Instance);
+  }
+
+  // Emit dependencies.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-  emitIndexData(Instance);
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
 
@@ -1686,37 +1835,187 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
+static bool printSwiftVersion(const CompilerInvocation &Invocation) {
+  llvm::outs() << version::getSwiftFullVersion(
+                      version::Version::getCurrentLanguageVersion())
+               << '\n';
+  llvm::outs() << "Target: " << Invocation.getLangOptions().Target.str()
+               << '\n';
+  return false;
+}
+
+static bool
+withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
+                     llvm::function_ref<bool(CompilerInstance &)> cont) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+  assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
+         "Action may only parse, but has requested semantic analysis!");
+
+  Instance.performSema();
+  if (observer)
+    observer->performedSemanticAnalysis(Instance);
+
+  switch (opts.CrashMode) {
+  case FrontendOptions::DebugCrashMode::AssertAfterParse:
+    debugFailWithAssertion();
+    return true;
+  case FrontendOptions::DebugCrashMode::CrashAfterParse:
+    debugFailWithCrash();
+    return true;
+  case FrontendOptions::DebugCrashMode::None:
+    break;
+  }
+
+  (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
+
+  if (Instance.getASTContext().hadError())
+    return true;
+
+  return cont(Instance);
+}
+
+static bool performScanDependencies(CompilerInstance &Instance) {
+  auto batchScanInput =
+      Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+  if (batchScanInput.empty()) {
+    return scanDependencies(Instance);
+  } else {
+    return batchScanModuleDependencies(Instance, batchScanInput);
+  }
+}
+
+static bool performParseOnly(ModuleDecl &MainModule) {
+  // A -parse invocation only cares about the side effects of parsing, so
+  // force the parsing of all the source files.
+  for (auto *file : MainModule.getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file))
+      (void)SF->getTopLevelDecls();
+  }
+  return MainModule.getASTContext().hadError();
+}
+
+static bool performAction(CompilerInstance &Instance,
+                          int &ReturnValue,
+                          FrontendObserver *observer) {
+  const auto &opts = Instance.getInvocation().getFrontendOptions();
+  auto &Context = Instance.getASTContext();
+  switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
+  // MARK: Trivial Actions
+  case FrontendOptions::ActionType::NoneAction:
+    return Context.hadError();
+  case FrontendOptions::ActionType::PrintVersion:
+    return printSwiftVersion(Instance.getInvocation());
+  case FrontendOptions::ActionType::REPL:
+    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
+                             "removed; use the LLDB-enhanced REPL instead.");
+
+  // MARK: Actions for Clang and Clang Modules
+  case FrontendOptions::ActionType::EmitPCH:
+    return precompileBridgingHeader(Instance);
+  case FrontendOptions::ActionType::EmitPCM:
+    return precompileClangModule(Instance);
+  case FrontendOptions::ActionType::DumpPCM:
+    return dumpPrecompiledClangModule(Instance);
+
+  // MARK: Module Interface Actions
+  case FrontendOptions::ActionType::CompileModuleFromInterface:
+  case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+    return buildModuleFromInterface(Instance);
+
+  // MARK: Actions that Dump
+  case FrontendOptions::ActionType::DumpParse:
+    return dumpAST(Instance);
+  case FrontendOptions::ActionType::DumpAST: {
+    // FIXME: -dump-ast expects to be able to write output even if type checking
+    // fails which does not cleanly fit the model \c withSemanticAnalysis is
+    // trying to impose. Once there is a request for the "semantic AST", this
+    // point is moot.
+    Instance.performSema();
+    return dumpAST(Instance);
+  }
+  case FrontendOptions::ActionType::PrintAST:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance).print(
+              llvm::outs(), PrintOptions::printEverything());
+          return Instance.getASTContext().hadError();
+        });
+  case FrontendOptions::ActionType::DumpScopeMaps:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          return dumpAndPrintScopeMap(Instance,
+                                      getPrimaryOrMainSourceFile(Instance));
+        });
+  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+              llvm::errs(), Instance.getASTContext().SourceMgr);
+          return Instance.getASTContext().hadError();
+        });
+  case FrontendOptions::ActionType::DumpInterfaceHash:
+    getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
+    return Context.hadError();
+  case FrontendOptions::ActionType::EmitSyntax:
+    return emitSyntax(getPrimaryOrMainSourceFile(Instance),
+                      opts.InputsAndOutputs.getSingleOutputFilename());
+  case FrontendOptions::ActionType::EmitImportedModules:
+    return emitImportedModules(Instance.getMainModule(), opts);
+
+  // MARK: Dependency Scanning Actions
+  case FrontendOptions::ActionType::ScanDependencies:
+    return performScanDependencies(Instance);
+  case FrontendOptions::ActionType::ScanClangDependencies:
+    return scanClangDependencies(Instance);
+
+  // MARK: General Compilation Actions
+  case FrontendOptions::ActionType::Parse:
+    return performParseOnly(*Instance.getMainModule());
+  case FrontendOptions::ActionType::ResolveImports:
+    return Instance.performParseAndResolveImportsOnly();
+  case FrontendOptions::ActionType::Typecheck:
+    return withSemanticAnalysis(Instance, observer,
+                                [](CompilerInstance &Instance) {
+                                  return Instance.getASTContext().hadError();
+                                });
+  case FrontendOptions::ActionType::EmitSILGen:
+  case FrontendOptions::ActionType::EmitSIBGen:
+  case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitSIB:
+  case FrontendOptions::ActionType::EmitModuleOnly:
+  case FrontendOptions::ActionType::MergeModules:
+  case FrontendOptions::ActionType::Immediate:
+  case FrontendOptions::ActionType::EmitAssembly:
+  case FrontendOptions::ActionType::EmitIR:
+  case FrontendOptions::ActionType::EmitBC:
+  case FrontendOptions::ActionType::EmitObject:
+  case FrontendOptions::ActionType::DumpTypeInfo:
+    return withSemanticAnalysis(
+        Instance, observer, [&](CompilerInstance &Instance) {
+          assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
+                 "All actions not requiring SILGen must have been handled!");
+          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+        });
+  }
+
+  assert(false && "Unhandled case in performCompile!");
+  return Context.hadError();
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
-                           ArrayRef<const char *> Args,
                            int &ReturnValue,
                            FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
 
-  // We've been asked to precompile a bridging header or module; we want to
-  // avoid touching any other inputs and just parse, emit and exit.
-  if (Action == FrontendOptions::ActionType::EmitPCH)
-    return precompileBridgingHeader(Instance);
-  if (Action == FrontendOptions::ActionType::EmitPCM)
-    return precompileClangModule(Instance);
-  if (Action == FrontendOptions::ActionType::DumpPCM)
-    return dumpPrecompiledClangModule(Instance);
-  if (Action == FrontendOptions::ActionType::PrintVersion) {
-    llvm::outs() << version::getSwiftFullVersion(
-      version::Version::getCurrentLanguageVersion()) << '\n';
-    llvm::outs() << "Target: "
-      << Invocation.getLangOptions().Target.str() << '\n';
-    return false;
-  }
-  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
-    return buildModuleFromInterface(Instance);
-
-  if (Invocation.getInputKind() == InputFileKind::LLVM)
+  // To compile LLVM IR, just pass it off unmodified.
+  if (opts.InputsAndOutputs.shouldTreatAsLLVM())
     return compileLLVMIR(Instance);
 
   // If we aren't in a parse-only context and expect an implicit stdlib import,
@@ -1725,90 +2024,35 @@ static bool performCompile(CompilerInstance &Instance,
   // trigger a bunch of other errors due to the stdlib being missing, or at
   // worst crash downstream as many call sites don't currently handle a missing
   // stdlib.
-  if (!FrontendOptions::shouldActionOnlyParse(Action)) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(Action)) {
     if (Instance.loadStdlibIfNeeded())
       return true;
   }
 
-  bool didFinishPipeline = false;
-  SWIFT_DEFER {
-    assert(didFinishPipeline && "Returned without calling finishPipeline");
-  };
-
-  auto finishPipeline = [&](bool hadError) -> bool {
-    // We might have freed the ASTContext already, but in that case we would
-    // have already performed these actions.
-    if (Instance.hasASTContext()) {
-      performEndOfPipelineActions(Instance);
-      hadError |= Instance.getASTContext().hadError();
+  assert([&]() -> bool {
+    if (FrontendOptions::shouldActionOnlyParse(Action)) {
+      // Parsing gets triggered lazily, but let's make sure we have the right
+      // input kind.
+      return llvm::all_of(
+          opts.InputsAndOutputs.getAllInputs(), [](const InputFile &IF) {
+            const auto kind = IF.getType();
+            return kind == file_types::TY_Swift ||
+                   kind == file_types::TY_SwiftModuleInterfaceFile;
+          });
     }
-    didFinishPipeline = true;
-    return hadError;
-  };
+    return true;
+  }() && "Only supports parsing .swift files");
 
-  auto &Context = Instance.getASTContext();
-  if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    // Parsing gets triggered lazily, but let's make sure we have the right
-    // input kind.
-    auto kind = Invocation.getInputKind();
-    assert((kind == InputFileKind::Swift ||
-            kind == InputFileKind::SwiftLibrary ||
-            kind == InputFileKind::SwiftModuleInterface) &&
-           "Only supports parsing .swift files");
-    (void)kind;
-  } else if (Action == FrontendOptions::ActionType::ResolveImports) {
-    Instance.performParseAndResolveImportsOnly();
-    return finishPipeline(Context.hadError());
-  } else {
-    Instance.performSema();
+  bool hadError = performAction(Instance, ReturnValue, observer);
+
+  // We might have freed the ASTContext already, but in that case we would
+  // have already performed these actions.
+  if (Instance.hasASTContext() &&
+      FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
+    performEndOfPipelineActions(Instance);
+    hadError |= Instance.getASTContext().hadError();
   }
-
-  if (Action == FrontendOptions::ActionType::Parse) {
-    // A -parse invocation only cares about the side effects of parsing, so
-    // force the parsing of all the source files.
-    for (auto *file : Instance.getMainModule()->getFiles()) {
-      if (auto *SF = dyn_cast<SourceFile>(file))
-        (void)SF->getTopLevelDecls();
-    }
-    return finishPipeline(Context.hadError());
-  }
-
-  if (Action == FrontendOptions::ActionType::ScanDependencies)
-    return finishPipeline(scanDependencies(Instance));
-
-  if (observer)
-    observer->performedSemanticAnalysis(Instance);
-
-  {
-    FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
-    if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
-      debugFailWithAssertion();
-    else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
-      debugFailWithCrash();
-  }
-
-  (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
-
-  if (Action == FrontendOptions::ActionType::REPL) {
-    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
-                             "removed; use the LLDB-enhanced REPL instead.");
-  }
-
-  if (auto r = dumpASTIfNeeded(Instance))
-    return finishPipeline(*r);
-
-  if (Context.hadError())
-    return finishPipeline(/*hadError*/ true);
-
-  // We've just been told to perform a typecheck, so we can return now.
-  if (Action == FrontendOptions::ActionType::Typecheck)
-    return finishPipeline(/*hadError*/ false);
-
-  assert(FrontendOptions::doesActionGenerateSIL(Action) &&
-         "All actions not requiring SILGen must have been handled!");
-
-  return finishPipeline(
-      performCompileStepsPostSema(Instance, ReturnValue, observer));
+  return hadError;
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1826,12 +2070,13 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   return Context.hadError();
 }
 
-static bool emitModuleSummary(SILModule *SM,
-                              const std::string &ModuleSummaryOutputPath,
-                              const ASTContext &Context) {
+static bool serializeModuleSummary(SILModule *SM,
+                                   const PrimarySpecificPaths &PSPs,
+                                   const ASTContext &Context) {
+  auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
   auto Summary = modulesummary::buildModuleSummaryIndex(*SM);
   return modulesummary::writeModuleSummaryIndex(*Summary.get(), Context.Diags,
-                                                ModuleSummaryOutputPath);
+                                                summaryOutputPath);
 }
 
 static GeneratedModule
@@ -1893,7 +2138,10 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
 
     // If we can't validate the given input file, bail early. This covers cases
     // like passing raw SIL as a primary file.
-    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind())) {
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    // FIXME: This would be a good test of the interface format.
+    if (IO.shouldTreatAsModuleInterface() || IO.shouldTreatAsSIL() ||
+        IO.shouldTreatAsLLVM() || IO.shouldTreatAsObjCHeader()) {
       return false;
     }
 
@@ -2044,7 +2292,23 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
     SerializationOptions serializationOpts =
         Invocation.computeSerializationOptions(outs, Instance.getMainModule());
-    serialize(MSF, serializationOpts, SM.get());
+    if (serializationOpts.ExperimentalCrossModuleIncrementalInfo) {
+      const auto alsoEmitDotFile =
+          Instance.getInvocation()
+              .getLangOptions()
+              .EmitFineGrainedDependencySourcefileDotFiles;
+
+      using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
+      auto *Mod = MSF.get<ModuleDecl *>();
+      fine_grained_dependencies::withReferenceDependencies(
+          Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
+          alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
+            serialize(MSF, serializationOpts, SM.get(), &g);
+            return false;
+          });
+    } else {
+      serialize(MSF, serializationOpts, SM.get());
+    }
   };
 
   // Set the serialization action, so that the SIL module
@@ -2058,8 +2322,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  if (!opts.ModuleSummaryOutputPath.empty()) {
-    if (emitModuleSummary(SM.get(), opts.ModuleSummaryOutputPath, Context)) {
+  if (PSPs.haveModuleSummaryOutputPath()) {
+    if (serializeModuleSummary(SM.get(), PSPs, Context)) {
       return true;
     }
   }
@@ -2200,7 +2464,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
-          subconsumers.emplace_back(input.file(), std::move(consumer));
+          subconsumers.emplace_back(input.getFileName(), std::move(consumer));
         return false;
       });
   // For batch mode, the compiler must sometimes swallow diagnostics pertaining
@@ -2217,7 +2481,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subconsumers.emplace_back(input.file(), nullptr);
+          subconsumers.emplace_back(input.getFileName(), nullptr);
           return false;
         });
   }
@@ -2407,6 +2671,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
   INITIALIZE_LLVM();
+  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   PrintingDiagnosticConsumer PDC;
@@ -2430,8 +2695,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     DiagnosticInfo errorInfo(
         DiagID(0), SourceLoc(), DiagnosticKind::Error,
-        "fatal error encountered during compilation; please file a bug report "
-        "with your project and the crash log",
+        "fatal error encountered during compilation; " SWIFT_BUG_REPORT_MESSAGE,
         {}, SourceLoc(), {}, {}, {}, false);
     DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note,
                             reason, {}, SourceLoc(), {}, {}, {}, false);
@@ -2596,7 +2860,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
+  bool HadError = performCompile(*Instance, ReturnValue, observer);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();

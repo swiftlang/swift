@@ -469,6 +469,28 @@ bb3:
   return %9999 : $()
 }
 
+sil @read_from_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> UInt8 {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %2 = load %1 : $*UInt8
+  return %2 : $UInt8
+}
+
+// CHECK-LABEL: sil @dont_remove_store_to_escaping_allocstack_to_known_function : $@convention(thin) (UInt8) -> UInt8
+// CHECK:        alloc_stack
+// CHECK-NEXT:   store
+// CHECK:      } // end sil function 'dont_remove_store_to_escaping_allocstack_to_known_function'
+sil @dont_remove_store_to_escaping_allocstack_to_known_function : $@convention(thin) (UInt8) -> UInt8 {
+bb0(%0 : $UInt8):
+  %1 = alloc_stack $UInt8
+  store %0 to %1 : $*UInt8
+  %3 = address_to_pointer %1 : $*UInt8 to $Builtin.RawPointer
+  %4 = function_ref @read_from_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> UInt8
+  %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8
+  dealloc_stack %1 : $*UInt8
+  return %5 : $UInt8
+}
+
 sil @unknown : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @inout_is_not_aliasing : $@convention(thin) (@inout Builtin.Int32) -> () {

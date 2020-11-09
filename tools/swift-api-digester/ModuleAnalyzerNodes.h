@@ -154,6 +154,7 @@ struct CheckerOptions {
   bool PrintModule;
   bool SwiftOnly;
   bool SkipOSCheck;
+  bool CompilerStyle;
   bool Migrator;
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;

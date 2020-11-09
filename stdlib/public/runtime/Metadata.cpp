@@ -18,6 +18,7 @@
 #include "MetadataCache.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
@@ -49,6 +50,8 @@
 #endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
+#endif
+#if SWIFT_OBJC_INTEROP
 extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
     (Class _Nonnull oldClass, Class _Nonnull newClass));
 #endif
@@ -192,7 +195,7 @@ computeMetadataBoundsForSuperclass(const void *ref,
 #endif
   }
   }
-  swift_runtime_unreachable("unsupported superclass reference kind");
+  swift_unreachable("unsupported superclass reference kind");
 }
 
 static ClassMetadataBounds computeMetadataBoundsFromSuperclass(
@@ -337,7 +340,7 @@ namespace {
 
 namespace {
   class GenericMetadataCache :
-    public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag, false> {
+    public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag> {
   public:
     uint16_t NumKeyParameters;
     uint16_t NumWitnessTables;
@@ -380,22 +383,7 @@ static GenericMetadataCache &getCache(
   return lazyCache->getWithInit(*description.getGenericContext());
 }
 
-/// Fetch the metadata cache for a generic metadata structure,
-/// in a context where it must have already been initialized.
-static GenericMetadataCache &unsafeGetInitializedCache(
-    const TypeGenericContextDescriptorHeader &generics) {
-  // Keep this assert even if you change the representation above.
-  static_assert(sizeof(LazyGenericMetadataCache) <=
-                sizeof(GenericMetadataInstantiationCache::PrivateData),
-                "metadata cache is larger than the allowed space");
-
-  auto lazyCache =
-    reinterpret_cast<LazyGenericMetadataCache*>(
-      generics.getInstantiationCache()->PrivateData);
-  return lazyCache->unsafeGetAlreadyInitialized();
-}
-
-#if SWIFT_PTRAUTH
+#if SWIFT_PTRAUTH && SWIFT_OBJC_INTEROP
 static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   auto oldClassMetadata = reinterpret_cast<const ClassMetadata *>(oldClass);
 
@@ -598,9 +586,6 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   description = swift_auth_data_non_address(
     description, SpecialPointerAuthDiscriminators::TypeDescriptor);
 
-  auto &generics = description->getFullGenericContextHeader();
-  auto &cache = unsafeGetInitializedCache(generics);
-
   // Compute the formal bounds of the metadata.
   auto bounds = description->getMetadataBounds();
 
@@ -613,7 +598,7 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   }
 
   auto bytes = (char*) 
-    cache.getAllocator().withTag(GenericClassMetadataTag)
+    MetadataAllocator(GenericClassMetadataTag)
       .Allocate(allocationBounds.getTotalSizeInBytes(), alignof(void*));
 
   auto addressPoint = bytes + allocationBounds.getAddressPointInBytes();
@@ -670,9 +655,6 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
                                           size_t extraDataSize) {
   description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
 
-  auto &generics = description->getFullGenericContextHeader();
-  auto &cache = unsafeGetInitializedCache(generics);
-
   static_assert(sizeof(StructMetadata::HeaderType)
                   == sizeof(ValueMetadata::HeaderType),
                 "struct metadata header unexpectedly has extra members");
@@ -686,7 +668,7 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
-  auto bytes = (char*) cache.getAllocator().withTag(GenericValueMetadataTag)
+  auto bytes = (char*) MetadataAllocator(GenericValueMetadataTag)
     .Allocate(totalSize, alignof(void*));
 
   auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
@@ -698,6 +680,56 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   installGenericArguments(metadata, description, arguments);
 
   return metadata;
+}
+
+// Look into the canonical prespecialized metadata attached to the type
+// descriptor and add them to the metadata cache.
+static void
+_cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
+  auto &cache = getCache(*description);
+  auto request =
+      MetadataRequest(MetadataState::Complete, /*isNonBlocking*/ true);
+  assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
+         cache.NumKeyParameters + cache.NumWitnessTables);
+  if (auto *classDescription = dyn_cast<ClassDescriptor>(description)) {
+    auto canonicalMetadataAccessors = classDescription->getCanonicalMetadataPrespecializationAccessors();
+    for (auto &canonicalMetadataAccessorPtr : canonicalMetadataAccessors) {
+      auto *canonicalMetadataAccessor = canonicalMetadataAccessorPtr.get();
+      auto response = canonicalMetadataAccessor(request);
+      auto *canonicalMetadata = response.Value;
+      const void *const *arguments =
+          reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
+      auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                                  arguments);
+      auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
+      (void)result;
+      assert(result.second.Value == canonicalMetadata);
+    }
+  } else {
+    auto canonicalMetadatas = description->getCanonicicalMetadataPrespecializations();
+    for (auto &canonicalMetadataPtr : canonicalMetadatas) {
+      Metadata *canonicalMetadata = canonicalMetadataPtr.get();
+      const void *const *arguments =
+          reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
+      auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                                  arguments);
+      auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
+      (void)result;
+      assert(result.second.Value == canonicalMetadata);
+    }
+  }
+}
+
+static void
+cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description,
+                                  swift_once_t *token) {
+  swift_once(
+      token,
+      [](void *uncastDescription) {
+        auto *description = (const TypeContextDescriptor *)uncastDescription;
+        _cacheCanonicalSpecializedMetadata(description);
+      },
+      (void *)description);
 }
 
 MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
@@ -717,29 +749,29 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
                             MetadataState::Complete};
   }
 
-  auto &cache = getCache(*description);
-  assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
-         cache.NumKeyParameters + cache.NumWitnessTables);
+  if (auto *token =
+          description
+              ->getCanonicalMetadataPrespecializationCachingOnceToken()) {
+    cacheCanonicalSpecializedMetadata(description, token);
+    // NOTE: If there is no token, then there are no canonical prespecialized
+    //       metadata records, either.
+  }
   const void *const *arguments =
       reinterpret_cast<const void *const *>(candidate->getGenericArgs());
+  auto &cache = getCache(*description);
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, candidate);
-
-  assert(
-      !result.second.Value->isCanonicalStaticallySpecializedGenericMetadata());
 
   cachedMetadataAddr->store(result.second.Value, std::memory_order_release);
 
   return result.second;
 }
 
-/// The primary entrypoint.
-MetadataResponse
-swift::swift_getGenericMetadata(MetadataRequest request,
-                                const void * const *arguments,
-                                const TypeContextDescriptor *description) {
-  description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+SWIFT_CC(swift)
+static MetadataResponse
+_swift_getGenericMetadata(MetadataRequest request, const void *const *arguments,
+                          const TypeContextDescriptor *description) {
   auto &cache = getCache(*description);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
          cache.NumKeyParameters + cache.NumWitnessTables);
@@ -747,10 +779,27 @@ swift::swift_getGenericMetadata(MetadataRequest request,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
 
-  assert(
-      !result.second.Value->isCanonicalStaticallySpecializedGenericMetadata());
-
   return result.second;
+}
+
+/// The primary entrypoint.
+MetadataResponse
+swift::swift_getGenericMetadata(MetadataRequest request,
+                                const void *const *arguments,
+                                const TypeContextDescriptor *description) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  return _swift_getGenericMetadata(request, arguments, description);
+}
+
+MetadataResponse swift::swift_getCanonicalPrespecializedGenericMetadata(
+    MetadataRequest request, const void *const *arguments,
+    const TypeContextDescriptor *description, swift_once_t *token) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  cacheCanonicalSpecializedMetadata(description, token);
+
+  return _swift_getGenericMetadata(request, arguments, description);
 }
 
 /***************************************************************************/
@@ -931,8 +980,12 @@ namespace {
       return reinterpret_cast<intptr_t>(Data.Class);
     }
 
-    int compareWithKey(const ClassMetadata *theClass) const {
-      return comparePointers(theClass, Data.Class);
+    bool matchesKey(const ClassMetadata *theClass) const {
+      return theClass == Data.Class;
+    }
+
+    friend llvm::hash_code hash_value(const ObjCClassCacheEntry &value) {
+      return llvm::hash_value(value.Data.Class);
     }
 
     static size_t getExtraAllocationSize(const ClassMetadata *key) {
@@ -1027,6 +1080,15 @@ public:
       auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
       return ParameterFlags::fromIntValue(flags);
     }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto hash = llvm::hash_combine(key.Flags.getIntValue(), key.Result);
+      for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
+        hash = llvm::hash_combine(hash, key.getParameter(i));
+        hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
+      }
+      return hash;
+    }
   };
 
   FunctionCacheEntry(const Key &key);
@@ -1035,28 +1097,27 @@ public:
     return 0; // No single meaningful value here.
   }
 
-  int compareWithKey(const Key &key) const {
-    auto keyFlags = key.getFlags();
-    if (auto result = compareIntegers(keyFlags.getIntValue(),
-                                      Data.Flags.getIntValue()))
-      return result;
-
-    if (auto result = comparePointers(key.getResult(), Data.ResultType))
-      return result;
-
-    for (unsigned i = 0, e = keyFlags.getNumParameters(); i != e; ++i) {
-      if (auto result =
-              comparePointers(key.getParameter(i), Data.getParameter(i)))
-        return result;
-
-      if (auto result =
-              compareIntegers(key.getParameterFlags(i).getIntValue(),
-                              Data.getParameterFlags(i).getIntValue()))
-        return result;
+  bool matchesKey(const Key &key) const {
+    if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
+      return false;
+    if (key.getResult() != Data.ResultType)
+      return false;
+    for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
+      if (key.getParameter(i) != Data.getParameter(i))
+        return false;
+      if (key.getParameterFlags(i).getIntValue() !=
+          Data.getParameterFlags(i).getIntValue())
+        return false;
     }
-
-    return 0;
+    return true;
   }
+
+  friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
+    Key key = {value.Data.Flags, value.Data.getParameters(),
+               value.Data.getParameterFlags(), value.Data.ResultType};
+    return hash_value(key);
+  }
+
   static size_t getExtraAllocationSize(const Key &key) {
     return getExtraAllocationSize(key.Flags);
   }
@@ -1195,6 +1256,19 @@ public:
     size_t NumElements;
     const Metadata * const *Elements;
     const char *Labels;
+
+    template <class Range>
+    static llvm::hash_code hash_value(Range elements, const char *labels) {
+      auto hash = llvm::hash_combine_range(elements.begin(), elements.end());
+      hash = llvm::hash_combine(hash, llvm::StringRef(labels));
+      return hash;
+    }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto elements =
+          llvm::ArrayRef<const Metadata *>(key.Elements, key.NumElements);
+      return hash_value(elements, key.Labels);
+    }
   };
 
   ValueType getValue() {
@@ -1228,34 +1302,33 @@ public:
     return 0; // No single meaningful value
   }
 
-  int compareWithKey(const Key &key) const {
-    // Order by the cheaper comparisons first:
+  friend llvm::hash_code hash_value(const TupleCacheEntry &value) {
+    auto elements = llvm::ArrayRef<TupleTypeMetadata::Element>(
+        value.Data.getElements(), value.Data.NumElements);
+    auto types =
+        makeTransformRange(elements, [](TupleTypeMetadata::Element element) {
+          return element.Type;
+        });
+    return Key::hash_value(types, value.Data.Labels);
+  }
 
-    // The number of elements.
-    if (auto result = compareIntegers(key.NumElements,(size_t)Data.NumElements))
-      return result;
+  bool matchesKey(const Key &key) {
+    if (key.NumElements != Data.NumElements)
+      return false;
 
-    // The element types.
-    for (size_t i = 0, e = key.NumElements; i != e; ++i) {
-      if (auto result = comparePointers(key.Elements[i],
-                                        Data.getElement(i).Type))
-        return result;
-    }
+    for (size_t i = 0, e = key.NumElements; i != e; ++i)
+      if (key.Elements[i] != Data.getElement(i).Type)
+        return false;
 
     // It's unlikely that we'll get pointer-equality here unless we're being
     // called from the same module or both label strings are null, but
     // those are important cases.
-    if (key.Labels != Data.Labels) {
-      // Order no-labels before labels.
-      if (!key.Labels) return -1;
-      if (!Data.Labels) return 1;
+    if (key.Labels == Data.Labels)
+      return true;
+    if (!key.Labels || !Data.Labels)
+      return false;
 
-      // Just do a strcmp.
-      if (auto result = strcmp(key.Labels, Data.Labels))
-        return result;
-    }
-
-    return 0;
+    return strcmp(key.Labels, Data.Labels) == 0;
   }
 
   size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>) const {
@@ -1271,7 +1344,7 @@ public:
 };
 
 class TupleCacheStorage :
-  public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag, false> {
+  public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -1702,7 +1775,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
   size_t labelsLen = strlen(labels);
   size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
   char *newLabels =
-    (char *) cache.getAllocator().Allocate(labelsAllocSize, alignof(char));
+    (char *) MetadataAllocator(TupleCacheTag).Allocate(labelsAllocSize, alignof(char));
   strcpy(newLabels, labels);
   key.Labels = newLabels;
 
@@ -1712,7 +1785,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
   if (cast<TupleTypeMetadata>(result.Value)->Labels != newLabels) {
-    cache.getAllocator().Deallocate(newLabels, labelsAllocSize, alignof(char));
+    MetadataAllocator(TupleCacheTag).Deallocate(newLabels, labelsAllocSize, alignof(char));
   }
 
   // Done.
@@ -1919,8 +1992,8 @@ namespace {
     bool operator==(const TypeContextIdentity &other) const {
       return Name == other.Name;
     }
-    int compare(const TypeContextIdentity &other) const {
-      return Name.compare(other.Name);
+    friend llvm::hash_code hash_value(const TypeContextIdentity &value) {
+      return llvm::hash_value(value.Name);
     }
   };
 }
@@ -1977,6 +2050,11 @@ bool swift::equalContexts(const ContextDescriptor *a,
 SWIFT_CC(swift)
 bool swift::swift_compareTypeContextDescriptors(
     const TypeContextDescriptor *a, const TypeContextDescriptor *b) {
+  a = swift_auth_data_non_address(
+      a, SpecialPointerAuthDiscriminators::TypeDescriptor);
+  b = swift_auth_data_non_address(
+      b, SpecialPointerAuthDiscriminators::TypeDescriptor);
+
   // The implementation is the same as the implementation of
   // swift::equalContexts except that the handling of non-type
   // context descriptors and casts to TypeContextDescriptor are removed.
@@ -2851,24 +2929,22 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
-    MetadataResponse response =
-      swift_getTypeByMangledName(request, superclassName,
-        substitutions.getGenericArgs(),
+    auto result = swift_getTypeByMangledName(
+        request, superclassName, substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index);
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        }).getResponse();
-    auto superclass = response.Value;
-    if (!superclass) {
-      fatalError(0,
-                 "failed to demangle superclass of %s from mangled name '%s'\n",
-                 self->getDescription()->Name.get(),
-                 superclassName.str().c_str());
+        });
+    if (auto *error = result.getError()) {
+      fatalError(
+          0, "failed to demangle superclass of %s from mangled name '%s': %s\n",
+          self->getDescription()->Name.get(), superclassName.str().c_str(),
+          error->copyErrorString());
     }
 
-    return response;
+    return result.getType().getResponse();
   } else {
     return MetadataResponse();
   }
@@ -3196,8 +3272,12 @@ namespace {
       return reinterpret_cast<intptr_t>(Data.InstanceType);
     }
 
-    int compareWithKey(const Metadata *instanceType) const {
-      return comparePointers(instanceType, Data.InstanceType);
+    bool matchesKey(const Metadata *instanceType) const {
+      return instanceType == Data.InstanceType;
+    }
+
+    friend llvm::hash_code hash_value(const MetatypeCacheEntry &value) {
+      return llvm::hash_value(value.Data.InstanceType);
     }
 
     static size_t getExtraAllocationSize(const Metadata *instanceType) {
@@ -3241,8 +3321,11 @@ public:
     return static_cast<intptr_t>(getNumWitnessTables());
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const ExistentialMetatypeValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3263,8 +3346,13 @@ public:
     return reinterpret_cast<intptr_t>(Data.InstanceType);
   }
 
-  int compareWithKey(const Metadata *instanceType) const {
-    return comparePointers(instanceType, Data.InstanceType);
+  bool matchesKey(const Metadata *instanceType) const {
+    return instanceType == Data.InstanceType;
+  }
+
+  friend llvm::hash_code
+  hash_value(const ExistentialMetatypeCacheEntry &value) {
+    return llvm::hash_value(value.Data.InstanceType);
   }
 
   static size_t getExtraAllocationSize(const Metadata *key) {
@@ -3377,6 +3465,14 @@ public:
     ProtocolClassConstraint ClassConstraint : 1;
     uint32_t NumProtocols : 31;
     const ProtocolDescriptorRef *Protocols;
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto hash = llvm::hash_combine(key.SuperclassConstraint,
+                                     key.ClassConstraint, key.NumProtocols);
+      for (size_t i = 0; i != key.NumProtocols; i++)
+        hash = llvm::hash_combine(hash, key.Protocols[i].getRawData());
+      return hash;
+    }
   };
 
   ExistentialCacheEntry(Key key);
@@ -3385,27 +3481,30 @@ public:
     return 0;
   }
 
-  int compareWithKey(Key key) const {
-    if (auto result = compareIntegers(key.ClassConstraint,
-                                      Data.Flags.getClassConstraint()))
-      return result;
+  bool matchesKey(Key key) const {
+    if (key.ClassConstraint != Data.Flags.getClassConstraint())
+      return false;
 
-    if (auto result = comparePointers(key.SuperclassConstraint,
-                                      Data.getSuperclassConstraint()))
-      return result;
+    if (key.SuperclassConstraint != Data.getSuperclassConstraint())
+      return false;
 
-    if (auto result = compareIntegers(key.NumProtocols,
-                                      Data.NumProtocols))
-      return result;
+    if (key.NumProtocols != Data.NumProtocols)
+      return false;
 
     auto dataProtocols = Data.getProtocols();
     for (size_t i = 0; i != key.NumProtocols; ++i) {
-      if (auto result = compareIntegers(key.Protocols[i].getRawData(),
-                                        dataProtocols[i].getRawData()))
-        return result;
+      if (key.Protocols[i].getRawData() != dataProtocols[i].getRawData())
+        return false;
     }
 
-    return 0;
+    return true;
+  }
+
+  friend llvm::hash_code hash_value(const ExistentialCacheEntry &value) {
+    Key key = {value.Data.getSuperclassConstraint(),
+               value.Data.Flags.getClassConstraint(), value.Data.NumProtocols,
+               value.Data.getProtocols().data()};
+    return hash_value(key);
   }
 
   static size_t getExtraAllocationSize(Key key) {
@@ -3436,8 +3535,11 @@ public:
     return getNumWitnessTables();
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const OpaqueExistentialValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3463,8 +3565,11 @@ public:
     return getNumWitnessTables();
   }
 
-  int compareWithKey(unsigned key) const {
-    return compareIntegers(key, getNumWitnessTables());
+  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+
+  friend llvm::hash_code
+  hash_value(const ClassExistentialValueWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.getNumWitnessTables());
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
@@ -3651,7 +3756,7 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
     return getOpaqueExistentialValueWitnesses(numWitnessTables);
   }
 
-  swift_runtime_unreachable("Unhandled ProtocolClassConstraint in switch.");
+  swift_unreachable("Unhandled ProtocolClassConstraint in switch.");
 }
 
 template<> ExistentialTypeRepresentation
@@ -3696,7 +3801,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   }
   }
 
-  swift_runtime_unreachable(
+  swift_unreachable(
       "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
@@ -3745,7 +3850,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   }
   }
 
-  swift_runtime_unreachable(
+  swift_unreachable(
       "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
@@ -3770,7 +3875,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   }
   }
 
-  swift_runtime_unreachable(
+  swift_unreachable(
       "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
@@ -3965,20 +4070,28 @@ class ForeignMetadataCacheEntry
     return Value;
   }
   void setValue(ValueType value) {
-    swift_runtime_unreachable("should never be called");
+    swift_unreachable("should never be called");
   }
 
 public:
+  struct Key {
+    const TypeContextDescriptor *Description;
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      return hash_value(TypeContextIdentity(key.Description));
+    }
+  };
+
   static const char *getName() { return "ForeignMetadataCache"; }
 
   template <class... Args>
-  ForeignMetadataCacheEntry(const TypeContextDescriptor *description,
+  ForeignMetadataCacheEntry(Key key,
                             MetadataRequest request, Metadata *candidate)
       : Value(candidate) {
     // Remember that the metadata is still just a candidate until this
     // is actually successfully installed in the concurrent map.
 
-    auto &init = description->getForeignMetadataInitialization();
+    auto &init = key.Description->getForeignMetadataInitialization();
 
     PrivateMetadataState state;
     if (!init.CompletionFunction) {
@@ -4020,17 +4133,19 @@ public:
     return reinterpret_cast<intptr_t>(getDescription()->Name.get());
   }
 
-  int compareWithKey(const TypeContextDescriptor *key) const {
+  friend llvm::hash_code hash_value(const ForeignMetadataCacheEntry &value) {
+    return hash_value(TypeContextIdentity(value.getDescription()));
+  }
+
+  bool matchesKey(Key key) {
     // We can just compare unparented type-context identities because
     // we assume that foreign types don't have interesting parenting
     // structure.
-    return TypeContextIdentity(key)
-             .compare(TypeContextIdentity(getDescription()));
+    return TypeContextIdentity(key.Description) == TypeContextIdentity(getDescription());
   }
 
   AllocationResult allocate(Metadata *candidate) {
-    swift_runtime_unreachable(
-                        "always flags allocation complete during construction");
+    swift_unreachable("always flags allocation complete during construction");
   }
 
   TryInitializeResult tryInitialize(Metadata *metadata,
@@ -4064,14 +4179,14 @@ public:
 
 } // end anonymous namespace
 
-static Lazy<MetadataCache<ForeignMetadataCacheEntry, ForeignMetadataCacheTag,
-                          false>> ForeignMetadata;
+static Lazy<MetadataCache<ForeignMetadataCacheEntry, ForeignMetadataCacheTag>> ForeignMetadata;
 
 MetadataResponse
 swift::swift_getForeignTypeMetadata(MetadataRequest request,
                                     ForeignTypeMetadata *candidate) {
   auto description = getForeignTypeDescription(candidate);
-  return ForeignMetadata->getOrInsert(description, request, candidate).second;
+  ForeignMetadataCacheEntry::Key key{description};
+  return ForeignMetadata->getOrInsert(key, request, candidate).second;
 }
 
 /// Unique-ing of foreign types' witness tables.
@@ -4081,24 +4196,34 @@ namespace {
     struct Key {
       const TypeContextDescriptor *type;
       const ProtocolDescriptor *protocol;
+
+      friend llvm::hash_code hash_value(const Key &value) {
+        return llvm::hash_combine(value.protocol,
+                                  TypeContextIdentity(value.type));
+      }
     };
 
-    const Key key;
+    const TypeContextDescriptor *type;
+    const ProtocolDescriptor *protocol;
     const WitnessTable *data;
 
     ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
                                   const WitnessTable *d)
-        : key(k), data(d) {}
+        : type(k.type), protocol(k.protocol), data(d) {}
 
     intptr_t getKeyIntValueForDump() {
-      return reinterpret_cast<intptr_t>(key.type);
+      return reinterpret_cast<intptr_t>(type);
     }
 
-    int compareWithKey(const Key other) const {
-      if (auto r = comparePointers(other.protocol, key.protocol))
-        return r;
+    bool matchesKey(const Key other) const {
+      return other.protocol == protocol &&
+             TypeContextIdentity(other.type) == TypeContextIdentity(type);
+    }
 
-      return TypeContextIdentity(other.type).compare(TypeContextIdentity(key.type));
+    friend llvm::hash_code
+    hash_value(const ForeignWitnessTableCacheEntry &value) {
+      Key key{value.type, value.protocol};
+      return hash_value(key);
     }
 
     static size_t getExtraAllocationSize(const Key,
@@ -4112,19 +4237,23 @@ namespace {
   };
 }
 
-static SimpleGlobalCache<ForeignWitnessTableCacheEntry,
-                         ForeignWitnessTablesTag> ForeignWitnessTables;
+static ConcurrentReadableHashMap<ForeignWitnessTableCacheEntry>
+    ForeignWitnessTables;
 
 static const WitnessTable *_getForeignWitnessTable(
     const WitnessTable *witnessTableCandidate,
     const TypeContextDescriptor *contextDescriptor,
     const ProtocolDescriptor *protocol) {
-  auto result =
-      ForeignWitnessTables
-          .getOrInsert(
-              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
-              witnessTableCandidate)
-          .first->data;
+  const WitnessTable *result = nullptr;
+  ForeignWitnessTableCacheEntry::Key key{contextDescriptor, protocol};
+  ForeignWitnessTables.getOrInsert(
+      key, [&](ForeignWitnessTableCacheEntry *entryPtr, bool created) {
+        if (created)
+          new (entryPtr)
+              ForeignWitnessTableCacheEntry(key, witnessTableCandidate);
+        result = entryPtr->data;
+        return true;
+      });
   return result;
 }
 
@@ -4342,9 +4471,13 @@ public:
     return reinterpret_cast<intptr_t>(Type);
   }
 
+  friend llvm::hash_code hash_value(const WitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.Type);
+  }
+
   /// The key value of the entry is just its type pointer.
-  int compareWithKey(const Metadata *type) const {
-    return comparePointers(Type, type);
+  bool matchesKey(const Metadata *type) {
+    return Type == type;
   }
 
   static size_t getExtraAllocationSize(
@@ -4375,8 +4508,7 @@ public:
 } // end anonymous namespace
 
 using GenericWitnessTableCache =
-  MetadataCache<WitnessTableCacheEntry, GenericWitnessTableCacheTag,
-                /*destructor*/ false>;
+  MetadataCache<WitnessTableCacheEntry, GenericWitnessTableCacheTag>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 
 /// Fetch the cache for a generic witness-table structure.
@@ -4490,7 +4622,7 @@ static void initProtocolWitness(void **slot, void *witness,
                                       reqt);
     return;
   }
-  swift_runtime_unreachable("bad witness kind");
+  swift_unreachable("bad witness kind");
 #else
   *slot = witness;
 #endif
@@ -4523,7 +4655,7 @@ static void copyProtocolWitness(void **dest, void * const *src,
     swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
     return;
   }
-  swift_runtime_unreachable("bad witness kind");
+  swift_unreachable("bad witness kind");
 #else
   *dest = *src;
 #endif
@@ -4863,12 +4995,12 @@ swift_getAssociatedTypeWitnessSlowImpl(
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
-  MetadataResponse response;
+  TypeLookupErrorOr<TypeInfo> result = TypeInfo();
   if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
-    response =
-      swift_getTypeByMangledName(request, mangledName, nullptr,
+    result = swift_getTypeByMangledName(
+        request, mangledName, nullptr,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4885,7 +5017,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
           return swift_getAssociatedConformanceWitness(wtable, conformingType,
                                                        type, reqBase,
                                                        dependentDescriptor);
-        }).getResponse();
+        });
   } else {
     // The generic parameters in the associated type name are those of the
     // conforming type.
@@ -4895,29 +5027,30 @@ swift_getAssociatedTypeWitnessSlowImpl(
     auto originalConformingType = findConformingSuperclass(conformingType,
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
-    response = swift_getTypeByMangledName(request, mangledName,
-      substitutions.getGenericArgs(),
-      [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index);
-      },
-      [&substitutions](const Metadata *type, unsigned index) {
-        return substitutions.getWitnessTable(type, index);
-      }).getResponse();
+    result = swift_getTypeByMangledName(
+        request, mangledName, substitutions.getGenericArgs(),
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        });
   }
+  auto *error = result.getError();
+  MetadataResponse response = result.getType().getResponse();
   auto assocTypeMetadata = response.Value;
-
-  if (!assocTypeMetadata) {
+  if (error || !assocTypeMetadata) {
+    const char *errStr = error ? error->copyErrorString()
+                               : "NULL metadata but no error was provided";
     auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
     StringRef conformingTypeName(conformingTypeNameInfo.data,
                                  conformingTypeNameInfo.length);
     StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
     fatalError(0,
                "failed to demangle witness for associated type '%s' in "
-               "conformance '%s: %s' from mangled name '%s'\n",
-               assocTypeName.str().c_str(),
-               conformingTypeName.str().c_str(),
-               protocol->Name.get(),
-               mangledName.str().c_str());
+               "conformance '%s: %s' from mangled name '%s' - %s\n",
+               assocTypeName.str().c_str(), conformingTypeName.str().c_str(),
+               protocol->Name.get(), mangledName.str().c_str(), errStr);
   }
 
   assert((uintptr_t(assocTypeMetadata) &
@@ -5075,7 +5208,7 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
     return assocWitnessTable;
   }
 
-  swift_runtime_unreachable("Invalid mangled associate conformance");
+  swift_unreachable("Invalid mangled associate conformance");
 }
 
 const WitnessTable *swift::swift_getAssociatedConformanceWitness(
@@ -5168,7 +5301,7 @@ static Result performOnMetadataCache(const Metadata *metadata,
     case TypeContextDescriptorFlags::SingletonMetadataInitialization:
       return std::move(callbacks).forSingletonMetadata(description);
     }
-    swift_runtime_unreachable("bad metadata initialization kind");
+    swift_unreachable("bad metadata initialization kind");
   }
 
   auto &generics = description->getFullGenericContextHeader();
@@ -5202,7 +5335,8 @@ bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
 
     bool forForeignMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description) {
-      return ForeignMetadata.get().enqueue(description, QueueEntry, Dependency);
+      ForeignMetadataCacheEntry::Key key{description};
+      return ForeignMetadata.get().enqueue(key, QueueEntry, Dependency);
     }
 
     bool forSingletonMetadata(const TypeContextDescriptor *description) && {
@@ -5214,7 +5348,7 @@ bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
     }
 
     bool forOtherMetadata(const Metadata *metadata) && {
-      swift_runtime_unreachable("metadata should always be complete");
+      swift_unreachable("metadata should always be complete");
     }
   } callbacks = { queueEntry, dependency };
 
@@ -5234,7 +5368,8 @@ void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
 
     void forForeignMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description) {
-      ForeignMetadata.get().resumeInitialization(description, QueueEntry);
+      ForeignMetadataCacheEntry::Key key{description};
+      ForeignMetadata.get().resumeInitialization(key, QueueEntry);
     }
 
     void forSingletonMetadata(const TypeContextDescriptor *description) && {
@@ -5246,7 +5381,7 @@ void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
     }
 
     void forOtherMetadata(const Metadata *metadata) && {
-      swift_runtime_unreachable("metadata should always be complete");
+      swift_unreachable("metadata should always be complete");
     }
   } callbacks = { queueEntry };
 
@@ -5269,7 +5404,8 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
 
     MetadataResponse forForeignMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description) {
-      return ForeignMetadata.get().await(description, Request);
+      ForeignMetadataCacheEntry::Key key{description};
+      return ForeignMetadata.get().await(key, Request);
     }
 
     MetadataResponse forSingletonMetadata(
@@ -5564,7 +5700,8 @@ checkMetadataDependency(MetadataDependency dependency) {
 
     MetadataDependency forForeignMetadata(const Metadata *metadata,
                                     const TypeContextDescriptor *description) {
-      return ForeignMetadata.get().checkDependency(description, Requirement);
+      ForeignMetadataCacheEntry::Key key{description};
+      return ForeignMetadata.get().checkDependency(key, Requirement);
     }
 
     MetadataDependency forSingletonMetadata(
@@ -5870,7 +6007,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
                           nullptr,
                           [](unsigned, unsigned){ return nullptr; },
                           [](const Metadata *, unsigned) { return nullptr; })
-      .getMetadata();
+      .getType().getMetadata();
   if (metadata != result)
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",
@@ -5904,3 +6041,8 @@ inline void _Atomic_storage<::PoolRange, 16>::_Unlock() const noexcept {
 }
 }
 #endif
+
+// Autolink with libc++, for cases where libswiftCore is linked statically.
+#if defined(__MACH__)
+asm(".linker_option \"-lc++\"\n");
+#endif // defined(__MACH__)

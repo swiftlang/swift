@@ -11,7 +11,7 @@ var mygg = 29
 // Check if we have one token: from mygg.
 // Initializers from other modules are never fragile.
 
-// CHECK: sil_global private{{.*}} @globalinit_[[T3:.*]]_token0
+// CHECK: sil_global private{{.*}} @[[T3:.*]]Wz
 
 //@inlinable
 public func sum() -> Int {
@@ -21,8 +21,8 @@ public func sum() -> Int {
 // Check if all the addressors are inlined.
 
 // CHECK-LABEL: sil {{.*}}@$s15fragile_globals3sumSiyF
-// CHECK-DAG: global_addr @globalinit_[[T1:.*]]_token0
-// CHECK-DAG: function_ref @globalinit_[[T1]]_func0
+// CHECK-DAG: global_addr @[[T1:.*]]Wz
+// CHECK-DAG: function_ref @[[T1]]WZ
 // CHECK-DAG: global_addr @$s15fragile_globals4myggSivp
 // CHECK-DAG: function_ref @$s7ModuleA2ggSivau
 // CHECK-DAG: function_ref @$s7ModuleB2ggSivau

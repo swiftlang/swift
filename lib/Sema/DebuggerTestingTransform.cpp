@@ -227,8 +227,8 @@ private:
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
-                    SourceLoc(), nullptr, DF.getNextDiscriminator(),
-                    getCurrentDeclContext());
+                    SourceLoc(), SourceLoc(), nullptr,
+                    DF.getNextDiscriminator(), getCurrentDeclContext());
     Closure->setImplicit(true);
 
     // TODO: Save and return the value of $OriginalExpr.
@@ -244,7 +244,8 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
+    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext(),
+                                          /*contextualInfo=*/{}))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
     // Captures have to be computed after the closure is type-checked. This

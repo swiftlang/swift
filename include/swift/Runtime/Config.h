@@ -17,23 +17,8 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Runtime/CMakeConfig.h"
-
-/// \macro SWIFT_RUNTIME_GNUC_PREREQ
-/// Extend the default __GNUC_PREREQ even if glibc's features.h isn't
-/// available.
-#ifndef SWIFT_RUNTIME_GNUC_PREREQ
-# if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
-#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
-    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) + __GNUC_PATCHLEVEL__ >= \
-     ((maj) << 20) + ((min) << 10) + (patch))
-# elif defined(__GNUC__) && defined(__GNUC_MINOR__)
-#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
-    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) >= ((maj) << 20) + ((min) << 10))
-# else
-#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) 0
-# endif
-#endif
 
 /// SWIFT_RUNTIME_LIBRARY_VISIBILITY - If a class marked with this attribute is
 /// linked into a shared library, then the class should be private to the
@@ -41,47 +26,20 @@
 /// variables and functions, making them private to any shared library they are
 /// linked into.
 /// On PE/COFF targets, library visibility is the default, so this isn't needed.
-#if (__has_attribute(visibility) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)) &&    \
+#if (__has_attribute(visibility) || SWIFT_GNUC_PREREQ(4, 0, 0)) &&    \
     !defined(__MINGW32__) && !defined(__CYGWIN__) && !defined(_WIN32)
 #define SWIFT_RUNTIME_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
 #else
 #define SWIFT_RUNTIME_LIBRARY_VISIBILITY
 #endif
 
-/// Attributes.
-/// SWIFT_RUNTIME_ATTRIBUTE_NOINLINE - On compilers where we have a directive to do so,
-/// mark a method "not for inlining".
-#if __has_attribute(noinline) || SWIFT_RUNTIME_GNUC_PREREQ(3, 4, 0)
-#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __attribute__((noinline))
-#elif defined(_MSC_VER)
-#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __declspec(noinline)
-#else
-#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
-#endif
-
-/// SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE - On compilers where we have a directive to do
-/// so, mark a method "always inline" because it is performance sensitive. GCC
-/// 3.4 supported this but is buggy in various cases and produces unimplemented
-/// errors, just use it in GCC 4.0 and later.
-#if __has_attribute(always_inline) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)
-#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
-#elif defined(_MSC_VER)
-#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __forceinline
-#else
-#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
-#endif
-
-#ifdef __GNUC__
-#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __attribute__((noreturn))
-#elif defined(_MSC_VER)
-#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __declspec(noreturn)
-#else
-#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN
-#endif
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE SWIFT_ATTRIBUTE_NOINLINE
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE SWIFT_ATTRIBUTE_ALWAYS_INLINE
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_ATTRIBUTE_NORETURN
 
 /// SWIFT_RUNTIME_BUILTIN_TRAP - On compilers which support it, expands to an expression
 /// which causes the program to exit abnormally.
-#if __has_builtin(__builtin_trap) || SWIFT_RUNTIME_GNUC_PREREQ(4, 3, 0)
+#if __has_builtin(__builtin_trap) || SWIFT_GNUC_PREREQ(4, 3, 0)
 # define SWIFT_RUNTIME_BUILTIN_TRAP __builtin_trap()
 #elif defined(_MSC_VER)
 // The __debugbreak intrinsic is supported by MSVC, does not require forward
@@ -251,6 +209,30 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dynamic_replacement_key                                \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::DynamicReplacementKey)
+#define __ptrauth_swift_job_invoke_function                                    \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::JobInvokeFunction)
+#define __ptrauth_swift_task_resume_function                                   \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::TaskResumeFunction)
+#define __ptrauth_swift_task_resume_context                                    \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TaskResumeContext)
+#define __ptrauth_swift_async_context_parent                                   \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::AsyncContextParent)
+#define __ptrauth_swift_async_context_resume                                   \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::AsyncContextResume)
+#define __ptrauth_swift_async_context_yield                                    \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::AsyncContextYield)
+#define __ptrauth_swift_cancellation_notification_function                     \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::CancellationNotificationFunction)
+#define __ptrauth_swift_escalation_notification_function                       \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::EscalationNotificationFunction)
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
   ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
                           ptrauth_key_process_independent_code,                \
@@ -268,6 +250,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
 #define __ptrauth_swift_value_witness_function_pointer(__key)
 #define __ptrauth_swift_type_metadata_instantiation_function
+#define __ptrauth_swift_job_invoke_function
+#define __ptrauth_swift_task_resume_function
+#define __ptrauth_swift_task_resume_context
+#define __ptrauth_swift_async_context_parent
+#define __ptrauth_swift_async_context_resume
+#define __ptrauth_swift_async_context_yield
+#define __ptrauth_swift_cancellation_notification_function
+#define __ptrauth_swift_escalation_notification_function
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)

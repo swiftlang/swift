@@ -56,6 +56,9 @@ NullablePtr<SILInstruction> createIncrementBefore(SILValue ptr,
 NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
                                                   SILInstruction *insertpt);
 
+/// Get the insertion point after \p val.
+Optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
+
 /// A utility for deleting one or more instructions belonging to a function, and
 /// cleaning up any dead code resulting from deleting those instructions. Use
 /// this utility instead of
@@ -308,21 +311,22 @@ bool tryCheckedCastBrJumpThreading(
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {
-  std::function<void(SILInstruction *)> deleteInst = [](SILInstruction *inst) {
-    inst->eraseFromParent();
-  };
-  std::function<void(SILInstruction *)> createdNewInst = [](SILInstruction *) {
-  };
-  std::function<void(SILValue, SILValue)> replaceValueUsesWith =
-      [](SILValue oldValue, SILValue newValue) {
-        oldValue->replaceAllUsesWith(newValue);
-      };
+  static const std::function<void(SILInstruction *)> defaultDeleteInst;
+  static const std::function<void(SILInstruction *)> defaultCreatedNewInst;
+  static const std::function<void(SILValue, SILValue)> defaultReplaceValueUsesWith;
+  static const std::function<void(SingleValueInstruction *, SILValue)>
+      defaultEraseAndRAUWSingleValueInst;
+
+  std::function<void(SILInstruction *)> deleteInst =
+      InstModCallbacks::defaultDeleteInst;
+  std::function<void(SILInstruction *)> createdNewInst =
+      InstModCallbacks::defaultCreatedNewInst;
+  std::function<void(SILValue, SILValue)>
+      replaceValueUsesWith =
+          InstModCallbacks::defaultReplaceValueUsesWith;
   std::function<void(SingleValueInstruction *, SILValue)>
       eraseAndRAUWSingleValueInst =
-          [](SingleValueInstruction *i, SILValue newValue) {
-            i->replaceAllUsesWith(newValue);
-            i->eraseFromParent();
-          };
+          InstModCallbacks::defaultEraseAndRAUWSingleValueInst;
 
   InstModCallbacks(decltype(deleteInst) deleteInst,
                    decltype(createdNewInst) createdNewInst,
@@ -330,10 +334,7 @@ struct InstModCallbacks {
       : deleteInst(deleteInst), createdNewInst(createdNewInst),
         replaceValueUsesWith(replaceValueUsesWith),
         eraseAndRAUWSingleValueInst(
-            [](SingleValueInstruction *i, SILValue newValue) {
-              i->replaceAllUsesWith(newValue);
-              i->eraseFromParent();
-            }) {}
+            InstModCallbacks::defaultEraseAndRAUWSingleValueInst) {}
 
   InstModCallbacks(
       decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
@@ -359,6 +360,11 @@ void getConsumedPartialApplyArgs(PartialApplyInst *pai,
                                  SmallVectorImpl<Operand *> &argOperands,
                                  bool includeTrivialAddrArgs);
 
+/// Emit destroy operation for \p operand, and call appropriate functions from
+/// \p callbacks for newly created instructions and deleted instructions.
+void emitDestroyOperation(SILBuilder &builder, SILLocation loc,
+                          SILValue operand, InstModCallbacks callbacks);
+
 /// Collect all (transitive) users of \p inst which just copy or destroy \p
 /// inst.
 ///
@@ -368,6 +374,7 @@ void getConsumedPartialApplyArgs(PartialApplyInst *pai,
 /// destroys, i.e. if \p inst can be considered as "dead".
 bool collectDestroys(SingleValueInstruction *inst,
                      SmallVectorImpl<SILInstruction *> &destroys);
+
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///

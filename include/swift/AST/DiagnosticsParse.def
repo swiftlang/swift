@@ -324,6 +324,8 @@ ERROR(func_decl_expected_arrow,none,
 ERROR(operator_static_in_protocol,none,
       "operator '%0' declared in protocol must be 'static'",
       (StringRef))
+ERROR(async_func_modifier,none,
+      "'async' must be written after the parameter list of a function", ())
 
 // Enum
 ERROR(expected_lbrace_enum,PointsToFirstBadToken,
@@ -626,6 +628,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_specialize_target_func_not_found,none,
+      "_specialize target function not found %0", (Identifier))
 ERROR(sil_availability_expected_version,none,
       "expected version number in 'available' attribute", ())
 
@@ -882,8 +886,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(multiple_parameter_ellipsis,none,
-      "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
 ERROR(parameter_specifier_as_attr_disallowed,none,
@@ -916,6 +918,8 @@ ERROR(initializer_as_typed_pattern,none,
 
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
+ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
+      "no parameters may follow a variadic parameter in a closure", ())
 
 ERROR(enum_element_empty_arglist,none,
       "enum element with associated values must have at least one "
@@ -1324,8 +1328,6 @@ ERROR(replace_equal_with_colon_for_value,none,
       "'=' has been replaced with ':' in attribute arguments", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
-ERROR(unknown_attribute,none,
-      "unknown attribute '%0'", (StringRef))
 ERROR(unexpected_lparen_in_attribute,none,
       "unexpected '(' in attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,none,
@@ -1357,6 +1359,12 @@ ERROR(attr_expected_comma,none,
 
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
+
+ERROR(attr_expected_option_such_as,none,
+      "expected '%0' option such as '%1'", (StringRef, StringRef))
+
+ERROR(attr_unknown_option,none,
+      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 ERROR(attr_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
@@ -1432,6 +1440,22 @@ WARNING(attr_availability_platform_agnostic_infeasible_option,none,
 WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
+
+// availability macro
+ERROR(attr_availability_wildcard_in_macro, none,
+      "future platforms identified by '*' cannot be used in "
+      "an availability macro definition", ())
+ERROR(attr_availability_missing_macro_name,none,
+      "expected an identifier to begin an availability macro definition", ())
+ERROR(attr_availability_expected_colon_macro,none,
+      "expected ':' after '%0' in availability macro definition",
+      (StringRef))
+ERROR(attr_availability_unknown_version,none,
+      "reference to undefined version '%0' for availability macro '%1'",
+      (StringRef, StringRef))
+ERROR(attr_availability_duplicate,none,
+      "duplicate definition of availability macro '%0' for version '%1'",
+      (StringRef, StringRef))
 
 // originallyDefinedIn
 ERROR(originally_defined_in_missing_rparen,none,
@@ -1517,17 +1541,9 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// inline, optimize
-ERROR(optimization_attribute_expect_option,none,
-      "expected '%0' option such as '%1'", (StringRef, StringRef))
-ERROR(optimization_attribute_unknown_option,none,
-      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
-
 // effects
 ERROR(effects_attribute_expect_option,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
-ERROR(effects_attribute_unknown_option,none,
-      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
@@ -1554,9 +1570,6 @@ ERROR(attr_specialize_unknown_parameter_name,none,
 ERROR(attr_specialize_expected_bool_value,none,
       "expected a boolean true or false value in '_specialize' attribute", ())
 
-WARNING(attr_specialize_export_true_no_op,none,
-        "'exported: true' has no effect in '_specialize' attribute", ())
-
 ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
       "expected a parameter label or a where clause in '_specialize' attribute", ())
 
@@ -1565,6 +1578,10 @@ ERROR(attr_specialize_parameter_already_defined,none,
 
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_function,none,
+      "expected a function name as the value of the 'target' parameter in '_specialize' attribute", ())
+ERROR(attr_specialize_expected_spi_name,none,
+      "expected an SPI identifier as the value of the 'spi' parameter in '_specialize' attribute", ())
 
 // _implements
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
@@ -1749,6 +1766,11 @@ ERROR(pound_available_package_description_not_allowed, none,
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
+
+ERROR(attr_requires_concurrency,none,
+      "'%0' %select{attribute|modifier}1 is only valid when experimental "
+      "concurrency is enabled",
+      (StringRef, bool))
 
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics

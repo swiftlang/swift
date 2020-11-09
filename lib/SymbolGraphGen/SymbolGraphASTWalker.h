@@ -86,7 +86,7 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   // MARK: - SourceEntityWalker
 
-  virtual bool walkToDeclPre(Decl *D, CharSourceRange Range);
+  virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
 };
 
 } // end namespace symbolgraphgen

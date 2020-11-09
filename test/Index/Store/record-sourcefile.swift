@@ -30,7 +30,7 @@
 // CHECK: type-alias/Swift | TA | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: class/Swift | C1 | s:{{.*}} | <no-cgname> | Def,Ref,RelBase,RelCont -
 // CHECK: instance-method/Swift | method() | s:{{.*}} | <no-cgname> | Def,Ref,Call,Dyn,RelChild,RelRec,RelCall,RelCont -
-// CHECK: class/Swift | C2 | s:{{.*}} | <no-cgname> | Def -
+// CHECK: class/Swift | C2 | s:{{.*}} | <no-cgname> | Def,Ref - RelChild,RelBase
 // CHECK: instance-method/Swift | method() | s:{{.*}} | <no-cgname> | Def,Dyn,RelChild,RelOver -
 // CHECK: function/Swift | takeC1(x:) | s:{{.*}} | <no-cgname> | Def -
 // CHECK: instance-method(test)/Swift | testFoo() | s:{{.*}} | <no-cgname> | Def,Dyn,RelChild -
@@ -151,3 +151,6 @@ class MyTestCase: XCTestCase {
 // CHECK-NEXT: RelChild | s:4file10MyTestCaseC
   func testFoo() { test1() }
 }
+
+// CHECK: [[@LINE+1]]:11 | class/Swift | s:4file2C2C | Ref | rel: 0
+extension C2 {}

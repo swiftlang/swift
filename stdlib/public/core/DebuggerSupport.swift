@@ -152,7 +152,14 @@ public enum _DebuggerSupport {
     // yes, a type can lie and say it's a class when it's not since we only
     // check the displayStyle - but then the type would have a custom Mirror
     // anyway, so there's that...
-    let willExpand = mirror.displayStyle != .`class` || value is CustomReflectable?
+    let isNonClass = mirror.displayStyle != .`class`
+    let isCustomReflectable: Bool
+    if let value = value {
+      isCustomReflectable = value is CustomReflectable
+    } else {
+      isCustomReflectable = true
+    }
+    let willExpand = isNonClass || isCustomReflectable
 
     let count = mirror._children.count
     let bullet = isRoot && (count == 0 || !willExpand) ? ""

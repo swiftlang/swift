@@ -12,6 +12,7 @@
 
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -124,6 +125,15 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
   return isOwnershipForwardingValueKind(SILNodeKind(i->getKind()));
 }
 
+bool swift::isReborrowInstruction(const SILInstruction *i) {
+  switch (i->getKind()) {
+  case SILInstructionKind::BranchInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                           Borrowing Operand
 //===----------------------------------------------------------------------===//
@@ -162,7 +172,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-void BorrowingOperand::visitEndScopeInstructions(
+void BorrowingOperand::visitLocalEndScopeInstructions(
     function_ref<void(Operand *)> func) const {
   switch (kind) {
   case BorrowingOperandKind::BeginBorrow:
@@ -180,18 +190,8 @@ void BorrowingOperand::visitEndScopeInstructions(
     return;
   }
   case BorrowingOperandKind::Branch:
-    for (auto *succBlock :
-         cast<BranchInst>(op->getUser())->getSuccessorBlocks()) {
-      auto *arg = succBlock->getArgument(op->getOperandNumber());
-      for (auto *use : arg->getUses()) {
-        if (use->isConsumingUse()) {
-          func(use);
-        }
-      }
-    }
     return;
   }
-  llvm_unreachable("Covered switch isn't covered");
 }
 
 void BorrowingOperand::visitBorrowIntroducingUserResults(
@@ -264,6 +264,12 @@ void BorrowingOperand::visitUserResultConsumingUses(
       }
     }
   }
+}
+
+void BorrowingOperand::getImplicitUses(
+    SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *errorFunction) const {
+  visitLocalEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -457,6 +463,115 @@ bool BorrowedValue::visitInteriorPointerOperands(
   }
 
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                           InteriorPointerOperand
+//===----------------------------------------------------------------------===//
+
+bool InteriorPointerOperand::getImplicitUses(
+    SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *onError) {
+  SILValue projectedAddress = getProjectedAddress();
+  SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
+
+  bool foundError = false;
+
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+
+    // Skip type dependent operands.
+    if (op->isTypeDependent())
+      continue;
+
+    // Before we do anything, add this operand to our implicit regular user
+    // list.
+    foundUses.push_back(op);
+
+    // Then update the worklist with new things to find if we recognize this
+    // inst and then continue. If we fail, we emit an error at the bottom of the
+    // loop that we didn't recognize the user.
+    auto *user = op->getUser();
+
+    // First, eliminate "end point uses" that we just need to check liveness at
+    // and do not need to check transitive uses of.
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isIncidentalUse(user) || isa<StoreInst>(user) ||
+        isa<StoreBorrowInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<DestroyAddrInst>(user) || isa<AssignInst>(user) ||
+        isa<AddressToPointerInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)) {
+      continue;
+    }
+
+    // Then handle users that we need to look at transitive uses of.
+    if (Projection::isAddressProjection(user) ||
+        isa<ProjectBlockStorageInst>(user) ||
+        isa<OpenExistentialAddrInst>(user) ||
+        isa<InitExistentialAddrInst>(user) ||
+        isa<InitEnumDataAddrInst>(user) || isa<BeginAccessInst>(user) ||
+        isa<TailAddrInst>(user) || isa<IndexAddrInst>(user) ||
+        isa<UnconditionalCheckedCastAddrInst>(user)) {
+      for (SILValue r : user->getResults()) {
+        llvm::copy(r->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    if (auto *builtin = dyn_cast<BuiltinInst>(user)) {
+      if (auto kind = builtin->getBuiltinKind()) {
+        if (*kind == BuiltinValueKind::TSanInoutAccess) {
+          continue;
+        }
+      }
+    }
+
+    // If we have a load_borrow, add it's end scope to the liveness requirement.
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
+      transform(lbi->getEndBorrows(), std::back_inserter(foundUses),
+                [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+      continue;
+    }
+
+    // TODO: Merge this into the full apply site code below.
+    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
+      // TODO: Just add this to implicit regular user list?
+      llvm::copy(beginApply->getTokenResult()->getUses(),
+                 std::back_inserter(foundUses));
+      continue;
+    }
+
+    if (auto fas = FullApplySite::isa(user)) {
+      continue;
+    }
+
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      // If this is the base, just treat it as a liveness use.
+      if (op->get() == mdi->getBase()) {
+        continue;
+      }
+
+      // If we are the value use, look through it.
+      llvm::copy(mdi->getValue()->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
+    // We were unable to recognize this user, so return true that we failed.
+    if (onError) {
+      (*onError)(op);
+    }
+    foundError = true;
+  }
+
+  // We were able to recognize all of the uses of the address, so return false
+  // that we did not find any errors.
+  return foundError;
 }
 
 //===----------------------------------------------------------------------===//

@@ -34,13 +34,11 @@ class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
   /// A list of arbitrary modules to import and make implicitly visible.
-  std::vector<std::string> ImplicitImportModuleNames;
+  std::vector<std::pair<std::string, bool /*testable*/>>
+      ImplicitImportModuleNames;
 
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
-
-  /// The kind of input on which the frontend should operate.
-  InputFileKind InputKind = InputFileKind::Swift;
 
   void forAllOutputPaths(const InputFile &input,
                          llvm::function_ref<void(StringRef)> fn) const;
@@ -118,6 +116,8 @@ public:
 
     /// Build from a swiftinterface, as close to `import` as possible
     CompileModuleFromInterface,
+    /// Same as CompileModuleFromInterface, but stopping after typechecking
+    TypecheckModuleFromInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
@@ -135,12 +135,21 @@ public:
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
-    ScanDependencies,   ///< Scan dependencies of Swift source files
+    ScanDependencies,        ///< Scan dependencies of Swift source files
+    ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
   };
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
+
+  enum class ParseInputMode {
+    Swift,
+    SwiftLibrary,
+    SwiftModuleInterface,
+    SIL,
+  };
+  ParseInputMode InputMode = ParseInputMode::Swift;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
@@ -238,6 +247,9 @@ public:
   /// output path is configured.
   Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
+  /// Should we emit the cType when printing @convention(c) or no?
+  bool PrintFullConvention = false;
+
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
@@ -262,6 +274,22 @@ public:
   /// Disable implicitly built Swift modules because they are explicitly
   /// built and given to the compiler invocation.
   bool DisableImplicitModules = false;
+
+  /// Disable building Swift modules from textual interfaces. This should be
+  /// for testing purposes only.
+  bool DisableBuildingInterface = false;
+
+  /// When performing a dependency scanning action, only identify and output all imports
+  /// of the main Swift module's source files.
+  bool ImportPrescan = false;
+
+  /// When performing an incremental build, ensure that cross-module incremental
+  /// build metadata is available in any swift modules emitted by this frontend
+  /// job.
+  ///
+  /// This flag is currently only propagated from the driver to
+  /// any merge-modules jobs.
+  bool EnableExperimentalCrossModuleIncrementalBuild = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -293,8 +321,18 @@ public:
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
   bool UseSharedResourceFolder = true;
 
-  /// \return true if action only parses without doing other compilation steps.
+  /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
+
+  /// \return true if the given action requires the standard library to be
+  /// loaded before it is run.
+  static bool doesActionRequireSwiftStandardLibrary(ActionType);
+
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionRequireInputs(ActionType action);
+
+  /// \return true if the given action requires input files to be provided.
+  static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -305,8 +343,8 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::Swift &&
-           InputsAndOutputs.hasSingleInput();
+    return InputsAndOutputs.hasSingleInput() &&
+           InputMode == ParseInputMode::Swift;
   }
 
   const PrimarySpecificPaths &
@@ -316,7 +354,8 @@ public:
 
   /// Retrieves the list of arbitrary modules to import and make implicitly
   /// visible.
-  ArrayRef<std::string> getImplicitImportModuleNames() const {
+  ArrayRef<std::pair<std::string, bool /*testable*/>>
+  getImplicitImportModuleNames() const {
     return ImplicitImportModuleNames;
   }
 
@@ -332,6 +371,7 @@ private:
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
 
 public:

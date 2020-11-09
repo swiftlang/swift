@@ -38,36 +38,33 @@ namespace {
 /// attached near the relevant declaration and takes one of the following forms:
 ///
 /// // expected-provides {{ProvidedName}}
-/// // expected-private-member {{some.User.member}}
+/// // expected-member {{some.User.member}}
 ///
 /// An expectation contains additional information about the expectation
 /// \c Kind, which matches one of the few kinds of dependency entry that are
-/// currently representable in the dependency graph, and an expectation
-/// \c Scope which must either be \c private or \c cascading.
+/// currently representable in the dependency graph.
 ///
-/// As not all combinations of scopes and kinds makes sense, and to ease the addition of further
-/// combinations of the two, the supported set of expectations is given by the following matrix:
+/// As not all combinations of scopes and kinds makes sense, and to ease the
+/// addition of further combinations of the two, the supported set of
+/// expectations is given by the following matrix:
 ///
 #define EXPECTATION_MATRIX                                                     \
-  MATRIX_ENTRY("expected-no-dependency", None, Negative)                       \
-  MATRIX_ENTRY("expected-provides", None, Provides)                            \
-  MATRIX_ENTRY("expected-private-superclass", Private, Superclass)             \
-  MATRIX_ENTRY("expected-cascading-superclass", Cascading, Superclass)         \
-  MATRIX_ENTRY("expected-private-conformance", Private, Conformance)           \
-  MATRIX_ENTRY("expected-cascading-conformance", Cascading, Conformance)       \
-  MATRIX_ENTRY("expected-private-member", Private, Member)                     \
-  MATRIX_ENTRY("expected-cascading-member", Cascading, Member)                 \
-  MATRIX_ENTRY("expected-private-dynamic-member", Private, DynamicMember)      \
-  MATRIX_ENTRY("expected-cascading-dynamic-member", Cascading, DynamicMember)
+  MATRIX_ENTRY("expected-no-dependency", Negative)                             \
+  MATRIX_ENTRY("expected-provides", Provides)                                  \
+  MATRIX_ENTRY("expected-superclass", Superclass)                              \
+  MATRIX_ENTRY("expected-conformance", Conformance)                            \
+  MATRIX_ENTRY("expected-member", Member)                                      \
+  MATRIX_ENTRY("expected-dynamic-member", DynamicMember)                       \
 ///
-/// To add a new supported combination, update \c Expectation::Kind and
-/// \c Expectation::Scope, then define a new \c MATRIX_ENTRY with the following information:
+/// To add a new supported combination, update \c Expectation::Kind
+/// then define a new \c MATRIX_ENTRY with the following information:
 ///
-/// MATRIX_ENTRY(<Expectation-Selector-String>, Expectation::Scope, Expectation::Kind)
+/// MATRIX_ENTRY(<Expectation-Selector-String>, Expectation::Kind)
 ///
-/// Where \c <Expectation-Selector-String> matches the grammar for an expectation. The
-/// verifier's parsing routines use this matrix to automatically keep the parser in harmony with the
-/// internal representation of the expectation.
+/// Where \c <Expectation-Selector-String> matches the grammar for an
+/// expectation. The verifier's parsing routines use this matrix to
+/// automatically keep the parser in harmony with the internal representation of
+/// the expectation.
 struct Expectation {
 public:
   enum class Kind : uint8_t {
@@ -80,24 +77,12 @@ public:
     DynamicMember,
   };
 
-  enum class Scope : uint8_t {
-    /// There is no scope information associated with this expectation.
-    ///
-    /// This is currently only true of negative expectations and provides expectations.
-    None,
-    /// The dependency does not cascade.
-    Private,
-    /// The dependency cascades.
-    Cascading,
-  };
-
   /// The full range of the "expected-foo {{}}".
   const char *ExpectedStart, *ExpectedEnd = nullptr;
 
   /// Additional information about the expectation.
   struct {
     Expectation::Kind Kind;
-    Expectation::Scope Scope;
   } Info;
 
   /// The raw input buffer for the message text, the part in the {{...}}
@@ -105,16 +90,12 @@ public:
 
 public:
   Expectation(const char *estart, const char *eend, Expectation::Kind k,
-              Expectation::Scope f, StringRef r)
-      : ExpectedStart(estart), ExpectedEnd(eend), Info{k, f}, MessageRange(r) {
-        assert(ExpectedStart <= MessageRange.data() &&
-               "Message range appears before expected start!");
-        assert(MessageRange.data()+MessageRange.size() <= ExpectedEnd &&
-               "Message range extends beyond expected end!");
-      }
-
-  bool isCascading() const {
-    return Info.Scope == Expectation::Scope::Cascading;
+              StringRef r)
+      : ExpectedStart(estart), ExpectedEnd(eend), Info{k}, MessageRange(r) {
+    assert(ExpectedStart <= MessageRange.data() &&
+           "Message range appears before expected start!");
+    assert(MessageRange.data() + MessageRange.size() <= ExpectedEnd &&
+           "Message range extends beyond expected end!");
   }
 };
 
@@ -214,43 +195,27 @@ struct Obligation {
 
 private:
   StringRef name;
-  std::pair<Expectation::Kind, Expectation::Scope> info;
+  Expectation::Kind kind;
   State state;
 
 public:
-  Obligation(StringRef name, Expectation::Kind k, Expectation::Scope f)
-      : name(name), info{k, f}, state(State::Owed) {
+  Obligation(StringRef name, Expectation::Kind k)
+      : name(name), kind{k}, state(State::Owed) {
     assert(k != Expectation::Kind::Negative &&
            "Cannot form negative obligation!");
   }
 
-  Expectation::Scope getScope() const { return info.second; }
-  Expectation::Kind getKind() const { return info.first; }
+  Expectation::Kind getKind() const { return kind; }
   StringRef getName() const { return name; }
-  bool getCascades() const {
-    return info.second == Expectation::Scope::Cascading;
-  }
-  StringRef describeCascade() const {
-    switch (info.second) {
-    case Expectation::Scope::None:
-      llvm_unreachable("Cannot describe obligation with no cascade info");
-    case Expectation::Scope::Private:
-      return "non-cascading";
-    case Expectation::Scope::Cascading:
-      return "cascading";
-    }
-    llvm_unreachable("invalid expectation scope");
-  }
 
   StringRef renderAsFixit(ASTContext &Ctx) const {
     llvm::StringRef selector =
-#define MATRIX_ENTRY(SELECTOR, SCOPE, KIND) \
-    if (getKind() == Expectation::Kind::KIND && \
-        getScope() == Expectation::Scope::SCOPE) { \
-      return SELECTOR; \
-    }
+#define MATRIX_ENTRY(SELECTOR, KIND)                                           \
+  if (getKind() == Expectation::Kind::KIND) {                                  \
+    return SELECTOR;                                                           \
+  }
 
-    [this]() -> StringRef {
+        [this]() -> StringRef {
       EXPECTATION_MATRIX
       return "";
     }();
@@ -267,8 +232,7 @@ public:
     return FullfillmentToken{};
   }
   FullfillmentToken fail() {
-    assert(state == State::Owed &&
-           "Cannot fail an obligation more than once!");
+    assert(state == State::Owed && "Cannot fail an obligation more than once!");
     state = State::Failed;
     return FullfillmentToken{};
   }
@@ -372,19 +336,17 @@ bool DependencyVerifier::parseExpectations(
     const char *DiagnosticLoc = MatchStart.data();
 
     Expectation::Kind ExpectedKind;
-    Expectation::Scope ExpectedScope;
     {
-#define MATRIX_ENTRY(EXPECTATION_SELECTOR, SCOPE, KIND)                        \
+#define MATRIX_ENTRY(EXPECTATION_SELECTOR, KIND)                               \
   .StartsWith(EXPECTATION_SELECTOR, [&]() {                                    \
     ExpectedKind = Expectation::Kind::KIND;                                    \
-    ExpectedScope = Expectation::Scope::SCOPE;                                 \
     MatchStart = MatchStart.substr(strlen(EXPECTATION_SELECTOR));              \
   })
 
       // clang-format off
-        llvm::StringSwitch<llvm::function_ref<void(void)>>{MatchStart}
-          EXPECTATION_MATRIX
-          .Default([]() {})();
+          llvm::StringSwitch<llvm::function_ref<void(void)>>{MatchStart}
+            EXPECTATION_MATRIX
+            .Default([]() {})();
       // clang-format on
 #undef MATRIX_ENTRY
     }
@@ -412,13 +374,11 @@ bool DependencyVerifier::parseExpectations(
     AfterEnd = AfterEnd.substr(AfterEnd.find_first_not_of(" \t"));
     const char *ExpectedEnd = AfterEnd.data();
 
-
     // Strip out the trailing whitespace.
     while (isspace(ExpectedEnd[-1]))
       --ExpectedEnd;
 
-    Expectations.emplace_back(DiagnosticLoc, ExpectedEnd,
-                              ExpectedKind, ExpectedScope,
+    Expectations.emplace_back(DiagnosticLoc, ExpectedEnd, ExpectedKind,
                               MatchStart.slice(2, End));
   }
   return false;
@@ -427,50 +387,37 @@ bool DependencyVerifier::parseExpectations(
 bool DependencyVerifier::constructObligations(const SourceFile *SF,
                                               ObligationMap &Obligations) {
   auto &Ctx = SF->getASTContext();
-  Ctx.evaluator.enumerateReferencesInFile(
-      SF, [&](const auto &reference) {
-        const auto isCascadingUse = reference.cascades;
-        using NodeKind = evaluator::DependencyCollector::Reference::Kind;
-        switch (reference.kind) {
-        case NodeKind::Empty:
-        case NodeKind::Tombstone:
-          llvm_unreachable("Cannot enumerate dead dependency!");
+  Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &reference) {
+    using NodeKind = evaluator::DependencyCollector::Reference::Kind;
+    switch (reference.kind) {
+    case NodeKind::Empty:
+    case NodeKind::Tombstone:
+      llvm_unreachable("Cannot enumerate dead dependency!");
 
-        case NodeKind::PotentialMember: {
-          auto key = copyQualifiedTypeName(Ctx, reference.subject);
-          Obligations.insert({Obligation::Key::forPotentialMember(key),
-                              {"", Expectation::Kind::PotentialMember,
-                               isCascadingUse ? Expectation::Scope::Cascading
-                                              : Expectation::Scope::Private}});
-        }
-          break;
-        case NodeKind::UsedMember: {
-          auto demContext = copyQualifiedTypeName(Ctx, reference.subject);
-          auto name = reference.name.userFacingName();
-          auto key = Ctx.AllocateCopy((demContext + "." + name).str());
-          Obligations.insert({Obligation::Key::forMember(key),
-                              {key, Expectation::Kind::Member,
-                               isCascadingUse ? Expectation::Scope::Cascading
-                                              : Expectation::Scope::Private}});
-        }
-          break;
-        case NodeKind::Dynamic: {
-          auto key = Ctx.AllocateCopy(reference.name.userFacingName());
-          Obligations.insert({Obligation::Key::forDynamicMember(key),
-                              {"", Expectation::Kind::DynamicMember,
-                               isCascadingUse ? Expectation::Scope::Cascading
-                                              : Expectation::Scope::Private}});
-        }
-          break;
-        case NodeKind::TopLevel: {
-          auto key = Ctx.AllocateCopy(reference.name.userFacingName());
-          Obligations.insert({Obligation::Key::forProvides(key),
-                              {key, Expectation::Kind::Provides,
-                               Expectation::Scope::None}});
-        }
-          break;
-        }
-      });
+    case NodeKind::PotentialMember: {
+      auto key = copyQualifiedTypeName(Ctx, reference.subject);
+      Obligations.insert({Obligation::Key::forPotentialMember(key),
+                          {"", Expectation::Kind::PotentialMember}});
+    } break;
+    case NodeKind::UsedMember: {
+      auto demContext = copyQualifiedTypeName(Ctx, reference.subject);
+      auto name = reference.name.userFacingName();
+      auto key = Ctx.AllocateCopy((demContext + "." + name).str());
+      Obligations.insert(
+          {Obligation::Key::forMember(key), {key, Expectation::Kind::Member}});
+    } break;
+    case NodeKind::Dynamic: {
+      auto key = Ctx.AllocateCopy(reference.name.userFacingName());
+      Obligations.insert({Obligation::Key::forDynamicMember(key),
+                          {"", Expectation::Kind::DynamicMember}});
+    } break;
+    case NodeKind::TopLevel: {
+      auto key = Ctx.AllocateCopy(reference.name.userFacingName());
+      Obligations.insert({Obligation::Key::forProvides(key),
+                          {key, Expectation::Kind::Provides}});
+    } break;
+    }
+  });
 
   return false;
 }
@@ -480,72 +427,35 @@ bool DependencyVerifier::verifyObligations(
     ObligationMap &OM, llvm::StringMap<Expectation> &NegativeExpectations) {
   auto &diags = SF->getASTContext().Diags;
   for (auto &expectation : ExpectedDependencies) {
-    const bool wantsCascade = expectation.isCascading();
-    switch (expectation.Info.Kind) {
-    case Expectation::Kind::Negative:
+    if (expectation.Info.Kind == Expectation::Kind::Negative) {
       // We'll verify negative expectations separately.
       NegativeExpectations.insert({expectation.MessageRange, expectation});
-      break;
-    case Expectation::Kind::Member:
-      matchExpectationOrFail(
-          OM, expectation,
-          [&](Obligation &p) {
-            const auto haveCascade = p.getCascades();
-            if (haveCascade != wantsCascade) {
-              diagnose(diags, expectation.MessageRange.begin(),
-                       diag::dependency_cascading_mismatch, wantsCascade,
-                       haveCascade);
-              return p.fail();
-            }
-
-            return p.fullfill();
-          },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    case Expectation::Kind::PotentialMember:
-      matchExpectationOrFail(
-          OM, expectation,
-          [&](Obligation &p) {
-            assert(p.getName().empty());
-            const auto haveCascade = p.getCascades();
-            if (haveCascade != wantsCascade) {
-              diagnose(diags, expectation.MessageRange.begin(),
-                       diag::potential_dependency_cascading_mismatch,
-                       wantsCascade, haveCascade);
-              return p.fail();
-            }
-
-            return p.fullfill();
-          },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    case Expectation::Kind::Provides:
-      matchExpectationOrFail(
-          OM, expectation, [](Obligation &O) { return O.fullfill(); },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
-    case Expectation::Kind::DynamicMember:
-      matchExpectationOrFail(
-          OM, expectation, [](Obligation &O) { return O.fullfill(); },
-          [&](const Expectation &e) {
-            diagnose(
-                diags, e.MessageRange.begin(), diag::missing_member_dependency,
-                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
-          });
-      break;
+      continue;
     }
+
+    matchExpectationOrFail(
+        OM, expectation,
+        [&](Obligation &O) {
+          switch (expectation.Info.Kind) {
+          case Expectation::Kind::Negative:
+            llvm_unreachable("Should have been handled above!");
+          case Expectation::Kind::Member:
+            return O.fullfill();
+          case Expectation::Kind::PotentialMember:
+            assert(O.getName().empty());
+            return O.fullfill();
+          case Expectation::Kind::Provides:
+          case Expectation::Kind::DynamicMember:
+            return O.fullfill();
+          }
+
+          llvm_unreachable("Unhandled expectation kind!");
+        },
+        [&](const Expectation &e) {
+          diagnose(diags, e.MessageRange.begin(),
+                   diag::missing_member_dependency,
+                   static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
+        });
   }
 
   return false;
@@ -585,13 +495,14 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     case Expectation::Kind::Member:
     case Expectation::Kind::DynamicMember:
     case Expectation::Kind::PotentialMember:
-      diags.diagnose(Loc, diag::unexpected_dependency, p.describeCascade(),
-                     static_cast<uint8_t>(p.getKind()), key)
-        .fixItInsert(Loc, p.renderAsFixit(Ctx));
+      diags
+          .diagnose(Loc, diag::unexpected_dependency,
+                    static_cast<uint8_t>(p.getKind()), key)
+          .fixItInsert(Loc, p.renderAsFixit(Ctx));
       break;
     case Expectation::Kind::Provides:
       diags.diagnose(Loc, diag::unexpected_provided_entity, p.getName())
-        .fixItInsert(Loc, p.renderAsFixit(Ctx));
+          .fixItInsert(Loc, p.renderAsFixit(Ctx));
       break;
     }
   });

@@ -1348,7 +1348,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
       ApplyIRLinkage({linkInfo.getLinkage(),
                       linkInfo.getVisibility(),
                       llvm::GlobalValue::DLLExportStorageClass})
-          .to(GA);
+          .to(GA, linkInfo.isForDefinition());
     }
     return;
   }

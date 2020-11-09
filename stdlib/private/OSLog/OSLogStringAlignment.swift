@@ -13,8 +13,8 @@
 // This file defines types and functions for specifying alignment of the
 // interpolations passed to the os log APIs.
 
-@frozen
-public enum OSLogCollectionBound {
+@usableFromInline
+internal enum OSLogCollectionBound {
   case start
   case end
 }
@@ -23,20 +23,24 @@ public enum OSLogCollectionBound {
 public struct OSLogStringAlignment {
   /// Minimum number of characters to be displayed. If the value to be printed
   /// is shorter than this number, the result is padded with spaces. The value
-  /// is not truncated even if the result is larger.This value need not be a
+  /// is not truncated even if the result is larger.  This value need not be a
   /// compile-time constant, and is therefore an autoclosure.
-  public var minimumColumnWidth: (() -> Int)?
-  /// This captures right/left alignment.
-  public var anchor: OSLogCollectionBound
+  @usableFromInline
+  internal var minimumColumnWidth: (() -> Int)?
 
+  /// This captures right/left alignment.
+  @usableFromInline
+  internal var anchor: OSLogCollectionBound
+
+  /// Initiailzes stored properties.
+  ///
   /// - Parameters:
   ///   - minimumColumnWidth: Minimum number of characters to be displayed. If the value to be
   ///    printed is shorter than this number, the result is padded with spaces. The value is not truncated
   ///    even if the result is larger.
   ///   - anchor: Use `.end` for right alignment and `.start` for left.
-  @_semantics("constant_evaluable")
-  @inlinable
-  @_optimize(none)
+  @_transparent
+  @usableFromInline
   internal init(
     minimumColumnWidth: (() -> Int)? = nil,
     anchor: OSLogCollectionBound = .end
@@ -45,29 +49,18 @@ public struct OSLogStringAlignment {
     self.anchor = anchor
   }
 
-  /// Right alignment formatter.
+  /// Indicates no alignment.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  public static var right: OSLogStringAlignment {
-    OSLogStringAlignment(anchor: .end)
-  }
+  public static var none: OSLogStringAlignment { OSLogStringAlignment(anchor: .end)  }
 
-  /// Left alignment formatter.
-  @_semantics("constant_evaluable")
-  @inlinable
-  @_optimize(none)
-  public static var left: OSLogStringAlignment {
-    OSLogStringAlignment(anchor: .start)
-  }
-
-  /// Use default alignment, which is right alignment.
-  @_semantics("constant_evaluable")
-  @inlinable
-  @_optimize(none)
-  public static var none: OSLogStringAlignment { .right  }
-
-  /// Right align and display at least`columns` characters.
+  /// Right align and display at least `columns` characters.
+  ///
+  /// The interpolated value would be padded with spaces, if necessary, to
+  /// meet the specified `columns` characters.
+  ///
+  /// - Parameter columns: minimum number of characters to display.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
@@ -77,7 +70,12 @@ public struct OSLogStringAlignment {
     OSLogStringAlignment(minimumColumnWidth: columns, anchor: .end)
   }
 
-  /// Left align and display at least`columns` characters.
+  /// Left align and display at least `columns` characters.
+  ///
+  /// The interpolated value would be padded with spaces, if necessary, to
+  /// meet the specified `columns` characters.
+  ///
+  /// - Parameter columns: minimum number of characters to display.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)

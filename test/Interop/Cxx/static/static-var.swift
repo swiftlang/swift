@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -c %S/Inputs/static-var.cpp -I %S/Inputs -o %t/static-var.o -std=c++17
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-var.o -Xfrontend -enable-cxx-interop -Xcc -std=c++17
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-var.o -Xfrontend -enable-cxx-interop
 // RUN: %target-codesign %t/statics
 // RUN: %target-run %t/statics
 //
@@ -67,10 +67,7 @@ StaticVarTestSuite.test("static-non-trivial-write-from-cxx") {
 
 StaticVarTestSuite.test("static-non-trivial-write-from-swift") {
   expectNotEqual(1026, staticNonTrivial.val)
-  //TODO: Delete `NonTrivial()` adn use `NonTrivial(int)` constructor once
-  // apple/swift/pull/30630 is merged.
-  staticNonTrivial = NonTrivial()
-  staticNonTrivial.val = 1026
+  staticNonTrivial = NonTrivial(1026)
   expectEqual(1026, getstaticNonTrivialFromCxx().pointee.val)
 }
 

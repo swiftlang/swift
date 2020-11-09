@@ -123,9 +123,9 @@ static  bool fixupReferenceCounts(
           });
 
       if (!consumedInLoop) {
-        applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
-          SILBuilderWithScope(iter).createDestroyAddr(loc, stackLoc);
-          SILBuilderWithScope(iter).createDeallocStack(loc, stackLoc);
+        applySite.insertAfterInvocation([&](SILBuilder &builder) {
+          builder.createDestroyAddr(loc, stackLoc);
+          builder.createDeallocStack(loc, stackLoc);
         });
       }
       v = stackLoc;
@@ -176,11 +176,11 @@ static  bool fixupReferenceCounts(
       // uses in the top of a diamond and need to insert a destroy after the
       // apply since the leak will just cover the other path.
       if (!consumedInLoop) {
-        applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
+        applySite.insertAfterInvocation([&](SILBuilder &builder) {
           if (hasOwnership) {
-            SILBuilderWithScope(iter).createEndBorrow(loc, argument);
+            builder.createEndBorrow(loc, argument);
           }
-          SILBuilderWithScope(iter).emitDestroyValueOperation(loc, copy);
+          builder.emitDestroyValueOperation(loc, copy);
         });
       }
       v = argument;
@@ -217,8 +217,8 @@ static  bool fixupReferenceCounts(
 
       // Then insert destroys after the apply site since our value is not being
       // consumed as part of the actual apply.
-      applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
-        SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
+      applySite.insertAfterInvocation([&](SILBuilder &builder) {
+        builder.emitDestroyValueOperation(loc, v);
       });
       break;
     }
@@ -263,8 +263,8 @@ static  bool fixupReferenceCounts(
   // Destroy the callee as the apply would have done if our function is not
   // callee guaranteed.
   if (!isCalleeGuaranteed) {
-    applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
-      SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
+    applySite.insertAfterInvocation([&](SILBuilder &builder) {
+      builder.emitDestroyValueOperation(loc, calleeValue);
     });
   }
   return invalidatedStackNesting;

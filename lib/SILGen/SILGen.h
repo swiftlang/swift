@@ -237,7 +237,7 @@ public:
 
   // These are either not allowed at global scope or don't require
   // code emission.
-  void visitImportDecl(ImportDecl *d) {}
+  void visitImportDecl(ImportDecl *d);
   void visitEnumCaseDecl(EnumCaseDecl *d) {}
   void visitEnumElementDecl(EnumElementDecl *d) {}
   void visitOperatorDecl(OperatorDecl *d) {}
@@ -270,7 +270,10 @@ public:
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
-  
+
+  /// Emits the function definition for a given SILDeclRef.
+  void emitFunctionDefinition(SILDeclRef constant, SILFunction *f);
+
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
@@ -302,11 +305,7 @@ public:
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
-  void preEmitFunction(SILDeclRef constant,
-                       llvm::PointerUnion<ValueDecl *,
-                                          Expr *> astNode,
-                       SILFunction *F,
-                       SILLocation L);
+  void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.

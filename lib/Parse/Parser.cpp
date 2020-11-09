@@ -189,9 +189,9 @@ void Parser::performCodeCompletionSecondPassImpl(
     parseDecl(ParseDeclOptions(info.Flags),
               /*IsAtStartOfLineOrPreviousHadSemi=*/true, [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
-                  NTD->addMember(D);
+                  NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-                  ED->addMember(D);
+                  ED->addMemberPreservingSourceOrder(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
                   SF->addTopLevelDecl(D);
                 } else {
@@ -203,7 +203,7 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    AFD->setBodyParsed(parseAbstractFunctionBodyImpl(AFD).getPtrOrNull());
+    (void)parseAbstractFunctionBodyImpl(AFD);
     break;
   }
   }
@@ -695,8 +695,9 @@ void Parser::skipSingle() {
 void Parser::skipUntil(tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
   if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
-  
-  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::code_complete))
+
+  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::pound_else,
+                   tok::pound_elseif))
     skipSingle();
 }
 
@@ -1101,8 +1102,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       return Status;
     }
     // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isError()) {
-      assert(Status.isError() && "no progress without error");
+    if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
+      assert(Status.isErrorOrHasCompletion() && "no progress without error");
       skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
       if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
@@ -1135,7 +1136,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ListContext.reset();
 
-  if (Status.isError()) {
+  if (Status.isErrorOrHasCompletion()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     if (Tok.is(RightK)) {
       RightLoc = consumeToken();
@@ -1184,11 +1185,37 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
                                                Segments.front().Length));
 }
 
+bool Parser::shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body) {
+  // If the body consists of an #if declaration with a single
+  // expression active clause, find a single expression.
+  if (Body.size() == 2) {
+    if (auto *D = Body.front().dyn_cast<Decl *>()) {
+      // Step into nested active clause.
+      while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+        auto ACE = ICD->getActiveClauseElements();
+        if (ACE.size() == 1) {
+          assert(Body.back() == ACE.back() &&
+                 "active clause not found in body");
+          return true;
+        } else if (ACE.size() == 2) {
+          if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
+            D = ND;
+            continue;
+          }
+        }
+        break;
+      }
+    }
+  }
+  return Body.size() == 1;
+}
+
 struct ParserUnit::Implementation {
   std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
+  ClangImporterOptions clangImporterOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1200,8 +1227,8 @@ struct ParserUnit::Implementation {
                  std::shared_ptr<SyntaxParseActions> spActions)
       : SPActions(std::move(spActions)), LangOpts(Opts),
         TypeCheckerOpts(TyOpts), Diags(SM),
-        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
-                             Diags)) {
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
+                             clangImporterOpts, SM, Diags)) {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;

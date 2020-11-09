@@ -566,33 +566,116 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   return false;
 }
 
-// Returns true if a given apply site should be skipped during the
-// early inlining pass.
-//
-// NOTE: Add here the checks for any specific @_semantics/@_effects
-// attributes causing a given callee to be excluded from the inlining
-// during the early inlining pass.
-static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
-  // Add here the checks for any specific @_semantics attributes that need
-  // to be skipped during the early inlining pass.
-  ArraySemanticsCall ASC(AI.getInstruction());
-  if (ASC && !ASC.canInlineEarly())
-    return true;
+SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
+  // Currently, we only consider "array" semantic calls to be "optimizable
+  // semantic functions" (non-transient) because we only have semantic passes
+  // that recognize array operations, for example, hoisting them out of loops.
+  //
+  // Compiler "hints" and informational annotations (like remarks) should
+  // ideally use a separate annotation rather than @_semantics.
+  switch (getArraySemanticsKind(function)) {
+  case ArrayCallKind::kNone:
+    return SemanticFunctionLevel::Transient;
 
-  SILFunction *Callee = AI.getReferencedFunctionOrNull();
-  if (!Callee)
+  case ArrayCallKind::kArrayInitEmpty:
+  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kCheckIndex:
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+  case ArrayCallKind::kGetElement:
+  case ArrayCallKind::kGetElementAddress:
+  case ArrayCallKind::kMakeMutable:
+  case ArrayCallKind::kEndMutation:
+  case ArrayCallKind::kMutateUnknown:
+    return SemanticFunctionLevel::Fundamental;
+
+  // These have nested semantic calls, but they also expose the underlying
+  // buffer so must be treated as fundamental, and should not be inlined until
+  // after array semantic passes have run.
+  //
+  // TODO: Once Nested semantics calls are preserved during early inlining,
+  // change these to Nested.
+  case ArrayCallKind::kArrayInit:
+  case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kWithUnsafeMutableBufferPointer:
+    return SemanticFunctionLevel::Fundamental;
+
+  case ArrayCallKind::kReserveCapacityForAppend:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
+    return SemanticFunctionLevel::Nested;
+
+  // Compiler intrinsics hide "normal" semantic methods, such as
+  // "array.uninitialized" or "array.end_mutation"--they are intentionally
+  // transient and should be inlined away immediately.
+  case ArrayCallKind::kArrayUninitializedIntrinsic:
+  case ArrayCallKind::kArrayFinalizeIntrinsic:
+    return SemanticFunctionLevel::Transient;
+
+  } // end switch
+}
+
+/// Return true if \p apply calls into an optimizable semantic function from
+/// within another semantic function, or from a "trivial" wrapper.
+///
+/// Checking for wrappers, in addition to directly annotated nested semantic
+/// functions, allows semantic function calls to be wrapped inside trivial
+/// getters and closures without needing to explicitly annotate those wrappers.
+///
+/// For example:
+///
+///   public var count: Int { getCount() }
+///   @_semantic("count") internal func getCount() { ... }
+///
+/// Wrappers may be closures, so this semantic "nesting" is allowed:
+///
+///   @_semantics("append")
+///   public func append(...) {
+///     defer { endMutation() }
+///     ...
+///   }
+///   @_semantics("endMutation") func endMutation() { ... }
+///
+/// TODO: if simply checking the call arguments results in too many functions
+/// being considered "wrappers", thus preventing useful inlining, consider
+/// either using a cost metric to check for low-cost wrappers or directly
+/// checking for getters or closures.
+///
+/// TODO: Move this into PerformanceInlinerUtils and apply it to
+/// getEligibleFunction. The mid-level pipeline should not inline semantic
+/// functions into their wrappers. If such wrappers have still not been fully
+/// inlined by the time late inlining runs, then the semantic call can be
+/// inlined into the wrapper at that time.
+bool swift::isNestedSemanticCall(FullApplySite apply) {
+  auto callee = apply.getReferencedFunctionOrNull();
+  if (!callee) {
+     return false;
+  }
+  if (!isOptimizableSemanticFunction(callee)) {
     return false;
-
-  if (Callee->hasSemanticsAttr("self_no_escaping_closure") ||
-      Callee->hasSemanticsAttr("pair_no_escaping_closure"))
+  }
+  if (isOptimizableSemanticFunction(apply.getFunction())) {
     return true;
-
-  // Add here the checks for any specific @_effects attributes that need
-  // to be skipped during the early inlining pass.
-  if (Callee->hasEffectsKind())
-    return true;
-
-  return false;
+  }
+  // In a trivial wrapper, all call arguments are simply forwarded from the
+  // wrapper's arguments.
+  auto isForwardedArg = [](SILValue arg) {
+    while (true) {
+      if (isa<SILFunctionArgument>(arg) || isa<LiteralInst>(arg)) {
+        return true;
+      }
+      auto *argInst = arg->getDefiningInstruction();
+      if (!argInst) {
+        return false;
+      }
+      if (!getSingleValueCopyOrCast(argInst)) {
+        return false;
+      }
+      arg = argInst->getOperand(0);
+    }
+  };
+  return llvm::all_of(apply.getArguments(), isForwardedArg);
 }
 
 /// Checks if a generic callee and caller have compatible layout constraints.
@@ -622,14 +705,20 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
     // The generic parameter has a layout constraint.
     // Check that the substitution has the same constraint.
     auto AIReplacement = Type(Param).subst(AISubs);
-    auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
-    if (!AIArchetype)
-      return false;
-    auto AILayout = AIArchetype->getLayoutConstraint();
-    if (!AILayout)
-      return false;
-    if (AILayout != Layout)
-      return false;
+
+    if (Layout->isClass()) {
+      if (!AIReplacement->satisfiesClassConstraint())
+        return false;
+    } else {
+      auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
+      if (!AIArchetype)
+        return false;
+      auto AILayout = AIArchetype->getLayoutConstraint();
+      if (!AILayout)
+        return false;
+      if (AILayout != Layout)
+        return false;
+    }
   }
   return true;
 }
@@ -662,8 +751,12 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline >= InlineSelection::NoSemanticsAndGlobalInit) {
-      if (shouldSkipApplyDuringEarlyInlining(AI))
+      // TODO: for stable optimization of semantics, prevent inlining whenever
+      // isOptimizableSemanticFunction(Callee) is true.
+      if (getSemanticFunctionLevel(Callee) == SemanticFunctionLevel::Fundamental
+          || Callee->hasEffectsKind()) {
         return nullptr;
+      }
       if (Callee->hasSemanticsAttr("inline_late"))
         return nullptr;
     }
@@ -692,7 +785,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  // Explicitly disabled inlining.
+  // Explicitly disabled inlining or optimization.
   if (Callee->getInlineStrategy() == NoInline) {
     return nullptr;
   }
@@ -720,11 +813,11 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     // Check if passed Self is the same as the Self of the caller.
     // In this case, it is safe to inline because both functions
     // use the same Self.
-    if (!AI.hasSelfArgument() || !Caller->hasSelfMetadataParam()) {
+    if (!AI.hasSelfArgument() || !Caller->hasDynamicSelfMetadata()) {
       return nullptr;
     }
     auto CalleeSelf = stripCasts(AI.getSelfArgument());
-    auto CallerSelf = Caller->getSelfMetadataArgument();
+    auto CallerSelf = Caller->getDynamicSelfMetadata();
     if (CalleeSelf != SILValue(CallerSelf)) {
       return nullptr;
     }
@@ -750,6 +843,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // Inlining self-recursive functions into other functions can result
   // in excessive code duplication since we run the inliner multiple
   // times in our pipeline
+  //
+  // FIXME: This should be cached!
   if (calleeIsSelfRecursive(Callee)) {
     return nullptr;
   }

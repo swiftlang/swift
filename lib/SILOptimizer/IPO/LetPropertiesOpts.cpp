@@ -190,11 +190,12 @@ class InitSequenceCloner : public SILClonerWithScopes<InitSequenceCloner> {
   friend class SILCloner<InitSequenceCloner>;
 
   const InitSequence &Init;
-  SILInstruction *DestIP;
 
 public:
   InitSequenceCloner(const InitSequence &init, SILInstruction *destIP)
-    : SILClonerWithScopes(*destIP->getFunction()), Init(init), DestIP(destIP) {}
+    : SILClonerWithScopes(*destIP->getFunction()), Init(init) {
+    Builder.setInsertionPoint(destIP);
+  }
 
   void process(SILInstruction *I) { visit(I); }
 
@@ -202,12 +203,6 @@ public:
 
   SILValue getMappedValue(SILValue Value) {
     return SILCloner<InitSequenceCloner>::getMappedValue(Value);
-  }
-
-  void postProcess(SILInstruction *orig, SILInstruction *cloned) {
-    DestIP->getParent()->push_front(cloned);
-    cloned->moveBefore(DestIP);
-    SILClonerWithScopes<InitSequenceCloner>::postProcess(orig, cloned);
   }
 
   /// Clone all the instructions from Insns into the destination function,

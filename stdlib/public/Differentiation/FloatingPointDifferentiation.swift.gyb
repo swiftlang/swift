@@ -205,8 +205,9 @@ extension ${Self} {
   static func _jvpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
   ) {
+    let oldLhs = lhs
     lhs *= rhs
-    return ((), { $0 *= $1 })
+    return ((), { $0 = $0 * rhs + oldLhs * $1 })
   }
 
   ${Availability(bits)}
@@ -251,8 +252,9 @@ extension ${Self} {
   static func _jvpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
   ) {
+    let oldLhs = lhs
     lhs /= rhs
-    return ((), { $0 /= $1 })
+    return ((), { $0 = ($0 * rhs - oldLhs * $1) / (rhs * rhs)  })
   }
 }
 

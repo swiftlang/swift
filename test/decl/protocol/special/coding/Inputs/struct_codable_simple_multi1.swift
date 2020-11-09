@@ -21,3 +21,11 @@ struct SimpleStruct : Codable {
     let _ = SimpleStruct.CodingKeys.z // expected-error {{type 'SimpleStruct.CodingKeys' has no member 'z'}}
   }
 }
+
+// SR-13137 Ensure unqualified lookup installs CodingKeys regardless of the
+// order of primaries.
+struct A: Codable {
+  var property: String
+  static let propertyName = CodingKeys.property.stringValue
+}
+

@@ -1,6 +1,5 @@
 -static
 -lswiftCore
--lswiftImageInspectionShared
 -lswiftSwiftOnoneSupport
 -lswiftWasiPthread
 -licuuc
@@ -11,5 +10,5 @@
 -lwasi-emulated-mman
 -Xlinker --error-limit=0
 -Xlinker --no-gc-sections
--Xlinker --no-threads
+-Xlinker --threads=1
 -D_WASI_EMULATED_MMAN

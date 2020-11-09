@@ -188,6 +188,7 @@ public:
   bool processTopDown(
       AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       LoopRegionFunctionInfo *LRFI,
+      llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &LoopRegionState,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
@@ -200,6 +201,7 @@ public:
       AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
       bool FreezeOwnedArgEpilogueReleases,
+      llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
@@ -219,9 +221,6 @@ public:
   void removeInterestingInst(SILInstruction *I);
 
 private:
-  void processBlockBottomUpPredTerminators(
-      const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
   bool processBlockBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       EpilogueARCFunctionInfo *EAFI,
@@ -230,17 +229,18 @@ private:
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
   bool processLoopBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
+      RCIdentityFunctionInfo *RCIA,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts);
 
   bool processBlockTopDown(
       SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
-  bool
-  processLoopTopDown(const LoopRegion *R, ARCRegionState *State,
-                     AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
-                     ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+  bool processLoopTopDown(
+      const LoopRegion *R, ARCRegionState *State, AliasAnalysis *AA,
+      LoopRegionFunctionInfo *LRFI, RCIdentityFunctionInfo *RCIA,
+      llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts);
 
   void summarizeLoop(
       const LoopRegion *R, LoopRegionFunctionInfo *LRFI,

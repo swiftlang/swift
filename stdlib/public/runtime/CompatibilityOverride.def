@@ -40,6 +40,7 @@
 #ifdef OVERRIDE
 #  define OVERRIDE_METADATALOOKUP OVERRIDE
 #  define OVERRIDE_CASTING OVERRIDE
+#  define OVERRIDE_DYNAMICCASTING OVERRIDE
 #  define OVERRIDE_OBJC OVERRIDE
 #  define OVERRIDE_FOREIGN OVERRIDE
 #  define OVERRIDE_PROTOCOLCONFORMANCE OVERRIDE
@@ -51,6 +52,9 @@
 #  endif
 #  ifndef OVERRIDE_CASTING
 #    define OVERRIDE_CASTING(...)
+#  endif
+#  ifndef OVERRIDE_DYNAMICCASTING
+#    define OVERRIDE_DYNAMICCASTING(...)
 #  endif
 #  ifndef OVERRIDE_OBJC
 #    define OVERRIDE_OBJC(...)
@@ -69,12 +73,12 @@
 #  endif
 #endif
 
-OVERRIDE_CASTING(dynamicCast, bool, , , swift::,
-                 (OpaqueValue *dest, OpaqueValue *src,
-                  const Metadata *srcType,
-                  const Metadata *targetType,
-                  DynamicCastFlags flags),
-                 (dest, src, srcType, targetType, flags))
+OVERRIDE_DYNAMICCASTING(dynamicCast, bool, , , swift::,
+                        (OpaqueValue *dest, OpaqueValue *src,
+                         const Metadata *srcType,
+                         const Metadata *targetType,
+                         DynamicCastFlags flags),
+                        (dest, src, srcType, targetType, flags))
 
 
 OVERRIDE_CASTING(dynamicCastClass, const void *, , , swift::,
@@ -134,18 +138,11 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , , swift
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
-OVERRIDE_PROTOCOLCONFORMANCE(conformsToSwiftProtocol,
-                             const ProtocolConformanceDescriptor *, , , swift::,
-                             (const Metadata * const type,
-                              const ProtocolDescriptor *protocol,
-                              StringRef moduleName),
-                             (type, protocol, moduleName))
-
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))
 
-OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , SWIFT_CC(swift), swift::,
+OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeLookupErrorOr<TypeInfo>, , SWIFT_CC(swift), swift::,
                         (MetadataRequest request,
                          Demangler &demangler,
                          Demangle::NodePointer node,
@@ -153,7 +150,7 @@ OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , SWIFT_CC(swift), swift
                          SubstGenericParameterFn substGenericParam,
                          SubstDependentWitnessTableFn substWitnessTable),
                         (request, demangler, node, arguments, substGenericParam, substWitnessTable))
-OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeInfo, , SWIFT_CC(swift), swift::,
+OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeLookupErrorOr<TypeInfo>, , SWIFT_CC(swift), swift::,
                         (MetadataRequest request,
                          StringRef typeName,
                          const void * const *arguments,
@@ -219,6 +216,7 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , , swift::
 #undef OVERRIDE
 #undef OVERRIDE_METADATALOOKUP
 #undef OVERRIDE_CASTING
+#undef OVERRIDE_DYNAMICCASTING
 #undef OVERRIDE_OBJC
 #undef OVERRIDE_FOREIGN
 #undef OVERRIDE_PROTOCOLCONFORMANCE

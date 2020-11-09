@@ -1,4 +1,0 @@
-class A {
-}
-class B {
-}

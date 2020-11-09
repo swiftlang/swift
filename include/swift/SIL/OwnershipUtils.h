@@ -66,6 +66,9 @@ bool isOwnedForwardingInstruction(SILInstruction *inst);
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
 
+/// Returns true if the instruction is a 'reborrow'.
+bool isReborrowInstruction(const SILInstruction *inst);
+
 class BorrowingOperandKind {
 public:
   enum Kind : uint8_t {
@@ -134,7 +137,7 @@ struct BorrowingOperand {
     return BorrowingOperand(*kind, op);
   }
 
-  void visitEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
@@ -195,6 +198,18 @@ struct BorrowingOperand {
   /// are BorrowScopeOperands.
   void visitConsumingUsesOfBorrowIntroducingUserResults(
       function_ref<void(Operand *)> visitor) const;
+
+  /// Compute the implicit uses that this borrowing operand "injects" into the
+  /// set of its operands uses.
+  ///
+  /// E.x.: end_apply uses.
+  ///
+  /// \p errorFunction a callback that if non-null is passed an operand that
+  /// triggers a mal-formed SIL error. This is just needed for the ownership
+  /// verifier to emit good output.
+  void getImplicitUses(
+      SmallVectorImpl<Operand *> &foundUses,
+      std::function<void(Operand *)> *errorFunction = nullptr) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -466,6 +481,16 @@ struct InteriorPointerOperand {
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
+
+  /// Compute the list of implicit uses that this interior pointer operand puts
+  /// on its parent guaranted value.
+  ///
+  /// Example: Uses of a ref_element_addr can not occur outside of the lifetime
+  /// of the instruction's operand. The uses of that address act as liveness
+  /// requirements to ensure that the underlying class is alive at all use
+  /// points.
+  bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
+                       std::function<void(Operand *)> *onError = nullptr);
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand

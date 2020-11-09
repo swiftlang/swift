@@ -93,6 +93,8 @@ void ScalarEnumerationTraits<swift::fine_grained_dependencies::NodeKind>::
   io.enumCase(value, "member", NodeKind::member);
   io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
   io.enumCase(value, "externalDepend", NodeKind::externalDepend);
+  io.enumCase(value, "incrementalExternalDepend",
+              NodeKind::incrementalExternalDepend);
   io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
 }
 
@@ -238,7 +240,8 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    if (writeFineGrainedDependencyGraph(diags, options::OutputFilename, fg)) {
+    if (writeFineGrainedDependencyGraphToPath(
+            diags, options::OutputFilename, fg)) {
       llvm::errs() << "Failed to write binary swiftdeps\n";
       return 1;
     }

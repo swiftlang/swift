@@ -47,6 +47,8 @@ swift_install_in_component(FILES ${datafiles}
                            DESTINATION "lib/swift/migrator"
                            COMPONENT compiler)
 
+set_swift_llvm_is_available()
+
 add_swift_host_library(swiftMigrator STATIC
   APIDiffMigratorPass.cpp
   EditorAdapter.cpp

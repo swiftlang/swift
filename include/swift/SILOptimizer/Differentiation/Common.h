@@ -271,59 +271,6 @@ inline void createEntryArguments(SILFunction *f) {
   }
 }
 
-/// Helper class for visiting basic blocks in post-order post-dominance order,
-/// based on a worklist algorithm.
-class PostOrderPostDominanceOrder {
-  SmallVector<DominanceInfoNode *, 16> buffer;
-  PostOrderFunctionInfo *postOrderInfo;
-  size_t srcIdx = 0;
-
-public:
-  /// Constructor.
-  /// \p root The root of the post-dominator tree.
-  /// \p postOrderInfo The post-order info of the function.
-  /// \p capacity Should be the number of basic blocks in the dominator tree to
-  ///             reduce memory allocation.
-  PostOrderPostDominanceOrder(DominanceInfoNode *root,
-                              PostOrderFunctionInfo *postOrderInfo,
-                              int capacity = 0)
-      : postOrderInfo(postOrderInfo) {
-    buffer.reserve(capacity);
-    buffer.push_back(root);
-  }
-
-  /// Get the next block from the worklist.
-  DominanceInfoNode *getNext() {
-    if (srcIdx == buffer.size())
-      return nullptr;
-    return buffer[srcIdx++];
-  }
-
-  /// Pushes the dominator children of a block onto the worklist in post-order.
-  void pushChildren(DominanceInfoNode *node) {
-    pushChildrenIf(node, [](SILBasicBlock *) { return true; });
-  }
-
-  /// Conditionally pushes the dominator children of a block onto the worklist
-  /// in post-order.
-  template <typename Pred>
-  void pushChildrenIf(DominanceInfoNode *node, Pred pred) {
-    SmallVector<DominanceInfoNode *, 4> children;
-    for (auto *child : *node)
-      children.push_back(child);
-    llvm::sort(children.begin(), children.end(),
-               [&](DominanceInfoNode *n1, DominanceInfoNode *n2) {
-                 return postOrderInfo->getPONumber(n1->getBlock()) <
-                        postOrderInfo->getPONumber(n2->getBlock());
-               });
-    for (auto *child : children) {
-      SILBasicBlock *childBB = child->getBlock();
-      if (pred(childBB))
-        buffer.push_back(child);
-    }
-  }
-};
-
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
     : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {

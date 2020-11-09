@@ -48,6 +48,9 @@ protected:
   void addDeploymentTargetArgs(llvm::opt::ArgStringList &Arguments,
                                const JobContext &context) const;
 
+  void addLTOLibArgs(llvm::opt::ArgStringList &Arguments,
+                     const JobContext &context) const;
+
   void addCommonFrontendArgs(
       const OutputInfo &OI, const CommandOutput &output,
       const llvm::opt::ArgList &inputArgs,

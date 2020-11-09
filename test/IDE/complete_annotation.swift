@@ -6,6 +6,8 @@
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=EXPR_POSTFIX | %FileCheck %s --check-prefix=EXPR_POSTFIX
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=EXPR_IMPLICITMEMBER | %FileCheck %s --check-prefix=EXPR_IMPLICITMEMBER
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=CALLARG | %FileCheck %s --check-prefix=CALLARG
+// RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=GENERIC | %FileCheck %s --check-prefix=GENERIC
+// RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=WHERE | %FileCheck %s --check-prefix=WHERE
 
 struct MyStruct {
   init(x: Int) {}
@@ -95,9 +97,13 @@ func testPostfix(value: MyStruct) {
 func testImplicitMember() -> MyStruct {
   return .#^EXPR_IMPLICITMEMBER^#
 }
-// EXPR_IMPLICITMEMBER: Begin completions, 3 items
+// EXPR_IMPLICITMEMBER: Begin completions, 7 items
 // EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelNameParamName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user>) -&gt; <typeid.sys>Void</typeid.sys>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: <keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER: End completions
 
@@ -109,3 +115,24 @@ func testArgument() -> MyStruct {
 // CALLARG-DAG: Pattern/ExprSpecific:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
 // CALLARG: End completions
 
+struct TestArchetypeAnnotations<T> {
+  func foo1<U>(u: U, t: T) {}
+  func foo2<S: Sequence>(s: S, elt: S.Element) {}
+}
+
+func testArchetypeAnnotations<T>(arg: TestArchetypeAnnotations<T>) {
+  arg.#^GENERIC^#
+}
+// GENERIC: Begin completions, 3 items
+// GENERIC-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>TestArchetypeAnnotations</typeid.user>&lt;<typeid.user>T</typeid.user>&gt;; name=self
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1(u: U, t: T)
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo2(s: Sequence, elt: Sequence.Element)
+// GENERIC: End completions
+
+struct TestGenericParamAnnotations<T> {
+  func foo1<U>(u: U) where #^WHERE^#
+}
+// WHERE: Begin completions, 2 items
+// WHERE-NEXT: Decl[GenericTypeParam]/Local:       <name>T</name>; typename=<typeid.user>T</typeid.user>; name=T
+// WHERE-NEXT: Decl[GenericTypeParam]/Local:       <name>U</name>; typename=<typeid.user>U</typeid.user>; name=U
+// WHERE: End completions

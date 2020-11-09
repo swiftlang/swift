@@ -43,30 +43,43 @@ SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *relativeToBB,
   }
 }
 SILBasicBlock::~SILBasicBlock() {
+  if (!getParent()) {
+    assert(ArgumentList.empty() &&
+           "a static initializer block must not have arguments");
+    assert(InstList.empty() &&
+           "a static initializer block must be cleared before the destructor");
+    return;
+  }
+    
+  SILModule &M = getModule();
+
   // Invalidate all of the basic block arguments.
   for (auto *Arg : ArgumentList) {
-    getModule().notifyDeleteHandlers(Arg);
+    M.notifyDeleteHandlers(Arg);
   }
 
   dropAllReferences();
 
-  SILModule *M = nullptr;
-  if (getParent())
-    M = &getParent()->getModule();
-
   for (auto I = begin(), E = end(); I != E;) {
     auto Inst = &*I;
     ++I;
-    if (M) {
-      // Notify the delete handlers that the instructions in this block are
-      // being deleted.
-      M->notifyDeleteHandlers(Inst);
-    }
     erase(Inst);
   }
+  assert(InstList.empty());
+}
 
-  // iplist's destructor is going to destroy the InstList.
-  InstList.clearAndLeakNodesUnsafely();
+void SILBasicBlock::clearStaticInitializerBlock(SILModule &module) {
+  assert(!getParent() && "not a global variable's static initializer block");
+  assert(ArgumentList.empty() &&
+         "a static initializer block must not have arguments");
+
+  for (auto I = begin(), E = end(); I != E;) {
+    SILInstruction *Inst = &*I;
+    ++I;
+    InstList.erase(Inst);
+    module.deallocateInst(Inst);
+  }
+  assert(InstList.empty());
 }
 
 int SILBasicBlock::getDebugID() const {
@@ -112,10 +125,10 @@ void SILBasicBlock::eraseInstructions() {
 /// Returns the iterator following the erased instruction.
 SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.
-  getModule().notifyDeleteHandlers(&*I);
-  auto *F = getParent();
+  SILModule &module = getModule();
+  module.notifyDeleteHandlers(&*I);
   auto nextIter = InstList.erase(I);
-  F->getModule().deallocateInst(I);
+  module.deallocateInst(I);
   return nextIter;
 }
 

@@ -53,6 +53,5 @@ extension A {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} i32 @main(i32 %0, i8** %1) {{.*}} {
 // CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @"$s7globals2g0Sivp", i32 0, i32 0), align 8
 
-// FIXME: give these initializers a real mangled name
-// CHECK: define internal void @globalinit_{{.*}}func0() {{.*}} {
+// CHECK: define internal void @"{{.*}}WZ"() {{.*}} {
 // CHECK:      store i64 5, i64* getelementptr inbounds (%TSi, %TSi* @"$s7globals1AV3fooSivpZ", i32 0, i32 0), align 8

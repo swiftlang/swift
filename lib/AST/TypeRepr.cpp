@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -171,6 +172,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
+
+  if (hasAttr(TAK_async))
+    Printer.printSimpleAttr("@async") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
@@ -454,14 +458,14 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
 // linkage dependency.
 
 struct TypeReprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);
     TR->print(OS);
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);

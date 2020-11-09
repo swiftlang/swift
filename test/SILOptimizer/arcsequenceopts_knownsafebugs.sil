@@ -1,0 +1,205 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+final class ChildCls {
+  var id: Int
+  init(_ i:Int)
+}
+
+struct S {
+  var child1 : ChildCls
+  var child2 : ChildCls
+  init()
+}
+
+class Cls {
+  var child1 : ChildCls
+  var child2 : ChildCls
+  init()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_subobject :
+// CHECK: bb0(%0 : $S):
+// CHECK:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK-LABEL: } // end sil function '$unmatched_rr_subobject'
+sil hidden @$unmatched_rr_subobject : $@convention(thin) (@owned S) -> () {
+bb0(%0 : $S):
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  %1 = struct_extract %0 : $S, #S.child1
+  strong_release %1 : $ChildCls
+  strong_retain %1 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$matched_rr_subobject :
+// CHECK: bb0(%0 : $S):
+// CHECK-NOT:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK-NEXT:   release_value %0 : $S
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]]
+// CHECK-LABEL: } // end sil function '$matched_rr_subobject'
+sil hidden @$matched_rr_subobject : $@convention(thin) (@owned S) -> () {
+bb0(%0 : $S):
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  %1 = struct_extract %0 : $S, #S.child1
+  strong_retain %1 : $ChildCls
+  strong_release %1 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_aliasing :
+// CHECK: bb0(%0 : $S, %1 : $ChildCls):
+// CHECK:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK-LABEL: } // end sil function '$unmatched_rr_aliasing'
+sil hidden @$unmatched_rr_aliasing : $@convention(thin) (@owned S, ChildCls) -> () {
+bb0(%0 : $S, %1 : $ChildCls):
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  strong_release %1 : $ChildCls
+  strong_retain %1 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$matched_rr_aliasing :
+// CHECK: bb0(%0 : $S, %1 : $ChildCls):
+// CHECK-NOT:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK-NEXT:   release_value %0 : $S
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]]
+// CHECK-LABEL: } // end sil function '$matched_rr_aliasing'
+sil hidden @$matched_rr_aliasing : $@convention(thin) (@owned S, ChildCls) -> () {
+bb0(%0 : $S, %1 : $ChildCls):
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  strong_retain %1 : $ChildCls
+  strong_release %1 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_cls_subobject :
+// CHECK: bb0(%0 : $Cls):
+// CHECK:   retain_value %0 : $Cls
+// CHECK: bb2:
+// CHECK:   release_value %0 : $Cls
+// CHECK:   release_value %0 : $Cls
+// CHECK-LABEL: } // end sil function '$unmatched_rr_cls_subobject'
+sil hidden @$unmatched_rr_cls_subobject : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  retain_value %0 : $Cls
+  br bb1
+
+bb1:
+  %1 = ref_element_addr %0 : $Cls, #Cls.child1
+  %2 = load %1 : $*ChildCls
+  strong_release %2 : $ChildCls
+  strong_retain %2 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $Cls
+  release_value %0 : $Cls
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$matched_rr_cls_subobject :
+// CHECK: bb0(%0 : $Cls):
+// CHECK-NOT:   retain_value %0 : $Cls
+// CHECK: bb2:
+// CHECK-NEXT:   release_value %0 : $Cls
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]]
+// CHECK-LABEL: } // end sil function '$matched_rr_cls_subobject'
+sil hidden @$matched_rr_cls_subobject : $@convention(thin) (@owned Cls) -> () {
+bb0(%0 : $Cls):
+  retain_value %0 : $Cls
+  br bb1
+
+bb1:
+  %1 = ref_element_addr %0 : $Cls, #Cls.child1
+  %2 = load %1 : $*ChildCls
+  strong_retain %2 : $ChildCls
+  strong_release %2 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $Cls
+  release_value %0 : $Cls
+  %ret = tuple()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil hidden @$unmatched_rr_subobject_nested_knownsafety :
+// CHECK: bb0(%0 : $S):
+// CHECK:   retain_value %0 : $S
+// CHECK:   retain_value %0 : $S
+// CHECK: bb2:
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK:   release_value %0 : $S
+// CHECK-LABEL: } // end sil function '$unmatched_rr_subobject_nested_knownsafety'
+sil hidden @$unmatched_rr_subobject_nested_knownsafety : $@convention(thin) (@owned S) -> () {
+bb0(%0 : $S):
+  retain_value %0 : $S
+  retain_value %0 : $S
+  br bb1
+
+bb1:
+  %1 = struct_extract %0 : $S, #S.child1
+  strong_release %1 : $ChildCls
+  strong_retain %1 : $ChildCls
+  br bb2
+
+bb2:
+  release_value %0 : $S
+  release_value %0 : $S
+  release_value %0 : $S
+  %ret = tuple()
+  return %ret : $()
+}
+

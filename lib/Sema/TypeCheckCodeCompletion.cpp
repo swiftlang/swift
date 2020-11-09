@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -41,6 +40,8 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -416,6 +417,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+  assert(exprType && !exprType->hasHole() &&
+         "type hole with FreeTypeVariableBinding::GenericParameters?");
 
   if (exprType->hasError()) {
     recoverOriginalType();
@@ -553,10 +556,10 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
   UnresolvedDeclRefExpr UDRE(DeclNameRef(opName), refKind, DeclNameLoc(Loc));
-  auto *opExpr = TypeChecker::resolveDeclRefExpr(&UDRE, DC);
+  auto *opExpr = TypeChecker::resolveDeclRefExpr(
+      &UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
 
   switch (refKind) {
-
   case DeclRefKind::PostfixOperator: {
     // (postfix_unary_expr
     //   (declref_expr name=<opName>)
@@ -590,10 +593,255 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-void TypeChecker::typeCheckForCodeCompletion(
-    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+namespace {
+
+class CompletionContextFinder : public ASTWalker {
+  enum class ContextKind {
+    FallbackExpression,
+    StringInterpolation,
+    SingleStmtClosure,
+    MultiStmtClosure,
+    ErrorExpression
+  };
+
+  struct Context {
+    ContextKind Kind;
+    Expr * E;
+  };
+
+  /// Stack of all "interesting" contexts up to code completion expression.
+  llvm::SmallVector<Context, 4> Contexts;
+  CodeCompletionExpr *CompletionExpr = nullptr;
+  Expr *InitialExpr = nullptr;
+  DeclContext *InitialDC;
+
+public:
+  /// Finder for completion contexts within the provided initial expression.
+  CompletionContextFinder(Expr *initialExpr, DeclContext *DC)
+      : InitialExpr(initialExpr), InitialDC(DC) {
+    assert(DC);
+    initialExpr->walk(*this);
+  };
+
+  /// Finder for completion contexts within the outermost non-closure context of
+  /// the code completion expression's direct context.
+  CompletionContextFinder(DeclContext *completionDC): InitialDC(completionDC) {
+    while (auto *ACE = dyn_cast<AbstractClosureExpr>(InitialDC))
+      InitialDC = ACE->getParent();
+    InitialDC->walkContext(*this);
+  }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+      Contexts.push_back({closure->hasSingleExpressionBody()
+                            ? ContextKind::SingleStmtClosure
+                            : ContextKind::MultiStmtClosure,
+                          closure});
+    }
+
+    if (isa<InterpolatedStringLiteralExpr>(E)) {
+      Contexts.push_back({ContextKind::StringInterpolation, E});
+    }
+
+    if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E)) {
+      Contexts.push_back({ContextKind::FallbackExpression, E});
+    }
+
+    if (auto *Error = dyn_cast<ErrorExpr>(E)) {
+      Contexts.push_back({ContextKind::ErrorExpression, E});
+      if (auto *OrigExpr = Error->getOriginalExpr()) {
+        OrigExpr->walk(*this);
+        if (hasCompletionExpr())
+          return std::make_pair(false, nullptr);
+      }
+    }
+
+    if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
+      CompletionExpr = CCE;
+      return std::make_pair(false, nullptr);
+    }
+
+    return std::make_pair(true, E);
+  }
+
+  Expr *walkToExprPost(Expr *E) override {
+    if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
+        isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E)) {
+      assert(Contexts.back().E == E);
+      Contexts.pop_back();
+    }
+    return E;
+  }
+
+  /// Check whether code completion expression is located inside of a
+  /// multi-statement closure.
+  bool locatedInMultiStmtClosure() const {
+    return hasContext(ContextKind::MultiStmtClosure);
+  }
+
+  bool locatedInStringIterpolation() const {
+    return hasContext(ContextKind::StringInterpolation);
+  }
+
+  bool hasCompletionExpr() const {
+    return CompletionExpr;
+  }
+
+  CodeCompletionExpr *getCompletionExpr() const {
+    assert(CompletionExpr);
+    return CompletionExpr;
+  }
+
+  struct Fallback {
+    Expr *E; ///< The fallback expression.
+    DeclContext *DC; ///< The fallback expression's decl context.
+    bool SeparatePrecheck; ///< True if the fallback may require prechecking.
+  };
+
+  /// As a fallback sometimes its useful to not only type-check
+  /// code completion expression directly but instead add some
+  /// of the enclosing context e.g. when completion is an argument
+  /// to a call.
+  Optional<Fallback> getFallbackCompletionExpr() const {
+    assert(CompletionExpr);
+
+    Optional<Fallback> fallback;
+    bool separatePrecheck = false;
+    DeclContext *fallbackDC = InitialDC;
+
+    // Find the outermost fallback expression within the innermost error
+    // expression or multi-statement closure, keeping track of its decl context.
+    for (auto context: Contexts) {
+      switch (context.Kind) {
+      case ContextKind::StringInterpolation:
+        LLVM_FALLTHROUGH;
+      case ContextKind::FallbackExpression:
+        if (!fallback && context.E != InitialExpr)
+          fallback = Fallback{context.E, fallbackDC, separatePrecheck};
+        continue;
+
+      case ContextKind::SingleStmtClosure:
+        if (!fallback && context.E != InitialExpr)
+          fallback = Fallback{context.E, fallbackDC, separatePrecheck};
+        fallbackDC = cast<AbstractClosureExpr>(context.E);
+        continue;
+
+      case ContextKind::MultiStmtClosure:
+        fallbackDC = cast<AbstractClosureExpr>(context.E);
+        LLVM_FALLTHROUGH;
+      case ContextKind::ErrorExpression:;
+        fallback = None;
+        separatePrecheck = true;
+        continue;
+      }
+    }
+
+    if (fallback)
+      return fallback;
+
+    if (CompletionExpr->getBase() && CompletionExpr != InitialExpr)
+      return Fallback{CompletionExpr, fallbackDC, separatePrecheck};
+    return None;
+  }
+
+private:
+  bool hasContext(ContextKind kind) const {
+    return llvm::find_if(Contexts, [&kind](const Context &currContext) {
+             return currContext.Kind == kind;
+           }) != Contexts.end();
+  }
+};
+
+} // end namespace
+
+// Determine if the target expression is the implicit BinaryExpr generated for
+// pattern-matching in a switch/if/guard case (<completion> ~= matchValue).
+static bool isForPatternMatch(SolutionApplicationTarget &target) {
+  if (target.getExprContextualTypePurpose() != CTP_Condition)
+    return false;
+  Expr *condition = target.getAsExpr();
+  if (!condition->isImplicit())
+    return false;
+  if (auto *BE = dyn_cast<BinaryExpr>(condition)) {
+    Identifier id;
+    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(BE->getFn())) {
+      id = ODRE->getDecls().front()->getBaseIdentifier();
+    } else if (auto *DRE = dyn_cast<DeclRefExpr>(BE->getFn())) {
+      id = DRE->getDecl()->getBaseIdentifier();
+    }
+    if (id != target.getDeclContext()->getASTContext().Id_MatchOperator)
+      return false;
+    return isa<CodeCompletionExpr>(BE->getArg()->getElement(0));
+  }
+  return false;
+}
+
+/// Remove any solutions from the provided vector with a score less than the best solution's.
+static void filterSolutions(SolutionApplicationTarget &target,
+                            SmallVectorImpl<Solution> &solutions) {
+  // FIXME: this is only needed because in pattern matching position, the
+  // code completion expression always becomes an expression pattern, which
+  // requires the ~= operator to be defined on the type being matched against.
+  // Pattern matching against an enum doesn't require that however, so valid
+  // solutions always end up having fixes. This is a problem because there will
+  // always be a valid solution as well. Optional defines ~= between Optional
+  // and _OptionalNilComparisonType (which defines a nilLiteral initializer),
+  // and the matched-against value can implicitly be made Optional if it isn't
+  // already, so _OptionalNilComparisonType is always a valid solution for the
+  // completion. That only generates the 'nil' completion, which is rarely what
+  // the user intends to write in this position and shouldn't be preferred over
+  // the other formed solutions (which require fixes). We should generate enum
+  // pattern completions separately.
+  if (isForPatternMatch(target))
+    return;
+
+  if (solutions.size() <= 1)
+    return;
+
+  auto min = std::min_element(solutions.begin(), solutions.end(),
+                              [](const Solution &a, const Solution &b) {
+    return a.getFixedScore() < b.getFixedScore();
+  });
+  auto fixStart = llvm::partition(solutions, [&](const Solution &S) {
+    return S.getFixedScore() == min->getFixedScore();
+  });
+
+  if (fixStart != solutions.begin() && fixStart != solutions.end())
+    solutions.erase(fixStart, solutions.end());
+}
+
+/// When solving for code completion we still consider solutions with holes as
+/// valid. Regular type-checking does not. This is intended to return true only
+/// if regular type-checking would consider this solution viable.
+static bool isViableForReTypeCheck(const Solution &S) {
+  if (llvm::any_of(S.Fixes, [&](const ConstraintFix *CF) {
+    return !CF->isWarning();
+  }))
+    return false;
+  using Binding = std::pair<swift::TypeVariableType *, swift::Type>;
+  return llvm::none_of(S.typeBindings, [&](const Binding& binding) {
+    return binding.second->hasHole();
+  });
+}
+
+bool TypeChecker::typeCheckForCodeCompletion(
+    SolutionApplicationTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const Solution &)> callback) {
+  auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
+
+  auto *expr = target.getAsExpr();
+  if (!expr)
+    return false;
+
+  // First of all, let's check whether given target expression
+  // does indeed have the code completion location in it.
+  {
+    auto range = expr->getSourceRange();
+    if (range.isInvalid() ||
+        !Context.SourceMgr.rangeContainsCodeCompletionLoc(range))
+      return false;
+  }
 
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-for-code-completion", expr);
@@ -601,9 +849,114 @@ void TypeChecker::typeCheckForCodeCompletion(
 
   expr = expr->walk(SanitizeExpr(Context,
                                  /*shouldReusePrecheckedType=*/false));
+  target.setExpr(expr);
 
-  ConstraintSystem::solveForCodeCompletion(expr, DC, contextualType, CTP,
-                                           callback);
+  CompletionContextFinder contextAnalyzer(expr, DC);
+
+  // If there was no completion expr (e.g. if the code completion location was
+  // among tokens that were skipped over during parser error recovery) bail.
+  if (!contextAnalyzer.hasCompletionExpr())
+    return false;
+
+  // Interpolation components are type-checked separately.
+  if (contextAnalyzer.locatedInStringIterpolation())
+    return false;
+
+  // FIXME: There is currently no way to distinguish between
+  // multi-statement closures which are result builder bodies
+  // (that are type-checked together with enclosing context)
+  // and regular closures which are type-checked separately.
+
+  if (needsPrecheck) {
+    // First, pre-check the expression, validating any types that occur in the
+    // expression and folding sequence expressions.
+    auto failedPreCheck = ConstraintSystem::preCheckExpression(
+        expr, DC,
+        /*replaceInvalidRefsWithErrors=*/true);
+
+    target.setExpr(expr);
+
+    if (failedPreCheck)
+      return false;
+  }
+
+  enum class CompletionResult { Ok, NotApplicable, Fallback };
+
+  auto solveForCodeCompletion =
+      [&](SolutionApplicationTarget &target) -> CompletionResult {
+    ConstraintSystemOptions options;
+    options |= ConstraintSystemFlags::AllowFixes;
+    options |= ConstraintSystemFlags::SuppressDiagnostics;
+    options |= ConstraintSystemFlags::ForCodeCompletion;
+
+    ConstraintSystem cs(DC, options);
+
+    llvm::SmallVector<Solution, 4> solutions;
+
+    // If solve failed to generate constraints or with some other
+    // issue, we need to fallback to type-checking a sub-expression.
+    if (!cs.solveForCodeCompletion(target, solutions))
+      return CompletionResult::Fallback;
+
+    // FIXME: instead of filtering, expose the score and viability to clients.
+    // Only keep the solution(s) with the best score.
+    filterSolutions(target, solutions);
+
+    // Similarly, if the type-check didn't produce any solutions, fall back
+    // to type-checking a sub-expression in isolation.
+    if (solutions.empty())
+      return CompletionResult::Fallback;
+
+    // If code completion expression resides inside of multi-statement
+    // closure body it could either be type-checked together with the context
+    // or not, it's impossible to say without checking.
+    if (contextAnalyzer.locatedInMultiStmtClosure()) {
+      auto &solution = solutions.front();
+
+      if (solution.hasType(contextAnalyzer.getCompletionExpr())) {
+        llvm::for_each(solutions, callback);
+        return CompletionResult::Ok;
+      }
+
+      // At this point we know the code completion expression wasn't checked
+      // with the closure's surrounding context. If a single valid solution
+      // was formed we can wait until the body of the closure is type-checked
+      // and gather completions then.
+      if (solutions.size() == 1 && isViableForReTypeCheck(solution))
+        return CompletionResult::NotApplicable;
+
+      // Otherwise, it's unlikely the body will ever be type-checked, so fall
+      // back to manually checking a sub-expression within the closure body.
+      return CompletionResult::Fallback;
+    }
+
+    llvm::for_each(solutions, callback);
+    return CompletionResult::Ok;
+  };
+
+  switch (solveForCodeCompletion(target)) {
+  case CompletionResult::Ok:
+    return true;
+
+  case CompletionResult::NotApplicable:
+    return false;
+
+  case CompletionResult::Fallback:
+    break;
+  }
+
+  // Determine the best subexpression to use based on the collected context
+  // of the code completion expression.
+  if (auto fallback = contextAnalyzer.getFallbackCompletionExpr()) {
+    assert(fallback->E != expr);
+    SolutionApplicationTarget completionTarget(fallback->E,
+                                               fallback->DC, CTP_Unused,
+                                               /*contextualType=*/Type(),
+                                               /*isDiscarded=*/true);
+    typeCheckForCodeCompletion(completionTarget, fallback->SeparatePrecheck,
+                               callback);
+  }
+  return true;
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -611,7 +964,8 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
+  if (constraints::ConstraintSystem::preCheckExpression(
+          parsedExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
     return None;
 
   switch (kind) {
@@ -691,12 +1045,139 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   parsedExpr = parsedExpr->walk(SanitizeExpr(ctx, /*shouldReusePrecheckedType=*/false));
 
   DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, Type(),
-                                                   CTP_Unused);
+  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC);
   return !resultTy;
 }
 
 LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
+}
+
+void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
+  assert(!gotCallback());
+
+  // Default to checking the completion expression in isolation.
+  Expr *fallbackExpr = CompletionExpr;
+  DeclContext *fallbackDC = DC;
+
+  CompletionContextFinder finder(DC);
+  if (finder.hasCompletionExpr()) {
+    if (auto fallback = finder.getFallbackCompletionExpr()) {
+      fallbackExpr = fallback->E;
+      fallbackDC = fallback->DC;
+    }
+  }
+
+  SolutionApplicationTarget completionTarget(fallbackExpr, fallbackDC,
+                                             CTP_Unused, Type(),
+                                             /*isDiscared=*/true);
+
+  TypeChecker::typeCheckForCodeCompletion(
+      completionTarget, /*needsPrecheck*/true,
+      [&](const Solution &S) { sawSolution(S); });
+}
+
+void DotExprTypeCheckCompletionCallback::
+sawSolution(const constraints::Solution &S) {
+  GotCallback = true;
+  auto &CS = S.getConstraintSystem();
+
+  auto GetType = [&](Expr *E) {
+    // To aid code completion, we need to attempt to convert type holes
+    // back into underlying generic parameters if possible, since type
+    // of the code completion expression is used as "expected" (or contextual)
+    // type so it's helpful to know what requirements it has to filter
+    // the list of possible member candidates e.g.
+    //
+    // \code
+    // func test<T: P>(_: [T]) {}
+    //
+    // test(42.#^MEMBERS^#)
+    // \code
+    //
+    // It's impossible to resolve `T` in this case but code completion
+    // expression should still have a type of `[T]` instead of `[<<hole>>]`
+    // because it helps to produce correct contextual member list based on
+    // a conformance requirement associated with generic parameter `T`.
+    if (isa<CodeCompletionExpr>(E)) {
+      auto completionTy = S.getType(E).transform([&](Type type) -> Type {
+        if (auto *typeVar = type->getAs<TypeVariableType>())
+          return S.getFixedType(typeVar);
+        return type;
+      });
+
+      return S.simplifyType(completionTy.transform([&](Type type) {
+        if (auto *hole = type->getAs<HoleType>()) {
+          if (auto *typeVar =
+                  hole->getOriginator().dyn_cast<TypeVariableType *>()) {
+            if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+              // Code completion depends on generic parameter type being
+              // represented in terms of `ArchetypeType` since it's easy
+              // to extract protocol requirements from it.
+              if (auto *GPD = GP->getDecl())
+                return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+            }
+          }
+
+          return Type(CS.getASTContext().TheUnresolvedType);
+        }
+
+        return type;
+      }));
+    }
+
+    return S.getResolvedType(E);
+  };
+
+  auto *ParsedExpr = CompletionExpr->getBase();
+  auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
+
+  auto BaseTy = GetType(ParsedExpr);
+  // If base type couldn't be determined (e.g. because base expression
+  // is an invalid reference), let's not attempt to do a lookup since
+  // it wouldn't produce any useful results anyway.
+  if (!BaseTy || BaseTy->is<UnresolvedType>())
+    return;
+
+  auto *Locator = CS.getConstraintLocator(SemanticExpr);
+  Type ExpectedTy = GetType(CompletionExpr);
+  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
+  if (!ParentExpr)
+    ExpectedTy = CS.getContextualType(CompletionExpr);
+
+  auto *CalleeLocator = S.getCalleeLocator(Locator);
+  ValueDecl *ReferencedDecl = nullptr;
+  if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
+    ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
+
+  auto Key = std::make_pair(BaseTy, ReferencedDecl);
+  auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
+  if (!Ret.second && ExpectedTy) {
+    Results[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
+  } else {
+    bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
+    bool SingleExprBody = false;
+    bool DisallowVoid = ExpectedTy
+                            ? !ExpectedTy->isVoid()
+                            : !ParentExpr && CS.getContextualTypePurpose(
+                                                 CompletionExpr) != CTP_Unused;
+
+    if (!ParentExpr) {
+      if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr)
+        SingleExprBody = true;
+    } else if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
+      if (ParentCE->hasSingleExpressionBody() &&
+          ParentCE->getSingleExpressionBody() == CompletionExpr) {
+        ASTNode Last = ParentCE->getBody()->getLastElement();
+        if (!Last.isStmt(StmtKind::Return) || Last.isImplicit())
+          SingleExprBody = true;
+      }
+    }
+
+    Results.push_back(
+        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, SingleExprBody});
+    if (ExpectedTy)
+      Results.back().ExpectedTypes.push_back(ExpectedTy);
+  }
 }

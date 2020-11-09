@@ -46,7 +46,7 @@ func foo(val: MyStruct) {
 // RUN: cp %t/State1.swift %t/test.swift
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -completion-check-dependency-interval ${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete -pos=5:4 %t/test.swift -- ${COMPILER_ARGS[@]} == \

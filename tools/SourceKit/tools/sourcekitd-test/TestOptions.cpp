@@ -371,29 +371,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       VFSName = InputArg->getValue();
       break;
 
-    case OPT_optimize_for_ide: {
-      bool Value;
-      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
-        llvm::errs() << "error: expected 0 or 1 for 'for-ide'\n";
-        return true;
-      }
-      OptimizeForIde = Value;
-      break;
-    }
-
-    case OPT_completion_check_dependency_interval: {
-      int64_t Value;
-      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
-        llvm::errs() << "error: expected number for inteval\n";
-        return true;
-      } else if (Value < 0) {
-        llvm::errs() << "error: completion-check-dependency-interval must be > 0\n";
-        return true;
-      }
-      CompletionCheckDependencyInterval = Value;
-      break;
-    }
-
     case OPT_suppress_config_request:
       SuppressDefaultConfigRequest = true;
       break;

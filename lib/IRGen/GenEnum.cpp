@@ -110,6 +110,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Analysis/CFG.h"
@@ -2715,8 +2716,8 @@ namespace {
         // Unpack as an instance of the payload type and use its fixLifetime
         // operation.
         Explosion srcAsPayload;
-        unpackIntoPayloadExplosion(IGF, srcAsPayload, srcAsPayload);
-        payloadTI.fixLifetime(IGF, src);
+        unpackIntoPayloadExplosion(IGF, src, srcAsPayload);
+        payloadTI.fixLifetime(IGF, srcAsPayload);
         return;
       }
       }

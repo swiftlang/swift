@@ -335,20 +335,17 @@ int main(int argc, char **argv) {
     if (Verbose)
       llvm::outs() << "Importing " << path << "... ";
 
+    swift::ImportPath::Module::Builder modulePath;
 #ifdef SWIFT_SUPPORTS_SUBMODULES
-    std::vector<swift::Located<swift::Identifier>> AccessPath;
     for (auto i = llvm::sys::path::begin(path);
          i != llvm::sys::path::end(path); ++i)
       if (!llvm::sys::path::is_separator((*i)[0]))
-          AccessPath.push_back({ CI.getASTContext().getIdentifier(*i),
-                                 swift::SourceLoc() });
+          modulePath.push_back(CI.getASTContext().getIdentifier(*i));
 #else
-    std::vector<swift::Located<swift::Identifier>> AccessPath;
-    AccessPath.push_back({ CI.getASTContext().getIdentifier(path),
-                           swift::SourceLoc() });
+    modulePath.push_back(CI.getASTContext().getIdentifier(path));
 #endif
 
-    auto Module = CI.getASTContext().getModule(AccessPath);
+    auto Module = CI.getASTContext().getModule(modulePath.get());
     if (!Module) {
       if (Verbose)
         llvm::errs() << "FAIL!\n";

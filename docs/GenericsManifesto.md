@@ -8,7 +8,7 @@ The "Complete Generics" goal for Swift 3 has been fairly ill-defined thus far, w
 
 This message expands upon the notion of "completing generics". It is not a plan for Swift 3, nor an official core team communication, but it collects the results of numerous discussions among the core team and Swift developers, both of the compiler and the standard library. I hope to achieve several things:
 
-* **Communicate a vision for Swift generics**, building on the [original generics design document](https://github.com/apple/swift/blob/master/docs/Generics.rst), so we have something concrete and comprehensive to discuss.
+* **Communicate a vision for Swift generics**, building on the [original generics design document](https://github.com/apple/swift/blob/main/docs/Generics.rst), so we have something concrete and comprehensive to discuss.
 
 * **Establish some terminology** that the Swift developers have been using for these features, so our discussions can be more productive ("oh, you're proposing what we refer to as 'conditional conformances'; go look over at this thread").
 

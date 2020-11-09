@@ -31,7 +31,6 @@ target_sources(swiftSILOptimizer PRIVATE
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
   ReleaseDevirtualizer.cpp
-  SemanticARCOpts.cpp
   SILCodeMotion.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp

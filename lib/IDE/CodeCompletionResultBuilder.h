@@ -49,8 +49,20 @@ struct ExpectedTypeContext {
   /// Since the input may be incomplete, we take into account that the types are
   /// only a hint.
   bool isSingleExpressionBody = false;
+  bool preferNonVoid = false;
 
   bool empty() const { return possibleTypes.empty(); }
+  bool requiresNonVoid() const {
+    if (isSingleExpressionBody)
+      return false;
+    if (preferNonVoid)
+      return true;
+    if (possibleTypes.empty())
+      return false;
+    return std::all_of(possibleTypes.begin(), possibleTypes.end(), [](Type Ty) {
+      return !Ty->isVoid();
+    });
+  }
 
   ExpectedTypeContext() = default;
   ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)
@@ -80,6 +92,7 @@ class CodeCompletionResultBuilder {
   bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
     CodeCompletionResult::NotRecommendedReason::NoReason;
+  StringRef BriefDocComment = StringRef();
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -433,6 +446,10 @@ public:
   void addAnnotatedWhitespace(StringRef space) {
     addWhitespace(space);
     getLastChunk().setIsAnnotation();
+  }
+
+  void setBriefDocComment(StringRef comment) {
+    BriefDocComment = comment;
   }
 };
 

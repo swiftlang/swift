@@ -29,6 +29,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/LLVMPasses/Passes.h"
+#include "clang/AST/StableHash.h"
+#include "clang/Basic/PointerAuthOptions.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/FunctionComparator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -37,6 +39,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -47,6 +50,7 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/ValueMap.h"
+#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -108,6 +112,27 @@ static bool isEligibleForConstantSharing(const Instruction *I) {
   }
 }
 
+/// Returns true if the \opIdx operand of \p CI is the callee operand.
+static bool isCalleeOperand(const CallInst *CI, unsigned opIdx) {
+  return &CI->getCalledOperandUse() == &CI->getOperandUse(opIdx);
+}
+
+static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
+  if (CI->isInlineAsm())
+    return false;
+  if (Function *Callee = CI->getCalledFunction()) {
+    if (Callee->isIntrinsic())
+      return false;
+  }
+  if (isCalleeOperand(CI, opIdx) &&
+      CI->getOperandBundle(LLVMContext::OB_ptrauth).hasValue()) {
+    // The operand is the callee and it has already been signed. Ignore this
+    // because we cannot add another ptrauth bundle to the call instruction.
+    return false;
+  }
+  return true;
+}
+
 int SwiftFunctionComparator::
 cmpOperandsIgnoringConsts(const Instruction *L, const Instruction *R,
                           unsigned opIdx) {
@@ -125,18 +150,9 @@ cmpOperandsIgnoringConsts(const Instruction *L, const Instruction *R,
     return Res;
 
   if (const auto *CL = dyn_cast<CallInst>(L)) {
-    if (CL->isInlineAsm())
+    if (!canParameterizeCallOperand(CL, opIdx) ||
+        !canParameterizeCallOperand(cast<CallInst>(R), opIdx)) {
       return Res;
-    if (Function *CalleeL = CL->getCalledFunction()) {
-      if (CalleeL->isIntrinsic())
-        return Res;
-    }
-    const CallInst *CR = cast<CallInst>(R);
-    if (CR->isInlineAsm())
-      return Res;
-    if (Function *CalleeR = CR->getCalledFunction()) {
-      if (CalleeR->isIntrinsic())
-        return Res;
     }
   }
 
@@ -218,6 +234,11 @@ public:
   SwiftMergeFunctions()
     : ModulePass(ID), FnTree(FunctionNodeCmp(&GlobalNumbers)) {
   }
+
+  SwiftMergeFunctions(bool ptrAuthEnabled, unsigned ptrAuthKey)
+    : ModulePass(ID), FnTree(FunctionNodeCmp(&GlobalNumbers)),
+      ptrAuthOptionsSet(true), ptrAuthEnabled(ptrAuthEnabled),
+      ptrAuthKey(ptrAuthKey) { }
 
   bool runOnModule(Module &M) override;
 
@@ -316,6 +337,14 @@ private:
       CurrentInst = &*std::next(CurrentInst->getIterator());
     }
 
+    /// Returns true if the operand \p OpIdx of the current instruction is the
+    /// callee of a call, which needs to be signed if passed as a parameter.
+    bool needsPointerSigning(unsigned OpIdx) const {
+      if (auto *CI = dyn_cast<CallInst>(CurrentInst))
+        return isCalleeOperand(CI, OpIdx);
+      return false;
+    }
+
     Function *F;
 
     /// The current instruction while iterating over all instructions.
@@ -337,12 +366,25 @@ private:
     /// All uses of the parameter in the merged function.
     SmallVector<OpLocation, 16> Uses;
 
+    /// The discriminator for pointer signing.
+    /// Only not null if needsPointerSigning is true.
+    ConstantInt *discriminator = nullptr;
+
+    /// True if the value is a callee function, which needs to be signed if
+    /// passed as a parameter.
+    bool needsPointerSigning = false;
+
     /// Checks if this parameter can be used to describe an operand in all
     /// functions of the equivalence class. Returns true if all values match
     /// the specific instruction operands in all functions.
-    bool matches(const FunctionInfos &FInfos, unsigned OpIdx) const {
+    bool matches(const FunctionInfos &FInfos, unsigned OpIdx,
+                 bool ptrAuthEnabled) const {
       unsigned NumFuncs = FInfos.size();
       assert(Values.size() == NumFuncs);
+      if (ptrAuthEnabled &&
+          needsPointerSigning != FInfos[0].needsPointerSigning(OpIdx)) {
+        return false;
+      }
       for (unsigned Idx = 0; Idx < NumFuncs; ++Idx) {
         const FunctionInfo &FI = FInfos[Idx];
         Constant *C = cast<Constant>(FI.CurrentInst->getOperand(OpIdx));
@@ -351,9 +393,32 @@ private:
       }
       return true;
     }
+    
+    /// Computes the discriminator for pointer signing.
+    void computeDiscriminator(LLVMContext &Context) {
+      assert(needsPointerSigning);
+      assert(!discriminator);
+      
+      /// Get a hash from the concatenated function names.
+      /// The hash is deterministic, because the order of values depends on the
+      /// order of functions in the module, which is itself deterministic.
+      /// Note that the hash is not part of the ABI, because it's purly used
+      /// for pointer authentication between a module-private caller-callee
+      /// pair.
+      std::string concatenatedCalleeNames;
+      for (Constant *value : Values) {
+        if (auto *GO = dyn_cast<GlobalObject>(value))
+          concatenatedCalleeNames += GO->getName();
+      }
+      uint64_t rawHash = clang::getStableStringHash(concatenatedCalleeNames);
+      IntegerType *discrTy = Type::getInt64Ty(Context);
+      discriminator = ConstantInt::get(discrTy, (rawHash % 0xFFFF) + 1);
+    }
   };
 
   using ParamInfos = SmallVector<ParamInfo, 16>;
+
+  Module *module = nullptr;
 
   GlobalNumberState GlobalNumbers;
 
@@ -366,6 +431,20 @@ private:
   FnTreeType FnTree;
 
   ValueMap<Function*, FunctionEntry *> FuncEntries;
+
+  // Maps a function-pointer / discriminator pair to a corresponding global in
+  // the llvm.ptrauth section.
+  // This map is used as a cache to not create ptrauth globals twice.
+  DenseMap<std::pair<Constant *, ConstantInt *>, Constant *> ptrAuthGlobals;
+
+  /// If true, ptrAuthEnabled and ptrAuthKey are valid.
+  bool ptrAuthOptionsSet = false;
+
+  /// True if the architecture has pointer authentication enabled.
+  bool ptrAuthEnabled = false;
+  
+  /// The key for pointer authentication.
+  unsigned ptrAuthKey = 0;
 
   FunctionEntry *getEntry(Function *F) const {
     return FuncEntries.lookup(F);
@@ -402,12 +481,42 @@ private:
   bool tryMapToParameter(FunctionInfos &FInfos, unsigned OpIdx,
                          ParamInfos &Params, unsigned maxParams);
 
+  void replaceCallWithAddedPtrAuth(CallInst *origCall, Value *newCallee,
+                                   ConstantInt *discriminator);
+
   void mergeWithParams(const FunctionInfos &FInfos, ParamInfos &Params);
 
   void removeEquivalenceClassFromTree(FunctionEntry *FE);
 
   void writeThunk(Function *ToFunc, Function *Thunk,
                   const ParamInfos &Params, unsigned FuncIdx);
+
+  bool isPtrAuthEnabled() const {
+    assert(ptrAuthOptionsSet);
+    return ptrAuthEnabled;
+  }
+
+  ConstantInt *getPtrAuthKey() {
+    assert(isPtrAuthEnabled());
+    return ConstantInt::get(Type::getInt32Ty(module->getContext()), ptrAuthKey);
+  }
+
+  /// Returns the value of function \p FuncIdx, and signes it if required.
+  Constant *getSignedValue(const ParamInfo &PI, unsigned FuncIdx) {
+    Constant *value = PI.Values[FuncIdx];
+    if (!PI.needsPointerSigning)
+      return value;
+
+    auto lookupKey = std::make_pair(value, PI.discriminator);
+    Constant *&ptrAuthGlobal = ptrAuthGlobals[lookupKey];
+    if (!ptrAuthGlobal) {
+      ptrAuthGlobal = GlobalPtrAuthInfo::create(*module, value,
+                             getPtrAuthKey(),
+                             ConstantInt::get(PI.discriminator->getType(), 0),
+                             PI.discriminator);
+    }
+    return ptrAuthGlobal;
+  }
 
   /// Replace all direct calls of Old with calls of New. Will bitcast New if
   /// necessary to make types match.
@@ -425,9 +534,10 @@ INITIALIZE_PASS_END(SwiftMergeFunctions,
                     "swift-merge-functions", "Swift merge function pass",
                     false, false)
 
-llvm::ModulePass *swift::createSwiftMergeFunctionsPass() {
+llvm::ModulePass *swift::createSwiftMergeFunctionsPass(bool ptrAuthEnabled,
+                                                       unsigned ptrAuthKey) {
   initializeSwiftMergeFunctionsPass(*llvm::PassRegistry::getPassRegistry());
-  return new SwiftMergeFunctions();
+  return new SwiftMergeFunctions(ptrAuthEnabled, ptrAuthKey);
 }
 
 bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
@@ -567,6 +677,17 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
   if (FunctionMergeThreshold == 0)
     return false;
 
+  module = &M;
+
+  if (!ptrAuthOptionsSet) {
+    // If invoked from IRGen in the compiler, those options are already set.
+    // If invoked from swift-llvm-opt, derive the options from the target triple.
+    Triple triple(M.getTargetTriple());
+    ptrAuthEnabled = (triple.getSubArch() == Triple::AArch64SubArch_E);
+    ptrAuthKey = (unsigned)clang::PointerAuthSchema::ARM8_3Key::ASIA;
+    ptrAuthOptionsSet = true;
+  }
+
   bool Changed = false;
 
   // All functions in the module, ordered by hash. Functions with a unique
@@ -682,6 +803,7 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
   FnTree.clear();
   GlobalNumbers.clear();
   FuncEntries.clear();
+  ptrAuthGlobals.clear();
 
   return Changed;
 }
@@ -859,7 +981,7 @@ bool SwiftMergeFunctions::tryMapToParameter(FunctionInfos &FInfos,
   // Try to find an existing parameter which exactly matches the differing
   // operands of the current instruction.
   for (ParamInfo &PI : Params) {
-    if (PI.matches(FInfos, OpIdx)) {
+    if (PI.matches(FInfos, OpIdx, isPtrAuthEnabled())) {
       Matching = &PI;
       break;
     }
@@ -880,10 +1002,37 @@ bool SwiftMergeFunctions::tryMapToParameter(FunctionInfos &FInfos,
       if (C != FirstC)
         FI.NumParamsNeeded += 1;
     }
+    if (isPtrAuthEnabled())
+      Matching->needsPointerSigning = FInfos[0].needsPointerSigning(OpIdx);
   }
   /// Remember where the parameter is needed when we build our merged function.
   Matching->Uses.push_back({FInfos[0].CurrentInst, OpIdx});
   return true;
+}
+
+/// Copy \p origCall with a \p newCalle and add a ptrauth bundle with \p
+/// discriminator.
+void SwiftMergeFunctions::replaceCallWithAddedPtrAuth(CallInst *origCall,
+                                    Value *newCallee,
+                                    ConstantInt *discriminator) {
+  SmallVector<llvm::OperandBundleDef, 4> bundles;
+  origCall->getOperandBundlesAsDefs(bundles);
+  ConstantInt *key = getPtrAuthKey();
+  llvm::Value *bundleArgs[] = { key, discriminator };
+  bundles.emplace_back("ptrauth", bundleArgs);
+
+  SmallVector<llvm::Value *, 4> copiedArgs;
+  for (Value *op : origCall->args()) {
+    copiedArgs.push_back(op);
+  }
+
+  auto *newCall = CallInst::Create(origCall->getFunctionType(),
+    newCallee, copiedArgs, bundles, origCall->getName(), origCall);
+  newCall->setAttributes(origCall->getAttributes());
+  newCall->setTailCallKind(origCall->getTailCallKind());
+  newCall->setCallingConv(origCall->getCallingConv());
+  origCall->replaceAllUsesWith(newCall);
+  origCall->eraseFromParent();
 }
 
 /// Merge all functions in \p FInfos by creating thunks which call the single
@@ -933,21 +1082,41 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
     Argument &NewArg = *NewArgIter++;
     OrigArg.replaceAllUsesWith(&NewArg);
   }
+  unsigned numOrigArgs = FirstF->arg_size();
 
   SmallPtrSet<Function *, 8> SelfReferencingFunctions;
 
   // Replace all differing operands with a parameter.
-  for (const ParamInfo &PI : Params) {
-    Argument *NewArg = &*NewArgIter++;
-    for (const OpLocation &OL : PI.Uses) {
-      OL.I->setOperand(OL.OpIndex, NewArg);
-    }
-    ParamTypes.push_back(PI.Values[0]->getType());
+  for (unsigned paramIdx = 0; paramIdx < Params.size(); ++paramIdx) {
+    const ParamInfo &PI = Params[paramIdx];
+    Argument *NewArg = NewFunction->getArg(numOrigArgs + paramIdx);
 
+    if (!PI.needsPointerSigning) {
+      for (const OpLocation &OL : PI.Uses) {
+        OL.I->setOperand(OL.OpIndex, NewArg);
+      }
+    }
     // Collect all functions which are referenced by any parameter.
     for (Value *V : PI.Values) {
       if (auto *F = dyn_cast<Function>(V))
         SelfReferencingFunctions.insert(F);
+    }
+  }
+
+  // Replace all differing operands, which need pointer signing, with a
+  // parameter.
+  // We need to do that after all other parameters, because here we replace
+  // call instructions, which must be live in case it has another constant to
+  // be replaced.
+  for (unsigned paramIdx = 0; paramIdx < Params.size(); ++paramIdx) {
+    ParamInfo &PI = Params[paramIdx];
+    if (PI.needsPointerSigning) {
+      PI.computeDiscriminator(NewFunction->getContext());
+      for (const OpLocation &OL : PI.Uses) {
+        auto *origCall = cast<CallInst>(OL.I);
+        Argument *newCallee = NewFunction->getArg(numOrigArgs + paramIdx);
+        replaceCallWithAddedPtrAuth(origCall, newCallee, PI.discriminator);
+      }
     }
   }
 
@@ -1049,7 +1218,8 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   // Add new arguments defined by Params.
   for (const ParamInfo &PI : Params) {
     assert(ParamIdx < ToFuncTy->getNumParams());
-    Args.push_back(createCast(Builder, PI.Values[FuncIdx],
+    Constant *param = getSignedValue(PI, FuncIdx);
+    Args.push_back(createCast(Builder, param,
                    ToFuncTy->getParamType(ParamIdx)));
     ++ParamIdx;
   }
@@ -1119,7 +1289,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     // Add the new parameters.
     for (const ParamInfo &PI : Params) {
       assert(ParamIdx < NewFuncTy->getNumParams());
-      Constant *ArgValue = PI.Values[FuncIdx];
+      Constant *ArgValue = getSignedValue(PI, FuncIdx);
       assert(ArgValue != Old &&
         "should not try to replace all callers of self referencing functions");
       NewArgs.push_back(ArgValue);

@@ -14,7 +14,9 @@
 #define SWIFT_BASIC_LAZY_H
 
 #include <memory>
-#ifdef __APPLE__
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+// No dependencies on single-threaded environments.
+#elif defined(__APPLE__)
 #include <dispatch/dispatch.h>
 #elif defined(__wasi__)
 // No pthread on wasi, see https://bugs.swift.org/browse/SR-12097 for more details.
@@ -44,7 +46,11 @@ inline void wasi_call_once(int *flag, void *context, void (*func)(void *)) {
 
 namespace swift {
 
-#ifdef __APPLE__
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  using OnceToken_t = bool;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  if (!TOKEN) { TOKEN = true; (FUNC)(CONTEXT); }
+#elif defined(__APPLE__)
   using OnceToken_t = dispatch_once_t;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)

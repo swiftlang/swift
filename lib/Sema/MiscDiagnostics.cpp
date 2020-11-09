@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -27,6 +28,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -34,6 +36,7 @@
 
 #define DEBUG_TYPE "Sema"
 using namespace swift;
+using namespace constraints;
 
 /// Return true if this expression is an implicit promotion from T to T?.
 static Expr *isImplicitPromotionToOptional(Expr *E) {
@@ -594,8 +597,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         isExistential = instanceTy->isExistentialType();
         if (!isExistential &&
             instanceTy->mayHaveMembers() &&
-            !TypeChecker::lookupConstructors(const_cast<DeclContext *>(DC),
-                                             instanceTy).empty()) {
+            !TypeChecker::lookupMember(const_cast<DeclContext *>(DC), instanceTy,
+                                       DeclNameRef::createConstructor()).empty()) {
           Ctx.Diags.diagnose(E->getEndLoc(), diag::add_parens_to_type)
             .fixItInsertAfter(E->getEndLoc(), "()");
         }
@@ -652,8 +655,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       auto descriptor = UnqualifiedLookupDescriptor(
-          DeclNameRef(VD->getBaseName()), topLevelContext, SourceLoc(),
-          UnqualifiedLookupFlags::KnownPrivate);
+          DeclNameRef(VD->getBaseName()), topLevelContext, SourceLoc());
       auto lookup = evaluateOrDefault(Ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
 
@@ -1493,8 +1495,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                   const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      return !AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
-               .isKnownNoEscape();
+      if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
+               .isKnownNoEscape())
+        return false;
+
+      if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
+        if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
+          return false;
+      }
+
+      return true;
     }
 
 
@@ -2223,7 +2233,7 @@ static bool fixItOverrideDeclarationTypesImpl(
 
       fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                             baseResultType, ParamDecl::Specifier::Default,
-                            method->getBodyResultTypeLoc().getSourceRange());
+                            method->getResultTypeSourceRange());
     }
     return fixedAny;
   }
@@ -2246,7 +2256,7 @@ static bool fixItOverrideDeclarationTypesImpl(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
-                          subscript->getElementTypeLoc().getSourceRange());
+                          subscript->getElementTypeSourceRange());
     return fixedAny;
   }
 
@@ -2280,6 +2290,8 @@ bool swift::computeFixitsForOverridenDeclaration(
 namespace {
 
 class VarDeclUsageChecker : public ASTWalker {
+  DeclContext *DC;
+
   DiagnosticEngine &Diags;
   // Keep track of some information about a variable.
   enum {
@@ -2316,7 +2328,8 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
+  VarDeclUsageChecker(DeclContext *DC,
+                      DiagnosticEngine &Diags) : DC(DC), Diags(Diags) {}
 
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
@@ -2360,7 +2373,7 @@ public:
     // If the variable is already unnamed, ignore it.
     if (!VD->hasName() || VD->getName().str() == "_")
       return false;
-    
+
     return true;
   }
 
@@ -3138,7 +3151,10 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
   struct ConservativeDeclMarker : public ASTWalker {
     VarDeclUsageChecker &VDUC;
-    ConservativeDeclMarker(VarDeclUsageChecker &VDUC) : VDUC(VDUC) {}
+    SourceFile *SF;
+
+    ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
+      : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
 
     Expr *walkToExprPost(Expr *E) override {
       // If we see a bound reference to a decl in an inactive #if block, then
@@ -3146,6 +3162,16 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
+      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+        auto name = declRef->getName();
+        auto loc = declRef->getLoc();
+        if (name.isSimpleName() && loc.isValid()) {
+          auto *varDecl = dyn_cast_or_null<VarDecl>(
+            ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc));
+          if (varDecl)
+            VDUC.addMark(varDecl, RK_Read|RK_Written);
+        }
+      }
       return E;
     }
   };
@@ -3164,7 +3190,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
 void swift::
 performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   auto &ctx = TLCD->getDeclContext()->getASTContext();
-  VarDeclUsageChecker checker(ctx.Diags);
+  VarDeclUsageChecker checker(TLCD, ctx.Diags);
   TLCD->walk(checker);
 }
 
@@ -3179,7 +3205,7 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // be checked as part of their parent function or TopLevelCodeDecl.
   if (!AFD->getDeclContext()->isLocalContext()) {
     auto &ctx = AFD->getDeclContext()->getASTContext();
-    VarDeclUsageChecker checker(ctx.Diags);
+    VarDeclUsageChecker checker(AFD, ctx.Diags);
     AFD->walk(checker);
   }
 
@@ -3456,8 +3482,7 @@ class ObjCSelectorWalker : public ASTWalker {
     auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
     auto result = TypeChecker::lookupMember(
         const_cast<DeclContext *>(DC), nominal->getDeclaredInterfaceType(),
-        DeclNameRef(lookupName),
-        (defaultMemberLookupOptions | NameLookupFlags::KnownPrivate));
+        DeclNameRef(lookupName), defaultMemberLookupOptions);
 
     // If we didn't find multiple methods, there is no ambiguity.
     if (result.size() < 2) return false;
@@ -4438,6 +4463,131 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
+  class ComparisonWithNaNFinder : public ASTWalker {
+    const ASTContext &C;
+    const DeclContext *DC;
+
+  public:
+    ComparisonWithNaNFinder(const DeclContext *dc)
+        : C(dc->getASTContext()), DC(dc) {}
+
+    void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
+      ValueDecl *comparisonDecl = nullptr;
+
+      // Comparison functions like == or <= take two arguments.
+      if (BE->getArg()->getNumElements() != 2) {
+        return;
+      }
+
+      // Dig out the function declaration.
+      if (auto Fn = BE->getFn()) {
+        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
+          comparisonDecl = DSCE->getCalledValue();
+        } else {
+          comparisonDecl = BE->getCalledValue();
+        }
+      }
+
+      // Bail out if it isn't a function.
+      if (!comparisonDecl || !isa<FuncDecl>(comparisonDecl)) {
+        return;
+      }
+
+      // We're only interested in comparison functions like == or <=.
+      auto comparisonDeclName = comparisonDecl->getBaseIdentifier();
+      if (!comparisonDeclName.isStandardComparisonOperator()) {
+        return;
+      }
+
+      auto firstArg = BE->getArg()->getElement(0);
+      auto secondArg = BE->getArg()->getElement(1);
+
+      // Both arguments must conform to FloatingPoint protocol.
+      if (!conformsToKnownProtocol(const_cast<DeclContext *>(DC),
+                                   firstArg->getType(),
+                                   KnownProtocolKind::FloatingPoint) ||
+          !conformsToKnownProtocol(const_cast<DeclContext *>(DC),
+                                   secondArg->getType(),
+                                   KnownProtocolKind::FloatingPoint)) {
+        return;
+      }
+
+      // Convenience utility to extract argument decl.
+      auto extractArgumentDecl = [&](Expr *arg) -> ValueDecl * {
+        if (auto DRE = dyn_cast<DeclRefExpr>(arg)) {
+          return DRE->getDecl();
+        } else if (auto MRE = dyn_cast<MemberRefExpr>(arg)) {
+          return MRE->getMember().getDecl();
+        }
+        return nullptr;
+      };
+
+      // Dig out the declarations for the arguments.
+      auto *firstVal = extractArgumentDecl(firstArg);
+      auto *secondVal = extractArgumentDecl(secondArg);
+
+      // If we can't find declarations for both arguments, bail out,
+      // because one of them has to be '.nan'.
+      if (!firstArg && !secondArg) {
+        return;
+      }
+
+      // Convenience utility to check if this is a 'nan' variable.
+      auto isNanDecl = [&](ValueDecl *VD) {
+        return VD && isa<VarDecl>(VD) && VD->getBaseIdentifier().is("nan");
+      };
+
+      // Diagnose comparison with '.nan'.
+      //
+      // If the comparison is done using '<=', '<', '==', '>', '>=', then
+      // the result is always false. If the comparison is done using '!=',
+      // then the result is always true.
+      //
+      // Emit a different diagnostic which doesn't mention using '.isNaN' if
+      // the comparison isn't done using '==' or '!=' or if both sides are
+      // '.nan'.
+      if (isNanDecl(firstVal) && isNanDecl(secondVal)) {
+        C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_both_nan,
+                         comparisonDeclName.str(), comparisonDeclName.is("!="));
+      } else if (isNanDecl(firstVal) || isNanDecl(secondVal)) {
+        if (comparisonDeclName.is("==") || comparisonDeclName.is("!=")) {
+          auto exprStr =
+              C.SourceMgr
+                  .extractText(Lexer::getCharSourceRangeFromSourceRange(
+                      C.SourceMgr, firstArg->getSourceRange()))
+                  .str();
+          auto prefix = exprStr;
+          if (comparisonDeclName.is("!=")) {
+            prefix = "!" + prefix;
+          }
+          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison,
+                           comparisonDeclName, comparisonDeclName.is("!="),
+                           prefix, exprStr);
+        } else {
+          C.Diags.diagnose(BE->getLoc(), diag::nan_comparison_without_isnan,
+                           comparisonDeclName, comparisonDeclName.is("!="));
+        }
+      }
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *BE = dyn_cast<BinaryExpr>(E)) {
+        tryDiagnoseComparisonWithNaN(BE);
+        return {false, E};
+      }
+
+      return {true, E};
+    }
+  };
+
+  ComparisonWithNaNFinder Walker(DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -4454,16 +4604,20 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
+  diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagAvailability(E, const_cast<DeclContext*>(DC));
+    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  checkActorIsolation(E, DC);
 }
 
-void swift::performStmtDiagnostics(ASTContext &ctx, const Stmt *S) {
+void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+
   TypeChecker::checkUnsupportedProtocolType(ctx, const_cast<Stmt *>(S));
     
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
@@ -4475,6 +4629,9 @@ void swift::performStmtDiagnostics(ASTContext &ctx, const Stmt *S) {
   if (auto *lcs = dyn_cast<LabeledConditionalStmt>(S))
     for (const auto &elt : lcs->getCond())
       checkImplicitPromotionsInCondition(elt, ctx);
+
+  if (!ctx.LangOpts.DisableAvailabilityChecking)
+    diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
 }
 
 //===----------------------------------------------------------------------===//
@@ -4718,7 +4875,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
                                 paramTypes, returnsSelf, false,
-                                /*allPropertyNames=*/nullptr, scratch))
+                                /*allPropertyNames=*/nullptr,
+                                None, None, scratch))
     return None;
 
   /// Retrieve a replacement identifier.
@@ -4773,7 +4931,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
                           /*returnsSelf=*/false, true,
-                          /*allPropertyNames=*/nullptr, scratch)) {
+                          /*allPropertyNames=*/nullptr, None, None, scratch)) {
     return Context.getIdentifier(name);
   }
 

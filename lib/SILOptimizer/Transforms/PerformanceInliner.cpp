@@ -318,6 +318,14 @@ bool SILPerformanceInliner::isProfitableToInline(
     return false;
   }
 
+  // Bail out if this is a generic call of a `@_specialize(exported:)` function
+  // and we are in the early inliner. We want to give the generic specializer
+  // the opportunity to see specialized call sites.
+  if (IsGeneric && WhatToInline == InlineSelection::NoSemanticsAndGlobalInit  &&
+      Callee->hasPrespecialization()) {
+    return false;
+  }
+
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
   assert(SPA->isValid());
@@ -439,7 +447,7 @@ bool SILPerformanceInliner::isProfitableToInline(
           // The access is dynamic and has no nested conflict
           // See if the storage location is considered by
           // access enforcement optimizations
-          AccessedStorage storage = findAccessedStorage(BAI->getSource());
+          auto storage = AccessedStorage::compute(BAI->getSource());
           if (BAI->hasNoNestedConflict() && (storage.isFormalAccessBase())) {
             BlockW.updateBenefit(ExclusivityBenefitWeight,
                                  ExclusivityBenefitBase);
@@ -559,6 +567,15 @@ static bool returnsClosure(SILFunction *F) {
   return false;
 }
 
+static bool isInlineAlwaysCallSite(SILFunction *Callee) {
+  if (Callee->isTransparent())
+    return true;
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    if (!Callee->getModule().getOptions().IgnoreAlwaysInline)
+      return true;
+  return false;
+}
+
 /// Checks if a given generic apply should be inlined unconditionally, i.e.
 /// without any complex analysis using e.g. a cost model.
 /// It returns true if a function should be inlined.
@@ -585,7 +602,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
 
   // Always inline generic functions which are marked as
   // AlwaysInline or transparent.
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
+  if (isInlineAlwaysCallSite(Callee))
     return true;
 
   // If all substitutions are concrete, then there is no need to perform the
@@ -632,7 +649,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+  if (isInlineAlwaysCallSite(Callee)) {
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    always-inline decision "
                             << Callee->getName() << '\n');
@@ -655,7 +672,7 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
     return false;
   }
 
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+  if (isInlineAlwaysCallSite(Callee)) {
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    always-inline decision "
                             << Callee->getName() << '\n');
@@ -715,10 +732,6 @@ addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
            "Expected to find block in map");
     BBToWeightMap[currBB] += numToAdd;
   }
-}
-
-static bool isInlineAlwaysCallSite(SILFunction *Callee) {
-  return Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent();
 }
 
 static void

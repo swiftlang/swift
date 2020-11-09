@@ -15,7 +15,7 @@
 #include "../SwiftShims/FoundationShims.h"
 #include <stdlib.h>
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && defined(__MACH__) && defined(SWIFT_RUNTIME_OS_VERSIONING)
 
 #if SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE
 static unsigned long long computeIsSwiftMask() {

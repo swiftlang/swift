@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -72,6 +72,8 @@ PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
 PASS(AccessedStorageAnalysisDumper, "accessed-storage-analysis-dump",
      "Dump Accessed Storage Analysis Summaries")
+PASS(AccessPathVerification, "access-path-verification",
+     "Verify Access Paths (and Accessed Storage)")
 PASS(AccessedStorageDumper, "accessed-storage-dump",
      "Dump Accessed Storage Information")
 PASS(AccessMarkerElimination, "access-marker-elim",
@@ -163,6 +165,8 @@ PASS(DifferentiabilityWitnessDevirtualizer,
      "Inlines Differentiability Witnesses")
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
+PASS(OnonePrespecializations, "onone-prespecializer",
+     "Pre specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
 PASS(EarlyInliner, "early-inline",
@@ -189,6 +193,9 @@ PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 PASS(ExistentialSpecializer, "existential-specializer",
      "Existential Specializer")
+PASS(SILSkippingChecker, "check-sil-skipping",
+     "Utility pass to ensure -experimental-skip-*-function-bodies skip "
+     "SIL generation of not-to-be-serialized functions entirely")
 PASS(GlobalOpt, "global-opt",
      "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
@@ -249,6 +256,8 @@ PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
+PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
+     "Diagnose improperly nested '@_semantics' functions")
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
@@ -341,9 +350,6 @@ PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
 PASS(CMOSerializeSILPass, "cmo-serialize-sil",
      "Utility pass. Serializes the current SILModule for cross-module-optimization")
-PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
-     "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
-     "skips everything it should")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")

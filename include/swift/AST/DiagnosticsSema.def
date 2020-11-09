@@ -112,6 +112,9 @@ ERROR(expected_argument_in_contextual_member,none,
       "member %0 expects argument of type %1", (DeclName, Type))
 ERROR(expected_parens_in_contextual_member,none,
       "member %0 is a function; did you mean to call it?", (DeclName))
+ERROR(expected_parens_in_contextual_member_type,none,
+      "member %0 is a function that produces expected type %1; did you mean to "
+      "call it?", (DeclName, Type))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
@@ -453,6 +456,10 @@ ERROR(cannot_convert_closure_result_nil,none,
 ERROR(cannot_convert_parent_type,none,
       "cannot convert parent type %0 to expected type %1",
       (Type, Type))
+ERROR(cannot_convert_chain_result_type,none,
+      "member chain produces result of type %0 but contextual base was "
+      "inferred as %1",
+      (Type, Type))
 
 NOTE(generic_argument_mismatch,none,
      "arguments to generic parameter %0 (%1 and %2) are expected to be equal",
@@ -708,12 +715,12 @@ ERROR(sema_opening_import,Fatal,
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
-      "failed to build module '%0' from its module interface; "
-      "%select{the compiler that produced it, '%2', may have used features "
-      "that aren't supported by this compiler, '%3'"
-      "|it may have been damaged or it may have triggered a bug in the Swift "
-      "compiler when it was produced}1",
-      (StringRef, bool, StringRef, StringRef))
+      "failed to %select{build module '%1' from its module interface|verify "
+      "module interface of '%1'}0; %select{the compiler that produced it, "
+      "'%3', may have used features that aren't supported by this compiler, "
+      "'%4'|it may have been damaged or it may have triggered a bug in the "
+      "Swift compiler when it was produced}2",
+      (bool, StringRef, bool, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -759,7 +766,7 @@ ERROR(serialization_target_too_new_repl,none,
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
-      "please file a bug report with your project and the crash log",
+      SWIFT_BUG_REPORT_MESSAGE,
       (StringRef))
 NOTE(serialization_misc_version,none,
      "module '%0' full misc version is '%1'",
@@ -1038,9 +1045,6 @@ WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
 NOTE(downcast_to_unrelated_fixit,none,
      "did you mean to call %0 with '()'?", (Identifier))
-ERROR(downcast_to_more_optional,none,
-      "cannot downcast from %0 to a more optional type %1",
-      (Type, Type))
 ERROR(optional_chain_noop,none,
       "optional chain has no effect, expression already produces %0",
       (Type))
@@ -1082,6 +1086,9 @@ NOTE(unwrap_with_guard,none,
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
+ERROR(invalid_optional_infered_keypath_root, none,
+      "key path root inferred as optional type %0 must be unwrapped to refer to member %1 "
+      "of unwrapped type %2", (Type, DeclNameRef, Type))
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
@@ -1089,6 +1096,12 @@ NOTE(optional_base_remove_optional_for_keypath_root, none,
      "use unwrapped type %0 as key path root", (Type))
 NOTE(optional_keypath_application_base, none,
      "use '?' to access key path subscript only for non-'nil' base values", ())
+NOTE(optional_key_path_root_base_chain, none,
+     "chain the optional using '?.' to access unwrapped type member %0",
+     (DeclNameRef))
+NOTE(optional_key_path_root_base_unwrap, none,
+     "unwrap the optional using '!.' to access unwrapped type member %0",
+     (DeclNameRef))
     
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
@@ -1294,8 +1307,9 @@ ERROR(nominal_type_not_attribute,none,
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
-      "classes or class-bound protocols", (SelfAccessKind))
+ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in " 
+      "%select{classes|class-bound protocols}2",
+      (SelfAccessKind, DescriptiveDeclKind, bool))
 
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
@@ -1370,6 +1384,8 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
+ERROR(cdecl_async,none,
+      "@_cdecl functions cannot be asynchronous", ())
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -1658,6 +1674,11 @@ ERROR(where_nongeneric_ctx,none,
 ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
+ERROR(unable_to_convert_generic_swift_types,none,
+      "could not generate C++ types from the generic Swift types provided. "
+      "The following Swift type(s) provided to '%0' were unable to be "
+      "converted: %1.",
+      (StringRef, StringRef))
 
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
@@ -1821,9 +1842,11 @@ ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 ERROR(type_cannot_conform, none,
       "%select{type %1|protocol %1 as a type}0 cannot conform to "
-      "%select{%3|the protocol itself}2; "
-      "only concrete types such as structs, enums and classes can conform to protocols",
+      "%select{%3|the protocol itself}2",
       (bool, Type, bool, Type))
+NOTE(only_concrete_types_conform_to_protocols,none,
+     "only concrete types such as structs, enums and classes can conform to protocols",
+     ())
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,
@@ -1976,14 +1999,15 @@ NOTE(witness_self_weaken_same_type,none,
       "consider weakening the same-type requirement %0 == %1 to a superclass "
       "requirement", (Type, Type))
 ERROR(witness_requires_dynamic_self,none,
-      "method %0 in non-final class %1 must return 'Self' to conform to "
-      "protocol %2",
-      (DeclName, Type, Type))
+      "%select{%error|method|property|subscript}0 %1 in non-final class %2 "
+      "must %select{%error|return|specify type|return}0 'Self' "
+      "to conform to protocol %3",
+      (RequirementKind, DeclName, Type, Type))
 ERROR(witness_requires_class_implementation,none,
-      "method %0 in non-final class %1 cannot be implemented in a "
-      "protocol extension because it returns 'Self' and has associated type "
-      "requirements",
-      (DeclName, Type))
+      "%select{%error|method|%error|subscript}0 %1 in non-final class %2 "
+      "cannot be implemented in a protocol extension because it returns 'Self' "
+      "and has associated type requirements",
+      (RequirementKind, DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
@@ -2174,9 +2198,6 @@ NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
-NOTE(protocol_witness_async_conflict,none,
-     "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
-     (bool))
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
@@ -2713,6 +2734,7 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
 
 ERROR(decl_from_hidden_module,none,
       "cannot use %0 %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
@@ -2721,20 +2743,26 @@ ERROR(decl_from_hidden_module,none,
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
       "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
+      "as result builder in SPI|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; %3 has been imported "
-      "as implementation-only",
-      (Type, Identifier, unsigned, Identifier))
+      "in an extension with conditional conformances}2; "
+      "%select{%3 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %3|"
+      "the conformance is declared as SPI}4",
+      (Type, Identifier, unsigned, Identifier, unsigned))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %2 has been imported as implementation-only",
-      (Type, Identifier, Identifier, Type, Type))
+      "%4); %select{%2 has been imported as implementation-only|"
+      "the conformance is declared as SPI in %2|"
+      "the conformance is declared as SPI}5",
+      (Type, Identifier, Identifier, Type, Type, unsigned))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
@@ -2765,8 +2793,9 @@ ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "be satisfied by a 'required' initializer in the class definition",
       (Type, DeclName))
 ERROR(cannot_synthesize_in_crossfile_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension "
-      "in a different file to the type", (Type))
+      "extension outside of file declaring %0 %1 prevents automatic synthesis "
+      "of %2 for protocol %3",
+      (DescriptiveDeclKind, DeclName, DeclName, Type))
 
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
@@ -2808,15 +2837,16 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
-      "requires 'wrappedValue' in property wrapper %0 to be mutable; "
-      "add an explicit '@noDerivative' attribute"
+      "requires 'wrappedValue' in property wrapper %0 to be mutable or have a "
+      "non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
       (/*wrapperType*/ Identifier, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
       "requires all stored properties not marked with `@noDerivative` to be "
-      "mutable; use 'var' instead, or add an explicit '@noDerivative' attribute"
+      "mutable or have a non-mutating 'move(along:)'; use 'var' instead, or "
+      "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
       (/*nominalName*/ Identifier, /*nominalCanDeriveAdditiveArithmetic*/ bool))
 
@@ -3091,14 +3121,11 @@ ERROR(differentiable_attr_layout_req_unsupported,none,
       ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
-NOTE(protocol_witness_missing_differentiable_attr_nonpublic_other_file,none,
-     "non-public %1 %2 must have explicit '%0' attribute to satisfy "
-     "requirement %3 %4 (in protocol %6) because it is declared in a different "
-     "file than the conformance of %5 to %6",
-     (StringRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
-      Type, Type))
+NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
+     "candidate is missing explicit '%0' attribute to satisfy requirement %1 "
+     "(in protocol %3); explicit attribute is necessary because candidate is "
+     "declared in a different type context or file than the conformance of %2 "
+     "to %3", (StringRef, DeclName, Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
@@ -3332,6 +3359,16 @@ ERROR(unordered_adjacent_operators,none,
 ERROR(missing_builtin_precedence_group,none,
       "broken standard library: missing builtin precedence group %0",
       (Identifier))
+WARNING(nan_comparison, none, 
+       "comparison with '.nan' using %0 is always %select{false|true}1, use "
+       "'%2.isNaN' to check if '%3' %select{is not a number|is a number}1",
+       (Identifier, bool, StringRef, StringRef))
+WARNING(nan_comparison_without_isnan, none, 
+       "comparison with '.nan' using %0 is always %select{false|true}1", 
+       (Identifier, bool))
+WARNING(nan_comparison_both_nan, none, 
+       "'.nan' %0 '.nan' is always %select{false|true}1", 
+       (StringRef, bool))
 
 // If you change this, also change enum TryKindForDiagnostics.
 #define TRY_KIND_SELECT(SUB) "%select{try|try!|try?|await}" #SUB
@@ -3407,7 +3444,7 @@ ERROR(type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report", ())
+      SWIFT_BUG_REPORT_MESSAGE, ())
 
 
 ERROR(missing_protocol,none,
@@ -3688,6 +3725,9 @@ ERROR(converting_noescape_to_type,none,
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
+
+ERROR(reference_to_invalid_decl,none,
+      "cannot reference invalid declaration %0", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
@@ -4016,10 +4056,13 @@ ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
 ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of %0",
-      (StringRef))
+      "call can throw, but errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 ERROR(throw_in_illegal_context,none,
-      "errors cannot be thrown out of %0", (StringRef))
+      "errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
@@ -4027,22 +4070,237 @@ ERROR(throwing_interpolation_without_try,none,
       "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
+ERROR(throwing_async_let_without_try,none,
+      "reading 'async let' can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
       "did you mean to use 'try'?", ())
 NOTE(note_error_to_optional,none,
       "did you mean to handle error as optional value?", ())
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
-ERROR(async_call_without_await,none,
-      "call is 'async' but is not marked with 'await'", ())
-WARNING(no_async_in_await,none,
-        "no calls to 'async' functions occur within 'await' expression", ())
 
 WARNING(no_throw_in_try,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
 WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
+
+//------------------------------------------------------------------------------
+// MARK: Concurrency
+//------------------------------------------------------------------------------
+ERROR(async_call_without_await,none,
+      "call is 'async' but is not marked with 'await'", ())
+ERROR(async_call_without_await_in_autoclosure,none,
+      "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
+ERROR(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer that is not marked "
+      "with 'await'", ())
+WARNING(no_async_in_await,none,
+        "no calls to 'async' functions occur within 'await' expression", ())
+ERROR(async_call_in_illegal_context,none,
+      "'async' call cannot occur in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
+ERROR(await_in_illegal_context,none,
+      "'await' operation cannot occur in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned))
+ERROR(async_in_nonasync_function,none,
+      "%select{'async'|'await'|'async let'}0 in "
+      "%select{a function|an autoclosure}1 that does not support concurrency",
+      (unsigned, bool))
+NOTE(note_add_async_to_function,none,
+     "add 'async' to function %0 to make it asynchronous", (DeclName))
+NOTE(note_add_asynchandler_to_function,none,
+     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
+ERROR(not_objc_function_async,none,
+      "'async' function cannot be represented in Objective-C", ())
+NOTE(not_objc_function_type_async,none,
+      "'async' function types cannot be represented in Objective-C", ())
+ERROR(actor_isolated_objc,none,
+      "actor-isolated %0 %1 cannot be @objc",
+       (DescriptiveDeclKind, DeclName))
+NOTE(protocol_witness_async_conflict,none,
+     "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
+     (bool))
+ERROR(async_autoclosure_nonasync_function,none,
+      "'async' autoclosure parameter in a non-'async' function", ())
+
+ERROR(async_not_let,none,
+      "'async' can only be used with 'let' declarations", ())
+ERROR(async_let_not_local,none,
+      "'async let' can only be used on local declarations", ())
+ERROR(async_let_not_initialized,none,
+      "'async let' binding requires an initializer expression", ())
+ERROR(async_let_no_variables,none,
+      "'async let' requires at least one named variable", ())
+ERROR(async_let_without_await,none,
+      "reference to async let %0 is not marked with 'await'", (DeclName))
+ERROR(async_let_in_illegal_context,none,
+      "async let %0 cannot be referenced in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
+      (DeclName, unsigned))
+
+ERROR(asynchandler_non_func,none,
+      "'@asyncHandler' can only be applied to functions",
+      ())
+ERROR(asynchandler_returns_value,none,
+      "'@asyncHandler' function can only return 'Void'",
+      ())
+ERROR(asynchandler_throws,none,
+      "'@asyncHandler' function cannot throw",
+      ())
+ERROR(asynchandler_async,none,
+      "'@asyncHandler' function cannot be 'async' itself",
+      ())
+ERROR(asynchandler_inout_parameter,none,
+      "'inout' parameter is not allowed in '@asyncHandler' function",
+      ())
+ERROR(asynchandler_noescape_closure_parameter,none,
+      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
+      ())
+ERROR(asynchandler_mutating,none,
+      "'@asyncHandler' function cannot be 'mutating'",
+      ())
+
+ERROR(objc_ambiguous_async_convention,none,
+      "%0 overrides or implements protocol requirements for Objective-C "
+      "declarations with incompatible async conventions",
+      (DeclName))
+NOTE(objc_ambiguous_async_convention_candidate,none,
+     "%0 provides async here", (DeclName))
+
+ERROR(satisfy_async_objc,none,
+      "satisfying an asychronous @objc %select{method|initializer}0 with "
+      "a synchronous %select{method|initializer}0 is not supported", (bool))
+ERROR(async_objc_dynamic_self,none,
+      "asynchronous method returning 'Self' cannot be '@objc'", ())
+
+ERROR(actor_with_nonactor_superclass,none,
+      "actor class cannot inherit from non-actor class %0", (DeclName))
+
+ERROR(actor_isolated_non_self_reference,none,
+        "actor-isolated %0 %1 can only be referenced "
+        "%select{inside the actor|on 'self'}2",
+        (DescriptiveDeclKind, DeclName, bool))
+ERROR(actor_isolated_self_independent_context,none,
+        "actor-isolated %0 %1 can not be referenced from an "
+        "'@actorIndependent' context",
+        (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_global_actor_context,none,
+      "actor-isolated %0 %1 can not be referenced from context of global "
+      "actor %2",
+      (DescriptiveDeclKind, DeclName, Type))
+ERROR(global_actor_from_instance_actor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from actor %3",
+      (DescriptiveDeclKind, DeclName, Type, DeclName))
+ERROR(global_actor_from_other_global_actor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from "
+      "different global actor %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(global_actor_from_independent_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from an "
+      "'@actorIndependent' context",
+      (DescriptiveDeclKind, DeclName, Type))
+ERROR(actor_isolated_partial_apply,none,
+        "actor-isolated %0 %1 can not be partially applied",
+        (DescriptiveDeclKind, DeclName))
+WARNING(concurrent_access_local,none,
+        "local %0 %1 is unsafe to reference in code that may execute "
+        "concurrently",
+        (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_concurrent_access,none,
+        "actor-isolated %0 %1 is unsafe to reference in code "
+        "that may execute concurrently",
+        (DescriptiveDeclKind, DeclName))
+NOTE(actor_isolated_method,none,
+     "only asynchronous methods can be used outside the actor instance; "
+     "do you want to add 'async'?", ())
+NOTE(actor_mutable_state,none,
+     "mutable state is only available within the actor instance", ())
+WARNING(shared_mutable_state_access,none,
+        "reference to %0 %1 is not concurrency-safe because it involves "
+        "shared mutable state", (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_witness,none,
+     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
+     (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_witness_could_be_async_handler,none,
+     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement; "
+     "did you mean to make it an asychronous handler?",
+     (DescriptiveDeclKind, DeclName))
+ERROR(global_actor_isolated_requirement,none,
+      "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_witness,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3",
+      (DescriptiveDeclKind, DeclName, Type, Identifier))
+ERROR(global_actor_isolated_requirement_witness_conflict,none,
+      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
+      "requirement from protocol %3 isolated to global actor %4",
+      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+
+ERROR(actorindependent_let,none,
+      "'@actorIndependent' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
+ERROR(actorindependent_mutable_storage,none,
+      "'@actorIndependent' can not be applied to stored properties",
+      ())
+ERROR(actorindependent_local_var,none,
+      "'@actorIndependent' can not be applied to local variables",
+      ())
+ERROR(actorindependent_not_actor_member,none,
+      "'@actorIndependent' can only be applied to actor members and "
+      "global/static variables",
+      ())
+ERROR(actorindependent_not_actor_instance_member,none,
+      "'@actorIndependent' can only be applied to instance members of actors",
+      ())
+
+ERROR(concurrency_lib_missing,none,
+      "missing '%0' declaration, probably because the '_Concurrency' "
+      "module was not imported", (StringRef))
+ERROR(enqueue_partial_task_not_in_context,none,
+      "'enqueue(partialTask:)' can only be implemented in the definition of "
+      "actor class %0", (Type))
+
+ERROR(global_actor_missing_shared,none,
+      "global actor %0 requires a static property 'shared' that produces an "
+      "actor instance", (Identifier))
+NOTE(global_actor_shared_not_static,none,
+     "'shared' property in global actor is not 'static'", ())
+NOTE(global_actor_shared_inaccessible,none,
+     "'shared' property has more restrictive access (%0) than its global actor "
+     "(%1)",
+     (StringRef, StringRef))
+NOTE(global_actor_shared_constrained_extension,none,
+     "'shared' property in global actor cannot be in a constrained extension",
+     ())
+NOTE(global_actor_shared_non_actor_type,none,
+     "'shared' property type %0 does not conform to the 'Actor' protocol",
+     (Type))
+
+ERROR(multiple_global_actors,none,
+      "declaration can not have multiple global actor attributes (%0 and %1)",
+      (Identifier, Identifier))
+ERROR(global_actor_disallowed,none,
+      "%0 cannot have a global actor", (DescriptiveDeclKind))
+ERROR(global_actor_on_actor_class,none,
+      "actor class %0 cannot have a global actor", (Identifier))
+ERROR(global_actor_on_local_variable,none,
+      "local variable %0 cannot have a global actor", (DeclName))
+ERROR(global_actor_on_struct_property,none,
+      "stored property %0 of a struct cannot have a global actor", (DeclName))
+
+ERROR(actor_isolation_multiple_attr,none,
+      "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
+      (DescriptiveDeclKind, DeclName, StringRef, StringRef))
+
+ERROR(actor_isolation_override_mismatch,none,
+      "%0 %1 %2 has different actor isolation from %3 overridden declaration",
+      (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -4398,10 +4656,6 @@ NOTE(not_objc_generic_type_param,none,
 NOTE(not_objc_function_type_param,none,
      "function types cannot be represented in Objective-C unless their "
      "parameters and returns can be", ())
-ERROR(not_objc_function_async,none,
-      "'async' function cannot be represented in Objective-C", ())
-NOTE(not_objc_function_type_async,none,
-      "'async' function types cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_throwing,none,
       "throwing function types cannot be represented in Objective-C", ())
 NOTE(objc_inferring_on_objc_protocol_member,none,
@@ -4775,12 +5029,49 @@ WARNING(public_decl_needs_availability, none,
         "public declarations should have an availability attribute when building "
         "with -require-explicit-availability", ())
 
+ERROR(availability_macro_in_inlinable, none,
+      "availability macro cannot be used in inlinable %0",
+      (DescriptiveDeclKind))
+
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.
 ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
+
+// Conformance availability checking diagnostics
+
+ERROR(conformance_availability_unavailable, none,
+      "conformance of %0 to %1 is unavailable"
+      "%select{ in %3|}2%select{|: %4}4",
+      (Type, Type, bool, StringRef, StringRef))
+
+NOTE(conformance_availability_marked_unavailable, none,
+     "conformance of %0 to %1 has been explicitly marked "
+     "unavailable here", (Type, Type))
+
+NOTE(conformance_availability_introduced_in_version, none,
+     "conformance of %0 to %1 was introduced in %2 %3",
+     (Type, Type, StringRef, llvm::VersionTuple))
+
+NOTE(conformance_availability_obsoleted, none,
+     "conformance of %0 to %1 was obsoleted in %2 %3",
+     (Type, Type, StringRef, llvm::VersionTuple))
+
+WARNING(conformance_availability_deprecated, none,
+        "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
+        (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+         StringRef))
+
+ERROR(conformance_availability_only_version_newer, none,
+      "conformance of %0 to %1 is only available in %2 %3 or newer",
+      (Type, Type, StringRef, llvm::VersionTuple))
+
+WARNING(conformance_availability_only_version_newer_warn, none,
+        "conformance of %0 to %1 is only available in %2 %3 or newer",
+        (Type, Type, StringRef, llvm::VersionTuple))
 
 //------------------------------------------------------------------------------
 // MARK: @discardableResult
@@ -4834,12 +5125,12 @@ ERROR(local_type_in_inlinable_function,
       (Identifier, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
       (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|'@_spi'|'@_spi'}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
@@ -4907,6 +5198,12 @@ ERROR(specialize_attr_missing_constraint,none,
       "Missing constraint for %0 in '_specialize' attribute", (DeclName))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
       "Only same-type and layout requirements are supported by '_specialize' attribute", ())
+ERROR(specialize_target_function_not_found, none,
+     "target function %0 could not be found", (DeclNameRef))
+ERROR(specialize_target_function_of_type_not_found, none,
+      "target function %0 of type %1 could not be found", (DeclNameRef, Type))
+NOTE(specialize_found_function_of_type, none,
+      "found function %0 of type %1", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Variable usage diagnostics
@@ -5059,8 +5356,6 @@ ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "
       "get-only property wrapper %1", (TypeLoc, TypeLoc))
 
-ERROR(property_wrapper_local,none,
-      "property wrappers are not yet supported on local properties", ())
 ERROR(property_wrapper_top_level,none,
       "property wrappers are not yet supported in top-level code", ())
 ERROR(property_wrapper_let, none,
@@ -5126,61 +5421,84 @@ ERROR(property_wrapper_missing_arg_init, none, "missing argument for parameter "
       "arguments in '@%1(...)'", (Identifier, StringRef))
 
 //------------------------------------------------------------------------------
-// MARK: function builder diagnostics
+// MARK: result builder diagnostics
 //------------------------------------------------------------------------------
-ERROR(function_builder_decl, none,
-      "closure containing a declaration cannot be used with function "
+ERROR(result_builder_decl, none,
+      "closure containing a declaration cannot be used with result "
       "builder %0", (DeclName))
-NOTE(note_function_builder_decl, none,
-      "closure containing a declaration cannot be used with function "
+NOTE(note_result_builder_decl, none,
+      "closure containing a declaration cannot be used with result "
       "builder %0", (DeclName))
-ERROR(function_builder_control_flow, none,
-      "closure containing control flow statement cannot be used with function "
+ERROR(result_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with result "
       "builder %0", (DeclName))
-NOTE(note_function_builder_control_flow, none,
-      "closure containing control flow statement cannot be used with function "
+NOTE(note_result_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with result "
       "builder %0", (DeclName))
-ERROR(function_builder_attribute_not_allowed_here, none,
-      "function builder attribute %0 can only be applied to a parameter, "
+ERROR(result_builder_attribute_not_allowed_here, none,
+      "result builder attribute %0 can only be applied to a parameter, "
       "function, or computed property", (Identifier))
-ERROR(function_builder_attribute_on_storage_without_getter, none,
-      "function builder attribute %0 can only be applied to a "
+ERROR(result_builder_attribute_on_storage_without_getter, none,
+      "result builder attribute %0 can only be applied to a "
       "%select{subscript|property|constant|variable}1 if it defines a getter",
       (DeclName, unsigned))
-ERROR(function_builder_parameter_not_of_function_type, none,
-      "function builder attribute %0 can only be applied to a parameter of "
+ERROR(result_builder_parameter_not_of_function_type, none,
+      "result builder attribute %0 can only be applied to a parameter of "
       "function type",
       (Identifier))
-ERROR(function_builder_parameter_autoclosure, none,
-      "function builder attribute %0 cannot be applied to an autoclosure "
+ERROR(result_builder_parameter_autoclosure, none,
+      "result builder attribute %0 cannot be applied to an autoclosure "
       "parameter",
       (Identifier))
-ERROR(function_builder_multiple, none,
-      "only one function builder attribute can be attached to a "
+ERROR(result_builder_multiple, none,
+      "only one result builder attribute can be attached to a "
       "%select{declaration|parameter}0", (bool))
-NOTE(previous_function_builder_here, none,
-     "previous function builder specified here", ())
-ERROR(function_builder_arguments, none,
-      "function builder attributes cannot have arguments", ())
-WARNING(function_builder_disabled_by_return, none,
-        "application of function builder %0 disabled by explicit 'return' "
+NOTE(previous_result_builder_here, none,
+     "previous result builder specified here", ())
+ERROR(result_builder_arguments, none,
+      "result builder attributes cannot have arguments", ())
+WARNING(result_builder_disabled_by_return, none,
+        "application of result builder %0 disabled by explicit 'return' "
         "statement", (Type))
-NOTE(function_builder_remove_attr, none,
-     "remove the attribute to explicitly disable the function builder", ())
-NOTE(function_builder_remove_returns, none,
-     "remove 'return' statements to apply the function builder", ())
-ERROR(function_builder_infer_ambig, none,
-      "ambiguous function builder inferred for %0: %1 or %2",
+NOTE(result_builder_remove_attr, none,
+     "remove the attribute to explicitly disable the result builder", ())
+NOTE(result_builder_remove_returns, none,
+     "remove 'return' statements to apply the result builder", ())
+ERROR(result_builder_infer_ambig, none,
+      "ambiguous result builder inferred for %0: %1 or %2",
       (DeclName, Type, Type))
-NOTE(function_builder_infer_add_return, none,
-     "add an explicit 'return' statement to not use a function builder", ())
-NOTE(function_builder_infer_pick_specific, none,
-     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+NOTE(result_builder_infer_add_return, none,
+     "add an explicit 'return' statement to not use a result builder", ())
+NOTE(result_builder_infer_pick_specific, none,
+     "apply result builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
-WARNING(function_builder_missing_limited_availability, none,
-        "function builder %0 does not implement 'buildLimitedAvailability'; "
+WARNING(result_builder_missing_limited_availability, none,
+        "result builder %0 does not implement 'buildLimitedAvailability'; "
         "this code may crash on earlier versions of the OS",
         (Type))
+ERROR(result_builder_static_buildblock, none,
+      "result builder must provide at least one static 'buildBlock' "
+      "method", ())
+NOTE(result_builder_non_static_buildblock, none,
+     "did you mean to make instance method 'buildBlock' static?", ())
+NOTE(result_builder_buildblock_enum_case, none,
+     "enum case 'buildBlock' cannot be used to satisfy the result builder "
+     "requirement", ())
+NOTE(result_builder_buildblock_not_static_method, none,
+     "potential match 'buildBlock' is not a static method", ())
+
+NOTE(result_builder_missing_build_optional, none,
+     "add 'buildOptional(_:)' to the result builder %0 to add support for "
+     "'if' statements without an 'else'", (Type))
+NOTE(result_builder_missing_build_either, none,
+     "add 'buildEither(first:)' and 'buildEither(second:)' to the result "
+     "builder %0 to add support for 'if'-'else' and 'switch'", (Type))
+NOTE(result_builder_missing_build_array, none,
+     "add 'buildArray(_:)' to the result builder %0 to add support for "
+     "'for'..'in' loops", (Type))
+NOTE(result_builder_missing_build_limited_availability, none,
+     "add 'buildLimitedAvailability(_:)' to the result "
+     "builder %0 to erase type information for less-available types", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

@@ -465,21 +465,22 @@ class NormalProtocolConformance : public RootProtocolConformance,
   uint64_t LoaderContextData;
   friend class ASTContext;
 
-  NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
-                            SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state)
-    : RootProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
-  {
-    assert(!conformingType->hasArchetype() &&
-           "ProtocolConformances should store interface types");
-  }
-
   void resolveLazyInfo() const;
 
   void differenceAndStoreConditionalRequirements() const;
 
 public:
+  NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
+                            SourceLoc loc, DeclContext *dc,
+                            ProtocolConformanceState state)
+      : RootProtocolConformance(ProtocolConformanceKind::Normal,
+                                conformingType),
+        ProtocolAndState(protocol, state), Loc(loc),
+        ContextAndInvalid(dc, false) {
+    assert(!conformingType->hasArchetype() &&
+           "ProtocolConformances should store interface types");
+  }
+
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
 

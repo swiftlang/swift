@@ -214,7 +214,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
   std::unique_ptr<ImplicitSerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
   if (ModuleName == Ctx.StdlibModuleName.str()) {
-    Mod = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
+    Mod = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
   } else {
     Loader = ImplicitSerializedModuleLoader::create(Ctx);
     auto Buf = std::unique_ptr<llvm::MemoryBuffer>(

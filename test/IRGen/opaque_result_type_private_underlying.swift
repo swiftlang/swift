@@ -68,3 +68,11 @@ public struct MyThing {
     }
 }
 #endif
+
+public struct E<V> {
+   var body : some P {
+     var r = R(V.self, getSome())
+     r.modify()
+     return r
+   }
+}

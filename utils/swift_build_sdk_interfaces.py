@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from shutil import copyfile
 
 BARE_INTERFACE_SEARCH_PATHS = [
     "usr/lib/swift",
@@ -111,9 +112,7 @@ def run_command(args, dry_run):
         raise
 
 
-def make_dirs_if_needed(path, dry_run):
-    if dry_run:
-        return
+def make_dirs_if_needed(path):
     try:
         os.makedirs(path)
     except OSError as e:
@@ -231,7 +230,7 @@ def log_output_to_file(content, module_name, interface_base, label, log_path):
         return
     if not content:
         return
-    make_dirs_if_needed(log_path, dry_run=False)
+    make_dirs_if_needed(log_path)
     log_name = module_name + "-" + interface_base + "-" + label + ".txt"
     with open(os.path.join(log_path, log_name), "w") as output_file:
         output_file.write(content)
@@ -254,7 +253,6 @@ def process_module(module_file):
             '-build-module-from-parseable-interface',
             '-sdk', args.sdk,
             '-prebuilt-module-cache-path', args.output_dir,
-            '-track-system-dependencies'
         ]
         module_cache_path = ""
         if args.module_cache_path:
@@ -295,7 +293,7 @@ def process_module(module_file):
                                    module_file.name + ".swiftmodule")
 
         if interface_base != module_file.name:
-            make_dirs_if_needed(output_path, args.dry_run)
+            make_dirs_if_needed(output_path)
             output_path = os.path.join(output_path,
                                        interface_base + ".swiftmodule")
 
@@ -354,6 +352,24 @@ def process_module_files(pool, module_files):
     return overall_exit_status
 
 
+def getSDKVersion(sdkroot):
+    settingPath = os.path.join(sdkroot, 'SDKSettings.json')
+    with open(settingPath) as json_file:
+        data = json.load(json_file)
+        return data['Version']
+    fatal("Failed to get SDK version from: " + settingPath)
+
+
+def copySystemVersionFile(sdkroot, output):
+    sysInfoPath = os.path.join(sdkroot,
+                               'System/Library/CoreServices/SystemVersion.plist')
+    destInfoPath = os.path.join(output, 'SystemVersion.plist')
+    try:
+        copyfile(sysInfoPath, destInfoPath)
+    except BaseException as e:
+        print("cannot copy from " + sysInfoPath + " to " + destInfoPath + ": " + str(e))
+
+
 def main():
     global args, shared_output_lock
     parser = create_parser()
@@ -373,6 +389,12 @@ def main():
     if not os.path.isdir(args.sdk):
         fatal("invalid SDK: " + args.sdk)
 
+    # if the given output dir ends with 'prebuilt-modules', we should
+    # append the SDK version number so all modules will built into
+    # the SDK-versioned sub-directory.
+    if os.path.basename(args.output_dir) == 'prebuilt-modules':
+        args.output_dir = os.path.join(args.output_dir, getSDKVersion(args.sdk))
+
     xfails = ()
     if args.ignore_non_stdlib_failures:
         if args.xfails:
@@ -383,7 +405,11 @@ def main():
         with open(args.xfails) as xfails_file:
             xfails = json.load(xfails_file)
 
-    make_dirs_if_needed(args.output_dir, args.dry_run)
+    make_dirs_if_needed(args.output_dir)
+
+    # Copy a file containing SDK build version into the prebuilt module dir,
+    # so we can keep track of the SDK version we built from.
+    copySystemVersionFile(args.sdk, args.output_dir)
     if 'ANDROID_DATA' not in os.environ:
         shared_output_lock = multiprocessing.Lock()
         pool = multiprocessing.Pool(args.jobs, set_up_child,

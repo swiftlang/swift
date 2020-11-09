@@ -49,7 +49,7 @@ namespace namelookup {
 /// it was explicitly imported (or re-exported).
 class ImportSet final :
     public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<ImportSet, ModuleDecl::ImportedModule> {
+    private llvm::TrailingObjects<ImportSet, ImportedModule> {
   friend TrailingObjects;
   friend class ImportCache;
 
@@ -58,8 +58,8 @@ class ImportSet final :
   unsigned NumTransitiveImports;
 
   ImportSet(bool hasHeaderImportModule,
-            ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
-            ArrayRef<ModuleDecl::ImportedModule> transitiveImports);
+            ArrayRef<ImportedModule> topLevelImports,
+            ArrayRef<ImportedModule> transitiveImports);
 
   ImportSet(const ImportSet &) = delete;
   void operator=(const ImportSet &) = delete;
@@ -70,9 +70,9 @@ public:
   }
   static void Profile(
       llvm::FoldingSetNodeID &ID,
-      ArrayRef<ModuleDecl::ImportedModule> topLevelImports);
+      ArrayRef<ImportedModule> topLevelImports);
 
-  size_t numTrailingObjects(OverloadToken<ModuleDecl::ImportedModule>) const {
+  size_t numTrailingObjects(OverloadToken<ImportedModule>) const {
     return NumTopLevelImports + NumTransitiveImports;
   }
 
@@ -83,24 +83,24 @@ public:
     return HasHeaderImportModule;
   }
 
-  ArrayRef<ModuleDecl::ImportedModule> getTopLevelImports() const {
-    return {getTrailingObjects<ModuleDecl::ImportedModule>(),
+  ArrayRef<ImportedModule> getTopLevelImports() const {
+    return {getTrailingObjects<ImportedModule>(),
             NumTopLevelImports};
   }
 
-  ArrayRef<ModuleDecl::ImportedModule> getTransitiveImports() const {
-    return {getTrailingObjects<ModuleDecl::ImportedModule>() +
+  ArrayRef<ImportedModule> getTransitiveImports() const {
+    return {getTrailingObjects<ImportedModule>() +
               NumTopLevelImports,
             NumTransitiveImports};
   }
 
-  ArrayRef<ModuleDecl::ImportedModule> getAllImports() const {
-      return {getTrailingObjects<ModuleDecl::ImportedModule>(),
+  ArrayRef<ImportedModule> getAllImports() const {
+      return {getTrailingObjects<ImportedModule>(),
               NumTopLevelImports + NumTransitiveImports};
   }
 };
 
-class alignas(ModuleDecl::ImportedModule) ImportCache {
+class alignas(ImportedModule) ImportCache {
   ImportCache(const ImportCache &) = delete;
   void operator=(const ImportCache &) = delete;
 
@@ -108,20 +108,20 @@ class alignas(ModuleDecl::ImportedModule) ImportCache {
   llvm::DenseMap<const DeclContext *, ImportSet *> ImportSetForDC;
   llvm::DenseMap<std::tuple<const ModuleDecl *,
                             const DeclContext *>,
-                 ArrayRef<ModuleDecl::AccessPathTy>> VisibilityCache;
+                 ArrayRef<ImportPath::Access>> VisibilityCache;
   llvm::DenseMap<std::tuple<const ModuleDecl *,
                             const ModuleDecl *,
                             const DeclContext *>,
-                 ArrayRef<ModuleDecl::AccessPathTy>> ShadowCache;
+                 ArrayRef<ImportPath::Access>> ShadowCache;
 
-  ModuleDecl::AccessPathTy EmptyAccessPath;
+  ImportPath::Access EmptyAccessPath;
 
-  ArrayRef<ModuleDecl::AccessPathTy> allocateArray(
+  ArrayRef<ImportPath::Access> allocateArray(
       ASTContext &ctx,
-      SmallVectorImpl<ModuleDecl::AccessPathTy> &results);
+      SmallVectorImpl<ImportPath::Access> &results);
 
   ImportSet &getImportSet(ASTContext &ctx,
-                          ArrayRef<ModuleDecl::ImportedModule> topLevelImports);
+                          ArrayRef<ImportedModule> topLevelImports);
 
 public:
   ImportCache() {}
@@ -132,7 +132,7 @@ public:
 
   /// Returns all access paths into 'mod' that are visible from 'dc',
   /// including transitively, via re-exports.
-  ArrayRef<ModuleDecl::AccessPathTy>
+  ArrayRef<ImportPath::Access>
   getAllVisibleAccessPaths(const ModuleDecl *mod, const DeclContext *dc);
 
   bool isImportedBy(const ModuleDecl *mod,
@@ -142,7 +142,7 @@ public:
 
   /// Returns all access paths in 'mod' that are visible from 'dc' if we
   /// subtract imports of 'other'.
-  ArrayRef<ModuleDecl::AccessPathTy>
+  ArrayRef<ImportPath::Access>
   getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                  const ModuleDecl *other,
                                  const DeclContext *dc);
@@ -154,7 +154,7 @@ public:
   }
 };
 
-ArrayRef<ModuleDecl::ImportedModule> getAllImports(const DeclContext *dc);
+ArrayRef<ImportedModule> getAllImports(const DeclContext *dc);
 
 }  // namespace namelookup
 

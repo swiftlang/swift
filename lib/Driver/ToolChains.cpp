@@ -129,6 +129,19 @@ static bool addOutputsOfType(ArgStringList &Arguments,
   return Added;
 }
 
+static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
+  switch (OI.LTOVariant) {
+  case OutputInfo::LTOKind::None:
+    break;
+  case OutputInfo::LTOKind::LLVMThin:
+    arguments.push_back("-lto=llvm-thin");
+    break;
+  case OutputInfo::LTOKind::LLVMFull:
+    arguments.push_back("-lto=llvm-full");
+    break;
+  }
+}
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -212,7 +225,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
@@ -247,10 +259,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments,
                        options::OPT_emit_fine_grained_dependency_sourcefile_dot_files);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
@@ -260,9 +268,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(
@@ -271,9 +278,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_direct_intramodule_dependencies,
-                       options::OPT_disable_direct_intramodule_dependencies);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -299,6 +303,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-Xcc");
     arguments.push_back(inputArgs.MakeArgString(workingDirectory));
   }
+
+  addLTOArgs(OI, arguments);
 
   // -g implies -enable-anonymous-context-mangled-names, because the extra
   // metadata aids debugging.
@@ -541,7 +547,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasFlag(options::OPT_static_executable,
                            options::OPT_no_static_executable, false) ||
       context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
+                           options::OPT_no_static_stdlib, false) ||
+      getTriple().isOSBinFormatWasm()) {
     Arguments.push_back("-use-static-resource-dir");
   }
 
@@ -621,6 +628,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftModuleSummaryFile: // FIXME(katei)
@@ -767,6 +775,9 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
                    "-emit-tbd-path");
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::TY_SwiftModuleSummaryFile,
+                   "-emit-module-summary-path");
 }
 
 ToolChain::InvocationInfo
@@ -879,6 +890,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
     case file_types::TY_PrivateSwiftModuleInterfaceFile:
+    case file_types::TY_SwiftModuleSummaryFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftModuleSummaryFile:
@@ -1035,6 +1047,16 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
+  context.Args.AddLastArg(
+      Arguments,
+      options::OPT_enable_experimental_cross_module_incremental_build);
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                            options::OPT_no_static_executable, false) ||
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                            options::OPT_no_static_stdlib, false) ||
+      getTriple().isOSBinFormatWasm()) {
+    Arguments.push_back("-use-static-resource-dir");
+  }
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
@@ -1045,6 +1067,41 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return II;
+}
+
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const VerifyModuleInterfaceJobAction &job,
+                               const JobContext &context) const {
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
+  Arguments.push_back("-frontend");
+
+  Arguments.push_back("-typecheck-module-from-interface");
+
+  size_t sizeBefore = Arguments.size();
+  addInputsOfType(Arguments, context.Inputs, context.Args, job.getInputType());
+
+  (void)sizeBefore;
+  assert(Arguments.size() - sizeBefore == 1 &&
+         "should verify exactly one module interface per job");
+
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
+
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+
+  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+
+  Arguments.push_back("-module-name");
+  Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
   return II;
 }
@@ -1198,6 +1255,14 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
 
   addInputsOfType(Arguments, context.InputActions, file_types::TY_ObjCHeader);
   context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
+
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                   options::OPT_no_static_executable, false) ||
+      context.Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
+                   false) ||
+      getTriple().isOSBinFormatWasm()) {
+    Arguments.push_back("-use-static-resource-dir");
+  }
 
   if (job.isPersistentPCH()) {
     Arguments.push_back("-emit-pch");

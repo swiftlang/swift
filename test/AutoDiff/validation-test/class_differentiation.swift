@@ -524,4 +524,19 @@ ClassTests.test("ClassProperties") {
               gradient(at: Super(base: 2)) { foo in foo.squared })
 }
 
+ClassTests.test("LetProperties") {
+  final class Foo: Differentiable {
+    var x: Tracked<Float>
+    init(x: Tracked<Float>) { self.x = x }
+  }
+  final class Bar: Differentiable {
+    let x = Foo(x: 2)
+  }
+  let bar = Bar()
+  let grad = gradient(at: bar) { bar in (bar.x.x * bar.x.x).value }
+  expectEqual(Bar.TangentVector(x: .init(x: 6.0)), grad)
+  bar.move(along: grad)
+  expectEqual(8.0, bar.x.x)
+}
+
 runAllTests()

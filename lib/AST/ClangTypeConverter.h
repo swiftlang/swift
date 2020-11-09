@@ -74,13 +74,28 @@ public:
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr);
 
+  /// Compute the C function type for a SIL function type.
+  const clang::Type *getFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation repr);
+
   /// Check whether the given Clang declaration is an export of a Swift
   /// declaration introduced by this converter, and if so, return the original
   /// Swift declaration.
   Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl) const;
 
+  /// Translate Swift generic arguments to template arguments.
+  ///
+  /// \returns nullptr if successful. If an error occors, returns a unique_ptr
+  /// to a `TemplateInstantiationError` with a list of the failed types.
+  std::unique_ptr<TemplateInstantiationError> getClangTemplateArguments(
+      const clang::TemplateParameterList *templateParams,
+      ArrayRef<Type> genericArgs,
+      SmallVectorImpl<clang::TemplateArgument> &templateArgs);
+
 private:
   clang::QualType convert(Type type);
+
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
 

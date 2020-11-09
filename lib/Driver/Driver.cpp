@@ -167,9 +167,14 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
                                            const ArgList &args) {
   const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_placeholder_dependency_module_map);
   const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
+  const Arg *Prescan = args.getLastArg(options::OPT_import_prescan);
   if (ExternalDependencyMap && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-placeholder-dependency-module-map-file", "-scan-dependencies");
+  }
+  if (Prescan && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-import-prescan", "-scan-dependencies");
   }
 }
 
@@ -282,17 +287,31 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
 std::unique_ptr<ToolChain>
 Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
 
-  if (const Arg *A = ArgList.getLastArg(options::OPT_target))
+  if (const Arg *A = ArgList.getLastArg(options::OPT_target)) {
     DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
+  }
 
-  const llvm::Triple target(DefaultTargetTriple);
+  llvm::Triple target(DefaultTargetTriple);
+
+  // Backward compatibility hack: infer "simulator" environment for x86
+  // iOS/tvOS/watchOS.
+  if (tripleInfersSimulatorEnvironment(target)) {
+    // Set the simulator environment.
+    target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
+
+    auto newTargetTriple = target.normalize();
+    Diags.diagnose(SourceLoc(), diag::warning_inferred_simulator_target,
+                   DefaultTargetTriple, newTargetTriple);
+
+    DefaultTargetTriple = newTargetTriple;
+  }
 
   switch (target.getOS()) {
-  case llvm::Triple::Darwin:
-  case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
-  case llvm::Triple::WatchOS: {
+  case llvm::Triple::WatchOS:
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX: {
     Optional<llvm::Triple> targetVariant;
     if (const Arg *A = ArgList.getLastArg(options::OPT_target_variant))
       targetVariant = llvm::Triple(llvm::Triple::normalize(A->getValue()));
@@ -385,10 +404,7 @@ class Driver::InputInfoMap
 using InputInfoMap = Driver::InputInfoMap;
 
 /// Get the filename for build record. Returns true if failed.
-/// Additionally, set 'outputBuildRecordForModuleOnlyBuild' to true if this is
-/// full compilation with swiftmodule.
 static bool getCompilationRecordPath(std::string &buildRecordPath,
-                                     bool &outputBuildRecordForModuleOnlyBuild,
                                      const OutputInfo &OI,
                                      const Optional<OutputFileMap> &OFM,
                                      DiagnosticEngine *Diags) {
@@ -409,17 +425,6 @@ static bool getCompilationRecordPath(std::string &buildRecordPath,
                       diag::incremental_requires_build_record_entry,
                       file_types::getTypeName(file_types::TY_SwiftDeps));
     return true;
-  }
-
-  // In 'emit-module' only mode, use build-record filename suffixed with
-  // '~moduleonly'. So that module-only mode doesn't mess up build-record
-  // file for full compilation.
-  if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile) {
-    buildRecordPath = buildRecordPath.append("~moduleonly");
-  } else if (OI.ShouldTreatModuleAsTopLevelOutput) {
-    // If we emit module along with full compilation, emit build record
-    // file for '-emit-module' only mode as well.
-    outputBuildRecordForModuleOnlyBuild = true;
   }
 
   return false;
@@ -941,8 +946,7 @@ Driver::buildCompilation(const ToolChain &TC,
       computeIncremental(ArgList.get(), ShowIncrementalBuildDecisions);
 
   std::string buildRecordPath;
-  bool outputBuildRecordForModuleOnlyBuild = false;
-  getCompilationRecordPath(buildRecordPath, outputBuildRecordForModuleOnlyBuild,
+  getCompilationRecordPath(buildRecordPath,
                            OI, OFM, Incremental ? &Diags : nullptr);
 
   SmallString<32> ArgsHash;
@@ -1010,19 +1014,14 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasFlag(options::OPT_enable_only_one_dependency_file,
                          options::OPT_disable_only_one_dependency_file, false);
 
-    const bool EnableTypeFingerprints =
-        ArgList->hasFlag(options::OPT_enable_type_fingerprints,
-                         options::OPT_disable_type_fingerprints,
-                         LangOptions().EnableTypeFingerprints);
-
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
     const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
-    const bool FineGrainedDependenciesIncludeIntrafileOnes =
-        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
+    const bool EnableCrossModuleDependencies = ArgList->hasArg(
+        options::OPT_enable_experimental_cross_module_incremental_build);
 
     // clang-format off
     C = std::make_unique<Compilation>(
@@ -1031,7 +1030,6 @@ Driver::buildCompilation(const ToolChain &TC,
         std::move(TranslatedArgList),
         std::move(Inputs),
         buildRecordPath,
-        outputBuildRecordForModuleOnlyBuild,
         ArgsHash,
         StartTime,
         LastBuildTime,
@@ -1045,13 +1043,12 @@ Driver::buildCompilation(const ToolChain &TC,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
         OnlyOneDependencyFile,
-        EnableTypeFingerprints,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
-        FineGrainedDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
         CompareIncrementalSchemes,
-        CompareIncrementalSchemesPath);
+        CompareIncrementalSchemesPath,
+        EnableCrossModuleDependencies);
     // clang-format on
   }
 
@@ -1430,12 +1427,29 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                              const bool BatchMode, const InputFileList &Inputs,
                              OutputInfo &OI) const {
+
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    auto LTOVariant =
+        llvm::StringSwitch<Optional<OutputInfo::LTOKind>>(A->getValue())
+            .Case("llvm-thin", OutputInfo::LTOKind::LLVMThin)
+            .Case("llvm-full", OutputInfo::LTOKind::LLVMFull)
+            .Default(llvm::None);
+    if (LTOVariant)
+      OI.LTOVariant = LTOVariant.getValue();
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
+  auto CompilerOutputType = OI.LTOVariant != OutputInfo::LTOKind::None
+                             ? file_types::TY_LLVM_BC
+                             : file_types::TY_Object;
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
 
   OI.CompilerOutputType = driverKind == DriverKind::Interactive
                               ? file_types::TY_Nothing
-                              : file_types::TY_Object;
+                              : CompilerOutputType;
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
     if (BatchMode) {
@@ -1465,14 +1479,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                        diag::error_static_emit_executable_disallowed);
                        
       OI.LinkAction = LinkKind::Executable;
-      OI.CompilerOutputType = file_types::TY_Object;
+      OI.CompilerOutputType = CompilerOutputType;
       break;
 
     case options::OPT_emit_library:
       OI.LinkAction = Args.hasArg(options::OPT_static) ?
                       LinkKind::StaticLibrary :
                       LinkKind::DynamicLibrary;
-      OI.CompilerOutputType = file_types::TY_Object;
+      OI.CompilerOutputType = CompilerOutputType;
       break;
 
     case options::OPT_static:
@@ -1740,6 +1754,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           });
         }
       }
+    } if (OI.SDKPath.empty() && TC.getTriple().isOSWASI()) {
+        llvm::SmallString<128> SDKPath;
+        llvm::sys::path::append(SDKPath, getSwiftProgramPath());
+        llvm::sys::path::remove_filename(SDKPath); // 'swift'
+        llvm::sys::path::remove_filename(SDKPath); // 'bin'
+        llvm::sys::path::append(SDKPath, "share", "wasi-sysroot");
+        OI.SDKPath = SDKPath.str().str();
     }
 
     if (!OI.SDKPath.empty()) {
@@ -1862,6 +1883,54 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   return OutputInfo::Mode::StandardCompile;
 }
 
+namespace {
+/// Encapsulates the computation of input jobs that are relevant to the
+/// merge-modules job the scheduler can insert if we are not in a single compile
+/// mode.
+class ModuleInputs final {
+private:
+  using InputInfo = IncrementalJobAction::InputInfo;
+  SmallVector<const Action *, 2> AllModuleInputs;
+  InputInfo StatusBound;
+
+public:
+  explicit ModuleInputs()
+      : StatusBound
+            {InputInfo::Status::UpToDate, llvm::sys::TimePoint<>::min()} {}
+
+public:
+  void addInput(const Action *inputAction) {
+    if (auto *IJA = dyn_cast<IncrementalJobAction>(inputAction)) {
+      // Take the upper bound of the status of any incremental inputs to
+      // ensure that the merge-modules job gets run if *any* input job is run.
+      const auto conservativeStatus =
+          std::max(StatusBound.status, IJA->getInputInfo().status);
+      // The modification time here is not important to the rest of the
+      // incremental build. We take the upper bound in case an attempt to
+      // compare the swiftmodule output's mod time and any input files is
+      // made. If the compilation has been correctly scheduled, the
+      // swiftmodule's mod time will always strictly exceed the mod time of
+      // any of its inputs when we are able to skip it.
+      const auto conservativeModTime = std::max(
+          StatusBound.previousModTime, IJA->getInputInfo().previousModTime);
+      StatusBound = InputInfo{conservativeStatus, conservativeModTime};
+    }
+    AllModuleInputs.push_back(inputAction);
+  }
+
+public:
+  /// Returns \c true if no inputs have been registered with this instance.
+  bool empty() const { return AllModuleInputs.empty(); }
+
+public:
+  /// Consumes this \c ModuleInputs instance and returns a merge-modules action
+  /// from the list of input actions and status it has computed thus far.
+  JobAction *intoAction(Compilation &C) && {
+    return C.createAction<MergeModuleJobAction>(AllModuleInputs, StatusBound);
+  }
+};
+} // namespace
+
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
                           const InputInfoMap *OutOfDateMap,
@@ -1874,7 +1943,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     return;
   }
 
-  SmallVector<const Action *, 2> AllModuleInputs;
+  ModuleInputs AllModuleInputs;
   SmallVector<const Action *, 2> AllLinkerInputs;
 
   switch (OI.CompilerMode) {
@@ -1915,10 +1984,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         // Source inputs always need to be compiled.
         assert(file_types::isPartOfSwiftCompilation(InputType));
 
-        CompileJobAction::InputInfo previousBuildState = {
-          CompileJobAction::InputInfo::NeedsCascadingBuild,
-          llvm::sys::TimePoint<>::min()
-        };
+        auto previousBuildState =
+            IncrementalJobAction::InputInfo::makeNeedsCascadingRebuild();
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);
         if (Args.hasArg(options::OPT_embed_bitcode)) {
@@ -1926,7 +1993,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
               Current, file_types::TY_LLVM_BC, previousBuildState);
           if (PCH)
             cast<JobAction>(Current)->addInput(PCH);
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
           Current = C.createAction<BackendJobAction>(Current,
                                                      OI.CompilerOutputType, 0);
         } else {
@@ -1935,7 +2002,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                                                      previousBuildState);
           if (PCH)
             cast<JobAction>(Current)->addInput(PCH);
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
         }
         AllLinkerInputs.push_back(Current);
         break;
@@ -1947,7 +2014,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           // When generating a .swiftmodule as a top-level output (as opposed
           // to, for example, linking an image), treat .swiftmodule files as
           // inputs to a MergeModule action.
-          AllModuleInputs.push_back(Current);
+          AllModuleInputs.addInput(Current);
           break;
         } else if (OI.shouldLink()) {
           // Otherwise, if linking, pass .swiftmodule files as inputs to the
@@ -1990,6 +2057,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
+      case file_types::TY_SwiftModuleSummaryFile:
       case file_types::TY_SwiftCrossImportDir:
       case file_types::TY_SwiftModuleSummaryFile: // FIXME(katei)
       case file_types::TY_SwiftOverlayFile:
@@ -2029,7 +2097,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         // Create a single CompileJobAction and a single BackendJobAction.
         JobAction *CA =
             C.createAction<CompileJobAction>(file_types::TY_LLVM_BC);
-        AllModuleInputs.push_back(CA);
+        AllModuleInputs.addInput(CA);
 
         int InputIndex = 0;
         for (const InputPair &Input : Inputs) {
@@ -2065,7 +2133,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
       CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
     }
-    AllModuleInputs.push_back(CA);
+    AllModuleInputs.addInput(CA);
     AllLinkerInputs.push_back(CA);
     break;
   }
@@ -2114,18 +2182,19 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       !AllModuleInputs.empty()) {
     // We're performing multiple compilations; set up a merge module step
     // so we generate a single swiftmodule as output.
-    MergeModuleAction = C.createAction<MergeModuleJobAction>(AllModuleInputs);
+    MergeModuleAction = std::move(AllModuleInputs).intoAction(C);
   }
 
+  bool shouldPerformLTO = OI.LTOVariant != OutputInfo::LTOKind::None;
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     JobAction *LinkAction = nullptr;
 
     if (OI.LinkAction == LinkKind::StaticLibrary) {
-      LinkAction = C.createAction<StaticLinkJobAction>(AllLinkerInputs,
-                                                    OI.LinkAction);
+      LinkAction =
+          C.createAction<StaticLinkJobAction>(AllLinkerInputs, OI.LinkAction);
     } else {
-      LinkAction = C.createAction<DynamicLinkJobAction>(AllLinkerInputs,
-                                                 OI.LinkAction);
+      LinkAction = C.createAction<DynamicLinkJobAction>(
+          AllLinkerInputs, OI.LinkAction, shouldPerformLTO);
     }
 
     // On ELF platforms there's no built in autolinking mechanism, so we
@@ -2147,9 +2216,10 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         AutolinkExtractInputs.push_back(A);
       }
     const bool AutolinkExtractRequired =
-        (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
-        Triple.getObjectFormat() == llvm::Triple::Wasm ||
-        Triple.isOSCygMing();
+        ((Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
+         Triple.getObjectFormat() == llvm::Triple::Wasm ||
+         Triple.isOSCygMing()) &&
+        !shouldPerformLTO;
     if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
@@ -2194,6 +2264,31 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (MergeModuleAction)
       TopLevelActions.push_back(MergeModuleAction);
     TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
+  }
+
+#ifdef NDEBUG
+  bool verifyInterfacesByDefault = false;
+#else
+  bool verifyInterfacesByDefault = true;
+#endif
+
+  if (MergeModuleAction
+      && Args.hasArg(options::OPT_enable_library_evolution)
+      && Args.hasFlag(options::OPT_verify_emitted_module_interface,
+                      options::OPT_no_verify_emitted_module_interface,
+                      verifyInterfacesByDefault)) {
+    if (Args.hasArgNoClaim(options::OPT_emit_module_interface,
+                           options::OPT_emit_module_interface_path)) {
+      TopLevelActions.push_back(
+          C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
+              file_types::TY_SwiftModuleInterfaceFile));
+    }
+
+    if (Args.hasArgNoClaim(options::OPT_emit_private_module_interface_path)) {
+      TopLevelActions.push_back(
+          C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
+              file_types::TY_PrivateSwiftModuleInterfaceFile));
+    }
   }
 }
 
@@ -2256,7 +2351,8 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     if (Args.hasFlag(options::OPT_static_executable,
                      options::OPT_no_static_executable, false) ||
         Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
-                     false)) {
+                     false) ||
+        TC.getTriple().isOSBinFormatWasm()) {
       commandLine.push_back("-use-static-resource-dir");
     }
 
@@ -2662,42 +2758,49 @@ static void addDiagFileOutputForPersistentPCHAction(
 
 /// If the file at \p input has not been modified since the last build (i.e. its
 /// mtime has not changed), adjust the Job's condition accordingly.
-static void
-handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
-                          StringRef input, bool alwaysRebuildDependents) {
-  if (inputInfo.status == CompileJobAction::InputInfo::NewlyAdded) {
+static void handleCompileJobCondition(Job *J,
+                                      CompileJobAction::InputInfo inputInfo,
+                                      Optional<StringRef> input,
+                                      bool alwaysRebuildDependents) {
+  using InputStatus = CompileJobAction::InputInfo::Status;
+
+  if (inputInfo.status == InputStatus::NewlyAdded) {
     J->setCondition(Job::Condition::NewlyAdded);
     return;
   }
 
+  auto output = J->getOutput().getPrimaryOutputFilename();
   bool hasValidModTime = false;
   llvm::sys::fs::file_status inputStatus;
-  if (!llvm::sys::fs::status(input, inputStatus)) {
+  if (input.hasValue() && !llvm::sys::fs::status(*input, inputStatus)) {
+    J->setInputModTime(inputStatus.getLastModificationTime());
+    hasValidModTime = J->getInputModTime() == inputInfo.previousModTime;
+  } else if (!llvm::sys::fs::status(output, inputStatus)) {
     J->setInputModTime(inputStatus.getLastModificationTime());
     hasValidModTime = true;
   }
 
   Job::Condition condition;
-  if (hasValidModTime && J->getInputModTime() == inputInfo.previousModTime) {
+  if (hasValidModTime) {
     switch (inputInfo.status) {
-    case CompileJobAction::InputInfo::UpToDate:
-      if (llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+    case InputStatus::UpToDate:
+      if (llvm::sys::fs::exists(output))
         condition = Job::Condition::CheckDependencies;
       else
         condition = Job::Condition::RunWithoutCascading;
       break;
-    case CompileJobAction::InputInfo::NeedsCascadingBuild:
+    case InputStatus::NeedsCascadingBuild:
       condition = Job::Condition::Always;
       break;
-    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
+    case InputStatus::NeedsNonCascadingBuild:
       condition = Job::Condition::RunWithoutCascading;
       break;
-    case CompileJobAction::InputInfo::NewlyAdded:
+    case InputStatus::NewlyAdded:
       llvm_unreachable("handled above");
     }
   } else {
     if (alwaysRebuildDependents ||
-        inputInfo.status == CompileJobAction::InputInfo::NeedsCascadingBuild) {
+        inputInfo.status == InputStatus::NeedsCascadingBuild) {
       condition = Job::Condition::Always;
     } else {
       condition = Job::Condition::RunWithoutCascading;
@@ -2818,6 +2921,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                       Output.get());
   }
 
+  if (isa<CompileJobAction>(JA)) {
+    chooseModuleSummaryPath(C, OutputMap, workingDirectory, Buf, Output.get());
+  }
+
   if (isa<MergeModuleJobAction>(JA) ||
       (isa<CompileJobAction>(JA) &&
        OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
@@ -2850,14 +2957,18 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.
-  if (!J->getOutput()
-           .getAdditionalOutputForType(file_types::TY_SwiftDeps)
-           .empty()) {
-    if (InputActions.size() == 1) {
-      auto compileJob = cast<CompileJobAction>(JA);
-      bool alwaysRebuildDependents =
-          C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
-      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput,
+  if (auto incrementalJob = dyn_cast<IncrementalJobAction>(JA)) {
+    const bool alwaysRebuildDependents =
+        C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
+    if (!J->getOutput()
+             .getAdditionalOutputForType(file_types::TY_SwiftDeps)
+             .empty()) {
+      if (InputActions.size() == 1) {
+        handleCompileJobCondition(J, incrementalJob->getInputInfo(), BaseInput,
+                                  alwaysRebuildDependents);
+      }
+    } else if (isa<MergeModuleJobAction>(JA)) {
+      handleCompileJobCondition(J, incrementalJob->getInputInfo(), None,
                                 alwaysRebuildDependents);
     }
   }
@@ -3169,6 +3280,22 @@ void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
       C.getOutputInfo(), C.getArgs(), pathOpt, fileType,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
   output->setAdditionalOutputForType(fileType, outputPath);
+}
+
+void Driver::chooseModuleSummaryPath(Compilation &C,
+                                     const TypeToPathMap *OutputMap,
+                                     StringRef workingDirectory,
+                                     llvm::SmallString<128> &Buf,
+                                     CommandOutput *Output) const {
+  StringRef pathFromArgs;
+  if (const Arg *A =
+          C.getArgs().getLastArg(options::OPT_emit_module_summary_path)) {
+    pathFromArgs = A->getValue();
+  }
+
+  addAuxiliaryOutput(C, *Output, file_types::TY_SwiftModuleSummaryFile,
+                     OutputMap, workingDirectory, pathFromArgs,
+                     /*requireArg=*/options::OPT_emit_module_summary);
 }
 
 void Driver::chooseSerializedDiagnosticsPath(Compilation &C,

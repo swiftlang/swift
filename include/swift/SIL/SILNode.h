@@ -19,6 +19,7 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include <type_traits>
@@ -451,7 +452,7 @@ public:
   /// If this is a SILArgument or a SILInstruction get its parent module,
   /// otherwise return null.
   SILModule *getModule() const;
-
+  
   /// Pretty-print the node.  If the node is an instruction, the output
   /// will be valid SIL assembly; otherwise, it will be an arbitrary
   /// format suitable for debugging.

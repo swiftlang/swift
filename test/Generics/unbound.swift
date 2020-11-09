@@ -74,3 +74,20 @@ struct X1<T> {
   func bar<U>() where T: X2<U> {}
 }
 class X2<T> {}
+
+// <rdar://problem/67292528> missing check for unbound parent type
+struct Outer<K, V> {
+  struct Inner {}
+
+  struct Middle {
+    typealias Inner = Outer<K, V>.Middle
+  }
+}
+
+func makeInner() -> Outer<String, String>.Middle.Inner {
+  return .init()
+}
+
+var innerProperty: Outer.Middle.Inner = makeInner()
+// expected-error@-1 {{reference to generic type 'Outer' requires arguments in <...>}}
+

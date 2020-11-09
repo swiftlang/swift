@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
@@ -34,35 +34,35 @@ import SubE
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: module_deps.swift
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "C"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "E"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "G"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "SubE"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "Swift"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "SwiftOnoneSupport"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "_cross_import_E"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "F"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "A"
-// CHECK-NEXT: }
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "A"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "clang": "C"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "E"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "F"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "G"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "SubE"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "Swift"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "_cross_import_E"
+// CHECK-NEXT:   }
 // CHECK-NEXT: ],
 
 // CHECK:      "extraPcmArgs": [
@@ -82,6 +82,17 @@ import SubE
 // CHECK: "moduleDependencies": [
 // CHECK-NEXT: "F"
 // CHECK-NEXT: ]
+
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "A.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-NEXT:   "clang": "A"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT: },
 
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "C.pcm",
@@ -105,7 +116,10 @@ import SubE
 // CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "clang"
-// CHECK: "-fno-implicit-modules"
+// CHECK:      "-fsystem-module",
+// CHECK-NEXT: "-emit-pcm",
+// CHECK-NEXT: "-module-name",
+// CHECK-NEXT: "C"
 
 /// --------Swift module E
 // CHECK: "swift": "E"
@@ -117,14 +131,30 @@ import SubE
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
 
+/// --------Swift module F
+// CHECK:      "modulePath": "F.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "clang": "F"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "Swift"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:   }
+// CHECK-NEXT: ],
+
 /// --------Swift module G
 // CHECK-LABEL: "modulePath": "G.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT:   "clang": "G"
 // CHECK-NEXT: },
 // CHECK-NEXT: {
-// CHECK-NEXT:   "clang": "G"
+// CHECK-NEXT:   "swift": "Swift"
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "swift": "SwiftOnoneSupport"
@@ -153,33 +183,6 @@ import SubE
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "SwiftShims"
 
-/// --------Swift module F
-// CHECK:      "modulePath": "F.swiftmodule",
-// CHECK-NEXT: "sourceFiles": [
-// CHECK-NEXT: ],
-// CHECK-NEXT: "directDependencies": [
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "swift": "Swift"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "clang": "F"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
-// CHECK-NEXT:   }
-// CHECK-NEXT: ],
-
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "A.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT:   "swift": "Swift"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT:   "clang": "A"
-// CHECK-NEXT: }
-
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "B.pcm"
 
@@ -195,9 +198,7 @@ import SubE
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
 
-// CHECK-NO-SEARCH-PATHS-NOT: "-I"
 // CHECK-NO-SEARCH-PATHS-NOT: "-sdk"
-// CHECK-NO-SEARCH-PATHS-NOT: "-F"
 // CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
 // Check make-style dependencies

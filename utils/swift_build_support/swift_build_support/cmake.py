@@ -126,6 +126,10 @@ class CMake(object):
             define("CMAKE_C_COMPILER_LAUNCHER:PATH", toolchain.distcc)
             define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", toolchain.distcc)
 
+        if args.sccache:
+            define("CMAKE_C_COMPILER_LAUNCHER:PATH", toolchain.sccache)
+            define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", toolchain.sccache)
+
         if args.cmake_c_launcher:
             define("CMAKE_C_COMPILER_LAUNCHER:PATH", args.cmake_c_launcher)
         if args.cmake_cxx_launcher:

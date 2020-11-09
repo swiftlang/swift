@@ -3,28 +3,50 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %S/Inputs/ioi_helper.swift -module-name IOIHelper -emit-module-path %t/IOIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/IOIHelper.swiftinterface -emit-private-module-interface-path %t/IOIHelper.private.swiftinterface
 
 /// Make sure that the public swiftinterface of spi_helper doesn't leak SPI.
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t/SPIHelper.swiftinterface
 // CHECK-HELPER-NOT: HelperSPI
 // CHECK-HELPER-NOT: @_spi
+// CHECK-HELPER-NOT: @_specialize
+
+// Test the spi parameter of the _specialize attribute in the private interface.
+// RUN: %FileCheck -check-prefix=CHECK-HELPER-PRIVATE %s < %t/SPIHelper.private.swiftinterface
+// CHECK-HELPER-PRIVATE: @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT: public func genericFunc<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc2<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc3<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc4<T>(_ t: T)
+// CHECK-HELPER-PRIVATE:   @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE-NEXT:  public func prespecializedMethod<T>(_ t: T)
+
+
 // RUN: %target-swift-frontend -emit-module %t/SPIHelper.swiftinterface -emit-module-path %t/SPIHelper-from-public-swiftinterface.swiftmodule -swift-version 5 -module-name SPIHelper -enable-library-evolution
 
 /// Test the textual interfaces generated from this test.
-// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/main.swiftinterface -emit-private-module-interface-path %t/main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/main.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/main.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name Main
+// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Main.swiftinterface
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Main.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.private.swiftinterface -module-name Main
 
 /// Serialize and deserialize this module, then print.
-// RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/merged-partial.swiftmodule -swift-version 5 -I %t -module-name merged -enable-library-evolution
-// RUN: %target-swift-frontend -merge-modules %t/merged-partial.swiftmodule -module-name merged -emit-module -emit-module-path %t/merged.swiftmodule -I %t -emit-module-interface-path %t/merged.swiftinterface -emit-private-module-interface-path %t/merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/merged.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/merged.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/Merged-partial.swiftmodule -swift-version 5 -I %t -module-name Merged -enable-library-evolution
+// RUN: %target-swift-frontend -merge-modules %t/Merged-partial.swiftmodule -module-name Merged -emit-module -emit-module-path %t/Merged.swiftmodule -I %t -emit-module-interface-path %t/Merged.swiftinterface -emit-private-module-interface-path %t/Merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
+// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Merged.swiftinterface
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Merged.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.private.swiftinterface -module-name Merged
 
 @_spi(HelperSPI) @_spi(OtherSPI) @_spi(OtherSPI) import SPIHelper
 // CHECK-PUBLIC: import SPIHelper
 // CHECK-PRIVATE: @_spi(OtherSPI) @_spi(HelperSPI) import SPIHelper
 
+@_implementationOnly import IOIHelper
 public func foo() {}
 // CHECK-PUBLIC: foo()
 // CHECK-PRIVATE: foo()
@@ -154,6 +176,23 @@ private protocol PrivateConstraint {}
 extension PublicType: SPIProto2 where T: SPIProto2 {}
 // CHECK-PRIVATE: extension PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+
+public protocol LocalPublicProto {}
+extension IOIPublicStruct : LocalPublicProto {}
+// CHECK-PRIVATE-NOT: IOIPublicStruct
+// CHECK-PUBLIC-NOT: IOIPublicStruct
+
+@_spi(S)
+@frozen public struct SPIFrozenStruct {
+// CHECK-PRIVATE: struct SPIFrozenStruct
+// CHECK-PUBLIC-NOT: SPIFrozenStruct
+
+  var spiTypeInFrozen = SPIStruct()
+  // CHECK-PRIVATE: @_spi(S) internal var spiTypeInFrozen
+
+  private var spiTypeInFrozen1: SPIClass
+  // CHECK-PRIVATE: @_spi(S) private var spiTypeInFrozen1
+}
 
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.

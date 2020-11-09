@@ -33,6 +33,7 @@ const char *Action::getClassName(Kind AC) {
   case Kind::GenerateDSYMJob:  return "generate-dSYM";
   case Kind::VerifyDebugInfoJob:  return "verify-debug-info";
   case Kind::GeneratePCHJob:  return "generate-pch";
+  case Kind::VerifyModuleInterfaceJob: return "verify-module-interface";
   }
 
   llvm_unreachable("invalid class");
@@ -41,6 +42,8 @@ const char *Action::getClassName(Kind AC) {
 void InputAction::anchor() {}
 
 void JobAction::anchor() {}
+
+void IncrementalJobAction::anchor() {}
 
 void CompileJobAction::anchor() {}
 
@@ -65,3 +68,5 @@ void GenerateDSYMJobAction::anchor() {}
 void VerifyDebugInfoJobAction::anchor() {}
 
 void GeneratePCHJobAction::anchor() {}
+
+void VerifyModuleInterfaceJobAction::anchor() {}

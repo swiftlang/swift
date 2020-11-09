@@ -35,7 +35,7 @@ struct SupplementaryOutputPaths {
   ///
   /// This binary format is used to describe the interface of a module when
   /// imported by client source code. The swiftmodule format is described in
-  /// docs/Serialization.rst.
+  /// docs/Serialization.md.
   ///
   /// \sa swift::serialize
   std::string ModuleOutputPath;
@@ -164,6 +164,9 @@ struct SupplementaryOutputPaths {
   /// This is a walk-around that linker directives cannot specify other install
   /// name per symbol, we should eventually remove this.
   std::string LdAddCFilePath;
+
+  /// The path to which we should emit module summary file.
+  std::string ModuleSummaryOutputPath;
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;

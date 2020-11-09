@@ -211,8 +211,8 @@ template <> struct DenseMapInfo<swift::irgen::LocalTypeDataKey> {
              swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
   }
   static unsigned getHashValue(const LocalTypeDataKey &key) {
-    return combineHashValue(CanTypeInfo::getHashValue(key.Type),
-                            key.Kind.getRawValue());
+    return detail::combineHashValue(CanTypeInfo::getHashValue(key.Type),
+                                    key.Kind.getRawValue());
   }
   static bool isEqual(const LocalTypeDataKey &a, const LocalTypeDataKey &b) {
     return a == b;

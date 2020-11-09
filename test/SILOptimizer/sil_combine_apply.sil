@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 import Swift
 import Builtin
@@ -369,7 +369,8 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
   %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto
   // CHECK: [[M:%[0-9]+]] = witness_method $MStruct,
   %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  // CHECK: apply [[M]]<@opened("{{.*}}") MutatingProto>([[E]]) :
+  // CHECK:  [[C:%[0-9]+]] = unchecked_addr_cast [[E]] : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto to $*MStruct
+  // CHECK: apply [[M]]<MStruct>([[C]]) :
   %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83") MutatingProto>(%11) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   copy_addr [take] %9 to [initialization] %0 : $*MutatingProto
   dealloc_stack %9 : $*MutatingProto
@@ -991,3 +992,29 @@ sil @test_partial_apply_method : $@convention(thin) () -> @owned @callee_owned (
 // CHECK: [[FN:%.*]] = function_ref @method
 // CHECK-NEXT: partial_apply [[FN]]()
 // CHECK-NEXT: return
+
+sil [noinline] @$foo : $@convention(thin) (@owned { var Int64 }) -> () 
+
+// CHECK-LABEL: sil private [noinline] @$testdeadpartialapply :
+// CHECK-NOT: partial_apply
+// CHECK-LABEL: } // end sil function '$testdeadpartialapply'
+sil private [noinline] @$testdeadpartialapply : $@convention(thin) (@owned { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %3 = function_ref @$foo : $@convention(thin) (@owned { var Int64 }) -> ()
+  %5 = partial_apply [callee_guaranteed] %3(%0) : $@convention(thin) (@owned { var Int64 }) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %0 : ${ var Int64 }
+  strong_retain %5 : $@callee_guaranteed () -> ()
+  unreachable
+bb2:
+  strong_retain %0 : ${ var Int64 }
+  strong_retain %5 : $@callee_guaranteed () -> ()
+  br bb3
+bb3:
+  strong_release %5 : $@callee_guaranteed () -> ()
+  strong_release %5 : $@callee_guaranteed () -> ()
+  strong_release %0 : ${ var Int64 }
+  %rv = tuple()
+  return %rv : $()
+}

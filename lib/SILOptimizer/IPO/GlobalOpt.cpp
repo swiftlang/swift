@@ -260,7 +260,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
     UnhandledOnceCallee = true;
     return;
   }
-  if (!Callee->getName().startswith("globalinit_"))
+  if (!Callee->isGlobalInitOnceFunction())
     return;
 
   // We currently disable optimizing the initializer if a globalinit_func
@@ -301,7 +301,7 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
 
   if (LoopCheckedFunctions.insert(F).second) {
     for (auto I = scc_begin(F); !I.isAtEnd(); ++I) {
-      if (I.hasLoop())
+      if (I.hasCycle())
         for (SILBasicBlock *BB : *I)
           LoopBlocks.insert(BB);
     }
@@ -358,7 +358,7 @@ static void replaceLoadsFromGlobal(SILValue addr,
     if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
       auto *ti = cast<TupleInst>(initVal);
       auto *member = cast<SingleValueInstruction>(
-                          ti->getElement(teai->getFieldNo()));
+                          ti->getElement(teai->getFieldIndex()));
       replaceLoadsFromGlobal(teai, member, cloner);
       continue;
     }

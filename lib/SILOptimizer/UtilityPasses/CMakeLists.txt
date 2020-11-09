@@ -1,6 +1,7 @@
 target_sources(swiftSILOptimizer PRIVATE
   AADumper.cpp
   AccessSummaryDumper.cpp
+  AccessPathVerification.cpp
   AccessedStorageAnalysisDumper.cpp
   AccessedStorageDumper.cpp
   BasicCalleePrinter.cpp
@@ -8,7 +9,6 @@ target_sources(swiftSILOptimizer PRIVATE
   BugReducerTester.cpp
   CFGPrinter.cpp
   CallerAnalysisPrinter.cpp
-  NonInlinableFunctionSkippingChecker.cpp
   ComputeDominanceInfo.cpp
   ComputeLoopInfo.cpp
   ConstantEvaluatorTester.cpp
@@ -28,6 +28,7 @@ target_sources(swiftSILOptimizer PRIVATE
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
+  SILSkippingChecker.cpp
   SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp

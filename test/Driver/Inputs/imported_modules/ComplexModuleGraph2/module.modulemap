@@ -1,0 +1,33 @@
+module CoreFilesystem {
+  header "CoreFilesystem-Generated.h"
+  export *
+}
+
+module FilesystemKit {
+  header "FilesystemKit.h"
+  export *
+}
+
+module CoreDaemon {
+  header "CoreDaemon.h"
+  export *
+}
+
+module DaemonKit {
+  umbrella header "DaemonKit/DaemonKit.h"
+  explicit module ViolateSecondLawOfThermodynamics {
+    header "DaemonKit/ViolateSecondLawOfThermodynamics.h"
+    export *
+  }
+  export *
+}
+
+module CoreMemory {
+  header "CoreMemory.h"
+  export *
+}
+
+module MemoryKit {
+  header "MemoryKit.h"
+  export *
+}

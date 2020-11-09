@@ -193,6 +193,11 @@ enum RequireMetadata_t : bool {
   RequireMetadata = true
 };
 
+enum class TypeMetadataCanonicality : bool {
+  Noncanonical,
+  Canonical,
+};
+
 /// The principal singleton which manages all of IR generation.
 ///
 /// The IRGenerator delegates the emission of different top-level entities
@@ -260,17 +265,22 @@ private:
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
 
-  /// Maps every generic type that is specialized within the module to its
-  /// specializations.
-  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
-      CanonicalSpecializationsForGenericTypes;
+  /// Maps every generic type whose metadata is specialized within the module
+  /// to its specializations.
+  llvm::DenseMap<
+      NominalTypeDecl *,
+      llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>>
+      MetadataPrespecializationsForGenericTypes;
 
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
       CanonicalSpecializedAccessorsForGenericTypes;
 
   /// The queue of specialized generic types whose prespecialized metadata to
   /// emit.
-  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+  llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
+      LazySpecializedTypeMetadataRecords;
+
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyReemittedTypeContextDescriptors;
 
   /// The queue of metadata accessors to emit.
   ///
@@ -424,9 +434,18 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
-  llvm::SmallVector<CanType, 4>
-  canonicalSpecializationsForType(NominalTypeDecl *type) {
-    return CanonicalSpecializationsForGenericTypes.lookup(type);
+  llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
+  metadataPrespecializationsForType(NominalTypeDecl *type) {
+    return MetadataPrespecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteLazyReemissionOfNominalTypeDescriptor(NominalTypeDecl *decl) {
+    LazilyReemittedTypeContextDescriptors.insert(decl);
+  }
+
+  bool isLazilyReemittingNominalTypeDescriptor(NominalTypeDecl *decl) {
+    return LazilyReemittedTypeContextDescriptors.find(decl) !=
+           std::end(LazilyReemittedTypeContextDescriptors);
   }
 
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
@@ -439,7 +458,8 @@ public:
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
 
-  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
+  void noteUseOfSpecializedGenericTypeMetadata(
+      IRGenModule &IGM, CanType theType, TypeMetadataCanonicality canonicality);
   void noteUseOfCanonicalSpecializedMetadataAccessor(CanType forType);
 
   void noteUseOfTypeMetadata(CanType type) {
@@ -546,11 +566,6 @@ enum class MangledTypeRefRole {
   /// The mangled type reference is used for a default associated type
   /// witness.
   DefaultAssociatedTypeWitness,
-};
-
-enum class TypeMetadataCanonicality : bool {
-  Noncanonical,
-  Canonical,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -708,6 +723,15 @@ public:
   llvm::PointerType
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
+
+  llvm::StructType *SwiftContextTy;
+  llvm::StructType *SwiftTaskTy;
+  llvm::StructType *SwiftExecutorTy;
+  llvm::PointerType *SwiftContextPtrTy;
+  llvm::PointerType *SwiftTaskPtrTy;
+  llvm::PointerType *SwiftExecutorPtrTy;
+  llvm::FunctionType *TaskContinuationFunctionTy;
+  llvm::PointerType *TaskContinuationFunctionPtrTy;
 
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
@@ -870,6 +894,9 @@ public:
   const TypeInfo &getTypeInfo(SILType T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
+  const TypeInfo &getSwiftContextPtrTypeInfo();
+  const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();
+  const TypeInfo &getSwiftExecutorPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
   const LoadableTypeInfo &
@@ -978,6 +1005,7 @@ public:
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
+  void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
 
   llvm::Constant *emitSwiftProtocols();
@@ -1006,10 +1034,10 @@ public:
                         bool setIsNoInline = false);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
-                                            llvm::Type *llvmType);
+                              llvm::Type *llvmType, Atomicity atomicity);
 
   llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
-                                             llvm::Type *llvmType);
+                              llvm::Type *llvmType, Atomicity atomicity);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
                               SILType objectType, const TypeInfo &objectTI,
@@ -1095,6 +1123,8 @@ private:
   /// List of Objective-C classes that require nonlazy realization, bitcast to
   /// i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
+  /// List of Objective-C resilient class stubs, bitcast to i8*.
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCClassStubs;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
   /// List of Objective-C categories on class stubs, bitcast to i8*.
@@ -1438,6 +1468,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+      NominalTypeDecl *decl);
   llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,

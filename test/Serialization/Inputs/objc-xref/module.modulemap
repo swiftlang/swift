@@ -1,0 +1,4 @@
+module ObjCXRef {
+  header "objc_xref.h"
+  export *
+}

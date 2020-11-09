@@ -1341,6 +1341,25 @@
       "hasMissingDesignatedInitializers": true
     },
     {
+      "kind": "Function",
+      "name": "emitIntoClientFunc",
+      "printedName": "emitIntoClientFunc()",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        }
+      ],
+      "declKind": "Func",
+      "usr": "s:4cake18emitIntoClientFuncyyF",
+      "moduleName": "cake",
+      "declAttributes": [
+        "AlwaysEmitIntoClient"
+      ],
+      "funcSelfKind": "NonMutating"
+    },
+    {
       "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",

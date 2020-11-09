@@ -70,7 +70,7 @@ struct Strukt {
     }
   }
 
-  // CHECK: (var_decl {{.*}} "storedWithObserver" type='Int' interface type='Int' access=internal dynamic readImpl=stored writeImpl=stored_with_observers readWriteImpl=stored_simple_didset
+  // CHECK: (var_decl {{.*}} "storedWithObserver" type='Int' interface type='Int' access=internal dynamic readImpl=stored writeImpl=stored_with_observers readWriteImpl=stored_with_didset
   // CHECK: (accessor_decl {{.*}}access=private dynamic didSet_for=storedWithObserver
   // CHECK: (accessor_decl {{.*}}access=internal dynamic get_for=storedWithObserver
   // CHECK: (accessor_decl {{.*}}access=internal set_for=storedWithObserver

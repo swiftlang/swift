@@ -1395,7 +1395,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
   // Constant fold extraction of a constant element.
   if (auto *TEI = dyn_cast<TupleExtractInst>(User)) {
     if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand())) {
-      Results.push_back(TheTuple->getElement(TEI->getFieldNo()));
+      Results.push_back(TheTuple->getElement(TEI->getFieldIndex()));
       return true;
     }
   }

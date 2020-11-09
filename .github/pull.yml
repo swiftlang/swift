@@ -1,10 +1,10 @@
 version: "1"
 rules:
   - base: swiftwasm
-    upstream: master
+    upstream: main
     mergeMethod: merge
-  - base: master
-    upstream: apple:master
+  - base: main
+    upstream: apple:main
     mergeMethod: hardreset
   - base: release/5.3
     upstream: apple:release/5.3

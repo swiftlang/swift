@@ -37,8 +37,10 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
-  unsigned MaxASTReuseCount = 100;
-  unsigned DependencyCheckIntervalSecond = 5;
+  struct Options {
+    unsigned MaxASTReuseCount = 100;
+    unsigned DependencyCheckIntervalSecond = 5;
+  } Opts;
 
   std::mutex mtx;
 
@@ -59,7 +61,7 @@ class CompletionInstance {
   /// argument has changed, primary file is not the same, the \c Offset is not
   /// in function bodies, or the interface hash of the file has changed.
   bool performCachedOperationIfPossible(
-      const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+      llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
@@ -78,7 +80,9 @@ class CompletionInstance {
       llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 
 public:
-  void setDependencyCheckIntervalSecond(unsigned Value);
+  CompletionInstance() {}
+
+  void setOptions(Options NewOpts);
 
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
   /// second pass. \p Callback is resposible to perform the second pass on it.
@@ -94,7 +98,7 @@ public:
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
+      std::string &Error, DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 };
 

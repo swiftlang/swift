@@ -190,14 +190,6 @@ public:
 
   bool isNeverDefaultInitializable() const;
 
-  /// Mark all vardecls in this pattern as having non-pattern initial
-  /// values bound into them.
-  void markHasNonPatternBindingInit() {
-    forEachVariable([&](VarDecl *VD) {
-      VD->setHasNonPatternBindingInit();
-    });
-  }
-
   /// Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
   void markOwnedByStatement(Stmt *S) {
@@ -553,6 +545,9 @@ public:
   }
   bool hasUnresolvedOriginalExpr() const {
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
+  }
+  void setUnresolvedOriginalExpr(Expr *e) {
+    ElementDeclOrUnresolvedOriginalExpr = e;
   }
 
   DeclNameLoc getNameLoc() const { return NameLoc; }

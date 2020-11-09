@@ -85,6 +85,9 @@ class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
 
   SourceRange VersionSrcRange;
 
+  // Location of the macro expanded to create this spec.
+  SourceLoc MacroLoc;
+
 public:
   PlatformVersionConstraintAvailabilitySpec(PlatformKind Platform,
                                             SourceLoc PlatformLoc,
@@ -116,6 +119,10 @@ public:
   llvm::VersionTuple getRuntimeVersion() const { return RuntimeVersion; }
 
   SourceRange getSourceRange() const;
+
+  // Location of the macro expanded to create this spec.
+  SourceLoc getMacroLoc() const { return MacroLoc; }
+  void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
 
   void print(raw_ostream &OS, unsigned Indent) const;
   

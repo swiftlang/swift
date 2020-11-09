@@ -15,17 +15,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
-#include "TypeCheckDecl.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -231,24 +230,6 @@ public:
 static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
   // Don't bother checking imported or deserialized decls.
   return decl->hasClangNode() || decl->wasDeserialized();
-}
-
-bool
-HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
-                                        ClassDecl *decl) const {
-  if (canSkipCircularityCheck(decl) || !decl->hasSuperclass())
-    return false;
-
-  auto *superclass = decl->getSuperclassDecl();
-  auto result = evaluator(HasCircularInheritanceRequest{superclass});
-
-  // If we have a cycle, handle it and return true.
-  if (!result) {
-    using Error = CyclicalRequestError<HasCircularInheritanceRequest>;
-    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
-    return true;
-  }
-  return result.get();
 }
 
 bool
@@ -472,6 +453,160 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   return CtorInitializerKind::Designated;
 }
 
+BodyInitKindAndExpr
+BodyInitKindRequest::evaluate(Evaluator &evaluator,
+                              ConstructorDecl *decl) const {
+
+  struct FindReferenceToInitializer : ASTWalker {
+    const ConstructorDecl *Decl;
+    BodyInitKind Kind = BodyInitKind::None;
+    ApplyExpr *InitExpr = nullptr;
+    ASTContext &ctx;
+
+    FindReferenceToInitializer(const ConstructorDecl *decl,
+                               ASTContext &ctx)
+        : Decl(decl), ctx(ctx) { }
+
+    bool walkToDeclPre(class Decl *D) override {
+      // Don't walk into further nominal decls.
+      return !isa<NominalTypeDecl>(D);
+    }
+    
+    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+      // Don't walk into closures.
+      if (isa<ClosureExpr>(E))
+        return { false, E };
+      
+      // Look for calls of a constructor on self or super.
+      auto apply = dyn_cast<ApplyExpr>(E);
+      if (!apply)
+        return { true, E };
+
+      auto Callee = apply->getSemanticFn();
+      
+      Expr *arg;
+
+      if (isa<OtherConstructorDeclRefExpr>(Callee)) {
+        arg = apply->getArg();
+      } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
+        arg = CRE->getArg();
+      } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
+        if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
+          return { true, E };
+
+        arg = dotExpr->getBase();
+      } else {
+        // Not a constructor call.
+        return { true, E };
+      }
+
+      // Look for a base of 'self' or 'super'.
+      arg = arg->getSemanticsProvidingExpr();
+
+      auto myKind = BodyInitKind::None;
+      if (arg->isSuperExpr())
+        myKind = BodyInitKind::Chained;
+      else if (arg->isSelfExprOf(Decl, /*sameBase*/true))
+        myKind = BodyInitKind::Delegating;
+      else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(arg)) {
+        // FIXME: We can see UnresolvedDeclRefExprs here because we have
+        // not yet run preCheckExpression() on the entire function body
+        // yet.
+        //
+        // We could consider pre-checking more eagerly.
+        auto name = declRef->getName();
+        auto loc = declRef->getLoc();
+        if (name.isSimpleName(ctx.Id_self)) {
+          auto *otherSelfDecl =
+            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(),
+                                            name.getFullName(), loc);
+          if (otherSelfDecl == Decl->getImplicitSelfDecl())
+            myKind = BodyInitKind::Delegating;
+        }
+      }
+      
+      if (myKind == BodyInitKind::None)
+        return { true, E };
+
+      if (Kind == BodyInitKind::None) {
+        Kind = myKind;
+
+        InitExpr = apply;
+        return { true, E };
+      }
+
+      // If the kind changed, complain.
+      if (Kind != myKind) {
+        // The kind changed. Complain.
+        ctx.Diags.diagnose(E->getLoc(), diag::init_delegates_and_chains);
+        ctx.Diags.diagnose(InitExpr->getLoc(), diag::init_delegation_or_chain,
+                           Kind == BodyInitKind::Chained);
+      }
+
+      return { true, E };
+    }
+  };
+
+  auto &ctx = decl->getASTContext();
+  FindReferenceToInitializer finder(decl, ctx);
+  decl->getBody()->walk(finder);
+
+  // get the kind out of the finder.
+  auto Kind = finder.Kind;
+
+  auto *NTD = decl->getDeclContext()->getSelfNominalTypeDecl();
+
+  // Protocol extension and enum initializers are always delegating.
+  if (Kind == BodyInitKind::None) {
+    if (isa<ProtocolDecl>(NTD) || isa<EnumDecl>(NTD)) {
+      Kind = BodyInitKind::Delegating;
+    }
+  }
+
+  // Struct initializers that cannot see the layout of the struct type are
+  // always delegating. This occurs if the struct type is not fixed layout,
+  // and the constructor is either inlinable or defined in another module.
+  if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for structs in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (NTD->isResilient() &&
+        decl->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      Kind = BodyInitKind::Delegating;
+
+    } else if (isa<ExtensionDecl>(decl->getDeclContext())) {
+      // Prior to Swift 5, cross-module initializers were permitted to be
+      // non-delegating. However, if the struct isn't fixed-layout, we have to
+      // be delegating because, well, we don't know the layout.
+      // A dynamic replacement is permitted to be non-delegating.
+      if (NTD->isResilient() ||
+          (ctx.isSwiftVersionAtLeast(5) &&
+           !decl->getAttrs().getAttribute<DynamicReplacementAttr>())) {
+        if (decl->getParentModule() != NTD->getParentModule())
+          Kind = BodyInitKind::Delegating;
+      }
+    }
+  }
+
+  // If we didn't find any delegating or chained initializers, check whether
+  // the initializer was explicitly marked 'convenience'.
+  if (Kind == BodyInitKind::None &&
+      decl->getAttrs().hasAttribute<ConvenienceAttr>())
+    Kind = BodyInitKind::Delegating;
+
+  // If we still don't know, check whether we have a class with a superclass: it
+  // gets an implicit chained initializer.
+  if (Kind == BodyInitKind::None) {
+    if (auto classDecl = decl->getDeclContext()->getSelfClassDecl()) {
+      if (classDecl->hasSuperclass())
+        Kind = BodyInitKind::ImplicitChained;
+    }
+  }
+
+  return BodyInitKindAndExpr(Kind, finder.InitExpr);
+}
+
 bool
 ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *decl) const {
@@ -583,7 +718,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       // Property wrapper storage wrappers are final if the original property
       // is final.
       if (auto *original = VD->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+            PropertyWrapperSynthesizedPropertyKind::Projection)) {
         if (original->isFinal())
           return true;
       }
@@ -1027,7 +1162,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     if (uncheckedRawValueOf(elt)) {
       if (!uncheckedRawValueOf(elt)->isImplicit())
         lastExplicitValueElt = elt;
-    } else if (!ED->LazySemanticInfo.hasFixedRawValues()) {
+    } else if (!ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues)) {
       // Try to pull out the automatic enum value kind.  If that fails, bail.
       if (!valueKind) {
         valueKind = computeAutomaticEnumValueKind(ED);
@@ -1063,10 +1198,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     
     {
       Expr *exprToCheck = prevValue;
-      if (TypeChecker::typeCheckExpression(exprToCheck, ED,
-                                           rawTy,
-                                           CTP_EnumCaseRawValue)) {
-        TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
+      if (TypeChecker::typeCheckExpression(
+              exprToCheck, ED,
+              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+        TypeChecker::checkEnumElementEffects(elt, exprToCheck);
       }
     }
 
@@ -1082,7 +1217,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     // to have set things up correctly.  This comes up with imported enums
     // and deserialized @objc enums which always have their raw values setup
     // beforehand.
-    if (ED->LazySemanticInfo.hasFixedRawValues())
+    if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues))
       continue;
 
     // Using magic literals like #file as raw value is not supported right now.
@@ -1136,73 +1271,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     }
   }
   return std::make_tuple<>();
-}
-
-bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
-                                   AccessorDecl *decl) const {
-
-  class OldValueFinder : public ASTWalker {
-    const ParamDecl *OldValueParam;
-    bool foundOldValueRef = false;
-
-  public:
-    OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
-
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (!E)
-        return {true, E};
-      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
-        if (auto decl = DRE->getDecl()) {
-          if (decl == OldValueParam) {
-            foundOldValueRef = true;
-            return {false, nullptr};
-          }
-        }
-      }
-
-      return {true, E};
-    }
-
-    bool didFindOldValueRef() { return foundOldValueRef; }
-  };
-
-  // If this is not a didSet accessor, bail out.
-  if (decl->getAccessorKind() != AccessorKind::DidSet) {
-    return false;
-  }
-
-  // Always assume non-simple 'didSet' in code completion mode.
-  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
-    return false;
-
-  // didSet must have a single parameter.
-  if (decl->getParameters()->size() != 1) {
-    return false;
-  }
-
-  auto param = decl->getParameters()->get(0);
-  // If this parameter is not implicit, then it means it has been explicitly
-  // provided by the user (i.e. 'didSet(oldValue)'). This means we cannot
-  // consider this a "simple" didSet because we have to fetch the oldValue
-  // regardless of whether it's referenced in the body or not.
-  if (!param->isImplicit()) {
-    return false;
-  }
-
-  // If we find a reference to the implicit 'oldValue' parameter, then it is
-  // not a "simple" didSet because we need to fetch it.
-  auto walker = OldValueFinder(param);
-  decl->getBody()->walk(walker);
-  auto hasOldValueRef = walker.didFindOldValueRef();
-  if (!hasOldValueRef) {
-    // If the body does not refer to implicit 'oldValue', it means we can
-    // consider this as a "simple" didSet. Let's also erase the implicit
-    // oldValue as it is never used.
-    auto &ctx = decl->getASTContext();
-    decl->setParameters(ParameterList::createEmpty(ctx));
-    return true;
-  }
-  return false;
 }
 
 const ConstructorDecl *
@@ -1640,13 +1708,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-  case AccessorKind::Set:
-    if (accessor->isSimpleDidSet()) {
-      // If this is a "simple" didSet, there won't be
-      // a parameter.
       return nullptr;
-    }
 
+  case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' parameter.
       return nullptr;
@@ -1682,7 +1746,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 
   switch (decl->getKind()) {
   case DeclKind::Func: {
-    TyR = cast<FuncDecl>(decl)->getBodyResultTypeLoc().getTypeRepr();
+    TyR = cast<FuncDecl>(decl)->getResultTypeRepr();
     break;
   }
 
@@ -1693,14 +1757,14 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 
     auto *storage = accessor->getStorage();
     if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
-      TyR = subscript->getElementTypeLoc().getTypeRepr();
+      TyR = subscript->getElementTypeRepr();
     else
       TyR = cast<VarDecl>(storage)->getTypeReprOrParentPatternTypeRepr();
     break;
   }
 
   case DeclKind::Subscript:
-    TyR = cast<SubscriptDecl>(decl)->getElementTypeLoc().getTypeRepr();
+    TyR = cast<SubscriptDecl>(decl)->getElementTypeRepr();
     break;
 
   case DeclKind::Param: {
@@ -1754,11 +1818,6 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
-
-  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
-          /*functionsAreNonCascading*/ true)) {
-    options |= TypeResolutionFlags::KnownNonCascadingDependency;
-  }
 
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
@@ -2003,7 +2062,12 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     }
   }
 
-  auto *resultTyRepr = getResultTypeLoc().getTypeRepr();
+  TypeRepr *resultTyRepr = nullptr;
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    resultTyRepr = funcDecl->getResultTypeRepr();
+  } else {
+    resultTyRepr = cast<SubscriptDecl>(decl)->getElementTypeRepr();
+  }
 
   // Nothing to do if there's no result type.
   if (resultTyRepr == nullptr)
@@ -2125,6 +2189,9 @@ static Type validateParameterType(ParamDecl *decl) {
                        TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
+  if (dc->isInSpecializeExtensionContext())
+    options |= TypeResolutionFlags::AllowUsableFromInline;
+
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener);
   auto Ty = resolution.resolveType(decl->getTypeRepr());
@@ -2148,9 +2215,8 @@ static Type validateParameterType(ParamDecl *decl) {
       decl->setInvalid();
       return ErrorType::get(ctx);
     }
-
-    return Ty;
   }
+
   return Ty;
 }
 
@@ -2446,21 +2512,16 @@ namespace {
 // Utility class for deterministically ordering vtable entries for
 // synthesized methods.
 struct SortedFuncList {
-  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  using Key = std::tuple<DeclName, std::string>;
+  using Entry = std::pair<Key, AbstractFunctionDecl *>;
   SmallVector<Entry, 2> elts;
   bool sorted = false;
 
   void add(AbstractFunctionDecl *afd) {
-    Mangle::ASTMangler mangler;
-    std::string mangledName;
-    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
-      mangledName = mangler.mangleConstructorEntity(cd, /*allocator=*/false);
-    else if (auto *dd = dyn_cast<DestructorDecl>(afd))
-      mangledName = mangler.mangleDestructorEntity(dd, /*deallocating=*/false);
-    else
-      mangledName = mangler.mangleEntity(afd);
+    assert(!isa<AccessorDecl>(afd));
 
-    elts.push_back(std::make_pair(mangledName, afd));
+    Key key{afd->getName(), afd->getInterfaceType().getString()};
+    elts.emplace_back(key, afd);
   }
 
   bool empty() { return elts.empty(); }
@@ -2489,60 +2550,52 @@ struct SortedFuncList {
 } // end namespace
 
 ArrayRef<Decl *>
-EmittedMembersRequest::evaluate(Evaluator &evaluator,
-                                ClassDecl *CD) const {
-  auto &Context = CD->getASTContext();
+SemanticMembersRequest::evaluate(Evaluator &evaluator,
+                                IterableDeclContext *idc) const {
+  auto dc = cast<DeclContext>(idc->getDecl());
+  auto &Context = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
-  if (!CD->getParentSourceFile()) {
-    auto members = CD->getMembers();
+  if (!dc->getParentSourceFile()) {
+    auto members = idc->getMembers();
     result.append(members.begin(), members.end());
     return Context.AllocateCopy(result);
   }
 
-  // We need to add implicit initializers because they
-  // affect vtable layout.
-  TypeChecker::addImplicitConstructors(CD);
+  auto nominal = dyn_cast<NominalTypeDecl>(idc);
 
-  auto forceConformance = [&](ProtocolDecl *protocol) {
-    auto ref = CD->getParentModule()->lookupConformance(
-        CD->getDeclaredInterfaceType(), protocol);
-    if (ref.isInvalid()) {
-      return;
-    }
+  if (nominal) {
+    // We need to add implicit initializers because they
+    // affect vtable layout.
+    TypeChecker::addImplicitConstructors(nominal);
+  }
 
-    auto conformance = ref.getConcrete();
-    if (conformance->getDeclContext() == CD &&
-        conformance->getState() == ProtocolConformanceState::Incomplete) {
+  // Force any derivable conformances in this context. This ensures that any
+  // synthesized members will approach in the member list.
+  for (auto conformance : idc->getLocalConformances()) {
+    if (conformance->getState() == ProtocolConformanceState::Incomplete &&
+        conformance->getProtocol()->getKnownDerivableProtocolKind())
       TypeChecker::checkConformance(conformance->getRootNormalConformance());
-    }
-  };
+  }
 
-  // If the class is Encodable, Decodable or Hashable, force those
-  // conformances to ensure that the synthesized members appear in the vtable.
-  //
-  // FIXME: Generalize this to other protocols for which
-  // we can derive conformances.
-  forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
-  forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
-
-  // If the class conforms to Encodable or Decodable, even via an extension,
+  // If the type conforms to Encodable or Decodable, even via an extension,
   // the CodingKeys enum is synthesized as a member of the type itself.
   // Force it into existence.
-  (void) evaluateOrDefault(Context.evaluator,
-                           ResolveImplicitMemberRequest{CD,
-                                      ImplicitMemberAction::ResolveCodingKeys},
-                           {});
+  if (nominal) {
+    (void) evaluateOrDefault(Context.evaluator,
+                             ResolveImplicitMemberRequest{nominal,
+                                        ImplicitMemberAction::ResolveCodingKeys},
+                             {});
+  }
 
-  // If the class has a @main attribute, we need to force synthesis of the
+  // If the decl has a @main attribute, we need to force synthesis of the
   // $main function.
-  (void) evaluateOrDefault(Context.evaluator,
-                           SynthesizeMainFunctionRequest{CD},
-                           nullptr);
+  (void) evaluateOrDefault(
+      Context.evaluator,
+      SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
+      nullptr);
 
-  for (auto *member : CD->getMembers()) {
+  for (auto *member : idc->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have dynamically-dispatched
       // accessors, so force them to be synthesized.
@@ -2553,8 +2606,17 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
 
   SortedFuncList synthesizedMembers;
 
-  for (auto *member : CD->getMembers()) {
+  for (auto *member : idc->getMembers()) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+      // If this is a witness to Actor.enqueue(partialTask:), put it at the
+      // beginning of the vtable.
+      if (auto func = dyn_cast<FuncDecl>(afd)) {
+        if (func->isActorEnqueuePartialTaskWitness()) {
+          result.insert(result.begin(), func);
+          continue;
+        }
+      }
+
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
       if (afd->isSynthesized()) {
@@ -2650,9 +2712,11 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
 
   // Compute the extended type.
-  const TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  if (ext->isInSpecializeExtensionContext())
+    options |= TypeResolutionFlags::AllowUsableFromInline;
   const auto resolution = TypeResolution::forStructural(
-      ext->getDeclContext(), TypeResolverContext::ExtensionBinding,
+      ext->getDeclContext(), options,
       [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.

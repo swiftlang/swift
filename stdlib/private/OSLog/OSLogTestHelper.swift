@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ObjectiveC
+
 // This file contains test helpers for testing the compiler diagnostics and optimizations
 // of the new swift APIs for os log that accept string interpolations.
 
@@ -51,41 +53,47 @@ func _osLogTestHelper(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let objectCount = message.interpolation.objectArgumentCount
+  let stringCount = message.interpolation.stringArgumentCount
+  let uint32bufferSize = UInt32(bufferSize)
   let argumentClosures = message.interpolation.arguments.argumentClosures
+
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
 
   // Code that will execute at runtime.
   if (!isLoggingEnabled()) {
     return
   }
-
-  // Allocate a byte buffer to store the arguments. The buffer could be stack
-  // allocated as it is local to this function and also its size is a
-  // compile-time constant.
   let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-  // Array of references to auxiliary storage created during serialization of
-  // strings. This array can be stack allocated.
-  var stringStorageObjects: [AnyObject] = []
+  // Buffer for storing NSObjects and strings to keep them alive until the
+  // _os_log_impl_test call completes.
+  let objectArguments = createStorage(capacity: objectCount, type: NSObject.self)
+  let stringArgumentOwners = createStorage(capacity: stringCount, type: Any.self)
 
   var currentBufferPosition = bufferMemory
+  var objectArgumentsPosition = objectArguments
+  var stringArgumentOwnersPosition = stringArgumentOwners
   serialize(preamble, at: &currentBufferPosition)
   serialize(argumentCount, at: &currentBufferPosition)
-  argumentClosures.forEach { $0(&currentBufferPosition, &stringStorageObjects) }
+  argumentClosures.forEach {
+    $0(&currentBufferPosition,
+       &objectArgumentsPosition,
+       &stringArgumentOwnersPosition)
+  }
 
   _os_log_impl_test(
     assertion,
     formatString,
     formatStringPointer,
     bufferMemory,
-    UInt32(bufferSize))
+    uint32bufferSize)
 
-  // The following operation extends the lifetime of argumentClosures,
-  // stringStorageObjects, and also of the objects stored in them, till this
-  // point. This is necessary because the assertion is passed internal pointers
-  // to the objects/strings stored in these arrays, as in the actual os log
-  // implementation.
-  _fixLifetime(argumentClosures)
-  _fixLifetime(stringStorageObjects)
+  // The following operation extends the lifetime of objectArguments and
+  // stringArgumentOwners till this point. This is necessary because the
+  // assertion is passed internal pointers to the objects/strings stored
+  // in these arrays, as in the actual os log implementation.
+  destroyStorage(objectArguments, count: objectCount)
+  destroyStorage(stringArgumentOwners, count: stringCount)
   bufferMemory.deallocate()
 }
 

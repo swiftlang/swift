@@ -1322,7 +1322,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                getIdentifier(privateDiscriminator));
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  NL_QualifiedDefault | NL_KnownNoDependency,
+                                  NL_QualifiedDefault,
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
@@ -1612,9 +1612,14 @@ giveUpFastPath:
       }
 
       if (memberName.getKind() == DeclBaseName::Kind::Destructor) {
+        assert(isa<ClassDecl>(nominal));
+        // Force creation of an implicit destructor
         auto CD = dyn_cast<ClassDecl>(nominal);
         values.push_back(CD->getDestructor());
-      } else if (!privateDiscriminator.empty()) {
+        break;
+      }
+
+      if (!privateDiscriminator.empty()) {
         ModuleDecl *searchModule = M;
         if (!searchModule)
           searchModule = nominal->getModuleContext();
@@ -2009,35 +2014,31 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
       llvm_unreachable("implementation detail only");
     }
   }
-  return getModule(getIdentifier(MID),
+  return getModule(ImportPath::Module::Builder(getIdentifier(MID)).get(),
                    getContext().LangOpts.AllowDeserializingImplementationOnly);
 }
 
-ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
+ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
                                   bool allowLoading) {
-  if (name.empty() || name.front().empty())
+  if (name.empty() || name.front().Item.empty())
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from ImportResolver::getModule
   if (name.size() == 1 &&
-      name.front() == FileContext->getParentModule()->getName()) {
+      name.front().Item == FileContext->getParentModule()->getName()) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
-      UnderlyingModule = importer->loadModule(SourceLoc(),
-                                              {{name.front(), SourceLoc()}});
+      UnderlyingModule =
+          importer->loadModule(SourceLoc(), name.getTopLevelPath());
     }
 
     return UnderlyingModule;
   }
 
-  SmallVector<ImportDecl::AccessPathElement, 4> importPath;
-  for (auto pathElem : name)
-    importPath.push_back({ pathElem, SourceLoc() });
-
   if (allowLoading)
-    return getContext().getModule(importPath);
-  return getContext().getLoadedModule(importPath);
+    return getContext().getModule(name);
+  return getContext().getLoadedModule(name);
 }
 
 
@@ -2198,8 +2199,8 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(StoredWithSimpleDidSet)
-  CASE(InheritedWithSimpleDidSet)
+  CASE(StoredWithDidSet)
+  CASE(InheritedWithDidSet)
 #undef CASE
   }
   return None;
@@ -2730,7 +2731,7 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    bool isImplicit, isObjC, isStatic;
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
     bool isLazyStorageProperty;
@@ -2748,7 +2749,6 @@ public:
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawIntroducer,
-                                       hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        isLazyStorageProperty,
                                        isTopLevelGlobal,
@@ -2820,9 +2820,7 @@ public:
       MF.fatal();
 
     auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
-                                      /*IsCaptureList*/ false, SourceLoc(),
-                                      name, DC);
-    var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
+                                      SourceLoc(), name, DC);
     var->setIsGetterMutating(isGetterMutating);
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
@@ -2900,13 +2898,13 @@ public:
       }
 
       VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
-      VarDecl *storageWrapperVar = nullptr;
+      VarDecl *projectionVar = nullptr;
       if (numBackingProperties > 1) {
-        storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
+        projectionVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
       }
 
       PropertyWrapperBackingPropertyInfo info(
-          backingVar, storageWrapperVar, nullptr, nullptr);
+          backingVar, projectionVar, nullptr, nullptr);
       ctx.evaluator.cacheOutput(
           PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
       ctx.evaluator.cacheOutput(
@@ -2914,8 +2912,8 @@ public:
           backingVar->getInterfaceType());
       backingVar->setOriginalWrappedProperty(var);
 
-      if (storageWrapperVar)
-        storageWrapperVar->setOriginalWrappedProperty(var);
+      if (projectionVar)
+        projectionVar->setOriginalWrappedProperty(var);
     }
 
     return var;
@@ -2998,6 +2996,7 @@ public:
     DeclID accessorStorageDeclID;
     bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
+    bool isUserAccessible;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3015,6 +3014,7 @@ public:
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           opaqueReturnTypeID,
+                                          isUserAccessible,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3126,21 +3126,19 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    const auto resultType = MF.getType(resultInterfaceTypeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
     FuncDecl *fn;
     if (!isAccessor) {
-      fn = FuncDecl::createDeserialized(
-        ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-        async, /*AsyncLoc=*/SourceLoc(),
-        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, DC);
+      fn = FuncDecl::createDeserialized(ctx, staticSpelling.getValue(), name,
+                                        async, throws, genericParams,
+                                        resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
-        ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-        accessorKind, storage,
-        /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, DC);
+          ctx, accessorKind, storage, staticSpelling.getValue(),
+          /*Throws=*/throws, genericParams, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -3176,8 +3174,6 @@ public:
     }
 
     fn->setStatic(isStatic);
-
-    fn->getBodyResultTypeLoc().setType(MF.getType(resultInterfaceTypeID));
     fn->setImplicitlyUnwrappedOptional(isIUO);
 
     ParameterList *paramList = MF.readParameterList();
@@ -3205,6 +3201,9 @@ public:
           OpaqueResultTypeRequest{fn},
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
+
+    if (!isAccessor)
+      fn->setUserAccessible(isUserAccessible);
 
     return fn;
   }
@@ -3853,11 +3852,12 @@ public:
     if (!staticSpelling.hasValue())
       MF.fatal();
 
-    auto subscript = MF.createDecl<SubscriptDecl>(name,
-                                                  SourceLoc(), *staticSpelling,
-                                                  SourceLoc(), nullptr,
-                                                  SourceLoc(), TypeLoc(),
-                                                  parent, genericParams);
+    const auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *const subscript = SubscriptDecl::createDeserialized(
+        ctx, name, *staticSpelling, elemInterfaceType, parent, genericParams);
     subscript->setIsGetterMutating(isGetterMutating);
     subscript->setIsSetterMutating(isSetterMutating);
     declOrOffset = subscript;
@@ -3881,8 +3881,6 @@ public:
         MF.fatal();
     }
 
-    auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
-    subscript->getElementTypeLoc().setType(elemInterfaceType);
     subscript->setImplicitlyUnwrappedOptional(isIUO);
 
     if (isImplicit)
@@ -4138,6 +4136,14 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::ActorIndependent_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ActorIndependentDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ActorIndependentAttr((ActorIndependentKind)kind);
+        break;
+      }
+
       case decls_block::Optimize_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::OptimizeDeclAttrLayout::readRecord(
@@ -4257,18 +4263,48 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         unsigned specializationKindVal;
         GenericSignatureID specializedSigID;
 
-        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, exported, specializationKindVal, specializedSigID);
+        ArrayRef<uint64_t> rawPieceIDs;
+        uint64_t numArgs;
+        uint64_t numSPIGroups;
+        DeclID targetFunID;
 
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+            scratch, exported, specializationKindVal, specializedSigID,
+            targetFunID, numArgs, numSPIGroups, rawPieceIDs);
+
+        assert(rawPieceIDs.size() == numArgs + numSPIGroups ||
+               rawPieceIDs.size() == (numArgs - 1 + numSPIGroups));
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
+        // The 'target' parameter.
+        DeclNameRef replacedFunctionName;
+        if (numArgs) {
+          bool numArgumentLabels = (numArgs == 1) ? 0 : numArgs - 2;
+          auto baseName = MF.getDeclBaseName(rawPieceIDs[0]);
+          SmallVector<Identifier, 4> pieces;
+          if (numArgumentLabels) {
+            for (auto pieceID : rawPieceIDs.slice(1, numArgumentLabels))
+              pieces.push_back(MF.getIdentifier(pieceID));
+          }
+          replacedFunctionName = (numArgs == 1)
+                                     ? DeclNameRef({baseName}) // simple name
+                                     : DeclNameRef({ctx, baseName, pieces});
+        }
+
+        SmallVector<Identifier, 4> spis;
+        if (numSPIGroups) {
+          auto numTargetFunctionPiecesToSkip =
+              (rawPieceIDs.size() == numArgs + numSPIGroups) ? numArgs
+                                                             : numArgs - 1;
+          for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
+            spis.push_back(MF.getIdentifier(id));
+        }
 
         auto specializedSig = MF.getGenericSignature(specializedSigID);
-        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      nullptr, exported != 0,
-                                      specializationKind,
-                                      specializedSig);
+        Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
+                                      spis, specializedSig,
+                                      replacedFunctionName, &MF, targetFunID);
         break;
       }
 
@@ -5363,6 +5399,7 @@ public:
 
   Expected<Type> deserializeSILFunctionType(ArrayRef<uint64_t> scratch,
                                             StringRef blobData) {
+    bool async;
     uint8_t rawCoroutineKind;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
@@ -5380,6 +5417,7 @@ public:
     ClangTypeID clangFunctionTypeID;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
+                                             async,
                                              rawCoroutineKind,
                                              rawCalleeConvention,
                                              rawRepresentation,
@@ -5406,21 +5444,18 @@ public:
     if (!diffKind.hasValue())
       MF.fatal();
 
-    const clang::FunctionType *clangFunctionType = nullptr;
+    const clang::Type *clangFunctionType = nullptr;
     if (clangFunctionTypeID) {
       auto clangType = MF.getClangType(clangFunctionTypeID);
       if (!clangType)
         return clangType.takeError();
-      // FIXME: allow block pointers here.
-      clangFunctionType =
-        dyn_cast_or_null<clang::FunctionType>(clangType.get());
-      if (!clangFunctionType)
-        MF.fatal();
+      clangFunctionType = clangType.get();
     }
 
     auto extInfo =
         SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
-                                        noescape, *diffKind, clangFunctionType)
+                                        noescape, async, *diffKind, 
+                                        clangFunctionType)
             .build();
 
     // Process the coroutine kind.
@@ -5802,6 +5837,9 @@ public:
 
 llvm::Expected<const clang::Type *>
 ModuleFile::getClangType(ClangTypeID TID) {
+  if (!getContext().LangOpts.UseClangFunctionTypes)
+    return nullptr;
+
   if (TID == 0)
     return nullptr;
 
@@ -6025,6 +6063,13 @@ ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
 AbstractFunctionDecl *
 ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
                                        uint64_t contextData) {
+  return cast<AbstractFunctionDecl>(getDecl(contextData));
+}
+
+ValueDecl *ModuleFile::loadTargetFunctionDecl(const SpecializeAttr *attr,
+                                              uint64_t contextData) {
+  if (contextData == 0)
+    return nullptr;
   return cast<AbstractFunctionDecl>(getDecl(contextData));
 }
 

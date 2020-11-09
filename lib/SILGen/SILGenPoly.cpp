@@ -3204,7 +3204,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // If this thunk involves DynamicSelfType in any way, add a capture for it
   // in case we need to recover metadata.
   if (hasDynamicSelf) {
-    dynamicSelfType = F.getSelfMetadataArgument()->getType().getASTType();
+    dynamicSelfType = F.getDynamicSelfMetadata()->getType().getASTType();
     if (!isa<MetatypeType>(dynamicSelfType)) {
       dynamicSelfType = CanMetatypeType::get(dynamicSelfType,
                                              MetatypeRepresentation::Thick);
@@ -4481,6 +4481,15 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 }
 
 //===----------------------------------------------------------------------===//
+// Concurrency
+//===----------------------------------------------------------------------===//
+
+void SILGenFunction::emitHopToCurrentExecutor(SILLocation loc) {
+  if (actor)
+    B.createHopToExecutor(loc, actor);
+}
+
+//===----------------------------------------------------------------------===//
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
@@ -4577,7 +4586,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                       SILLocation loc) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
-    if (auto *derivativeId = witness.derivativeFunctionIdentifier) {
+    if (auto *derivativeId = witness.getDerivativeFunctionIdentifier()) {
       auto originalFn =
           SGF.emitGlobalFunctionRef(loc, witness.asAutoDiffOriginalFunction());
       auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
@@ -4594,7 +4603,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     }
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
-    assert(!witness.derivativeFunctionIdentifier);
+    assert(!witness.getDerivativeFunctionIdentifier());
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Witness: {
     auto typeAndConf =
@@ -4609,7 +4618,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     // If `witness` is a derivative function `SILDeclRef`, replace the
     // derivative function identifier's generic signature with the witness thunk
     // substitution map's generic signature.
-    if (auto *derivativeId = witness.derivativeFunctionIdentifier) {
+    if (auto *derivativeId = witness.getDerivativeFunctionIdentifier()) {
       auto *newDerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
           derivativeId->getKind(), derivativeId->getParameterIndices(),
           witnessSubs.getGenericSignature(), SGF.getASTContext());

@@ -306,20 +306,24 @@ AvailabilityContext ASTContext::getTypesInAbstractMetadataStateAvailability() {
 }
 
 AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
-  return getSwift53Availability();
+  return getSwift54Availability();
 }
 
 AvailabilityContext ASTContext::getCompareTypeContextDescriptorsAvailability() {
-  return getSwiftFutureAvailability();
+  return getSwift54Availability();
 }
 
 AvailabilityContext
 ASTContext::getCompareProtocolConformanceDescriptorsAvailability() {
-  return getSwiftFutureAvailability();
+  return getSwift54Availability();
 }
 
 AvailabilityContext
 ASTContext::getIntermodulePrespecializedGenericMetadataAvailability() {
+  return getSwift54Availability();
+}
+
+AvailabilityContext ASTContext::getConcurrencyAvailability() {
   return getSwiftFutureAvailability();
 }
 
@@ -382,6 +386,10 @@ AvailabilityContext ASTContext::getSwift53Availability() {
   } else {
     return AvailabilityContext::alwaysAvailable();
   }
+}
+
+AvailabilityContext ASTContext::getSwift54Availability() {
+  return getSwiftFutureAvailability();
 }
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {

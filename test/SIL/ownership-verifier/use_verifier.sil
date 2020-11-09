@@ -1328,3 +1328,92 @@ bb0(%0 : @guaranteed $GenericS<T>):
   %2 = copy_value %1 : $GenericS<AnyObject>
   return %2 : $GenericS<AnyObject>
 }
+
+/////////////////////////////
+// Thin To Thick Ownership //
+/////////////////////////////
+
+// Make sure that we always have thin_to_thick_function produce any ownership
+// and that ownership phis propagate things correctly.
+
+sil @thin_to_thick_function_callee : $@convention(thin) () -> ()
+
+sil [ossa] @thin_to_thick_function_noneownership_test_1 : $@convention(thin) () -> () {
+bb0:
+  %f1 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  %f2 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1thick = thin_to_thick_function %f1 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f1thick : $@callee_owned () -> ())
+
+bb2:
+  %f2thick = thin_to_thick_function %f2 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f2thick : $@callee_owned () -> ())
+
+bb3(%fUnknown : @owned $@callee_owned () -> ()):
+  destroy_value %fUnknown : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @thin_to_thick_function_noneownership_test_2 : $@convention(thin) () -> () {
+bb0:
+  %f1 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  %f2 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1thick = thin_to_thick_function %f1 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f1thick : $@callee_owned () -> ())
+
+bb2:
+  %f2thick = thin_to_thick_function %f2 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f2thick : $@callee_owned () -> ())
+
+bb3(%fUnknown : $@callee_owned () -> ()):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @thin_to_thick_function_noneownership_test_3 : $@convention(thin) () -> () {
+bb0:
+  %f1 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  %f2 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1thick = thin_to_thick_function %f1 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f1thick : $@callee_owned () -> ())
+
+bb2:
+  %f2thick = thin_to_thick_function %f2 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f2thick : $@callee_owned () -> ())
+
+bb3(%fUnknown : @guaranteed $@callee_owned () -> ()):
+  end_borrow %fUnknown : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @thin_to_thick_function_noneownership_test_4 : $@convention(thin) () -> () {
+bb0:
+  %f1 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  %f2 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1thick = thin_to_thick_function %f1 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  br bb3(%f1thick : $@callee_owned () -> ())
+
+bb2:
+  %f2thick = partial_apply %f2() : $@convention(thin) () -> ()
+  br bb3(%f2thick : $@callee_owned () -> ())
+
+// This case we can only pass owned b/c of the partial apply.
+bb3(%fUnknown : @owned $@callee_owned () -> ()):
+  destroy_value %fUnknown : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

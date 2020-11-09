@@ -82,6 +82,14 @@ func variadic_arg_3(_ y: Float..., x: Int) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_3{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Int):
 
+func variadic_arg_4(_ y: Float..., x: Int...) {}
+// CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_4{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Array<Int>):
+
+func variadic_arg_5(a: Int, b: Float..., c: Int, d: Int...) {}
+// CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_5{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[A:%[0-9]+]] : $Int, [[B:%[0-9]+]] : $Array<Float>, [[C:%[0-9]+]] : $Int, [[D:%[0-9]+]] : $Array<Int>):
+
 variadic_arg_3(x: i)
 variadic_arg_3(f, x: i)
 variadic_arg_3(f, f, f, x: i)

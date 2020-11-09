@@ -566,7 +566,7 @@ bool AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       // now, since this optimization runs at the end of the pipeline, we
       // gracefully ignore unrecognized source address patterns, which show up
       // here as an invalid `storage` value.
-      AccessedStorage storage = findAccessedStorage(beginAccess->getSource());
+      auto storage = AccessedStorage::compute(beginAccess->getSource());
 
       auto iterAndInserted = storageSet.insert(storage);
 
@@ -1020,7 +1020,7 @@ static bool mergeAccesses(
   info.id = 0;
   for (auto sccIt = scc_begin(F); !sccIt.isAtEnd(); ++sccIt) {
     ++info.id;
-    info.hasLoop = sccIt.hasLoop();
+    info.hasLoop = sccIt.hasCycle();
     for (auto *bb : *sccIt) {
       blockToSCCMap.insert(std::make_pair(bb, info));
     }

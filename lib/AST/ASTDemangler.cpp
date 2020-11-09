@@ -44,7 +44,7 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
     return Type();
 
   ASTBuilder builder(ctx);
-  return swift::Demangle::decodeMangledType(builder, node);
+  return swift::Demangle::decodeMangledType(builder, node).getType();
 }
 
 TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
@@ -144,7 +144,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
     return Type();
 
   // If the declaration is generic, fail.
-  if (nominalDecl->getGenericParams())
+  if (auto list = nominalDecl->getGenericParams())
     return Type();
 
   // Imported types can be renamed to be members of other (non-generic)
@@ -200,21 +200,16 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
   if (!genericSig)
     return SubstitutionMap();
   
-  SmallVector<GenericTypeParamType *, 4> genericParams;
-  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
-    if (canonical)
-      genericParams.push_back(gp);
-  });
-  if (genericParams.size() != args.size())
+  if (genericSig->getGenericParams().size() != args.size())
     return SubstitutionMap();
 
   return SubstitutionMap::get(
       genericSig,
       [&](SubstitutableType *t) -> Type {
-        for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
-          if (t->isEqual(genericParams[i]))
-            return args[i];
-        }
+        auto *gp = cast<GenericTypeParamType>(t);
+        unsigned ordinal = genericSig->getGenericParamOrdinal(gp);
+        if (ordinal < args.size())
+          return args[ordinal];
         return Type();
       },
       LookUpConformanceInModule(moduleDecl));
@@ -401,7 +396,7 @@ Type ASTBuilder::createFunctionType(
     && !flags.isEscaping();
 
   const clang::Type *clangFunctionType = nullptr;
-  if (representation == FunctionTypeRepresentation::CFunctionPointer)
+  if (shouldStoreClangType(representation))
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
@@ -528,12 +523,6 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  // [TODO: Store-SIL-Clang-type]
-  auto einfo = SILExtInfoBuilder(representation, flags.isPseudogeneric(),
-                                 !flags.isEscaping(), diffKind,
-                                 /*clangFunctionType*/ nullptr)
-                   .build();
-
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
   llvm::SmallVector<SILResultInfo, 8> funcResults;
@@ -558,6 +547,21 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
+
+  const clang::Type *clangFnType = nullptr;
+  if (shouldStoreClangType(representation)) {
+    assert(funcResults.size() <= 1 && funcYields.size() == 0 &&
+           "C functions and blocks have at most 1 result and 0 yields.");
+    auto result =
+        funcResults.empty() ? Optional<SILResultInfo>() : funcResults[0];
+    clangFnType = getASTContext().getCanonicalClangFunctionType(
+        funcParams, result, representation);
+  }
+  auto einfo = SILFunctionType::ExtInfoBuilder(
+                   representation, flags.isPseudogeneric(), !flags.isEscaping(),
+                   flags.isAsync(), diffKind, clangFnType)
+                   .build();
+
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,
@@ -846,8 +850,8 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
 
     if (child->getNumChildren() != 2)
       return CanGenericSignature();
-    auto subjectType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(0));
+    auto subjectType =
+        swift::Demangle::decodeMangledType(*this, child->getChild(0)).getType();
     if (!subjectType)
       return CanGenericSignature();
 
@@ -856,8 +860,9 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
           Demangle::Node::Kind::DependentGenericConformanceRequirement ||
         child->getKind() ==
           Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
-      constraintType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(1));
+      constraintType =
+          swift::Demangle::decodeMangledType(*this, child->getChild(1))
+              .getType();
       if (!constraintType)
         return CanGenericSignature();
     }

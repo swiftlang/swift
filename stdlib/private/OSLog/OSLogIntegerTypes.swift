@@ -24,19 +24,23 @@
 
 extension OSLogInterpolation {
 
-  /// Define interpolation for expressions of type Int.
+  /// Defines interpolation for expressions of type Int.
+  ///
+  /// Do not call this function directly. It will be called automatically when interpolating
+  /// a value of type `Int` in the string interpolations passed to the log APIs.
+  ///
   /// - Parameters:
-  ///  - number: the interpolated expression of type Int, which is autoclosured.
-  ///  - format: a formatting option available for integer types, defined by the
-  ///    type`OSLogIntegerFormatting`. The default is .decimal.
-  ///  - align: left or right alignment with the minimum number of columns as
-  ///    defined by the type `OSLogStringAlignment`.
-  ///  - privacy: a privacy qualifier which is either private or public.
-  ///    It is auto-inferred by default.
+  ///   - number: The interpolated expression of type Int, which is autoclosured.
+  ///   - format: A formatting option available for integer types, defined by the
+  ///     type: `OSLogIntegerFormatting`. The default is `.decimal`.
+  ///   - align: Left or right alignment with the minimum number of columns as
+  ///     defined by the type `OSLogStringAlignment`.
+  ///   - privacy: A privacy qualifier which is either private or public.
+  ///     It is auto-inferred by default.
   @_semantics("constant_evaluable")
-  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
+  @_semantics("oslog.requires_constant_arguments")
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int,
     format: OSLogIntegerFormatting = .decimal,
@@ -46,18 +50,12 @@ extension OSLogInterpolation {
     appendInteger(number, format: format, align: align, privacy: privacy)
   }
 
-  /// Define interpolation for expressions of type Int32.
-  /// - Parameters:
-  ///  - number: the interpolated expression of type Int32, which is autoclosured.
-  ///  - format: a formatting option available for integer types, defined by the
-  ///    type `OSLogIntegerFormatting`.
-  ///  - align: left or right alignment with the minimum number of columns as
-  ///    defined by the type `OSLogStringAlignment`.
-  ///  - privacy: a privacy qualifier which is either private or public.
-  ///    It is auto-inferred by default.
+  // Define appendInterpolation overloads for fixed-size integers.
+
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
+  @_semantics("oslog.requires_constant_arguments")
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int32,
     format: OSLogIntegerFormatting = .decimal,
@@ -67,19 +65,23 @@ extension OSLogInterpolation {
     appendInteger(number, format: format, align: align, privacy: privacy)
   }
 
-  /// Define interpolation for expressions of type UInt.
+  /// Defines interpolation for expressions of type UInt.
+  ///
+  /// Do not call this function directly. It will be called automatically when interpolating
+  /// a value of type `Int` in the string interpolations passed to the log APIs.
+  ///
   /// - Parameters:
-  ///  - number: the interpolated expression of type UInt, which is autoclosured.
-  ///  - format: a formatting option available for integer types, defined by the
-  ///    type `OSLogIntegerFormatting`.
-  ///  - align: left or right alignment with the minimum number of columns as
-  ///    defined by the type `OSLogStringAlignment`.
-  ///  - privacy: a privacy qualifier which is either private or public.
-  ///    It is auto-inferred by default.
+  ///   - number: The interpolated expression of type UInt, which is autoclosured.
+  ///   - format: A formatting option available for integer types, defined by the
+  ///     type `OSLogIntegerFormatting`.
+  ///   - align: Left or right alignment with the minimum number of columns as
+  ///     defined by the type `OSLogStringAlignment`.
+  ///   - privacy: A privacy qualifier which is either private or public.
+  ///     It is auto-inferred by default.
   @_semantics("constant_evaluable")
-  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
+  @_semantics("oslog.requires_constant_arguments")
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> UInt,
     format: OSLogIntegerFormatting = .decimal,
@@ -104,18 +106,27 @@ extension OSLogInterpolation {
     guard argumentCount < maxOSLogArgumentCount else { return }
     formatString +=
       format.formatSpecifier(for: T.self, align: align, privacy: privacy)
-    // If minimum column width is specified, append this value first. Note that the
-    // format specifier would use a '*' for width e.g. %*d.
+
+    // If minimum column width is specified, append this value first. Note that
+    // the format specifier would use a '*' for width e.g. %*d.
     if let minColumns = align.minimumColumnWidth {
-      appendPrecisionArgument(minColumns)
+      appendAlignmentArgument(minColumns)
     }
 
-    // If minimum number of digits (precision) is specified, append the precision before
-    // the argument. Note that the format specifier would use a '*' for precision: %.*d.
+    // If the privacy has a mask, append the mask argument, which is a constant payload.
+    // Note that this should come after the width but before the precision.
+    if privacy.hasMask {
+      appendMaskArgument(privacy)
+    }
+
+    // If minimum number of digits (precision) is specified, append the
+    // precision before the argument. Note that the format specifier would use
+    // a '*' for precision: %.*d.
     if let minDigits = format.minDigits {
       appendPrecisionArgument(minDigits)
     }
 
+    // Append the integer.
     addIntHeaders(privacy, sizeForEncoding(T.self))
     arguments.append(number)
     argumentCount += 1
@@ -151,19 +162,57 @@ extension OSLogInterpolation {
   @inlinable
   @_optimize(none)
   internal mutating func appendPrecisionArgument(_ count: @escaping () -> Int) {
-    // Note that we don't have to update the preamble here.
-    let argumentHeader = getArgumentHeader(privacy: .auto, type: .count)
+    appendPrecisionAlignCount(
+      count,
+      getArgumentHeader(privacy: .auto, type: .count))
+  }
+
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  internal mutating func appendAlignmentArgument(_ count: @escaping () -> Int) {
+    appendPrecisionAlignCount(
+      count,
+      getArgumentHeader(privacy: .auto, type: .scalar))
+  }
+
+  // This is made transparent to minimize compile time overheads. The function's
+  // implementation also uses literals whenever possible for the same reason.
+  @_transparent
+  @inlinable
+  internal mutating func appendPrecisionAlignCount(
+    _ count: @escaping () -> Int,
+    _ argumentHeader: UInt8
+  ) {
     arguments.append(argumentHeader)
     // Append number of bytes needed to serialize the argument.
-    let byteCount = sizeForEncoding(CInt.self)
-    arguments.append(UInt8(byteCount))
+    arguments.append(4)
     // Increment total byte size by the number of bytes needed for this
     // argument, which is the sum of the byte size of the argument and
     // two bytes needed for the headers.
-    totalBytesForSerializingArguments += 2 + byteCount
+    totalBytesForSerializingArguments += 6
     // The count is expected to be a CInt.
     arguments.append({ CInt(count()) })
     argumentCount += 1
+    // Note that we don't have to update the preamble here.
+  }
+
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  internal mutating func appendMaskArgument(_ privacy: OSLogPrivacy) {
+    arguments.append(getArgumentHeader(privacy: .auto, type: .mask))
+    // Append number of bytes needed to serialize the mask. Mask is 64 bit payload.
+    arguments.append(8)
+    // Increment total byte size by the number of bytes needed for this
+    // argument, which is the sum of the byte size of the argument and
+    // two bytes needed for the headers.
+    totalBytesForSerializingArguments += 10
+    // Append the mask value. This is a compile-time constant.
+    let maskValue = privacy.maskValue
+    arguments.append({ maskValue })
+    argumentCount += 1
+    // Note that we don't have to update the preamble here.
   }
 }
 
@@ -177,7 +226,7 @@ extension OSLogArguments {
   internal mutating func append<T>(
     _ value: @escaping () -> T
   ) where T: FixedWidthInteger {
-    argumentClosures.append({ (position, _) in
+    argumentClosures.append({ (position, _, _) in
       serialize(value(), at: &position)
     })
   }
@@ -188,7 +237,7 @@ extension OSLogArguments {
 /// it is marked transparent instead of @inline(__always) as it is used in
 /// optimize(none) functions.
 @_transparent
-@usableFromInline
+@_alwaysEmitIntoClient
 internal func sizeForEncoding<T>(
   _ type: T.Type
 ) -> Int where T : FixedWidthInteger  {
@@ -197,7 +246,6 @@ internal func sizeForEncoding<T>(
 
 /// Serialize an integer at the buffer location that `position` points to and
 /// increment `position` by the byte size of `T`.
-@inlinable
 @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize<T>(

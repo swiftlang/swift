@@ -32,7 +32,7 @@ struct ModuleInterfaceOptions {
   /// interface, or should we fully-qualify them?
   bool PreserveTypesAsWritten = false;
 
-  /// Should we emit the cType when printing @convention(c) or no?
+  /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
@@ -41,12 +41,15 @@ struct ModuleInterfaceOptions {
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string Flags;
 
-  // Print SPI decls and attributes.
+  /// Print SPI decls and attributes.
   bool PrintSPIs = false;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.
   bool ExperimentalSPIImports = false;
+
+  /// Intentionally print invalid syntax into the file.
+  bool DebugPrintInvalidSyntax = false;
 };
 
 extern version::Version InterfaceFormatVersion;

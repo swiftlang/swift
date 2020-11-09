@@ -104,9 +104,7 @@ Optional<DependencyKey> UnitTestSourceFileDepGraphFactory::parseADefinedDecl(
     StringRef s, const NodeKind kind, const DeclAspect aspect) {
   static const char *privatePrefix = "#";
 
-  const bool isPrivate = s.consume_front(privatePrefix);
-  if (isPrivate && !includePrivateDeps)
-    return None;
+  s.consume_front(privatePrefix);
   const std::string context =
       parseContext(s.split(fingerprintSeparator).first, kind);
   std::string name = parseName(s.split(fingerprintSeparator).first, kind);
@@ -125,9 +123,7 @@ UnitTestSourceFileDepGraphFactory::parseAUsedDecl(const StringRef argString,
   // Someday, we might differentiate.
   const DeclAspect aspectOfDefUsed = DeclAspect::interface;
 
-  const bool isHolderPrivate = s.consume_front(privateHolderPrefix);
-  if (!includePrivateDeps && isHolderPrivate)
-    return None;
+  s.consume_front(privateHolderPrefix);
   const auto defUseStrings = s.split(defUseSeparator);
   const auto context = parseContext(defUseStrings.first, kind);
   const auto name = parseName(defUseStrings.first, kind);
@@ -147,6 +143,7 @@ UnitTestSourceFileDepGraphFactory::singleNameIsContext(const NodeKind kind) {
     return true;
   case NodeKind::topLevel:
   case NodeKind::dynamicLookup:
+  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     return false;

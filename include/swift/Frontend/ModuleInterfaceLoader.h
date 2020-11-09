@@ -133,15 +133,24 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
   explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
                                      bool IgnoreSwiftSourceInfoFile);
-  std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
-  bool canImportModule(Located<Identifier> mID) override;
+  bool findModule(ImportPath::Element moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                  bool &isFramework, bool &isSystemModule) override;
+
+  std::error_code findModuleFilesInDirectory(
+                  ImportPath::Element ModuleID,
+                  const SerializedModuleBaseName &BaseName,
+                  SmallVectorImpl<char> *ModuleInterfacePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+                  bool IsFramework) override;
+
+  bool canImportModule(ImportPath::Element mID) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -172,6 +181,8 @@ struct ExplicitModuleInfo {
   std::string moduleSourceInfoPath;
   // Opened buffer for the .swiftmodule file.
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+  // A flag that indicates whether this module is a framework
+  bool isFramework;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -181,12 +192,14 @@ struct ExplicitModuleInfo {
 //      "modulePath": "A.swiftmodule",
 //      "docPath": "A.swiftdoc",
 //      "sourceInfoPath": "A.swiftsourceinfo"
+//      "isFramework": false
 //    },
 //    {
 //      "moduleName": "B",
 //      "modulePath": "B.swiftmodule",
 //      "docPath": "B.swiftdoc",
 //      "sourceInfoPath": "B.swiftsourceinfo"
+//      "isFramework": false
 //    }
 //  ]
 class ExplicitModuleMapParser {
@@ -248,6 +261,15 @@ private:
         result.moduleDocPath = val.str();
       } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val.str();
+      } else if (key == "isFramework") {
+        auto valStr = val.str();
+        valStr.erase(std::remove(valStr.begin(), valStr.end(), '\n'), valStr.end());
+        if (valStr.compare("true") == 0)
+          result.isFramework = true;
+        else if (valStr.compare("false") == 0)
+          result.isFramework = false;
+        else
+          llvm_unreachable("Unexpected JSON value for isFramework");
       } else {
         // Being forgiving for future fields.
         continue;
@@ -263,16 +285,59 @@ private:
 };
 
 struct ModuleInterfaceLoaderOptions {
+  FrontendOptions::ActionType requestedAction =
+      FrontendOptions::ActionType::EmitModuleOnly;
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
+  bool disableBuildingInterface = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
-    mainExecutablePath(Opts.MainExecutablePath) {}
+    disableBuildingInterface(Opts.DisableBuildingInterface),
+    mainExecutablePath(Opts.MainExecutablePath)
+  {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+      requestedAction = FrontendOptions::ActionType::Typecheck;
+      break;
+    default:
+      requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
+      break;
+    }
+  }
   ModuleInterfaceLoaderOptions() = default;
+};
+
+class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
+  friend class ModuleInterfaceLoader;
+  ASTContext &Ctx;
+  std::string CacheDir;
+  std::string PrebuiltCacheDir;
+  ModuleInterfaceLoaderOptions Opts;
+
+public:
+  explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx,
+                                      StringRef cacheDir,
+                                      StringRef prebuiltCacheDir,
+                                      ModuleInterfaceLoaderOptions Opts)
+  : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
+    Opts(Opts) {}
+
+  std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) override;
+
+  /// Given a list of potential ready-to-use compiled modules for \p interfacePath,
+  /// check if any one of them is up-to-date. If so, emit a forwarding module
+  /// to the candidate binary module to \p outPath.
+  bool tryEmitForwardingModule(StringRef moduleName,
+                               StringRef interfacePath,
+                               ArrayRef<std::string> candidates,
+                               StringRef outPath) override;
+  bool isCached(StringRef DepPath);
 };
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
@@ -282,43 +347,37 @@ struct ModuleInterfaceLoaderOptions {
 class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   friend class unittest::ModuleInterfaceLoaderTest;
   explicit ModuleInterfaceLoader(
-      ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+      ASTContext &ctx, ModuleInterfaceCheckerImpl &InterfaceChecker,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
-      bool IgnoreSwiftSourceInfoFile, ModuleInterfaceLoaderOptions Opts)
-  : SerializedModuleLoaderBase(ctx, tracker, loadMode,
-                               IgnoreSwiftSourceInfoFile),
-  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-  PreferInterfaceForModules(PreferInterfaceForModules),
-  Opts(Opts) {}
+      bool IgnoreSwiftSourceInfoFile)
+  : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfoFile),
+    InterfaceChecker(InterfaceChecker),
+    PreferInterfaceForModules(PreferInterfaceForModules){}
 
-  std::string CacheDir;
-  std::string PrebuiltCacheDir;
+  ModuleInterfaceCheckerImpl &InterfaceChecker;
   ArrayRef<std::string> PreferInterfaceForModules;
-  ModuleInterfaceLoaderOptions Opts;
 
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID,
-    const SerializedModuleBaseName &BaseName,
-    SmallVectorImpl<char> *ModuleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+     ImportPath::Element ModuleID,
+     const SerializedModuleBaseName &BaseName,
+     SmallVectorImpl<char> *ModuleInterfacePath,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+     bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:
   static std::unique_ptr<ModuleInterfaceLoader>
-  create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+  create(ASTContext &ctx, ModuleInterfaceCheckerImpl &InterfaceChecker,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> PreferInterfaceForModules = {},
-         ModuleInterfaceLoaderOptions Opts = ModuleInterfaceLoaderOptions(),
          bool IgnoreSwiftSourceInfoFile = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
-      new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
-                                         tracker, loadMode,
-                                         PreferInterfaceForModules,
-                                         IgnoreSwiftSourceInfoFile,
-                                         Opts));
+      new ModuleInterfaceLoader(ctx, InterfaceChecker, tracker, loadMode,
+                                PreferInterfaceForModules,
+                                IgnoreSwiftSourceInfoFile));
   }
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -338,18 +397,6 @@ public:
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     ModuleInterfaceLoaderOptions Opts);
-
-  std::vector<std::string>
-  getCompiledModuleCandidatesForInterface(StringRef moduleName,
-                                          StringRef interfacePath) override;
-
-  /// Given a list of potential ready-to-use compiled modules for \p interfacePath,
-  /// check if any one of them is up-to-date. If so, emit a forwarding module
-  /// to the candidate binary module to \p outPath.
-  bool tryEmitForwardingModule(StringRef moduleName,
-                               StringRef interfacePath,
-                               ArrayRef<std::string> candidates,
-                               StringRef outPath) override;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -385,24 +432,25 @@ public:
                                   DiagnosticEngine &Diags,
                                   const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
+                                  const ClangImporterOptions &clangImporterOpts,
                                   ModuleInterfaceLoaderOptions LoaderOpts,
-                                  ClangModuleLoader *clangImporter,
                                   bool buildModuleCacheDirIfAbsent,
                                   StringRef moduleCachePath,
                                   StringRef prebuiltCachePath,
                                   bool serializeDependencyHashes,
                                   bool trackSystemDependencies);
-  bool runInSubContext(StringRef moduleName,
-                       StringRef interfacePath,
-                       StringRef outputPath,
-                       SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                            ArrayRef<StringRef>, StringRef)> action) override;
-  bool runInSubCompilerInstance(StringRef moduleName,
-                                StringRef interfacePath,
-                                StringRef outputPath,
-                                SourceLoc diagLoc,
-            llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
+  std::error_code runInSubContext(StringRef moduleName,
+                                  StringRef interfacePath,
+                                  StringRef outputPath,
+                                  SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
+                                       ArrayRef<StringRef>, ArrayRef<StringRef>,
+                                       StringRef)> action) override;
+  std::error_code runInSubCompilerInstance(StringRef moduleName,
+                                           StringRef interfacePath,
+                                           StringRef outputPath,
+                                           SourceLoc diagLoc,
+    llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;
 
@@ -412,7 +460,6 @@ public:
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath);
-  void addExtraClangArg(StringRef Arg);
 };
 }
 

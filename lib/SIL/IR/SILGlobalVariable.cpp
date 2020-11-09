@@ -58,7 +58,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
-  getModule().GlobalVariableMap.erase(Name);
+  StaticInitializerBlock.dropAllReferences();
+  StaticInitializerBlock.clearStaticInitializerBlock(Module);
 }
 
 /// Get this global variable's fragile attribute.
@@ -84,7 +85,7 @@ BuiltinInst *SILGlobalVariable::getOffsetSubtract(const TupleExtractInst *TE,
   // Match the pattern:
   // tuple_extract(usub_with_overflow(x, integer_literal, integer_literal 0), 0)
 
-  if (TE->getFieldNo() != 0)
+  if (TE->getFieldIndex() != 0)
     return nullptr;
 
   auto *BI = dyn_cast<BuiltinInst>(TE->getOperand());
@@ -272,7 +273,7 @@ SILFunction *swift::findInitializer(SILFunction *AddrF,
   if (!CallToOnce)
     return nullptr;
   SILFunction *callee = getCalleeOfOnceCall(CallToOnce);
-  if (!callee->getName().startswith("globalinit_"))
+  if (!callee->isGlobalInitOnceFunction())
     return nullptr;
   return callee;
 }

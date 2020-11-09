@@ -29,6 +29,14 @@ namespace llvm {
   hash_code hash_value(const llvm::PointerUnion<PT1, PT2> &ptr) {
     return hash_value(ptr.getOpaqueValue());
   }
+
+  // FIXME: Belongs in LLVM itself
+  template<typename T>
+  hash_code hash_value(const llvm::Optional<T> &opt) {
+    if (!opt)
+      return 1;
+    return hash_value(*opt);
+  }
 }
 
 namespace swift {

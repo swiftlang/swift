@@ -87,6 +87,7 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
+class ErrorExpr;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -148,7 +149,10 @@ public:
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
 
-    Last_Property = HasOpaqueArchetype
+    /// This type contains a type hole.
+    HasTypeHole          = 0x800,
+
+    Last_Property = HasTypeHole
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -202,6 +206,10 @@ public:
   /// Does a type with these properties structurally contain an unbound
   /// generic type?
   bool hasUnboundGeneric() const { return Bits & HasUnboundGeneric; }
+
+  /// Does a type with these properties structurally contain a
+  /// type hole?
+  bool hasTypeHole() const { return Bits & HasTypeHole; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -308,7 +316,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 
 protected:
   enum { NumAFTExtInfoBits = 9 };
-  enum { NumSILExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -573,9 +581,7 @@ public:
   }
 
   /// Determine whether this type involves a hole.
-  bool hasHole() const {
-    return getRecursiveProperties().hasUnresolvedType();
-  }
+  bool hasHole() const { return getRecursiveProperties().hasTypeHole(); }
 
   /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
@@ -595,9 +601,6 @@ public:
   bool hasOpaqueArchetype() const {
     return getRecursiveProperties().hasOpaqueArchetype();
   }
-  /// Determine whether the type has any stored properties or enum cases that
-  /// involve an opaque type.
-  bool hasOpaqueArchetypePropertiesOrCases();
 
   /// Determine whether the type is an opened existential type.
   ///
@@ -2872,7 +2875,7 @@ protected:
                   unsigned NumParams, ExtInfo Info)
   : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     Bits.AnyFunctionType.ExtInfoBits = Info.getBits();
-    Bits.AnyFunctionType.HasClangTypeInfo = Info.getClangTypeInfo().hasValue();
+    Bits.AnyFunctionType.HasClangTypeInfo = !Info.getClangTypeInfo().empty();
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
@@ -2922,6 +2925,24 @@ public:
 
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
+
+  /// Returns true if the function type stores a Clang type that cannot
+  /// be derived from its Swift type. Returns false otherwise, including if
+  /// the function type is not @convention(c) or @convention(block).
+  ///
+  /// For example, if you have a function pointer from C getting imported with
+  /// the following type:
+  ///
+  /// @convention(c, cType: "void (*)(size_t (*)(size_t))")
+  ///   (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)) -> Void
+  ///
+  /// The parameter's function type will have hasNonDerivableClangType() = true,
+  /// but the outer function type will have hasNonDerivableClangType() = false,
+  /// because the parameter and result type are sufficient to correctly derive
+  /// the Clang type for the outer function type. In terms of mangling,
+  /// the parameter type's mangling will incorporate the Clang type but the
+  /// outer function type's mangling doesn't need to duplicate that information.
+  bool hasNonDerivableClangType();
 
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo());
@@ -3883,7 +3904,7 @@ class SILFunctionType final
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
                                     SILResultInfo, SILYieldInfo,
-                                    SubstitutionMap, CanType> {
+                                    SubstitutionMap, CanType, ClangTypeInfo> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3905,6 +3926,10 @@ class SILFunctionType final
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
     return size_t(hasPatternSubstitutions()) +
            size_t(hasInvocationSubstitutions());
+  }
+
+  size_t numTrailingObjects(OverloadToken<ClangTypeInfo>) const {
+    return Bits.SILFunctionType.HasClangTypeInfo ? 1 : 0;
   }
 
 public:
@@ -4045,6 +4070,8 @@ public:
   SILCoroutineKind getCoroutineKind() const {
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
+
+  bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {
@@ -4297,6 +4324,11 @@ public:
   }
 
   ClangTypeInfo getClangTypeInfo() const;
+
+  /// Returns true if the function type stores a Clang type that cannot
+  /// be derived from its Swift type. Returns false otherwise, including if
+  /// the function type is not @convention(c) or @convention(block).
+  bool hasNonDerivableClangType();
 
   bool hasSameExtInfoAs(const SILFunctionType *otherFn);
 
@@ -5187,6 +5219,10 @@ public:
   GenericEnvironment *getGenericEnvironment() const {
     return Environment;
   }
+
+  GenericTypeParamType *getInterfaceType() const {
+    return cast<GenericTypeParamType>(InterfaceType.getPointer());
+  }
       
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PrimaryArchetype;
@@ -5724,6 +5760,32 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+/// HoleType - This represents a placeholder type for a type variable
+/// or dependent member type that cannot be resolved to a concrete type
+/// because the expression is ambiguous. This type is only used by the
+/// constraint solver and transformed into UnresolvedType to be used in AST.
+class HoleType : public TypeBase {
+  using Originator = llvm::PointerUnion<TypeVariableType *,
+                                        DependentMemberType *, VarDecl *,
+                                        ErrorExpr *>;
+
+  Originator O;
+
+  HoleType(ASTContext &C, Originator originator,
+           RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Hole, &C, properties), O(originator) {}
+
+public:
+  static Type get(ASTContext &ctx, Originator originator);
+
+  Originator getOriginator() const { return O; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hole;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HoleType, Type)
+
 inline bool TypeBase::isTypeVariableOrMember() {
   if (is<TypeVariableType>())
     return true;
@@ -6003,10 +6065,8 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
   }
 }
 
-/// If this is a method in a type or extension thereof, compute
-/// and return a parameter to be used for the 'self' argument.  The type of
-/// the parameter is the empty Type() if no 'self' argument should exist. This
-/// can only be used after types have been resolved.
+/// If this is a method in a type or extension thereof, return the
+/// 'self' parameter.
 ///
 /// \param isInitializingCtor Specifies whether we're computing the 'self'
 /// type of an initializing constructor, which accepts an instance 'self'

@@ -1,7 +1,7 @@
 // REQUIRES: shell
 // Test that when:
 //
-// 1. Using -incremental -disable-direct-intramodule-dependencies -v -driver-show-incremental, and...
+// 1. Using -incremental -v -driver-show-incremental, and...
 // 2. ...the Swift compiler version used to perform the incremental
 //    compilation differs the original compilation...
 //
@@ -14,12 +14,12 @@
 // RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
-// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -disable-direct-intramodule-dependencies -v -driver-show-incremental -disable-direct-intramodule-dependencies -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-INCREMENTAL %s
+// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-INCREMENTAL %s
 // CHECK-INCREMENTAL-NOT: Incremental compilation has been enabled
 // CHECK-INCREMENTAL: Queuing (initial): {compile: main.o <= main.swift}
 
 // RUN: echo '{version: "bogus", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
-// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -disable-direct-intramodule-dependencies -v -driver-show-incremental -disable-direct-intramodule-dependencies -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-VERSION-MISMATCH %s
+// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-VERSION-MISMATCH %s
 // CHECK-VERSION-MISMATCH: Incremental compilation has been disabled{{.*}}compiler version mismatch
 // CHECK-VERSION-MISMATCH: Compiling with:
 // CHECK-VERSION-MISMATCH: Previously compiled with: bogus

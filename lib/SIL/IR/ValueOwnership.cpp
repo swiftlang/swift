@@ -148,6 +148,9 @@ CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
+CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
+CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
+CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
@@ -203,9 +206,6 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 // this since this is used in reinterpret_cast which is important from
 // a performance perspective.
 CONSTANT_OR_NONE_OWNERSHIP_INST(Unowned, UncheckedBitwiseCast)
-
-// A thin_to_thick instruction can return a trivial (@noescape) type.
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, ThinToThickFunction)
 
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
@@ -541,6 +541,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, GetCurrentAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

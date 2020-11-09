@@ -336,10 +336,17 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
 
 /// Get the type of each parameter, filtering out empty tuples.
 static SmallVector<CanType, 8>
-getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
+getParameterTypes(AnyFunctionType::CanParamArrayRef params,
+                  bool hasSelfParam=false) {
   SmallVector<CanType, 8> results;
-  for (auto param : params) {
-    assert(!param.isInOut() && !param.isVariadic());
+  for (auto n : indices(params)) {
+    bool isSelf = (hasSelfParam ? n == params.size() - 1 : false);
+
+    const auto &param = params[n];
+    assert(isSelf || !param.isInOut() &&
+           "Only the 'self' parameter can be inout in a bridging thunk");
+    assert(!param.isVariadic());
+
     if (param.getPlainType()->isVoid())
       continue;
     results.push_back(param.getPlainType());
@@ -347,11 +354,11 @@ getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
   return results;
 }
 
-static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
-                                              CanAnyFunctionType blockType) {
-  return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
-                                         blockType, blockType->getExtInfo(),
-                                         Bridgeability::Full);
+static CanAnyFunctionType
+getBridgedBlockType(SILGenModule &SGM, CanAnyFunctionType blockType,
+                    SILFunctionTypeRepresentation silRep) {
+  return SGM.Types.getBridgedFunctionType(
+      AbstractionPattern(blockType), blockType, Bridgeability::Full, silRep);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
@@ -368,7 +375,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SILFunctionConventions funcConv(funcTy, SGF.SGM.M);
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType);
+  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType,
+                                        blockTy->getRepresentation());
 
   // Set up the indirect result.
   SILType blockResultTy =
@@ -552,9 +560,16 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
             blockInterfaceTy->getParameters().end(),
             std::back_inserter(params));
 
-  auto extInfo =
-      SILFunctionType::ExtInfo()
-        .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
+  auto results = blockInterfaceTy->getResults();
+  auto representation = SILFunctionType::Representation::CFunctionPointer;
+  auto *clangFnType = getASTContext().getCanonicalClangFunctionType(
+      params, results.empty() ? Optional<SILResultInfo>() : results[0],
+      representation);
+
+  auto extInfo = SILFunctionType::ExtInfoBuilder()
+                     .withRepresentation(representation)
+                     .withClangFunctionType(clangFnType)
+                     .build();
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
@@ -822,7 +837,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockTy = getBridgedBlockType(SGF.SGM, formalBlockTy);
+  formalBlockTy =
+      getBridgedBlockType(SGF.SGM, formalBlockTy, blockTy->getRepresentation());
 
   assert(blockTy->getNumParameters() == funcTy->getNumParameters()
          && "block and function types don't match");
@@ -1714,10 +1730,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     };
 
     {
+      bool hasSelfParam = fd->hasImplicitSelfDecl();
       auto foreignFormalParams =
-        getParameterTypes(foreignCI.LoweredType.getParams());
+        getParameterTypes(foreignCI.LoweredType.getParams(), hasSelfParam);
       auto nativeFormalParams =
-        getParameterTypes(nativeCI.LoweredType.getParams());
+        getParameterTypes(nativeCI.LoweredType.getParams(), hasSelfParam);
 
       for (unsigned nativeParamIndex : indices(params)) {
         // Bring the parameter to +1.
@@ -1753,7 +1770,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
         maybeAddForeignErrorArg();
 
-        bool isSelf = nativeParamIndex == params.size() - 1;
+        bool isSelf = (hasSelfParam && nativeParamIndex == params.size() - 1);
 
         if (memberStatus.isInstance()) {
           // Leave space for `self` to be filled in later.
@@ -1777,6 +1794,12 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         CanType foreignFormalType =
           F.mapTypeIntoContext(foreignFormalParams[nativeParamIndex])
             ->getCanonicalType();
+
+        if (isSelf) {
+          assert(!nativeCI.LoweredType.getParams()[nativeParamIndex].isInOut() ||
+                 nativeFormalType == foreignFormalType &&
+                 "Cannot bridge 'self' parameter if passed inout");
+        }
 
         auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
         SILType foreignLoweredTy =
@@ -1821,7 +1844,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     CalleeTypeInfo calleeTypeInfo(
         fnType, AbstractionPattern(nativeFnTy->getInvocationGenericSignature(),
                                    bridgedFormalResultType),
-        nativeFormalResultType, foreignError, ImportAsMemberStatus());
+        nativeFormalResultType,
+        foreignError,
+        {}, // TODO foreignAsync
+        ImportAsMemberStatus());
 
     auto init = indirectResult
                 ? useBufferAsTemporary(indirectResult,

@@ -1363,55 +1363,10 @@ sil [_semantics "array.get_element_address"] @get_element_address : $@convention
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32
 sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@guaranteed Array<X>) -> Int32
 
-sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
-sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
 sil [_semantics "array.uninitialized"] @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
 
 // A simplified version of swift_bufferAllocate
 sil @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
-
-// CHECK-LABEL: CG of semantics_pair_no_escaping_closure
-// CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ:
-// CHECK-NEXT:   Con [int] %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:   Con [ref] %0.2 Esc: A, Succ: 
-// CHECK-NEXT:   Arg [ref] %1 Esc: A, Succ:
-// CHECK-NEXT:   Con [int] %1.1 Esc: A, Succ: (%1.2)
-// CHECK-NEXT:   Con [ref] %1.2 Esc: A, Succ: 
-// CHECK-NEXT:   Arg [ref] %2 Esc: A, Succ: (%2.1)
-// CHECK-NEXT:   Con [int] %2.1 Esc: G, Succ: (%2.2)
-// CHECK-NEXT:   Con %2.2 Esc: G, Succ: 
-// CHECK-NEXT:   Val %4 Esc: , Succ: (%4.1)
-// CHECK-NEXT:   Con [ref] %4.1 Esc: %5, Succ: 
-// CHECK-NEXT: End
-sil @semantics_pair_no_escaping_closure : $@convention(thin) (@owned X, @guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error Error)) -> () {
-bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error Error)):
-  %3 = function_ref @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
-  %4 = alloc_stack $X
-  %6 = apply [nothrow] %3(%4, %0, %2, %1) : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
-  dealloc_stack %4 : $*X
-  %7 = tuple()
-	return %7 : $()
-}
-
-// CHECK-LABEL: CG of semantics_self_no_escaping_closure
-// CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ:
-// CHECK-NEXT:   Con [int] %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:   Con [ref] %0.2 Esc: A, Succ: 
-// CHECK-NEXT:   Arg [ref] %1 Esc: A, Succ: (%1.1)
-// CHECK-NEXT:   Con [int] %1.1 Esc: G, Succ: (%1.2)
-// CHECK-NEXT:   Con %1.2 Esc: G, Succ: 
-// CHECK-NEXT:   Val %3 Esc: , Succ:
-// CHECK-NEXT:   Con [ref] %3.1 Esc: %4, Succ: 
-// CHECK-NEXT: End
-sil @semantics_self_no_escaping_closure : $@convention(thin) (@guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error Error)) -> () {
-bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error Error)):
-  %2 = function_ref @unsafeWithNotEscapedSelfPointer : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
-  %3 = alloc_stack $X
-  %6 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
-  dealloc_stack %3 : $*X
-  %7 = tuple()
-	return %7 : $()
-}
 
 // CHECK-LABEL: CG of check_dealloc_ref
 // CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ:
@@ -1983,3 +1938,27 @@ bb4:
   %z = tuple ()
   return %z : $()
 }
+
+// Test CGNode mapping for result of an apply to no return function
+// CHECK-LABEL:CG of $testcaller
+// CHECK:  Arg [ref] %0 Esc: A, Succ: (%0.1)
+// CHECK:  Con [int] %0.1 Esc: A, Succ: (%0.2)
+// CHECK:  Con [ref] %0.2 Esc: A, Succ: 
+// CHECK-LABEL:End
+sil hidden [noinline] @$testcaller : $@convention(thin)  (@owned Z) -> () {
+bb0(%0 : $Z):
+  %2 = function_ref @$noreturncallee : $@convention(thin) (@guaranteed Z) -> @owned Z
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed Z) -> @owned Z
+  dealloc_ref %3 : $Z
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL:CG of $noreturncallee
+// CHECK:  Arg [ref] %0 Esc: A, Succ: 
+// CHECK-LABEL:End
+sil hidden [noinline] @$noreturncallee : $@convention(thin)  (@guaranteed Z) -> @owned Z {
+bb0(%0 : $Z):
+  unreachable
+}
+

@@ -636,7 +636,7 @@ extension ArraySlice: RangeReplaceableCollection {
   ///     print(emptyArray.isEmpty)
   ///     // Prints "true"
   @inlinable
-  @_semantics("array.init")
+  @_semantics("array.init.empty")
   public init() {
     _buffer = _Buffer()
   }
@@ -726,6 +726,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   /// Construct a ArraySlice of `count` uninitialized elements.
   @inlinable
+  @_semantics("array.init")
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ArraySlice with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra
@@ -1429,7 +1430,7 @@ extension ArraySlice {
   /// and enums.
   ///
   /// The following example copies bytes from the `byteValues` array into
-  /// `numbers`, an array of `Int`:
+  /// `numbers`, an array of `Int32`:
   ///
   ///     var numbers: [Int32] = [0, 0]
   ///     var byteValues: [UInt8] = [0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
@@ -1440,6 +1441,8 @@ extension ArraySlice {
   ///         }
   ///     }
   ///     // numbers == [1, 2]
+  ///
+  /// - Note: This example shows the behavior on a little-endian platform.
   ///
   /// The pointer passed as an argument to `body` is valid only for the
   /// lifetime of the closure. Do not escape it from the closure for later
@@ -1478,12 +1481,14 @@ extension ArraySlice {
   /// The following example copies the bytes of the `numbers` array into a
   /// buffer of `UInt8`:
   ///
-  ///     var numbers = [1, 2, 3]
+  ///     var numbers: [Int32] = [1, 2, 3]
   ///     var byteBuffer: [UInt8] = []
   ///     numbers.withUnsafeBytes {
   ///         byteBuffer.append(contentsOf: $0)
   ///     }
-  ///     // byteBuffer == [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, ...]
+  ///     // byteBuffer == [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0]
+  ///
+  /// - Note: This example shows the behavior on a little-endian platform.
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
   ///   that points to the contiguous storage for the array.

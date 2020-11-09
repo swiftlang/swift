@@ -22,7 +22,11 @@
 
 namespace swift {
 
-#ifdef __APPLE__
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
+typedef bool swift_once_t;
+
+#elif defined(__APPLE__)
 
 // On OS X and iOS, swift_once_t matches dispatch_once_t.
 typedef long swift_once_t;
@@ -44,10 +48,6 @@ typedef std::once_flag swift_once_t;
 /// extent of type swift_once_t.
 SWIFT_RUNTIME_EXPORT
 void swift_once(swift_once_t *predicate, void (*fn)(void *), void *context);
-#ifdef __wasm__
-// WebAssembly: hack
-void swift_once_real(swift_once_t *predicate, void (*fn)(void *), void *context);
-#endif
 
 }
 

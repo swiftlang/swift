@@ -12,7 +12,6 @@ Contents
    Generics
    StoredAndComputedVariables
    SIL
-   TypeChecker
    OptimizationTips
    ABI: TypeMetadata <ABI/TypeMetadata>
    ABI: TypeLayout <ABI/TypeLayout>

@@ -3,8 +3,11 @@
 // RUN: %empty-directory(%t/stats-entities)
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-events %s -profile-stats-events
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t/stats-entities %s -profile-stats-entities
-// RUN: %FileCheck -check-prefix=EVENTS -input-file %t/stats-events/*.dir/Time.User.events %s
-// RUN: %FileCheck -check-prefix=ENTITIES -input-file %t/stats-entities/*.dir/Time.User.entities %s
+
+// Need to use %long-tmp because in Windows the * may expand to a path longer
+// than 260 characters.
+// RUN: %FileCheck -check-prefix=EVENTS -input-file %long-tmp/stats-events/*.dir/Time.User.events %s
+// RUN: %FileCheck -check-prefix=ENTITIES -input-file %long-tmp/stats-entities/*.dir/Time.User.entities %s
 
 // EVENTS: {{perform-sema;.*;typecheck-decl.* [0-9]+}}
 // ENTITIES: {{perform-sema;.*;TypeCheckFunctionBodyRequest bar\(\);typecheck-stmt.* [0-9]+}}

@@ -30,7 +30,7 @@ public:
   PrettyStackTraceSILFunctionTransform(SILFunctionTransform *SFT,
                                        unsigned PassNumber);
 
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 class PrettyStackTraceSILModuleTransform : public llvm::PrettyStackTraceEntry {
@@ -41,7 +41,7 @@ public:
   PrettyStackTraceSILModuleTransform(SILModuleTransform *SMT,
                                      unsigned PassNumber)
       : SMT(SMT), PassNumber(PassNumber) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(llvm::raw_ostream &OS) const override;
 };
 
 } // end namespace swift

@@ -59,6 +59,9 @@ public:
     Text,
   };
 private:
+  /// The symbol graph for which a declaration is being printed.
+  const SymbolGraph *SG;
+
   /// The output stream to print fragment objects to.
   llvm::json::OStream &OS;
 
@@ -81,9 +84,11 @@ private:
   unsigned NumFragments;
 
 public:
-  DeclarationFragmentPrinter(llvm::json::OStream &OS,
+  DeclarationFragmentPrinter(const SymbolGraph *SG,
+                             llvm::json::OStream &OS,
                              Optional<StringRef> Key = None)
-    : OS(OS),
+    : SG(SG),
+      OS(OS),
       Kind(FragmentKind::None),
       NumFragments(0) {
     if (Key) {

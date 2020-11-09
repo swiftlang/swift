@@ -160,6 +160,10 @@ private:
   evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
 
 public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
   // Caching
   bool isCached() const { return true; }
   Optional<ClassDecl *> getCachedResult() const;
@@ -169,8 +173,7 @@ public:
 class InheritedProtocolsRequest
     : public SimpleRequest<
           InheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
-          RequestFlags::SeparatelyCached | RequestFlags::DependencySink |
-              RequestFlags::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -189,8 +192,6 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
@@ -310,8 +311,7 @@ public:
 /// Finds or synthesizes a destructor for the given class.
 class GetDestructorRequest
     : public SimpleRequest<GetDestructorRequest, DestructorDecl *(ClassDecl *),
-                           RequestFlags::SeparatelyCached |
-                               RequestFlags::DependencySource> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -327,11 +327,6 @@ public:
   bool isCached() const { return true; }
   Optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 class GenericParamListRequest :
@@ -420,7 +415,7 @@ SourceLoc extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc);
 class UnqualifiedLookupRequest
     : public SimpleRequest<UnqualifiedLookupRequest,
                            LookupResult(UnqualifiedLookupDescriptor),
-                           RequestFlags::Uncached | RequestFlags::DependencySource |
+                           RequestFlags::Uncached |
                                RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -434,8 +429,6 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            LookupResult res) const;
 };
@@ -444,11 +437,12 @@ using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
 
 /// Performs a lookup into a given module and its imports.
 class LookupInModuleRequest
-    : public SimpleRequest<LookupInModuleRequest,
-                           QualifiedLookupResult(
-                               const DeclContext *, DeclName, NLKind,
-                               namelookup::ResolutionKind, const DeclContext *),
-                           RequestFlags::Uncached | RequestFlags::DependencySink> {
+    : public SimpleRequest<
+          LookupInModuleRequest,
+          QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+                                namelookup::ResolutionKind, const DeclContext *,
+                                NLOptions),
+          RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -459,7 +453,7 @@ private:
   QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
            NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
-           const DeclContext *moduleScopeContext) const;
+           const DeclContext *moduleScopeContext, NLOptions options) const;
 
 public:
   // Incremental dependencies
@@ -495,7 +489,7 @@ class ModuleQualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  ModuleDecl *, DeclNameRef,
                                                  NLOptions),
-                           RequestFlags::Uncached | RequestFlags::DependencySource |
+                           RequestFlags::Uncached |
                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -511,8 +505,6 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
@@ -522,7 +514,7 @@ class QualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  SmallVector<NominalTypeDecl *, 4>,
                                                  DeclNameRef, NLOptions),
-                           RequestFlags::Uncached | RequestFlags::DependencySource> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -535,11 +527,6 @@ private:
            SmallVector<NominalTypeDecl *, 4> decls,
            DeclNameRef name,
            NLOptions opts) const;
-
-public:
-  // Incremental dependencies.
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// The input type for a direct lookup request.

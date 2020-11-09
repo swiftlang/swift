@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s
 
 import _Differentiation
 
@@ -290,7 +291,7 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   var y: Float
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   public init(x: Float, y: Float) {
     self.x = x
@@ -298,31 +299,31 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   public init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Float) -> Float'}}
   public func amb(x: Float, y: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}} {{10-10=@differentiable(wrt: x) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(wrt: x)' attribute to satisfy requirement}} {{10-10=@differentiable(wrt: x) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Int) -> Float'}}
   public func amb(x: Float, y: Int) -> Float {
     return x
   }
 
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}}
   public func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}}
   @differentiable(wrt: (self, x))
   public func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
@@ -557,7 +558,7 @@ public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because
   // it is mroe constrained than the requirement's `@differentiable` attribute.
   @differentiable(where T: CustomStringConvertible)
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(wrt: (x, y))' attribute to satisfy requirement}}
   public func requirement<T: Differentiable>(_ x: T, _ y: T) -> T { x }
 }
 

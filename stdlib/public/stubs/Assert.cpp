@@ -12,6 +12,7 @@
 
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Portability.h"
 #include "../SwiftShims/AssertionReporting.h"
 #include <cstdarg>
 #include <cstdint>

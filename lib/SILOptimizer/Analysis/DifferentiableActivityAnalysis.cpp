@@ -557,6 +557,8 @@ void DifferentiableActivityInfo::dump(SILAutoDiffIndices indices,
     for (auto &inst : bb)
       for (auto res : inst.getResults())
         dump(res, indices, s);
-    s << '\n';
+    if (std::next(bb.getIterator()) != fn.end())
+      s << '\n';
   }
+  s << "End activity info for " << fn.getName() << " at " << indices << "\n\n";
 }

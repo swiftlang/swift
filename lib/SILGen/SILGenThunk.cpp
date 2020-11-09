@@ -90,32 +90,14 @@ SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
-  assert(!thunk.isForeign && "foreign-to-native thunks only");
-  SILFunction *f = getFunction(thunk, ForDefinition);
-  f->setThunk(IsThunk);
-  if (thunk.asForeign().isClangGenerated())
-    f->setSerialized(IsSerializable);
-  preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
-  PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
-  SILGenFunction(*this, *f, SwiftModule).emitForeignToNativeThunk(thunk);
-  postEmitFunction(thunk, f);
+  assert(thunk.isForeignToNativeThunk() && "foreign-to-native thunks only");
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
 void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
-  assert(thunk.isForeign && "native-to-foreign thunks only");
-  
-  SILFunction *f = getFunction(thunk, ForDefinition);
-  if (thunk.hasDecl())
-    preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
-  else
-    preEmitFunction(thunk, thunk.getAbstractClosureExpr(), f,
-                    thunk.getAbstractClosureExpr());
-  PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
-  f->setBare(IsBare);
-  f->setThunk(IsThunk);
-  SILGenFunction(*this, *f, SwiftModule).emitNativeToForeignThunk(thunk);
-  postEmitFunction(thunk, f);
+  assert(thunk.isNativeToForeignThunk() && "native-to-foreign thunks only");
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
 SILValue
@@ -142,8 +124,14 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   }
 
   auto f = SGM.getFunction(constant, NotForDefinition);
-  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext()) ==
-         constantInfo.SILFnType);
+#ifndef NDEBUG
+  auto constantFnTypeInContext =
+    SGM.Types.getLoweredType(constantInfo.SILFnType,
+                             B.getTypeExpansionContext())
+             .castTo<SILFunctionType>();
+  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext())
+          == constantFnTypeInContext);
+#endif
   if (callPreviousDynamicReplaceableImpl)
     return B.createPreviousDynamicFunctionRef(loc, f);
   else
@@ -187,7 +175,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
 
 SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
     SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
-  auto *derivativeId = derivativeFnDeclRef.derivativeFunctionIdentifier;
+  auto *derivativeId = derivativeFnDeclRef.getDerivativeFunctionIdentifier();
   assert(derivativeId);
   auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
 

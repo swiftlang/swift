@@ -295,6 +295,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kReserveCapacityForAppend:
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
+  case ArrayCallKind::kArrayInitEmpty:
   case ArrayCallKind::kArrayUninitialized:
   case ArrayCallKind::kArrayUninitializedIntrinsic:
   case ArrayCallKind::kArrayFinalizeIntrinsic:
@@ -658,6 +659,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         auto Kind = Sem.getKind();
         // Safe because they create new arrays.
         if (Kind == ArrayCallKind::kArrayInit ||
+            Kind == ArrayCallKind::kArrayInitEmpty ||
             Kind == ArrayCallKind::kArrayUninitialized ||
             Kind == ArrayCallKind::kArrayUninitializedIntrinsic)
           continue;
@@ -843,7 +845,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
     return false;
   }
 
-  SmallVector<unsigned, 4> AccessPath;
+  SmallVector<int, 4> AccessPath;
   SILValue ArrayContainer =
     StructUseCollector::getAccessPath(CurrentArrayAddr, AccessPath);
   bool arrayContainerIsUnique = checkUniqueArrayContainer(ArrayContainer);

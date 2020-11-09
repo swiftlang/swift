@@ -1,5 +1,4 @@
 add_swift_unittest(SourceKitSupportTests
-  FuzzyStringMatcherTest.cpp
   ImmutableTextBufferTest.cpp
   )
 

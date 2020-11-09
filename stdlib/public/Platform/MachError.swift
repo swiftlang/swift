@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS)) && _runtime(_ObjC)
 /// Enumeration describing Mach error codes.
 @objc
 public enum MachErrorCode : Int32 {
@@ -202,4 +202,4 @@ public enum MachErrorCode : Int32 {
   /// The requested property cannot be changed at this time.
   case policyStatic             = 51
 }
-#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#endif // (os(macOS) || os(iOS) || os(tvOS) || os(watchOS)) && _runtime(_ObjC)

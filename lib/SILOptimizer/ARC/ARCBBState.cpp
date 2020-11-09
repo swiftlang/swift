@@ -137,6 +137,34 @@ void ARCBBState::initPredTopDown(ARCBBState &PredBBState) {
   PtrToTopDownState = PredBBState.PtrToTopDownState;
 }
 
+void ARCBBState::dumpBottomUpState() {
+  for (auto state : getBottomupStates()) {
+    if (!state.hasValue())
+      continue;
+    auto elem = state.getValue();
+    if (!elem.first)
+      continue;
+    llvm::dbgs() << "SILValue: ";
+    elem.first->dump();
+    llvm::dbgs() << "RefCountState: ";
+    elem.second.dump();
+  }
+}
+
+void ARCBBState::dumpTopDownState() {
+  for (auto state : getTopDownStates()) {
+    if (!state.hasValue())
+      continue;
+    auto elem = state.getValue();
+    if (!elem.first)
+      continue;
+    llvm::dbgs() << "SILValue: ";
+    elem.first->dump();
+    llvm::dbgs() << "RefCountState: ";
+    elem.second.dump();
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                               ARCBBStateInfo
 //===----------------------------------------------------------------------===//

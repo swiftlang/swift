@@ -51,16 +51,17 @@ public:
   }
 };
 
-template<uint16_t StaticTag>
-class TaggedMetadataAllocator: public MetadataAllocator {
+template <uint16_t StaticTag>
+class TaggedMetadataAllocator : public MetadataAllocator {
 public:
   constexpr TaggedMetadataAllocator() : MetadataAllocator(StaticTag) {}
 };
 
-/// A typedef for simple global caches.
+/// A typedef for simple global caches with stable addresses for the entries.
 template <class EntryTy, uint16_t Tag>
 using SimpleGlobalCache =
-  ConcurrentMap<EntryTy, /*destructor*/ false, TaggedMetadataAllocator<Tag>>;
+    StableAddressConcurrentReadableHashMap<EntryTy,
+                                           TaggedMetadataAllocator<Tag>>;
 
 template <class T, bool ProvideDestructor = true>
 class StaticOwningPointer {
@@ -105,16 +106,21 @@ struct ConcurrencyControl {
   ConcurrencyControl() = default;
 };
 
-template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag>
 class LockingConcurrentMapStorage {
-  ConcurrentMap<EntryType, ProvideDestructor,
-                TaggedMetadataAllocator<Tag>> Map;
-  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
+  // This class must fit within
+  // TargetGenericMetadataInstantiationCache::PrivateData. On 32-bit archs, that
+  // space is not large enough to accommodate a Mutex along with everything
+  // else. There, use a SmallMutex to squeeze into the available space.
+  using MutexTy =
+      std::conditional_t<sizeof(void *) == 8, StaticMutex, SmallMutex>;
+  StableAddressConcurrentReadableHashMap<EntryType,
+                                         TaggedMetadataAllocator<Tag>, MutexTy>
+      Map;
+  StaticOwningPointer<ConcurrencyControl, false> Concurrency;
 
 public:
   LockingConcurrentMapStorage() : Concurrency(new ConcurrencyControl()) {}
-
-  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
 
   ConcurrencyControl &getConcurrency() { return *Concurrency; }
 
@@ -184,8 +190,6 @@ class LockingConcurrentMap {
 
 public:
   LockingConcurrentMap() = default;
-
-  MetadataAllocator &getAllocator() { return Storage.getAllocator(); }
 
   template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
@@ -366,7 +370,7 @@ public:
   template <class... ArgTys>
   Status beginInitialization(ConcurrencyControl &concurrency,
                              ArgTys &&...args) {
-    swift_runtime_unreachable("beginAllocation always short-circuits");
+    swift_unreachable("beginAllocation always short-circuits");
   }
 };
 
@@ -493,6 +497,10 @@ public:
     return Hash;
   }
 
+  friend llvm::hash_code hash_value(const MetadataCacheKey &key) {
+    return key.Hash;
+  }
+
   const void * const *begin() const { return Data; }
   const void * const *end() const { return Data + size(); }
   unsigned size() const { return NumKeyParameters + NumWitnessTables; }
@@ -592,7 +600,7 @@ inline bool satisfies(PrivateMetadataState state, MetadataState requirement) {
   case MetadataState::Complete:
     return state >= PrivateMetadataState::Complete;
   }
-  swift_runtime_unreachable("unsupported requirement kind");
+  swift_unreachable("unsupported requirement kind");
 }
 
 class PrivateMetadataTrackingInfo {
@@ -642,7 +650,7 @@ public:
   MetadataState getAccomplishedRequestState() const {
     switch (getState()) {
     case PrivateMetadataState::Allocating:
-      swift_runtime_unreachable("cannot call on allocating state");
+      swift_unreachable("cannot call on allocating state");
     case PrivateMetadataState::Abstract:
       return MetadataState::Abstract;
     case PrivateMetadataState::LayoutComplete:
@@ -652,7 +660,7 @@ public:
     case PrivateMetadataState::Complete:
       return MetadataState::Complete;
     }
-    swift_runtime_unreachable("bad state");
+    swift_unreachable("bad state");
   }
 
   bool satisfies(MetadataState requirement) {
@@ -678,7 +686,7 @@ public:
       // Otherwise, if it's a non-blocking request, we do not need to block.
       return (request.isBlocking() && !satisfies(request.getState()));
     }
-    swift_runtime_unreachable("bad state");
+    swift_unreachable("bad state");
   }
 
   constexpr RawType getRawValue() const { return Data; }
@@ -775,10 +783,22 @@ protected:
   using super::asImpl;
 
 private:
+  #ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  using ThreadID = int;
+  static ThreadID CurrentThreadID() {
+    return 0;
+  }
+  #else
+  using ThreadID = std::thread::id;
+  static ThreadID CurrentThreadID() {
+    return std::this_thread::get_id();
+  }
+  #endif
+
   /// Additional storage that is only ever accessed under the lock.
   union LockedStorage_t {
     /// The thread that is allocating the entry.
-    std::thread::id AllocatingThread;
+    ThreadID AllocatingThread;
 
     /// The completion queue.
     MetadataCompletionQueueEntry *CompletionQueue;
@@ -837,7 +857,7 @@ public:
   MetadataCacheEntryBase()
       : LockedStorageKind(LSK::AllocatingThread),
         TrackingInfo(PrivateMetadataTrackingInfo::initial().getRawValue()) {
-    LockedStorage.AllocatingThread = std::this_thread::get_id();
+    LockedStorage.AllocatingThread = CurrentThreadID();
   }
 
   // Note that having an explicit destructor here is important to make this
@@ -850,7 +870,7 @@ public:
 
   bool isBeingAllocatedByCurrentThread() const {
     return LockedStorageKind == LSK::AllocatingThread &&
-           LockedStorage.AllocatingThread == std::this_thread::get_id();
+           LockedStorage.AllocatingThread == CurrentThreadID();
   }
 
   /// Given that this thread doesn't own the right to initialize the
@@ -1112,9 +1132,9 @@ private:
       return;
 
     case LSK::Complete:
-      swift_runtime_unreachable("preparing to enqueue when already complete?");
+      swift_unreachable("preparing to enqueue when already complete?");
     }
-    swift_runtime_unreachable("bad kind");
+    swift_unreachable("bad kind");
   }
 
   /// Claim all the satisfied completion queue entries, given that
@@ -1276,7 +1296,7 @@ public:
 
       switch (LockedStorageKind) {
       case LSK::Complete:
-        swift_runtime_unreachable("enqueuing on complete cache entry?");
+        swift_unreachable("enqueuing on complete cache entry?");
 
       case LSK::AllocatingThread:
         LockedStorageKind = LSK::CompletionQueue;
@@ -1328,7 +1348,7 @@ public:
       // Check for an existing dependency.
       switch (LockedStorageKind) {
       case LSK::Complete:
-        swift_runtime_unreachable("dependency on complete cache entry?");
+        swift_unreachable("dependency on complete cache entry?");
 
       case LSK::AllocatingThread:
       case LSK::CompletionQueue:
@@ -1411,15 +1431,19 @@ public:
     return Hash;
   }
 
-  int compareWithKey(const MetadataCacheKey &key) const {
-    return key.compare(getKey());
+  friend llvm::hash_code hash_value(const VariadicMetadataCacheEntryBase<Impl, Objects...> &value) {
+    return hash_value(value.getKey());
+  }
+
+  bool matchesKey(const MetadataCacheKey &key) const {
+    return key == getKey();
   }
 };
 
-template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag>
 class MetadataCache :
     public LockingConcurrentMap<EntryType,
-             LockingConcurrentMapStorage<EntryType, Tag, ProvideDestructor>> {
+             LockingConcurrentMapStorage<EntryType, Tag>> {
 };
 
 } // namespace swift

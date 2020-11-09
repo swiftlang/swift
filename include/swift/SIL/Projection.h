@@ -67,9 +67,9 @@ inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
 
 /// Extract an integer index from a SILValue.
 ///
-/// Return true if IndexVal is a constant index representable as unsigned
+/// Return true if IndexVal is a constant index representable as an
 /// int. We do not support symbolic projections yet.
-bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
+bool getIntegerIndex(SILValue IndexVal, int &IndexConst);
 
 /// The kind of projection that we are representing.
 ///
@@ -136,11 +136,18 @@ static inline bool isCastProjectionKind(ProjectionKind Kind) {
 /// that immediately contains it.
 ///
 /// This lightweight utility maps a SIL address projection to an index.
+///
+/// project_box does not have a projection index. At the SIL level, the box
+/// storage is considered part of the same object as the. The box projection is
+/// does not affect access path so that box projections can occur on distinct
+/// phi paths in the address def-use chain.
 struct ProjectionIndex {
-  SILValue Aggregate;
-  unsigned Index;
+  static constexpr int TailIndex = std::numeric_limits<int>::max();
 
-  explicit ProjectionIndex(SILValue V) : Index(~0U) {
+  SILValue Aggregate;
+  int Index = std::numeric_limits<int>::min();
+
+  explicit ProjectionIndex(SILValue V) {
     switch (V->getKind()) {
     default:
       break;
@@ -152,44 +159,37 @@ struct ProjectionIndex {
     }
     case ValueKind::StructElementAddrInst: {
       StructElementAddrInst *SEA = cast<StructElementAddrInst>(V);
-      Index = SEA->getFieldNo();
+      Index = SEA->getFieldIndex();
       Aggregate = SEA->getOperand();
       break;
     }
     case ValueKind::RefElementAddrInst: {
       RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
-      Index = REA->getFieldNo();
+      Index = REA->getFieldIndex();
       Aggregate = REA->getOperand();
       break;
     }
     case ValueKind::RefTailAddrInst: {
-      RefTailAddrInst *REA = cast<RefTailAddrInst>(V);
-      Index = 0;
-      Aggregate = REA->getOperand();
-      break;
-    }
-    case ValueKind::ProjectBoxInst: {
-      ProjectBoxInst *PBI = cast<ProjectBoxInst>(V);
-      // A box has only a single payload.
-      Index = 0;
-      Aggregate = PBI->getOperand();
+      RefTailAddrInst *RTA = cast<RefTailAddrInst>(V);
+      Index = TailIndex;
+      Aggregate = RTA->getOperand();
       break;
     }
     case ValueKind::TupleElementAddrInst: {
       TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
-      Index = TEA->getFieldNo();
+      Index = TEA->getFieldIndex();
       Aggregate = TEA->getOperand();
       break;
     }
     case ValueKind::StructExtractInst: {
       StructExtractInst *SEA = cast<StructExtractInst>(V);
-      Index = SEA->getFieldNo();
+      Index = SEA->getFieldIndex();
       Aggregate = SEA->getOperand();
       break;
     }
     case ValueKind::TupleExtractInst: {
       TupleExtractInst *TEA = cast<TupleExtractInst>(V);
-      Index = TEA->getFieldNo();
+      Index = TEA->getFieldIndex();
       Aggregate = TEA->getOperand();
       break;
     }
@@ -233,8 +233,7 @@ public:
       : Projection(dyn_cast<SingleValueInstruction>(I)) {}
   explicit Projection(SingleValueInstruction *I);
 
-  Projection(ProjectionKind Kind, unsigned NewIndex)
-      : Value(Kind, NewIndex) {}
+  Projection(ProjectionKind Kind, int NewIndex) : Value(Kind, NewIndex) {}
 
   Projection(ProjectionKind Kind, TypeBase *Ptr)
       : Value(Kind, Ptr) {}
@@ -252,10 +251,8 @@ public:
 
   /// Convenience method for getting the underlying index. Assumes that this
   /// projection is valid. Otherwise it asserts.
-  unsigned getIndex() const {
-    return Value.getIndex();
-  }
-  
+  int getIndex() const { return Value.getIndex(); }
+
   unsigned getHash() const { return (unsigned)Value.getStorage(); }
 
   /// Determine if I is a value projection instruction whose corresponding
@@ -302,10 +299,9 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    assert(BaseType.getNominalOrBoundGenericNominal() &&
-           "This should only be called with a nominal type");
-    auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
-    return NDecl->getStoredProperties()[getIndex()];
+    auto *nominalDecl = BaseType.getNominalOrBoundGenericNominal();
+    assert(nominalDecl && "This should only be called with a nominal type");
+    return getIndexedField(nominalDecl, getIndex());
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
@@ -360,7 +356,7 @@ public:
       return nullptr;
     case ValueKind::IndexAddrInst: {
       auto *i = cast<IndexAddrInst>(v);
-      unsigned scalar;
+      int scalar;
       if (getIntegerIndex(i->getIndex(), scalar))
         return i;
       return nullptr;

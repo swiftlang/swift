@@ -73,6 +73,14 @@ public:
   /// Is \p ED empty of members and protocol conformances to include?
   bool isEmptyExtensionDecl(const ExtensionDecl *ED);
 
+  /// Returns the type that will be printed by PrintAsObjC for a parameter or
+  /// result type resolved to this declaration.
+  ///
+  /// \warning This handles \c _ObjectiveCBridgeable types, but it doesn't
+  /// currently know about other aspects of PrintAsObjC behavior, like known
+  /// types.
+  const TypeDecl *getObjCTypeDecl(const TypeDecl* TD);
+
   /// Prints a category declaring the given members.
   ///
   /// All members must have the same parent type. The list must not be empty.

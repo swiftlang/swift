@@ -52,6 +52,8 @@ static void verifyFields(CanGenericSignature Sig, ArrayRef<SILField> Fields) {
            && "SILLayout field cannot have an archetype type");
     assert(!ty->hasTypeVariable()
            && "SILLayout cannot contain constraint system type variables");
+    assert(!ty->hasHole() &&
+           "SILLayout cannot contain constraint system type holes");
     if (!ty->hasTypeParameter())
       continue;
     field.getLoweredType().findIf([Sig](Type t) -> bool {

@@ -61,13 +61,13 @@ class FooClass {
   
   mutating init(a : Bool) {}     // expected-error {{'mutating' may only be used on 'func' declarations}} {{3-12=}}
   
-  mutating            // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} {{3-12=}}
+  mutating            // expected-error {{'mutating' is not valid on instance methods in classes}} {{3-12=}}
   func baz() {}
 
-  nonmutating         // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}} {{3-15=}}
+  nonmutating         // expected-error {{'nonmutating' is not valid on instance methods in classes}} {{3-15=}}
   func bay() {}
 
-  mutating nonmutating // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+  mutating nonmutating // expected-error {{'mutating' is not valid on instance methods in classes}} expected-error {{'nonmutating' is not valid on instance methods in classes}}
   func bax() {}
 
   var x : Int {
@@ -86,6 +86,15 @@ class FooClass {
     }
   }
 
+  var computed: Int {
+    mutating get { 0 } // expected-error {{'mutating' is not valid on getters in classes}} {{5-14=}}
+    nonmutating set {} // expected-error {{'nonmutating' is not valid on setters in classes}} {{5-17=}}
+  }
+
+  var storedWithObservers: Int = 0 {
+    mutating willSet {} // expected-error {{'mutating' is not valid on willSet observers in classes}} {{5-14=}}
+    nonmutating didSet {}  // expected-error {{'nonmutating' is not valid on didSet observers in classes}} {{5-17=}}
+  }
 }
 
 
@@ -241,7 +250,7 @@ func test_arguments(_ a : Int,
 
 
 protocol ClassBoundProtocolMutating : class {
-  mutating       // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} {{3-12=}}
+  mutating       // expected-error {{'mutating' is not valid on instance methods in class-bound protocols}} {{3-12=}}
   func f()
 }
 

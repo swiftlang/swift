@@ -187,12 +187,17 @@ void SILGenFunction::emitCaptures(SILLocation loc,
   // Partial applications take ownership of the context parameters, so we'll
   // need to pass ownership rather than merely guaranteeing parameters.
   bool canGuarantee;
+  bool captureCanEscape = true;
   switch (purpose) {
   case CaptureEmission::PartialApplication:
     canGuarantee = false;
     break;
   case CaptureEmission::ImmediateApplication:
     canGuarantee = true;
+    break;
+  case CaptureEmission::AssignByWrapper:
+    canGuarantee = false;
+    captureCanEscape = false;
     break;
   }
 
@@ -381,7 +386,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         } else {
           capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
         }
-        escapesToMark.push_back(entryValue);
+        if (captureCanEscape)
+          escapesToMark.push_back(entryValue);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -506,12 +512,12 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
+  emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitProfilerIncrement(fd->getBody());
-  emitStmt(fd->getBody());
+  emitStmt(fd->getTypecheckedBody());
 
   emitEpilog(fd);
 
@@ -524,10 +530,10 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
+  emitProfilerIncrement(ace);
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
   prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
-  emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
   } else {
@@ -564,12 +570,13 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     // be imported.
     ASTContext &ctx = getASTContext();
     
-    Located<Identifier> UIKitName =
+    ImportPath::Element UIKitName =
       {ctx.getIdentifier("UIKit"), SourceLoc()};
     
     ModuleDecl *UIKit = ctx
       .getClangModuleLoader()
-      ->loadModule(SourceLoc(), UIKitName);
+      ->loadModule(SourceLoc(),
+                   ImportPath::Module(llvm::makeArrayRef(UIKitName)));
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit,
@@ -598,20 +605,23 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 
-    auto NSStringFromClassType = SILFunctionType::get(nullptr,
-                  SILFunctionType::ExtInfo()
-                    .withRepresentation(SILFunctionType::Representation::
-                                        CFunctionPointer),
-                  SILCoroutineKind::None,
-                  ParameterConvention::Direct_Unowned,
-                  SILParameterInfo(anyObjectMetaTy,
-                                   ParameterConvention::Direct_Unowned),
-                  /*yields*/ {},
-                  SILResultInfo(OptNSStringTy,
-                                ResultConvention::Autoreleased),
-                  /*error result*/ None,
-                  SubstitutionMap(), SubstitutionMap(),
-                  ctx);
+    auto paramConvention = ParameterConvention::Direct_Unowned;
+    auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};
+    std::array<SILResultInfo, 1> resultInfos = {
+        SILResultInfo(OptNSStringTy, ResultConvention::Autoreleased)};
+    auto repr = SILFunctionType::Representation::CFunctionPointer;
+    auto *clangFnType =
+        ctx.getCanonicalClangFunctionType(params, resultInfos[0], repr);
+    auto extInfo = SILFunctionType::ExtInfoBuilder()
+                       .withRepresentation(repr)
+                       .withClangFunctionType(clangFnType)
+                       .build();
+
+    auto NSStringFromClassType = SILFunctionType::get(
+        nullptr, extInfo, SILCoroutineKind::None, paramConvention, params,
+        /*yields*/ {}, resultInfos, /*error result*/ None, SubstitutionMap(),
+        SubstitutionMap(), ctx);
+
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
         NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
@@ -692,12 +702,10 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     };
     auto NSApplicationMainType = SILFunctionType::get(
         nullptr,
-        SILFunctionType::ExtInfoBuilder()
-            // Should be C calling convention, but NSApplicationMain
-            // has an overlay to fix the type of argv.
-            .withRepresentation(SILFunctionType::Representation::Thin)
-            .build(),
-        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, argTypes,
+        // Should be C calling convention, but NSApplicationMain
+        // has an overlay to fix the type of argv.
+        SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, argTypes,
         /*yields*/ {},
         SILResultInfo(argc->getType().getASTType(), ResultConvention::Unowned),
         /*error result*/ None, SubstitutionMap(), SubstitutionMap(),

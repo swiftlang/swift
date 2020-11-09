@@ -96,3 +96,20 @@ public protocol SPIProtocol {
   @_spi(Private)
   static var staticProperty: Int { get }
 }
+
+public protocol OtherProto {}
+public protocol Proto {
+  associatedtype A : Sequence where A.Element : OtherProto
+}
+
+public struct BadStruct {}
+@_spi(Horse) extension BadStruct : OtherProto {}
+public struct BadConforms : Proto { // expected-error {{cannot use conformance of 'BadStruct' to 'OtherProto' in associated type 'Self.A.Element' (inferred as 'BadStruct'); the conformance is declared as SPI}}
+  public typealias A = [BadStruct]
+}
+
+public struct OKStruct {}
+@_spi(Horse) extension OKStruct : OtherProto {}
+@_spi(Horse) public struct OKConforms : Proto {
+  public typealias A = [OKStruct]
+}

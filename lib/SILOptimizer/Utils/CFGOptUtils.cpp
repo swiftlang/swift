@@ -449,6 +449,20 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     yi->eraseFromParent();
     return;
   }
+      
+  case TermKind::AwaitAsyncContinuationInst: {
+    auto ai = cast<AwaitAsyncContinuationInst>(t);
+    SILBasicBlock *resumeBB =
+      (oldDest == ai->getResumeBB() ? newDest : ai->getResumeBB());
+    SILBasicBlock *errorBB =
+      (oldDest == ai->getErrorBB() ? newDest : ai->getErrorBB());
+    
+    builder.createAwaitAsyncContinuation(ai->getLoc(),
+                                         ai->getOperand(),
+                                         resumeBB, errorBB);
+    ai->eraseFromParent();
+    return;
+  }
 
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
@@ -726,6 +740,7 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   // yield is special because it can do arbitrary,
   // potentially-process-terminating things.
   case TermKind::YieldInst:
+  case TermKind::AwaitAsyncContinuationInst:
     return false;
   case TermKind::TryApplyInst:
     return true;

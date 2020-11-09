@@ -94,7 +94,7 @@
       key.description: "<name>init</name>()",
       key.typename: "<typeid.user>MyStruct</typeid.user>",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructVACycfc",
       key.modulename: "complete_annotateddescription"
@@ -106,7 +106,7 @@
       key.description: "<name>labelName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(label: (<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV9labelName0E0yS2iyXKXE_tF",
       key.modulename: "complete_annotateddescription"
@@ -118,7 +118,7 @@
       key.description: "<name>labelNameParamName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(label: (<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV014labelNameParamF00E0yACSizKXE_tKF",
       key.modulename: "complete_annotateddescription"
@@ -130,7 +130,7 @@
       key.description: "<name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV9paramNameyySiF",
       key.modulename: "complete_annotateddescription"
@@ -142,7 +142,7 @@
       key.description: "<name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>)",
       key.typename: "(label: <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.unrelated,
+      key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:29complete_annotateddescription8MyStructV8sameName5labelySi_tF",
       key.modulename: "complete_annotateddescription"

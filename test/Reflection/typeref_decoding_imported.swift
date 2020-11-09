@@ -1,5 +1,8 @@
 // XFAIL: OS=windows-msvc
 
+// SR-12893
+// XFAIL: openbsd
+
 // UNSUPPORTED: CPU=arm64e
 
 // RUN: %empty-directory(%t)

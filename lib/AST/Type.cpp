@@ -76,7 +76,7 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
 }
 
 void TypeLoc::setType(Type Ty) {
-  assert(!Ty || !Ty->hasTypeVariable());
+  assert(!Ty || !Ty->hasTypeVariable() || !Ty->hasHole());
   this->Ty = Ty;
 }
 
@@ -153,9 +153,7 @@ bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
 
-bool TypeBase::isHole() {
-  return isEqual(getASTContext().TheUnresolvedType);
-}
+bool TypeBase::isHole() { return getCanonicalType()->is<HoleType>(); }
 
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
@@ -221,6 +219,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
+  case TypeKind::Hole:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
@@ -1149,6 +1148,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
+  case TypeKind::Hole:
     llvm_unreachable("these types are always canonical");
 
 #define SUGARED_TYPE(id, parent) \
@@ -3063,8 +3063,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
           }))
     return maybeOpaqueType;
 
-  // If the type still contains opaque types, recur.
-  if (substTy->hasOpaqueArchetype()) {
+  // If the type changed, but still contains opaque types, recur.
+  if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
     return ::substOpaqueTypesWithUnderlyingTypes(
         substTy, inContext, contextExpansion, isContextWholeModule);
   }
@@ -3206,14 +3206,8 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (Bits.ArchetypeType.HasSuperclass)
-    return true;
   if (auto layout = getLayoutConstraint())
-    if (layout->isClass())
-      return true;
-  for (ProtocolDecl *conformed : getConformsTo())
-    if (conformed->requiresClass())
-      return true;
+    return layout->isClass();
   return false;
 }
 
@@ -3430,13 +3424,41 @@ ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
 
+bool AnyFunctionType::hasNonDerivableClangType() {
+  auto clangTypeInfo = getClangTypeInfo();
+  if (clangTypeInfo.empty())
+    return false;
+  auto computedClangType = getASTContext().getClangFunctionType(
+      getParams(), getResult(), getRepresentation());
+  assert(computedClangType && "Failed to compute Clang type.");
+  return clangTypeInfo != ClangTypeInfo(computedClangType);
+}
+
 bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
-// [TODO: Store-SIL-Clang-type]
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
-  return ClangTypeInfo();
+  if (!Bits.SILFunctionType.HasClangTypeInfo)
+    return ClangTypeInfo();
+  auto *info = getTrailingObjects<ClangTypeInfo>();
+  assert(!info->empty() &&
+         "If the ClangTypeInfo was empty, we shouldn't have stored it.");
+  return *info;
+}
+
+bool SILFunctionType::hasNonDerivableClangType() {
+  auto clangTypeInfo = getClangTypeInfo();
+  if (clangTypeInfo.empty())
+    return false;
+  auto results = getResults();
+  auto computedClangType =
+      getASTContext().getCanonicalClangFunctionType(
+          getParameters(),
+          results.empty() ? None : Optional<SILResultInfo>(results[0]),
+          getRepresentation());
+  assert(computedClangType && "Failed to compute Clang type.");
+  return clangTypeInfo != ClangTypeInfo(computedClangType);
 }
 
 bool SILFunctionType::hasSameExtInfoAs(const SILFunctionType *otherFn) {
@@ -3761,7 +3783,7 @@ static Type substType(Type derivedType,
     // we want to structurally substitute the substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       auto subMap = boxTy->getSubstitutions();
-      auto newSubMap = subMap.subst(substitutions, lookupConformances);
+      auto newSubMap = subMap.subst(substitutions, lookupConformances, options);
 
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
@@ -4250,6 +4272,7 @@ case TypeKind::Id:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
+  case TypeKind::Hole:
   case TypeKind::GenericTypeParam:
   case TypeKind::SILToken:
   case TypeKind::Module:
@@ -4952,8 +4975,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;
-    assert(archetype->requiresClass() ||
-           (layout && layout->isRefCounted()));
+    assert(layout && layout->isRefCounted());
     if (auto supertype = archetype->getSuperclass())
       return supertype->getReferenceCounting();
     return ReferenceCounting::Unknown;
@@ -4989,6 +5011,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
+  case TypeKind::Hole:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
@@ -5047,27 +5070,6 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   }
   opened = OpenedArchetypeType::get(this);
   return opened;
-}
-
-bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
-  if (auto *structDecl = getStructOrBoundGenericStruct()) {
-    for (auto *field : structDecl->getStoredProperties()) {
-      auto fieldTy = field->getInterfaceType()->getCanonicalType();
-      if (fieldTy->hasOpaqueArchetype() ||
-          fieldTy->hasOpaqueArchetypePropertiesOrCases())
-        return true;
-    }
-  }
-
-  if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
-    for (auto *elt : enumDecl->getAllElements()) {
-      auto eltType = elt->getInterfaceType();
-      if (eltType->hasOpaqueArchetype() ||
-          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
-        return true;
-    }
-  }
-  return false;
 }
 
 CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,

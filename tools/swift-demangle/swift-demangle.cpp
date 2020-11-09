@@ -118,6 +118,7 @@ static void stripSpecialization(NodePointer Node) {
   switch (Node->getFirstChild()->getKind()) {
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::GenericSpecialization:
+    case Node::Kind::GenericSpecializationPrespecialized:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericPartialSpecialization:
     case Node::Kind::GenericPartialSpecializationNotReAbstracted:

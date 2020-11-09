@@ -30,6 +30,7 @@ class IRGenOptions;
 class SILModule;
 class SILOptions;
 struct TBDGenOptions;
+class TBDGenDescriptor;
 
 namespace irgen {
   class IRGenModule;
@@ -126,6 +127,9 @@ public:
 struct IRGenDescriptor {
   llvm::PointerUnion<FileUnit *, ModuleDecl *> Ctx;
 
+  using SymsToEmit = Optional<llvm::SmallVector<std::string, 1>>;
+  SymsToEmit SymbolsToEmit;
+
   const IRGenOptions &Opts;
   const TBDGenOptions &TBDOpts;
   const SILOptions &SILOpts;
@@ -143,12 +147,13 @@ struct IRGenDescriptor {
   llvm::GlobalVariable **outModuleHash;
 
   friend llvm::hash_code hash_value(const IRGenDescriptor &owner) {
-    return llvm::hash_combine(owner.Ctx);
+    return llvm::hash_combine(owner.Ctx, owner.SymbolsToEmit, owner.SILMod);
   }
 
   friend bool operator==(const IRGenDescriptor &lhs,
                          const IRGenDescriptor &rhs) {
-    return lhs.Ctx == rhs.Ctx;
+    return lhs.Ctx == rhs.Ctx && lhs.SymbolsToEmit == rhs.SymbolsToEmit &&
+           lhs.SILMod == rhs.SILMod;
   }
 
   friend bool operator!=(const IRGenDescriptor &lhs,
@@ -162,9 +167,10 @@ public:
           const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
           Lowering::TypeConverter &Conv, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-          StringRef PrivateDiscriminator,
+          StringRef PrivateDiscriminator, SymsToEmit symsToEmit = None,
           llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{file,
+                           symsToEmit,
                            Opts,
                            TBDOpts,
                            SILOpts,
@@ -182,10 +188,11 @@ public:
                  const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
                  Lowering::TypeConverter &Conv,
                  std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
-                 const PrimarySpecificPaths &PSPs,
+                 const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = None,
                  ArrayRef<std::string> parallelOutputFilenames = {},
                  llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{M,
+                           symsToEmit,
                            Opts,
                            TBDOpts,
                            SILOpts,
@@ -198,12 +205,16 @@ public:
                            outModuleHash};
   }
 
-  /// Retrieves the files to perform IR generation for.
-  TinyPtrVector<FileUnit *> getFiles() const;
+  /// Retrieves the files to perform IR generation for. If the descriptor is
+  /// configured only to emit a specific set of symbols, this will be empty.
+  TinyPtrVector<FileUnit *> getFilesToEmit() const;
 
   /// For a single file, returns its parent module, otherwise returns the module
   /// itself.
   ModuleDecl *getParentModule() const;
+
+  /// Retrieve a descriptor suitable for generating TBD for the file or module.
+  TBDGenDescriptor getTBDGenDescriptor() const;
 
   /// Compute the linker directives to emit.
   std::vector<std::string> getLinkerDirectives() const;
@@ -252,6 +263,26 @@ private:
 
   // Evaluation.
   GeneratedModule evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
+};
+
+using SymbolsToEmit = SmallVector<std::string, 1>;
+
+/// Return the object code for a specific set of symbols in a file or module.
+class SymbolObjectCodeRequest : public SimpleRequest<SymbolObjectCodeRequest,
+                                                     StringRef(IRGenDescriptor),
+                                                     RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  StringRef evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 /// The zone number for IRGen.

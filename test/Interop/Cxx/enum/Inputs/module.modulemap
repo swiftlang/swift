@@ -1,0 +1,3 @@
+module BoolEnums {
+  header "bool-enums.h"
+}

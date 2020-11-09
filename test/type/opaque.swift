@@ -73,7 +73,7 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-//let zingle = {() -> some P in 1 } // FIXME ex/pected-error{{'some' types are only implemented}}
+let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
 // Invalid positions
 
@@ -383,7 +383,7 @@ protocol P_51641323 {
 func rdar_51641323() {
   struct Foo: P_51641323 {
     var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
-      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only concrete types such as structs, enums and classes can conform to protocols}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
     }
   }
 }
@@ -485,3 +485,28 @@ protocol SomeProtocolA {}
 protocol SomeProtocolB {}
 struct SomeStructC: SomeProtocolA, SomeProtocolB {}
 let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }}
+
+// An opaque result type on a protocol extension member effectively
+// contains an invariant reference to 'Self', and therefore cannot
+// be referenced on an existential type.
+
+protocol OpaqueProtocol {}
+extension OpaqueProtocol {
+  var asSome: some OpaqueProtocol { return self }
+  func getAsSome() -> some OpaqueProtocol { return self }
+  subscript(_: Int) -> some OpaqueProtocol { return self }
+}
+
+func takesOpaqueProtocol(existential: OpaqueProtocol) {
+  // this is not allowed:
+  _ = existential.asSome // expected-error{{member 'asSome' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+  _ = existential.getAsSome() // expected-error{{member 'getAsSome' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+  _ = existential[0] // expected-error{{member 'subscript' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+}
+
+func takesOpaqueProtocol<T : OpaqueProtocol>(generic: T) {
+  // these are all OK:
+  _ = generic.asSome
+  _ = generic.getAsSome()
+  _ = generic[0]
+}

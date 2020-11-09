@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -56,13 +57,9 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
   auto *locScope = findInnermostEnclosingScope(loc, &llvm::errs());
   locScope->print(llvm::errs(), 0, false, false);
 
-  // Dump the AST context, too.
-  if (auto *dc = locScope->getDeclContext().getPtrOrNull())
-    dc->printContext(llvm::errs());
-
   namelookup::ASTScopeDeclGatherer gatherer;
   // Print the local bindings introduced by this scope.
-  locScope->lookupLocalsOrMembers({this}, gatherer);
+  locScope->lookupLocalsOrMembers(gatherer);
   if (!gatherer.getDecls().empty()) {
     llvm::errs() << "Local bindings: ";
     llvm::interleave(
@@ -126,9 +123,7 @@ static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
 }
 
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
-  if (!isSourceRangeCached(true))
-    out << "(uncached) ";
-  SourceRange range = computeSourceRangeOfScope(/*omitAssertions=*/true);
+  SourceRange range = getSourceRangeOfThisASTNode(/*omitAssertions=*/true);
   printSourceRange(out, range, getSourceManager());
 }
 
@@ -179,22 +174,13 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
   });
 }
 
-void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
-  ASTScopeImpl::printSpecifics(out);
-  out << "index " << index;
-}
-
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  decl->dumpRef(out);
-}
-
-void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
 void ConditionalClausePatternUseScope::printSpecifics(
     llvm::raw_ostream &out) const {
-  pattern->print(out);
+  sec.getPattern()->print(out);
 }
 
 bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }

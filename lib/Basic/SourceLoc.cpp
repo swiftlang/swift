@@ -152,9 +152,8 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
   return nullptr;
 }
 
-
-Optional<unsigned> SourceManager::getIDForBufferIdentifier(
-    StringRef BufIdentifier) {
+Optional<unsigned>
+SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   auto It = BufIdentIDMap.find(BufIdentifier);
   if (It == BufIdentIDMap.end())
     return None;

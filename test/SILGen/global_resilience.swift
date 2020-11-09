@@ -43,21 +43,21 @@ public var myEmptyGlobal = MyEmptyStruct()
 
 // Mutable addressor for fixed-layout global
 
-// CHECK-LABEL: sil private [ossa] @globalinit_{{.*}}_func1
+// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ
 // CHECK:         alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK:         return
 
 // CHECK-LABEL: sil [global_init] [ossa] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
-// CHECK:         function_ref @globalinit_{{.*}}_func1
+// CHECK:         function_ref @{{.*}}WZ
 // CHECK:         global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK:         return
 
-// CHECK-OPT-LABEL: sil private @globalinit_{{.*}}_func1
+// CHECK-OPT-LABEL: sil private [global_init_once_fn] @{{.*}}WZ
 // CHECK-OPT:     alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK-OPT:     return
 
 // CHECK-OPT-LABEL: sil [global_init] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
-// CHECK-OPT:     function_ref @globalinit_{{.*}}_func1
+// CHECK-OPT:     function_ref @{{.*}}WZ
 // CHECK-OPT:     global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvp
 // CHECK-OPT:     return
 

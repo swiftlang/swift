@@ -1,10 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
-class C { 
+class C {
   func f() {}
 }
 
-class D : C { 
+class D : C {
 }
 
 class E { }
@@ -30,3 +30,11 @@ func testP<T:P>(_ t: T) {
 func callTestP(_ x1: X1) {
   testP(x1)
 }
+
+// SR-10251: unable to infer associated type in child protocol
+protocol P2 { associatedtype T }
+
+protocol P3: P2 where T == Self {}
+
+enum C3: P3 {} // correct, might be an error
+

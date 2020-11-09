@@ -352,7 +352,7 @@ public:
   static SourceLoc getLocForStartOfLine(SourceManager &SM, SourceLoc Loc);
 
   /// Retrieve the source location for the end of the line containing the
-  /// given token, which is the location of the start of the next line.
+  /// given location, which is the location of the start of the next line.
   static SourceLoc getLocForEndOfLine(SourceManager &SM, SourceLoc Loc);
 
   /// Retrieve the string used to indent the line that contains the given

@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -53,24 +54,6 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
   writeTBDFile(M, OS, Opts);
 
   return false;
-}
-
-bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
-  // Only things that involve an AST can have a TBD file computed, at the
-  // moment.
-  switch (kind) {
-  case InputFileKind::Swift:
-  case InputFileKind::SwiftLibrary:
-    return true;
-  case InputFileKind::SwiftModuleInterface:
-    // FIXME: This would be a good test of the interface format.
-    return false;
-  case InputFileKind::None:
-  case InputFileKind::SIL:
-  case InputFileKind::LLVM:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
 }
 
 static bool validateSymbols(DiagnosticEngine &diags,

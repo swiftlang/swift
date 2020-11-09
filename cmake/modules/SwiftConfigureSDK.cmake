@@ -145,6 +145,8 @@ endfunction()
 #   SWIFT_SDK_${prefix}_LIB_SUBDIR          Library subdir for this SDK
 #   SWIFT_SDK_${prefix}_VERSION_MIN_NAME    Version min name for this SDK
 #   SWIFT_SDK_${prefix}_TRIPLE_NAME         Triple name for this SDK
+#   SWIFT_SDK_${prefix}_OBJECT_FORMAT       The object file format (e.g. MACHO)
+#   SWIFT_SDK_${prefix}_USE_ISYSROOT        Whether to use -isysroot
 #   SWIFT_SDK_${prefix}_ARCHITECTURES       Architectures (as a list)
 #   SWIFT_SDK_${prefix}_IS_SIMULATOR        Whether this is a simulator target.
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE Triple name
@@ -187,6 +189,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
+  set(SWIFT_SDK_${prefix}_USE_ISYSROOT TRUE)
 
   set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
   if(SWIFT_DARWIN_SUPPORTED_ARCHS)
@@ -270,6 +273,7 @@ macro(configure_sdk_unix name architectures)
   else()
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
   endif()
+  set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
@@ -432,6 +436,7 @@ macro(configure_sdk_windows name environment architectures)
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+  set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
   foreach(arch ${architectures})
     if(arch STREQUAL armv7)

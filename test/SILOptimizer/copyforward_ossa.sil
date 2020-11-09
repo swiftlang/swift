@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -enable-destroyhoisting | %FileCheck %s
+// RUN: %target-sil-opt  -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -enable-destroyhoisting -allow-critical-edges=false | %FileCheck %s
 
 // This is the ossa version of CopyForwarding tests
 sil_stage raw
@@ -209,9 +209,12 @@ bb1:                                              // Preds: bb0
   copy_addr %0 to [initialization] %5 : $*T     // id: %6
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %5 : $*T         // id: %8
-  br bb2                                          // id: %9
+  br bb3                                          // id: %9
 
-bb2:                                              // Preds: bb0 bb1
+bb2:
+  br bb3
+
+bb3:                                              // Preds: bb0 bb1
   destroy_addr %0 : $*T                           // id: %10
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12
@@ -265,7 +268,7 @@ sil [ossa] @_TFSq4someU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@in τ
 
 sil [ossa] @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
 
-// CHECK-LABEL: sil hidden [ossa] @option_init
+// CHECK-LABEL: sil hidden [ossa] @option_init :
 // CHECK: alloc_stack
 // CHECK: alloc_stack
 // CHECK: alloc_stack

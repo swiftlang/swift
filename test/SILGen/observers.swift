@@ -171,7 +171,7 @@ public struct DidSetWillSetTests {
 
 var global_observing_property : Int = zero {
   // The variable is initialized with "zero".
-  // CHECK-LABEL: sil private [ossa] @globalinit_{{.*}}_func1 : $@convention(c) () -> () {
+  // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) () -> () {
   // CHECK: bb0:
   // CHECK-NEXT: alloc_global @$s9observers25global_observing_propertySiv
   // CHECK-NEXT: %1 = global_addr @$s9observers25global_observing_propertySivp : $*Int

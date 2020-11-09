@@ -183,7 +183,7 @@ OutputFilesComputer::computeOutputFile(StringRef outputArg,
 
 Optional<std::string>
 OutputFilesComputer::deriveOutputFileFromInput(const InputFile &input) const {
-  if (input.file() == "-" || HasTextualOutput)
+  if (input.getFileName() == "-" || HasTextualOutput)
     return std::string("-");
 
   std::string baseName = determineBaseNameOfOutput(input);
@@ -210,7 +210,7 @@ std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
   std::string nameToStem =
       input.isPrimary()
-          ? input.file()
+          ? input.getFileName()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
   return llvm::sys::path::stem(nameToStem).str();
 }
@@ -306,11 +306,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_source_info_path);
   auto ldAddCFileOutput  = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_ldadd_cfile_path);
+  auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_summary_path);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !ldAddCFileOutput) {
+      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -334,6 +336,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
+    sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -422,6 +425,10 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_emit_module_source_info, pathsFromArguments.ModuleSourceInfoOutputPath,
       file_types::TY_SwiftSourceInfoFile, "",
       defaultSupplementaryOutputPathExcludingExtension);
+  auto moduleSummaryOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_summary, pathsFromArguments.ModuleSummaryOutputPath,
+      file_types::TY_SwiftModuleSummaryFile, "",
+      defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
   auto ModuleInterfaceOutputPath =
@@ -456,6 +463,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
+  sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
   return sop;
 }
 
@@ -466,8 +474,8 @@ StringRef SupplementaryOutputPathsComputer::
   if (!outputFilename.empty() && outputFilename != "-")
     return outputFilename;
 
-  if (input.isPrimary() && input.file() != "-")
-    return llvm::sys::path::filename(input.file());
+  if (input.isPrimary() && input.getFileName() != "-")
+    return llvm::sys::path::filename(input.getFileName());
 
   return ModuleName;
 }
@@ -537,6 +545,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_TBD, paths.TBDPath},
       {file_types::TY_SwiftModuleInterfaceFile,
        paths.ModuleInterfaceOutputPath},
+      {file_types::TY_SwiftModuleSummaryFile, paths.ModuleSummaryOutputPath},
       {file_types::TY_PrivateSwiftModuleInterfaceFile,
        paths.PrivateModuleInterfaceOutputPath}};
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
@@ -591,12 +600,12 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         const TypeToPathMap *mapForInput =
-            OFM->getOutputMapForInput(input.file());
+            OFM->getOutputMapForInput(input.getFileName());
         if (!mapForInput) {
           Diags.diagnose(
               SourceLoc(),
               diag::error_missing_entry_in_supplementary_output_file_map,
-              supplementaryFileMapPath, input.file());
+              supplementaryFileMapPath, input.getFileName());
           hadError = true;
         }
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));

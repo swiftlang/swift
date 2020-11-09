@@ -21,18 +21,17 @@ func makeSignatureAbstract() {
 
 // CHECK-LABEL: sil{{.*}}@makeSignatureAbstract
 // CHECK:   [[BEFORE:%.*]] = differentiable_function [parameters 0] [results 0]
-// CHECK:   [[BEFORE_BORROWED:%.*]] = begin_borrow [[BEFORE]]
-// CHECK:   [[ORIG_0:%.*]] = differentiable_function_extract [original] [[BEFORE_BORROWED]]
+// CHECK:   [[ORIG_0:%.*]] = differentiable_function_extract [original] [[BEFORE]]
 // CHECK:   [[ORIG_1:%.*]] = copy_value [[ORIG_0]]
 // CHECK:   [[ORIG_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> Float) -> @out Float
 // CHECK:   [[ORIG_2:%.*]] = partial_apply [callee_guaranteed] [[ORIG_THUNK]]([[ORIG_1]])
 // CHECK:   [[ORIG_3:%.*]] = convert_function [[ORIG_2]]
-// CHECK:   [[JVP_0:%.*]] = differentiable_function_extract [jvp] [[BEFORE_BORROWED]]
+// CHECK:   [[JVP_0:%.*]] = differentiable_function_extract [jvp] [[BEFORE]]
 // CHECK:   [[JVP_1:%.*]] = copy_value [[JVP_0]]
 // CHECK:   [[JVP_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> (@out Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>)
 // CHECK:   [[JVP_2:%.*]] = partial_apply [callee_guaranteed] [[JVP_THUNK]]([[JVP_1]])
 // CHECK:   [[JVP_3:%.*]] = convert_function [[JVP_2]]
-// CHECK:   [[VJP_0:%.*]] = differentiable_function_extract [vjp] [[BEFORE_BORROWED]]
+// CHECK:   [[VJP_0:%.*]] = differentiable_function_extract [vjp] [[BEFORE]]
 // CHECK:   [[VJP_1:%.*]] = copy_value [[VJP_0]]
 // CHECK:   [[VJP_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> (@out Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>)
 // CHECK:   [[VJP_2:%.*]] = partial_apply [callee_guaranteed] [[VJP_THUNK]]([[VJP_1]])

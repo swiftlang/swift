@@ -165,3 +165,20 @@ func test5() {
   e()
 }
 
+// rdar://problem/67704651 - crash due to nested fallthrough
+func testNestedFallthrough(x: (Int, String), y: (Int, Int)) {
+  switch x {
+  case (17, let s):
+    switch y {
+    case (42, let i):
+      print("the answer")
+    default:
+      print("nope")
+    }
+    fallthrough
+  case (42, let s):
+    print("42 and \(s)")
+  default:
+    print("done")
+  }
+}

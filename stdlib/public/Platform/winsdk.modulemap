@@ -21,6 +21,10 @@ module WinSDK [system] {
     link "WS2_32.Lib"
   }
 
+  module WinSock {
+    header "winsock.h"
+  }
+
   module core {
     module acl {
       header "AclAPI.h"
@@ -39,6 +43,8 @@ module WinSDK [system] {
 
     module console {
       header "consoleapi.h"
+      header "consoleapi2.h"
+      header "consoleapi3.h"
       export *
     }
 
@@ -96,6 +102,8 @@ module WinSDK [system] {
     module path {
       header "PathCch.h"
       export *
+
+      link "pathcch.lib"
     }
 
     // api-ms-win-core-processthreads-l1-1-2.dll
@@ -121,18 +129,28 @@ module WinSDK [system] {
       header "timezoneapi.h"
       export *
     }
+
+    // api-ms-win-core-version-l1-1-0.dll
+    module version {
+      header "winver.h"
+      export *
+
+      link "Version.Lib"
+    }
   }
 
-  module AuthZ {
-    header "AuthZ.h"
-    export *
+  module Controls {
+    module CommCtrl {
+      header "CommCtrl.h"
+      export *
+    }
 
-    link "AuthZ.Lib"
-  }
+    module CommDlg {
+      header "commdlg.h"
+      export *
 
-  module CommCtrl {
-    header "CommCtrl.h"
-    export *
+      link "ComDlg32.Lib"
+    }
   }
 
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
@@ -149,13 +167,6 @@ module WinSDK [system] {
     link "NetAPI32.Lib"
   }
 
-  module DbgHelp {
-    header "DbgHelp.h"
-    export *
-
-    link "DbgHelp.Lib"
-  }
-
   module DWM {
     header "dwmapi.h"
     export *
@@ -170,15 +181,93 @@ module WinSDK [system] {
     link "Cabinet.Lib"
   }
 
+  module Internationalization {
+    module WinNLS {
+      header "winnls.h"
+      export *
+    }
+
+    module IMM {
+      header "immdev.h"
+      header "imm.h"
+      export *
+
+      link "Imm32.lib"
+    }
+  }
+
+  module Multimedia {
+    module DigitalVideo {
+      header "Digitalv.h"
+      export *
+    }
+
+    module Video {
+      header "Vfw.h"
+      export *
+
+      link "Vfw32.Lib"
+    }
+
+    header "mmeapi.h"
+    header "mmddk.h"
+    header "mmsystem.h"
+    header "mmiscapi.h"
+    header "timeapi.h"
+    header "joystickapi.h"
+    export *
+
+    link "WinMM.Lib"
+  }
+
+  module Networking {
+    header "winnetwk.h"
+    export *
+
+    link "Mpr.Lib"
+  }
+
+  module Security {
+    module AuthZ {
+      header "AuthZ.h"
+      export *
+
+      link "AuthZ.Lib"
+    }
+
+    module SmartCard {
+      header "winscard.h"
+      export *
+
+      link "winscard.lib"
+    }
+
+    module WinCrypt {
+      header "wincrypt.h"
+      export *
+
+      link "Crypt32.Lib"
+    }
+  }
+
   module Shell {
     header "ShlObj.h"
     export *
   }
 
+  module AppNotify {
+    header "appnotify.h"
+    export *
+
+    link "appnotify.lib"
+  }
+
   module ShellAPI {
+    header "shellapi.h"
     header "Shlwapi.h"
     export *
 
+    link "shell32.lib"
     link "ShLwApi.Lib"
   }
 
@@ -189,11 +278,56 @@ module WinSDK [system] {
     link "shcore.lib"
   }
 
+  module System {
+    module DbgHelp {
+      header "DbgHelp.h"
+      export *
+
+      link "DbgHelp.Lib"
+    }
+
+    module IOCTL {
+      header "winioctl.h"
+      export *
+    }
+
+    module MCX {
+      header "mcx.h"
+      export *
+    }
+  }
+
   module OLE32 {
     header "oaidl.h"
     export *
 
     link "OleAut32.Lib"
+  }
+
+  module Performance {
+    module PerfLib {
+      header "perflib.h"
+      export *
+
+      link "AdvAPI32.Lib"
+    }
+
+    module PDH {
+      header "Pdh.h"
+      export *
+
+      link "Pdh.Lib"
+    }
+
+    header "winperf.h"
+    export *
+  }
+
+  module Printing {
+    header "winspool.h"
+    export *
+
+    link "WinSpool.Lib"
   }
 
   module RichEdit {
@@ -206,11 +340,16 @@ module WinSDK [system] {
     export *
   }
 
-  module WinCrypt {
-    header "wincrypt.h"
+  module WIC {
+    header "wincodec.h"
     export *
 
-    link "Crypt32.Lib"
+    link "windowscodecs.lib"
+  }
+
+  module WinBase {
+    header "winbase.h"
+    export *
   }
 
   module WinDNS {
@@ -227,6 +366,11 @@ module WinSDK [system] {
     link "Gdi32.Lib"
   }
 
+  module WinNT {
+    header "winnt.h"
+    export *
+  }
+
   module WinReg {
     header "winreg.h"
     export *
@@ -240,6 +384,23 @@ module WinSDK [system] {
     export *
 
     link "RpcRT4.Lib"
+  }
+
+  module WinSVC {
+    header "winsvc.h"
+    export *
+
+    link "AdvAPI32.Lib"
+  }
+
+  // TODO(compnerd) does it make sense to implicitly export this API surface?
+  // It seems to be meant for device drivers.
+  module WLANAPI {
+    header "wlanapi.h"
+    header "wlanihv.h"
+    header "wlclient.h"
+
+    link "wlanapi.lib"
   }
 }
 

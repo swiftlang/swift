@@ -11,92 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/SILGlobalVariable.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/SIL/SILGlobalVariable.h"
 
 using namespace swift;
 using namespace Mangle;
-
-void SpecializationMangler::beginMangling() {
-  ASTMangler::beginManglingWithoutPrefix();
-  if (Serialized)
-    ArgOpBuffer << 'q';
-  ArgOpBuffer << char(uint8_t(Pass) + '0');
-}
-
-namespace {
-
-/// Utility class for demangling specialization attributes.
-class AttributeDemangler : public Demangle::Demangler {
-public:
-  void demangleAndAddAsChildren(StringRef MangledSpecialization,
-                                NodePointer Parent) {
-    DemangleInitRAII state(*this, MangledSpecialization, nullptr);
-    if (!parseAndPushNodes()) {
-      llvm::errs() << "Can't demangle: " << MangledSpecialization << '\n';
-      abort();
-    }
-    for (Node *Nd : NodeStack) {
-      addChild(Parent, Nd);
-    }
-  }
-};
-
-} // namespace
-
-std::string SpecializationMangler::finalize() {
-  StringRef MangledSpecialization(Storage.data(), Storage.size());
-  AttributeDemangler D;
-  NodePointer TopLevel = D.createNode(Node::Kind::Global);
-  D.demangleAndAddAsChildren(MangledSpecialization, TopLevel);
-
-  StringRef FuncName = Function->getName();
-  NodePointer FuncTopLevel = nullptr;
-  if (FuncName.startswith(MANGLING_PREFIX_STR)) {
-    FuncTopLevel = D.demangleSymbol(FuncName);
-    assert(FuncTopLevel);
-  }
-  if (!FuncTopLevel) {
-    FuncTopLevel = D.createNode(Node::Kind::Global);
-    FuncTopLevel->addChild(D.createNode(Node::Kind::Identifier, FuncName), D);
-  }
-  for (NodePointer FuncChild : *FuncTopLevel) {
-    TopLevel->addChild(FuncChild, D);
-  }
-  std::string mangledName = Demangle::mangleNode(TopLevel);
-  verify(mangledName);
-  return mangledName;
-}
-
-//===----------------------------------------------------------------------===//
-//                           Generic Specialization
-//===----------------------------------------------------------------------===//
-
-std::string GenericSpecializationMangler::mangle(GenericSignature Sig) {
-  beginMangling();
-
-  if (!Sig) {
-    SILFunctionType *FTy = Function->getLoweredFunctionType();
-    Sig = FTy->getInvocationGenericSignature();
-  }
-
-  bool First = true;
-  Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
-    if (Canonical) {
-      appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
-      appendListSeparator(First);
-    }
-  });
-  assert(!First && "no generic substitutions");
-
-  if (isInlined)
-    appendSpecializationOperator("Ti");
-  else
-    appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
-  return finalize();
-}
 
 //===----------------------------------------------------------------------===//
 //                         Partial Generic Specialization

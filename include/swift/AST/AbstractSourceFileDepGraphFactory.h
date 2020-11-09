@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCE_FILE_DEP_GRAPH_CONSTRUCTOR_H
 #define SWIFT_AST_SOURCE_FILE_DEP_GRAPH_CONSTRUCTOR_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/FineGrainedDependencies.h"
 
@@ -24,10 +25,6 @@ namespace fine_grained_dependencies {
 /// \c SourceFile or a unit test
 class AbstractSourceFileDepGraphFactory {
 protected:
-  /// To match the existing system, set this to false.
-  /// To include even private entities and get intra-file info, set to true.
-  const bool includePrivateDeps;
-
   /// If there was an error, cannot get accurate info.
   const bool hadCompilationError;
 
@@ -48,8 +45,7 @@ protected:
 public:
   /// Expose this layer to enable faking up a constructor for testing.
   /// See the instance variable comments for explanation.
-  AbstractSourceFileDepGraphFactory(bool includePrivateDeps,
-                                    bool hadCompilationError,
+  AbstractSourceFileDepGraphFactory(bool hadCompilationError,
                                     StringRef swiftDeps,
                                     StringRef fileFingerprint,
                                     bool emitDotFileAfterConstruction,
@@ -70,6 +66,19 @@ private:
   virtual void addAllUsedDecls() = 0;
 
 protected:
+  /// Given an array of Decls or pairs of them in \p declsOrPairs
+  /// create node pairs for context and name
+  template <NodeKind kind, typename ContentsT>
+  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec) {
+    for (const auto &declOrPair : contentsVec) {
+      Optional<std::string> fp =
+          AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
+      addADefinedDecl(
+          DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
+          fp ? StringRef(fp.getValue()) : Optional<StringRef>());
+    }
+  }
+
   /// Add an pair of interface, implementation nodes to the graph, which
   /// represent some \c Decl defined in this source file. \param key the
   /// interface key of the pair
@@ -77,6 +86,21 @@ protected:
                        Optional<StringRef> fingerprint);
 
   void addAUsedDecl(const DependencyKey &def, const DependencyKey &use);
+
+  static Optional<std::string> getFingerprintIfAny(
+      std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+    return None;
+  }
+
+  static Optional<std::string> getFingerprintIfAny(const Decl *d) {
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+      auto result = idc->getBodyFingerprint();
+      assert((!result || !result->empty()) &&
+             "Fingerprint should never be empty");
+      return result;
+    }
+    return None;
+  }
 };
 
 } // namespace fine_grained_dependencies

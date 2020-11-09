@@ -845,7 +845,7 @@ logical operations in different ways, with the following axes:
 
 We should represent these aspects as orthogonal, composable components,
 abstracting pattern matchers into a protocol like
-[this one](https://github.com/apple/swift/blob/master/test/Prototypes/PatternMatching.swift#L33),
+[this one](https://github.com/apple/swift/blob/main/test/Prototypes/PatternMatching.swift#L33),
 that can allow us to define logical operations once, without introducing
 overloads, and massively reducing API surface area.
 

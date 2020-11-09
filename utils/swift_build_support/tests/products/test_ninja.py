@@ -101,7 +101,7 @@ class NinjaTestCase(unittest.TestCase):
                 "env "
                 "'CFLAGS=-isysroot {sysroot} -mmacosx-version-min=10.9' "
                 "CXX={cxx} "
-                "LDFLAGS=-mmacosx-version-min=10.9 "
+                "'LDFLAGS=-isysroot {sysroot} -mmacosx-version-min=10.9' "
             ).format(
                 cxx=self.toolchain.cxx,
                 sysroot=xcrun.sdk_path('macosx')

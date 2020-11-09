@@ -85,8 +85,6 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
 /// This assumes the AST which contains \p DC has exact the same structure with
 /// \p SF.
-/// FIXME: This doesn't support IfConfigDecl blocks. If \p DC is in an inactive
-///        config block, this function returns \c false.
 static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
                                                            SourceFile *SF) {
   PrettyStackTraceDeclContext trace("getting equivalent decl context for", DC);
@@ -129,7 +127,6 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     }
 
     // Not found in the decl context tree.
-    // FIXME: Probably DC is in an inactive #if block.
     if (N == ~0U) {
       return nullptr;
     }
@@ -198,6 +195,10 @@ forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
 
   // Check other non-system depenencies (e.g. modules, headers).
   for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
+    if (callback(dep))
+      return true;
+  }
+  for (auto &dep : CI.getDependencyTracker()->getIncrementalDependencies()) {
     if (callback(dep))
       return true;
   }
@@ -275,10 +276,55 @@ static bool areAnyDependentFilesInvalidated(
       });
 }
 
+/// Get interface hash of \p SF including the type members in the file.
+///
+/// See if the inteface of the function and types visible from a function body
+/// has changed since the last completion. If they haven't changed, completion
+/// can reuse the existing AST of the source file. \c SF->getInterfaceHash() is
+/// not enough because it doesn't take the interface of the type members into
+/// account. For example:
+///
+///   struct S {
+///     func foo() {}
+///   }
+///   func main(val: S) {
+///     val.<HERE>
+///   }
+///
+/// In this case, we need to ensure that the interface of \c S hasn't changed.
+/// Note that we don't care about local types (i.e. type declarations inside
+/// function bodies, closures, or top level statement bodies) because they are
+/// not visible from other functions where the completion is happening.
+void getInterfaceHashIncludingTypeMembers(SourceFile *SF,
+                                          llvm::SmallString<32> &str) {
+  /// FIXME: Gross. Hashing multiple "hash" values.
+  llvm::MD5 hash;
+  SF->getInterfaceHash(str);
+  hash.update(str);
+
+  std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
+      [&](IterableDeclContext *IDC) {
+        if (auto fp = IDC->getBodyFingerprint())
+          hash.update(*fp);
+        for (auto *member : IDC->getParsedMembers())
+          if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
+            hashTypeBodyFingerprints(childIDC);
+      };
+
+  for (auto *D : SF->getTopLevelDecls()) {
+    if (auto IDC = dyn_cast<IterableDeclContext>(D))
+      hashTypeBodyFingerprints(IDC);
+  }
+
+  llvm::MD5::MD5Result result;
+  hash.final(result);
+  str = result.digest();
+}
+
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
-    const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+   llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
@@ -288,7 +334,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   if (!CachedCI)
     return false;
-  if (CachedReuseCount >= MaxASTReuseCount)
+  if (CachedReuseCount >= Opts.MaxASTReuseCount)
     return false;
   if (CachedArgHash != ArgsHash)
     return false;
@@ -321,13 +367,13 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
   langOpts.DisableParserLookup = true;
-  // Ensure all non-function-body tokens are hashed into the interface hash
-  langOpts.EnableTypeFingerprints = false;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
+  ClangImporterOptions clangOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts, tmpSM,
+                      tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
@@ -354,8 +400,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // If the interface has changed, AST must be refreshed.
     llvm::SmallString<32> oldInterfaceHash{};
     llvm::SmallString<32> newInterfaceHash{};
-    oldSF->getInterfaceHash(oldInterfaceHash);
-    tmpSF->getInterfaceHash(newInterfaceHash);
+    getInterfaceHashIncludingTypeMembers(oldSF, oldInterfaceHash);
+    getInterfaceHashIncludingTypeMembers(tmpSF, newInterfaceHash);
     if (oldInterfaceHash != newInterfaceHash)
       return false;
 
@@ -405,15 +451,24 @@ bool CompletionInstance::performCachedOperationIfPossible(
     Scope Top(SI, ScopeKind::TopLevel);
     Scope Body(SI, ScopeKind::FunctionBody);
 
+    assert(oldInfo.Kind == CodeCompletionDelayedDeclKind::FunctionBody &&
+           "If the interface hash is the same as old one, the previous kind "
+           "must be FunctionBody too. Otherwise, hashing is too weak");
+    oldInfo.Kind = CodeCompletionDelayedDeclKind::FunctionBody;
     oldInfo.ParentContext = DC;
     oldInfo.StartOffset = newInfo.StartOffset;
     oldInfo.EndOffset = newInfo.EndOffset;
     oldInfo.PrevOffset = newInfo.PrevOffset;
     oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
 
+    auto newBufferStart = SM.getRangeForBuffer(newBufferID).getStart();
+    SourceRange newBodyRange(newBufferStart.getAdvancedLoc(newInfo.StartOffset),
+                             newBufferStart.getAdvancedLoc(newInfo.EndOffset));
+
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    if (AFD->isBodySkipped())
-      AFD->setBodyDelayed(AFD->getBodySourceRange());
+    AFD->setBodyToBeReparsed(newBodyRange);
+    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
+    oldSF->clearScope();
 
     traceDC = AFD;
     break;
@@ -483,8 +538,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   CachedReuseCount += 1;
-  cacheDependencyHashIfNeeded(CI, SM.getCodeCompletionBufferID(),
-                              InMemoryDependencyHash);
 
   return true;
 }
@@ -568,20 +621,21 @@ bool CompletionInstance::shouldCheckDependencies() const {
   assert(CachedCI);
   using namespace std::chrono;
   auto now = system_clock::now();
-  return DependencyCheckedTimestamp + seconds(DependencyCheckIntervalSecond) <
-         now;
+  auto threshold = DependencyCheckedTimestamp +
+                   seconds(Opts.DependencyCheckIntervalSecond);
+  return threshold < now;
 }
 
-void CompletionInstance::setDependencyCheckIntervalSecond(unsigned Value) {
+void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
   std::lock_guard<std::mutex> lock(mtx);
-  DependencyCheckIntervalSecond = Value;
+  Opts = NewOpts;
 }
 
 bool swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
+    std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
@@ -592,39 +646,26 @@ bool swift::ide::CompletionInstance::performOperation(
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
 
-  // Since caching uses the interface hash, and since per type fingerprints
-  // weaken that hash, disable them here:
-  Invocation.getLangOptions().EnableTypeFingerprints = false;
-
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
 
-  // FIXME: ASTScopeLookup doesn't support code completion yet.
-  Invocation.disableASTScopeLookup();
+  // Compute the signature of the invocation.
+  llvm::hash_code ArgsHash(0);
+  for (auto arg : Args)
+    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
 
-  if (EnableASTCaching) {
-    // Compute the signature of the invocation.
-    llvm::hash_code ArgsHash(0);
-    for (auto arg : Args)
-      ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+  // Concurrent completions will block so that they have higher chance to use
+  // the cached completion instance.
+  std::lock_guard<std::mutex> lock(mtx);
 
-    // Concurrent completions will block so that they have higher chance to use
-    // the cached completion instance.
-    std::lock_guard<std::mutex> lock(mtx);
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
+                                       Offset, DiagC, Callback)) {
+    return true;
+  }
 
-    if (performCachedOperationIfPossible(Invocation, ArgsHash, FileSystem,
-                                         completionBuffer, Offset, DiagC,
-                                         Callback))
-      return true;
-
-    if (performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                            Offset, Error, DiagC, Callback))
-      return true;
-  } else {
-    // Concurrent completions may happen in parallel when caching is disabled.
-    if (performNewOperation(None, Invocation, FileSystem, completionBuffer,
-                            Offset, Error, DiagC, Callback))
-      return true;
+  if(performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
+                         Offset, Error, DiagC, Callback)) {
+    return true;
   }
 
   assert(!Error.empty());

@@ -398,26 +398,23 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // -- initialization for y
-    // CHECK: [[Y_INIT:%[0-9]+]] = function_ref @$s8lifetime3FooC1ySi_AA3RefCtvpfi : $@convention(thin) <τ_0_0> () -> (Int, @owned Ref)
-    // CHECK: [[Y_VALUE:%[0-9]+]] = apply [[Y_INIT]]<T>()
-    // CHECK: ([[Y_EXTRACTED_0:%.*]], [[Y_EXTRACTED_1:%.*]]) = destructure_tuple
     // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
     // CHECK: [[THIS_Y:%.*]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.y
-    // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_Y]] : $*(Int, Ref)
-    // CHECK: [[THIS_Y_0:%.*]] = tuple_element_addr [[WRITE]] : $*(Int, Ref), 0
-    // CHECK: assign [[Y_EXTRACTED_0]] to [[THIS_Y_0]]
-    // CHECK: [[THIS_Y_1:%.*]] = tuple_element_addr [[WRITE]] : $*(Int, Ref), 1
-    // CHECK: assign [[Y_EXTRACTED_1]] to [[THIS_Y_1]]
-    // CHECK: end_access [[WRITE]] : $*(Int, Ref)
+    // CHECK: [[Y_INIT:%[0-9]+]] = function_ref @$s8lifetime3FooC1ySi_AA3RefCtvpfi : $@convention(thin) <τ_0_0> () -> (Int, @owned Ref)
+    // CHECK: [[THIS_Y_0:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 0
+    // CHECK: [[THIS_Y_1:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 1
+    // CHECK: [[Y_VALUE:%[0-9]+]] = apply [[Y_INIT]]<T>()
+    // CHECK: ([[Y_EXTRACTED_0:%.*]], [[Y_EXTRACTED_1:%.*]]) = destructure_tuple
+    // CHECK: store [[Y_EXTRACTED_0]] to [trivial] [[THIS_Y_0]]
+    // CHECK: store [[Y_EXTRACTED_1]] to [init] [[THIS_Y_1]]
     // CHECK: end_borrow [[BORROWED_THIS]]
 
     // -- Initialization for w
-    // CHECK: [[Z_FUNC:%.*]] = function_ref @$s{{.*}}8lifetime3FooC1wAA3RefCvpfi : $@convention(thin) <τ_0_0> () -> @owned Ref
-    // CHECK: [[Z_RESULT:%.*]] = apply [[Z_FUNC]]<T>()
     // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
     // CHECK: [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]]
-    // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_Z]] : $*Ref
-    // CHECK: assign [[Z_RESULT]] to [[WRITE]]
+    // CHECK: [[Z_FUNC:%.*]] = function_ref @$s{{.*}}8lifetime3FooC1wAA3RefCvpfi : $@convention(thin) <τ_0_0> () -> @owned Ref
+    // CHECK: [[Z_RESULT:%.*]] = apply [[Z_FUNC]]<T>()
+    // CHECK: store [[Z_RESULT]] to [init] [[THIS_Z]]
     // CHECK: end_borrow [[BORROWED_THIS]]
 
     // -- Initialization for x
@@ -462,11 +459,10 @@ class Foo<T> {
     // -- First we initialize #Foo.y.
     // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
     // CHECK:   [[THIS_Y:%.*]] = ref_element_addr [[BORROWED_THIS]] : $Foo<T>, #Foo.y
-    // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_Y]] : $*(Int, Ref)
-    // CHECK:   [[THIS_Y_1:%.*]] = tuple_element_addr [[WRITE]] : $*(Int, Ref), 0
-    // CHECK:   assign {{.*}} to [[THIS_Y_1]] : $*Int
-    // CHECK:   [[THIS_Y_2:%.*]] = tuple_element_addr [[WRITE]] : $*(Int, Ref), 1
-    // CHECK:   assign {{.*}} to [[THIS_Y_2]] : $*Ref
+    // CHECK:   [[THIS_Y_1:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 0
+    // CHECK:   [[THIS_Y_2:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 1
+    // CHECK:   store {{.*}} to [trivial] [[THIS_Y_1]] : $*Int
+    // CHECK:   store {{.*}} to [init] [[THIS_Y_2]] : $*Ref
     // CHECK:   end_borrow [[BORROWED_THIS]]
 
     // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.

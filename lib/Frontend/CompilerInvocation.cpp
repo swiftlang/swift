@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -108,11 +108,11 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     llvm::sys::path::append(defaultPrebuiltPathWithSDKVer, ver->getAsString());
     // If the versioned prebuilt module cache exists in the disk, use it.
     if (llvm::sys::fs::exists(defaultPrebuiltPathWithSDKVer)) {
-      FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPathWithSDKVer.str();
+      FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPathWithSDKVer.str());
       return;
     }
   }
-  FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
+  FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath.str());
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -137,9 +137,13 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
     return;
 
-  if (!Triple.isOSDarwin())
-    llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+  // This is compatibility for <=5.3
+  if (!Triple.isOSDarwin()) {
+    llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+  }
 
   if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
@@ -226,24 +230,6 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
-SourceFileKind CompilerInvocation::getSourceFileKind() const {
-  switch (getInputKind()) {
-  case InputFileKind::Swift:
-    return SourceFileKind::Main;
-  case InputFileKind::SwiftLibrary:
-    return SourceFileKind::Library;
-  case InputFileKind::SwiftModuleInterface:
-    return SourceFileKind::Interface;
-  case InputFileKind::SIL:
-    return SourceFileKind::SIL;
-  case InputFileKind::None:
-  case InputFileKind::LLVM:
-    llvm_unreachable("Trying to convert from unsupported InputFileKind");
-  }
-
-  llvm_unreachable("Unhandled InputFileKind in switch.");
-}
-
 static bool ParseFrontendArgs(
     FrontendOptions &opts, ArgList &args, DiagnosticEngine &diags,
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
@@ -325,6 +311,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_print_full_convention);
   Opts.ExperimentalSPIImports |=
     Args.hasArg(OPT_experimental_spi_imports);
+  Opts.DebugPrintInvalidSyntax |=
+    Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -388,6 +376,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
+  Opts.DisableImplicitConcurrencyModuleImport |=
+    Args.hasArg(OPT_disable_implicit_concurrency_module_import);
+
   Opts.EnableSubstSILFunctionTypesForFunctionValues |=
     Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
 
@@ -403,9 +394,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
-  if (FrontendOpts.InputKind == InputFileKind::SIL)
-    Opts.DisableAvailabilityChecking = true;
-  
+  if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
+                               OPT_disable_conformance_availability_errors)) {
+    Opts.EnableConformanceAvailabilityErrors
+      = A->getOption().matches(OPT_enable_conformance_availability_errors);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
@@ -440,16 +434,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
   
-  Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
-  Opts.EnableASTScopeLookup =
-      Args.hasFlag(options::OPT_enable_astscope_lookup,
-                   options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
-      Opts.DisableParserLookup;
-  Opts.CrosscheckUnqualifiedLookup |=
-      Args.hasArg(OPT_crosscheck_unqualified_lookup);
-  Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
-  Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
-  Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
+  Opts.DisableParserLookup |= Args.hasFlag(OPT_disable_parser_lookup,
+                                           OPT_enable_parser_lookup,
+                                           /*default*/ true);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -462,24 +449,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
-  Opts.EnableTypeFingerprints =
-      Args.hasFlag(options::OPT_enable_type_fingerprints,
-                   options::OPT_disable_type_fingerprints,
-                   LangOptions().EnableTypeFingerprints);
-
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
-  if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
-    Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
-
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-
-  Opts.DirectIntramoduleDependencies =
-      Args.hasFlag(OPT_enable_direct_intramodule_dependencies,
-                   OPT_disable_direct_intramodule_dependencies,
-                   Opts.DirectIntramoduleDependencies);
 
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
@@ -531,6 +505,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
       Opts.RequireExplicitAvailabilityTarget = A->getValue();
     }
+  }
+
+  for (const Arg *A : Args.filtered(OPT_define_availability)) {
+    Opts.AvailabilityMacros.push_back(A->getValue());
   }
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
@@ -601,9 +579,22 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
+  std::string TargetArgScratch;
+
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
+
+    // Backward compatibility hack: infer "simulator" environment for x86
+    // iOS/tvOS/watchOS. The driver takes care of this for the frontend
+    // most of the time, but loading of old .swiftinterface files goes
+    // directly to the frontend.
+    if (tripleInfersSimulatorEnvironment(Target)) {
+      // Set the simulator environment.
+      Target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
+      TargetArgScratch = Target.str();
+      TargetArg = TargetArgScratch;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
@@ -686,8 +677,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   // If we're parsing SIL, access control doesn't make sense to enforce.
-  if (FrontendOpts.InputKind == InputFileKind::SIL) {
+  if (Args.hasArg(OPT_parse_sil) ||
+      FrontendOpts.InputsAndOutputs.shouldTreatAsSIL()) {
     Opts.EnableAccessControl = false;
+    Opts.DisableAvailabilityChecking = true;
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
@@ -731,22 +724,26 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
-  Opts.SkipNonInlinableFunctionBodies |=
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies);
 
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
-  Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
+  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
+      Args.hasArg(OPT_tbd_is_installapi))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
 
-  if (Opts.SkipNonInlinableFunctionBodies &&
+  if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::All;
+
+  if (Opts.SkipFunctionBodies == FunctionBodySkipping::NonInlinable &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
     // Disable this optimization if we're compiling SwiftOnoneSupport, because
     // we _definitely_ need to look inside every declaration to figure out
     // what gets prespecialized.
-    Opts.SkipNonInlinableFunctionBodies = false;
-    Diags.diagnose(SourceLoc(),
-                   diag::module_incompatible_with_skip_function_bodies,
-                   SWIFT_ONONE_SUPPORT);
+    Opts.SkipFunctionBodies = FunctionBodySkipping::None;
+    Diags.diagnose(
+        SourceLoc(),
+        diag::module_incompatible_with_skip_non_inlinable_function_bodies,
+        SWIFT_ONONE_SUPPORT);
   }
 
   Opts.DisableConstraintSolverPerformanceHacks |=
@@ -758,8 +755,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
-  Opts.SolverEnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_solver_enable_operator_designated_types);
   Opts.EnableOneWayClosureParameters |=
       Args.hasArg(OPT_experimental_one_way_closure_params);
 
@@ -913,7 +908,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
     Opts.PlaceholderDependencyModuleMap = A->getValue();
-
+  if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
+    Opts.BatchScanInputFilePath = A->getValue();
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -1077,8 +1073,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.StopOptimizationAfterSerialization = true;
 
   // Propagate the typechecker's understanding of
-  // -experimental-skip-non-inlinable-function-bodies to SIL.
-  Opts.SkipNonInlinableFunctionBodies = TCOpts.SkipNonInlinableFunctionBodies;
+  // -experimental-skip-*-function-bodies to SIL.
+  Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -1111,6 +1107,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_AssumeSingleThreaded)) {
     Opts.AssumeSingleThreaded = true;
   }
+
+  Opts.IgnoreAlwaysInline |= Args.hasArg(OPT_ignore_always_inline);
 
   // Parse the assert configuration identifier.
   if (const Arg *A = Args.getLastArg(OPT_AssertConfig)) {
@@ -1152,7 +1150,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
+  Opts.PrintFullConvention |=
+      Args.hasArg(OPT_experimental_print_full_convention);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
+  Opts.StopOptimizationBeforeLoweringOwnership |=
+      Args.hasArg(OPT_sil_stop_optzns_before_lowering_ownership);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 
@@ -1871,7 +1873,7 @@ CompilerInvocation::setUpInputForSILTool(
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
   getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get()));
+      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get(), file_types::TY_SIL));
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), &extendedInfo);
@@ -1882,13 +1884,14 @@ CompilerInvocation::setUpInputForSILTool(
                                ? moduleNameArg
                                : llvm::sys::path::stem(inputFilename);
     setModuleName(stem);
-    setInputKind(InputFileKind::SwiftLibrary);
+    getFrontendOptions().InputMode =
+        FrontendOptions::ParseInputMode::SwiftLibrary;
   } else {
     const StringRef name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
                                : moduleNameArg;
     setModuleName(name);
-    setInputKind(InputFileKind::SIL);
+    getFrontendOptions().InputMode = FrontendOptions::ParseInputMode::SIL;
   }
   return fileBufOrErr;
 }

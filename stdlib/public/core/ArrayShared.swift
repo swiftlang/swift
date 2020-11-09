@@ -64,6 +64,7 @@ func _deallocateUninitializedArray<Element>(
   array._deallocateUninitialized()
 }
 
+#if !INTERNAL_CHECKS_ENABLED
 @_alwaysEmitIntoClient
 @_semantics("array.finalize_intrinsic")
 @_effects(readnone)
@@ -75,6 +76,20 @@ func _finalizeUninitializedArray<Element>(
   mutableArray._endMutation()
   return mutableArray
 }
+#else
+// When asserts are enabled, _endCOWMutation writes to _native.isImmutable
+// So we cannot have @_effects(readnone)
+@_alwaysEmitIntoClient
+@_semantics("array.finalize_intrinsic")
+public // COMPILER_INTRINSIC
+func _finalizeUninitializedArray<Element>(
+  _ array: __owned Array<Element>
+) -> Array<Element> {
+  var mutableArray = array
+  mutableArray._endMutation()
+  return mutableArray
+}
+#endif
 
 extension Collection {  
   // Utility method for collections that wish to implement

@@ -22,6 +22,7 @@ import TestsUtils
 enum ChaCha20 { }
 
 extension ChaCha20 {
+    @inline(never)
     public static func encrypt<Key: Collection, Nonce: Collection, Bytes: MutableCollection>(bytes: inout Bytes, key: Key, nonce: Nonce, initialCounter: UInt32 = 0) where Bytes.Element == UInt8, Key.Element == UInt8, Nonce.Element == UInt8 {
         var baseState = ChaChaState(key: key, nonce: nonce, counter: initialCounter)
         var index = bytes.startIndex
@@ -347,13 +348,28 @@ public let ChaCha = BenchmarkInfo(
   runFunction: run_ChaCha,
   tags: [.runtime, .cpubench])
 
+@inline(never)
+func checkResult(_ plaintext: [UInt8]) {
+    CheckResults(plaintext.first! == 6 && plaintext.last! == 254)
+    var hash: UInt64 = 0
+    for byte in plaintext {
+        // rotate
+        hash = (hash &<< 8) | (hash &>> (64 - 8))
+        hash ^= UInt64(byte)
+    }
+    CheckResults(hash == 0xa1bcdb217d8d14e4)
+}
 
 @inline(never)
 public func run_ChaCha(_ N: Int) {
-  var plaintext = Array(repeating: UInt8(0), count: 30720)  // Chosen for CI runtime
   let key = Array(repeating: UInt8(1), count: 32)
   let nonce = Array(repeating: UInt8(2), count: 12)
 
+  var checkedtext = Array(repeating: UInt8(0), count: 1024)
+  ChaCha20.encrypt(bytes: &checkedtext, key: key, nonce: nonce)
+  checkResult(checkedtext)
+
+  var plaintext = Array(repeating: UInt8(0), count: 30720)  // Chosen for CI runtime
   for _ in 1...N {
     ChaCha20.encrypt(bytes: &plaintext, key: key, nonce: nonce)
     blackHole(plaintext.first!)

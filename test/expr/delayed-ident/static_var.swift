@@ -50,8 +50,7 @@ var _: HasClosure = .factoryOpt(3)
 // expected-error@-1 {{value of optional type '((Int) -> HasClosure)?' must be unwrapped to a value of type '(Int) -> HasClosure'}}
 // expected-note@-2 {{coalesce}}
 // expected-note@-3 {{force-unwrap}}
-// FIXME: we should accept this
-var _: HasClosure = .factoryOpt!(4) // expected-error {{cannot infer contextual base in reference to member 'factoryOpt'}}
+var _: HasClosure = .factoryOpt!(4)
 
 infix operator =%: ComparisonPrecedence
 

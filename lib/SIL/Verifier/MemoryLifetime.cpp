@@ -261,14 +261,14 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
     switch (user->getKind()) {
       case SILInstructionKind::StructElementAddrInst: {
         auto SEAI = cast<StructElementAddrInst>(user);
-        if (!analyzeAddrProjection(SEAI, locIdx, SEAI->getFieldNo(),
+        if (!analyzeAddrProjection(SEAI, locIdx, SEAI->getFieldIndex(),
                                 collectedVals, subLocationMap))
           return false;
         break;
       }
       case SILInstructionKind::TupleElementAddrInst: {
         auto *TEAI = cast<TupleElementAddrInst>(user);
-        if (!analyzeAddrProjection(TEAI, locIdx, TEAI->getFieldNo(),
+        if (!analyzeAddrProjection(TEAI, locIdx, TEAI->getFieldIndex(),
                                 collectedVals, subLocationMap))
           return false;
         break;

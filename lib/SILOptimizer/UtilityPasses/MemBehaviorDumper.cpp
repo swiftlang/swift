@@ -59,7 +59,10 @@ class MemBehaviorDumper : public SILModuleTransform {
   // selected types of instructions.
   static bool shouldTestInstruction(SILInstruction *I) {
     // Only consider function calls.
-    if ((EnableDumpAll && I->mayReadOrWriteMemory()) || FullApplySite::isa(I))
+    if ((EnableDumpAll && I->mayReadOrWriteMemory()) ||
+        FullApplySite::isa(I) ||
+        isa<EndApplyInst>(I) ||
+        isa<AbortApplyInst>(I))
       return true;
 
     return false;
@@ -88,11 +91,9 @@ class MemBehaviorDumper : public SILModuleTransform {
 
               bool Read = AA->mayReadFromMemory(&I, V);
               bool Write = AA->mayWriteToMemory(&I, V);
-              bool SideEffects = AA->mayHaveSideEffects(&I, V);
               llvm::outs() << "PAIR #" << PairCount++ << ".\n"
                            << "  " << I << "  " << V
-                           << "  r=" << Read << ",w=" << Write
-                           << ",se=" << SideEffects << "\n";
+                           << "  r=" << Read << ",w=" << Write << "\n";
             }
           }
         }

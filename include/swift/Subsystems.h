@@ -29,6 +29,7 @@
 #include <memory>
 
 namespace llvm {
+  class raw_pwrite_stream;
   class GlobalVariable;
   class MemoryBuffer;
   class Module;
@@ -72,6 +73,10 @@ namespace swift {
 
   namespace Lowering {
     class TypeConverter;
+  }
+
+  namespace fine_grained_dependencies {
+    class SourceFileDepGraph;
   }
 
   /// @{
@@ -148,7 +153,9 @@ namespace swift {
   ///
   /// \returns A well-formed type on success, or an \c ErrorType.
   Type performTypeResolution(TypeRepr *TyR, ASTContext &Ctx, bool isSILMode,
-                             bool isSILType, GenericEnvironment *GenericEnv,
+                             bool isSILType,
+                             GenericEnvironment *GenericEnv,
+                             GenericParamList *GenericParams,
                              DeclContext *DC, bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -171,8 +178,10 @@ namespace swift {
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
   /// Serializes a module or single source file to the given output file.
-  void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
-                 const SILModule *M = nullptr);
+  void
+  serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+            const SILModule *M = nullptr,
+            const fine_grained_dependencies::SourceFileDepGraph *DG = nullptr);
 
   /// Serializes a module or single source file to the given output file and
   /// returns back the file's contents as a memory buffer.

@@ -18,10 +18,12 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "swift/AST/LocalizationFormat.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
@@ -92,6 +94,7 @@ namespace swift {
     DeclAttribute,
     VersionTuple,
     LayoutConstraint,
+    ActorIsolation,
   };
 
   namespace diag {
@@ -121,6 +124,7 @@ namespace swift {
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
+      ActorIsolation ActorIsolationVal;
     };
     
   public:
@@ -208,6 +212,12 @@ namespace swift {
     DiagnosticArgument(LayoutConstraint L)
       : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
     }
+
+    DiagnosticArgument(ActorIsolation AI)
+      : Kind(DiagnosticArgumentKind::ActorIsolation),
+        ActorIsolationVal(AI) {
+    }
+
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -297,6 +307,11 @@ namespace swift {
     LayoutConstraint getAsLayoutConstraint() const {
       assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
       return LayoutConstraintVal;
+    }
+
+    ActorIsolation getAsActorIsolation() const {
+      assert(Kind == DiagnosticArgumentKind::ActorIsolation);
+      return ActorIsolationVal;
     }
   };
   
@@ -987,7 +1002,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    const char *diagnosticStringFor(const DiagID id, bool printDiagnosticName);
+    llvm::StringRef diagnosticStringFor(const DiagID id,
+                                        bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
@@ -1054,6 +1070,21 @@ namespace swift {
         Engine.TransactionStrings.clear();
         Engine.TransactionAllocator.Reset();
       }
+    }
+
+    bool hasErrors() const {
+      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
+                                           PrevDiagnostics,
+                                       Engine.TentativeDiagnostics.end());
+
+      for (auto &diagnostic : diagnostics) {
+        auto behavior = Engine.state.determineBehavior(diagnostic.getID());
+        if (behavior == DiagnosticState::Behavior::Fatal ||
+            behavior == DiagnosticState::Behavior::Error)
+          return true;
+      }
+
+      return false;
     }
 
     /// Abort and close this transaction and erase all diagnostics

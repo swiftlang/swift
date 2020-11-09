@@ -27,10 +27,16 @@ using namespace swift;
 
 namespace {
 class PruneVTables : public SILModuleTransform {
-  void runOnVTable(SILModule *M,
-                   SILVTable *vtable) {
+  void runOnVTable(SILModule *M, SILVTable *vtable) {
     LLVM_DEBUG(llvm::dbgs() << "PruneVTables inspecting table:\n";
                vtable->print(llvm::dbgs()));
+    if (!M->isWholeModule() &&
+        vtable->getClass()->getEffectiveAccess() >= AccessLevel::FilePrivate) {
+      LLVM_DEBUG(llvm::dbgs() << "Ignoring visible table: ";
+                 vtable->print(llvm::dbgs()));
+      return;
+    }
+
     for (auto &entry : vtable->getMutableEntries()) {
       
       // We don't need to worry about entries that are overridden,

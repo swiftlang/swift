@@ -190,5 +190,7 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
 
+REMARK(remark_forwarding_to_new_driver, none, "new Swift driver will be used", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

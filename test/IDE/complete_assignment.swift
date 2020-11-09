@@ -127,17 +127,19 @@ func f2() {
 	  d = .#^ASSIGN_5^#
 	}
 
-// ASSIGN_5: Begin completions, 2 items
+// ASSIGN_5: Begin completions, 3 items
 // ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     case2[#D1#]; name=case2
 // ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     case1[#D1#]; name=case1
+// ASSIGN_5-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): D1#})[#(into: inout Hasher) -> Void#]; name=hash(self: D1)
 
 	func f6() {
 	  var d : D2
 	  d = .#^ASSIGN_6^#
 	}
-// ASSIGN_6: Begin completions, 2 items
+// ASSIGN_6: Begin completions, 3 items
 // ASSIGN_6-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     case3[#D2#]; name=case3
 // ASSIGN_6-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     case4[#D2#]; name=case4
+// ASSIGN_6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:     hash({#(self): D2#})[#(into: inout Hasher) -> Void#]; name=hash(self: D2)
 
   func f7 (C : C2) {
     var i : Int
@@ -200,7 +202,7 @@ func f2() {
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
-// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   VoidGen()[#Void#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:   VoidGen()[#Void#]
 // ASSIGN_11-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C2#]
 
   func f12() {

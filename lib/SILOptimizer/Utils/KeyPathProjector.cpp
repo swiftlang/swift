@@ -230,7 +230,11 @@ public:
       auto addr = builder.createAllocStack(loc, type);
       
       assertHasNoContext();
-      assert(getter->getArguments().size() == 2);
+      // For wasm, SILGen emit keypath projecter with extra generic param
+      // argument to match callee and caller signature even if it doesn't
+      // have generic param.
+      auto target = builder.getASTContext().LangOpts.Target;
+      assert(getter->getArguments().size() == 2 + target.isOSBinFormatWasm());
       
       auto ref = builder.createFunctionRef(loc, getter);
       builder.createApply(loc, ref, subs, {addr, parentValue});

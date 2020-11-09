@@ -49,8 +49,7 @@ struct SwiftToSourceKitCompletionAdapter {
     llvm::SmallString<64> name;
     {
       llvm::raw_svector_ostream OSS(name);
-      CodeCompletion::CompletionBuilder::getFilterName(
-          result->getCompletionString(), OSS);
+      ide::printCodeCompletionResultFilterName(*result, OSS);
     }
 
     llvm::SmallString<64> description;
@@ -74,9 +73,6 @@ struct SwiftToSourceKitCompletionAdapter {
                            Completion *result, bool leadingPunctuation,
                            bool legacyLiteralToKeyword,
                            bool annotatedDescription);
-
-  static void getResultSourceText(const CodeCompletionString *CCStr,
-                                  raw_ostream &OS);
 
   static void getResultAssociatedUSRs(ArrayRef<StringRef> AssocUSRs,
                                       raw_ostream &OS);
@@ -125,9 +121,9 @@ static bool swiftCodeCompleteImpl(
     unsigned Offset, SwiftCodeCompletionConsumer &SwiftConsumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    bool EnableASTCaching, bool annotateDescription, std::string &Error) {
+    bool annotateDescription, std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
@@ -219,7 +215,6 @@ void SwiftLangSupport::codeComplete(
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
                              Args, fileSystem,
-                             CCOpts.reuseASTContextIfPossible,
                              CCOpts.annotatedDescription, Error)) {
     SKConsumer.failed(Error);
   }
@@ -466,7 +461,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   unsigned TextBegin = SS.size();
   {
     llvm::raw_svector_ostream ccOS(SS);
-    getResultSourceText(Result->getCompletionString(), ccOS);
+    ide::printCodeCompletionResultSourceText(*Result, ccOS);
   }
   unsigned TextEnd = SS.size();
 
@@ -601,121 +596,6 @@ getCodeCompletionKeywordKindForUID(UIdent uid) {
 
   // FIXME: should warn about unexpected keyword kind.
   return CodeCompletionKeywordKind::None;
-}
-
-using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-
-/// Provide the text for the call parameter, including constructing a typed
-/// editor placeholder for it.
-static void constructTextForCallParam(
-    ArrayRef<CodeCompletionString::Chunk> ParamGroup, raw_ostream &OS) {
-  assert(ParamGroup.front().is(ChunkKind::CallParameterBegin));
-
-  for (; !ParamGroup.empty(); ParamGroup = ParamGroup.slice(1)) {
-    auto &C = ParamGroup.front();
-    if (C.isAnnotation())
-      continue;
-    if (C.is(ChunkKind::CallParameterInternalName) ||
-        C.is(ChunkKind::CallParameterType) ||
-        C.is(ChunkKind::CallParameterTypeBegin) ||
-        C.is(ChunkKind::CallParameterClosureExpr)) {
-      break;
-    }
-    if (!C.hasText())
-      continue;
-    OS << C.getText();
-  }
-
-  SmallString<32> DisplayString;
-  SmallString<32> TypeString;
-  SmallString<32> ExpansionTypeString;
-
-  for (auto i = ParamGroup.begin(), e = ParamGroup.end(); i != e; ++i) {
-    auto &C = *i;
-    if (C.is(ChunkKind::CallParameterTypeBegin)) {
-      assert(TypeString.empty());
-      auto nestingLevel = C.getNestingLevel();
-      ++i;
-      for (; i != e; ++i) {
-        if (i->endsPreviousNestedGroup(nestingLevel))
-          break;
-        if (!i->isAnnotation() && i->hasText()) {
-          TypeString += i->getText();
-          DisplayString += i->getText();
-        }
-      }
-      --i;
-      continue;
-    }
-    if (C.is(ChunkKind::CallParameterClosureType)) {
-      assert(ExpansionTypeString.empty());
-      ExpansionTypeString = C.getText();
-      continue;
-    }
-    if (C.is(ChunkKind::CallParameterType)) {
-      assert(TypeString.empty());
-      TypeString = C.getText();
-    }
-    if (C.is(ChunkKind::CallParameterClosureExpr)) {
-      // We have a closure expression, so provide it directly instead of in
-      // a placeholder.
-      OS << "{";
-      if (!C.getText().empty())
-        OS << " " << C.getText();
-      OS << "\n" << getCodePlaceholder() << "\n}";
-      return;
-    }
-    if (C.isAnnotation() || !C.hasText())
-      continue;
-    DisplayString += C.getText();
-  }
-
-  StringRef Display = DisplayString.str();
-  StringRef Type = TypeString.str();
-  StringRef ExpansionType = ExpansionTypeString.str();
-  if (ExpansionType.empty())
-    ExpansionType = Type;
-
-  OS << "<#T##" << Display;
-  if (Display == Type && Display == ExpansionType) {
-    // Short version, display and type are the same.
-  } else {
-    OS << "##" << Type;
-    if (ExpansionType != Type)
-      OS << "##" << ExpansionType;
-  }
-  OS << "#>";
-}
-
-void SwiftToSourceKitCompletionAdapter::getResultSourceText(
-    const CodeCompletionString *CCStr, raw_ostream &OS) {
-  auto Chunks = CCStr->getChunks();
-  for (size_t i = 0; i < Chunks.size(); ++i) {
-    auto &C = Chunks[i];
-    if (C.is(ChunkKind::BraceStmtWithCursor)) {
-      OS << " {\n" << getCodePlaceholder() << "\n}";
-      continue;
-    }
-    if (C.is(ChunkKind::CallParameterBegin)) {
-      size_t Start = i++;
-      for (; i < Chunks.size(); ++i) {
-        if (Chunks[i].endsPreviousNestedGroup(C.getNestingLevel()))
-          break;
-      }
-      constructTextForCallParam(Chunks.slice(Start, i-Start), OS);
-      --i;
-      continue;
-    }
-    if (C.is(ChunkKind::TypeAnnotationBegin)) {
-      // Skip type annotation structure.
-      auto level = C.getNestingLevel();
-      do { ++i; } while (i != Chunks.size() && !Chunks[i].endsPreviousNestedGroup(level));
-      --i;
-    }
-    if (!C.isAnnotation() && C.hasText()) {
-      OS << C.getText();
-    }
-  }
 }
 
 void SwiftToSourceKitCompletionAdapter::getResultAssociatedUSRs(
@@ -853,7 +733,6 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
-  static UIdent KeyReuseASTContext("key.codecomplete.reuseastcontext");
   static UIdent KeyAnnotatedDescription("key.codecomplete.annotateddescription");
 
   from.valueForOption(KeySortByName, to.sortByName);
@@ -879,7 +758,6 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyPopularityBonus, to.popularityBonus);
   from.valueForOption(KeyHideByName, to.hideByNameStyle);
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
-  from.valueForOption(KeyReuseASTContext, to.reuseASTContextIfPossible);
   from.valueForOption(KeyAnnotatedDescription, to.annotatedDescription);
 }
 
@@ -1005,8 +883,7 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
     llvm::SmallString<64> filterName;
     {
       llvm::raw_svector_ostream OSS(filterName);
-      CodeCompletion::CompletionBuilder::getFilterName(
-          result->getCompletionString(), OSS);
+      ide::printCodeCompletionResultFilterName(*result, OSS);
     }
     llvm::SmallString<64> description;
     {
@@ -1140,8 +1017,7 @@ static void transformAndForwardResults(
     std::string str = inputBuf->getBuffer().slice(0, offset).str();
     {
       llvm::raw_string_ostream OSS(str);
-      SwiftToSourceKitCompletionAdapter::getResultSourceText(
-          exactMatch->getCompletionString(), OSS);
+      ide::printCodeCompletionResultSourceText(*exactMatch, OSS);
     }
 
     auto buffer =
@@ -1153,7 +1029,6 @@ static void transformAndForwardResults(
     std::string error;
     if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
                                cargs, session->getFileSystem(),
-                               options.reuseASTContextIfPossible,
                                options.annotatedDescription, error)) {
       consumer.failed(error);
       return;
@@ -1255,7 +1130,6 @@ void SwiftLangSupport::codeCompleteOpen(
   // Invoke completion.
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
                              extendedArgs, fileSystem,
-                             CCOpts.reuseASTContextIfPossible,
                              CCOpts.annotatedDescription, error)) {
     consumer.failed(error);
     return;

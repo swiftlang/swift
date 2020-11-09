@@ -25,7 +25,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "ConstraintSystem.h"
 
 using namespace swift;
 
@@ -601,10 +600,10 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   assert(!Decls.empty() && "Must have at least one declaration");
 
   auto &Context = UseDC->getASTContext();
-  if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
-                                                       /*isAccessOnSelf*/false);
-    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
+
+  if (Decls.size() == 1) {
+    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit,
+                                     AccessSemantics::Ordinary);
   }
 
   Decls = Context.AllocateCopy(Decls);
@@ -617,13 +616,10 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
 static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
   auto &ctx = dc->getASTContext();
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  if (isa<AbstractFunctionDecl>(dc))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
   DeclNameRef nameRef(ctx.getIdentifier(name));
   auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
                                                nameRef, SourceLoc(),
-                                               lookupOptions);
+                                               defaultUnqualifiedLookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();

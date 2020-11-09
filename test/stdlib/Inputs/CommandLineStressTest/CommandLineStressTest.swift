@@ -1,5 +1,5 @@
 // Do not change the SIL name for this without also changing CommandLineStressTest.c
-@_silgen_name("swift_commandline_test_getProcessArgs")
+@_cdecl("swift_commandline_test_getProcessArgs")
 public func runTest() {
   let CommandLineRaceTestSuite = TestSuite("CommandLine Race")
 

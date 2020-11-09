@@ -1169,7 +1169,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       // Private migration help for overrides of Objective-C methods.
       TypeLoc resultTL;
       if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
-        resultTL = methodAsFunc->getBodyResultTypeLoc();
+        resultTL = TypeLoc(methodAsFunc->getResultTypeRepr(),
+                           methodAsFunc->getResultInterfaceType());
 
       emittedMatchError |= diagnoseMismatchedOptionals(
           method, method->getParameters(), resultTL, baseDecl,
@@ -1197,9 +1198,11 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       emittedMatchError = true;
 
     } else if (mayHaveMismatchedOptionals) {
+      TypeLoc elementTL(subscript->getElementTypeRepr(),
+                        subscript->getElementInterfaceType());
       emittedMatchError |= diagnoseMismatchedOptionals(
           subscript, subscript->getIndices(),
-          subscript->getElementTypeLoc(), baseDecl,
+          elementTL, baseDecl,
           cast<SubscriptDecl>(baseDecl)->getIndices(), owningTy,
           mayHaveMismatchedOptionals);
     }
@@ -1416,6 +1419,7 @@ namespace  {
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
+    UNINTERESTING_ATTR(AsyncHandler)
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
@@ -1468,6 +1472,7 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(SpecializeExtension)
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
@@ -1505,9 +1510,13 @@ namespace  {
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
-    UNINTERESTING_ATTR(FunctionBuilder)
+    UNINTERESTING_ATTR(ResultBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
+    UNINTERESTING_ATTR(Actor)
+    UNINTERESTING_ATTR(ActorIndependent)
+    UNINTERESTING_ATTR(GlobalActor)
+    UNINTERESTING_ATTR(Async)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -2026,13 +2035,30 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Accessors determine their overrides based on their abstract storage
   // declarations.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto kind = accessor->getAccessorKind();
+
+    switch (kind) {
+    case AccessorKind::Get:
+    case AccessorKind::Set:
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+      break;
+
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      // These accessors are never part of the opaque set. Bail out early
+      // to avoid computing the overridden declarations of the storage.
+      return noResults;
+    }
+
     auto overridingASD = accessor->getStorage();
 
     // Check the various overridden storage declarations.
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,
       // this isn't really an override.
@@ -2130,4 +2156,54 @@ bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
 
   return derivedInterfaceTy->matches(overrideInterfaceTy,
                                      TypeMatchFlags::AllowABICompatible);
+}
+
+void swift::checkImplementationOnlyOverride(const ValueDecl *VD) {
+  if (VD->isImplicit())
+    return;
+
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return;
+
+  if (isa<AccessorDecl>(VD))
+    return;
+
+  // Is this part of the module's API or ABI?
+  AccessScope accessScope =
+      VD->getFormalAccessScope(nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  if (!accessScope.isPublic())
+    return;
+
+  const ValueDecl *overridden = VD->getOverriddenDecl();
+  if (!overridden)
+    return;
+
+  auto *SF = VD->getDeclContext()->getParentSourceFile();
+  assert(SF && "checking a non-source declaration?");
+
+  ModuleDecl *M = overridden->getModuleContext();
+  if (SF->isImportedImplementationOnly(M)) {
+    VD->diagnose(diag::implementation_only_override_import_without_attr,
+                 overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+    overridden->diagnose(diag::overridden_here);
+    return;
+  }
+
+  if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+    VD->diagnose(diag::implementation_only_override_without_attr,
+                 overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+    overridden->diagnose(diag::overridden_here);
+    return;
+  }
+
+  // FIXME: Check storage decls where the setter is in a separate module from
+  // the getter, which is a thing Objective-C can do. The ClangImporter
+  // doesn't make this easy, though, because it just gives the setter the same
+  // DeclContext as the property or subscript, which means we've lost the
+  // information about whether its module was implementation-only imported.
 }

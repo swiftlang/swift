@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "irgen"
 #include "IRGenModule.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
@@ -23,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SILOptimizerRequests.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
@@ -41,6 +43,7 @@
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -123,12 +126,6 @@ static void addSwiftContractPass(const PassManagerBuilder &Builder,
                                PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
     PM.add(createSwiftARCContractPass());
-}
-
-static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
-                                       PassManagerBase &PM) {
-  if (Builder.OptLevel > 0)
-    PM.add(createSwiftMergeFunctionsPass());
 }
 
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
@@ -250,9 +247,16 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
-  if (RunSwiftSpecificLLVMOptzns)
+  if (RunSwiftSpecificLLVMOptzns) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addSwiftMergeFunctionsPass);
+      [&](const PassManagerBuilder &Builder, PassManagerBase &PM) {
+        if (Builder.OptLevel > 0) {
+          const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
+          unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
+          PM.add(createSwiftMergeFunctionsPass(schema.isEnabled(), key));
+        }
+      });
+  }
 
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
@@ -687,6 +691,10 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.ResilientClassStubInitCallbacks =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::ResilientClassStubInitCallback);
+
+  opts.AsyncContextParent =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators::AsyncContextParent);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -910,6 +918,52 @@ static void runIRGenPreparePasses(SILModule &Module,
   executePassPipelinePlan(&Module, plan, /*isMandatory*/ true, &IRModule);
 }
 
+namespace {
+using IREntitiesToEmit = SmallVector<LinkEntity, 1>;
+
+struct SymbolSourcesToEmit {
+  SILRefsToEmit silRefsToEmit;
+  IREntitiesToEmit irEntitiesToEmit;
+};
+
+static Optional<SymbolSourcesToEmit>
+getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
+  if (!desc.SymbolsToEmit)
+    return None;
+
+  assert(!desc.SILMod && "Already emitted SIL?");
+
+  // First retrieve the symbol source map to figure out what we need to build,
+  // making sure to include non-public symbols.
+  auto &ctx = desc.getParentModule()->getASTContext();
+  auto tbdDesc = desc.getTBDGenDescriptor();
+  tbdDesc.getOptions().PublicSymbolsOnly = false;
+  auto symbolMap =
+      llvm::cantFail(ctx.evaluator(SymbolSourceMapRequest{std::move(tbdDesc)}));
+
+  // Then split up the symbols so they can be emitted by the appropriate part
+  // of the pipeline.
+  SILRefsToEmit silRefsToEmit;
+  IREntitiesToEmit irEntitiesToEmit;
+  for (const auto &symbol : *desc.SymbolsToEmit) {
+    auto source = symbolMap.find(symbol);
+    assert(source && "Couldn't find symbol");
+    switch (source->kind) {
+    case SymbolSource::Kind::SIL:
+      silRefsToEmit.push_back(source->getSILDeclRef());
+      break;
+    case SymbolSource::Kind::IR:
+      irEntitiesToEmit.push_back(source->getIRLinkEntity());
+      break;
+    case SymbolSource::Kind::LinkerDirective:
+    case SymbolSource::Kind::Unknown:
+      llvm_unreachable("Not supported");
+    }
+  }
+  return SymbolSourcesToEmit{silRefsToEmit, irEntitiesToEmit};
+}
+} // end of anonymous namespace
+
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
 /// All this is done in a single thread.
 GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
@@ -920,12 +974,17 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = M->getASTContext();
   assert(!Ctx.hadError());
 
+  auto symsToEmit = getSymbolSourcesToEmit(desc);
+  assert(!symsToEmit || symsToEmit->irEntitiesToEmit.empty() &&
+         "IR symbol emission not implemented yet");
+
   // If we've been provided a SILModule, use it. Otherwise request the lowered
   // SIL for the file or module.
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   if (!SILMod) {
-    auto loweringDesc =
-        ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts};
+    auto loweringDesc = ASTLoweringDescriptor{
+        desc.Ctx, desc.Conv, desc.SILOpts,
+        symsToEmit.map([](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
     // If there was an error, bail.
@@ -933,7 +992,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       return GeneratedModule::null();
   }
 
-  auto filesToEmit = desc.getFiles();
+  auto filesToEmit = desc.getFilesToEmit();
   auto *primaryFile =
       dyn_cast_or_null<SourceFile>(desc.Ctx.dyn_cast<FileUnit *>());
 
@@ -1014,7 +1073,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
 
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the embedding of bitcode.
-  auto SILModuleRelease = [&SILMod]() { SILMod.reset(nullptr); };
+  auto SILModuleRelease = [&SILMod]() {
+    SILMod.reset(nullptr);
+    SILModule::checkForLeaksAfterDestruction();
+  };
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
   SWIFT_DEFER { Thread.join(); };
@@ -1315,7 +1377,10 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
-  auto SILModuleRelease = [&SILMod]() { SILMod.reset(nullptr); };
+  auto SILModuleRelease = [&SILMod]() {
+    SILMod.reset(nullptr);
+    SILModule::checkForLeaksAfterDestruction();
+  };
   auto releaseModuleThread = std::thread(SILModuleRelease);
 
   codeGenThreads.runMainThread();
@@ -1336,7 +1401,8 @@ GeneratedModule swift::performIRGeneration(
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forWholeModule(
       M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
-      ModuleName, PSPs, parallelOutputFilenames, outModuleHash);
+      ModuleName, PSPs, /*symsToEmit*/ None, parallelOutputFilenames,
+      outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
@@ -1360,7 +1426,8 @@ performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forFile(
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
-      ModuleName, PSPs, PrivateDiscriminator, outModuleHash);
+      ModuleName, PSPs, PrivateDiscriminator, /*symsToEmit*/ None,
+      outModuleHash);
   return llvm::cantFail(file->getASTContext().evaluator(IRGenRequest{desc}));
 }
 
@@ -1449,12 +1516,6 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
 
   bindExtensions(*parentMod);
 
-  // Type-check the files that need emitting.
-  for (auto *file : desc.getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(file))
-      performTypeChecking(*SF);
-  }
-
   if (ctx.hadError())
     return GeneratedModule::null();
 
@@ -1465,4 +1526,24 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
   performLLVMOptimizations(desc.Opts, irMod.getModule(),
                            irMod.getTargetMachine());
   return irMod;
+}
+
+StringRef SymbolObjectCodeRequest::evaluate(Evaluator &evaluator,
+                                            IRGenDescriptor desc) const {
+  auto &ctx = desc.getParentModule()->getASTContext();
+  auto mod = cantFail(evaluator(OptimizedIRRequest{desc}));
+  auto *targetMachine = mod.getTargetMachine();
+
+  // Add the passes to emit the LLVM module as object code.
+  // TODO: Use compileAndWriteLLVM.
+  legacy::PassManager emitPasses;
+  emitPasses.add(createTargetTransformInfoWrapperPass(
+      targetMachine->getTargetIRAnalysis()));
+
+  SmallString<0> output;
+  raw_svector_ostream os(output);
+  targetMachine->addPassesToEmitFile(emitPasses, os, nullptr, CGFT_ObjectFile);
+  emitPasses.run(*mod.getModule());
+  os << '\0';
+  return ctx.AllocateCopy(output.str());
 }

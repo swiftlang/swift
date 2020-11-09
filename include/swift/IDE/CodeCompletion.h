@@ -57,6 +57,20 @@ std::string removeCodeCompletionTokens(StringRef Input,
                                        StringRef TokenName,
                                        unsigned *CompletionOffset);
 
+StringRef copyString(llvm::BumpPtrAllocator &Allocator,
+                     StringRef Str);
+
+const char *copyCString(llvm::BumpPtrAllocator &Allocator,
+                        StringRef Str);
+
+template <typename T>
+ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
+                            ArrayRef<T> Arr) {
+  T *Buffer = Allocator.Allocate<T>(Arr.size());
+  std::copy(Arr.begin(), Arr.end(), Buffer);
+  return llvm::makeArrayRef(Buffer, Arr.size());
+}
+
 namespace detail {
 class CodeCompletionStringChunk {
   friend class swift::ide::CodeCompletionResultBuilder;
@@ -626,11 +640,13 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind =
-                           CodeCompletionOperatorKind::None)
+                           CodeCompletionOperatorKind::None,
+                       StringRef BriefDocComment = StringRef())
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
         NotRecReason(NotRecommendedReason::NoReason),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        BriefDocComment(BriefDocComment),
         TypeDistance(TypeDistance) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
@@ -650,12 +666,13 @@ public:
                        SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance)
+                       ExpectedTypeRelation TypeDistance,
+                       StringRef BriefDocComment = StringRef())
       : Kind(Keyword), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
         NotRecReason(NotRecommendedReason::NoReason),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        TypeDistance(TypeDistance) {
+        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
     IsSystem = 0;
@@ -870,7 +887,7 @@ public:
     /// but should not hide any results.
     SingleExpressionBody,
 
-    /// There are known contextual types.
+    /// There are known contextual types, or there aren't but a nonvoid type is expected.
     Required,
   };
 

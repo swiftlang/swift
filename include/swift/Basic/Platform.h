@@ -44,11 +44,11 @@ namespace swift {
   /// Returns true if the given triple represents watchOS running in a simulator.
   bool tripleIsWatchSimulator(const llvm::Triple &triple);
 
-  /// Return true if the given triple represents any simulator.
-  bool tripleIsAnySimulator(const llvm::Triple &triple);
-
   /// Returns true if the given triple represents a macCatalyst environment.
   bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
+
+  /// Determine whether the triple infers the "simulator" environment.
+  bool tripleInfersSimulatorEnvironment(const llvm::Triple &triple);
 
   /// Returns true if the given -target triple and -target-variant triple
   /// can be zippered.
@@ -106,6 +106,13 @@ namespace swift {
   /// Retrieve the target SDK version for the given SDKInfo and target triple.
   llvm::VersionTuple getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
                                          const llvm::Triple &triple);
+
+  /// Get SDK build version.
+  std::string getSDKBuildVersion(StringRef SDKPath);
+  std::string getSDKBuildVersionFromPlist(StringRef Path);
+
+  /// Get SDK name.
+  std::string getSDKName(StringRef SDKPath);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H

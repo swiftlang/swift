@@ -68,8 +68,6 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
       continue;
     }
 
-    // We need to be known safe over all increments/decrements we are matching
-    // up to ignore insertion points.
     bool BUIsKnownSafe = (*BURefCountState)->second.isKnownSafe();
     LLVM_DEBUG(llvm::dbgs() << "        BOTTOM UP KNOWNSAFE: "
                             << (BUIsKnownSafe ? "true" : "false") << "\n");
@@ -152,8 +150,6 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
       continue;
     }
 
-    // We need to be known safe over all increments/decrements we are matching
-    // up to ignore insertion points.
     bool TDIsKnownSafe = (*TDRefCountState)->second.isKnownSafe();
     LLVM_DEBUG(llvm::dbgs() << "        TOP DOWN KNOWNSAFE: "
                             << (TDIsKnownSafe ? "true" : "false") << "\n");
@@ -223,7 +219,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
     LLVM_DEBUG(llvm::dbgs() << "Attempting to match up increments -> "
                "decrements:\n");
     // For each increment in our list of new increments, attempt to match them
-    // up with decrements and gather the insertion points of the decrements.
+    // up with decrements.
     auto Result = matchIncrementsToDecrements();
     if (!Result) {
       LLVM_DEBUG(llvm::dbgs() << "    FAILED TO MATCH INCREMENTS -> "
@@ -287,8 +283,6 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
   assert(MatchSet.Increments.empty() == MatchSet.Decrements.empty() &&
          "Match set without increments or decrements");
 
-  // If we do not have any insertion points but we do have increments, we must
-  // be eliminating pairs.
   if (!MatchSet.Increments.empty())
     MatchedPair = true;
 

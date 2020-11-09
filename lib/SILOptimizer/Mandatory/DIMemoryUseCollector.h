@@ -176,6 +176,11 @@ public:
            MemoryInst->isDerivedClassSelfOnly();
   }
 
+  /// True if this memory object is the 'self' of a root class init method.
+  bool isRootClassSelf() const {
+    return isClassInitSelf() && MemoryInst->isRootSelf();
+  }
+
   /// True if this memory object is the 'self' of a non-root class init method.
   bool isNonRootClassSelf() const {
     return isClassInitSelf() && !MemoryInst->isRootSelf();
@@ -249,6 +254,10 @@ enum DIUseKind {
   /// value.
   Assign,
 
+  /// The instruction is an assignment of a wrapped value with an already initialized
+  /// backing property wrapper.
+  AssignWrappedValue,
+
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
 
@@ -272,6 +281,9 @@ enum DIUseKind {
   /// This instruction is a load that's only used to answer a `type(of: self)`
   /// question.
   LoadForTypeOfSelf,
+
+  /// This instruction is a value_metatype on the address of 'self'.
+  TypeOfSelf
 };
 
 /// This struct represents a single classified access to the memory object

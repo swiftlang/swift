@@ -46,7 +46,7 @@ class SwiftFormat(product.Product):
     def is_swiftpm_unified_build_product(cls):
         return True
 
-    def run_build_script_helper(self, action, additional_params=[]):
+    def run_build_script_helper(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
@@ -55,7 +55,7 @@ class SwiftFormat(product.Product):
         helper_cmd = [
             script_path,
             action,
-            '--toolchain', self.install_toolchain_path(),
+            '--toolchain', self.install_toolchain_path(host_target),
             '--configuration', configuration,
             '--build-path', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
@@ -74,13 +74,13 @@ class SwiftFormat(product.Product):
         return True
 
     def build(self, host_target):
-        self.run_build_script_helper('build')
+        self.run_build_script_helper('build', host_target)
 
     def should_test(self, host_target):
         return self.args.test_swiftformat
 
     def test(self, host_target):
-        self.run_build_script_helper('test')
+        self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
         return False

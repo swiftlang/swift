@@ -11,10 +11,10 @@ var totalsum = nonTrivialInit(true)
 
 //CHECK-LABEL: sil {{.*}}testit 
 //CHECK: {{^bb0}}
-//CHECK: globalinit_
+//CHECK: WZ
 //CHECK-NOT: {{^bb0}}
 //CHECK: {{^bb1}}
-//CHECK-NOT: globalinit
+//CHECK-NOT: WZ
 //CHECK-NOT: totalsum
 //CHECK-NOT: inputval
 //CHECK: {{^}$}}

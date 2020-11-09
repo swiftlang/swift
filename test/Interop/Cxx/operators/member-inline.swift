@@ -10,13 +10,13 @@ import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-OperatorsTestSuite.test("plus") {
-  var lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
+OperatorsTestSuite.test("LoadableIntWrapper.plus") {
+  var lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
 
-  let result = lhs + rhs
+  let result = lhs - rhs
 
-  expectEqual(65, result.value)
+  expectEqual(19, result.value)
 }
 
 runAllTests()

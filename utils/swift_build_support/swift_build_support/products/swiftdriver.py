@@ -10,9 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from . import cmark
 from . import foundation
-from . import indexstoredb
 from . import libcxx
 from . import libdispatch
 from . import libicu
@@ -20,7 +21,10 @@ from . import llbuild
 from . import llvm
 from . import product
 from . import swift
+from . import swiftpm
 from . import xctest
+from .. import shell
+from .. import targets
 
 
 class SwiftDriver(product.Product):
@@ -47,21 +51,70 @@ class SwiftDriver(product.Product):
                 xctest.XCTest,
                 llbuild.LLBuild]
 
+    def should_clean(self, host_target):
+        return self.args.clean_swift_driver
+
+    def clean(self, host_target):
+        run_build_script_helper('clean', host_target, self, self.args)
+
     def build(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'build', host_target, self, self.args)
+        run_build_script_helper('build', host_target, self, self.args)
 
     def should_test(self, host_target):
         return self.args.test_swift_driver
 
     def test(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'test', host_target, self, self.args,
-            self.args.test_sourcekitlsp_sanitize_all)
+        run_build_script_helper('test', host_target, self, self.args)
 
     def should_install(self, host_target):
         return self.args.install_swift_driver
 
     def install(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'install', host_target, self, self.args)
+        run_build_script_helper('install', host_target, self, self.args)
+
+
+def run_build_script_helper(action, host_target, product, args):
+    build_root = os.path.dirname(product.build_dir)
+    script_path = os.path.join(
+        product.source_dir, 'Utilities', 'build-script-helper.py')
+
+    install_destdir = args.install_destdir
+    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+        install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
+                                                              host_target,
+                                                              product.build_dir)
+    toolchain_path = targets.toolchain_path(install_destdir,
+                                            args.install_prefix)
+
+    # Pass Dispatch directory down if we built it
+    dispatch_build_dir = os.path.join(
+        build_root, '%s-%s' % ('libdispatch', host_target))
+
+    # Pass Foundation directory down if we built it
+    foundation_build_dir = os.path.join(
+        build_root, '%s-%s' % ('foundation', host_target))
+
+    is_release = product.is_release()
+    configuration = 'release' if is_release else 'debug'
+    helper_cmd = [
+        script_path,
+        action,
+        '--package-path', product.source_dir,
+        '--build-path', product.build_dir,
+        '--configuration', configuration,
+        '--toolchain', toolchain_path,
+        '--ninja-bin', product.toolchain.ninja,
+        '--cmake-bin', product.toolchain.cmake,
+    ]
+    if os.path.exists(dispatch_build_dir):
+        helper_cmd += [
+            '--dispatch-build-dir', dispatch_build_dir
+        ]
+    if os.path.exists(foundation_build_dir):
+        helper_cmd += [
+            '--foundation-build-dir', foundation_build_dir
+        ]
+    if args.verbose_build:
+        helper_cmd.append('--verbose')
+
+    shell.call(helper_cmd)

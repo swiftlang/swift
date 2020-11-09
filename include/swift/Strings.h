@@ -22,6 +22,8 @@ namespace swift {
 constexpr static const StringLiteral STDLIB_NAME = "Swift";
 /// The name of the Onone support library, which is a reserved module name.
 constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
+/// The name of the Concurrency module, which supports that extension.
+constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the Builtin module, which contains Builtin functions.
@@ -37,6 +39,10 @@ constexpr static const StringLiteral MANGLING_MODULE_OBJC = "__C";
 /// The name of the fake module used to hold synthesized ClangImporter things.
 constexpr static const StringLiteral MANGLING_MODULE_CLANG_IMPORTER =
     "__C_Synthesized";
+
+/// The name prefix for C++ template instantiation imported as a Swift struct.
+constexpr static const StringLiteral CXX_TEMPLATE_INST_PREFIX =
+    "__CxxTemplateInst";
 
 constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";
@@ -109,7 +115,7 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
     {"Builtin.UnsafeValueBuffer"};
 /// The name of the Builtin type for UnknownObject
 ///
-/// This no longer exists as an AST-accessible type, but it's still used for 
+/// This no longer exists as an AST-accessible type, but it's still used for
 /// fields shaped like AnyObject when ObjC interop is enabled.
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNKNOWNOBJECT = {
     "Builtin.UnknownObject"};

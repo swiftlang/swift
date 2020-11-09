@@ -111,10 +111,12 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)
 // FIXME: Should only suggest 'up' and 'down' (rdar://problem/60346573).
-//OVERLOADED_ARG2_VALUE: Begin completions, 4 items
+//OVERLOADED_ARG2_VALUE: Begin completions, 6 items
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: up[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: down[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Vertical#})[#(into: inout Hasher) -> Void#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: left[#Functor.Horizontal#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: right[#Functor.Horizontal#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Horizontal#})[#(into: inout Hasher) -> Void#];
 //OVERLOADED_ARG2_VALUE: End completions
 }

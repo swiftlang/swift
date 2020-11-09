@@ -1,6 +1,7 @@
 target_sources(swiftSIL PRIVATE
-  LoadBorrowInvalidationChecker.cpp
+  LoadBorrowImmutabilityChecker.cpp
   LinearLifetimeChecker.cpp
   MemoryLifetime.cpp
+  ReborrowVerifier.cpp
   SILOwnershipVerifier.cpp
   SILVerifier.cpp)

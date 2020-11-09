@@ -1407,7 +1407,8 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
     canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
   }
   resultStorageType = SILType::getPrimitiveObjectType(canType);
-  auto newResultStorageType = pass.getNewSILType(loweredTy, resultStorageType);
+  auto newResultStorageType =
+      pass.F->getLoweredType(pass.getNewSILType(loweredTy, resultStorageType));
 
   auto &ctx = pass.F->getModule().getASTContext();
   auto var = new (ctx) ParamDecl(
@@ -2862,7 +2863,7 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   case SILInstructionKind::LinearFunctionExtractInst: {
     auto instr = cast<LinearFunctionExtractInst>(convInstr);
     newInstr = convBuilder.createLinearFunctionExtract(
-        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
+        instr->getLoc(), instr->getExtractee(), instr->getOperand());
     break;
   }
   default:

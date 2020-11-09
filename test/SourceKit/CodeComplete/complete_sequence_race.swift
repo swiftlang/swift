@@ -19,21 +19,23 @@ func bar(arg: Bar) {
 
 // ReuseASTContext disabled.
 // RUN: %sourcekitd-test \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=17:1 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=17:1 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -async -- %s
+// RUN:   -req=global-config -req-opts=completion_max_astcontext_reuse_count=0 \
+// RUN:   -req=complete -pos=12:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=12:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=17:1 %s -async -- %s == \
+// RUN:   -req=complete -pos=12:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=12:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=17:1 %s -async -- %s == \
+// RUN:   -req=complete -pos=12:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=15:11 %s -async -- %s
 
 // ReuseASTContext enabled.
 // RUN: %sourcekitd-test \
+// RUN:   -req=global-config -req-opts=completion_max_astcontext_reuse_count=5 \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \

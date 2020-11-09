@@ -806,6 +806,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
       // BuilderContext before rewriting any uses of the ConcreteType.
       OpenedArchetypesTracker.addOpenedArchetypeDef(
           cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
+    } else if (auto *I = CEI.ConcreteValue->getDefiningInstruction()) {
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(I);
     }
   }
 }
@@ -992,6 +994,48 @@ struct ConcreteArgumentCopy {
   }
 };
 
+SILValue SILCombiner::canCastArg(FullApplySite Apply,
+                                 const OpenedArchetypeInfo &OAI,
+                                 const ConcreteExistentialInfo &CEI,
+                                 unsigned ArgIdx) {
+  if (!CEI.ConcreteValue || CEI.ConcreteType->isOpenedExistential() ||
+      !CEI.ConcreteValue->getType().isAddress())
+    return SILValue();
+
+  // Don't specialize apply instructions that return the callee's Arg type,
+  // because this optimization does not know how to substitute types in the
+  // users of this apply. In the function type substitution below, all
+  // references to OpenedArchetype will be substituted. So walk to type to
+  // find all possible references, such as returning Optional<Arg>.
+  if (Apply.getType().getASTType().findIf(
+          [&OAI](Type t) -> bool { return t->isEqual(OAI.OpenedArchetype); })) {
+    return SILValue();
+  }
+  // Bail out if any other arguments or indirect result that refer to the
+  // OpenedArchetype. The following optimization substitutes all occurrences
+  // of OpenedArchetype in the function signature, but will only rewrite the
+  // Arg operand.
+  //
+  // Note that the language does not allow Self to occur in contravariant
+  // position. However, SIL does allow this and it can happen as a result of
+  // upstream transformations. Since this is bail-out logic, it must handle
+  // all verifiable SIL.
+
+  // This bailout check is also needed for non-Self arguments [including Self].
+  unsigned NumApplyArgs = Apply.getNumArguments();
+  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
+    if (Idx == ArgIdx)
+      continue;
+    if (Apply.getArgument(Idx)->getType().getASTType().findIf(
+            [&OAI](Type t) -> bool {
+              return t->isEqual(OAI.OpenedArchetype);
+            })) {
+      return SILValue();
+    }
+  }
+  return Builder.createUncheckedAddrCast(
+      Apply.getLoc(), Apply.getArgument(ArgIdx), CEI.ConcreteValue->getType());
+}
 /// Rewrite the given method apply instruction in terms of the provided conrete
 /// type information.
 ///
@@ -1047,6 +1091,32 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 
     // Check for Arg's concrete type propagation legality.
     if (!canReplaceArg(Apply, OAI, CEI, ArgIdx)) {
+
+      // As on last fall-back try to cast the argument.
+      if (auto cast = canCastArg(Apply, OAI, CEI, ArgIdx)) {
+        NewArgs.push_back(cast);
+        // Form a new set of substitutions where the argument is
+        // replaced with a concrete type.
+        NewCallSubs = NewCallSubs.subst(
+            [&](SubstitutableType *type) -> Type {
+              if (type == OAI.OpenedArchetype)
+                return CEI.ConcreteType;
+              return type;
+            },
+            [&](CanType origTy, Type substTy,
+                ProtocolDecl *proto) -> ProtocolConformanceRef {
+              if (origTy->isEqual(OAI.OpenedArchetype)) {
+                assert(substTy->isEqual(CEI.ConcreteType));
+                // Do a conformance lookup on this witness requirement using the
+                // existential's conformances. The witness requirement may be a
+                // base type of the existential's requirements.
+                return CEI.lookupExistentialConformance(proto);
+              }
+              return ProtocolConformanceRef(proto);
+            });
+        continue;
+      }
+      // Otherwise, use the original argument.
       NewArgs.push_back(Apply.getArgument(ArgIdx));
       continue;
     }

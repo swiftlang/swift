@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -1827,30 +1828,30 @@ public:
         Out << "\n";
         abort();
       }
-      
+
+      if (!isa<VarDecl>(E->getMember().getDecl())) {
+        Out << "Member reference to a non-VarDecl\n";
+        E->dump(Out);
+        Out << "\n";
+        abort();
+      }
+
+      auto baseType = E->getBase()->getType();
+      if (baseType->is<InOutType>()) {
+        Out << "Member reference to an inout type\n";
+        E->dump(Out);
+        Out << "\n";
+        abort();
+      }
+
       // The base of a member reference cannot be an existential type.
-      if (E->getBase()->getType()->getWithoutSpecifierType()
-            ->isExistentialType()) {
+      if (baseType->getWithoutSpecifierType()->isExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
         Out << "\n";
         abort();
       }
 
-      // The only time the base is allowed to be inout is if we are accessing
-      // a computed property or if the base is a protocol or existential.
-      if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
-        if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
-          auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || !VD->requiresOpaqueAccessors()) {
-            Out << "member_ref_expr on value of inout type\n";
-            E->dump(Out);
-            Out << "\n";
-            abort();
-          }
-        }
-      }
-      
       // FIXME: Check container/member types through substitutions.
 
       verifyCheckedBase(E);
@@ -2994,8 +2995,23 @@ public:
         }
       }
 
-      // Throwing @objc methods must have a foreign error convention.
+      // Asynchronous @objc methods must have a foreign async convention.
       if (AFD->isObjC() &&
+          static_cast<bool>(AFD->getForeignAsyncConvention())
+            != AFD->hasAsync()) {
+        if (AFD->hasAsync())
+          Out << "@objc method async but does not have a foreign async "
+              << "convention";
+        else
+          Out << "@objc method has a foreign async convention but is not "
+              << "async";
+        abort();
+      }
+
+      // Synchronous throwing @objc methods must have a foreign error
+      // convention.
+      if (AFD->isObjC() &&
+          !AFD->hasAsync() &&
           static_cast<bool>(AFD->getForeignErrorConvention())
             != AFD->hasThrows()) {
         if (AFD->hasThrows())

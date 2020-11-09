@@ -49,6 +49,9 @@ public:
     return !SupplementaryOutputs.ModuleOutputPath.empty() ||
            !SupplementaryOutputs.ModuleDocOutputPath.empty();
   }
+  bool haveModuleSummaryOutputPath() const {
+    return !SupplementaryOutputs.ModuleSummaryOutputPath.empty();
+  }
 };
 } // namespace swift
 

@@ -90,7 +90,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getDynamicThunk(
         derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
                      .SILFnType);
-  } else if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+  } else if (auto *derivativeId = derived.getDerivativeFunctionIdentifier()) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
     // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
@@ -168,7 +168,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
         base.kind == SILDeclRef::Kind::Allocator);
     }
     // TODO(TF-685): Use proper autodiff thunk mangling.
-    if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+    if (auto *derivativeId = derived.getDerivativeFunctionIdentifier()) {
       switch (derivativeId->getKind()) {
       case AutoDiffDerivativeFunctionKind::JVP:
         name += "_jvp";
@@ -733,8 +733,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
       M.Types, TypeExpansionContext::minimal(), AbstractionPattern(reqtOrigTy),
-      reqtSubstTy, requirement, witnessRef, witnessSubsForTypeLowering,
-      conformance);
+      reqtSubstTy, requirementInfo.SILFnType->getExtInfo(), requirement,
+      witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
@@ -743,7 +743,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
   // TODO(TF-685): Proper mangling for derivative witness thunks.
-  if (auto *derivativeId = requirement.derivativeFunctionIdentifier) {
+  if (auto *derivativeId = requirement.getDerivativeFunctionIdentifier()) {
     std::string kindString;
     switch (derivativeId->getKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
@@ -1038,7 +1038,7 @@ public:
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
-      for (Decl *member : theClass->getEmittedMembers())
+      for (Decl *member : theClass->getSemanticMembers())
         visit(member);
 
       SILGenVTable genVTable(SGM, theClass);

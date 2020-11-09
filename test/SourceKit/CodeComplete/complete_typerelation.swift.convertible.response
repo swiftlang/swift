@@ -31,7 +31,7 @@
       key.description: "intanceReturnMyEnum(self: MyEnum)",
       key.typename: "() -> MyEnum",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.convertible,
+      key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO013intanceReturncD0ACyF",
       key.modulename: "complete_typerelation"

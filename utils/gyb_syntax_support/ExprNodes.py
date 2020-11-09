@@ -49,7 +49,9 @@ EXPR_NODES = [
     # await foo()
     Node('AwaitExpr', kind='Expr',
          children=[
-             Child('AwaitKeyword', kind='AwaitToken'),
+             Child('AwaitKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['await']),
              Child('Expression', kind='Expr'),
          ]),
 
@@ -390,6 +392,9 @@ EXPR_NODES = [
                        Child('SimpleInput', kind='ClosureParamList'),
                        Child('Input', kind='ParameterClause'),
                    ]),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
              Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
              Child('InTok', kind='InToken'),

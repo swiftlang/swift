@@ -177,9 +177,8 @@ ValidationInfo validateSerializedAST(
 /// - \p ModuleName is the name used to refer to the module in diagnostics.
 void diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc, const ValidationInfo &loadInfo,
-    const ExtendedValidationInfo &extendedInfo, StringRef moduleBufferID,
-    StringRef moduleDocBufferID, ModuleFile *loadedModuleFile,
-    Identifier ModuleName);
+    StringRef moduleBufferID, StringRef moduleDocBufferID,
+    ModuleFile *loadedModuleFile, Identifier ModuleName);
 
 } // end namespace serialization
 } // end namespace swift

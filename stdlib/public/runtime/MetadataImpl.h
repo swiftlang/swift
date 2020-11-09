@@ -136,7 +136,7 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr size_t stride = sizeof(T);
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = true;
-#ifdef SWIFT_STDLIB_USE_NONATOMIC_RC
+#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
   static constexpr bool isAtomic = false;
 #else
   static constexpr bool isAtomic = true;

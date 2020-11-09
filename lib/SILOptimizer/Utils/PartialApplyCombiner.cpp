@@ -115,7 +115,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
 
     // Destroy the argument value (either as SSA value or in the stack-
     // allocated temporary) at the end of the partial_apply's lifetime.
-    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt);
+    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
   }
   return true;
 }
@@ -153,8 +153,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
         builder.createCopyAddr(pai->getLoc(), arg, ASI, IsTake_t::IsNotTake,
                                IsInitialization_t::IsInitialization);
-        paiAI.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
-          SILBuilderWithScope builder(insertPt);
+        paiAI.insertAfterFullEvaluation([&](SILBuilder &builder) {
           builder.createDeallocStack(destroyloc, ASI);
         });
         arg = ASI;
@@ -184,8 +183,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // We also need to destroy the partial_apply instruction itself because it is
   // consumed by the apply_instruction.
   if (!pai->hasCalleeGuaranteedContext()) {
-    paiAI.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
-      SILBuilderWithScope builder(insertPt);
+    paiAI.insertAfterFullEvaluation([&](SILBuilder &builder) {
       builder.emitDestroyValueOperation(destroyloc, pai);
     });
   }

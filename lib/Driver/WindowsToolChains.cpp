@@ -76,6 +76,24 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
     Linker = A->getValue();
   }
+
+  switch (context.OI.LTOVariant) {
+  case OutputInfo::LTOKind::LLVMThin:
+    Arguments.push_back("-flto=thin");
+    break;
+  case OutputInfo::LTOKind::LLVMFull:
+    Arguments.push_back("-flto=full");
+    break;
+  case OutputInfo::LTOKind::None:
+    break;
+  }
+
+  if (Linker.empty() && context.OI.LTOVariant != OutputInfo::LTOKind::None) {
+    // Force to use lld for LTO on Windows because we don't support link LTO or
+    // something else except for lld LTO at this time.
+    Linker = "lld";
+  }
+
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 
@@ -117,7 +135,10 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {

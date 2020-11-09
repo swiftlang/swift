@@ -363,6 +363,9 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
+  unreachable("unsupported");
+}
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   unreachable("unsupported");
 }
@@ -1241,24 +1244,39 @@ void Remangler::mangleImplFunctionType(Node *node) {
 
 void Remangler::mangleImplFunctionAttribute(Node *node) {
   StringRef text = node->getText();
-  if (text == "@convention(block)") {
-    Buffer << "Cb";
-  } else if (text == "@convention(c)") {
-    Buffer << "Cc";
-  } else if (text == "@convention(method)") {
-    Buffer << "Cm";
-  } else if (text == "@convention(objc_method)") {
-    Buffer << "CO";
-  } else if (text == "@convention(witness_method)") {
-    Buffer << "Cw";
-  } else if (text == "@yield_once") {
+  if (text == "@yield_once") {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
+  } else if (text == "@async") {
+    Buffer << "H";
   } else {
     unreachable("bad impl-function-attribute");
   }
 }
+
+void Remangler::mangleImplFunctionConvention(Node *node) {
+  mangle(node->getChild(0));
+}
+
+void Remangler::mangleImplFunctionConventionName(Node *node) {
+  StringRef text = node->getText();
+  if (text == "block") {
+    Buffer << "Cb";
+  } else if (text == "c") {
+    Buffer << "Cc";
+  } else if (text == "method") {
+    Buffer << "Cm";
+  } else if (text == "objc_method") {
+    Buffer << "CO";
+  } else if (text == "witness_method") {
+    Buffer << "Cw";
+  } else {
+    unreachable("bad impl-function-convention-name");
+  }
+}
+
+void Remangler::mangleClangType(Node *node) { unreachable("unsupported"); }
 
 void Remangler::mangleImplParameter(Node *node) {
   assert(node->getNumChildren() == 2);
@@ -2139,6 +2157,18 @@ void Remangler::mangleAccessorFunctionReference(Node *node) {
 void Remangler::mangleMetadataInstantiationCache(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::mangleGlobalVariableOnceToken(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
   Buffer << "MM";
@@ -2159,6 +2189,12 @@ void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadata(Node *node) {
 void Remangler::mangleNoncanonicalSpecializedGenericTypeMetadataCache(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MJ";
+}
+
+void Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mz";
 }
 
 /// The top-level interface to the remangler.

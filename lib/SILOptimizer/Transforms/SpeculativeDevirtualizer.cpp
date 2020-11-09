@@ -380,7 +380,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
             dyn_cast<BuiltinInst>(TupleExtract->getOperand()))
       if (UnsafeGuaranteedSelf->getBuiltinKind() ==
               BuiltinValueKind::UnsafeGuaranteed &&
-          TupleExtract->getFieldNo() == 0)
+          TupleExtract->getFieldIndex() == 0)
         return false;
 
   // Strip any upcasts off of our 'self' value, potentially leaving us

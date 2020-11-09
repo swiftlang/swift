@@ -210,6 +210,23 @@ bb0(%0 : $Builtin.NativeObject):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @checkedaddr
+// CHECK: <func=rw+-,param0=,param1=;alloc;trap;readrc>
+sil @checkedaddr : $@convention(thin) (Builtin.NativeObject, X) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $X):
+  unconditional_checked_cast_addr Builtin.NativeObject in %0 : $Builtin.NativeObject to X in %1 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @checkedcastvalue
+// CHECK: <func=r,param0=;trap>
+sil @checkedcastvalue : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = unconditional_checked_cast_value Builtin.NativeObject in %0 : $Builtin.NativeObject to X
+  %r = tuple ()
+  return %r : $()
+}
 
 sil_global public @sil_global1 : $Int32
 

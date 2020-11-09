@@ -53,6 +53,7 @@ TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
 TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
+TYPE_ATTR(async)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -119,8 +120,7 @@ DECL_ATTR(_silgen_name, SILGenName,
   0)
 DECL_ATTR(available, Available,
   OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement |
-  OnExtension | OnGenericTypeParam |
-  AllowMultipleAttributes | LongAttribute |
+  OnExtension | AllowMultipleAttributes | LongAttribute |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   1)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
@@ -493,8 +493,8 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   87)
-SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
-  OnNominalType | UserInaccessible |
+SIMPLE_DECL_ATTR(resultBuilder, ResultBuilder,
+  OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   88)
 DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
@@ -559,6 +559,40 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   OnAbstractFunction | OnVar | OnSubscript |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
+
+SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
+  OnFunc | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  101)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
+  DeclModifier | OnClass | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  102)
+
+DECL_ATTR(actorIndependent, ActorIndependent,
+  OnFunc | OnVar | OnSubscript | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  103)
+
+SIMPLE_DECL_ATTR(globalActor, GlobalActor,
+  OnClass | OnStruct | OnEnum | ConcurrencyOnly |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  104)
+
+SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
+  OnExtension | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  105)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
+  DeclModifier | OnVar | OnFunc | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  106)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

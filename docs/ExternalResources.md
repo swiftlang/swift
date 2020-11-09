@@ -135,6 +135,24 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
 
 ## Code generation, runtime and ABI
 
+- [The Swift Runtime][] by Jordan Rose (blog post series, Aug-Oct 2020):
+  This blog post series describes the runtime layout for different structures,
+  runtime handling for metadata, as well as basic runtime functionality such
+  as retain/release that needs to be handled when porting Swift to a new
+  platform, such as [Mac OS 9][].
+  - [Part 1: Heap Objects][]
+  - [Part 2: Type Layout][]
+  - [Part 3: Type Metadata][]
+  - [Part 4: Uniquing Caches][]
+  - [Part 5: Class Metadata][]
+  - [Part 6: Class Metadata Initialization][]
+  - [Part 7: Enums][]
+- [Implementing the Swift Runtime in Swift][]
+  by JP Simard and Jesse Squires with Jordan Rose (podcast episode, Oct 2020):
+  This episode describes Jordan's effort to port Swift to Mac OS 9.
+  It touches on a wide variety of topics, such as ObjC interop, memory layout
+  guarantees, performance, library evolution, writing low-level code in Swift,
+  the workflow of porting Swift to a new platform and the design of Swift.
 - [How Swift Achieved Dynamic Linking Where Rust Couldn't][] by Alexis
   Beingessner (blog post, Nov 2019): This blog post describes Swift's approach
   for compiling polymorphic functions, contrasting it with the strategy used by
@@ -169,6 +187,16 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
   value witness tables, type metadata, abstraction patterns, reabstraction,
   reabstraction thunks and protocol witness tables.
 
+[Mac OS 9]: https://belkadan.com/blog/2020/04/Swift-on-Mac-OS-9/
+[The Swift Runtime]: https://belkadan.com/blog/tags/swift-runtime/
+[Part 1: Heap Objects]: https://belkadan.com/blog/2020/08/Swift-Runtime-Heap-Objects/
+[Part 2: Type Layout]: https://belkadan.com/blog/2020/09/Swift-Runtime-Type-Layout/
+[Part 3: Type Metadata]: https://belkadan.com/blog/2020/09/Swift-Runtime-Type-Metadata/
+[Part 4: Uniquing Caches]: https://belkadan.com/blog/2020/09/Swift-Runtime-Uniquing-Caches/
+[Part 5: Class Metadata]: https://belkadan.com/blog/2020/09/Swift-Runtime-Class-Metadata/
+[Part 6: Class Metadata Initialization]: https://belkadan.com/blog/2020/10/Swift-Runtime-Class-Metadata-Initialization/
+[Part 7: Enums]: https://belkadan.com/blog/2020/10/Swift-Runtime-Enums/
+[Implementing the Swift Runtime in Swift]: https://spec.fm/podcasts/swift-unwrapped/1DMLbJg5
 [How Swift Achieved Dynamic Linking Where Rust Couldn't]: https://gankra.github.io/blah/swift-abi/
 [arm64e: An ABI for Pointer Authentication]: https://youtu.be/C1nZvpEBfYA
 [Exploiting The Swift ABI]: https://youtu.be/0rHG_Pa86oA

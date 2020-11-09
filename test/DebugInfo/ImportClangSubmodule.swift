@@ -22,11 +22,9 @@
 // CHECK-SAME:                              {{..}}-DFOO=foo{{..}}
 // CHECK-SAME:                              {{..}}-UBAR{{..}}
 
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], file:
-// CHECK-SAME:              line: [[@LINE+1]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], file:{{.*}}line: [[@LINE+1]])
 import ClangModule.SubModule
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],
-// CHECK-SAME:              line: [[@LINE+1]])
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],{{.*}}line: [[@LINE+1]])
 import OtherClangModule.SubModule
 
 // The Swift compiler uses an ugly hack that auto-imports a

@@ -6,6 +6,18 @@ module TypeClassification {
   header "type-classification.h"
 }
 
+module Constructors {
+  header "constructors.h"
+}
+
+module ConstructorsObjC {
+  header "constructors-objc.h"
+}
+
+module LoadableTypes {
+  header "loadable-types.h"
+}
+
 module MemberwiseInitializer {
   header "memberwise-initializer.h"
 }

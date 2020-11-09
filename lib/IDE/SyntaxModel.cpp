@@ -905,7 +905,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                         AFD->getSignatureSourceRange());
     if (FD) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                                    FD->getBodyResultTypeLoc().getSourceRange());
+                                    FD->getResultTypeSourceRange());
     }
     pushStructureNode(SN, AFD);
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -990,7 +990,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (bracesRange.isValid())
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
     SourceLoc NRStart = VD->getNameLoc();
-    SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
+    SourceLoc NREnd = (!VD->getName().empty()
+                       ? NRStart.getAdvancedLoc(VD->getName().getLength())
+                       : NRStart);
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());
@@ -1096,7 +1098,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.NameRange = charSourceRangeFromSourceRange(SM,
                                         SubscriptD->getSignatureSourceRange());
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                            SubscriptD->getElementTypeLoc().getSourceRange());
+                            SubscriptD->getElementTypeSourceRange());
     pushStructureNode(SN, SubscriptD);
   } else if (auto *AssociatedTypeD = dyn_cast<AssociatedTypeDecl>(D)) {
     SyntaxStructureNode SN;

@@ -68,13 +68,13 @@ private:
 
   bool handleImports(ImportDecl *Import);
   bool handleCustomAttributes(Decl *D);
-  bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
+  bool passModulePathElements(ImportPath::Module Path,
                               const clang::Module *ClangMod);
 
   bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
                      ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
-  bool passReference(ModuleEntity Mod, Located<Identifier> IdLoc);
+  bool passReference(ModuleEntity Mod, ImportPath::Element IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
@@ -644,14 +644,15 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
 }
 
 bool SemaAnnotator::passModulePathElements(
-    ArrayRef<ImportDecl::AccessPathElement> Path,
+    ImportPath::Module Path,
     const clang::Module *ClangMod) {
 
-  if (Path.empty() || !ClangMod)
-    return true;
+  assert(ClangMod && "can't passModulePathElements of null ClangMod");
 
-  if (!passModulePathElements(Path.drop_back(1), ClangMod->Parent))
-    return false;
+  // Visit parent, if any, first.
+  if (ClangMod->Parent && Path.hasSubmodule())
+    if (!passModulePathElements(Path.getParentPath(), ClangMod->Parent))
+      return false;
 
   return passReference(ClangMod, Path.back());
 }
@@ -715,6 +716,12 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
   }
 
+  if (D == nullptr) {
+    // FIXME: When does this happen?
+    assert(false && "unhandled reference");
+    return true;
+  }
+
   CharSourceRange CharRange =
     Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
                                              Range);
@@ -726,7 +733,7 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
-                                  Located<Identifier> IdLoc) {
+                                  ImportPath::Element IdLoc) {
   if (IdLoc.Loc.isInvalid())
     return true;
   unsigned NameLen = IdLoc.Item.getLength();

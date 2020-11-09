@@ -43,6 +43,7 @@
       "declKind": "Protocol",
       "usr": "c:objc(pl)AnotherObjcProt",
       "moduleName": "Foo",
+      "genericSig": "<Self : AnyObject>",
       "objc_name": "AnotherObjcProt",
       "declAttributes": [
         "ObjC",
@@ -196,6 +197,7 @@
       "declKind": "Protocol",
       "usr": "c:objc(pl)ObjcProt",
       "moduleName": "Foo",
+      "genericSig": "<Self : AnyObject>",
       "objc_name": "ObjcProt",
       "declAttributes": [
         "ObjC",

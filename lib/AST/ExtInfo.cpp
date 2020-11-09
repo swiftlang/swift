@@ -19,6 +19,8 @@
 
 #include "clang/AST/Type.h"
 
+#include "llvm/ADT/Optional.h"
+
 namespace swift {
 
 // MARK: - ClangTypeInfo
@@ -32,6 +34,10 @@ bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs) {
   return false;
 }
 
+bool operator!=(ClangTypeInfo lhs, ClangTypeInfo rhs) {
+  return !(lhs == rhs);
+}
+
 ClangTypeInfo ClangTypeInfo::getCanonical() const {
   if (!type)
     return ClangTypeInfo();
@@ -43,33 +49,112 @@ void ClangTypeInfo::printType(ClangModuleLoader *cml,
   cml->printClangType(type, os);
 }
 
-void ClangTypeInfo::dump(llvm::raw_ostream &os) const {
+void ClangTypeInfo::dump(llvm::raw_ostream &os,
+                         const clang::ASTContext &ctx) const {
   if (type) {
-    type->dump(os);
+    type->dump(os, ctx);
   } else {
     os << "<nullptr>";
   }
 }
 
-// MARK: - ASTExtInfoBuilder
+// MARK: - UnexpectedClangTypeError
 
-void ASTExtInfoBuilder::assertIsFunctionType(const clang::Type *type) {
-#ifndef NDEBUG
-  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
-        type->isFunctionReferenceType())) {
-    SmallString<256> buf;
-    llvm::raw_svector_ostream os(buf);
-    os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n";
-    type->dump(os);
-    llvm_unreachable(os.str().data());
+Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
+  SILFunctionTypeRepresentation silRep,
+  const clang::Type *type, bool expectNonnullForCOrBlock, bool expectCanonical) {
+#ifdef NDEBUG
+  return None;
+#else
+  bool isBlock = true;
+  switch (silRep) {
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+      isBlock = false;
+      LLVM_FALLTHROUGH;
+  case SILFunctionTypeRepresentation::Block: {
+    if (!type) {
+      if (expectNonnullForCOrBlock)
+        return {{Kind::NullForCOrBlock, type}};
+      return None;
+    }
+    if (expectCanonical && !type->isCanonicalUnqualified())
+      return {{Kind::NonCanonical, type}};
+    if (isBlock && !type->isBlockPointerType())
+      return {{Kind::NotBlockPointer, type}};
+    if (!isBlock && !(type->isFunctionPointerType()
+                      || type->isFunctionReferenceType()))
+      return {{Kind::NotFunctionPointerOrReference, type}};
+    return None;
+  }
+  default: {
+    if (type)
+      return {{Kind::NonnullForNonCOrBlock, type}};
+    return None;
+  }
   }
 #endif
-  return;
 }
 
+void UnexpectedClangTypeError::dump() {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
+
+  auto &e = llvm::errs();
+  using Kind = UnexpectedClangTypeError::Kind;
+  switch (errorKind) {
+  case Kind::NullForCOrBlock: {
+    e << "Expected non-null Clang type for @convention(c)/@convention(block)"
+      << " function but found nullptr.";
+    return;
+  }
+  case Kind::NonnullForNonCOrBlock: {
+    e << ("Expected null Clang type for non-@convention(c),"
+          " non-@convention(block) function but found:\n");
+    type->dump();
+    return;
+  }
+  case Kind::NotBlockPointer: {
+    e << ("Expected block pointer type for @convention(block) function but"
+          " found:\n");
+    type->dump();
+    return;
+  }
+  case Kind::NotFunctionPointerOrReference: {
+    e << ("Expected function pointer/reference type for @convention(c) function"
+          " but found:\n");
+    type->dump();
+    return;
+  }
+  case Kind::NonCanonical: {
+    e << "Expected canonicalized Clang type but found:\n";
+    type->dump();
+    return;
+  }
+  }
+  llvm_unreachable("Unhandled case for UnexpectedClangTypeError");
+}
+
+// [NOTE: ExtInfo-Clang-type-invariant]
+// At the SIL level, all @convention(c) and @convention(block) function types
+// are expected to carry a ClangTypeInfo. This is not enforced at the AST level
+// because we may synthesize types which are not convertible to Clang types.
+// 1. Type errors: If we have a type error, we may end up generating (say) a
+//    @convention(c) function type that has an ErrorType as a parameter.
+// 2. Bridging: The representation can change during bridging. For example, an
+//    @convention(swift) function can be bridged to an @convention(block)
+//    function. Since this happens during SILGen, we may see a "funny" type
+//    like @convention(c) () -> @convention(swift) () -> () at the AST level.
+
+// MARK: - ASTExtInfoBuilder
+
 void ASTExtInfoBuilder::checkInvariants() const {
-  // TODO: Add validation checks here while making sure things don't blow up.
+  // See [NOTE: ExtInfo-Clang-type-invariant]
+  if (auto error = UnexpectedClangTypeError::checkClangType(
+          getSILRepresentation(), clangTypeInfo.getType(), false, false)) {
+    error.getValue().dump();
+    llvm_unreachable("Ill-formed ASTExtInfoBuilder.");
+  }
 }
 
 // MARK: - ASTExtInfo
@@ -82,12 +167,26 @@ ASTExtInfo ASTExtInfoBuilder::build() const {
 // MARK: - SILExtInfoBuilder
 
 void SILExtInfoBuilder::checkInvariants() const {
-  // TODO: Add validation checks here while making sure things don't blow up.
+  // See [NOTE: ExtInfo-Clang-type-invariant]
+  // [FIXME: Clang-type-plumbing] Strengthen check when UseClangFunctionTypes
+  // is removed.
+  if (auto error = UnexpectedClangTypeError::checkClangType(
+          getRepresentation(), clangTypeInfo.getType(), false, true)) {
+    error.getValue().dump();
+    llvm_unreachable("Ill-formed SILExtInfoBuilder.");
+  }
 }
 
 SILExtInfo SILExtInfoBuilder::build() const {
   checkInvariants();
   return SILExtInfo(*this);
+}
+
+// MARK: - SILExtInfo
+
+Optional<UnexpectedClangTypeError> SILExtInfo::checkClangType() const {
+  return UnexpectedClangTypeError::checkClangType(
+      getRepresentation(), getClangTypeInfo().getType(), true, true);
 }
 
 } // end namespace swift

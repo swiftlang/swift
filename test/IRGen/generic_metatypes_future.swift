@@ -1,5 +1,5 @@
 
-// RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-macosx50.99  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-macosx99.99  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
 // RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-ios99.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
 // RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-tvos99.0     -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
 // RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target i386-apple-watchos9.99    -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s
@@ -150,7 +150,7 @@ func makeGenericMetatypes() {
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes6OneArgVMa"
 // CHECK-SAME:    ([[INT]] %0, %swift.type* %1)
 // CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* undef, i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* undef, i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes7TwoArgsVMa"

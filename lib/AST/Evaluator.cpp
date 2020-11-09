@@ -62,21 +62,11 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-static evaluator::DependencyRecorder::Mode
-computeDependencyModeFromFlags(const LangOptions &opts) {
-  using Mode = evaluator::DependencyRecorder::Mode;
-  if (opts.DirectIntramoduleDependencies) {
-    return Mode::DirectDependencies;
-  }
-
-  return Mode::LegacyCascadingDependencies;
-}
-
 Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
     : diags(diags),
       debugDumpCycles(opts.DebugDumpCycles),
       buildDependencyGraph(opts.BuildRequestDependencyGraph),
-      recorder{computeDependencyModeFromFlags(opts)} {}
+      recorder{} {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -381,8 +371,7 @@ void Evaluator::dumpDependenciesGraphviz() const {
 
 void evaluator::DependencyRecorder::realize(
     const DependencyCollector::Reference &ref) {
-  auto *source = getActiveDependencySourceOrNull();
-  assert(source && "cannot realize dependency without associated file!");
+  auto *source = getActiveDependencySourceOrNull().get();
   if (!source->isPrimary()) {
     return;
   }
@@ -391,46 +380,32 @@ void evaluator::DependencyRecorder::realize(
 
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
-  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(
-        Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
-  }
-  return parent.realize(
-      Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
+  scratch.insert(Reference::usedMember(subject, name));
+  return parent.realize(Reference::usedMember(subject, name));
 }
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
-  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(
-        Reference::potentialMember(subject, parent.isActiveSourceCascading()));
-  }
-  return parent.realize(
-      Reference::potentialMember(subject, parent.isActiveSourceCascading()));
+  scratch.insert(Reference::potentialMember(subject));
+  return parent.realize(Reference::potentialMember(subject));
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
-  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(Reference::topLevel(name, parent.isActiveSourceCascading()));
-  }
-  return parent.realize(
-      Reference::topLevel(name, parent.isActiveSourceCascading()));
+  scratch.insert(Reference::topLevel(name));
+  return parent.realize(Reference::topLevel(name));
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
-  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(Reference::dynamic(name, parent.isActiveSourceCascading()));
-  }
-  return parent.realize(
-      Reference::dynamic(name, parent.isActiveSourceCascading()));
+  scratch.insert(Reference::dynamic(name));
+  return parent.realize(Reference::dynamic(name));
 }
 
 void evaluator::DependencyRecorder::record(
     const llvm::SetVector<swift::ActiveRequest> &stack,
     llvm::function_ref<void(DependencyCollector &)> rec) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
-  auto *source = getActiveDependencySourceOrNull();
-  if (!source || !source->isPrimary()) {
+  auto source = getActiveDependencySourceOrNull();
+  if (source.isNull() || !source.get()->isPrimary()) {
     return;
   }
 
@@ -450,12 +425,8 @@ void evaluator::DependencyRecorder::replay(
     const swift::ActiveRequest &req) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
-  auto *source = getActiveDependencySourceOrNull();
-  if (mode == Mode::LegacyCascadingDependencies) {
-    return;
-  }
-
-  if (!source || !source->isPrimary()) {
+  auto source = getActiveDependencySourceOrNull();
+  if (source.isNull() || !source.get()->isPrimary()) {
     return;
   }
 
@@ -503,7 +474,6 @@ void evaluator::DependencyRecorder::replay(
 void evaluator::DependencyRecorder::unionNearestCachedRequest(
     ArrayRef<swift::ActiveRequest> stack,
     const DependencyCollector::ReferenceSet &scratch) {
-  assert(mode != Mode::LegacyCascadingDependencies);
   auto nearest = std::find_if(stack.rbegin(), stack.rend(),
                               [](const auto &req){ return req.isCached(); });
   if (nearest == stack.rend()) {

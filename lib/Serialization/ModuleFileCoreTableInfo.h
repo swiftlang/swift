@@ -455,7 +455,7 @@ public:
     while (data < limit) {
       DeclID genSigId = endian::readNext<uint32_t, little, unaligned>(data);
       int32_t nameLength = endian::readNext<int32_t, little, unaligned>(data);
-      StringRef mangledName(reinterpret_cast<const char *>(data), nameLength);
+      std::string mangledName(reinterpret_cast<const char *>(data), nameLength);
       data += nameLength;
       result.push_back({mangledName, genSigId});
     }

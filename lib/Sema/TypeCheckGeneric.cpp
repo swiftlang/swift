@@ -691,9 +691,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       // Gather requirements from the result type.
       auto *resultTypeRepr = [&subscr, &func]() -> TypeRepr * {
         if (subscr) {
-          return subscr->getElementTypeLoc().getTypeRepr();
+          return subscr->getElementTypeRepr();
         } else if (auto *FD = dyn_cast<FuncDecl>(func)) {
-          return FD->getBodyResultTypeLoc().getTypeRepr();
+          return FD->getResultTypeRepr();
         } else {
           return nullptr;
         }
@@ -903,8 +903,9 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                              unsigned index,
                              TypeResolutionStage stage) const {
   // Figure out the type resolution.
-  const auto options =
-      TypeResolutionOptions(TypeResolverContext::GenericRequirement);
+  auto options = TypeResolutionOptions(TypeResolverContext::GenericRequirement);
+  if (owner.dc->isInSpecializeExtensionContext())
+    options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
@@ -951,11 +952,6 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
 
-  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
-          /*functionsAreNonCascading*/ true)) {
-    options |= TypeResolutionFlags::KnownNonCascadingDependency;
-  }
-  
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto &ctx = typeAlias->getASTContext();

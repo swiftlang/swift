@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-
 #include "swift/AST/ASTWalker.h"
 
 namespace swift {

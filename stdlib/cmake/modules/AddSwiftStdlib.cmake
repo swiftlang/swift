@@ -2,20 +2,6 @@
 include(AddSwift)
 include(SwiftSource)
 
-function(is_darwin_based_sdk sdk_name out_var)
-  if ("${sdk_name}" STREQUAL "OSX" OR
-      "${sdk_name}" STREQUAL "IOS" OR
-      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "TVOS" OR
-      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "WATCHOS" OR
-      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
-    set(${out_var} TRUE PARENT_SCOPE)
-  else()
-    set(${out_var} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -63,8 +49,7 @@ function(_add_target_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
       if(DEFINED maccatalyst_build_flavor)
@@ -98,7 +83,7 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
-  if(IS_DARWIN)
+  if(SWIFT_SDK_${CFLAGS_SDK}_USE_ISYSROOT)
     list(APPEND result "-isysroot" "${_sysroot}")
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     list(APPEND result "--sysroot=${_sysroot}")
@@ -113,7 +98,7 @@ function(_add_target_variant_c_compile_link_flags)
     endif()
   endif()
 
-  if(IS_DARWIN)
+  if("${CFLAGS_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -180,7 +165,11 @@ function(_add_target_variant_c_compile_flags)
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
   if(optimized)
-    list(APPEND result "-O2")
+    if("${CFLAGS_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      list(APPEND result "-Os")
+    else()
+      list(APPEND result "-O2")
+    endif()
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
@@ -212,6 +201,9 @@ function(_add_target_variant_c_compile_flags)
       else()
         list(APPEND result "-g")
       endif()
+    elseif("${CFLAGS_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      # MinSizeRel builds of stdlib (but not the compiler) should get debug info
+      list(APPEND result "-g")
     else()
       list(APPEND result "-g0")
     endif()
@@ -327,6 +319,32 @@ function(_add_target_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "WASI")
     list(APPEND result "-D_WASI_EMULATED_MMAN")
+  endif()
+
+  if(SWIFT_DISABLE_OBJC_INTEROP)
+    list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
+  endif()
+
+  if(SWIFT_STDLIB_STABLE_ABI)
+    list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
+  else()
+    list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=0")
+  endif()
+
+  if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
+    list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
+  endif()
+
+  if(SWIFT_RUNTIME_MACHO_NO_DYLD)
+    list(APPEND result "-DSWIFT_RUNTIME_MACHO_NO_DYLD")
+  endif()
+
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  endif()
+
+  if(SWIFT_STDLIB_OS_VERSIONING)
+    list(APPEND result "-DSWIFT_RUNTIME_OS_VERSIONING")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -497,7 +515,7 @@ function(_add_swift_lipo_target)
     list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
-  if(${LIPO_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if("${SWIFT_SDK_${LIPO_SDK}_OBJECT_FORMAT}" STREQUAL "MACHO")
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
@@ -984,7 +1002,7 @@ function(_add_swift_target_library_single target name)
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
-      INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
+      INSTALL_RPATH "$ORIGIN")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "CYGWIN")
     set_target_properties("${target}"
       PROPERTIES
@@ -1424,6 +1442,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_WATCHOS
 #   Swift modules this library depends on when built for watchOS.
 #
+# SWIFT_MODULE_DEPENDS_FREESTANDING
+#   Swift modules this library depends on when built for Freestanding.
+#
 # SWIFT_MODULE_DEPENDS_FREEBSD
 #   Swift modules this library depends on when built for FreeBSD.
 #
@@ -1548,6 +1569,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
+        SWIFT_MODULE_DEPENDS_FREESTANDING
         SWIFT_MODULE_DEPENDS_OPENBSD
         SWIFT_MODULE_DEPENDS_HAIKU
         SWIFT_MODULE_DEPENDS_IOS
@@ -1639,6 +1661,12 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_DEPENDS clang)
   endif()
 
+  # Turn off implicit import of _Concurrency when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS 
+                      "-Xfrontend;-disable-implicit-concurrency-module-import")
+  endif()
+
   # If we are building this library for targets, loop through the various
   # SDKs building the variants of this library.
   list_intersect(
@@ -1705,6 +1733,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL WATCHOS OR ${sdk} STREQUAL WATCHOS_SIMULATOR)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
+    elseif(${sdk} STREQUAL FREESTANDING)
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREESTANDING})
     elseif(${sdk} STREQUAL FREEBSD)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})

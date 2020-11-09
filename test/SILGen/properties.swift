@@ -670,7 +670,9 @@ class r19254812Derived: r19254812Base{
 // Initialization of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
+// CHECK:  [[FN:%[0-9]+]] = function_ref @$s10properties16r19254812DerivedC2piSdvpfi : $@convention(thin) () -> Double
+// CHECK-NEXT:  [[RESULT:%[0-9]+]] = apply [[FN]]() : $@convention(thin) () -> Double
+// CHECK-NEXT:  store [[RESULT]] to [trivial] [[PIPTR]] : $*Double
 
 // CHECK-NOT: destroy_value
 // CHECK-NOT: copy_value

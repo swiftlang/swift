@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -72,6 +73,26 @@ llvm::cl::opt<bool> VerifyLineTable(
 namespace {
 using TrackingDIRefMap =
     llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>;
+
+class EqualUpToClangTypes
+    : public CanTypeDifferenceVisitor<EqualUpToClangTypes> {
+public:
+  bool visitDifferentTypeStructure(CanType t1, CanType t2) {
+#define COMPARE_UPTO_CLANG_TYPE(CLASS)                                         \
+  if (auto f1 = dyn_cast<CLASS>(t1)) {                                         \
+    auto f2 = cast<CLASS>(t2);                                                 \
+    return !f1->getExtInfo().isEqualTo(f2->getExtInfo(),                       \
+                                       /*useClangTypes*/ false);               \
+  }
+    COMPARE_UPTO_CLANG_TYPE(FunctionType);
+    COMPARE_UPTO_CLANG_TYPE(SILFunctionType);
+#undef COMPARE_UPTO_CLANG_TYPE
+    return true;
+  }
+  bool check(Type t1, Type t2) {
+    return !visit(t1->getCanonicalType(), t2->getCanonicalType());
+  };
+};
 
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
@@ -550,7 +571,7 @@ private:
 
     case DeclContextKind::Module:
       return getOrCreateModule(
-          {ModuleDecl::AccessPathTy(), cast<ModuleDecl>(DC)});
+          {ImportPath::Access(), cast<ModuleDecl>(DC)});
     case DeclContextKind::FileUnit:
       // A module may contain multiple files.
       return getOrCreateContext(DC->getParent());
@@ -639,6 +660,24 @@ private:
            isa<ConstructorDecl>(DeclCtx);
   }
 
+  void createImportedModule(llvm::DIScope *Context,
+                            ImportedModule M, llvm::DIFile *File,
+                            unsigned Line) {
+    // For overlays of Clang modules also emit an import of the underlying Clang
+    // module. The helps the debugger resolve types that are present only in the
+    // underlying module.
+    if (const clang::Module *UnderlyingClangModule =
+            M.importedModule->findUnderlyingClangModule()) {
+      DBuilder.createImportedModule(
+          Context,
+          getOrCreateModule(
+              {*const_cast<clang::Module *>(UnderlyingClangModule)},
+              UnderlyingClangModule),
+          File, 0);
+    }
+    DBuilder.createImportedModule(Context, getOrCreateModule(M), File, Line);
+  }
+
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     uint64_t Signature = ~1ULL,
@@ -672,7 +711,7 @@ private:
     return M;
   }
 
-  using ASTSourceDescriptor = clang::ExternalASTSource::ASTSourceDescriptor;
+  using ASTSourceDescriptor = clang::ASTSourceDescriptor;
   /// Create a DIModule from a clang module or PCH.
   /// The clang::Module pointer is passed separately because the recursive case
   /// needs to fudge the AST descriptor.
@@ -722,7 +761,7 @@ private:
     return None;
   }
 
-  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
+  llvm::DIModule *getOrCreateModule(ImportedModule IM) {
     ModuleDecl *M = IM.importedModule;
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
@@ -815,7 +854,9 @@ private:
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());
         abort();
-      } else if (!Reconstructed->isEqual(Ty)) {
+      } else if (!Reconstructed->isEqual(Ty) &&
+                 !EqualUpToClangTypes().check(Reconstructed, Ty)) {
+        // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());
@@ -1020,7 +1061,8 @@ private:
     SmallVector<llvm::Metadata *, 16> TemplateParams;
     for (auto Param : BGT->getGenericArgs()) {
       TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
-          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param)),
+          false));
     }
     return DBuilder.getOrCreateArray(TemplateParams);
   }
@@ -1571,6 +1613,7 @@ private:
     case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
+    case TypeKind::Hole:
     case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILBox:
@@ -1839,15 +1882,14 @@ void IRGenDebugInfoImpl::finalize() {
 
   // Get the list of imported modules (which may actually be different
   // from all ImportDecls).
-  SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
+  SmallVector<ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(
-      ModuleWideImports, {ModuleDecl::ImportFilterKind::Public,
-                          ModuleDecl::ImportFilterKind::Private,
+      ModuleWideImports, {ModuleDecl::ImportFilterKind::Exported,
+                          ModuleDecl::ImportFilterKind::Default,
                           ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.importedModule))
-      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
-                                    0);
+      createImportedModule(MainFile, M, MainFile, 0);
 
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {
@@ -2087,11 +2129,10 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     return;
 
   assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
-  ModuleDecl::ImportedModule Imported = {D->getModulePath(), D->getModule()};
-  auto DIMod = getOrCreateModule(Imported);
+  ImportedModule Imported = { D->getAccessPath(), D->getModule() };
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
-  DBuilder.createImportedModule(File, DIMod, File, L.Line);
+  createImportedModule(File, Imported, File, L.Line);
   ImportedModules.insert(Imported.importedModule);
 }
 

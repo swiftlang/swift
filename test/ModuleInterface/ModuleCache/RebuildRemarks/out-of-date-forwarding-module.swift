@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t/ModuleCache)
 // RUN: %empty-directory(%t/Build)
 // RUN: %empty-directory(%t/PrebuiltCache)
+// RUN: %empty-directory(%t/System/Library/CoreServices)
+
+// RUN: cp %S/../Inputs/sdk-build-ver.1.plist %t/System/Library/CoreServices/SystemVersion.plist
+// RUN: cp %S/../Inputs/sdk-build-ver.2.plist %t/PrebuiltCache/SystemVersion.plist
 
 // 1. Create a dummy module
 // RUN: echo 'public func publicFunction() {}' > %t/TestModule.swift
@@ -30,3 +34,4 @@ import TestModule // expected-remark {{rebuilding module 'TestModule' from inter
 // expected-note @-2 {{dependency is out of date}}
 // expected-note @-3 {{prebuilt module is out of date}}
 // expected-note @-4 {{dependency is out of date}}
+// expected-note @-5 {{SDK build version is '11111'; prebuilt modules were built using SDK build version: '22222'}}

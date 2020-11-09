@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSStep.h"
-#include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -578,13 +578,15 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
+  bool hasAsyncMismatch = delta.Data[SK_AsyncSyncMismatch] > 0;
   auto isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only
-  // if the disjunction choice we are comparing to did not involve
-  // selecting unavailable overloads or result in fixes being
-  // applied to reach a solution.
-  return !hasUnavailableOverloads && !hasFixes &&
+  // if the disjunction choice we are comparing to did not involve:
+  //   1. selecting unavailable overloads
+  //   2. result in fixes being applied to reach a solution
+  //   3. selecting an overload that results in an async/sync mismatch
+  return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
          (isBeginningOfPartition ||
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
@@ -660,8 +662,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getKind() == ConstraintKind::BindOverload &&
       isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
-      !ctx.TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
+      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl())) {
     return true;
   }
 

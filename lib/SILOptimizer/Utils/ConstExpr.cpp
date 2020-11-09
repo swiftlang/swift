@@ -300,7 +300,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     auto val = getConstantValue(tei->getOperand());
     if (!val.isConstant())
       return val;
-    return val.getAggregateMembers()[tei->getFieldNo()];
+    return val.getAggregateMembers()[tei->getFieldIndex()];
   }
 
   // If this is a struct extract from a fragile type, then we can return the
@@ -312,7 +312,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       return val;
     }
     assert(val.getKind() == SymbolicValue::Aggregate);
-    return val.getAggregateMembers()[sei->getFieldNo()];
+    return val.getAggregateMembers()[sei->getFieldIndex()];
   }
 
   // If this is an unchecked_enum_data from a fragile type, then we can return
@@ -379,9 +379,9 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     // Add our index onto the next of the list.
     unsigned index;
     if (auto sea = dyn_cast<StructElementAddrInst>(inst))
-      index = sea->getFieldNo();
+      index = sea->getFieldIndex();
     else
-      index = cast<TupleElementAddrInst>(inst)->getFieldNo();
+      index = cast<TupleElementAddrInst>(inst)->getFieldIndex();
     accessPath.push_back(index);
     return SymbolicValue::getAddress(memObject, accessPath,
                                      evaluator.getAllocator());

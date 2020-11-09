@@ -27,8 +27,10 @@ public func returnsAlias() -> Alias<Int> {
   return (0, 0)
 }
 
-@_functionBuilder
-struct BridgeBuilder {}
+@resultBuilder
+struct BridgeBuilder {
+    static func buildBlock(_: Any...) {}
+}
 
 public struct City {
   public init(@BridgeBuilder builder: () -> ()) {}

@@ -26,7 +26,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
-enum class AtomicOrdering;
+enum class AtomicOrdering : unsigned;
 }
 
 namespace swift {

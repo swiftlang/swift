@@ -47,7 +47,7 @@ class ARCLoopOpts : public SILFunctionTransform {
       return;
 
     // Skip global init functions.
-    if (F->getName().startswith("globalinit_"))
+    if (F->isGlobalInitOnceFunction())
       return;
 
     auto *LA = getAnalysis<SILLoopAnalysis>();

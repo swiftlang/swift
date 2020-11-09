@@ -99,3 +99,24 @@ protocol Q11 {
 // expected-error@+2 {{type 'S11' does not conform to protocol 'P11a'}}
 // expected-error@+1 {{type 'S11' does not conform to protocol 'P11b'}}
 struct S11: Q11, P11b {}
+
+protocol P12 where A == B {
+  associatedtype A
+  associatedtype B
+  func foo(arg: A)
+}
+struct S12: P12 { // OK, A == B == Never
+  func foo(arg: Never) {}
+}
+
+protocol P13a {
+  associatedtype A
+  func foo(arg: A)
+}
+protocol P13b {
+  associatedtype B
+}
+protocol P13c: P13a, P13b where A == B {}
+struct S13: P13c { // OK, A == B == Never
+  func foo(arg: Never) {}
+}

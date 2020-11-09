@@ -30,6 +30,9 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SIL_SILINSTRUCTIONWORKLIST_H
+#define SWIFT_SIL_SILINSTRUCTIONWORKLIST_H
+
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -342,3 +345,5 @@ public:
 };
 
 } // end namespace swift
+
+#endif // SWIFT_SIL_SILINSTRUCTIONWORKLIST_H

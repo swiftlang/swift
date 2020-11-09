@@ -126,7 +126,6 @@ public:
   /// Returns a Range of Mutators. Asserts if this transition is not a mutator
   /// transition.
   mutator_range getMutators() const {
-    assert(isMutator() && "This should never be called given mutators");
     return {Mutators->begin(), Mutators->end()};
   }
 

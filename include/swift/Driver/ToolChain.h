@@ -162,6 +162,9 @@ protected:
   virtual InvocationInfo
   constructInvocation(const VerifyDebugInfoJobAction &job,
                       const JobContext &context) const;
+  virtual InvocationInfo
+  constructInvocation(const VerifyModuleInterfaceJobAction &job,
+                      const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const GeneratePCHJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo

@@ -1256,6 +1256,12 @@ void NominalTypeDecl::prepareConformanceTable() const {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
+
+  // Actor classes conform to the actor protocol.
+  if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
+    if (classDecl->isActor())
+      addSynthesized(KnownProtocolKind::Actor);
+  }
 }
 
 bool NominalTypeDecl::lookupConformance(
@@ -1489,7 +1495,7 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
 
 struct ProtocolConformanceTraceFormatter
     : public UnifiedStatsReporter::TraceFormatter {
-  void traceName(const void *Entity, raw_ostream &OS) const {
+  void traceName(const void *Entity, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const ProtocolConformance *C =
@@ -1497,7 +1503,7 @@ struct ProtocolConformanceTraceFormatter
     C->printName(OS);
   }
   void traceLoc(const void *Entity, SourceManager *SM,
-                clang::SourceManager *CSM, raw_ostream &OS) const {
+                clang::SourceManager *CSM, raw_ostream &OS) const override {
     if (!Entity)
       return;
     const ProtocolConformance *C =

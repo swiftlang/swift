@@ -30,6 +30,8 @@ benefit of all Swift developers.
         - [Debugging the Compiler using advanced LLDB Breakpoints](#debugging-the-compiler-using-advanced-lldb-breakpoints)
         - [Debugging the Compiler using LLDB Scripts](#debugging-the-compiler-using-lldb-scripts)
         - [Custom LLDB Commands](#custom-lldb-commands)
+    - [Debugging at LLVM Level](#debugging-at-llvm-level)
+        - [Options for Dumping LLVM IR](#options-for-dumping-llvm-ir)
     - [Bisecting Compiler Errors](#bisecting-compiler-errors)
         - [Bisecting on SIL optimizer pass counts to identify optimizer bugs](#bisecting-on-sil-optimizer-pass-counts-to-identify-optimizer-bugs)
         - [Using git-bisect in the presence of branch forwarding/feature branches](#using-git-bisect-in-the-presence-of-branch-forwardingfeature-branches)
@@ -536,6 +538,20 @@ to define custom commands using just other lldb commands. For example,
 `custom_step()` function defined above could be defined as:
 
     (lldb) command alias cs sequence p/x $rax; stepi
+
+## Debugging at LLVM Level
+
+### Options for Dumping LLVM IR
+
+Similar to SIL, one can configure LLVM to dump the llvm-ir at various points in
+the pipeline. Here is a quick summary of the various options:
+
+* ``-Xllvm -print-before=$PASS_ID``: Print the LLVM IR before a specified LLVM pass runs.
+* ``-Xllvm -print-before-all``: Print the LLVM IR before each pass runs.
+* ``-Xllvm -print-after-all``: Print the LLVM IR after each pass runs.
+* ``-Xllvm -filter-print-funcs=$FUNC_NAME_1,$FUNC_NAME_2,...,$FUNC_NAME_N``:
+  When printing IR for functions for print-[before|after]-all options, Only
+  print the IR for functions whose name is in this comma separated list.
 
 ## Bisecting Compiler Errors
 

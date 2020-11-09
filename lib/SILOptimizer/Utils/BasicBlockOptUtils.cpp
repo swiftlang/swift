@@ -44,6 +44,11 @@ bool ReachableBlocks::visit(SILFunction *f,
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *bb) {
+
+  for (SILArgument *arg : bb->getArguments()) {
+    arg->replaceAllUsesWithUndef();
+  }
+
   // Instructions in the dead block may be used by other dead blocks.  Replace
   // any uses of them with undef values.
   while (!bb->empty()) {
@@ -127,28 +132,6 @@ void BasicBlockCloner::updateSSAAfterCloning() {
       ssaUpdater.rewriteUse(*use);
     }
   }
-}
-
-// FIXME: Remove this. SILCloner should not create critical edges.
-bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *domInfo,
-                                          SILLoopInfo *loopInfo) {
-  bool changed = false;
-  // Remove any critical edges that the EdgeThreadingCloner may have
-  // accidentally created.
-  for (unsigned succIdx = 0, succEnd = origBB->getSuccessors().size();
-       succIdx != succEnd; ++succIdx) {
-    if (nullptr
-        != splitCriticalEdge(origBB->getTerminator(), succIdx, domInfo,
-                             loopInfo))
-      changed |= true;
-  }
-  for (unsigned succIdx = 0, succEnd = getNewBB()->getSuccessors().size();
-       succIdx != succEnd; ++succIdx) {
-    auto *newBB = splitCriticalEdge(getNewBB()->getTerminator(), succIdx,
-                                    domInfo, loopInfo);
-    changed |= (newBB != nullptr);
-  }
-  return changed;
 }
 
 void BasicBlockCloner::sinkAddressProjections() {

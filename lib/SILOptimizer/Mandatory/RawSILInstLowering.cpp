@@ -179,8 +179,8 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   SILLocation loc = inst->getLoc();
   SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
 
-  switch (inst->getOwnershipQualifier()) {
-    case AssignOwnershipQualifier::Init: {
+  switch (inst->getAssignDestination()) {
+    case AssignByWrapperInst::Destination::BackingWrapper: {
       SILValue initFn = inst->getInitializer();
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
@@ -193,15 +193,18 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
         getAssignByWrapperArgs(args, src, convention, b, forCleanup);
         SILValue wrappedSrc = b.createApply(loc, initFn, SubstitutionMap(),
                                             args);
-        b.createTrivialStoreOr(loc, wrappedSrc, dest,
-                               StoreOwnershipQualifier::Init);
+        if (inst->getOwnershipQualifier() == AssignOwnershipQualifier::Init ||
+            inst->getDest()->getType().isTrivial(*inst->getFunction())) {
+          b.createTrivialStoreOr(loc, wrappedSrc, dest, StoreOwnershipQualifier::Init);
+        } else {
+          b.createStore(loc, wrappedSrc, dest, StoreOwnershipQualifier::Assign);
+        }
       }
       // TODO: remove the unused setter function, which usually is a dead
       // partial_apply.
       break;
     }
-    case AssignOwnershipQualifier::Unknown:
-    case AssignOwnershipQualifier::Reassign: {
+    case AssignByWrapperInst::Destination::WrappedValue: {
       SILValue setterFn = inst->getSetter();
       CanSILFunctionType fTy = setterFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
@@ -220,8 +223,6 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // partial_apply.
       break;
     }
-    case AssignOwnershipQualifier::Reinit:
-      llvm_unreachable("wrong qualifier for assign_by_wrapper");
   }
   inst->eraseFromParent();
 }

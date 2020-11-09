@@ -233,7 +233,7 @@ public ilist_node_traits<::swift::SILGlobalVariable> {
   using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:
-  static void deleteNode(SILGlobalVariable *V) {}
+  static void deleteNode(SILGlobalVariable *V) { V->~SILGlobalVariable(); }
   
 private:
   void createNode(const SILGlobalVariable &);

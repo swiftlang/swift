@@ -99,10 +99,10 @@ public:
   bool hasUnresolvedOpenedArchetypeDefinitions();
 
   // Handling of instruction removal notifications.
-  bool needsNotifications() { return true; }
+  bool needsNotifications() override { return true; }
 
   // Handle notifications about removals of instructions.
-  void handleDeleteNotification(SILNode *node);
+  void handleDeleteNotification(SILNode *node) override;
 
   // Dump the contents.
   void dump() const;

@@ -1,3 +1,4 @@
+set_swift_llvm_is_available()
 add_swift_host_library(swiftFrontend STATIC
   ArgsToFrontendInputsConverter.cpp
   ArgsToFrontendOptionsConverter.cpp
@@ -23,6 +24,7 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftSILGen
   swiftSILOptimizer
   swiftIRGen
+  swiftLocalization
   swiftSema
   swiftSerialization
   swiftTBDGen)

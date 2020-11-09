@@ -15,10 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintGraph.h"
-#include "ConstraintGraphScope.h"
-#include "ConstraintSystem.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/ConstraintGraphScope.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"

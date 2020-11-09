@@ -409,20 +409,28 @@ StringRef SDKNodeDecl::getScreenInfo() const {
   auto &Ctx = getSDKContext();
   llvm::SmallString<64> SS;
   llvm::raw_svector_ostream OS(SS);
-  if (Ctx.getOpts().PrintModule)
-    OS << ModuleName;
-  if (!HeaderName.empty())
-    OS << "(" << HeaderName << ")";
+  if (Ctx.getOpts().CompilerStyle) {
+    // Compiler style we don't need source info
+    OS << (Ctx.checkingABI() ? "ABI breakage" : "API breakage");
+  } else {
+    // Print more source info.
+    if (Ctx.getOpts().PrintModule)
+      OS << ModuleName;
+    if (!HeaderName.empty())
+      OS << "(" << HeaderName << ")";
+  }
   if (!OS.str().empty())
     OS << ": ";
   bool IsExtension = false;
   if (auto *TD = dyn_cast<SDKNodeDeclType>(this)) {
     IsExtension = TD->isExternal();
   }
-  if (IsExtension)
-    OS << "Extension";
-  else
-    OS << getDeclKind();
+
+  // There is no particular reasons why we don't use lower-cased keyword names
+  // in non-CompilerStyle mode. This is to be backward compatible so clients
+  // don't need to update existing known breakages.
+  OS << getDeclKindStr(IsExtension? DeclKind::Extension : getDeclKind(),
+                       getSDKContext().getOpts().CompilerStyle);
   OS << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }
@@ -1603,6 +1611,11 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
       if (isa<TypeAliasDecl>(VD))
         return true;
     }
+    // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
+    // These decls are considered effectively public because they are usable
+    // from inline, so we have to manually exclude them here.
+    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return true;
   } else {
     if (D->isPrivateStdlibDecl(false))
       return true;

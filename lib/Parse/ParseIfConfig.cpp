@@ -603,17 +603,42 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 /// Delegate callback function to parse elements in the blocks.
 ParserResult<IfConfigDecl> Parser::parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
+  assert(Tok.is(tok::pound_if));
   SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
 
   SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
+  // Find the region containing code completion token.
+  SourceLoc codeCompletionClauseLoc;
+  if (SourceMgr.hasCodeCompletionBuffer() &&
+      SourceMgr.getCodeCompletionBufferID() == L->getBufferID() &&
+      SourceMgr.isBeforeInBuffer(Tok.getLoc(),
+                                 SourceMgr.getCodeCompletionLoc())) {
+    llvm::SaveAndRestore<Optional<llvm::MD5>> H(CurrentTokenHash, None);
+    BacktrackingScope backtrack(*this);
+    do {
+      auto startLoc = Tok.getLoc();
+      consumeToken();
+      skipUntilConditionalBlockClose();
+      auto endLoc = PreviousLoc;
+      if (SourceMgr.rangeContainsTokenLoc(SourceRange(startLoc, endLoc),
+                                          SourceMgr.getCodeCompletionLoc())){
+        codeCompletionClauseLoc = startLoc;
+        break;
+      }
+    } while (Tok.isNot(tok::pound_endif, tok::eof));
+  }
+
   bool shouldEvaluate =
       // Don't evaluate if it's in '-parse' mode, etc.
       shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
-      !getScopeInfo().isInactiveConfigBlock();
+      !getScopeInfo().isInactiveConfigBlock() &&
+      // If this directive contains code completion location, 'isActive' is
+      // determined solely by which block has the completion token.
+      !codeCompletionClauseLoc.isValid();
 
   bool foundActive = false;
   bool isVersionCondition = false;
@@ -657,6 +682,10 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
     }
+
+    // Treat the region containing code completion token as "active".
+    if (codeCompletionClauseLoc.isValid() && !foundActive)
+      isActive = (ClauseLoc == codeCompletionClauseLoc);
 
     foundActive |= isActive;
 

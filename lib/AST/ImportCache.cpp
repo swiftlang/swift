@@ -26,19 +26,19 @@ using namespace swift;
 using namespace namelookup;
 
 ImportSet::ImportSet(bool hasHeaderImportModule,
-                     ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
-                     ArrayRef<ModuleDecl::ImportedModule> transitiveImports)
+                     ArrayRef<ImportedModule> topLevelImports,
+                     ArrayRef<ImportedModule> transitiveImports)
   : HasHeaderImportModule(hasHeaderImportModule),
     NumTopLevelImports(topLevelImports.size()),
     NumTransitiveImports(transitiveImports.size()) {
-  auto buffer = getTrailingObjects<ModuleDecl::ImportedModule>();
+  auto buffer = getTrailingObjects<ImportedModule>();
   std::uninitialized_copy(topLevelImports.begin(), topLevelImports.end(),
                           buffer);
   std::uninitialized_copy(transitiveImports.begin(), transitiveImports.end(),
                           buffer + topLevelImports.size());
 
 #ifndef NDEBUG
-  llvm::SmallDenseSet<ModuleDecl::ImportedModule, 8> unique;
+  llvm::SmallDenseSet<ImportedModule, 8> unique;
   for (auto import : topLevelImports) {
     auto result = unique.insert(import).second;
     assert(result && "Duplicate imports in import set");
@@ -52,7 +52,7 @@ ImportSet::ImportSet(bool hasHeaderImportModule,
 
 void ImportSet::Profile(
     llvm::FoldingSetNodeID &ID,
-    ArrayRef<ModuleDecl::ImportedModule> topLevelImports) {
+    ArrayRef<ImportedModule> topLevelImports) {
   ID.AddInteger(topLevelImports.size());
   for (auto import : topLevelImports) {
     ID.AddInteger(import.accessPath.size());
@@ -63,9 +63,9 @@ void ImportSet::Profile(
   }
 }
 
-static void collectExports(ModuleDecl::ImportedModule next,
-                           SmallVectorImpl<ModuleDecl::ImportedModule> &stack) {
-  SmallVector<ModuleDecl::ImportedModule, 4> exports;
+static void collectExports(ImportedModule next,
+                           SmallVectorImpl<ImportedModule> &stack) {
+  SmallVector<ImportedModule, 4> exports;
   next.importedModule->getImportedModulesForLookup(exports);
   for (auto exported : exports) {
     if (next.accessPath.empty())
@@ -73,8 +73,7 @@ static void collectExports(ModuleDecl::ImportedModule next,
     else if (exported.accessPath.empty()) {
       exported.accessPath = next.accessPath;
       stack.push_back(exported);
-    } else if (ModuleDecl::isSameAccessPath(next.accessPath,
-                                            exported.accessPath)) {
+    } else if (next.accessPath.isSameAs(exported.accessPath)) {
       stack.push_back(exported);
     }
   }
@@ -82,16 +81,16 @@ static void collectExports(ModuleDecl::ImportedModule next,
 
 ImportSet &
 ImportCache::getImportSet(ASTContext &ctx,
-                          ArrayRef<ModuleDecl::ImportedModule> imports) {
+                          ArrayRef<ImportedModule> imports) {
   bool hasHeaderImportModule = false;
   ModuleDecl *headerImportModule = nullptr;
   if (auto *loader = ctx.getClangModuleLoader())
     headerImportModule = loader->getImportedHeaderModule();
 
-  SmallVector<ModuleDecl::ImportedModule, 4> topLevelImports;
+  SmallVector<ImportedModule, 4> topLevelImports;
 
-  SmallVector<ModuleDecl::ImportedModule, 4> transitiveImports;
-  llvm::SmallDenseSet<ModuleDecl::ImportedModule, 32> visited;
+  SmallVector<ImportedModule, 4> transitiveImports;
+  llvm::SmallDenseSet<ImportedModule, 32> visited;
 
   for (auto next : imports) {
     if (!visited.insert(next).second)
@@ -116,7 +115,7 @@ ImportCache::getImportSet(ASTContext &ctx,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().ImportSetFoldMiss;
 
-  SmallVector<ModuleDecl::ImportedModule, 4> stack;
+  SmallVector<ImportedModule, 4> stack;
   for (auto next : topLevelImports) {
     collectExports(next, stack);
   }
@@ -140,7 +139,7 @@ ImportCache::getImportSet(ASTContext &ctx,
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
     return *result;
   
-  size_t bytes = ImportSet::totalSizeToAlloc<ModuleDecl::ImportedModule>(topLevelImports.size() + transitiveImports.size());
+  size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(topLevelImports.size() + transitiveImports.size());
   void *mem = ctx.Allocate(bytes, alignof(ImportSet), AllocationArena::Permanent);
 
   auto *result = new (mem) ImportSet(hasHeaderImportModule,
@@ -170,14 +169,13 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().ImportSetCacheMiss;
 
-  SmallVector<ModuleDecl::ImportedModule, 4> imports;
+  SmallVector<ImportedModule, 4> imports;
 
-  imports.emplace_back(
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), mod});
+  imports.emplace_back(ImportPath::Access(), mod);
 
   if (file) {
     file->getImportedModules(imports,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
@@ -188,18 +186,18 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   return result;
 }
 
-ArrayRef<ModuleDecl::AccessPathTy> ImportCache::allocateArray(
+ArrayRef<ImportPath::Access> ImportCache::allocateArray(
     ASTContext &ctx,
-    SmallVectorImpl<ModuleDecl::AccessPathTy> &results) {
+    SmallVectorImpl<ImportPath::Access> &results) {
   if (results.empty())
-    return ArrayRef<ModuleDecl::AccessPathTy>();
+    return {};
   else if (results.size() == 1 && results[0].empty())
     return {&EmptyAccessPath, 1};
   else
     return ctx.AllocateCopy(results);
 }
 
-ArrayRef<ModuleDecl::AccessPathTy>
+ArrayRef<ImportPath::Access>
 ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
                                       const DeclContext *dc) {
   dc = dc->getModuleScopeContext();
@@ -216,7 +214,7 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss;
 
-  SmallVector<ModuleDecl::AccessPathTy, 1> accessPaths;
+  SmallVector<ImportPath::Access, 1> accessPaths;
   for (auto next : getImportSet(dc).getAllImports()) {
     // If we found 'mod', record the access path.
     if (next.importedModule == mod) {
@@ -231,7 +229,7 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   return result;
 }
 
-ArrayRef<ModuleDecl::AccessPathTy>
+ArrayRef<ImportPath::Access>
 ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                             const ModuleDecl *other,
                                             const DeclContext *dc) {
@@ -241,7 +239,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
 
   // Fast path.
   if (currentMod == other)
-    return ArrayRef<ModuleDecl::AccessPathTy>();
+    return {};
 
   auto key = std::make_tuple(mod, other, dc);
   auto found = ShadowCache.find(key);
@@ -254,20 +252,19 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().ModuleShadowCacheMiss;
 
-  SmallVector<ModuleDecl::ImportedModule, 4> stack;
-  llvm::SmallDenseSet<ModuleDecl::ImportedModule, 32> visited;
+  SmallVector<ImportedModule, 4> stack;
+  llvm::SmallDenseSet<ImportedModule, 32> visited;
 
-  stack.emplace_back(
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), currentMod});
+  stack.emplace_back(ImportPath::Access(), currentMod);
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
     file->getImportedModules(stack,
-                             {ModuleDecl::ImportFilterKind::Private,
+                             {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
                               ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
 
-  SmallVector<ModuleDecl::AccessPathTy, 4> accessPaths;
+  SmallVector<ImportPath::Access, 4> accessPaths;
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val();
@@ -296,7 +293,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   return result;
 };
 
-ArrayRef<ModuleDecl::ImportedModule>
+ArrayRef<ImportedModule>
 swift::namelookup::getAllImports(const DeclContext *dc) {
   return dc->getASTContext().getImportCache().getImportSet(dc)
     .getAllImports();

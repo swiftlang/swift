@@ -45,3 +45,8 @@ func intValueWithPrecisionTest() -> OSLogMessage {
      \(10, format: .decimal(minDigits: 25), align: .right(columns: 10))
     """
 }
+
+@_semantics("test_driver")
+func intValueWithPrivacyTest() -> OSLogMessage {
+    return "An integer value \(10, privacy: .private(mask: .hash))"
+}

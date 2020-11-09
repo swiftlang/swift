@@ -42,6 +42,7 @@ namespace swift {
 
 class TBDGenDescriptor;
 struct TBDGenOptions;
+class SymbolSource;
 
 namespace tbdgen {
 
@@ -72,7 +73,8 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   const TBDGenOptions &Opts;
 
   using SymbolKind = llvm::MachO::SymbolKind;
-  using SymbolCallbackFn = llvm::function_ref<void(StringRef, SymbolKind)>;
+  using SymbolCallbackFn =
+      llvm::function_ref<void(StringRef, SymbolKind, SymbolSource)>;
 
   SymbolCallbackFn SymbolCallback;
 
@@ -90,11 +92,11 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     parsePreviousModuleInstallNameMap();
   void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
-                         bool isLinkerDirective = false);
+                         SymbolSource source);
   void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
   void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
-  void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
-                                     llvm::MachO::SymbolKind::GlobalSymbol);
+  void addSymbol(StringRef name, SymbolSource source,
+                 SymbolKind kind = SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
@@ -150,7 +152,7 @@ public:
 
   /// Create a new visitor using the target and layout information from a
   /// TBDGenDescriptor.
-  TBDGenVisitor(TBDGenDescriptor desc, SymbolCallbackFn symbolCallback);
+  TBDGenVisitor(const TBDGenDescriptor &desc, SymbolCallbackFn symbolCallback);
 
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
@@ -160,8 +162,9 @@ public:
     //
     // Make sure to only add the main symbol for the module that we're emitting
     // TBD for, and not for any statically linked libraries.
+    // FIXME: We should have a SymbolSource for main.
     if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
-      addSymbol("main");
+      addSymbol("main", SymbolSource::forUnknown());
   }
 
   /// Adds the global symbols associated with the first file.

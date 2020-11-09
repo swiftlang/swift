@@ -1125,6 +1125,7 @@ public:
 
   UncheckedValueCastInst *createUncheckedValueCast(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
+    assert(hasOwnership());
     return insert(UncheckedValueCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
   }
@@ -1935,6 +1936,29 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Concurrency instructions
+  //===--------------------------------------------------------------------===//
+
+  GetAsyncContinuationInst *createGetAsyncContinuation(SILLocation Loc,
+                                                       SILType ContinuationTy) {
+    return insert(new (getModule()) GetAsyncContinuationInst(getSILDebugLocation(Loc),
+                                                             ContinuationTy));
+  }
+
+  GetAsyncContinuationAddrInst *createGetAsyncContinuationAddr(SILLocation Loc,
+                                                               SILValue Operand,
+                                                               SILType ContinuationTy) {
+    return insert(new (getModule()) GetAsyncContinuationAddrInst(getSILDebugLocation(Loc),
+                                                                 Operand,
+                                                                 ContinuationTy));
+  }
+
+  HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor) {
+    return insert(new (getModule()) HopToExecutorInst(getSILDebugLocation(Loc),
+                                                      Actor, hasOwnership()));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
@@ -1964,7 +1988,17 @@ public:
         YieldInst::create(getSILDebugLocation(loc), yieldedValues,
                           resumeBB, unwindBB, getFunction()));
   }
-
+  
+  AwaitAsyncContinuationInst *createAwaitAsyncContinuation(SILLocation loc,
+                                                           SILValue continuation,
+                                                           SILBasicBlock *resumeBB,
+                                                           SILBasicBlock *errorBB) {
+    return insertTerminator(
+        new (getModule()) AwaitAsyncContinuationInst(getSILDebugLocation(loc),
+                                                     continuation,
+                                                     resumeBB, errorBB));
+  }
+  
   CondBranchInst *
   createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
                    SILBasicBlock *Target2,
@@ -2358,15 +2392,11 @@ private:
   }
 
   void insertImpl(SILInstruction *TheInst) {
-    if (BB == 0)
-      return;
-
+    assert(hasValidInsertionPoint());
     BB->insert(InsertPt, TheInst);
 
     C.notifyInserted(TheInst);
 
-// TODO: We really shouldn't be creating instructions unless we are going to
-// insert them into a block... This failed in SimplifyCFG.
 #ifndef NDEBUG
     TheInst->verifyOperandOwnership();
 #endif
@@ -2479,6 +2509,20 @@ public:
     assert(DS && "Instruction without debug scope associated!");
     setCurrentDebugScope(DS);
   }
+
+  /// If \p inst is a terminator apply site, then pass a builder to insert at
+  /// the first instruction of each successor to \p func. Otherwise, pass a
+  /// builder to insert at std::next(inst).
+  ///
+  /// The intention is that this abstraction will enable the compiler writer to
+  /// ignore whether or not \p inst is a terminator when inserting instructions
+  /// after \p inst.
+  ///
+  /// Precondition: It's the responsibility of the caller to ensure that if
+  /// \p inst is a terminator, all successor blocks have only a single
+  /// predecessor block: the parent of \p inst.
+  static void insertAfter(SILInstruction *inst,
+                          function_ref<void(SILBuilder &)> func);
 };
 
 class SavedInsertionPointRAII {

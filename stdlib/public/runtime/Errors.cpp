@@ -137,7 +137,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol

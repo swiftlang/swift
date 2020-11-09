@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 // REQUIRES: OS=windows-msvc
 
-import MSVCRT
+import visualc
 typealias JumpBuffer = _JBTYPE
 
 func test_unavailable_returns_twice_function() {

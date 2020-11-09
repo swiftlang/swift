@@ -123,8 +123,10 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                     AccessSemantics::Ordinary, fnType);
 
     fnType = fnType->getResult()->castTo<FunctionType>();
-    cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
-    cmpFuncExpr->setImplicit();
+    auto *callExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
+    callExpr->setImplicit();
+    callExpr->setThrows(false);
+    cmpFuncExpr = callExpr;
   } else {
     cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
                                       /*implicit*/ true,
@@ -142,6 +144,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto *cmpExpr = new (C) BinaryExpr(
       cmpFuncExpr, abTuple, /*implicit*/ true,
       fnType->castTo<FunctionType>()->getResult());
+  cmpExpr->setThrows(false);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -202,9 +205,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -406,17 +408,11 @@ deriveEquatable_eq(
   }
 
   DeclName name(C, generatedIdentifier, params);
-  auto eqDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::KeywordStatic,
-                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-                     /*Async*/ false, SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     TypeLoc::withoutLoc(boolTy),
-                     parentDC);
-  eqDecl->setImplicit();
+  auto *const eqDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
@@ -549,15 +545,11 @@ deriveHashable_hashInto(
 
   // Func name: hash(into: inout Hasher) -> ()
   DeclName name(C, C.Id_hash, params);
-  auto *hashDecl = FuncDecl::create(C,
-                                    SourceLoc(), StaticSpellingKind::None,
-                                    SourceLoc(), name, SourceLoc(),
-                                    /*Async*/ false, SourceLoc(),
-                                    /*Throws=*/false, SourceLoc(),
-                                    nullptr, params,
-                                    TypeLoc::withoutLoc(returnType),
-                                    parentDC);
-  hashDecl->setImplicit();
+  auto *const hashDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
   hashDecl->copyFormalAccessFrom(derived.Nominal);
@@ -737,9 +729,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
       for (unsigned i : indices(payloadVars)) {
         auto *vOld = payloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(),
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
         copy[i] = vNew;
       }
@@ -849,6 +840,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto callExpr = CallExpr::createImplicit(C, hashExpr,
                                            { selfRef }, { C.Id_for });
   callExpr->setType(hashFuncResultType);
+  callExpr->setThrows(false);
 
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
@@ -887,8 +879,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   VarDecl *hashValueDecl =
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                    /*IsCaptureList*/false, SourceLoc(),
-                    C.Id_hashValue, parentDC);
+                    SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
 
   ParameterList *params = ParameterList::createEmpty(C);
@@ -899,7 +890,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
-      TypeLoc::withoutLoc(intType), parentDC);
+      intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);

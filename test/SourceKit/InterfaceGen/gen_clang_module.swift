@@ -73,20 +73,20 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN:      == -req=cursor -pos=1:8 == -req=cursor -pos=1:12 \
-// RUN:      == -req=cursor -pos=2:10 \
-// RUN:      == -req=cursor -pos=3:10 | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN:      == -req=cursor -pos=1:8 \
+// RUN:      == -req=cursor -pos=2:8 == -req=cursor -pos=2:12 \
+// RUN:      == -req=cursor -pos=3:8 | %FileCheck -check-prefix=CHECK-IMPORT %s
 // The cursors point to module names inside the imports, see 'gen_clang_module.swift.response'
 
 // CHECK-IMPORT: 	  source.lang.swift.ref.module ()
 // CHECK-IMPORT-NEXT: Foo{{$}}
 // CHECK-IMPORT-NEXT: Foo{{$}}
 // CHECK-IMPORT: 	  source.lang.swift.ref.module ()
+// CHECK-IMPORT-NEXT: Foo{{$}}
+// CHECK-IMPORT-NEXT: Foo{{$}}
+// CHECK-IMPORT: 	  source.lang.swift.ref.module ()
 // CHECK-IMPORT-NEXT: FooSub{{$}}
 // CHECK-IMPORT-NEXT: Foo.FooSub{{$}}
-// CHECK-IMPORT: 	  source.lang.swift.ref.module ()
-// CHECK-IMPORT-NEXT: Foo{{$}}
-// CHECK-IMPORT-NEXT: Foo{{$}}
 // CHECK-IMPORT: 	  source.lang.swift.ref.module ()
 // CHECK-IMPORT-NEXT: FooHelper{{$}}
 // CHECK-IMPORT-NEXT: FooHelper{{$}}

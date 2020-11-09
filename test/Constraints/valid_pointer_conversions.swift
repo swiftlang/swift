@@ -41,3 +41,8 @@ func SR12382(_ x: UnsafeMutablePointer<Double>??) {}
 var i = 0
 SR12382(&i) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>'}}
 // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}
+
+//problem/68254165 - Bad diagnostic when using String init(decodingCString:) with an incorrect pointer type
+func rdar68254165(ptr: UnsafeMutablePointer<Int8>) {
+  _ = String(decodingCString: ptr, as: .utf8) // expected-error {{generic parameter 'Encoding' could not be inferred}}
+}

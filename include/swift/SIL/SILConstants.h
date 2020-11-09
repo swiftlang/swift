@@ -73,7 +73,7 @@ public:
   SymbolicValueBumpAllocator() {}
   ~SymbolicValueBumpAllocator() {}
 
-  void *allocate(unsigned long byteSize, unsigned alignment) {
+  void *allocate(unsigned long byteSize, unsigned alignment) override {
     return bumpAllocator.Allocate(byteSize, alignment);
   }
 };

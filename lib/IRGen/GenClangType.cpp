@@ -132,10 +132,10 @@ namespace {
 /// ABI.
 class GenClangType : public CanTypeVisitor<GenClangType, clang::CanQualType> {
   IRGenModule &IGM;
-  ClangTypeConverter &Converter;
+  irgen::ClangTypeConverter &Converter;
 
 public:
-  GenClangType(IRGenModule &IGM, ClangTypeConverter &converter)
+  GenClangType(IRGenModule &IGM, irgen::ClangTypeConverter &converter)
     : IGM(IGM), Converter(converter) {}
 
   const clang::ASTContext &getClangASTContext() const {
@@ -264,8 +264,8 @@ static clang::CanQualType getClangBuiltinTypeFromTypedef(
 }
 
 clang::CanQualType
-ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
-                                              CanStructType type) {
+irgen::ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
+                                                     CanStructType type) {
   // Handle builtin types by adding entries to the cache that reverse
   // the mapping done by the importer.  We could try to look at the
   // members of the struct instead, but even if that's ABI-equivalent
@@ -748,7 +748,7 @@ clang::CanQualType GenClangType::visitType(CanType type) {
   llvm_unreachable("Unexpected type in Clang type generation.");
 }
 
-clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
+clang::CanQualType irgen::ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
   // Look in the cache.
   auto it = Cache.find(type);
   if (it != Cache.end()) {

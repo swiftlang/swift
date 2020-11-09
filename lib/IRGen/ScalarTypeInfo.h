@@ -117,10 +117,33 @@ public:
     schema.add(ExplosionSchema::Element::forScalar(ty));
   }
 
+  void storeAsBytes(IRGenFunction &IGF, Explosion &src, Address addr) const {
+    auto &IGM = IGF.IGM;
+
+    // Store in multiples of bytes to avoid undefined bits.
+    auto storageTy = addr.getAddress()->getType()->getPointerElementType();
+    if (storageTy->isIntegerTy() && (storageTy->getIntegerBitWidth() % 8)) {
+      auto &Builder = IGF.Builder;
+      auto nextByteSize = (storageTy->getIntegerBitWidth() + 7) & ~7UL;
+      auto nextByteSizedIntTy =
+          llvm::IntegerType::get(IGM.getLLVMContext(), nextByteSize);
+      auto newAddr =
+          Address(Builder.CreatePointerCast(addr.getAddress(),
+                                            nextByteSizedIntTy->getPointerTo()),
+                  addr.getAlignment());
+      auto newValue = Builder.CreateZExt(src.claimNext(), nextByteSizedIntTy);
+      Builder.CreateStore(newValue, newAddr);
+      return;
+    }
+
+    IGF.Builder.CreateStore(src.claimNext(), addr);
+  }
+
   void initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                   bool isOutlined) const override {
     addr = asDerived().projectScalar(IGF, addr);
-    IGF.Builder.CreateStore(src.claimNext(), addr);
+
+    storeAsBytes(IGF, src, addr);
   }
 
   void loadAsCopy(IRGenFunction &IGF, Address addr,
@@ -149,8 +172,7 @@ public:
     }
 
     // Store.
-    llvm::Value *newValue = src.claimNext();
-    IGF.Builder.CreateStore(newValue, dest);
+    storeAsBytes(IGF, src, dest);
 
     // Release the old value if we need to.
     if (!Derived::IsScalarPOD) {
