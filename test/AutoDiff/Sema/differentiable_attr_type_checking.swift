@@ -632,7 +632,7 @@ class Super: Differentiable {
   // TODO(TF-632): Fix "'TangentVector' is not a member type of 'Self'" diagnostic.
   // The underlying error should appear instead:
   // "covariant 'Self' can only appear at the top level of method result type".
-  // expected-error @+1 2 {{'TangentVector' is not a member type of 'Self'}}
+  // expected-error @+1 2 {{'TangentVector' is not a member type of type 'Self'}}
   func vjpDynamicSelfResult() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { $0 })
   }

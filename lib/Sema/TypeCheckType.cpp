@@ -153,6 +153,17 @@ Type TypeResolution::mapTypeIntoContext(Type type) const {
   llvm_unreachable("unhandled stage");
 }
 
+// FIXME: It would be nice to have a 'DescriptiveTypeKind' abstraction instead.
+static DescriptiveDeclKind describeDeclOfType(Type t) {
+  if (!t) {
+    return DescriptiveDeclKind::Type;
+  }
+  if (auto *NTD = t->getAnyNominal()) {
+    return NTD->getDescriptiveKind();
+  }
+  return DescriptiveDeclKind::Type;
+}
+
 Type TypeResolution::resolveDependentMemberType(
                                           Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
@@ -211,8 +222,9 @@ Type TypeResolution::resolveDependentMemberType(
     if (!singleType) {
       auto name = ref->getNameRef();
       auto nameLoc = ref->getNameLoc();
-      ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
-        .highlight(baseRange);
+      const auto kind = describeDeclOfType(baseTy);
+      ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, kind, baseTy)
+          .highlight(baseRange);
       corrections.noteAllCandidates();
 
       return ErrorType::get(ctx);
@@ -1160,8 +1172,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Qualified lookup case.
   if (!parentType->mayHaveMembers()) {
-    diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
-                   comp->getNameRef(), parentType)
+    const auto kind = describeDeclOfType(parentType);
+    diags
+        .diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                  comp->getNameRef(), kind, parentType)
         .highlight(parentRange);
     return ErrorType::get(ctx);
   }
@@ -1214,9 +1228,11 @@ static Type diagnoseUnknownType(TypeResolution resolution,
                      parentType)
           .highlight(parentRange);
     } else {
-      diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
-                     comp->getNameRef(), parentType)
-        .highlight(parentRange);
+      const auto kind = describeDeclOfType(parentType);
+      diags
+          .diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                    comp->getNameRef(), kind, parentType)
+          .highlight(parentRange);
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
       if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
