@@ -222,6 +222,17 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
                        unavailablePlatformKind);
 }
 
+ExportContext ExportContext::forConformance(DeclContext *DC,
+                                            ProtocolDecl *proto) {
+  assert(isa<ExtensionDecl>(DC) || isa<NominalTypeDecl>(DC));
+  auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
+
+  where.Exported &= proto->getFormalAccessScope(
+      DC, /*usableFromInlineAsPublic*/true).isPublic();
+
+  return where;
+}
+
 ExportContext ExportContext::withReason(ExportabilityReason reason) const {
   auto copy = *this;
   copy.Reason = unsigned(reason);
@@ -2172,20 +2183,19 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 }
 
-void TypeChecker::diagnoseIfDeprecated(
-    SourceLoc loc,
-    const RootProtocolConformance *rootConf,
-    const ExtensionDecl *ext,
-    const ExportContext &where) {
+bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
+                                       const RootProtocolConformance *rootConf,
+                                       const ExtensionDecl *ext,
+                                       const ExportContext &where) {
   const AvailableAttr *attr = TypeChecker::getDeprecated(ext);
   if (!attr)
-    return;
+    return false;
 
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
   if (where.isDeprecated()) {
-    return;
+    return false;
   }
 
   auto *dc = where.getDeclContext();
@@ -2196,7 +2206,7 @@ void TypeChecker::diagnoseIfDeprecated(
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
-      return;
+      return false;
     }
   }
 
@@ -2215,7 +2225,7 @@ void TypeChecker::diagnoseIfDeprecated(
              attr->Deprecated.hasValue(), deprecatedVersion,
              /*message*/ StringRef())
         .highlight(attr->getRange());
-    return;
+    return true;
   }
 
   EncodedDiagnosticMessage encodedMessage(attr->Message);
@@ -2225,6 +2235,7 @@ void TypeChecker::diagnoseIfDeprecated(
       attr->Deprecated.hasValue(), deprecatedVersion,
       encodedMessage.Message)
     .highlight(attr->getRange());
+  return true;
 }
 
 void swift::diagnoseUnavailableOverride(ValueDecl *override,
@@ -3374,7 +3385,8 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
-                                       const ExportContext &where) {
+                                       const ExportContext &where,
+                                       Type depTy, Type replacementTy) {
   assert(!where.isImplicit());
 
   if (!conformance.isConcrete())
@@ -3385,15 +3397,30 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   auto *DC = where.getDeclContext();
 
+  auto maybeEmitAssociatedTypeNote = [&]() {
+    if (!depTy && !replacementTy)
+      return;
+
+    Type selfTy = rootConf->getProtocol()->getProtocolSelfType();
+    if (!depTy->isEqual(selfTy)) {
+      auto &ctx = DC->getASTContext();
+      ctx.Diags.diagnose(
+          loc,
+          diag::assoc_conformance_from_implementation_only_module,
+          depTy, replacementTy->getCanonicalType());
+    }
+  };
+
   if (auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext())) {
-    if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where))
+    if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where)) {
+      maybeEmitAssociatedTypeNote();
       return true;
+    }
 
-    if (diagnoseExplicitUnavailability(loc, rootConf, ext, where))
+    if (diagnoseExplicitUnavailability(loc, rootConf, ext, where)) {
+      maybeEmitAssociatedTypeNote();
       return true;
-
-    // Diagnose for deprecation
-    TypeChecker::diagnoseIfDeprecated(loc, rootConf, ext, where);
+    }
 
     // Diagnose (and possibly signal) for potential unavailability
     auto maybeUnavail = TypeChecker::checkConformanceAvailability(
@@ -3401,13 +3428,24 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     if (maybeUnavail.hasValue()) {
       TypeChecker::diagnosePotentialUnavailability(rootConf, ext, loc, DC,
                                                    maybeUnavail.getValue());
+      maybeEmitAssociatedTypeNote();
+      return true;
+    }
+
+    // Diagnose for deprecation
+    if (TypeChecker::diagnoseIfDeprecated(loc, rootConf, ext, where)) {
+      maybeEmitAssociatedTypeNote();
+
+      // Deprecation is just a warning, so keep going with checking the
+      // substitution map below.
     }
   }
 
   // Now, check associated conformances.
   SubstitutionMap subConformanceSubs =
       concreteConf->getSubstitutions(DC->getParentModule());
-  if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where))
+  if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
+                                          depTy, replacementTy))
     return true;
 
   return false;
@@ -3416,10 +3454,12 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 bool
 swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
-                                           const ExportContext &where) {
+                                           const ExportContext &where,
+                                           Type depTy, Type replacementTy) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
-    if (diagnoseConformanceAvailability(loc, conformance, where))
+    if (diagnoseConformanceAvailability(loc, conformance, where,
+                                        depTy, replacementTy))
       hadAnyIssues = true;
   }
   return hadAnyIssues;
