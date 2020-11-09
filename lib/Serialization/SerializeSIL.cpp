@@ -11,18 +11,20 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-serialize"
+
 #include "SILFormat.h"
 #include "Serialization.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Strings.h"
 
@@ -1186,28 +1188,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // default basic block ID. Use SILOneTypeValuesLayout: the type is
     // for condition, the list has value for condition, hasDefault, default
     // basic block ID, a list of (DeclID, BasicBlock ID).
-    const SwitchEnumInstBase *SOI = cast<SwitchEnumInstBase>(&SI);
+    SwitchEnumTermInst SOI(&SI);
+    assert(SOI);
     SmallVector<ValueID, 4> ListOfValues;
-    ListOfValues.push_back(addValueRef(SOI->getOperand()));
-    ListOfValues.push_back((unsigned)SOI->hasDefault());
-    if (SOI->hasDefault())
-      ListOfValues.push_back(BasicBlockMap[SOI->getDefaultBB()]);
+    ListOfValues.push_back(addValueRef(SOI.getOperand()));
+    ListOfValues.push_back((unsigned)SOI.hasDefault());
+    if (SOI.hasDefault())
+      ListOfValues.push_back(BasicBlockMap[SOI.getDefaultBB()]);
     else
       ListOfValues.push_back(0);
 
-    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+    for (unsigned i = 0, e = SOI.getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILBasicBlock *dest;
-      std::tie(elt, dest) = SOI->getCase(i);
+      std::tie(elt, dest) = SOI.getCase(i);
       ListOfValues.push_back(S.addDeclRef(elt));
       ListOfValues.push_back(BasicBlockMap[dest]);
     }
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(),
-        S.addTypeRef(SOI->getOperand()->getType().getASTType()),
-        (unsigned)SOI->getOperand()->getType().getCategory(),
-        ListOfValues);
+        S.addTypeRef(SOI.getOperand()->getType().getASTType()),
+        (unsigned)SOI.getOperand()->getType().getCategory(), ListOfValues);
     break;
   }
   case SILInstructionKind::SelectEnumInst:
