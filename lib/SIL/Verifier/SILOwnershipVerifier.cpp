@@ -242,7 +242,7 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // First do a quick check if we have a consuming use. If so, stash the value
     // and continue.
-    if (op->isConsumingUse()) {
+    if (op->isLifetimeEnding()) {
       LLVM_DEBUG(llvm::dbgs() << "Lifetime Ending User: " << *user);
       lifetimeEndingUsers.push_back(op);
       continue;
@@ -343,7 +343,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     // Now check if we have a non guaranteed forwarding inst...
     if (!isGuaranteedForwardingInst(user)) {
       // First check if we are visiting an operand that is a consuming use...
-      if (op->isConsumingUse()) {
+      if (op->isLifetimeEnding()) {
         // If its underlying value is our original value, then this is a true
         // lifetime ending use. Otherwise, we have a guaranteed value that has
         // an end_borrow on a forwarded value which is not supported in any
