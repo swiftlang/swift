@@ -1189,10 +1189,12 @@ namespace {
         // Here `P.foo` would be replaced with `S.foo`
         if (!isExistentialMetatype && baseTy->is<ProtocolType>() &&
             member->isStatic()) {
+          auto selfParam =
+              overload.openedFullType->castTo<FunctionType>()->getParams()[0];
+
           Type baseTy =
-              simplifyType(openedType->is<FunctionType>()
-                               ? openedType->castTo<FunctionType>()->getResult()
-                               : openedType);
+              simplifyType(selfParam.getPlainType())->getMetatypeInstanceType();
+
           base = TypeExpr::createImplicitHack(base->getLoc(), baseTy, context);
           cs.cacheType(base);
         }
