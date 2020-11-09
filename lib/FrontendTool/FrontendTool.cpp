@@ -67,6 +67,8 @@
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
+#include "swift/SIL/ModuleSummary.h"
+#include "swift/Serialization/ModuleSummary.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/Module.h"
@@ -2072,11 +2074,9 @@ static bool serializeModuleSummary(SILModule *SM,
                                    const PrimarySpecificPaths &PSPs,
                                    const ASTContext &Context) {
   auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
-  return withOutputFile(Context.Diags, summaryOutputPath,
-                        [&](llvm::raw_ostream &out) {
-                          out << "Some stuff";
-                          return false;
-                        });
+  auto Summary = modulesummary::buildModuleSummaryIndex(*SM);
+  return modulesummary::writeModuleSummaryIndex(*Summary.get(), Context.Diags,
+                                                summaryOutputPath);
 }
 
 static GeneratedModule

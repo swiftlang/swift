@@ -1140,6 +1140,11 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 }
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
+
+  if (!silModule->getOptions().ModuleSummaryPath.empty()) {
+    return runSILCrossModuleEliminatorPass(*silModule);
+  }
+
   if (performMandatorySILPasses(Invocation, silModule))
     return true;
 

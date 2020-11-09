@@ -36,6 +36,7 @@
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/LLVMPasses/PassesFwd.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -1019,6 +1020,8 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
         IGM.emitSourceFile(*nextSF);
+      } else if (auto nextSAF = dyn_cast<SerializedASTFile>(file)) {
+        IGM.emitSerializedASTFile(*nextSAF);
       } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(file)) {
         IGM.emitSynthesizedFileUnit(*nextSFU);
       } else {
@@ -1260,6 +1263,9 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
       CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
+    } if (auto *SAF = dyn_cast<SerializedASTFile>(File)) {
+      CurrentIGMPtr IGM = irgen.getGenModule(SAF);
+      IGM->emitSerializedASTFile(*SAF);
     } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
       CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
       IGM->emitSynthesizedFileUnit(*nextSFU);

@@ -47,10 +47,14 @@ fi
 if [[ "$(uname)" == "Linux" ]]; then
   $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
     $TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/stdlib
+  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
+    $TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/LTO
   echo "Skip running test suites for Linux"
 else
   $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
  	$TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/stdlib
+  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
+	$TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/LTO
 
   # Run test but ignore failure temporarily
   ninja check-swift-wasi-wasm32 -C $TARGET_BUILD_DIR/swift-$HOST_SUFFIX || true
