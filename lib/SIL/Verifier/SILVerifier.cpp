@@ -5215,37 +5215,30 @@ public:
 
   void verifyBranches(const SILFunction *F) {
     // Verify no critical edge.
-    auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
-      assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
-
+    auto requireNonCriticalSucc = [this](const TermInst *termInst,
+                                         const Twine &message) {
       // A critical edge has more than one outgoing edges from the source
       // block.
-      auto SrcSuccs = T->getSuccessors();
-      if (SrcSuccs.size() <= 1)
-        return false;
+      auto succBlocks = termInst->getSuccessorBlocks();
+      if (succBlocks.size() <= 1)
+        return;
 
-      // And its destination block has more than one predecessor.
-      SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
-      assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessorBlock())
-        return false;
-
-      return true;
+      for (const SILBasicBlock *destBB : succBlocks) {
+        // And its destination block has more than one predecessor.
+        _require(destBB->getSinglePredecessorBlock(), message);
+      }
     };
 
-    for (auto &BB : *F) {
-      const TermInst *TI = BB.getTerminator();
-      CurInstruction = TI;
+    for (auto &bb : *F) {
+      const TermInst *termInst = bb.getTerminator();
+      CurInstruction = termInst;
 
-      // FIXME: In OSSA, critical edges will never be allowed.
-      // In Lowered SIL, they are allowed on unconditional branches only.
-      //   if (!(isSILOwnershipEnabled() && F->hasOwnership()))
-      if (AllowCriticalEdges && isa<CondBranchInst>(TI))
-        continue;
-
-      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-        require(!isCriticalEdgePred(TI, Idx),
-                "non cond_br critical edges not allowed");
+      if (isSILOwnershipEnabled() && F->hasOwnership()) {
+        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
+      }
+      // In Lowered SIL, they are allowed on conditional branches only.
+      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
+        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
       }
     }
   }
