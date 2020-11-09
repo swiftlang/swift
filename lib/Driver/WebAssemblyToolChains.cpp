@@ -124,6 +124,7 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("--sysroot");
