@@ -41,9 +41,6 @@ def emit_module_doc_path
 def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
   HelpText<"Output module source info file">;
   
-def emit_module_summary : Flag<["-"], "emit-module-summary">,
-  HelpText<"Emit module summary">;
-
 def module_summary_path
   : Separate<["-"], "module-summary-path">, MetaVarName<"<path>">,
     HelpText<"Combined module summary file <path>">;

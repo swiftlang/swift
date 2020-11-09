@@ -107,7 +107,7 @@ void FunctionSummaryIndexer::indexDirectFunctionCall(
   if (!RecordedDirectTargets.insert(guid).second) {
     return;
   }
-  FunctionSummary::Call call(guid, Callee.getName(),
+  FunctionSummary::Call call(guid, Callee.getName().str(),
                              FunctionSummary::Call::Direct);
   TheSummary->addCall(call);
 }
@@ -334,7 +334,7 @@ void FunctionSummaryIndexer::indexFunction() {
   GUID guid = getGUIDFromUniqueName(F.getName());
   uint32_t instSize = 0;
   TheSummary = std::make_unique<FunctionSummary>(guid);
-  TheSummary->setName(F.getName());
+  TheSummary->setName(F.getName().str());
   for (auto &BB : F) {
     for (auto &I : BB) {
       visit(&I);
@@ -456,7 +456,7 @@ void ModuleSummaryIndexer::indexVTable(const SILVTable &VT) {
 void ModuleSummaryIndexer::indexModule() {
   TheSummary = std::make_unique<ModuleSummaryIndex>();
   auto moduleName = Mod.getSwiftModule()->getName().str();
-  TheSummary->setName(moduleName);
+  TheSummary->setName(moduleName.str());
 
   for (auto &F : Mod) {
     FunctionSummaryIndexer indexer(F);

@@ -441,14 +441,14 @@ class RetainedSizeCalculator {
 
   void calculateRecursively(DomCallInfoNode *domNode) {
     Entries.push_back({domNode, getInstSize(domNode)});
-    for (auto child : domNode->getChildren()) {
+    for (auto child : domNode->children()) {
       calculateRecursively(child);
     }
   }
 
 public:
   void calculate(DomCallInfoNode *root) {
-    for (auto child : root->getChildren()) {
+    for (auto child : root->children()) {
       calculateRecursively(child);
     }
     std::sort(Entries.begin(), Entries.end(),
@@ -473,7 +473,7 @@ public:
     O << "\t| ";
     O.indent(2 * Lev) << FS->getName() << "\n";
 
-    auto Children = Root->getChildren();
+    auto Children = Root->children();
     std::sort(Children.begin(), Children.end(),
               [&](DomCallInfoNode *lhs, DomCallInfoNode *rhs) {
                 return getInstSize(lhs) > getInstSize(rhs);
@@ -485,10 +485,10 @@ public:
   void displayTree(llvm::raw_ostream &O, DomCallInfoNode *Root) {
     O << "size\t| %\t| symbol\n";
     uint32_t TotalSize = 0;
-    for (auto Child : Root->getChildren()) {
+    for (auto Child : Root->children()) {
       TotalSize += getInstSize(Child);
     }
-    auto Children = Root->getChildren();
+    auto Children = Root->children();
     std::sort(Children.begin(), Children.end(),
               [&](DomCallInfoNode *lhs, DomCallInfoNode *rhs) {
                 return getInstSize(lhs) > getInstSize(rhs);

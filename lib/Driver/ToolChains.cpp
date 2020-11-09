@@ -628,10 +628,9 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
-  case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
-  case file_types::TY_SwiftModuleSummaryFile: // FIXME(katei)
+  case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftOverlayFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
@@ -890,7 +889,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
     case file_types::TY_PrivateSwiftModuleInterfaceFile:
-    case file_types::TY_SwiftModuleSummaryFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftModuleSummaryFile:

@@ -90,7 +90,6 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_PCH:
   case file_types::TY_SIB:
   case file_types::TY_RawSIB:
-  case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftModuleFile:
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SwiftSourceInfoFile:
@@ -140,7 +139,6 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
-  case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SerializedDiagnostics:
@@ -192,7 +190,6 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
-  case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SerializedDiagnostics:

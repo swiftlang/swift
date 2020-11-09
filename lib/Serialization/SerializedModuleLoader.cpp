@@ -1123,15 +1123,21 @@ void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
 
   llvm::SmallDenseSet<ModuleDecl *, 32> visited;
-  SmallVector<ModuleDecl::ImportedModule, 32> stack;
-  ModuleDecl::ImportFilter filter = {ModuleDecl::ImportFilterKind::Exported,
-                                     ModuleDecl::ImportFilterKind::Default};
-  File.getImportedModules(stack, filter);
+  SmallVector<ImportedModule, 32> stack;
+
+  ModuleDecl::ImportFilter filter = {
+      ModuleDecl::ImportFilterKind::Exported,
+      ModuleDecl::ImportFilterKind::Default,
+      ModuleDecl::ImportFilterKind::SPIAccessControl};
+
+  auto *topLevel = getParentModule();
+
+  ModuleDecl::ImportFilter topLevelFilter = filter;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  auto topLevelModule =
-      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), getParentModule()};
-  stack.emplace_back(topLevelModule);
+  stack.emplace_back(ImportPath::Access(), topLevel);
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val().importedModule;

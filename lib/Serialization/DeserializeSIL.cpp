@@ -510,18 +510,17 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, specialPurpose, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, specialPurpose, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass,
-      funcTyID, replacedFunctionID, genericSigID,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, isExactSelfClass, funcTyID, replacedFunctionID, genericSigID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -2861,18 +2860,17 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   IdentifierID replacedFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, isGlobal, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isAsync, isGlobal, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass,
-      funcTyID, replacedFunctionID, genericSigID,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, isExactSelfClass, funcTyID, replacedFunctionID, genericSigID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
