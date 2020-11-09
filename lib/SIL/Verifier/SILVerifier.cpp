@@ -3692,6 +3692,18 @@ public:
           CBI->getOperand()->getType(),
           "failure dest block argument must match type of original type in "
           "ownership qualified sil");
+      auto succOwnershipKind =
+          CBI->getSuccessBB()->args_begin()[0]->getOwnershipKind();
+      require(succOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "succ dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
+      auto failOwnershipKind =
+          CBI->getFailureBB()->args_begin()[0]->getOwnershipKind();
+      require(failOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "failure dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
     } else {
       require(CBI->getFailureBB()->args_empty(),
               "Failure dest of checked_cast_br must not take any argument in "

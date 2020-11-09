@@ -8126,23 +8126,20 @@ public:
 };
 
 /// The base class for cast instructions which are terminators.
-class CastBranchInstBase : public TermInst {
+template <typename BaseTy> class CastBranchInstBase : public BaseTy {
   std::array<SILSuccessor, 2> DestBBs;
 
 public:
-
+  template <typename... ArgTys>
   CastBranchInstBase(SILInstructionKind K, SILDebugLocation DebugLoc,
                      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-                     ProfileCounter Target1Count = ProfileCounter(),
-                     ProfileCounter Target2Count = ProfileCounter()) :
-    TermInst(K, DebugLoc),
-    DestBBs{{{this, SuccessBB, Target1Count},
-             {this, FailureBB, Target2Count}}}
-      {}
+                     ProfileCounter Target1Count, ProfileCounter Target2Count,
+                     ArgTys &&... args)
+      : BaseTy(K, DebugLoc, std::forward<ArgTys>(args)...),
+        DestBBs{{{this, SuccessBB, Target1Count},
+                 {this, FailureBB, Target2Count}}} {}
 
-  SuccessorListTy getSuccessors() {
-    return DestBBs;
-  }
+  TermInst::SuccessorListTy getSuccessors() { return DestBBs; }
 
   SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
@@ -8157,7 +8154,7 @@ public:
 
 /// The base class for cast instructions which are terminators and have a
 /// CastConsumptionKind.
-class CastBranchWithConsumptionKindBase : public CastBranchInstBase {
+class CastBranchWithConsumptionKindBase : public CastBranchInstBase<TermInst> {
   CastConsumptionKind ConsumptionKind;
 
 public:
@@ -8250,11 +8247,10 @@ public:
 /// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The success branch destination block receives the cast result as a BB
 /// argument.
-class CheckedCastBranchInst final:
-  public UnaryInstructionWithTypeDependentOperandsBase<
-                              SILInstructionKind::CheckedCastBranchInst,
-                              CheckedCastBranchInst,
-                              CastBranchInstBase> {
+class CheckedCastBranchInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::CheckedCastBranchInst, CheckedCastBranchInst,
+          CastBranchInstBase<OwnershipForwardingTermInst>> {
   friend SILBuilder;
 
   SILType DestLoweredTy;
@@ -8266,12 +8262,12 @@ class CheckedCastBranchInst final:
                         ArrayRef<SILValue> TypeDependentOperands,
                         SILType DestLoweredTy, CanType DestFormalTy,
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-                        ProfileCounter Target1Count, ProfileCounter Target2Count)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-            TypeDependentOperands,
-            SuccessBB, FailureBB, Target1Count, Target2Count),
-        DestLoweredTy(DestLoweredTy),
-        DestFormalTy(DestFormalTy),
+                        ProfileCounter Target1Count,
+                        ProfileCounter Target2Count)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
+            Target1Count, Target2Count, Operand.getOwnershipKind()),
+        DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
         IsExact(IsExact) {}
 
   static CheckedCastBranchInst *
@@ -8297,23 +8293,23 @@ public:
 class CheckedCastValueBranchInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::CheckedCastValueBranchInst,
-          CheckedCastValueBranchInst,
-          CastBranchInstBase> {
+          CheckedCastValueBranchInst, CastBranchInstBase<TermInst>> {
   friend SILBuilder;
 
   CanType SourceFormalTy;
   SILType DestLoweredTy;
   CanType DestFormalTy;
 
-  CheckedCastValueBranchInst(SILDebugLocation DebugLoc,
-                             SILValue Operand, CanType SourceFormalTy,
+  CheckedCastValueBranchInst(SILDebugLocation DebugLoc, SILValue Operand,
+                             CanType SourceFormalTy,
                              ArrayRef<SILValue> TypeDependentOperands,
                              SILType DestLoweredTy, CanType DestFormalTy,
                              SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                  TypeDependentOperands, SuccessBB, FailureBB),
-        SourceFormalTy(SourceFormalTy),
-        DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
+            ProfileCounter(), ProfileCounter()),
+        SourceFormalTy(SourceFormalTy), DestLoweredTy(DestLoweredTy),
+        DestFormalTy(DestFormalTy) {}
 
   static CheckedCastValueBranchInst *
   create(SILDebugLocation DebugLoc,

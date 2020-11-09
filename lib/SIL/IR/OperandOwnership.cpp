@@ -458,31 +458,9 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
     CheckedCastBranchInst *ccbi) {
-  // TODO: Simplify this using ValueOwnershipKind::merge.
-  Optional<OperandOwnershipKindMap> map;
-  for (auto argArray : ccbi->getSuccessorBlockArgumentLists()) {
-    assert(!argArray.empty());
-
-    auto argOwnershipKind = argArray[getOperandIndex()]->getOwnershipKind();
-    // If we do not have a map yet, initialize it and continue.
-    if (!map) {
-      auto lifetimeConstraint =
-          argOwnershipKind.getForwardingLifetimeConstraint();
-      map = Map::compatibilityMap(argOwnershipKind, lifetimeConstraint);
-      continue;
-    }
-
-    // Otherwise, make sure that we can accept the rest of our
-    // arguments. If not, we return an empty ownership kind to make
-    // sure that we flag everything as an error.
-    if (map->canAcceptKind(argOwnershipKind)) {
-      continue;
-    }
-
-    return OperandOwnershipKindMap();
-  }
-
-  return map.getValue();
+  auto kind = getOwnershipKind();
+  auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(kind, lifetimeConstraint);
 }
 
 //// FIX THIS HERE

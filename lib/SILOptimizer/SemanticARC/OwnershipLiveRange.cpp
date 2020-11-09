@@ -280,6 +280,12 @@ static void convertInstructionOwnership(SILInstruction *i,
       if (mvir->getOwnershipKind() == oldOwnership) {
         mvir->setOwnershipKind(newOwnership);
       }
+      if (auto *base = dyn_cast<OwnershipForwardingMultipleValueInstruction>(
+              mvir->getParent())) {
+        if (base->getOwnershipKind() == oldOwnership) {
+          base->setOwnershipKind(newOwnership);
+        }
+      }
       continue;
     }
 
