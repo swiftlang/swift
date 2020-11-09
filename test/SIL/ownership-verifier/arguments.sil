@@ -17,6 +17,11 @@ struct NativeObjectPair {
   var obj2 : Builtin.NativeObject
 }
 
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
 ///////////
 // Tests //
 ///////////
@@ -837,3 +842,4 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+

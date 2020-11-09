@@ -687,3 +687,10 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
     return t;
   });
 }
+
+bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
+  EnumDecl *decl = getEnumOrBoundGenericEnum();
+  assert(decl && "Called for a non enum type");
+  return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
+                                       f->getResilienceExpansion());
+}
