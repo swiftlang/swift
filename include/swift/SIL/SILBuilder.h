@@ -2501,6 +2501,10 @@ public:
       : SILBuilder(BB, InheritScopeFrom->getDebugScope(),
                    B.getBuilderContext()) {}
 
+  explicit SILBuilderWithScope(SILBasicBlock *BB, SILBuilderContext &C,
+                               const SILDebugScope *debugScope)
+      : SILBuilder(BB, debugScope, C) {}
+
   /// Creates a new SILBuilder with an insertion point at the
   /// beginning of BB and the debug scope from the first
   /// non-metainstruction in the BB.

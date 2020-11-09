@@ -83,6 +83,11 @@ void replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
 /// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *t, unsigned edgeIdx);
 
+inline bool isNonCriticalEdge(SILBasicBlock *predBB, SILBasicBlock *succBB) {
+  return predBB->getSingleSuccessorBlock() == succBB
+    || succBB->getSinglePredecessorBlock() == predBB;
+}
+
 /// Splits the edge from terminator if it is critical.
 ///
 /// Updates dominance information and loop information if not null.
@@ -117,6 +122,17 @@ bool splitCriticalEdgesTo(SILBasicBlock *toBB, DominanceInfo *domInfo = nullptr,
 void splitEdgesFromTo(SILBasicBlock *from, SILBasicBlock *to,
                       DominanceInfo *domInfo = nullptr,
                       SILLoopInfo *loopInfo = nullptr);
+
+/// Create a basic block to serve as the target of a conditional branch, or
+/// other terminator with multiple successors. This avoids introducing critical
+/// edges when inserting conditional branches.
+///
+/// This is a lightweight helper that assumes no block arguments and does not
+/// update dominators or loops. For more general functionality, just create the
+/// conditional branch then call splitCriticalEdge to fix it up.
+SILBasicBlock *createSplitBranchTarget(SILBasicBlock *targetBlock,
+                                       SILBuilder &builder,
+                                       SILLocation loc);
 
 /// Splits the basic block before the instruction with an unconditional branch
 /// and updates the dominator tree and loop info. Returns the new, branched to

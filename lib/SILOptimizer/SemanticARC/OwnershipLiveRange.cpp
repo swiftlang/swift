@@ -48,7 +48,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // can also accept something that is guaranteed. Any non-consuming use of
     // an owned value should be able to take a guaranteed parameter as well
     // (modulo bugs). We assert to catch these.
-    if (!op->isConsumingUse()) {
+    if (!op->isLifetimeEnding()) {
       continue;
     }
 
@@ -227,9 +227,15 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
 static void convertInstructionOwnership(SILInstruction *i,
                                         ValueOwnershipKind oldOwnership,
                                         ValueOwnershipKind newOwnership) {
-  // If this is a term inst, just convert all of its incoming values that are
-  // owned to be guaranteed.
+  // If this is a term inst...
   if (auto *ti = dyn_cast<TermInst>(i)) {
+    // First see if it is an ownership forwarding term inst. In such a case,
+    // change the ownership kind as appropriate.
+    if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(ti))
+      if (ofti->getOwnershipKind() == oldOwnership)
+        ofti->setOwnershipKind(newOwnership);
+
+    // Then convert all of its incoming values that are owned to be guaranteed.
     for (auto &succ : ti->getSuccessors()) {
       auto *succBlock = succ.getBB();
 

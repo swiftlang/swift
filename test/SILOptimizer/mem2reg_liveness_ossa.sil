@@ -52,11 +52,14 @@ bb4:
   cond_fail %33 : $Builtin.Int1
   %36 = apply %25(%34) : $@convention(thin) (Int64) -> ()
   dealloc_stack %8 : $*Int64
-  br bb5
+  br bb6
+
+bb5:
+  br bb6
 
 // We don't need a PHI node here because the value is dead!
 // CHECK: bb5:
-bb5:
+bb6:
   dealloc_stack %1 : $*Int64
   %40 = tuple ()
   return %40 : $()

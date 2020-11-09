@@ -36,6 +36,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/TargetInfo.h"
@@ -3516,12 +3517,12 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchEnum(
-        IRGenSILFunction &IGF,
-        SmallVectorImpl<std::pair<EnumElementDecl*, llvm::BasicBlock*>> &dests,
-        SwitchEnumInstBase *inst) {
-  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
-    auto casePair = inst->getCase(i);
-    
+    IRGenSILFunction &IGF,
+    SmallVectorImpl<std::pair<EnumElementDecl *, llvm::BasicBlock *>> &dests,
+    SwitchEnumTermInst inst) {
+  for (unsigned i = 0, e = inst.getNumCases(); i < e; ++i) {
+    auto casePair = inst.getCase(i);
+
     // If the destination BB accepts the case argument, set up a waypoint BB so
     // we can feed the values into the argument's PHI node(s).
     //
@@ -3533,10 +3534,10 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
     else
       dests.push_back({casePair.first, IGF.getLoweredBB(casePair.second).bb});
   }
-  
+
   llvm::BasicBlock *defaultDest = nullptr;
-  if (inst->hasDefault())
-    defaultDest = IGF.getLoweredBB(inst->getDefaultBB()).bb;
+  if (inst.hasDefault())
+    defaultDest = IGF.getLoweredBB(inst.getDefaultBB()).bb;
   return defaultDest;
 }
 

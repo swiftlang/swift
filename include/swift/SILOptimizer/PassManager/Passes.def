@@ -206,6 +206,8 @@ PASS(HighLevelLICM, "high-level-licm",
      "Loop Invariant Code Motion in High-Level SIL")
 PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
+PASS(OptimizeHopToExecutor, "optimize-hop-to-executor",
+     "Optimize hop_to_executor instructions for actor isolated code")
 PASS(InstCount, "inst-count",
      "Record SIL Instruction, Block, and Function Counts as LLVM Statistics")
 PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",

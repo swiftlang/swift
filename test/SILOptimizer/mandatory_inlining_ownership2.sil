@@ -1242,9 +1242,12 @@ bb3:
 
 bb4:
   dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
-  cond_br undef, bb1, bb5
+  cond_br undef, bb5, bb6
 
 bb5:
+  br bb1
+
+bb6:
   %tuple = tuple()
   return %tuple : $()
 }
