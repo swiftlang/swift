@@ -259,19 +259,13 @@ else()
   endif()
 endif()
 
-if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL ANDROID)
-  # workaround for libatomic needing to be after object files for swiftCore.so
-  list(APPEND swift_core_private_link_libraries atomic)
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)
   # TODO(compnerd) cache this variable to permit re-configuration
   execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}" OUTPUT_VARIABLE ENV_SYSTEMROOT)
   list(APPEND swift_core_private_link_libraries "${ENV_SYSTEMROOT}/system32/psapi.dll")
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL FREEBSD)
   find_library(EXECINFO_LIBRARY execinfo)
   list(APPEND swift_core_private_link_libraries ${EXECINFO_LIBRARY})
-  # workaround for libatomic needing to be after object files for swiftCore.so
-  list(APPEND swift_core_private_link_libraries
-    ${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${SWIFT_PRIMARY_VARIANT_ARCH}.a)
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
   if(SWIFT_BUILD_STATIC_STDLIB)
     list(APPEND swift_core_private_link_libraries)
