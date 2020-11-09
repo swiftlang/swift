@@ -66,7 +66,7 @@
 // VTABLE-IMPL-NEXT:     type_guid:       9126595621082655001
 
 
-// RUN: %swift_frontend_plain -cross-module-opt %t/type_refs.swiftmodule.summary -module-summary-embed-debug-name -o %t/type_refs.swiftmodule.merged-summary
+// RUN: %swift_frontend_plain -merge-module-summary %t/type_refs.swiftmodule.summary -module-summary-embed-debug-name -o %t/type_refs.swiftmodule.merged-summary
 // RUN: %swift-module-summary-test --to-yaml %t/type_refs.swiftmodule.merged-summary -o %t/type_refs.merged-summary.yaml
 // Ensure that WT of V is not used.
 // RUN: cat %t/type_refs.merged-summary.yaml | %FileCheck %s -check-prefix USED-TYPE

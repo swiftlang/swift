@@ -46,14 +46,17 @@ func callableFromC2(x: Int) -> Int {
   return 2
 }
 
-// RUN: cat %t/preserved.summary.yaml | %FileCheck %s -check-prefix OBJC
+// RUN: if [ %target-runtime == "objc" ]; then cat %t/preserved.summary.yaml | %FileCheck %s -check-prefix OBJC; fi
 // OBJC:      3149498140227613915:
 // OBJC-NEXT:    name:            '$s9preserved1AC11objcMethod1yyFTo'
 // OBJC-NEXT:    guid:            3149498140227613915
 // OBJC-NEXT:    live:            false
 // OBJC-NEXT:    preserved:       true
+
+#if canImport(ObjectiveC)
 import Foundation
 
 class A: NSObject {
   @objc func objcMethod1() {}
 }
+#endif
