@@ -2863,3 +2863,28 @@ bool GetAsyncContinuationInstBase::throws() const {
   return getType().castTo<BoundGenericType>()->getDecl()
     == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
 }
+
+ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
+                       SILValue returnValue)
+    : UnaryInstructionBase(debugLoc, returnValue),
+      ownershipKind(ValueOwnershipKind::None) {
+  // If we have a trivial value, leave our ownership kind as none.
+  if (returnValue->getType().isTrivial(func))
+    return;
+
+  SILFunctionConventions fnConv = func.getConventions();
+
+  // If we do not have any direct SIL results, we should accept a tuple
+  // argument, meaning that we should have a none ownership kind.
+  auto results = fnConv.getDirectSILResults();
+  if (results.empty())
+    return;
+
+  auto ownershipKindRange =
+      makeTransformRange(results, [&](const SILResultInfo &info) {
+        return info.getOwnershipKind(func, func.getLoweredFunctionType());
+      });
+
+  // Then merge all of our ownership kinds. Assert if we fail to merge.
+  ownershipKind = *ValueOwnershipKind::merge(ownershipKindRange);
+}
