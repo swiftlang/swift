@@ -66,6 +66,20 @@ bool isOwnedForwardingInstruction(SILInstruction *inst);
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
 
+class ForwardingOperand {
+  Operand *use;
+
+  ForwardingOperand(Operand *use) : use(use) {}
+
+public:
+  static Optional<ForwardingOperand> get(Operand *use);
+
+  ValueOwnershipKind getOwnershipKind() const;
+  void setOwnershipKind(ValueOwnershipKind newKind) const;
+  void replaceOwnershipKind(ValueOwnershipKind oldKind,
+                            ValueOwnershipKind newKind) const;
+};
+
 /// Returns true if the instruction is a 'reborrow'.
 bool isReborrowInstruction(const SILInstruction *inst);
 

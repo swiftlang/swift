@@ -827,3 +827,161 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
 
   llvm_unreachable("Should never hit this");
 }
+
+//===----------------------------------------------------------------------===//
+//                             Forwarding Operand
+//===----------------------------------------------------------------------===//
+
+Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
+  auto *user = use->getUser();
+  if (isa<OwnershipForwardingTermInst>(user))
+    return ForwardingOperand(use);
+  if (isa<OwnershipForwardingSingleValueInst>(user))
+    return ForwardingOperand(use);
+  if (isa<OwnershipForwardingConversionInst>(user))
+    return ForwardingOperand(use);
+  if (isa<OwnershipForwardingSelectEnumInstBase>(user))
+    return ForwardingOperand(use);
+  if (isa<OwnershipForwardingMultipleValueInstruction>(user))
+    return ForwardingOperand(use);
+  return None;
+}
+
+ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
+  auto *user = use->getUser();
+  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user))
+    return ofti->getOwnershipKind();
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInst>(user))
+    return ofsvi->getOwnershipKind();
+  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
+    return ofci->getOwnershipKind();
+  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
+    return ofseib->getOwnershipKind();
+  if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user))
+    return ofmvi->getOwnershipKind();
+  llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+}
+
+void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
+  auto *user = use->getUser();
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInst>(user))
+    if (!ofsvi->getType().isTrivial(*ofsvi->getFunction()))
+      return ofsvi->setOwnershipKind(newKind);
+  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
+    if (!ofci->getType().isTrivial(*ofci->getFunction()))
+      return ofci->setOwnershipKind(newKind);
+  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
+    if (!ofseib->getType().isTrivial(*ofseib->getFunction()))
+      return ofseib->setOwnershipKind(newKind);
+
+  if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
+    assert(ofmvi->getNumOperands() == 1);
+    if (!ofmvi->getOperand(0)->getType().isTrivial(*ofmvi->getFunction())) {
+      ofmvi->setOwnershipKind(newKind);
+      // TODO: Refactor this better.
+      if (auto *dsi = dyn_cast<DestructureStructInst>(ofmvi)) {
+        for (auto &result : dsi->getAllResultsBuffer()) {
+          if (result.getType().isTrivial(*dsi->getFunction()))
+            continue;
+          result.setOwnershipKind(newKind);
+        }
+      } else {
+        auto *dti = cast<DestructureTupleInst>(ofmvi);
+        for (auto &result : dti->getAllResultsBuffer()) {
+          if (result.getType().isTrivial(*dti->getFunction()))
+            continue;
+          result.setOwnershipKind(newKind);
+        }
+      }
+    }
+    return;
+  }
+
+  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
+    assert(ofti->getNumOperands() == 1);
+    if (!ofti->getOperand(0)->getType().isTrivial(*ofti->getFunction())) {
+      ofti->setOwnershipKind(newKind);
+
+      // Then convert all of its incoming values that are owned to be guaranteed.
+      for (auto &succ : ofti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (!succArg->getType().isTrivial(*ofti->getFunction()))
+            continue;
+          succArg->setOwnershipKind(newKind);
+        }
+      }
+    }
+    return;
+  }
+
+  llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+}
+
+void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
+                                             ValueOwnershipKind newKind) const {
+  auto *user = use->getUser();
+
+  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInst>(user))
+    if (ofsvi->getOwnershipKind() == oldKind)
+      return ofsvi->setOwnershipKind(newKind);
+
+  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
+    if (ofci->getOwnershipKind() == oldKind)
+      return ofci->setOwnershipKind(newKind);
+
+  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
+    if (ofseib->getOwnershipKind() == oldKind)
+      return ofseib->setOwnershipKind(newKind);
+
+  if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
+    if (ofmvi->getOwnershipKind() == oldKind) {
+      ofmvi->setOwnershipKind(newKind);
+    }
+    // TODO: Refactor this better.
+    if (auto *dsi = dyn_cast<DestructureStructInst>(ofmvi)) {
+      for (auto &result : dsi->getAllResultsBuffer()) {
+        if (result.getOwnershipKind() != oldKind)
+          continue;
+        result.setOwnershipKind(newKind);
+      }
+    } else {
+      auto *dti = cast<DestructureTupleInst>(ofmvi);
+      for (auto &result : dti->getAllResultsBuffer()) {
+        if (result.getOwnershipKind() != oldKind)
+          continue;
+        result.setOwnershipKind(newKind);
+      }
+    }
+    return;
+  }
+
+  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
+    if (ofti->getOwnershipKind() == oldKind) {
+      ofti->setOwnershipKind(newKind);
+      // Then convert all of its incoming values that are owned to be guaranteed.
+      for (auto &succ : ofti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (succArg->getOwnershipKind() == oldKind) {
+            succArg->setOwnershipKind(newKind);
+          }
+        }
+      }
+    }
+    return;
+  }
+  llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+}
