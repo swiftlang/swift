@@ -222,7 +222,7 @@ public:
   //
   // This call cannot be allowed to destroy %val.
   void recordUser(Operand *use) {
-    bool consume = use->isConsumingUse();
+    bool consume = use->isLifetimeEnding();
     auto iterAndSuccess = users.try_emplace(use->getUser(), consume);
     if (!iterAndSuccess.second)
       iterAndSuccess.first->second &= consume;
@@ -429,7 +429,7 @@ static bool computeLiveness(CopyPropagationState &pass) {
         continue;
       }
 
-      if (use->isConsumingUse()) {
+      if (use->isLifetimeEnding()) {
         pass.liveness.recordOriginalDestroy(use);
         // Destroying a values does not force liveness.
         if (isa<DestroyValueInst>(user))
@@ -622,7 +622,7 @@ static void rewriteCopies(CopyPropagationState &pass) {
     }
 
     // Nonconsuming uses do not need copies and cannot be marked as destroys.
-    if (!use->isConsumingUse())
+    if (!use->isLifetimeEnding())
       return;
 
     // If this use was marked as a final destroy *and* this is the first

@@ -200,9 +200,9 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
 // CHECK: unowned:  No.
-// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: owned: Yes. Liveness: LifetimeEnding
 // CHECK: guaranteed:  No.
-// CHECK: any: Yes. Liveness: MustBeLive
+// CHECK: any: Yes. Liveness: NonLifetimeEnding
 sil [ossa] @switch_enum_mismatching_argument_guaranteed_to_owned : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @guaranteed $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
@@ -228,8 +228,8 @@ bb3:
 // CHECK: -- OperandOwnershipKindMap --
 // CHECK: unowned:  No.
 // CHECK: owned:  No.
-// CHECK: guaranteed: Yes. Liveness: MustBeLive
-// CHECK: any: Yes. Liveness: MustBeLive
+// CHECK: guaranteed: Yes. Liveness: NonLifetimeEnding
+// CHECK: any: Yes. Liveness: NonLifetimeEnding
 sil [ossa] @switch_enum_mismatching_argument_owned_to_guaranteed : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
@@ -280,9 +280,9 @@ bb3:
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
 // CHECK: unowned:  No.
-// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: owned: Yes. Liveness: LifetimeEnding
 // CHECK: guaranteed:  No.
-// CHECK: any: Yes. Liveness: MustBeLive
+// CHECK: any: Yes. Liveness: NonLifetimeEnding
 sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_1 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
@@ -353,8 +353,8 @@ bb3:
 // CHECK: -- OperandOwnershipKindMap --
 // CHECK: unowned:  No.
 // CHECK: owned:  No.
-// CHECK: guaranteed: Yes. Liveness: MustBeLive
-// CHECK: any: Yes. Liveness: MustBeLive
+// CHECK: guaranteed: Yes. Liveness: NonLifetimeEnding
+// CHECK: any: Yes. Liveness: NonLifetimeEnding
 sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2

@@ -321,11 +321,11 @@ void OperandOwnershipKindMap::dump() const { print(llvm::dbgs()); }
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      UseLifetimeConstraint constraint) {
   switch (constraint) {
-  case UseLifetimeConstraint::MustBeLive:
-    os << "MustBeLive";
+  case UseLifetimeConstraint::NonLifetimeEnding:
+    os << "NonLifetimeEnding";
     break;
-  case UseLifetimeConstraint::MustBeInvalidated:
-    os << "MustBeInvalidated";
+  case UseLifetimeConstraint::LifetimeEnding:
+    os << "LifetimeEnding";
     break;
   }
   return os;

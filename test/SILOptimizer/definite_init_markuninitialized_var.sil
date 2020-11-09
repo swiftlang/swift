@@ -478,9 +478,12 @@ bb1:
   %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %6 = apply %f() : $@convention(thin) () -> @owned SomeClass
   assign %6 to %3 : $*SomeClass
-  br bb2
+  br bb3
 
 bb2:
+  br bb3
+  
+bb3:
   destroy_addr %3 : $*SomeClass
   dealloc_stack %2 : $*SomeClass
   %14 = tuple ()
@@ -510,9 +513,12 @@ bb1:
   // CHECK: store {{.*}} to [trivial] [[CONTROL]]
   // CHECK: assign [[V1]] to [init] [[CLASSVAL]]
   assign %12 to %6 : $*SomeClass                // id: %13
-  br bb2                                          // id: %14
+  br bb3                                          // id: %14
 
 bb2:
+  br bb3
+
+bb3:
   // CHECK: = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   %3 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[V2:%[0-9]+]] = apply
@@ -522,10 +528,10 @@ bb2:
   // true or not.  This gets expanded out to a conditional destroy of the value.
   // CHECK:   load [trivial] [[CONTROL]]
   // CHECK:   cond_br
-  // CHECK: bb3:
+  // CHECK: bb4:
   // CHECK:   destroy_addr [[CLASSVAL]]
-  // CHECK:   br bb5
-  // CHECK: bb5:
+  // CHECK:   br bb6
+  // CHECK: bb6:
   // CHECK: assign [[V2]] to [init] [[CLASSVAL]]
   assign %17 to %6 : $*SomeClass                // id: %18
   destroy_addr %6 : $*SomeClass                 // id: %19
