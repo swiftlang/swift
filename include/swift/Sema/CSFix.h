@@ -2325,6 +2325,8 @@ class AllowInvalidStaticMemberRefOnProtocolMetatype final
     return "allow invalid static member reference on a protocol metatype";
   }
 
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
   static AllowInvalidStaticMemberRefOnProtocolMetatype *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
