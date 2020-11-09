@@ -450,36 +450,7 @@ OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
-  auto opTy = sei->getOperand()->getType();
-
-  // If our passed in type is trivial, we shouldn't have any non-trivial
-  // successors. Just bail early returning trivial.
-  if (opTy.isTrivial(*sei->getFunction()))
-    return Map::allLive();
-
-  // Otherwise, go through the ownership constraints of our successor arguments
-  // and merge them.
-  auto mergedKind = ValueOwnershipKind::merge(makeTransformRange(
-      sei->getSuccessorBlockArgumentLists(),
-      [&](ArrayRef<SILArgument *> array) -> ValueOwnershipKind {
-        // If the array is empty, we have a non-payloaded case. Return any.
-        if (array.empty())
-          return ValueOwnershipKind::None;
-
-        // Otherwise, we should have a single element since a payload is
-        // a tuple.
-        assert(std::distance(array.begin(), array.end()) == 1);
-        return array.front()->getOwnershipKind();
-      }));
-
-  // If we failed to merge, return an empty map so we will fail to pattern match
-  // with any operand. This is a known signal to the verifier that we failed to
-  // merge in a forwarding context.
-  if (!mergedKind)
-    return Map();
-  auto kind = mergedKind.getValue();
-  if (kind == ValueOwnershipKind::None)
-    return Map::allLive();
+  auto kind = getOwnershipKind();
   auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
   return Map::compatibilityMap(kind, lifetimeConstraint);
 }
