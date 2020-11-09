@@ -14,6 +14,9 @@ struct G<T> : P {
 extension P {
   static var property: S { S() }
 
+  static var iuoProp: S! { S() }
+  static var optProp: S? { S() }
+
   static var fnProp: () -> S {
     { S() }
   }
@@ -37,6 +40,10 @@ extension P {
 
 _ = P.property // Ok
 _ = P.property.other // Ok
+_ = P.iuoProp // Ok
+_ = P.iuoProp.other // Ok
+_ = P.optProp // Ok
+_ = P.optProp?.other // Ok
 _ = P.fnProp // Ok
 _ = P.fnProp() // Ok
 _ = P.fnProp().other // Ok
@@ -75,6 +82,14 @@ func test<T: P>(_: T) {}
 
 test(.property) // Ok, base is inferred as Style.Type
 test(.property.other) // Ok
+test(.iuoProp) // Ok
+test(.iuoProp.other) // Ok
+test(.optProp!) // Ok
+test(.optProp)
+// expected-error@-1 {{value of optional type 'S?' must be unwrapped to a value of type 'S'}}
+// expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+// expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+test(.optProp!.other) // Ok
 test(.fnProp()) // Ok
 test(.fnProp().other) // Ok
 test(.method()) // Ok, static method call on the metatype

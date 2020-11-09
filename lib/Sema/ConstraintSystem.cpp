@@ -1591,6 +1591,10 @@ ConstraintSystem::getTypeOfMemberReference(
         baseOpenedTy = funcTy->getResult();
       else
         baseOpenedTy = refTy;
+
+      // It should be possible to form optional chains which start
+      // from a protocol metatype.
+      baseOpenedTy = baseOpenedTy->lookThroughAllOptionalTypes();
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
