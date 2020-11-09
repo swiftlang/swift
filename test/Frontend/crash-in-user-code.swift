@@ -8,8 +8,6 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
-// XFAIL: MSVC_VER=15.0
-
 // CHECK: Stack dump:
 // CHECK-NEXT: Program arguments:
 // CHECK-NEXT: Swift version

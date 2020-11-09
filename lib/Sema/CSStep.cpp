@@ -616,21 +616,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
 
-  // If the successfully applied constraint is favored, we'll consider that to
-  // be the "best".
-  if (lastSuccessfulChoice->isFavored() && !currentChoice->isFavored()) {
-#if !defined(NDEBUG)
-    if (lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload) {
-      auto overloadChoice = lastSuccessfulChoice->getOverloadChoice();
-      assert((!overloadChoice.isDecl() ||
-              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
-             "Unavailable decl should not be favored!");
-    }
-#endif
-
-    return true;
-  }
-
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
@@ -656,15 +641,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // Implicit conversions are better than checked casts.
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
-
-  // If we have a SIMD operator, and the prior choice was not a SIMD
-  // Operator, we're done.
-  if (currentChoice->getKind() == ConstraintKind::BindOverload &&
-      isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
-      lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl())) {
-    return true;
-  }
 
   return false;
 }

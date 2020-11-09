@@ -213,11 +213,6 @@ protected:
     CS.CG.addConstraint(constraint);
   }
 
-  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
-  getResolvedOverloads() const {
-    return CS.ResolvedOverloads;
-  }
-
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) const {
     CS.recordDisjunctionChoice(disjunctionLocator, index);
@@ -716,8 +711,8 @@ private:
     if (!repr || repr == typeVar)
       return;
 
-    for (auto elt : getResolvedOverloads()) {
-      auto resolved = elt.second;
+    for (auto overload : CS.getResolvedOverloads()) {
+      auto resolved = overload.second;
       if (!resolved.boundType->isEqual(repr))
         continue;
 
