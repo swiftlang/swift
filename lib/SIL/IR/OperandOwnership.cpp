@@ -622,9 +622,11 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     return Map::allLive();
   }
 
-  // If we have a type dependent operand, return an empty map.
-  if (apply.getInstruction()->isTypeDependentOperand(op))
-    return Map();
+  // We should have early exited if we saw a type dependent operand, so we
+  // should never hit this.
+  //
+  // Lets just assert to be careful though.
+  assert(!apply.getInstruction()->isTypeDependentOperand(op));
 
   unsigned argIndex = apply.getCalleeArgIndex(op);
   auto conv = apply.getSubstCalleeConv();
@@ -1024,6 +1026,8 @@ OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //===----------------------------------------------------------------------===//
 
 OperandOwnershipKindMap Operand::getOwnershipKindMap() const {
+  if (isTypeDependent())
+    return OperandOwnershipKindMap();
   OperandOwnershipKindClassifier classifier(getUser()->getModule(), *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }
