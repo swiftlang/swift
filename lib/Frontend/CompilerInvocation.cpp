@@ -373,8 +373,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
 
-  Opts.EnableExperimentalConcurrency |=
-    Args.hasArg(OPT_enable_experimental_concurrency);
+  Opts.EnableExperimentalConcurrency = true;
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
