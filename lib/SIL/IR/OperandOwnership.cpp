@@ -344,13 +344,28 @@ FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
-FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
-FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
 FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedValueCast)
 #undef FORWARD_ANY_OWNERSHIP_INST
+
+// Temporary implementation for staging purposes.
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitDestructureStructInst(
+    DestructureStructInst *dsi) {
+  auto kind = dsi->getOwnershipKind();
+  auto constraint = kind.getForwardingLifetimeConstraint();
+  return {kind, constraint};
+}
+
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitDestructureTupleInst(
+    DestructureTupleInst *dsi) {
+  auto kind = dsi->getOwnershipKind();
+  auto constraint = kind.getForwardingLifetimeConstraint();
+  return {kind, constraint};
+}
 
 // An instruction that forwards a constant ownership or trivial ownership.
 #define FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP,                     \

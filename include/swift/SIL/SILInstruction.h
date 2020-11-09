@@ -8753,6 +8753,23 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   }
 }
 
+class OwnershipForwardingMultipleValueInstruction
+    : public MultipleValueInstruction {
+  ValueOwnershipKind ownershipKind;
+
+public:
+  OwnershipForwardingMultipleValueInstruction(SILInstructionKind kind,
+                                              SILDebugLocation loc,
+                                              ValueOwnershipKind ownershipKind)
+      : MultipleValueInstruction(kind, loc), ownershipKind(ownershipKind) {}
+
+  /// Returns the preferred ownership kind of this multiple value instruction.
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+  void setOwnershipKind(ValueOwnershipKind newOwnershipKind) {
+    ownershipKind = newOwnershipKind;
+  }
+};
+
 /// A result for the destructure_struct instruction. See documentation for
 /// destructure_struct for more information.
 class DestructureStructResult final : public MultipleValueInstructionResult {
@@ -8776,15 +8793,15 @@ public:
 /// struct's fields.
 class DestructureStructInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureStructInst,
-                                  MultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<
-          DestructureStructInst, DestructureStructResult> {
+                                  OwnershipForwardingMultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<DestructureStructInst,
+                                                     DestructureStructResult> {
   friend TrailingObjects;
 
   DestructureStructInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
                         ArrayRef<SILType> Types,
                         ArrayRef<ValueOwnershipKind> OwnershipKinds)
-      : UnaryInstructionBase(Loc, Operand),
+      : UnaryInstructionBase(Loc, Operand, Operand.getOwnershipKind()),
         MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
 
 public:
@@ -8825,15 +8842,15 @@ public:
 /// tuples's elements.
 class DestructureTupleInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureTupleInst,
-                                  MultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<
-          DestructureTupleInst, DestructureTupleResult> {
+                                  OwnershipForwardingMultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<DestructureTupleInst,
+                                                     DestructureTupleResult> {
   friend TrailingObjects;
 
   DestructureTupleInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
                        ArrayRef<SILType> Types,
                        ArrayRef<ValueOwnershipKind> OwnershipKinds)
-      : UnaryInstructionBase(Loc, Operand),
+      : UnaryInstructionBase(Loc, Operand, Operand.getOwnershipKind()),
         MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
 
 public:
