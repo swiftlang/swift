@@ -53,7 +53,7 @@ func testProtocolExtensions<T1, T2, T3, T4>(t1: T1, t2: T2, t3: T3, t4: T4)
         T2: Whereable & Sequence,
         T3: Whereable, T3.Assoc == T3.Bssoc,
         T4: Whereable, T4.Assoc: Whereable {
-  _ = T1.staticExtensionFunc // expected-error {{cannot reference static method 'staticExtensionFunc(arg:)' on 'Whereable.Protocol' with non-conforming result type '_.Element'}}
+  _ = T1.staticExtensionFunc // expected-error {{cannot reference static method 'staticExtensionFunc(arg:)' on 'Whereable.Protocol' with non-conforming result type 'T1.Element'}}
   _ = T2.staticExtensionFunc
 
   t1.extensionFunc() // expected-error {{instance method 'extensionFunc()' requires the types 'T1.Assoc' and 'T1.Bssoc' be equivalent}}
