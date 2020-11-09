@@ -494,6 +494,17 @@ bool swift::isCriticalEdge(TermInst *t, unsigned edgeIdx) {
   return true;
 }
 
+SILBasicBlock *swift::createSplitBranchTarget(SILBasicBlock *targetBlock,
+                                              SILBuilder &builder,
+                                              SILLocation loc) {
+  auto *function = targetBlock->getParent();
+  auto *edgeBB = function->createBasicBlockBefore(targetBlock);
+  SILBuilderWithScope(edgeBB, builder.getBuilderContext(),
+                      builder.getCurrentDebugScope())
+      .createBranch(loc, targetBlock);
+  return edgeBB;
+}
+
 /// Splits the basic block at the iterator with an unconditional branch and
 /// updates the dominator tree and loop info.
 SILBasicBlock *swift::splitBasicBlockAndBranch(SILBuilder &builder,
