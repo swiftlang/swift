@@ -224,81 +224,13 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
   }
 }
 
-static void convertInstructionOwnership(SILInstruction *i,
-                                        ValueOwnershipKind oldOwnership,
-                                        ValueOwnershipKind newOwnership) {
-  // If this is a term inst...
-  if (auto *ti = dyn_cast<TermInst>(i)) {
-    // First see if it is an ownership forwarding term inst. In such a case,
-    // change the ownership kind as appropriate.
-    if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(ti))
-      if (ofti->getOwnershipKind() == oldOwnership)
-        ofti->setOwnershipKind(newOwnership);
-
-    // Then convert all of its incoming values that are owned to be guaranteed.
-    for (auto &succ : ti->getSuccessors()) {
-      auto *succBlock = succ.getBB();
-
-      // If we do not have any arguments, then continue.
-      if (succBlock->args_empty())
-        continue;
-
-      for (auto *succArg : succBlock->getSILPhiArguments()) {
-        // If we have an any value, just continue.
-        if (succArg->getOwnershipKind() == oldOwnership) {
-          succArg->setOwnershipKind(newOwnership);
-        }
-      }
-    }
-    return;
-  }
-
-  assert(i->hasResults());
-  for (SILValue result : i->getResults()) {
-    if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
-      if (svi->getOwnershipKind() == oldOwnership) {
-        svi->setOwnershipKind(newOwnership);
-      }
-      continue;
-    }
-
-    if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
-      if (ofci->getOwnershipKind() == oldOwnership) {
-        ofci->setOwnershipKind(newOwnership);
-      }
-      continue;
-    }
-
-    if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
-      if (sei->getOwnershipKind() == oldOwnership) {
-        sei->setOwnershipKind(newOwnership);
-      }
-      continue;
-    }
-
-    if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
-      if (mvir->getOwnershipKind() == oldOwnership) {
-        mvir->setOwnershipKind(newOwnership);
-      }
-      if (auto *base = dyn_cast<OwnershipForwardingMultipleValueInstruction>(
-              mvir->getParent())) {
-        if (base->getOwnershipKind() == oldOwnership) {
-          base->setOwnershipKind(newOwnership);
-        }
-      }
-      continue;
-    }
-
-    llvm_unreachable("unhandled forwarding instruction?!");
-  }
-}
-
 void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   while (!ownershipForwardingUses.empty()) {
-    auto *i = ownershipForwardingUses.back()->getUser();
+    auto *use = ownershipForwardingUses.back();
     ownershipForwardingUses = ownershipForwardingUses.drop_back();
-    convertInstructionOwnership(i, ValueOwnershipKind::Owned,
-                                ValueOwnershipKind::Guaranteed);
+    auto operand = *ForwardingOperand::get(use);
+    operand.replaceOwnershipKind(ValueOwnershipKind::Owned,
+                                 ValueOwnershipKind::Guaranteed);
   }
 }
 

@@ -1095,6 +1095,12 @@ public:
     return { ptr, NumResults };
   }
 
+  MutableArrayRef<DerivedResult> getAllResultsBuffer() {
+    auto *ptr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
+    return { ptr, NumResults };
+  }
+
   SILInstructionResultArray getAllResults() const {
     // Our results start at element 1 since we stash the pointer to our parent
     // MultipleValueInstruction in the 0 elt slot. This allows all
