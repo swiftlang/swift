@@ -138,7 +138,7 @@ extension _ArrayBuffer {
   
   /// Puts the buffer in an immutable state.
   ///
-  /// - Precondition: The buffer must be mutable.
+  /// - Precondition: The buffer must be mutable or the empty array singleton.
   ///
   /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
   ///   until the next call of `beginCOWMutation`.
