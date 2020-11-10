@@ -2915,6 +2915,41 @@ public:
     require(!sd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
+    if (F.hasOwnership()) {
+      // Make sure that all of our destructure results ownership kinds are
+      // compatible with our destructure_struct's ownership kind /and/ that if
+      // our destructure ownership kind is non-trivial then all non-trivial
+      // results must have the same ownership kind as our operand.
+      auto parentKind = DSI->getOwnershipKind();
+      for (const DestructureStructResult &result : DSI->getAllResultsBuffer()) {
+        require(parentKind.isCompatibleWith(result.getOwnershipKind()),
+                "destructure result with ownership that is incompatible with "
+                "parent forwarding ownership kind");
+        require(parentKind != ValueOwnershipKind::None ||
+                    result.getOwnershipKind() == ValueOwnershipKind::None,
+                "destructure with none ownership kind operand and non-none "
+                "ownership kind result?!");
+      }
+    }
+  }
+
+  void checkDestructureTupleInst(DestructureTupleInst *dti) {
+    if (F.hasOwnership()) {
+      // Make sure that all of our destructure results ownership kinds are
+      // compatible with our destructure_struct's ownership kind /and/ that if
+      // our destructure ownership kind is non-trivial then all non-trivial
+      // results must have the same ownership kind as our operand.
+      auto parentKind = dti->getOwnershipKind();
+      for (const auto &result : dti->getAllResultsBuffer()) {
+        require(parentKind.isCompatibleWith(result.getOwnershipKind()),
+                "destructure result with ownership that is incompatible with "
+                "parent forwarding ownership kind");
+        require(parentKind != ValueOwnershipKind::None ||
+                    result.getOwnershipKind() == ValueOwnershipKind::None,
+                "destructure with none ownership kind operand and non-none "
+                "ownership kind result?!");
+      }
+    }
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
@@ -3692,6 +3727,18 @@ public:
           CBI->getOperand()->getType(),
           "failure dest block argument must match type of original type in "
           "ownership qualified sil");
+      auto succOwnershipKind =
+          CBI->getSuccessBB()->args_begin()[0]->getOwnershipKind();
+      require(succOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "succ dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
+      auto failOwnershipKind =
+          CBI->getFailureBB()->args_begin()[0]->getOwnershipKind();
+      require(failOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "failure dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
     } else {
       require(CBI->getFailureBB()->args_empty(),
               "Failure dest of checked_cast_br must not take any argument in "
@@ -4280,6 +4327,13 @@ public:
           require(dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
+          if (!dest->getArgument(0)->getType().isTrivial(*SOI->getFunction())) {
+            require(
+                dest->getArgument(0)->getOwnershipKind().isCompatibleWith(
+                    SOI->getOwnershipKind()),
+                "Switch enum non-trivial destination arg must have ownership "
+                "kind that is compatible with the switch_enum's operand");
+          }
         } else {
           require(dest->getArguments().empty() ||
                       dest->getArguments().size() == 1,
@@ -4327,6 +4381,12 @@ public:
             SOI->getOperand()->getType(),
             "Switch enum default block should have one argument that is "
             "the same as the input type");
+        auto defaultKind =
+            SOI->getDefaultBB()->getArgument(0)->getOwnershipKind();
+        require(
+            defaultKind.isCompatibleWith(SOI->getOperand().getOwnershipKind()),
+            "Switch enum default block arg must have same ownership kind "
+            "as operand");
       } else if (!F.hasOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
@@ -5188,37 +5248,30 @@ public:
 
   void verifyBranches(const SILFunction *F) {
     // Verify no critical edge.
-    auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
-      assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
-
+    auto requireNonCriticalSucc = [this](const TermInst *termInst,
+                                         const Twine &message) {
       // A critical edge has more than one outgoing edges from the source
       // block.
-      auto SrcSuccs = T->getSuccessors();
-      if (SrcSuccs.size() <= 1)
-        return false;
+      auto succBlocks = termInst->getSuccessorBlocks();
+      if (succBlocks.size() <= 1)
+        return;
 
-      // And its destination block has more than one predecessor.
-      SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
-      assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessorBlock())
-        return false;
-
-      return true;
+      for (const SILBasicBlock *destBB : succBlocks) {
+        // And its destination block has more than one predecessor.
+        _require(destBB->getSinglePredecessorBlock(), message);
+      }
     };
 
-    for (auto &BB : *F) {
-      const TermInst *TI = BB.getTerminator();
-      CurInstruction = TI;
+    for (auto &bb : *F) {
+      const TermInst *termInst = bb.getTerminator();
+      CurInstruction = termInst;
 
-      // FIXME: In OSSA, critical edges will never be allowed.
-      // In Lowered SIL, they are allowed on unconditional branches only.
-      //   if (!(isSILOwnershipEnabled() && F->hasOwnership()))
-      if (AllowCriticalEdges && isa<CondBranchInst>(TI))
-        continue;
-
-      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-        require(!isCriticalEdgePred(TI, Idx),
-                "non cond_br critical edges not allowed");
+      if (isSILOwnershipEnabled() && F->hasOwnership()) {
+        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
+      }
+      // In Lowered SIL, they are allowed on conditional branches only.
+      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
+        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
       }
     }
   }

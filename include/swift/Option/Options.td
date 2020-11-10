@@ -1113,6 +1113,10 @@ def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
   HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
+def emit_supported_features : Flag<["-"], "emit-supported-features">,
+  HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ASTScope lookup only (experimental)">;

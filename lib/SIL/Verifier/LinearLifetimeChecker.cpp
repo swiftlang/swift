@@ -29,6 +29,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -549,7 +550,8 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
     Optional<function_ref<void(Operand *)>>
         nonConsumingUseOutsideLifetimeCallback) {
-  assert((!consumingUses.empty() || !deadEndBlocks.empty()) &&
+  assert((!consumingUses.empty()
+          || deadEndBlocks.isDeadEnd(value->getParentBlock())) &&
          "Must have at least one consuming user?!");
 
   State state(value, visitedBlocks, errorBuilder, leakingBlockCallback,

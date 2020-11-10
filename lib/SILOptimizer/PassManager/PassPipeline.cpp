@@ -148,6 +148,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
 
+  P.addOptimizeHopToExecutor();
+
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();

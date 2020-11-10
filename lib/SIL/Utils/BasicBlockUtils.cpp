@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/TerminatorUtils.h"
 
 using namespace swift;
 
@@ -97,6 +98,12 @@ static SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned edgeIdx) {
   return S->getCase(edgeIdx).second;
 }
 
+static SILBasicBlock *getNthEdgeBlock(SwitchEnumTermInst S, unsigned edgeIdx) {
+  if (S.getNumCases() == edgeIdx)
+    return S.getDefaultBB();
+  return S.getCase(edgeIdx).second;
+}
+
 void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
                         llvm::SmallVectorImpl<SILValue> &args) {
   switch (T->getKind()) {
@@ -159,8 +166,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
   // destination block to figure this out.
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchEnumAddrInst: {
-    auto SEI = cast<SwitchEnumInstBase>(T);
-    auto *succBB = getNthEdgeBlock(SEI, edgeIdx);
+    SwitchEnumTermInst branch(T);
+    auto *succBB = getNthEdgeBlock(branch, edgeIdx);
     assert(succBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!succBB->getNumArguments())
       return;

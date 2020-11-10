@@ -3399,6 +3399,30 @@ static bool diagnoseAmbiguity(
 
   auto &DE = cs.getASTContext().Diags;
 
+  llvm::SmallPtrSet<ValueDecl *, 4> localAmbiguity;
+  {
+    for (auto &entry : aggregateFix) {
+      const auto &solution = entry.first;
+      const auto &overload = solution->getOverloadChoice(ambiguity.locator);
+      auto *choice = overload.choice.getDeclOrNull();
+
+      // It's not possible to diagnose different kinds of overload choices.
+      if (!choice)
+        return false;
+
+      localAmbiguity.insert(choice);
+    }
+  }
+
+  if (localAmbiguity.empty())
+    return false;
+
+  // If all of the fixes are rooted in the same choice.
+  if (localAmbiguity.size() == 1) {
+    auto &primaryFix = aggregateFix.front();
+    return primaryFix.second->diagnose(*primaryFix.first);
+  }
+
   {
     auto fixKind = aggregateFix.front().second->getKind();
     if (llvm::all_of(
@@ -3413,10 +3437,7 @@ static bool diagnoseAmbiguity(
     }
   }
 
-  auto *decl = ambiguity.choices.front().getDeclOrNull();
-  if (!decl)
-    return false;
-
+  auto *decl = *localAmbiguity.begin();
   auto *commonCalleeLocator = ambiguity.locator;
 
   bool diagnosed = true;

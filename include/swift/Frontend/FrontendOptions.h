@@ -138,6 +138,7 @@ public:
     ScanDependencies,        ///< Scan dependencies of Swift source files
     ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
+    PrintFeature,       ///< Print supported feature of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
