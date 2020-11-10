@@ -149,8 +149,23 @@ public:
   Optional<int64_t> getOptionalInt64(SourceKit::UIdent Key);
 };
 
-void initialize();
-void shutdown();
+/// Initialize the service. Must be called before attempting to handle requests.
+/// \param runtimeLibPath The path to the toolchain's library directory.
+/// \param diagnosticDocumentationPath The path to diagnostics documentation.
+/// \param postNotification Callback to post a notification.
+void initializeService(
+    llvm::StringRef runtimeLibPath, llvm::StringRef diagnosticDocumentationPath,
+    std::function<void(sourcekitd_response_t)> postNotification);
+/// Shutdown the service.
+void shutdownService();
+
+/// Initialize the sourcekitd client library. Returns true if this is the first
+/// time it is initialized.
+bool initializeClient();
+/// Shutdown the sourcekitd client. Returns true if this is the last active
+/// client and the service should be shutdown.
+bool shutdownClient();
+
 void set_interrupted_connection_handler(llvm::function_ref<void()> handler);
 
 typedef std::function<void(sourcekitd_response_t)> ResponseReceiver;
@@ -165,16 +180,9 @@ sourcekitd_response_t createErrorRequestFailed(llvm::StringRef Description);
 sourcekitd_response_t createErrorRequestInterrupted(llvm::StringRef Descr);
 sourcekitd_response_t createErrorRequestCancelled();
 
-/// Send notification object.
-/// The ownership of the object is transferred to the function.
-void postNotification(sourcekitd_response_t Notification);
-
 // The client & service have their own implementations for these.
 sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
-
-std::string getRuntimeLibPath();
-std::string getDiagnosticDocumentationPath();
 
 void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 

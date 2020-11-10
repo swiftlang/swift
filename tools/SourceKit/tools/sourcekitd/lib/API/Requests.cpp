@@ -90,6 +90,10 @@ struct SKEditorConsumerOptions {
 
 } // anonymous namespace
 
+static Optional<UIdent> getUIDForOperationKind(trace::OperationKind OpKind);
+static void fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
+                                            const DiagnosticEntryInfo &Info);
+
 #define REQUEST(NAME, CONTENT) static LazySKDUID Request##NAME(CONTENT);
 #define KIND(NAME, CONTENT) static LazySKDUID Kind##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
@@ -97,30 +101,73 @@ struct SKEditorConsumerOptions {
 #define REFACTORING(KIND, NAME, ID) static LazySKDUID Kind##Refactoring##KIND("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
-static void onDocumentUpdateNotification(StringRef DocumentName) {
-  static UIdent DocumentUpdateNotificationUID(
-      "source.notification.editor.documentupdate");
-
-  ResponseBuilder RespBuilder;
-  auto Dict = RespBuilder.getDictionary();
-  Dict.set(KeyNotification, DocumentUpdateNotificationUID);
-  Dict.set(KeyName, DocumentName);
-
-  sourcekitd::postNotification(RespBuilder.createResponse());
-}
-
 static SourceKit::Context *GlobalCtx = nullptr;
 
-void sourcekitd::initialize() {
+void sourcekitd::initializeService(
+    StringRef runtimeLibPath, StringRef diagnosticDocumentationPath,
+    std::function<void(sourcekitd_response_t)> postNotification) {
   llvm::EnablePrettyStackTrace();
   GlobalCtx =
-      new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
-                             sourcekitd::getDiagnosticDocumentationPath(),
+      new SourceKit::Context(runtimeLibPath, diagnosticDocumentationPath,
                              SourceKit::createSwiftLangSupport);
-  GlobalCtx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
-    onDocumentUpdateNotification);
+  auto noteCenter = GlobalCtx->getNotificationCenter();
+
+  noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {
+    static UIdent DocumentUpdateNotificationUID(
+        "source.notification.editor.documentupdate");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, DocumentUpdateNotificationUID);
+    Dict.set(KeyName, DocumentName);
+    postNotification(RespBuilder.createResponse());
+  });
+
+  noteCenter->addTestNotificationReceiver([postNotification] {
+    static UIdent TestNotification("source.notification.test");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, TestNotification);
+    postNotification(RespBuilder.createResponse());
+  });
+
+  noteCenter->addSemaEnabledNotificationReceiver([postNotification] {
+    static UIdent SemaEnabledNotificationUID(
+        "source.notification.sema_enabled");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, SemaEnabledNotificationUID);
+    postNotification(RespBuilder.createResponse());
+  });
+
+  noteCenter->addCompileWillStartNotificationReceiver([postNotification](uint64_t OpId, trace::OperationKind OpKind, const trace::SwiftInvocation &Inv){
+    static UIdent CompileWillStartUID("source.notification.compile-will-start");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, CompileWillStartUID);
+    Dict.set(KeyCompileID, std::to_string(OpId));
+    Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
+    if (auto OperationUID = getUIDForOperationKind(OpKind))
+      Dict.set(KeyCompileOperation, OperationUID.getValue());
+    Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
+    postNotification(RespBuilder.createResponse());
+  });
+
+  noteCenter->addCompileDidFinishNotificationReceiver([postNotification](uint64_t OpId, trace::OperationKind OpKind, ArrayRef<DiagnosticEntryInfo> Diagnostics){
+    static UIdent CompileDidFinishUID("source.notification.compile-did-finish");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, CompileDidFinishUID);
+    Dict.set(KeyCompileID, std::to_string(OpId));
+    if (auto OperationUID = getUIDForOperationKind(OpKind))
+      Dict.set(KeyCompileOperation, OperationUID.getValue());
+    auto DiagArray = Dict.setArray(KeyDiagnostics);
+    for (const auto &DiagInfo : Diagnostics)
+      fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
+    postNotification(RespBuilder.createResponse());
+  });
 }
-void sourcekitd::shutdown() {
+
+void sourcekitd::shutdownService() {
   delete GlobalCtx;
   GlobalCtx = nullptr;
 }
@@ -269,10 +316,6 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
                  ArrayRef<const char *> Args);
 
 static bool isSemanticEditorDisabled();
-
-static void fillDictionaryForDiagnosticInfo(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
-
 static void enableCompileNotifications(bool value);
 
 static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
@@ -488,11 +531,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   }
 
   if (ReqUID == RequestTestNotification) {
-    static UIdent TestNotification("source.notification.test");
-    ResponseBuilder RespBuilder;
-    auto Dict = RespBuilder.getDictionary();
-    Dict.set(KeyNotification, TestNotification);
-    sourcekitd::postNotification(RespBuilder.createResponse());
+    getGlobalContext().getNotificationCenter()->postTestNotification();
     return Rec(ResponseBuilder().createResponse());
   }
 
@@ -3183,13 +3222,9 @@ static bool isSemanticEditorDisabled() {
                                            NSEC_PER_SEC * Seconds);
       dispatch_after(When, dispatch_get_main_queue(), ^{
         Toggle = SemaInfoToggle::Enable;
-
-        static UIdent SemaEnabledNotificationUID(
-            "source.notification.sema_enabled");
-        ResponseBuilder RespBuilder;
-        auto Dict = RespBuilder.getDictionary();
-        Dict.set(KeyNotification, SemaEnabledNotificationUID);
-        sourcekitd::postNotification(RespBuilder.createResponse());
+        getGlobalContext()
+            .getNotificationCenter()
+            ->postSemaEnabledNotification();
       });
     });
   }
@@ -3232,42 +3267,19 @@ static Optional<UIdent> getUIDForOperationKind(trace::OperationKind OpKind) {
 void CompileTrackingConsumer::operationStarted(
     uint64_t OpId, trace::OperationKind OpKind,
     const trace::SwiftInvocation &Inv, const trace::StringPairs &OpArgs) {
-  if (!desiredOperations().contains(OpKind))
-    return;
-
-  static UIdent CompileWillStartUID("source.notification.compile-will-start");
-  ResponseBuilder RespBuilder;
-  auto Dict = RespBuilder.getDictionary();
-  Dict.set(KeyNotification, CompileWillStartUID);
-  Dict.set(KeyCompileID, std::to_string(OpId));
-  Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
-  if (auto OperationUID = getUIDForOperationKind(OpKind)) {
-    Dict.set(KeyCompileOperation, OperationUID.getValue());
-  }
-  Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
-  sourcekitd::postNotification(RespBuilder.createResponse());
+  if (desiredOperations().contains(OpKind))
+    getGlobalContext()
+        .getNotificationCenter()
+        ->postCompileWillStartNotification(OpId, OpKind, Inv);
 }
 
 void CompileTrackingConsumer::operationFinished(
     uint64_t OpId, trace::OperationKind OpKind,
     ArrayRef<DiagnosticEntryInfo> Diagnostics) {
-  if (!desiredOperations().contains(OpKind))
-    return;
-
-  static UIdent CompileDidFinishUID("source.notification.compile-did-finish");
-  ResponseBuilder RespBuilder;
-  auto Dict = RespBuilder.getDictionary();
-  Dict.set(KeyNotification, CompileDidFinishUID);
-  Dict.set(KeyCompileID, std::to_string(OpId));
-  if (auto OperationUID = getUIDForOperationKind(OpKind)) {
-    Dict.set(KeyCompileOperation, OperationUID.getValue());
-  }
-  auto DiagArray = Dict.setArray(KeyDiagnostics);
-  for (const auto &DiagInfo : Diagnostics) {
-    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
-  }
-
-  sourcekitd::postNotification(RespBuilder.createResponse());
+  if (desiredOperations().contains(OpKind))
+    getGlobalContext()
+        .getNotificationCenter()
+        ->postCompileDidFinishNotification(OpId, OpKind, Diagnostics);
 }
 
 static void enableCompileNotifications(bool value) {

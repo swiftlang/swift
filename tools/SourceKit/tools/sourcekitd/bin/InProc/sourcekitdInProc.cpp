@@ -13,6 +13,7 @@
 #include "sourcekitd/Internal.h"
 
 #include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "llvm/ADT/SmallString.h"
@@ -35,6 +36,8 @@ using namespace SourceKit;
 static llvm::sys::Mutex GlobalHandlersMtx;
 static sourcekitd_uid_handler_t UidMappingHandler;
 static sourcekitd_str_from_uid_handler_t StrFromUidMappingHandler;
+
+static void postNotification(sourcekitd_response_t Notification);
 
 void
 sourcekitd_set_uid_handler(sourcekitd_uid_handler_t handler) {
@@ -106,18 +109,34 @@ static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
 #endif
 }
 
-std::string sourcekitd::getRuntimeLibPath() {
+static std::string getRuntimeLibPath() {
   llvm::SmallString<128> libPath;
   getToolchainPrefixPath(libPath);
   llvm::sys::path::append(libPath, "lib");
   return libPath.str().str();
 }
 
-std::string sourcekitd::getDiagnosticDocumentationPath() {
+static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> docPath;
   getToolchainPrefixPath(docPath);
   llvm::sys::path::append(docPath, "share", "doc", "swift", "diagnostics");
   return docPath.str().str();
+}
+
+void sourcekitd_initialize(void) {
+  if (sourcekitd::initializeClient()) {
+    LOG_INFO_FUNC(High, "initializing");
+    sourcekitd::initializeService(getRuntimeLibPath(),
+                                  getDiagnosticDocumentationPath(),
+                                  postNotification);
+  }
+}
+
+void sourcekitd_shutdown(void) {
+  if (sourcekitd::shutdownClient()) {
+    LOG_INFO_FUNC(High, "shutting down");
+    sourcekitd::shutdownService();
+  }
 }
 
 void sourcekitd::set_interrupted_connection_handler(
@@ -179,7 +198,7 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver) {
   });
 }
 
-void sourcekitd::postNotification(sourcekitd_response_t Notification) {
+void postNotification(sourcekitd_response_t Notification) {
   WorkQueue::dispatchOnMain([=]{
     if (!NotificationReceiver) {
       sourcekitd_response_dispose(Notification);
