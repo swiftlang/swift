@@ -1934,6 +1934,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
+  case PlatformKind::Windows:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::none:
     break;
   }
@@ -1968,6 +1972,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
 
   case PlatformKind::OpenBSD:
     return name == "openbsd";
+
+  case PlatformKind::Windows:
+    return name == "windows";
 
   case PlatformKind::none:
     return false;
@@ -2011,6 +2018,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 
   case PlatformKind::OpenBSD:
     // No deprecation filter on OpenBSD
+    return false;
+
+  case PlatformKind::Windows:
+    // No deprecation filter on Windows
     return false;
   }
 

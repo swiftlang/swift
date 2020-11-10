@@ -58,6 +58,8 @@ StringRef getDomain(const AvailableAttr &AvAttr) {
       return { "watchOSAppExtension" };
     case swift::PlatformKind::OpenBSD:
       return { "OpenBSD" };
+    case swift::PlatformKind::Windows:
+      return { "Windows" };
     case swift::PlatformKind::none:
       return { "*" };
   }
