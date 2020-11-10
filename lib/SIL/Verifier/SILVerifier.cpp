@@ -2915,6 +2915,41 @@ public:
     require(!sd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
+    if (F.hasOwnership()) {
+      // Make sure that all of our destructure results ownership kinds are
+      // compatible with our destructure_struct's ownership kind /and/ that if
+      // our destructure ownership kind is non-trivial then all non-trivial
+      // results must have the same ownership kind as our operand.
+      auto parentKind = DSI->getOwnershipKind();
+      for (const DestructureStructResult &result : DSI->getAllResultsBuffer()) {
+        require(parentKind.isCompatibleWith(result.getOwnershipKind()),
+                "destructure result with ownership that is incompatible with "
+                "parent forwarding ownership kind");
+        require(parentKind != ValueOwnershipKind::None ||
+                    result.getOwnershipKind() == ValueOwnershipKind::None,
+                "destructure with none ownership kind operand and non-none "
+                "ownership kind result?!");
+      }
+    }
+  }
+
+  void checkDestructureTupleInst(DestructureTupleInst *dti) {
+    if (F.hasOwnership()) {
+      // Make sure that all of our destructure results ownership kinds are
+      // compatible with our destructure_struct's ownership kind /and/ that if
+      // our destructure ownership kind is non-trivial then all non-trivial
+      // results must have the same ownership kind as our operand.
+      auto parentKind = dti->getOwnershipKind();
+      for (const auto &result : dti->getAllResultsBuffer()) {
+        require(parentKind.isCompatibleWith(result.getOwnershipKind()),
+                "destructure result with ownership that is incompatible with "
+                "parent forwarding ownership kind");
+        require(parentKind != ValueOwnershipKind::None ||
+                    result.getOwnershipKind() == ValueOwnershipKind::None,
+                "destructure with none ownership kind operand and non-none "
+                "ownership kind result?!");
+      }
+    }
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
@@ -3692,6 +3727,18 @@ public:
           CBI->getOperand()->getType(),
           "failure dest block argument must match type of original type in "
           "ownership qualified sil");
+      auto succOwnershipKind =
+          CBI->getSuccessBB()->args_begin()[0]->getOwnershipKind();
+      require(succOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "succ dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
+      auto failOwnershipKind =
+          CBI->getFailureBB()->args_begin()[0]->getOwnershipKind();
+      require(failOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "failure dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
     } else {
       require(CBI->getFailureBB()->args_empty(),
               "Failure dest of checked_cast_br must not take any argument in "
