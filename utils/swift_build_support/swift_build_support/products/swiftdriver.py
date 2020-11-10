@@ -106,14 +106,19 @@ def run_build_script_helper(action, host_target, product, args):
         '--ninja-bin', product.toolchain.ninja,
         '--cmake-bin', product.toolchain.cmake,
     ]
-    if os.path.exists(dispatch_build_dir):
-        helper_cmd += [
-            '--dispatch-build-dir', dispatch_build_dir
-        ]
-    if os.path.exists(foundation_build_dir):
-        helper_cmd += [
-            '--foundation-build-dir', foundation_build_dir
-        ]
+
+    # SWIFT_ENABLE_TENSORFLOW
+    # Don't pass in these args since they interfere with yams.
+    # if os.path.exists(dispatch_build_dir):
+    #     helper_cmd += [
+    #         '--dispatch-build-dir', dispatch_build_dir
+    #     ]
+    # if os.path.exists(foundation_build_dir):
+    #     helper_cmd += [
+    #         '--foundation-build-dir', foundation_build_dir
+    #     ]
+    # SWIFT_ENABLE_TENSORFLOW END
+
     if args.verbose_build:
         helper_cmd.append('--verbose')
 
