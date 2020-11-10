@@ -416,6 +416,10 @@ class CompilerInstance {
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
 
+  /// A cache describing the set of inter-module dependencies that have been queried.
+  /// Null if not present.
+  std::unique_ptr<ModuleDependenciesCache> ModDepCache;
+
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
   /// If there is no stats output directory by the time the
@@ -487,6 +491,8 @@ public:
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
+  ModuleDependenciesCache *getModuleDependencyCache() { return ModDepCache.get(); }
+
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
 
   /// Retrieve the main module containing the files being compiled.
@@ -552,6 +558,7 @@ private:
   bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
+  void setUpModuleDependencyCacheIfNeeded();
   bool setUpModuleLoaders();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
