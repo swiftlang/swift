@@ -526,11 +526,22 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.ClosingQuotationMark;
     break;
 
+  case DiagnosticArgumentKind::FullyQualifiedType:
   case DiagnosticArgumentKind::Type: {
     assert(Modifier.empty() && "Improper modifier for Type argument");
     
     // Strip extraneous parentheses; they add no value.
-    auto type = Arg.getAsType()->getWithoutParens();
+    Type type;
+    bool needsQualification = false;
+
+    if (Arg.getKind() == DiagnosticArgumentKind::Type) {
+      type = Arg.getAsType()->getWithoutParens();
+      needsQualification = typeSpellingIsAmbiguous(type, Args);
+    } else {
+      assert(Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType);
+      type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
+      needsQualification = true;
+    }
 
     // If a type has an unresolved type, print it with syntax sugar removed for
     // clarity. For example, print `Array<_>` instead of `[_]`.
@@ -538,9 +549,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       type = type->getWithoutSyntaxSugar();
     }
 
-    bool isAmbiguous = typeSpellingIsAmbiguous(type, Args);
-
-    if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+    if (needsQualification && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
       auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
 
       llvm::SmallString<256> NamingDeclText;
@@ -562,7 +571,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
     } else {
       auto printOptions = PrintOptions();
-      printOptions.FullyQualifiedTypes = isAmbiguous;
+      printOptions.FullyQualifiedTypes = needsQualification;
       std::string typeName = type->getString(printOptions);
 
       if (shouldShowAKA(type, typeName)) {

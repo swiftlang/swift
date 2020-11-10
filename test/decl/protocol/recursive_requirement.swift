@@ -82,8 +82,8 @@ struct Epsilon<T: Alpha, // expected-note{{conformance constraint 'U': 'Gamma' i
 // expected-warning@-1{{redundant conformance constraint 'T': 'Alpha'}}
                U: Gamma> // expected-warning{{redundant conformance constraint 'U': 'Gamma'}}
 // expected-note@-1{{conformance constraint 'T': 'Alpha' implied here}}
-  where T.Beta == U, // expected-error{{'Beta' is not a member type of 'T'}}
-        U.Delta == T {} // expected-error{{'Delta' is not a member type of 'U'}}
+  where T.Beta == U, // expected-error{{'Beta' is not a member type of type 'T'}}
+        U.Delta == T {} // expected-error{{'Delta' is not a member type of type 'U'}}
 
 // -----
 
