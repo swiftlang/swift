@@ -1953,6 +1953,11 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   if (desc.opts.SkipFunctionBodies == FunctionBodySkipping::All)
     return silMod;
 
+  // Skip emitting SIL if there's been any compilation errors
+  if (silMod->getASTContext().hadError() &&
+      silMod->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+    return silMod;
+
   SILGenModuleRAII scope(*silMod);
 
   // Emit a specific set of SILDeclRefs if needed.
