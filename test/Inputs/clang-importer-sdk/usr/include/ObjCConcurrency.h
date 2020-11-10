@@ -14,6 +14,20 @@
 -(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
 @property(readwrite) void (^completionHandler)(NSInteger);
 
+-(NSString *)magicNameWithSeed:(NSInteger)seed;
+-(void)magicNameAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSString * _Nullable, NSError * _Nullable))handler;
+
+-(NSString * _Nullable)boringNameWithSeed:(NSInteger)seed error:(NSError **)error;
+-(void)boringNameAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSString * _Nullable, NSError * _Nullable))handler;
+
+-(NSString *)confusingName;
+-(void)confusingNameAsynchronouslyWithCompletionHandler:(void (^)(NSString * _Nullable, NSError * _Nullable))handler;
+
+-(NSString *)amazingName:(NSInteger)integer;
+-(void)amazingNameAsynchronouslyWithCompletionHandler:(void (^)(NSString * _Nullable, NSError * _Nullable))handler;
+
+-(void)terrifyingNameWithCompletionHandler:(void (^)(NSString * _Nullable, NSError * _Nullable))handler;
+
 -(void)doSomethingConflicted:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(NSInteger)doSomethingConflicted:(NSString *)operation;
 -(void)server:(NSString *)name restartWithCompletionHandler:(void (^)(void))block;

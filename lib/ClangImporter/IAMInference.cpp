@@ -448,7 +448,7 @@ private:
     baseName = humbleBaseName.userFacingName();
     bool didOmit =
         omitNeedlessWords(baseName, argStrs, "", "", "", paramTypeNames, false,
-                          false, nullptr, None, None, scratch);
+                          false, nullptr, None, None, false, scratch);
     SmallVector<Identifier, 8> argLabels;
     for (auto str : argStrs)
       argLabels.push_back(getIdentifier(str));

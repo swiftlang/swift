@@ -460,6 +460,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        const InheritedNameSet *allPropertyNames,
                        Optional<unsigned> completionHandlerIndex,
                        Optional<StringRef> completionHandlerName,
+                       bool appendAsyncToBaseName,
                        StringScratchSpace &scratch);
 
 /// If the name has a completion-handler suffix, strip off that suffix.

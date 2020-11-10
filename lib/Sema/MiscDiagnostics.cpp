@@ -4876,7 +4876,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
                                 getTypeNameForOmission(contextType),
                                 paramTypes, returnsSelf, false,
                                 /*allPropertyNames=*/nullptr,
-                                None, None, scratch))
+                                None, None, false, scratch))
     return None;
 
   /// Retrieve a replacement identifier.
@@ -4931,7 +4931,8 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
                           /*returnsSelf=*/false, true,
-                          /*allPropertyNames=*/nullptr, None, None, scratch)) {
+                          /*allPropertyNames=*/nullptr, None, None, false,
+                          scratch)) {
     return Context.getIdentifier(name);
   }
 

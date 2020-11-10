@@ -1222,6 +1222,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               const InheritedNameSet *allPropertyNames,
                               Optional<unsigned> completionHandlerIndex,
                               Optional<StringRef> completionHandlerName,
+                              bool appendAsyncToBaseName,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
@@ -1317,7 +1318,23 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   const StringRef asynchronously = "Asynchronously";
   if (isAsync && camel_case::getLastWord(baseName) == asynchronously &&
       baseName.size() > asynchronously.size()) {
-    baseName = baseName.drop_back(asynchronously.size());
+    if (appendAsyncToBaseName) {
+      // We're going to add back the 'Async' anyway, so remove less.
+      baseName = baseName.drop_back(asynchronously.size() - 5);
+      appendAsyncToBaseName = false;
+    } else {
+      // Just drop "Asynchronously".
+      baseName = baseName.drop_back(asynchronously.size());
+    }
+    anyChanges = true;
+  }
+
+  // If we need to append "async" to the base name, do so now.
+  if (isAsync && appendAsyncToBaseName) {
+    SmallString<32> newBaseName;
+    newBaseName += baseName;
+    appendSentenceCase(newBaseName, "Async");
+    baseName = scratch.copyString(newBaseName);
     anyChanges = true;
   }
 

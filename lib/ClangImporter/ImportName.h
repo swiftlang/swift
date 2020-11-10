@@ -436,9 +436,10 @@ private:
   /// Look for a method that will import to have the same name as the
   /// given method after importing the Nth parameter as an elided error
   /// parameter.
-  bool hasErrorMethodNameCollision(const clang::ObjCMethodDecl *method,
-                                   unsigned paramIndex,
-                                   StringRef suffixToStrip);
+  bool hasMethodNameCollision(const clang::ObjCMethodDecl *method,
+                              unsigned paramIndex,
+                              StringRef suffixToStrip,
+                              bool isForAsync);
 
   /// Test to see if there is a value with the same name as 'proposedName' in
   /// the same module as the decl
@@ -459,7 +460,8 @@ private:
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName,
-                      Optional<ForeignErrorConvention::Info> errorInfo);
+                      Optional<ForeignErrorConvention::Info> errorInfo,
+                      bool &appendAsyncToBaseName);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

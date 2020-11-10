@@ -805,7 +805,9 @@ static bool omitNeedlessWordsInFunctionName(
     const clang::DeclContext *dc, const SmallBitVector &nonNullArgs,
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
     Optional<unsigned> completionHandlerIndex,
-    Optional<StringRef> completionHandlerName, NameImporter &nameImporter) {
+    Optional<StringRef> completionHandlerName,
+    bool appendAsyncToBaseName,
+    NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
@@ -856,7 +858,8 @@ static bool omitNeedlessWordsInFunctionName(
                            getClangTypeNameForOmission(clangCtx, contextType),
                            paramTypes, returnsSelf, /*isProperty=*/false,
                            allPropertyNames, completionHandlerIndex,
-                           completionHandlerName, nameImporter.getScratch());
+                           completionHandlerName, appendAsyncToBaseName,
+                           nameImporter.getScratch());
 }
 
 /// Prepare global name for importing onto a swift_newtype.
@@ -1096,7 +1099,8 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
     // TODO: this logic doesn't really work with init methods
     // TODO: this privileges the old API over the new one
     if (adjustName &&
-        hasErrorMethodNameCollision(clangDecl, index, suffixToStrip)) {
+        hasMethodNameCollision(
+            clangDecl, index, suffixToStrip, /*isAsync=*/false)) {
       // If there was a conflict on the first argument, and this was
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
@@ -1173,7 +1177,8 @@ NameImporter::considerAsyncImport(
     SmallVectorImpl<StringRef> &paramNames,
     ArrayRef<const clang::ParmVarDecl *> params,
     bool isInitializer, bool hasCustomName,
-    Optional<ForeignErrorConvention::Info> errorInfo) {
+    Optional<ForeignErrorConvention::Info> errorInfo,
+    bool &appendAsyncToBaseName) {
   // If there are no unclaimed parameters, there's no .
   unsigned errorParamAdjust = errorInfo ? 1 : 0;
   if (params.size() - errorParamAdjust == 0)
@@ -1191,6 +1196,7 @@ NameImporter::considerAsyncImport(
 
   // Determine whether the naming indicates that this is a completion
   // handler.
+  Optional<StringRef> baseNameStripped;
   if (isCompletionHandlerParamName(
           paramNames[completionHandlerParamNameIndex]) ||
       (completionHandlerParamNameIndex > 0 &&
@@ -1198,7 +1204,7 @@ NameImporter::considerAsyncImport(
            paramNames[completionHandlerParamNameIndex]))) {
     // The argument label itself has an appropriate name.
   } else if (!hasCustomName && completionHandlerParamIndex == 0 &&
-             stripWithCompletionHandlerSuffix(baseName)) {
+             (baseNameStripped = stripWithCompletionHandlerSuffix(baseName))) {
     // The base name implies that the first parameter is a completion handler.
   } else if (isCompletionHandlerParamName(
                  params[completionHandlerParamIndex]->getName())) {
@@ -1287,13 +1293,33 @@ NameImporter::considerAsyncImport(
   // Drop the completion handler parameter name.
   paramNames.erase(paramNames.begin() + completionHandlerParamNameIndex);
 
+  // Check for a name collision with another (synchronous) method.
+  StringRef baseNameStrippedSuffix;
+  if (baseNameStripped)
+    baseNameStrippedSuffix = baseName.substr(baseNameStripped->size());
+
+  if (!hasCustomName &&
+      hasMethodNameCollision(
+          clangDecl, completionHandlerParamIndex, baseNameStrippedSuffix,
+          /*isAsync=*/true)) {
+    // Cannot handle the collision for initializers.
+    if (isInitializer)
+      return notAsync("cannot fix the names of initializers");
+
+    // Append "Async" to the base name to distinguish from the
+    // existing method.
+    appendAsyncToBaseName = true;
+  } else {
+    appendAsyncToBaseName = false;
+  }
+
   return ForeignAsyncConvention::Info(
       completionHandlerParamIndex, completionHandlerErrorParamIndex);
 }
 
-bool NameImporter::hasErrorMethodNameCollision(
+bool NameImporter::hasMethodNameCollision(
     const clang::ObjCMethodDecl *method, unsigned paramIndex,
-    StringRef suffixToStrip) {
+    StringRef suffixToStrip, bool isAsync) {
   // Copy the existing selector pieces into an array.
   auto selector = method->getSelector();
   unsigned numArgs = selector.getNumArgs();
@@ -1314,24 +1340,62 @@ bool NameImporter::hasErrorMethodNameCollision(
     chunks.erase(chunks.begin() + paramIndex);
   }
 
-  auto newSelector = ctx.Selectors.getSelector(numArgs - 1, chunks.data());
-  const clang::ObjCMethodDecl *conflict;
-  if (auto iface = method->getClassInterface()) {
-    conflict = iface->lookupMethod(newSelector, method->isInstanceMethod());
-  } else {
-    auto protocol = cast<clang::ObjCProtocolDecl>(method->getDeclContext());
-    conflict = protocol->getMethod(newSelector, method->isInstanceMethod());
+  // If this is for "async" matching, look for "Asynchronously" and try
+  // dropping it.
+  if (isAsync) {
+    StringRef extraWordToStrip = "Asynchronously";
+    Optional<size_t> wordStartIndex;
+    auto firstChunkStr = chunks[0]->getName();
+    for (auto word : camel_case::getWords(firstChunkStr)) {
+      if (camel_case::sameWordIgnoreFirstCase(word, extraWordToStrip)) {
+        wordStartIndex = word.data() - firstChunkStr.data();
+        break;
+      }
+    }
+
+    // We found the word, so drop it.
+    if (wordStartIndex) {
+      SmallString<32> buffer;
+      buffer = firstChunkStr.substr(0, *wordStartIndex);
+      buffer += firstChunkStr.substr(*wordStartIndex + extraWordToStrip.size());
+      chunks[0] = &ctx.Idents.get(buffer);
+    }
   }
 
-  if (conflict == nullptr)
+  // Check whether there is a conflict for the chunks we have.
+  auto findConflict = [&](unsigned numArgs) {
+    auto newSelector = ctx.Selectors.getSelector(numArgs, chunks.data());
+    const clang::ObjCMethodDecl *conflict;
+    if (auto iface = method->getClassInterface()) {
+      conflict = iface->lookupMethod(newSelector, method->isInstanceMethod());
+    } else {
+      auto protocol = cast<clang::ObjCProtocolDecl>(method->getDeclContext());
+      conflict = protocol->getMethod(newSelector, method->isInstanceMethod());
+    }
+
+    if (conflict == nullptr || conflict == method)
+      return false;
+
+    // Look to see if the conflicting decl is unavailable, either because it's
+    // been marked NS_SWIFT_UNAVAILABLE, because it's actually marked unavailable,
+    // or because it was deprecated before our API sunset. We can handle
+    // "conflicts" where one form is unavailable.
+    return !isUnavailableInSwift(conflict, availability,
+                                 enableObjCInterop());
+  };
+
+  // If we found a conflict, we're done.
+  if (findConflict(numArgs - 1))
+    return true;
+
+  // For non-async imports, we're done.
+  if (!isAsync)
     return false;
 
-  // Look to see if the conflicting decl is unavailable, either because it's
-  // been marked NS_SWIFT_UNAVAILABLE, because it's actually marked unavailable,
-  // or because it was deprecated before our API sunset. We can handle
-  // "conflicts" where one form is unavailable.
-  return !isUnavailableInSwift(conflict, availability,
-                               enableObjCInterop());
+  // Check whether adding an "error" parameter produces a conflict that would
+  // show up when the other method is imported as "throws".
+  chunks.push_back(&ctx.Idents.get("error"));
+  return findConflict(numArgs);
 }
 
 /// Whether we should suppress this factory method being imported as an
@@ -1449,6 +1513,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   }
 
   // If we have a swift_name attribute, use that.
+  bool appendAsyncToBaseName = false;
   if (auto *nameAttr = findSwiftNameAttr(D, version)) {
     bool skipCustomName = false;
 
@@ -1529,7 +1594,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           if (auto asyncInfo = considerAsyncImport(
                   method, parsedName.BaseName, parsedName.ArgumentLabels,
                   params, isInitializer, /*hasCustomName=*/true,
-                  result.getErrorInfo())) {
+                  result.getErrorInfo(), appendAsyncToBaseName)) {
+            assert(!appendAsyncToBaseName);
             result.info.hasAsyncInfo = true;
             result.info.asyncInfo = *asyncInfo;
 
@@ -1812,7 +1878,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.accessorKind == ImportedAccessorKind::None) {
       if (auto asyncInfo = considerAsyncImport(
               objcMethod, baseName, argumentNames, params, isInitializer,
-              /*hasCustomName=*/false, result.getErrorInfo())) {
+              /*hasCustomName=*/false, result.getErrorInfo(),
+              appendAsyncToBaseName)) {
         result.info.hasAsyncInfo = true;
         result.info.asyncInfo = *asyncInfo;
       }
@@ -1952,7 +2019,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
                                 contextTypeName, {}, /*returnsSelf=*/false,
                                 /*isProperty=*/true, allPropertyNames,
-                                None, None, scratch);
+                                None, None, false, scratch);
       }
     }
 
@@ -1974,6 +2041,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
               return method->getDeclName().getObjCSelector().getNameForSlot(
                                             info.completionHandlerParamIndex());
             }),
+          appendAsyncToBaseName,
           *this);
     }
 
