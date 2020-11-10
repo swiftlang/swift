@@ -433,36 +433,11 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
   return Map::compatibilityMap(kind, lifetimeConstraint);
 }
 
-//// FIX THIS HERE
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
-  auto *f =ri->getFunction();
-
-  // If we have a trivial value, return allLive().
-  bool isTrivial = ri->getOperand()->getType().isTrivial(*f);
-  if (isTrivial) {
-    return Map::allLive();
-  }
-
-  SILFunctionConventions fnConv = f->getConventions();
-
-  auto results = fnConv.getDirectSILResults();
-  if (results.empty())
-    return Map();
-
-  auto ownershipKindRange = makeTransformRange(results,
-     [&](const SILResultInfo &info) {
-       return info.getOwnershipKind(*f, f->getLoweredFunctionType());
-     });
-
-  // Then merge all of our ownership kinds. If we fail to merge, return an empty
-  // map so we fail on all operands.
-  auto mergedBase = ValueOwnershipKind::merge(ownershipKindRange);
-  if (!mergedBase)
-    return Map();
-
-  auto base = *mergedBase;
-  return Map::compatibilityMap(base, base.getForwardingLifetimeConstraint());
+  auto kind = ri->getOwnershipKind();
+  auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(kind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
