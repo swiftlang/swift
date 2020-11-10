@@ -260,3 +260,65 @@ struct AssocConformanceAvailable4 {}
 extension AssocConformanceAvailable4 : Rider {
 	typealias H = HasAvailableConformance1
 }
+
+// Solution ranking should down-rank solutions involving unavailable conformances
+protocol First {}
+extension First {
+	func doStuff<T>(_: T) -> Bool {}
+}
+
+protocol Second {}
+extension Second {
+	func doStuff(_: Int) -> Int {}
+}
+
+struct ConformingType1 {}
+
+extension ConformingType1 : First {}
+
+@available(macOS 100, *)
+extension ConformingType1 : Second {}
+
+func usesConformingType1(_ c: ConformingType1) {
+  // We should pick First.doStuff() here, since Second.doStuff() is unavailable
+	let result = c.doStuff(123)
+	let _: Bool = result
+}
+
+@available(macOS 100, *)
+func usesConformingType1a(_ c: ConformingType1) {
+  // We should pick Second.doStuff() here, since it is more specialized than
+  // First.doStuff()
+	let result = c.doStuff(123)
+	let _: Int = result
+}
+
+// Same as above but unconditionally unavailable
+struct ConformingType2 {}
+
+extension ConformingType2 : First {}
+
+@available(*, unavailable)
+extension ConformingType2 : Second {}
+
+func usesConformingType2(_ c: ConformingType2) {
+  // We should pick First.doStuff() here, since Second.doStuff() is unavailable
+	let result = c.doStuff(123)
+	let _: Bool = result
+}
+
+// Make sure this also works for synthesized conformances
+struct UnavailableHashable {
+	let x: Int
+	let y: Int
+}
+
+@available(macOS 100, *)
+extension UnavailableHashable : Hashable {}
+
+func usesUnavailableHashable(_ c: UnavailableHashable) {
+  // expected-note@-1 2 {{add @available attribute to enclosing global function}}
+	_ = Set([c])
+	// expected-error@-1 2 {{conformance of 'UnavailableHashable' to 'Hashable' is only available in macOS 100 or newer}}
+	// expected-note@-2 2 {{add 'if #available' version check}}
+}

@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
@@ -5085,6 +5086,37 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   // If not, let's check contextual unavailability.
   ExportContext where = ExportContext::forFunctionBody(DC, loc);
   auto result = TypeChecker::checkDeclarationAvailability(D, where);
+  return result.hasValue();
+}
+
+bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
+                                                ConstraintLocator *locator) const {
+  if (!conformance.isConcrete())
+    return false;
+
+  auto *concrete = conformance.getConcrete();
+  auto *rootConf = concrete->getRootConformance();
+  auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext());
+  if (ext == nullptr)
+    return false;
+
+  auto &ctx = getASTContext();
+
+  // First check whether this declaration is universally unavailable.
+  if (ext->getAttrs().isUnavailable(ctx))
+    return true;
+
+  SourceLoc loc;
+
+  if (locator) {
+    if (auto anchor = locator->getAnchor())
+      loc = getLoc(anchor);
+  }
+
+  // If not, let's check contextual unavailability.
+  ExportContext where = ExportContext::forFunctionBody(DC, loc);
+  auto result = TypeChecker::checkConformanceAvailability(
+      rootConf, ext, where);
   return result.hasValue();
 }
 

@@ -5612,11 +5612,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Unsolved;
   }
 
+  auto *loc = getConstraintLocator(locator);
+
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
     // Record the conformance.
-    CheckedConformances.push_back({getConstraintLocator(locator), conformance});
+    CheckedConformances.push_back({loc, conformance});
+
+    if (isConformanceUnavailable(conformance, loc))
+      increaseScore(SK_Unavailable);
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
@@ -5664,7 +5669,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   auto protocolTy = protocol->getDeclaredInterfaceType();
 
   // If this conformance has been fixed already, let's just consider this done.
-  if (isFixedRequirement(getConstraintLocator(locator), protocolTy))
+  if (isFixedRequirement(loc, protocolTy))
     return SolutionKind::Solved;
 
   // If this is a generic requirement let's try to record that
@@ -5711,7 +5716,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto dstType = getType(assignment->getDest());
 
       auto *fix = IgnoreAssignmentDestinationType::create(
-          *this, srcType, dstType, getConstraintLocator(locator));
+          *this, srcType, dstType, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
@@ -5722,8 +5727,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // let's record it as a "contextual mismatch" because diagnostic
     // is going to be dependent on other contextual information.
     if (path.back().is<LocatorPathElt::ContextualType>()) {
-      auto *fix = ContextualMismatch::create(*this, type, protocolTy,
-                                             getConstraintLocator(locator));
+      auto *fix = ContextualMismatch::create(*this, type, protocolTy, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
@@ -5761,7 +5765,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    auto *loc = getConstraintLocator(locator);
     if (loc->isResultOfKeyPathDynamicMemberLookup() ||
         loc->isKeyPathSubscriptComponent()) {
       if (protocol ==
