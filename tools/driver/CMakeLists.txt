@@ -13,6 +13,21 @@ target_link_libraries(swift-frontend
                         swiftSymbolGraphGen
                         LLVMBitstreamReader)
 
+# Generate and install supported feature JSON file to the toolchain.
+if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+  set(DUMMY_SWIFT_INPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/dummyInput.swift")
+  set(INT_FEATURE_FILE "${SWIFT_RUNTIME_OUTPUT_INTDIR}/SupportedFeatures.json")
+  add_custom_command(TARGET swift-frontend POST_BUILD
+                     COMMAND "${CMAKE_COMMAND}" "-E" "touch" "${DUMMY_SWIFT_INPUT}"
+                     COMMAND "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-frontend"
+                             "-emit-supported-features" "-o"
+                             "${INT_FEATURE_FILE}"
+                             "${DUMMY_SWIFT_INPUT}")
+  swift_install_in_component(FILES "${INT_FEATURE_FILE}"
+                             DESTINATION "bin"
+                             COMPONENT compiler)
+endif()
+
 swift_create_post_build_symlink(swift-frontend
   SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
   DESTINATION "swift${CMAKE_EXECUTABLE_SUFFIX}"
