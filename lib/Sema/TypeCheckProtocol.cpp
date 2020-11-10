@@ -4308,56 +4308,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
-static void checkExportability(Type depTy, Type replacementTy,
-                               const ProtocolConformance *conformance,
-                               NormalProtocolConformance *conformanceBeingChecked,
-                               DeclContext *DC) {
-  SourceFile *SF = DC->getParentSourceFile();
-  if (!SF)
-    return;
-
-  SubstitutionMap subs =
-      conformance->getSubstitutions(SF->getParentModule());
-  for (auto &subConformance : subs.getConformances()) {
-    if (!subConformance.isConcrete())
-      continue;
-    checkExportability(depTy, replacementTy, subConformance.getConcrete(),
-                       conformanceBeingChecked, DC);
-  }
-
-  const RootProtocolConformance *rootConformance =
-      conformance->getRootConformance();
-  ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
-
-  auto where = ExportContext::forDeclSignature(
-      DC->getInnermostDeclarationDeclContext());
-  auto originKind = getDisallowedOriginKind(
-      rootConformance->getDeclContext()->getAsDecl(),
-      where);
-  if (originKind == DisallowedOriginKind::None)
-    return;
-
-  ASTContext &ctx = SF->getASTContext();
-
-  Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
-  if (depTy->isEqual(selfTy)) {
-    ctx.Diags.diagnose(
-        conformanceBeingChecked->getLoc(),
-        diag::conformance_from_implementation_only_module,
-        rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), 0, M->getName(),
-        static_cast<unsigned>(originKind));
-  } else {
-    ctx.Diags.diagnose(
-        conformanceBeingChecked->getLoc(),
-        diag::assoc_conformance_from_implementation_only_module,
-        rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), M->getName(),
-        depTy, replacementTy->getCanonicalType(),
-        static_cast<unsigned>(originKind));
-  }
-}
-
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
@@ -4403,18 +4353,21 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   // Now check that our associated conformances are at least as visible as
   // the conformance itself.
-  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired()) {
-    for (auto req : proto->getRequirementSignature()) {
-      if (req.getKind() == RequirementKind::Conformance) {
-        auto depTy = req.getFirstType();
-        auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-        auto conformance = Conformance->getAssociatedConformance(depTy, proto);
-        if (conformance.isConcrete()) {
-          auto *concrete = conformance.getConcrete();
-          auto replacementTy = DC->mapTypeIntoContext(concrete->getType());
-          checkExportability(depTy, replacementTy, concrete,
-                             Conformance, DC);
-        }
+  auto where = ExportContext::forConformance(DC, proto);
+  if (where.isImplicit())
+    return;
+
+  for (auto req : proto->getRequirementSignature()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto depTy = req.getFirstType();
+      auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto conformance = Conformance->getAssociatedConformance(depTy, proto);
+      if (conformance.isConcrete()) {
+        auto *concrete = conformance.getConcrete();
+        auto replacementTy = DC->mapTypeIntoContext(concrete->getType());
+        diagnoseConformanceAvailability(Conformance->getLoc(),
+                                        conformance, where,
+                                        depTy, replacementTy);
       }
     }
   }
