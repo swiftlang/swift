@@ -757,7 +757,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
                                  nativeType);
 
     // Put the value into memory if necessary.
-    assert(v.getOwnershipKind() == ValueOwnershipKind::None || v.hasCleanup());
+    assert(v.getOwnershipKind() == OwnershipKind::None || v.hasCleanup());
     SILModuleConventions silConv(SGF.SGM.M);
     // bridgeAnything always takes an indirect argument as @in.
     // Since we don't have the SIL type here, check the current SIL stage/mode
@@ -1575,7 +1575,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     {
       B.emitBlock(normalBB);
       SILValue nativeResult =
-          normalBB->createPhiArgument(swiftResultTy, ValueOwnershipKind::Owned);
+          normalBB->createPhiArgument(swiftResultTy, OwnershipKind::Owned);
 
       if (substConv.hasIndirectSILResults()) {
         assert(substTy->getNumResults() == 1);
@@ -1599,7 +1599,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       B.emitBlock(errorBB);
       SILValue nativeError = errorBB->createPhiArgument(
           substConv.getSILErrorType(getTypeExpansionContext()),
-          ValueOwnershipKind::Owned);
+          OwnershipKind::Owned);
 
       // In this branch, the eventual return value is mostly invented.
       // Store the native error in the appropriate location and return.
@@ -1611,7 +1611,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
     // Emit the join block.
     B.emitBlock(contBB);
-    result = contBB->createPhiArgument(objcResultTy, ValueOwnershipKind::Owned);
+    result = contBB->createPhiArgument(objcResultTy, OwnershipKind::Owned);
 
     // Leave the scope now.
     argScope.pop();

@@ -299,7 +299,7 @@ struct CopyPropagationState {
       : func(F), invalidation(SILAnalysis::InvalidationKind::Nothing) {}
 
   bool isValueOwned() const {
-    return currDef.getOwnershipKind() == ValueOwnershipKind::Owned;
+    return currDef.getOwnershipKind() == OwnershipKind::Owned;
   }
 
   void markInvalid(SILAnalysis::InvalidationKind kind) {

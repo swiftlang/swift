@@ -22,7 +22,7 @@ namespace swift {
 ///
 /// NOTE: This assumes that the passed in SILValues are not values used as type
 /// dependent operands.
-Optional<ValueOwnershipKind> mergeSILValueOwnership(ArrayRef<SILValue> values);
+ValueOwnershipKind mergeSILValueOwnership(ArrayRef<SILValue> values);
 
 } // namespace swift
 

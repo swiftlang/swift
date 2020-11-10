@@ -284,7 +284,7 @@ namespace {
       if (!P.consumeIf(tok::at_sign)) {
         // If we fail, we must have @any ownership. We check elsewhere in the
         // parser that this matches what the function signature wants.
-        OwnershipKind = ValueOwnershipKind::None;
+        OwnershipKind = OwnershipKind::None;
         return false;
       }
 
@@ -491,7 +491,8 @@ bool SILParser::parseVerbatim(StringRef name) {
 SILParser::~SILParser() {
   for (auto &Entry : ForwardRefLocalValues) {
     if (ValueBase *dummyVal = LocalValues[Entry.first()]) {
-      dummyVal->replaceAllUsesWith(SILUndef::get(dummyVal->getType(), SILMod, ValueOwnershipKind::None));
+      dummyVal->replaceAllUsesWith(
+          SILUndef::get(dummyVal->getType(), SILMod, OwnershipKind::None));
       SILInstruction::destroy(cast<GlobalAddrInst>(dummyVal));
       SILMod.deallocateInst(cast<GlobalAddrInst>(dummyVal));
     }
@@ -3019,8 +3020,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
-    ValueOwnershipKind LHSKind = ValueOwnershipKind::None;
-    ValueOwnershipKind RHSKind = ValueOwnershipKind::None;
+    ValueOwnershipKind LHSKind = OwnershipKind::None;
+    ValueOwnershipKind RHSKind = OwnershipKind::None;
     SourceLoc Loc;
 
     if (parseTypedValueRef(Val, Loc, B) ||
@@ -5667,7 +5668,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
     BB = getBBForDefinition(BBName, NameLoc);
     // For now, since we always assume that PhiArguments have
-    // ValueOwnershipKind::None, do not parse or do anything special. Eventually
+    // OwnershipKind::None, do not parse or do anything special. Eventually
     // we will parse the convention.
     bool IsEntry = BB->isEntry();
 
@@ -5675,7 +5676,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
-        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::None;
+        ValueOwnershipKind OwnershipKind = OwnershipKind::None;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,

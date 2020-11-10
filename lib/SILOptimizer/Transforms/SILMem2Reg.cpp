@@ -408,7 +408,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
     LI->replaceAllUsesWith(builder.createCopyValue(LI->getLoc(), val));
   } else {
     assert(!ASI->getFunction()->hasOwnership() ||
-           val.getOwnershipKind() != ValueOwnershipKind::Guaranteed);
+           val.getOwnershipKind() != OwnershipKind::Guaranteed);
     LI->replaceAllUsesWith(val);
   }
 
@@ -679,7 +679,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createPhiArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
+    Block->createPhiArgument(ASI->getElementType(), OwnershipKind::Owned);
 }
 
 SILValue

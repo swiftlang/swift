@@ -388,7 +388,7 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
                          NullablePtr<SILGenFunction> SGF = nullptr) {
 // This is a no-op in non-assert builds.
 #ifndef NDEBUG
-  ValueOwnershipKind result = ValueOwnershipKind::None;
+  ValueOwnershipKind result = OwnershipKind::None;
   Optional<bool> sameHaveCleanups;
   for (ManagedValue v : values) {
     assert((!SGF || !v.getType().isLoadable(SGF.get()->F) ||
@@ -396,7 +396,7 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
            "All loadable values in an RValue must be an object");
 
     ValueOwnershipKind kind = v.getOwnershipKind();
-    if (kind == ValueOwnershipKind::None)
+    if (kind == OwnershipKind::None)
       continue;
 
     // Merge together whether or not the RValue has cleanups.
