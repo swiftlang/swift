@@ -414,7 +414,8 @@ function verify_host_is_supported() {
       | watchsimulator-arm64    \
       | watchos-armv7k          \
       | android-armv7           \
-      | android-aarch64)
+      | android-aarch64         \
+      | android-x86_64)
         ;;
       *)
         echo "Unknown host tools target: ${host}"
@@ -457,6 +458,10 @@ function set_build_options_for_host() {
         android-armv7)
             SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
             llvm_target_arch="ARM"
+            ;;
+        android-x86_64)
+            SWIFT_HOST_TRIPLE="x86_64-unknown-linux-android${ANDROID_API_LEVEL}"
+            llvm_target_arch="X86"
             ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
