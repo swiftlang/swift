@@ -20,6 +20,7 @@
 
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Runtime/Portability.h"
+#include <string.h>
 
 namespace swift {
 
@@ -115,8 +116,14 @@ public:
   }
 
   /// Construct a TypeLookupError that just returns a constant C string.
-  TypeLookupError(const char *str)
-      : TypeLookupError([=] { return const_cast<char *>(str); }) {}
+  TypeLookupError(const char *str) {
+    Context = const_cast<char *>(str);
+    Fn = [](void *context, Command command, void *param) -> void * {
+      // The context pointer is the string and works for both copying the string
+      // and copying the context. Other commands don't need to do anything.
+      return context;
+    };
+  }
 
   /// Construct a TypeLookupError that creates a string using asprintf. The passed-in
   /// format string and arguments are passed directly to swift_asprintf when
