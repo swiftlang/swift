@@ -588,7 +588,8 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
 serialization::TypeID Serializer::addTypeRef(Type ty) {
 #ifndef NDEBUG
   PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
-  assert((!ty || !ty->hasError()) && "Serializing error type");
+  assert(M->getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
+         !ty || !ty->hasError() && "serializing type with an error");
 #endif
 
   return TypesToSerialize.addRef(ty);
@@ -755,6 +756,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_TESTABLE);
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
+  BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -932,6 +934,12 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
         options_block::ResilienceStrategyLayout Strategy(Out);
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
+      }
+
+      if (getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+        options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
+            AllowErrors(Out);
+        AllowErrors.emit(ScratchRecord);
       }
 
       if (options.SerializeOptionsForDebugging) {
@@ -2712,6 +2720,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     // Retrieve the type of the pattern.
     auto getPatternType = [&] {
+      if (!pattern->hasType()) {
+        if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+          return ErrorType::get(S.getASTContext());
+        llvm_unreachable("all nodes should have types");
+      }
+
       Type type = pattern->getType();
 
       // If we have a contextual type, map out to an interface type.
@@ -3438,7 +3452,8 @@ public:
         getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
-    if (interfaceType->hasError()) {
+    if (interfaceType->hasError() &&
+        !S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
       param->getDeclContext()->printContext(llvm::errs());
       interfaceType->dump(llvm::errs());
       llvm_unreachable("error in interface type of parameter");
@@ -3797,7 +3812,8 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
-  assert(!D->isInvalid() && "cannot create a module with an invalid decl");
+  assert(getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
+         !D->isInvalid() && "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -3968,16 +3984,23 @@ public:
   /// If this gets referenced, we forgot to handle a type.
   void visitType(const TypeBase *) = delete;
 
-  void visitErrorType(const ErrorType *) {
-    llvm_unreachable("should not serialize an invalid type");
+  void visitErrorType(const ErrorType *ty) {
+    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      using namespace decls_block;
+      unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorTypeLayout::Code];
+      ErrorTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  S.addTypeRef(ty->getOriginalType()));
+      return;
+    }
+    llvm_unreachable("should not serialize an ErrorType");
   }
 
   void visitUnresolvedType(const UnresolvedType *) {
-    llvm_unreachable("should not serialize an invalid type");
+    llvm_unreachable("should not serialize an UnresolvedType");
   }
 
   void visitHoleType(const HoleType *) {
-    llvm_unreachable("should not serialize an invalid type");
+    llvm_unreachable("should not serialize a HoleType");
   }
 
   void visitModuleType(const ModuleType *) {
@@ -4520,6 +4543,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+  registerDeclTypeAbbr<ErrorTypeLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
 
