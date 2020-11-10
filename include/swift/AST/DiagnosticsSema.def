@@ -4531,6 +4531,9 @@ ERROR(invalid_objc_decl,none,
       "properties, and subscript declarations can be declared @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
+NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
+     "inherit from 'NSObject' to silence this error", ())
+
 ERROR(invalid_nonobjc_decl,none,
       "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
