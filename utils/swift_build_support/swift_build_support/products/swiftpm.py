@@ -72,10 +72,13 @@ class SwiftPM(product.Product):
         dispatch_build_dir = os.path.join(
             build_root, '%s-%s' % ("libdispatch", host_target))
 
-        if os.path.exists(dispatch_build_dir):
-            helper_cmd += [
-                "--dispatch-build-dir", dispatch_build_dir
-            ]
+        # SWIFT_ENABLE_TENSORFLOW
+        # Don't pass in this arg since it interferes with yams.
+        # if os.path.exists(dispatch_build_dir):
+        #     helper_cmd += [
+        #         "--dispatch-build-dir", dispatch_build_dir
+        #     ]
+        # SWIFT_ENABLE_TENSORFLOW END
 
         # Pass Foundation directory down if we built it
         foundation_build_dir = os.path.join(
