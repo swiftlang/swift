@@ -159,7 +159,7 @@ endmacro()
 macro(swift_common_standalone_build_config_clang product)
   find_package(Clang CONFIG REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 
-  if (NOT CMAKE_CROSSCOMPILING)
+  if (NOT CMAKE_CROSSCOMPILING AND NOT SWIFT_CROSS_COMPILING)
     set(${product}_NATIVE_CLANG_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
