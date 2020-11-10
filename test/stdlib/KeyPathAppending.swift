@@ -61,7 +61,7 @@ func mismatchedAppends<T, U, V>(readOnlyLeft: KeyPath<T, U>,
   // expected-error@-1 {{no exact matches in call to instance method 'appending'}}
 
   _ = writableRight.appending(path: readOnlyLeft)
-  // expected-error@-1 {{no exact matches in call to instance method 'appending'}}
+  // expected-error@-1 {{instance method 'appending(path:)' requires that 'KeyPath<U, V>' inherit from 'KeyPath<U, T>'}}
 
   _ = writableRight.appending(path: writableLeft)
   // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<T, U>' to expected argument type 'WritableKeyPath<V, U>'}}
@@ -71,7 +71,7 @@ func mismatchedAppends<T, U, V>(readOnlyLeft: KeyPath<T, U>,
   // expected-error@-1 {{no exact matches in call to instance method 'appending'}}
 
   _ = referenceRight.appending(path: readOnlyLeft)
-  // expected-error@-1 {{no exact matches in call to instance method 'appending'}}
+  // expected-error@-1 {{instance method 'appending(path:)' requires that 'KeyPath<U, V>' inherit from 'KeyPath<U, T>'}}
 
   _ = referenceRight.appending(path: writableLeft)
   // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<T, U>' to expected argument type 'WritableKeyPath<V, U>'}}
