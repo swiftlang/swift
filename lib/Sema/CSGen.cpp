@@ -3904,10 +3904,11 @@ bool ConstraintSystem::generateConstraints(
   case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
     auto *wrappedVar = target.getAsUninitializedWrappedVar();
     auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
-    auto *typeRepr = outermostWrapper->getTypeRepr();
+    auto *typeExpr = outermostWrapper->getTypeExpr();
     auto backingType = replaceInferableTypesWithTypeVars(
-        outermostWrapper->getType(),getConstraintLocator(typeRepr));
-    setType(typeRepr, backingType);
+        outermostWrapper->getType(),getConstraintLocator(typeExpr));
+
+    setType(typeExpr, backingType);
 
     auto propertyType = getVarType(wrappedVar);
     if (propertyType->hasError())

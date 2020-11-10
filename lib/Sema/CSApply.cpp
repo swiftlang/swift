@@ -8217,7 +8217,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // Get the outermost wrapper type from the solution
     auto outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
     auto backingType = solution.simplifyType(
-        solution.getType(outermostWrapper->getTypeRepr()));
+        solution.getType(outermostWrapper->getTypeExpr()));
 
     auto &ctx = solution.getConstraintSystem().getASTContext();
     ctx.setSideCachedPropertyWrapperBackingPropertyType(
