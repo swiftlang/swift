@@ -2319,6 +2319,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_Swift_COMPILER:PATH="${SWIFTC_BIN}"
+                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
