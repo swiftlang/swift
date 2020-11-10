@@ -508,8 +508,8 @@ public:
   }
   
   void push_back(const ElemTy &elem) {
-    ScopedLock guard(WriterLock);
-    
+    Mutex::ScopedLock guard(WriterLock);
+
     auto *storage = Elements.load(std::memory_order_relaxed);
     auto count = storage ? storage->Count.load(std::memory_order_relaxed) : 0;
     if (count >= Capacity) {
@@ -594,9 +594,6 @@ struct ConcurrentReadableHashMap {
                 "Elements must not have destructors (they won't be called).");
 
 private:
-  // A scoped lock type to use on MutexTy.
-  using ScopedLockTy = ScopedLockT<MutexTy, false>;
-
   /// The reciprocal of the load factor at which we expand the table. A value of
   /// 4 means that we resize at 1/4 = 75% load factor.
   static const size_t ResizeProportion = 4;
@@ -970,7 +967,7 @@ public:
   /// The return value is ignored when `created` is `false`.
   template <class KeyTy, typename Call>
   void getOrInsert(KeyTy key, const Call &call) {
-    ScopedLockTy guard(WriterLock);
+    typename MutexTy::ScopedLock guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     if (!indices)
@@ -1022,7 +1019,7 @@ public:
   /// Clear the hash table, freeing (when safe) all memory currently used for
   /// indices and elements.
   void clear() {
-    ScopedLockTy guard(WriterLock);
+    typename MutexTy::ScopedLock guard(WriterLock);
 
     auto *indices = Indices.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);

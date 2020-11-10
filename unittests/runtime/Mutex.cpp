@@ -47,7 +47,7 @@ TEST(MutexTest, BasicLockableThreaded) {
 }
 
 TEST(ConditionMutexTest, BasicLockableThreaded) {
-  ConditionMutex mutex(/* checked = */ true);
+  ConditionVariable::Mutex mutex(/* checked = */ true);
   basicLockableThreaded(mutex);
 }
 
@@ -133,22 +133,22 @@ template <typename SL, typename M> void scopedLockThreaded(M &mutex) {
 
 TEST(MutexTest, ScopedLockThreaded) {
   Mutex mutex(/* checked = */ true);
-  scopedLockThreaded<ScopedLock>(mutex);
+  scopedLockThreaded<Mutex::ScopedLock>(mutex);
 }
 
 TEST(ConditionMutexTest, ScopedLockThreaded) {
-  ConditionMutex mutex(/* checked = */ true);
-  scopedLockThreaded<ConditionScopedLock>(mutex);
+  ConditionVariable::Mutex mutex(/* checked = */ true);
+  scopedLockThreaded<ConditionVariable::Mutex::ScopedLock>(mutex);
 }
 
 TEST(StaticMutexTest, ScopedLockThreaded) {
   static StaticMutex Mutex;
-  scopedLockThreaded<StaticScopedLock>(Mutex);
+  scopedLockThreaded<StaticMutex::ScopedLock>(Mutex);
 }
 
 TEST(StaticConditionMutexTest, ScopedLockThreaded) {
-  static StaticConditionMutex Mutex;
-  scopedLockThreaded<StaticConditionScopedLock>(Mutex);
+  static StaticConditionVariable::StaticMutex Mutex;
+  scopedLockThreaded<StaticConditionVariable::StaticMutex::ScopedLock>(Mutex);
 }
 
 TEST(SmallMutexTest, ScopedLockThreaded) {
@@ -181,31 +181,34 @@ void scopedUnlockUnderScopedLockThreaded(M &mutex) {
 
 TEST(MutexTest, ScopedUnlockUnderScopedLockThreaded) {
   Mutex mutex(/* checked = */ true);
-  scopedUnlockUnderScopedLockThreaded<ScopedLock, ScopedUnlock>(mutex);
+  scopedUnlockUnderScopedLockThreaded<Mutex::ScopedLock, Mutex::ScopedUnlock>(
+      mutex);
 }
 
 TEST(ConditionMutexTest, ScopedUnlockUnderScopedLockThreaded) {
-  ConditionMutex mutex(/* checked = */ true);
-  scopedUnlockUnderScopedLockThreaded<ConditionScopedLock,
-                                      ConditionScopedUnlock>(mutex);
+  ConditionVariable::Mutex mutex(/* checked = */ true);
+  scopedUnlockUnderScopedLockThreaded<ConditionVariable::Mutex::ScopedLock,
+                                      ConditionVariable::Mutex::ScopedUnlock>(
+      mutex);
 }
 
 TEST(StaticMutexTest, ScopedUnlockUnderScopedLockThreaded) {
   static StaticMutex Mutex;
-  scopedUnlockUnderScopedLockThreaded<StaticScopedLock, StaticScopedUnlock>(
-      Mutex);
+  scopedUnlockUnderScopedLockThreaded<StaticMutex::ScopedLock,
+                                      StaticMutex::ScopedUnlock>(Mutex);
 }
 
 TEST(StaticConditionMutexTest, ScopedUnlockUnderScopedLockThreaded) {
-  static StaticConditionMutex Mutex;
-  scopedUnlockUnderScopedLockThreaded<StaticConditionScopedLock,
-                                      StaticConditionScopedUnlock>(Mutex);
+  static StaticConditionVariable::StaticMutex Mutex;
+  scopedUnlockUnderScopedLockThreaded<
+      StaticConditionVariable::StaticMutex::ScopedLock,
+      StaticConditionVariable::StaticMutex::ScopedUnlock>(Mutex);
 }
 
 TEST(SmallMutexTest, ScopedUnlockUnderScopedLockThreaded) {
   SmallMutex mutex(/* checked = */ true);
-  scopedUnlockUnderScopedLockThreaded<ScopedLockT<SmallMutex, false>,
-                                      ScopedLockT<SmallMutex, true>>(mutex);
+  scopedUnlockUnderScopedLockThreaded<SmallMutex::ScopedLock,
+                                      SmallMutex::ScopedUnlock>(mutex);
 }
 
 template <typename M> void criticalSectionThreaded(M &mutex) {
@@ -232,7 +235,7 @@ TEST(MutexTest, CriticalSectionThreaded) {
 }
 
 TEST(ConditionMutexTest, CriticalSectionThreaded) {
-  ConditionMutex mutex(/* checked = */ true);
+  ConditionVariable::Mutex mutex(/* checked = */ true);
   criticalSectionThreaded(mutex);
 }
 
@@ -242,7 +245,7 @@ TEST(StaticMutexTest, CriticalSectionThreaded) {
 }
 
 TEST(StaticConditionMutexTest, CriticalSectionThreaded) {
-  static StaticConditionMutex Mutex;
+  static StaticConditionVariable::StaticMutex Mutex;
   criticalSectionThreaded(Mutex);
 }
 
@@ -290,16 +293,17 @@ void conditionThreaded(M &mutex, C &condition) {
 }
 
 TEST(MutexTest, ConditionThreaded) {
-  ConditionMutex mutex(/* checked = */ true);
+  ConditionVariable::Mutex mutex(/* checked = */ true);
   ConditionVariable condition;
-  conditionThreaded<ConditionScopedLock, ConditionScopedUnlock>(mutex,
-                                                                condition);
+  conditionThreaded<ConditionVariable::Mutex::ScopedLock,
+                    ConditionVariable::Mutex::ScopedUnlock>(mutex, condition);
 }
 
 TEST(StaticMutexTest, ConditionThreaded) {
-  static StaticConditionMutex mutex;
+  static StaticConditionVariable::StaticMutex mutex;
   static StaticConditionVariable condition;
-  conditionThreaded<StaticConditionScopedLock, StaticConditionScopedUnlock>(
+  conditionThreaded<StaticConditionVariable::StaticMutex::ScopedLock,
+                    StaticConditionVariable::StaticMutex::ScopedUnlock>(
       mutex, condition);
 }
 
@@ -347,17 +351,17 @@ void conditionLockOrWaitLockThenNotifyThreaded(M &mutex, C &condition) {
 }
 
 TEST(MutexTest, ConditionLockOrWaitLockThenNotifyThreaded) {
-  ConditionMutex mutex(/* checked = */ true);
+  ConditionVariable::Mutex mutex(/* checked = */ true);
   ConditionVariable condition;
-  conditionLockOrWaitLockThenNotifyThreaded<ConditionScopedUnlock>(mutex,
-                                                                   condition);
+  conditionLockOrWaitLockThenNotifyThreaded<
+      ConditionVariable::Mutex::ScopedUnlock>(mutex, condition);
 }
 
 TEST(StaticMutexTest, ConditionLockOrWaitLockThenNotifyThreaded) {
-  static StaticConditionMutex mutex;
+  static StaticConditionVariable::StaticMutex mutex;
   static StaticConditionVariable condition;
-  conditionLockOrWaitLockThenNotifyThreaded<StaticConditionScopedUnlock>(
-      mutex, condition);
+  conditionLockOrWaitLockThenNotifyThreaded<
+      StaticConditionVariable::StaticMutex::ScopedUnlock>(mutex, condition);
 }
 
 template <typename SRL, bool Locking, typename RW>
