@@ -414,7 +414,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::CompileModuleFromInterface;
   if (Opt.matches(OPT_typecheck_module_from_interface))
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
-
+  if (Opt.matches(OPT_emit_supported_features))
+    return FrontendOptions::ActionType::PrintFeature;
   llvm_unreachable("Unhandled mode option");
 }
 

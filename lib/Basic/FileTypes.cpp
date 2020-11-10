@@ -83,6 +83,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_JSONDependencies:
+  case file_types::TY_JSONFeatures:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -155,6 +156,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_JSONDependencies:
+  case file_types::TY_JSONFeatures:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -205,6 +207,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
+  case file_types::TY_JSONFeatures:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
