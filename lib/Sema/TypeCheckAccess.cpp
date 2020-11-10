@@ -1519,7 +1519,6 @@ swift::getDisallowedOriginKind(const Decl *decl,
     if (auto clangDecl = decl->getClangDecl()) {
       for (auto redecl : clangDecl->redecls()) {
         if (!visibleModules.contains(redecl->getOwningModule())) {
-          redecl->getOwningModule()->dump();
           continue;
         }
 

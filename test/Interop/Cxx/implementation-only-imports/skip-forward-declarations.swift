@@ -10,7 +10,6 @@ import UserC
 @_inlineable
 public func createAWrapper() {
   let _ = MagicWrapper()
-  let _ = MagicWrapper(42)
 }
 
 // CHECK: struct 'MagicWrapper' cannot be used in an '@inlinable' function because 'UserA' was imported implementation-only

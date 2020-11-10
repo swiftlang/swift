@@ -5,17 +5,12 @@
 
 // RUN: %target-swift-frontend -typecheck -swift-version 5 -I %t/use_module_a -I %t/use_module_b -I %S/Inputs %s
 
-
-// If a decl comes from two modules, one of which is marked as
-// @_implementationOnly, Swift may choose the @_implementationOnly source
-// and then error out due to the decl being hidden.
-
-// Swift should consider all sources for the decl and recognize that the
+// Swift should consider all sources for a decl and recognize that the
 // decl is not hidden behind @_implementationOnly in all modules.
 
-// This test, as well as `lookup-visible-decls-recursively.swift`
+// This test, as well as `check-function-transitive-visibility-inversed.swift`
 // ensures that Swift looks into the transitive visible modules as well
-// when looking for the `getFortyTwo` decl. 
+// when looking for the `getFortyTwo()` decl. 
 
 import UseModuleA
 @_implementationOnly import UseModuleB
