@@ -927,6 +927,7 @@ public:
       // Ignore everything in getAccessProjectionOperand that is an access
       // projection with no affect on the access path.
       assert(isa<OpenExistentialAddrInst>(projectedAddr)
+             || isa<InitEnumDataAddrInst>(projectedAddr)
              || isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
              || isa<ProjectBoxInst>(projectedAddr));
     }
@@ -1389,6 +1390,10 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     pushUsers(svi, dfs);
     return IgnoredUse;
   }
+
+  case SILInstructionKind::InitEnumDataAddrInst:
+    pushUsers(svi, dfs);
+    return IgnoredUse;
 
   // open_existential_addr and unchecked_take_enum_data_addr are classified as
   // access projections, but they also modify memory. Both see through them and
