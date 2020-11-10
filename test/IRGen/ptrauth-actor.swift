@@ -6,6 +6,7 @@
 // REQUIRES: OS=macosx
 
 import Swift
+import _Concurrency
 
 public actor class A1 {
   var x: Int = 17
