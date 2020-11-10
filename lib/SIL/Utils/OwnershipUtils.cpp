@@ -149,6 +149,15 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::Branch:
     os << "Branch";
     return;
+  case Kind::Apply:
+    os << "Apply";
+    return;
+  case Kind::TryApply:
+    os << "TryApply";
+    return;
+  case Kind::Yield:
+    os << "Yield";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -189,6 +198,12 @@ void BorrowingOperand::visitLocalEndScopeInstructions(
     }
     return;
   }
+  // These are instantaneous borrow scopes so there aren't any special end
+  // scope instructions.
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
+  case BorrowingOperandKind::Yield:
+    return;
   case BorrowingOperandKind::Branch:
     return;
   }
@@ -197,7 +212,10 @@ void BorrowingOperand::visitLocalEndScopeInstructions(
 void BorrowingOperand::visitBorrowIntroducingUserResults(
     function_ref<void(BorrowedValue)> visitor) const {
   switch (kind) {
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::BeginApply:
+  case BorrowingOperandKind::Yield:
     llvm_unreachable("Never has borrow introducer results!");
   case BorrowingOperandKind::BeginBorrow: {
     auto value = *BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));

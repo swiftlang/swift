@@ -29,8 +29,7 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   for (auto *op : bbi->getUses()) {
     if (!op->isLifetimeEnding()) {
       // Make sure that this operand can accept our arguments kind.
-      auto map = op->getOwnershipKindMap();
-      if (map.canAcceptKind(kind))
+      if (op->canAcceptKind(kind))
         continue;
       return false;
     }
