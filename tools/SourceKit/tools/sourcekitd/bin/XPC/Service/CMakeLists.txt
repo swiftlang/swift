@@ -1,4 +1,4 @@
-if (NOT SOURCEKIT_INSTALLING_INPROC)
+if (BUILD_SOURCEKIT_XPC_SERVICE)
   add_sourcekit_xpc_service(SourceKitService sourcekitd
     XPCService.cpp
     LLVM_LINK_COMPONENTS support coverage

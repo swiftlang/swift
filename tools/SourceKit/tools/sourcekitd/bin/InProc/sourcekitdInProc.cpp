@@ -45,20 +45,32 @@ static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
   if (!GetModuleFileNameA(static_cast<HINSTANCE>(mbi.AllocationBase), path,
                           MAX_PATH))
     llvm_unreachable("call to GetModuleFileNameA failed");
-  auto parent =
-      llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
+  auto parent = llvm::sys::path::parent_path(path);
   Path.append(parent.begin(), parent.end());
 #else
   // This silly cast below avoids a C++ warning.
   Dl_info info;
   if (dladdr((void *)(uintptr_t)sourcekitd_initialize, &info) == 0)
     llvm_unreachable("Call to dladdr() failed");
-
   // We now have the path to the shared lib, move to the parent prefix path.
-  auto parent = llvm::sys::path::parent_path(
-      llvm::sys::path::parent_path(info.dli_fname));
+  auto parent = llvm::sys::path::parent_path(info.dli_fname);
   Path.append(parent.begin(), parent.end());
 #endif
+
+#if defined(SOURCEKIT_UNVERSIONED_FRAMEWORK_BUNDLE)
+  // Path points to e.g. "usr/lib/sourcekitdInProc.framework/"
+  const unsigned NestingLevel = 2;
+#elif defined(SOURCEKIT_VERSIONED_FRAMEWORK_BUNDLE)
+  // Path points to e.g. "usr/lib/sourcekitdInProc.framework/Versions/Current/"
+  const unsigned NestingLevel = 4;
+#else
+  // Path points to e.g. "usr/lib/"
+  const unsigned NestingLevel = 1;
+#endif
+
+  // Get it to "usr"
+  for (unsigned i = 0; i < NestingLevel; ++i)
+    llvm::sys::path::remove_filename(Path);
 }
 
 static std::string getRuntimeLibPath() {
