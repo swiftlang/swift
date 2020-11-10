@@ -217,15 +217,23 @@ protocol InternalAssociatedTypeProto {
 public struct PublicInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension PublicInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
-extension PublicInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension PublicInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
+extension PublicInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
 extension PublicInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 @usableFromInline struct UFIInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension UFIInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
-extension UFIInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension UFIInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
+extension UFIInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
 extension UFIInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 struct InternalInferredAssociatedTypeImpl {
@@ -239,8 +247,12 @@ public struct PublicExplicitAssociatedTypeImpl {
   public typealias Assoc = NormalStruct
   public func takesAssoc(_: NormalStruct) {}
 }
-extension PublicExplicitAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
-extension PublicExplicitAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension PublicExplicitAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
+extension PublicExplicitAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+
 extension PublicExplicitAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 
@@ -251,7 +263,8 @@ public protocol BaseProtoWithNoRequirement {
 public protocol RefinedProto: BaseProtoWithNoRequirement where Assoc: NormalProto {
 }
 
-public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
   public func takesAssoc(_: NormalStruct) {}
 }
 
@@ -266,18 +279,26 @@ public protocol SlightlyMoreComplicatedRequirement {
   associatedtype Assoc: Collection where Assoc.Element: NormalProto
   func takesAssoc(_: Assoc)
 }
-public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct')}}
+
   public func takesAssoc(_: [NormalStruct]) {}
 }
-public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass'); 'BADLibrary' has been imported as implementation-only}}
+public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass')}}
+
   public func takesAssoc(_: [SubclassOfNormalClass]) {}
 }
 
-public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>'); 'BADLibrary' has been imported as implementation-only}}
+public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>')}}
+
   public func takesAssoc(_: [ConditionalGenericStruct<NormalStruct>]) {}
 }
 
-public struct ClassConstrainedGenericArg<T: NormalClass>: PublicAssociatedTypeProto { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'T'); 'BADLibrary' has been imported as implementation-only}}
+public struct ClassConstrainedGenericArg<T: NormalClass>: PublicAssociatedTypeProto { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-note@-1 {{in associated type 'Self.Assoc' (inferred as 'T')}}
+
   public func takesAssoc(_: T) {}
 }
 
