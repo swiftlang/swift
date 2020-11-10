@@ -20,6 +20,7 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
 // CHECK-NEXT: owned: Yes. Liveness: LifetimeEnding
 // CHECK-NEXT: guaranteed:  No.
@@ -28,6 +29,7 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
 // CHECK-NEXT: owned: Yes. Liveness: LifetimeEnding
 // CHECK-NEXT: guaranteed:  No.
@@ -36,6 +38,7 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
 // CHECK-NEXT: owned: Yes. Liveness: LifetimeEnding
 // CHECK-NEXT: guaranteed:  No.
@@ -44,6 +47,7 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
 // CHECK-NEXT: owned: No.
 // CHECK-NEXT: guaranteed:  No.
