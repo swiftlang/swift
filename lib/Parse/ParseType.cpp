@@ -275,10 +275,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
         return makeParserError();
       Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
       
-      if (consumeIf(tok::comma))
-        continue;
-      
-      break;
+      if (!consumeIf(tok::comma))
+        break;
     }
   }
   
@@ -302,9 +300,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
       if (!argTy.getPtrOrNull())
         return makeParserError();
       Args.push_back(argTy.get());
-      if (consumeIf(tok::comma))
-        continue;
-      break;
+      if (!consumeIf(tok::comma))
+        break;
     }
     if (!startsWithGreater(Tok)) {
       diagnose(Tok, diag::sil_box_expected_r_angle);
@@ -506,9 +503,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
           if (!argTy.getPtrOrNull())
             return false;
           SubsTypesVec.push_back(argTy.get());
-          if (consumeIf(tok::comma))
-            continue;
-          break;
+          if (!consumeIf(tok::comma))
+            break;
         }
         if (!startsWithGreater(Tok)) {
           diagnose(Tok, diag::sil_function_subst_expected_r_angle);
@@ -597,27 +593,31 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
 
   auto result = parseType(MessageID);
 
-  if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::r_square)) {
-    auto diag = diagnose(Tok, diag::extra_rbracket);
-    diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    consumeToken();
-    return makeParserErrorResult(new (Context)
-                                     ErrorTypeRepr(getTypeErrorLoc()));
-  } else if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::colon)) {
-    auto colonTok = consumeToken();
-    auto secondType = parseType(diag::expected_dictionary_value_type);
-
-    auto diag = diagnose(colonTok, diag::extra_colon);
-    diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    if (!secondType.isParseErrorOrHasCompletion()) {
-      if (Tok.is(tok::r_square)) {
-        consumeToken();
-      } else {
-        diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
-      }
+  if (!result.isParseErrorOrHasCompletion()) {
+    if (Tok.is(tok::r_square)) {
+      auto diag = diagnose(Tok, diag::extra_rbracket);
+      diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
+      consumeToken();
+      return makeParserErrorResult(new (Context)
+                                       ErrorTypeRepr(getTypeErrorLoc()));
     }
-    return makeParserErrorResult(new (Context)
-                                     ErrorTypeRepr(getTypeErrorLoc()));
+
+    if (Tok.is(tok::colon)) {
+      auto colonTok = consumeToken();
+      auto secondType = parseType(diag::expected_dictionary_value_type);
+
+      auto diag = diagnose(colonTok, diag::extra_colon);
+      diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
+      if (!secondType.isParseErrorOrHasCompletion()) {
+        if (Tok.is(tok::r_square)) {
+          consumeToken();
+        } else {
+          diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
+        }
+      }
+      return makeParserErrorResult(new (Context)
+                                       ErrorTypeRepr(getTypeErrorLoc()));
+    }
   }
   return result;
 }
@@ -747,28 +747,26 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
         Status.setHasCodeCompletionAndIsError();
         break;
       }
-      if (!peekToken().isContextualKeyword("Type")
-          && !peekToken().isContextualKeyword("Protocol")) {
-        // If parsing a qualified declaration name, break before parsing the
-        // period before the final declaration name component.
-        if (isParsingQualifiedDeclBaseType) {
-          // If qualified name base type cannot be parsed from the current
-          // point (i.e. the next type identifier is not followed by a '.'),
-          // then the next identifier is the final declaration name component.
-          BacktrackingScope backtrack(*this);
-          consumeStartingCharacterOfCurrentToken(tok::period);
-          if (!canParseBaseTypeForQualifiedDeclName())
-            break;
-        }
-        // Consume the period.
-        consumeToken();
-        continue;
+      if (peekToken().isContextualKeyword("Type") ||
+          peekToken().isContextualKeyword("Protocol"))
+        break;
+      // If parsing a qualified declaration name, break before parsing the
+      // period before the final declaration name component.
+      if (isParsingQualifiedDeclBaseType) {
+        // If qualified name base type cannot be parsed from the current
+        // point (i.e. the next type identifier is not followed by a '.'),
+        // then the next identifier is the final declaration name component.
+        BacktrackingScope backtrack(*this);
+        consumeStartingCharacterOfCurrentToken(tok::period);
+        if (!canParseBaseTypeForQualifiedDeclName())
+          break;
       }
-    } else if (Tok.is(tok::code_complete)) {
-      if (!Tok.isAtStartOfLine())
-        Status.setHasCodeCompletionAndIsError();
-      break;
+      // Consume the period.
+      consumeToken();
+      continue;
     }
+    if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine())
+      Status.setHasCodeCompletionAndIsError();
     break;
   }
 
@@ -1322,13 +1320,14 @@ bool Parser::isOptionalToken(const Token &T) const {
   // A postfix '?' by itself is obviously optional.
   if (T.is(tok::question_postfix))
     return true;
-  
   // A postfix or bound infix operator token that begins with '?' can be
-  // optional too. We'll munch off the '?', so long as it is left-bound with
-  // the type (i.e., parsed as a postfix or unspaced binary operator).
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) &&
-      T.getText().startswith("?"))
-    return true;
+  // optional too.
+  if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
+    // We'll munch off the '?', so long as it is left-bound with
+    // the type (i.e., parsed as a postfix or unspaced binary operator).
+    return T.getText().startswith("?");
+  }
+
   return false;
 }
 
@@ -1338,12 +1337,13 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
   if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
     return true;
   // A postfix or bound infix operator token that begins with '!' can be
-  // implicitly unwrapped optional too. We'll munch off the '!', so long as it
-  // is left-bound with the type (i.e., parsed as a postfix or unspaced binary
-  // operator).
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) &&
-      T.getText().startswith("!"))
-    return true;
+  // implicitly unwrapped optional too.
+  if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
+    // We'll munch off the '!', so long as it is left-bound with
+    // the type (i.e., parsed as a postfix or unspaced binary operator).
+    return T.getText().startswith("!");
+  }
+
   return false;
 }
 
@@ -1548,9 +1548,7 @@ bool Parser::canParseType() {
   }
   
   if (consumeIf(tok::arrow)) {
-    if (!canParseType())
-      return false;
-    return true;
+    return canParseType();
   }
 
   return true;
@@ -1580,9 +1578,8 @@ bool Parser::canParseSimpleTypeIdentifier() {
   consumeToken();
 
   // Parse an optional generic argument list.
-  if (startsWithLess(Tok))
-    if (!canParseGenericArguments())
-      return false;
+  if (startsWithLess(Tok) && !canParseGenericArguments())
+    return false;
 
   return true;
 }
