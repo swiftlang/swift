@@ -225,6 +225,30 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask) {
+    auto flags = args.claimNext();
+    auto parentTask = args.claimNext();
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+
+    // FIXME: SIL treats the function/context parameter as "guaranteed", but
+    // the runtime entry point assumes it is owned. Introduce an extra retain
+    // of the context to balance things out.
+    IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
+
+    auto newTaskAndContext = emitTaskCreate(
+        IGF, flags, parentTask, taskFunction, taskContext);
+
+    // Cast back to NativeObject/RawPointer.
+    auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
+    newTask = IGF.Builder.CreateBitCast(newTask, IGF.IGM.RefCountedPtrTy);
+    auto newContext = IGF.Builder.CreateExtractValue(newTaskAndContext, { 1 });
+    newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
+    out.add(newTask);
+    out.add(newContext);
+    return;
+  }
+
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;

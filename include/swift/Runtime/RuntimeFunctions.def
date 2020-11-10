@@ -1489,12 +1489,22 @@ FUNCTION(TaskDealloc,
          ARGS(SwiftTaskPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// void swift_task_dealloc(AsyncTask *task, void *ptr);
+// void swift_task_cancel(AsyncTask *task);
 FUNCTION(TaskCancel,
          swift_task_cancel, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// AsyncTaskAndContext swift_task_create_f(
+//     size_t flags, AsyncTask *task, AsyncFunctionType<void()> *function,
+//     size_t initialContextSize);
+FUNCTION(TaskCreateFunc,
+         swift_task_create_f, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, TaskContinuationFunctionPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS

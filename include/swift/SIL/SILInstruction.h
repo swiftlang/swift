@@ -7369,16 +7369,25 @@ class ReturnInst
 {
   friend SILBuilder;
 
+  /// We store the ownership kind in the return inst, but we do not consider the
+  /// underlying return inst to be forwarding. This is because its ownership is
+  /// tied to the function signature and thus should be static.
+  ValueOwnershipKind ownershipKind;
+
   /// Constructs a ReturnInst representing a return.
   ///
-  /// \param DebugLoc The backing AST location.
-  ///
-  /// \param ReturnValue The value to be returned.
-  ///
-  ReturnInst(SILDebugLocation DebugLoc, SILValue ReturnValue)
-      : UnaryInstructionBase(DebugLoc, ReturnValue) {}
+  /// \param func The function we are returning from. Used to compute the
+  ///             preferred ownership kind.
+  /// \param debugLoc The backing AST location.
+  /// \param returnValue The value to be returned.
+  ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
+             SILValue returnValue);
 
 public:
+  /// Return the ownership kind for this instruction if we had any direct
+  /// results.
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+
   SuccessorListTy getSuccessors() {
     // No Successors.
     return SuccessorListTy();

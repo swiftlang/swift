@@ -3466,8 +3466,52 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskCancelFn(), {task});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
+}
+
+llvm::Value *irgen::emitTaskCreate(
+    IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
+    llvm::Value *taskFunction, llvm::Value *localContextInfo) {
+  parentTask = IGF.Builder.CreateBitOrPointerCast(
+      parentTask, IGF.IGM.SwiftTaskPtrTy);
+  taskFunction = IGF.Builder.CreateBitOrPointerCast(
+      taskFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
+
+  // Determine the size of the async context for the closure.
+  // FIXME: If the task function comes in as an AsyncFunctionPointer, we might
+  // want to use swift_task_create instead of swift_task_create_f.
+  ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  auto taskFunctionType = FunctionType::get(
+    { }, ctx.TheEmptyTupleType, extInfo);
+  CanSILFunctionType taskFunctionCanSILType =
+      IGF.IGM.getLoweredType(taskFunctionType).castTo<SILFunctionType>();
+  auto layout = getAsyncContextLayout(
+      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType,
+      SubstitutionMap());
+  auto layoutSize = getAsyncContextSize(layout);
+  auto layoutSizeVal = llvm::ConstantInt::get(
+      IGF.IGM.SizeTy, layoutSize.getValue());
+
+  // Call the function.
+  auto *result = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskCreateFuncFn(),
+      { flags, parentTask, taskFunction, layoutSizeVal });
+  result->setDoesNotThrow();
+  result->setCallingConv(IGF.IGM.SwiftCC);
+
+  // Write the local context information into the initial context for the task.
+  if (layout.hasLocalContext()) {
+    // Dig out the initial context returned from task creation.
+    auto initialContext = IGF.Builder.CreateExtractValue(result, { 1 });
+    Address initialContextAddr = layout.emitCastTo(IGF, initialContext);
+
+    auto localContextLayout = layout.getLocalContextLayout();
+    auto localContextAddr = localContextLayout.project(
+        IGF, initialContextAddr, llvm::None);
+    IGF.Builder.CreateStore(localContextInfo, localContextAddr);
+  }
+
+  return result;
 }
 
 std::pair<Address, Size> irgen::emitAllocAsyncContext(IRGenFunction &IGF,
