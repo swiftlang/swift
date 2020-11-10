@@ -866,3 +866,54 @@ bb5:
   %999 = tuple ()
   return %999 : $()
 }
+
+// CHECK-LABEL: @test_init_enum_addr
+// CHECK: ###For MemOp:   store %0 to [init] %2 : $*AnyObject
+// CHECK: Stack   %1 = alloc_stack $Optional<AnyObject>
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:  store %0 to [init] %{{.*}} : $*AnyObject
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT: }
+// CHECK: ###For MemOp:   inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+// CHECK: Stack   %1 = alloc_stack $Optional<AnyObject>
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:  store %0 to [init] %{{.*}} : $*AnyObject
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT: }
+// CHECK: ###For MemOp:   %5 = load [copy] %1 : $*Optional<AnyObject>
+// CHECK: Stack   %1 = alloc_stack $Optional<AnyObject>
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:  store %0 to [init] %{{.*}} : $*AnyObject
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT: }
+sil [ossa] @test_init_enum_addr : $@convention(thin) (@owned AnyObject) -> @owned Optional<AnyObject> {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack $Optional<AnyObject>
+  %2 = init_enum_data_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+  store %0 to [init] %2 : $*AnyObject
+  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+  %5 = load [copy] %1 : $*Optional<AnyObject>
+  dealloc_stack %1 : $*Optional<AnyObject>
+  return %5 : $Optional<AnyObject>
+}
