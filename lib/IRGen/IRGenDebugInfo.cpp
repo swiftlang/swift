@@ -379,7 +379,7 @@ private:
   }
 
 #ifndef NDEBUG
-  /// Perform a couple of sanity checks on scopes.
+  /// Perform a couple of safety checks on scopes.
   static bool parentScopesAreSane(const SILDebugScope *DS) {
     auto *Parent = DS;
     while ((Parent = Parent->Parent.dyn_cast<const SILDebugScope *>())) {
@@ -653,7 +653,7 @@ private:
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
 
-  /// FIXME: replace this condition with something more sane.
+  /// FIXME: replace this condition with something more sensible.
   static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
                                       DeclContext *DeclCtx) {
     return Rep != SILFunctionTypeRepresentation::Method && DeclCtx &&
@@ -1762,7 +1762,7 @@ private:
     // Incrementally build the DIRefMap.
     if (auto *CTy = dyn_cast<llvm::DICompositeType>(DITy)) {
 #ifndef NDEBUG
-      // Sanity check.
+      // Safety check.
       if (llvm::Metadata *V = DIRefMap.lookup(UID)) {
         auto *CachedTy = cast<llvm::DIType>(V);
         assert(CachedTy == DITy && "conflicting types for one UID");
@@ -1980,7 +1980,7 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
 
   auto *InlinedAt = createInlinedAt(DS);
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
-  assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
+  assert(parentScopesAreSane(DS) && "parent scope safety check failed");
   auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
   Builder.SetCurrentDebugLocation(DL);
 }
@@ -2008,7 +2008,7 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   ScopeCache[TrapSc] = llvm::TrackingMDNodeRef(TrapSP);
   LastScope = TrapSc;
 
-  assert(parentScopesAreSane(TrapSc) && "parent scope sanity check failed");
+  assert(parentScopesAreSane(TrapSc) && "parent scope safety check failed");
 
   // Wrap the existing TrapLoc into the failure function.
   auto DL = llvm::DebugLoc::get(0, 0, TrapSP, TrapLoc);
@@ -2364,7 +2364,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       if (!AlignInBits)
         AlignInBits = SizeOfByte;
 
-      // Sanity checks.
+      // Safety checks.
       assert(SizeInBits && "zero-sized piece");
       assert(SizeInBits < getSizeInBits(Var) && "piece covers entire var");
       assert(OffsetInBits + SizeInBits <= getSizeInBits(Var) && "pars > totum");

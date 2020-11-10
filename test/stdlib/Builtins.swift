@@ -82,7 +82,7 @@ class XObjC : NSObject {}
 tests.test("_isUnique_native/SpareBitTrap")
   .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
+    reason: "safety checks are disabled in this build of stdlib"))
   .code {
   // Fake an ObjC pointer.
   var b = _makeObjCBridgeObject(X())
@@ -93,7 +93,7 @@ tests.test("_isUnique_native/SpareBitTrap")
 tests.test("_isUnique_native/NonNativeTrap")
   .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
+    reason: "safety checks are disabled in this build of stdlib"))
   .code {
   var x = XObjC()
   expectCrashLater()

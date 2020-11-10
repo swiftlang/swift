@@ -466,7 +466,7 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 
   DemangleToMetadataTests.test("Check _mangledTypeName, _typeName use appropriate cache keys") {
-    // sanity check that name functions use the right keys to store cached names:
+    // safety check that name functions use the right keys to store cached names:
     for _ in 1...2 {
       expectEqual("Si", _mangledTypeName(Int.self)!)
       expectEqual("Swift.Int", _typeName(Int.self, qualified: true))

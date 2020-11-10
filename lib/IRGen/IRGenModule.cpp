@@ -180,7 +180,7 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
 static void sanityCheckStdlib(IRGenModule &IGM) {
   if (!IGM.getSwiftModule()->isStdlibModule()) return;
 
-  // Only run the sanity check when we're building the real stdlib.
+  // Only run the safety check when we're building the real stdlib.
   if (!lookupSimple(IGM.getSwiftModule(), { "String" })) return;
 
   checkPointerAuthAssociatedTypeDiscriminator(IGM, { "_ObjectiveCBridgeable", "_ObjectiveCType" }, SpecialPointerAuthDiscriminators::ObjectiveCTypeDiscriminator);

@@ -863,7 +863,7 @@ class BuildScriptInvocation(object):
             impl_product_classes.append(products.XCTest)
         if self.args.build_llbuild:
             impl_product_classes.append(products.LLBuild)
-        # Sanity check that all of our impl classes are actually
+        # Safety check that all of our impl classes are actually
         # build_script_impl products.
         for prod in impl_product_classes:
             assert(prod.is_build_script_impl_product())
@@ -893,7 +893,7 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SwiftInspect)
         if self.args.tsan_libdispatch_test:
             product_classes.append(products.TSanLibDispatch)
-        # Sanity check that all of our non-impl classes are actually
+        # Safety check that all of our non-impl classes are actually
         # not build_script_impl products.
         for prod in product_classes:
             assert(not prod.is_build_script_impl_product())

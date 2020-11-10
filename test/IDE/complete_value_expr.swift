@@ -1988,7 +1988,7 @@ func testThrows006() {
 
 
 // rdar://21346928
-// Just sample some String API to sanity check.
+// Just sample some String API to safety check.
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}unicodeScalars[#String.UnicodeScalarView#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}utf16[#String.UTF16View#]
 func testWithAutoClosure1(_ x: String?) {

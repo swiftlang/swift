@@ -7,5 +7,5 @@ func test1() {
 func test2() {
   "" + [""]#^B^#
 }
-// Sanity check results.
+// Safety check results.
 // CHECK: Decl[InstanceVar]/CurrNominal/IsSystem:      .startIndex[#Int#]; name=startIndex

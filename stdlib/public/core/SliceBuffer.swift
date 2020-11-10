@@ -298,7 +298,7 @@ internal struct _SliceBuffer<Element>
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
   ///
-  /// This function should only be used for internal sanity checks and for
+  /// This function should only be used for internal safety checks and for
   /// backward compatibility.
   /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable

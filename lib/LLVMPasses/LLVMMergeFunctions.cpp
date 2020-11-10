@@ -69,7 +69,7 @@ STATISTIC(NumSwiftThunksWritten, "Number of thunks generated");
 static cl::opt<unsigned> NumFunctionsForSanityCheck(
     "swiftmergefunc-sanity",
     cl::desc("How many functions in module could be used for "
-             "SwiftMergeFunctions pass sanity check. "
+             "SwiftMergeFunctions pass safety check. "
              "'0' disables this check. Works only with '-debug' key."),
     cl::init(0), cl::Hidden);
 
@@ -460,7 +460,7 @@ private:
   }
 
   /// Checks the rules of order relation introduced among functions set.
-  /// Returns true, if sanity check has been passed, and false if failed.
+  /// Returns true, if safety check has been passed, and false if failed.
   bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence

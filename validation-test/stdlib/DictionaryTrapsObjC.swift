@@ -58,7 +58,7 @@ assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
 assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
 DictionaryTraps.test("sanity") {
-  // Sanity checks.  This code should not trap.
+  // Safety checks.  This code should not trap.
   let d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
   _ = d as NSDictionary
 }

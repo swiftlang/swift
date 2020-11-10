@@ -922,7 +922,7 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
-  // FIXME: For sanity, address-type phis should be prohibited at all SIL
+  // FIXME: For safety, address-type phis should be prohibited at all SIL
   // stages. However, the optimizer currently breaks the invariant in three
   // places:
   // 1. Normal Simplify CFG during conditional branch simplification

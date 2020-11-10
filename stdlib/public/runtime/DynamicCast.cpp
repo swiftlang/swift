@@ -303,7 +303,7 @@ tryCastFromClassToObjCBridgeable(
     return DynamicCastResult::Failure;
   }
 
-  // 1. Sanity check whether the source object can cast to the
+  // 1. Safety check whether the source object can cast to the
   // type expected by the target.
 
   auto targetBridgedClass =

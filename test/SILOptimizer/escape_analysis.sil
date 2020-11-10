@@ -92,7 +92,7 @@ bb0(%0 : $Int):
   return %10 : $()
 }
 
-// Sanity check with a simple function.
+// Safety check with a simple function.
 
 // CHECK-LABEL: CG of test_simple
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%5)

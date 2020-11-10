@@ -55,7 +55,7 @@ assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 var SetTraps = TestSuite("SetTraps" + testSuiteSuffix)
 
 SetTraps.test("sanity") {
-  // Sanity checks.  This code should not trap.
+  // Safety checks.  This code should not trap.
   let s = Set<BridgedVerbatimRefTy>()
   _ = s as NSSet
 }

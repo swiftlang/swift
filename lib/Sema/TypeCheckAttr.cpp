@@ -2189,7 +2189,7 @@ static void collectUsedGenericParameters(
   });
 }
 
-/// Perform some sanity checks for the requirements provided by
+/// Perform some safety checks for the requirements provided by
 /// the @_specialize attribute.
 static void checkSpecializeAttrRequirements(
     SpecializeAttr *attr,

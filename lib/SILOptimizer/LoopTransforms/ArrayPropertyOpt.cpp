@@ -300,7 +300,7 @@ private:
       return false;
     }
 
-    // Otherwise, all of our users are sane. The array does not escape.
+    // Otherwise, all of our users are sensible. The array does not escape.
     return true;
   }
 

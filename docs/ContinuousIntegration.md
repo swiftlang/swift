@@ -91,7 +91,7 @@ All supported platforms     | @swift-ci Please clean test and merge             
 macOS platform               | @swift-ci Please test OS X platform           | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
 macOS platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
 macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform (many runs - rigorous)
-macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark on OS X Platform (few runs - sanity)
+macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark on OS X Platform (few runs - quick)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
@@ -135,7 +135,7 @@ A validation test on Linux does the following:
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
 macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on OS X Platform (many runs - rigorous)
-macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on OS X Platform (few runs - sanity)
+macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on OS X Platform (few runs - quick)
 
 ### Linting
 

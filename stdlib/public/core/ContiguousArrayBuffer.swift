@@ -670,7 +670,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
   ///
-  /// This function should only be used for internal sanity checks.
+  /// This function should only be used for internal safety checks.
   /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {

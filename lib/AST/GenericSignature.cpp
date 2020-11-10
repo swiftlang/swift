@@ -282,7 +282,7 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
         canSig->areSameTypeParameterInContext(prevReqt.getFirstType(),
                                               reqt.getFirstType())) {
       // If it's a it's a type parameter, make sure the equivalence class is
-      // wired together sanely.
+      // wired together sensibly.
       if (prevReqt.getSecondType()->isTypeParameter()) {
         assert(prevReqt.getSecondType()->isEqual(reqt.getFirstType()) &&
                "same-type constraints within an equiv. class are out-of-order");

@@ -1,4 +1,4 @@
-// Sanity check that -help works
+// Safety check that -help works
 
 // RUN: not %sourcekitd-test -help | %FileCheck %s
 

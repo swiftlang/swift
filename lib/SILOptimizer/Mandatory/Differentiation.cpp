@@ -585,7 +585,7 @@ emitDerivativeFunctionReference(
             diag::autodiff_external_nondifferentiable_function);
         return None;
       }
-      // Sanity check passed. Create a new differentiability witness and
+      // Safety check passed. Create a new differentiability witness and
       // canonicalize it.
       GenericSignature contextualDerivativeGenSig = GenericSignature();
       if (invoker.getKind() ==

@@ -1130,7 +1130,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
-    // (when it's sane) would help us do much better here.
+    // (when it's sensible) would help us do much better here.
     if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
       identical = false;
       continue;

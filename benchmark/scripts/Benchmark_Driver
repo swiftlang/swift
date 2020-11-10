@@ -812,7 +812,7 @@ def compare(args):
             len(recent_logs[current_branch + "_O"]) == 0
             or len(recent_logs[current_branch + "_Onone"]) == 0
         ):
-            print("branch sanity failure: missing branch logs")
+            print("branch safety failure: missing branch logs")
             return 1
 
         if (

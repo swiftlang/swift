@@ -38,7 +38,7 @@ public:
 TEST(ImportPath, Comparison) {
   ImportPathContext ctx;
 
-  /// Simple sanity check:
+  /// Simple safety check:
   EXPECT_FALSE(ctx.Build("A.B.C") < ctx.Build("A.B.C"));
 
   /// Check order chain:

@@ -1110,7 +1110,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
   // produce the same thing.
   if (this == end) {
 #ifndef NDEBUG
-    // Sanity check: make sure the 'start' precedes the 'end'.
+    // Safety check: make sure the 'start' precedes the 'end'.
     bool foundStart = false;
     for (auto source = this; source; source = source->parent) {
       if (source == start) {

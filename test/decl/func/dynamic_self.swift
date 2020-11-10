@@ -299,13 +299,13 @@ func testOptionalSelf(_ y : Y) {
     clone.operationThatOnlyExistsOnY()
   }
 
-  // Sanity-checking to make sure that the above succeeding
+  // Safety-checking to make sure that the above succeeding
   // isn't coincidental.
   if let clone = y.cloneOrFail() { // expected-error {{initializer for conditional binding must have Optional type, not 'Y'}}
     clone.operationThatOnlyExistsOnY()
   }
 
-  // Sanity-checking to make sure that the above succeeding
+  // Safety-checking to make sure that the above succeeding
   // isn't coincidental.
   if let clone = y.cloneAsObjectSlice() {
     clone.operationThatOnlyExistsOnY() // expected-error {{value of type 'X' has no member 'operationThatOnlyExistsOnY'}}

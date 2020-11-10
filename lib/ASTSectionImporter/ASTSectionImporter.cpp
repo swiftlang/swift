@@ -36,7 +36,7 @@ bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
   while (!buf.empty()) {
     auto info = serialization::validateSerializedAST(buf);
 
-    assert(info.name.size() < (2 << 10) && "name failed sanity check");
+    assert(info.name.size() < (2 << 10) && "name failed safety check");
 
     if (info.status == serialization::Status::Valid) {
       assert(info.bytes != 0);
