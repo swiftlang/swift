@@ -104,7 +104,8 @@ public protocol Proto {
 
 public struct BadStruct {}
 @_spi(Horse) extension BadStruct : OtherProto {}
-public struct BadConforms : Proto { // expected-error {{cannot use conformance of 'BadStruct' to 'OtherProto' in associated type 'Self.A.Element' (inferred as 'BadStruct'); the conformance is declared as SPI}}
+public struct BadConforms : Proto { // expected-error {{cannot use conformance of 'BadStruct' to 'OtherProto' here; the conformance is declared as SPI}}
+// expected-note@-1 {{in associated type 'Self.A.Element' (inferred as 'BadStruct')}}
   public typealias A = [BadStruct]
 }
 

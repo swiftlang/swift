@@ -1239,6 +1239,7 @@ inline Operand *getAccessProjectionOperand(SingleValueInstruction *svi) {
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::TailAddrInst:
+  case SILInstructionKind::InitEnumDataAddrInst:
   // open_existential_addr and unchecked_take_enum_data_addr are problematic
   // because they both modify memory and are access projections. Ideally, they
   // would not be casts, but will likely be eliminated with opaque values.

@@ -16,7 +16,7 @@ public struct HasUnavailableConformance1 {}
 
 @available(*, unavailable)
 extension HasUnavailableConformance1 : Horse {}
-// expected-note@-1 6{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
+// expected-note@-1 7{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
 
 func passUnavailableConformance1(x: HasUnavailableConformance1) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
@@ -212,4 +212,51 @@ func passAvailableConformance1a(x: HasAvailableConformance1) {
   takesHorse(x)
   x.giddyUp()
   _ = UsesHorse<HasAvailableConformance1>.self
+}
+
+// Associated conformance with unavailability
+protocol Rider {
+	associatedtype H : Horse
+}
+
+struct AssocConformanceUnavailable : Rider {
+// expected-error@-1 {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
+// expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasUnavailableConformance1')}}
+	typealias H = HasUnavailableConformance1
+}
+
+// Associated conformance with deprecation
+struct AssocConformanceDeprecated : Rider {
+// expected-warning@-1 {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}
+// expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasDeprecatedConformance1')}}
+	typealias H = HasDeprecatedConformance1
+}
+
+// Associated conformance with availability
+struct AssocConformanceAvailable1 : Rider {
+// expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+// expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
+// expected-note@-3 {{add @available attribute to enclosing struct}}
+	typealias H = HasAvailableConformance1
+}
+
+@available(macOS 100, *)
+struct AssocConformanceAvailable2 : Rider {
+	typealias H = HasAvailableConformance1
+}
+
+struct AssocConformanceAvailable3 {}
+
+extension AssocConformanceAvailable3 : Rider {
+// expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+// expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
+// expected-note@-3 {{add @available attribute to enclosing extension}}
+	typealias H = HasAvailableConformance1
+}
+
+struct AssocConformanceAvailable4 {}
+
+@available(macOS 100, *)
+extension AssocConformanceAvailable4 : Rider {
+	typealias H = HasAvailableConformance1
 }

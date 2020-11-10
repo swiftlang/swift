@@ -129,6 +129,11 @@ public:
   /// it can reference anything.
   static ExportContext forFunctionBody(DeclContext *DC, SourceLoc loc);
 
+  /// Create an instance describing associated conformances that can be
+  /// referenced from the the conformance defined by the given DeclContext,
+  /// which must be a NominalTypeDecl or ExtensionDecl.
+  static ExportContext forConformance(DeclContext *DC, ProtocolDecl *proto);
+
   /// Produce a new context with the same properties as this one, except
   /// changing the ExportabilityReason. This only affects diagnostics.
   ExportContext withReason(ExportabilityReason reason) const;
@@ -212,12 +217,16 @@ void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 bool
 diagnoseConformanceAvailability(SourceLoc loc,
                                 ProtocolConformanceRef conformance,
-                                const ExportContext &context);
+                                const ExportContext &context,
+                                Type depTy=Type(),
+                                Type replacementTy=Type());
 
 bool
 diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                     SubstitutionMap subs,
-                                    const ExportContext &context);
+                                    const ExportContext &context,
+                                    Type depTy=Type(),
+                                    Type replacementTy=Type());
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
