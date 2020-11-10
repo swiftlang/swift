@@ -802,7 +802,8 @@ NOTE(invalid_redecl_implicit_wrapper,none,
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
 ERROR(invalid_member_type,none,
-      "%0 is not a member type of %1", (DeclNameRef, Type))
+      "%0 is not a member type of %1 %2",
+      (DeclNameRef, DescriptiveDeclKind, FullyQualified<Type>))
 ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
