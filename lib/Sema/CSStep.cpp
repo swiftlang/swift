@@ -125,7 +125,7 @@ void SplitterStep::computeFollowupSteps(
     unsigned solutionIndex = components[i].solutionIndex;
 
     // If there are no dependencies, build a normal component step.
-    if (components[i].dependsOn.empty()) {
+    if (components[i].getDependencies().empty()) {
       steps.push_back(std::make_unique<ComponentStep>(
           CS, solutionIndex, &Components[i], std::move(components[i]),
           PartialSolutions[solutionIndex]));
@@ -135,7 +135,7 @@ void SplitterStep::computeFollowupSteps(
     // Note that the partial results from any dependencies of this component
     // need not be included in the final merged results, because they'll
     // already be part of the partial results for this component.
-    for (auto dependsOn : components[i].dependsOn) {
+    for (auto dependsOn : components[i].getDependencies()) {
       IncludeInMergedResults[dependsOn] = false;
     }
 
@@ -265,13 +265,13 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
 
   // Figure out the sets of partial solutions that this component depends on.
   SmallVector<const SmallVector<Solution, 4> *, 2> dependsOnSets;
-  for (auto index : Component.dependsOn) {
+  for (auto index : Component.getDependencies()) {
     dependsOnSets.push_back(&AllPartialSolutions[index]);
   }
 
   // Produce all combinations of partial solutions for the inputs.
   SmallVector<std::unique_ptr<SolverStep>, 4> followup;
-  SmallVector<unsigned, 2> indices(Component.dependsOn.size(), 0);
+  SmallVector<unsigned, 2> indices(Component.getDependencies().size(), 0);
   auto dependsOnSetsRef = llvm::makeArrayRef(dependsOnSets);
   do {
     // Form the set of input partial solutions.
@@ -296,8 +296,9 @@ StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
 
 void DependentComponentSplitterStep::print(llvm::raw_ostream &Out) {
   Out << "DependentComponentSplitterStep for dependencies on [";
-  interleave(Component.dependsOn, [&](unsigned index) { Out << index; },
-             [&] { Out << ", "; });
+  interleave(
+      Component.getDependencies(), [&](unsigned index) { Out << index; },
+      [&] { Out << ", "; });
   Out << "]\n";
 }
 

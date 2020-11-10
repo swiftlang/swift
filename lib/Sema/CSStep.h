@@ -313,7 +313,7 @@ public:
     : SolverStep(cs, allPartialSolutions[index]), Constraints(constraints),
       Index(index), Component(std::move(component)),
       AllPartialSolutions(allPartialSolutions) {
-    assert(!Component.dependsOn.empty() && "Should use ComponentStep");
+    assert(!Component.getDependencies().empty() && "Should use ComponentStep");
     injectConstraints();
   }
 
@@ -421,7 +421,7 @@ public:
       Constraints->push_back(constraint);
     }
 
-    assert(component.dependsOn.empty());
+    assert(component.getDependencies().empty());
   }
 
   /// Create a component step that composes existing partial solutions before
@@ -437,7 +437,8 @@ public:
           Constraints(constraints),
           DependsOnPartialSolutions(std::move(dependsOnPartialSolutions)) {
     TypeVars = component.typeVars;
-    assert(DependsOnPartialSolutions.size() == component.dependsOn.size());
+    assert(DependsOnPartialSolutions.size() ==
+           component.getDependencies().size());
 
     for (auto constraint : component.getConstraints()) {
       constraints->erase(constraint);
