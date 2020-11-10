@@ -1,4 +1,4 @@
-set(EXPORTED_SYMBOL_FILE "${SOURCEKITD_SOURCE_DIR}/bin/sourcekitd.exports")
+set(EXPORTED_SYMBOL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/sourcekitdInProc.exports")
 
 option(SOURCEKITD_BUILD_STATIC_INPROC
   "Build sourcekitdInProc as a static library (in addition to a shared one)" OFF)

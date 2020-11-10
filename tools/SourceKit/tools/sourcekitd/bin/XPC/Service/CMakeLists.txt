@@ -3,9 +3,14 @@ if (BUILD_SOURCEKIT_XPC_SERVICE)
     XPCService.cpp
     LLVM_LINK_COMPONENTS support coverage
   )
-  target_link_libraries(SourceKitService PRIVATE
-    SourceKitSwiftLang
-    sourcekitdAPI)
+  swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
+  if(SOURCEKIT_INSTALLING_INPROC)
+    target_link_libraries(SourceKitService PUBLIC sourcekitdInProc)
+  else()
+    target_link_libraries(SourceKitService PRIVATE
+      SourceKitSwiftLang
+      sourcekitdAPI)
+  endif()
 endif()
 
 if (NOT SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
