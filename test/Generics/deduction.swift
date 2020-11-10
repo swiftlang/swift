@@ -385,3 +385,17 @@ SR13776(SR13776A(), SR13776C()) // expected-error {{conflicting arguments to gen
 
 // Chooses the E == SR13776C as best solution.
 SR13776(SR13776C(), SR13776A()) // expected-error {{cannot convert value of type 'SR13776A' to expected argument type 'SR13776C'}}
+
+// Generic mismatch involving deep-equality.
+func SR13776_Test<T>(_ expression1: @autoclosure () throws -> T, 
+                     _ expression2: @autoclosure () throws -> T) where T : Equatable {}
+
+extension Collection {
+  func aCollectionExtension() -> [SubSequence] { [] }
+}
+
+let expected : [[Int]] = []
+let actual = [1, 2, 3].aCollectionExtension()
+
+SR13776_Test(expected, actual) 
+// expected-error@-1 {{conflicting arguments to generic parameter 'T' ('[[Int]]' vs. '[ArraySlice<Int>]')}}
