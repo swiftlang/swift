@@ -3351,7 +3351,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
 
     case .pointer:
       // Resolve the sign-extended relative reference.
-      var absoluteID: UnsafeRawPointer? = idValueBase + Int(idValue)
+      var absoluteID: UnsafeRawPointer? = _resolveRelativeAddress(idValueBase, idValue)
 
       // If the pointer ID is unresolved, then it needs work to get to
       // the final value.
@@ -3456,7 +3456,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       for i in externalArgs.indices {
         let base = externalArgs.baseAddress.unsafelyUnwrapped + i
         let offset = base.pointee
-        let metadataRef = UnsafeRawPointer(base) + Int(offset)
+        let metadataRef = _resolveRelativeAddress(UnsafeRawPointer(base), offset)
         let result = _resolveKeyPathGenericArgReference(
                        metadataRef,
                        genericEnvironment: genericEnvironment,
