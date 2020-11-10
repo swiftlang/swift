@@ -344,9 +344,19 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
-  diagnoseObjCMethodConflicts(SF);
-  diagnoseObjCUnsatisfiedOptReqConflicts(SF);
-  diagnoseUnintendedObjCMethodOverrides(SF);
+  switch (SF.Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    diagnoseObjCMethodConflicts(SF);
+    diagnoseObjCUnsatisfiedOptReqConflicts(SF);
+    diagnoseUnintendedObjCMethodOverrides(SF);
+    return;
+  case SourceFileKind::SIL:
+  case SourceFileKind::Interface:
+    // SIL modules and .swiftinterface files don't benefit from whole-module
+    // ObjC checking - skip it.
+    return;
+  }
 }
 
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
