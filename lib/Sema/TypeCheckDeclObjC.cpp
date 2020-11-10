@@ -2402,6 +2402,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
         break;
       }
     }
+    assert(req != bestConflict && "requirement conflicts with itself?");
 
     // Diagnose the conflict.
     auto reqDiagInfo = getObjCMethodDiagInfo(unsatisfied.second);
