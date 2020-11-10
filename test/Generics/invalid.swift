@@ -79,7 +79,7 @@ func badDiagnostic3() {
 // Crash with missing nested type inside concrete type
 class OuterGeneric<T> {
   class InnerGeneric<U> where U:OuterGeneric<T.NoSuchType> {
-  // expected-error@-1 {{'NoSuchType' is not a member type of 'T'}}
+  // expected-error@-1 {{'NoSuchType' is not a member type of type 'T'}}
     func method() {
       _ = method
     }
@@ -107,10 +107,10 @@ class P<N> {
 
 // SR-5579
 protocol Foo {
-    associatedtype Bar where Bar.Nonsense == Int // expected-error{{'Nonsense' is not a member type of 'Self.Bar'}}
+    associatedtype Bar where Bar.Nonsense == Int // expected-error{{'Nonsense' is not a member type of type 'Self.Bar'}}
 }
 
-protocol Wibble : Foo where Bar.EvenMoreNonsense == Int { } // expected-error{{'EvenMoreNonsense' is not a member type of 'Self.Bar'}}
+protocol Wibble : Foo where Bar.EvenMoreNonsense == Int { } // expected-error{{'EvenMoreNonsense' is not a member type of type 'Self.Bar'}}
 
 // rdar://45271500 - failure to emit a diagnostic
 enum Cat<A> {}
