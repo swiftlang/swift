@@ -236,8 +236,7 @@ struct AssocConformanceDeprecated : Rider {
 struct AssocConformanceAvailable1 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
-// FIXME expected-note@-3 {{add @available attribute to enclosing initializer}}
-// expected-note@-4 {{add @available attribute to enclosing struct}}
+// expected-note@-3 {{add @available attribute to enclosing struct}}
 	typealias H = HasAvailableConformance1
 }
 

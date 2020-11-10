@@ -1237,7 +1237,8 @@ static const Decl *ancestorMemberLevelDeclForAvailabilityFixit(const Decl *D) {
   while (D) {
     D = relatedDeclForAvailabilityFixit(D);
 
-    if (D->getDeclContext()->isTypeContext() &&
+    if (!D->isImplicit() &&
+        D->getDeclContext()->isTypeContext() &&
         DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Available,
                                                 D)) {
       break;
