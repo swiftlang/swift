@@ -881,6 +881,9 @@ private:
       case PlatformKind::OpenBSD:
         plat = "openbsd";
         break;
+      case PlatformKind::Windows:
+        plat = "windows";
+        break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
       }
