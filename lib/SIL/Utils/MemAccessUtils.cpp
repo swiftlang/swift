@@ -1800,6 +1800,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
+    case BuiltinValueKind::CreateAsyncTask:
       return;
 
     // General memory access to a pointer in first operand position.
