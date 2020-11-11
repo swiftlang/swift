@@ -14,12 +14,12 @@ class C1: ConcurrentProtocol {
 
 // Conform via completion-handler method
 class C2: ConcurrentProtocol {
-  func askUser(toSolvePuzzle puzzle: String, completionHandler: ((String?, Error?) -> Void)?) {
-    completionHandler?("hello", nil)
+  func askUser(toSolvePuzzle puzzle: String, completionHandler: (String?, Error?) -> Void) {
+    completionHandler("hello", nil)
   }
 
-  func askUser(toJumpThroughHoop hoop: String, completionHandler: ((String) -> Void)?) {
-    completionHandler?("hello")
+  func askUser(toJumpThroughHoop hoop: String, completionHandler: (String) -> Void) {
+    completionHandler("hello")
   }
 }
 
@@ -29,8 +29,8 @@ class C3: ConcurrentProtocol {
   func askUser(toSolvePuzzle puzzle: String) async throws -> String { "" }
 
   // expected-error@+1{{'askUser(toSolvePuzzle:completionHandler:)' with Objective-C selector 'askUserToSolvePuzzle:completionHandler:' conflicts with method 'askUser(toSolvePuzzle:)' with the same Objective-C selector}}
-  func askUser(toSolvePuzzle puzzle: String, completionHandler: ((String?, Error?) -> Void)?) {
-    completionHandler?("hello", nil)
+  func askUser(toSolvePuzzle puzzle: String, completionHandler: (String?, Error?) -> Void) {
+    completionHandler("hello", nil)
   }
 }
 
@@ -43,11 +43,11 @@ class C5 {
 }
 
 extension C5: ConcurrentProtocol {
-  func askUser(toSolvePuzzle puzzle: String, completionHandler: ((String?, Error?) -> Void)?) {
-    completionHandler?("hello", nil)
+  func askUser(toSolvePuzzle puzzle: String, completionHandler: (String?, Error?) -> Void) {
+    completionHandler("hello", nil)
   }
 
-  func askUser(toJumpThroughHoop hoop: String, completionHandler: ((String) -> Void)?) {
-    completionHandler?("hello")
+  func askUser(toJumpThroughHoop hoop: String, completionHandler: (String) -> Void) {
+    completionHandler("hello")
   }
 }

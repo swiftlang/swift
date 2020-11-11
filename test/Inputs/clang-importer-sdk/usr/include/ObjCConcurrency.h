@@ -43,10 +43,10 @@
 @end
 
 @protocol ConcurrentProtocol
--(void)askUserToSolvePuzzle:(NSString *)puzzle completionHandler:(void (^ _Nullable)(NSString * _Nullable, NSError * _Nullable))completionHandler;
+-(void)askUserToSolvePuzzle:(NSString *)puzzle completionHandler:(void (^)(NSString * _Nullable, NSError * _Nullable))completionHandler;
 
 @optional
--(void)askUserToJumpThroughHoop:(NSString *)hoop completionHandler:(void (^ _Nullable)(NSString *))completionHandler;
+-(void)askUserToJumpThroughHoop:(NSString *)hoop completionHandler:(void (^)(NSString *))completionHandler;
 @end
 
 #pragma clang assume_nonnull end

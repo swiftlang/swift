@@ -16,16 +16,16 @@ func syncContext() {
 func asyncNoAwait() async {
   let r = Request()
   let d = Delegate()
-  d.makeRequest1(r) // expected-error {{call is 'async' but is not marked with 'await'}}
-  d.makeRequest2(r) // expected-error {{call is 'async' but is not marked with 'await'}}
-  d.makeRequest3(r) // expected-error {{call is 'async' but is not marked with 'await'}}
+  d.makeRequest1Async(r) // expected-error {{call is 'async' but is not marked with 'await'}}
+  d.makeRequest2Async(r) // expected-error {{call is 'async' but is not marked with 'await'}}
+  d.makeRequest3Async(r) // expected-error {{call is 'async' but is not marked with 'await'}}
 }
 
 
 func asyncWithAwait() async {
   let r = Request()
   let d = Delegate()
-  await d.makeRequest1(r)
-  await d.makeRequest2(r)
-  await d.makeRequest3(r)
+  await d.makeRequest1Async(r)
+  await d.makeRequest2Async(r)
+  await d.makeRequest3Async(r)
 }

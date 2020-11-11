@@ -1313,6 +1313,21 @@ NameImporter::considerAsyncImport(
     appendAsyncToBaseName = false;
   }
 
+  // If nullability is specified, check it.
+  if (auto nullability =
+          completionHandlerParam->getType()->getNullability(clangCtx)) {
+    switch (translateNullability(*nullability)) {
+    case OTK_None:
+      break;
+
+    case OTK_ImplicitlyUnwrappedOptional:
+    case OTK_Optional:
+      if (!isInitializer && !hasCustomName)
+        appendAsyncToBaseName = true;
+      break;
+    }
+  }
+
   return ForeignAsyncConvention::Info(
       completionHandlerParamIndex, completionHandlerErrorParamIndex);
 }
@@ -1595,9 +1610,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                   method, parsedName.BaseName, parsedName.ArgumentLabels,
                   params, isInitializer, /*hasCustomName=*/true,
                   result.getErrorInfo(), appendAsyncToBaseName)) {
-            assert(!appendAsyncToBaseName);
             result.info.hasAsyncInfo = true;
             result.info.asyncInfo = *asyncInfo;
+
+            SmallString<32> baseNameScratch;
+            if (appendAsyncToBaseName) {
+              baseNameScratch = parsedName.BaseName;
+              camel_case::appendSentenceCase(baseNameScratch, "Async");
+              parsedName.BaseName = baseNameScratch;
+            }
 
             // Update the name to reflect the new parameter labels.
             result.declName = formDeclName(
