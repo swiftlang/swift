@@ -1554,10 +1554,13 @@ ERROR(observingprop_requires_initializer,none,
       "non-member observing properties require an initializer", ())
 ERROR(global_requires_initializer,none,
       "global '%select{var|let}0' declaration requires an initializer expression"
-      "%select{ or getter/setter specifier|}0", (bool))
+      "%select{ or an explicitly stated getter|}0", (bool))
 ERROR(static_requires_initializer,none,
-      "%select{ERROR|'static var'|'class var'|}0 declaration requires an initializer "
-      "expression or getter/setter specifier", (StaticSpellingKind))
+      "'%select{ERROR|static|class|}0 %select{var|let}1' declaration requires "
+      "an initializer expression or an explicitly stated getter",
+      (StaticSpellingKind, bool))
+NOTE(static_requires_initializer_add_init,none,
+      "add an initializer to silence this error", ())
 ERROR(pattern_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"

@@ -1622,7 +1622,8 @@ public:
           Ctx.evaluator, PatternBindingEntryRequest{PBD, i}, nullptr);
       assert(entry && "No pattern binding entry?");
 
-      PBD->getPattern(i)->forEachVariable([&](VarDecl *var) {
+      const auto *Pat = PBD->getPattern(i);
+      Pat->forEachVariable([&](VarDecl *var) {
         this->visitBoundVariable(var);
 
         if (PBD->isInitialized(i)) {
@@ -1680,7 +1681,10 @@ public:
           }
 
           var->diagnose(diag::static_requires_initializer,
-                        var->getCorrectStaticSpelling());
+                        var->getCorrectStaticSpelling(),
+                        var->isLet());
+          var->diagnose(diag::static_requires_initializer_add_init)
+            .fixItInsert(Pat->getEndLoc(), " = <#initializer#>");
           markVarAndPBDInvalid();
           return;
         }
@@ -1697,6 +1701,8 @@ public:
           }
 
           var->diagnose(diag::global_requires_initializer, var->isLet());
+          var->diagnose(diag::static_requires_initializer_add_init)
+            .fixItInsert(Pat->getEndLoc(), " = <#initializer#>");
           markVarAndPBDInvalid();
           return;
         }
