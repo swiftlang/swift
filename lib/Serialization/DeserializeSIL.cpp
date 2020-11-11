@@ -277,9 +277,9 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
   // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, SILMod, ValueOwnershipKind::None);
+    return SILUndef::get(Type, SILMod, OwnershipKind::None);
   else if (Id == 1)
-    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Owned);
+    return SILUndef::get(Type, SILMod, OwnershipKind::Owned);
 
   // Check to see if this is already defined.
   ValueBase *Entry = LocalValues.lookup(Id);
@@ -877,10 +877,9 @@ static_assert(
 // We put these static asserts here to formalize our assumption that both
 // SILValueCategory and ValueOwnershipKind have uint8_t as their underlying
 // pointer values.
-static_assert(
-    std::is_same<std::underlying_type<ValueOwnershipKind::innerty>::type,
-                 uint8_t>::value,
-    "Expected an underlying uint8_t type");
+static_assert(std::is_same<std::underlying_type<OwnershipKind::innerty>::type,
+                           uint8_t>::value,
+              "Expected an underlying uint8_t type");
 SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
                                                   SILBasicBlock *Prev,
                                     SmallVectorImpl<uint64_t> &scratch) {

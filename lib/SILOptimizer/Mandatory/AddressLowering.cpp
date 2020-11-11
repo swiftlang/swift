@@ -429,7 +429,7 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
       assert(!pass.valueStorageMap.contains(arg));
 
       arg = arg->getParent()->replaceFunctionArgument(
-          arg->getIndex(), addrType, ValueOwnershipKind::None, arg->getDecl());
+          arg->getIndex(), addrType, OwnershipKind::None, arg->getDecl());
 
       loadArg->setOperand(arg);
 
@@ -458,7 +458,7 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
     var->setSpecifier(ParamSpecifier::InOut);
 
     pass.F->begin()->insertFunctionArgument(
-        argIdx, bodyResultTy.getAddressType(), ValueOwnershipKind::None, var);
+        argIdx, bodyResultTy.getAddressType(), OwnershipKind::None, var);
     ++argIdx;
   }
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults());

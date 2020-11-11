@@ -541,7 +541,7 @@ RValue Lowering::emitConditionalCheckedCast(
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
     auto argument = contBlock->createPhiArgument(resultTL.getLoweredType(),
-                                                 ValueOwnershipKind::Owned);
+                                                 OwnershipKind::Owned);
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -593,7 +593,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::None);
+  auto isa = contBB->createPhiArgument(i1Ty, OwnershipKind::None);
   return isa;
 }
 

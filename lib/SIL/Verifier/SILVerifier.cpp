@@ -2091,7 +2091,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(*SI->getFunction()) ||
-                  Src.getOwnershipKind() == ValueOwnershipKind::None,
+                  Src.getOwnershipKind() == OwnershipKind::None,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -2939,8 +2939,8 @@ public:
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
                 "parent forwarding ownership kind");
-        require(parentKind != ValueOwnershipKind::None ||
-                    result.getOwnershipKind() == ValueOwnershipKind::None,
+        require(parentKind != OwnershipKind::None ||
+                    result.getOwnershipKind() == OwnershipKind::None,
                 "destructure with none ownership kind operand and non-none "
                 "ownership kind result?!");
       }
@@ -2958,8 +2958,8 @@ public:
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
                 "parent forwarding ownership kind");
-        require(parentKind != ValueOwnershipKind::None ||
-                    result.getOwnershipKind() == ValueOwnershipKind::None,
+        require(parentKind != OwnershipKind::None ||
+                    result.getOwnershipKind() == OwnershipKind::None,
                 "destructure with none ownership kind operand and non-none "
                 "ownership kind result?!");
       }
@@ -4915,7 +4915,7 @@ public:
               "error successor argument must have Error type");
       
       if (AACI->getFunction()->hasOwnership()) {
-        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "error successor argument must be owned");
       }
     }
@@ -4930,7 +4930,7 @@ public:
       requireSameType(arg->getType(), cont->getLoweredResumeType(),
                       "resume successor must take an argument of the continuation resume type");
       if (AACI->getFunction()->hasOwnership()) {
-        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "resume successor argument must be owned");
       }
     }

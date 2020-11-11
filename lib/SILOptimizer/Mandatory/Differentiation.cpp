@@ -328,7 +328,7 @@ static void copyParameterArgumentsForApply(
     // Objects are to be retained.
     if (arg->getType().isObject()) {
       auto newArg = arg;
-      if (newArg.getOwnershipKind() != ValueOwnershipKind::None)
+      if (newArg.getOwnershipKind() != OwnershipKind::None)
         newArg = copyBuilder.emitCopyValueOperation(loc, arg);
       collectNewArg(newArg);
       continue;
@@ -504,7 +504,7 @@ emitDerivativeFunctionReference(
           builder.emitBeginBorrowOperation(original.getLoc(), original);
       SILValue derivativeFn = builder.createDifferentiableFunctionExtract(
           borrowedDiffFunc.getLoc(), kind, borrowedDiffFunc);
-      if (derivativeFn.getOwnershipKind() != ValueOwnershipKind::None)
+      if (derivativeFn.getOwnershipKind() != OwnershipKind::None)
         derivativeFn =
             builder.emitCopyValueOperation(original.getLoc(), derivativeFn);
       builder.emitEndBorrowOperation(original.getLoc(), borrowedDiffFunc);
@@ -870,7 +870,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto loc = f->getLocation();
   // Destroy all owned arguments to pass ownership verification.
   for (auto *arg : entry->getArguments())
-    if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned)
       builder.emitDestroyOperation(loc, arg);
   // Fatal error with a nice message.
   auto neverResultInfo =
@@ -1216,7 +1216,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     builder.createDeallocStack(loc, buf);
 
   // If our original copy does not have none ownership, copy it.
-  if (origFnOperand.getOwnershipKind() != ValueOwnershipKind::None)
+  if (origFnOperand.getOwnershipKind() != OwnershipKind::None)
     origFnOperand = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newDiffFn = context.createDifferentiableFunction(
       builder, loc, parameterIndices, resultIndices, origFnOperand,
@@ -1232,7 +1232,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   // with an undef transpose function operand. Eventually, a legitimate
   // transpose function operand should be created and used.
   auto origFnOperand = lfi->getOriginalFunction();
-  if (origFnOperand.getOwnershipKind() != ValueOwnershipKind::None)
+  if (origFnOperand.getOwnershipKind() != OwnershipKind::None)
     origFnOperand = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *parameterIndices = lfi->getParameterIndices();
   auto originalType = origFnOperand->getType().castTo<SILFunctionType>();

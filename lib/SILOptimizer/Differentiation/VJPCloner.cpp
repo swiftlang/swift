@@ -146,7 +146,7 @@ public:
         getOpASTType(predEnum->getDeclaredInterfaceType()->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
         enumTy, TypeExpansionContext::minimal());
-    vjpBB->createPhiArgument(enumLoweredTy, ValueOwnershipKind::Owned);
+    vjpBB->createPhiArgument(enumLoweredTy, OwnershipKind::Owned);
     remappedBasicBlocks.insert(bb);
     return vjpBB;
   }
