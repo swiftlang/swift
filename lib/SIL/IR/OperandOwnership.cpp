@@ -246,7 +246,7 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding, DeinitExistentialValue)
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
   OwnershipConstraint OwnershipConstraintClassifier::visit##INST##Inst(        \
       INST##Inst *i) {                                                         \
-    return OwnershipConstraint::anyValueAcceptingConstraint();                 \
+    return OwnershipConstraint::any();                                         \
   }
 ACCEPTS_ANY_OWNERSHIP_INST(BeginBorrow)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyValue)
@@ -342,13 +342,13 @@ OwnershipConstraint OwnershipConstraintClassifier::visitDeallocPartialRefInst(
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
   }
 
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 OwnershipConstraint
 OwnershipConstraintClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   if (getValue() == i->getEnumOperand()) {
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   }
 
   auto kind = i->getOwnershipKind();
@@ -360,14 +360,14 @@ OwnershipConstraint
 OwnershipConstraintClassifier::visitAllocRefInst(AllocRefInst *i) {
   assert(i->getNumOperands() != 0 &&
          "If we reach this point, we must have a tail operand");
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 OwnershipConstraint OwnershipConstraintClassifier::visitAllocRefDynamicInst(
     AllocRefDynamicInst *i) {
   assert(i->getNumOperands() != 0 &&
          "If we reach this point, we must have a tail operand");
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 OwnershipConstraint
@@ -401,7 +401,7 @@ OwnershipConstraint
 OwnershipConstraintClassifier::visitCondBranchInst(CondBranchInst *cbi) {
   // In ossa, cond_br insts are not allowed to take non-trivial values. Thus, we
   // just accept anything since we know all of our operands will be trivial.
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 OwnershipConstraint
@@ -444,7 +444,7 @@ OwnershipConstraintClassifier::visitThrowInst(ThrowInst *i) {
     /* but it does not touch the strong reference count of the value. We */    \
     /* also just care about liveness for the dest. So just match everything */ \
     /* as must be live. */                                                     \
-    return OwnershipConstraint::anyValueAcceptingConstraint();                 \
+    return OwnershipConstraint::any();                                         \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
@@ -456,7 +456,7 @@ OwnershipConstraintClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
     return {OwnershipKind::Guaranteed,
             UseLifetimeConstraint::NonLifetimeEnding};
   }
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 // FIXME: Why not use SILArgumentConvention here?
@@ -478,12 +478,12 @@ OwnershipConstraintClassifier::visitCallee(CanSILFunctionType substCalleeType) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for callee");
   case ParameterConvention::Direct_Unowned:
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   case ParameterConvention::Direct_Owned:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
   case ParameterConvention::Direct_Guaranteed:
     if (substCalleeType->isNoEscape())
-      return OwnershipConstraint::anyValueAcceptingConstraint();
+      return OwnershipConstraint::any();
     return {OwnershipKind::Guaranteed,
             UseLifetimeConstraint::NonLifetimeEnding};
   }
@@ -509,7 +509,7 @@ OwnershipConstraintClassifier::visitFullApply(FullApplySite apply) {
 
   // Indirect return arguments are address types.
   if (apply.isIndirectResultOperand(op)) {
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   }
 
   // We should have early exited if we saw a type dependent operand, so we
@@ -527,12 +527,12 @@ OwnershipConstraintClassifier::visitFullApply(FullApplySite apply) {
     return visitApplyParameter(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Direct_Unowned:
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
 
   case ParameterConvention::Indirect_In: {
     // This expects an @trivial if we have lowered addresses and @
     if (conv.useLoweredAddresses()) {
-      return OwnershipConstraint::anyValueAcceptingConstraint();
+      return OwnershipConstraint::any();
     }
     // TODO: Once trivial is subsumed in any, this goes away.
     auto map = visitApplyParameter(OwnershipKind::Owned,
@@ -543,7 +543,7 @@ OwnershipConstraintClassifier::visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_In_Guaranteed: {
     // This expects an @trivial if we have lowered addresses and @
     if (conv.useLoweredAddresses()) {
-      return OwnershipConstraint::anyValueAcceptingConstraint();
+      return OwnershipConstraint::any();
     }
     return visitApplyParameter(OwnershipKind::Guaranteed,
                                UseLifetimeConstraint::NonLifetimeEnding);
@@ -554,7 +554,7 @@ OwnershipConstraintClassifier::visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
 
   case ParameterConvention::Direct_Guaranteed:
     // A +1 value may be passed to a guaranteed argument. From the caller's
@@ -586,7 +586,7 @@ OwnershipConstraint
 OwnershipConstraintClassifier::visitPartialApplyInst(PartialApplyInst *i) {
   // partial_apply [stack] does not take ownership of its operands.
   if (i->isOnStack())
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
 
   // All non-trivial types should be captured.
   return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
@@ -599,7 +599,7 @@ OwnershipConstraintClassifier::visitYieldInst(YieldInst *i) {
   //
   // TODO: Change this to check if this operand is an indirect result
   if (isAddressOrTrivialType())
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
 
   auto fnType = i->getFunction()->getLoweredFunctionType();
   auto yieldInfo = fnType->getYields()[getOperandIndex()];
@@ -611,7 +611,7 @@ OwnershipConstraintClassifier::visitYieldInst(YieldInst *i) {
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
     // We accept unowned, owned, and guaranteed in unowned positions.
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
     return visitApplyParameter(OwnershipKind::Guaranteed,
@@ -627,7 +627,7 @@ OwnershipConstraintClassifier::visitYieldInst(YieldInst *i) {
 OwnershipConstraint
 OwnershipConstraintClassifier::visitAssignInst(AssignInst *i) {
   if (getValue() != i->getSrc()) {
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   }
 
   return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
@@ -636,7 +636,7 @@ OwnershipConstraintClassifier::visitAssignInst(AssignInst *i) {
 OwnershipConstraint OwnershipConstraintClassifier::visitAssignByWrapperInst(
     AssignByWrapperInst *i) {
   if (getValue() != i->getSrc()) {
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   }
 
   return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
@@ -645,7 +645,7 @@ OwnershipConstraint OwnershipConstraintClassifier::visitAssignByWrapperInst(
 OwnershipConstraint
 OwnershipConstraintClassifier::visitStoreInst(StoreInst *i) {
   if (getValue() != i->getSrc()) {
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   }
 
   return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
@@ -659,7 +659,7 @@ OwnershipConstraintClassifier::visitCopyBlockWithoutEscapingInst(
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
   }
 
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 OwnershipConstraint OwnershipConstraintClassifier::visitMarkDependenceInst(
@@ -668,7 +668,7 @@ OwnershipConstraint OwnershipConstraintClassifier::visitMarkDependenceInst(
   if (getValue() == mdi->getValue()) {
     auto kind = mdi->getOwnershipKind();
     if (kind == OwnershipKind::None)
-      return OwnershipConstraint::anyValueAcceptingConstraint();
+      return OwnershipConstraint::any();
     auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
     return {kind, lifetimeConstraint};
   }
@@ -677,7 +677,7 @@ OwnershipConstraint OwnershipConstraintClassifier::visitMarkDependenceInst(
   // "base". This means that any use that would destroy "value" can not be moved
   // before any uses of "base". We treat this as non-consuming and rely on the
   // rest of the optimizer to respect the movement restrictions.
-  return OwnershipConstraint::anyValueAcceptingConstraint();
+  return OwnershipConstraint::any();
 }
 
 OwnershipConstraint
@@ -702,7 +702,7 @@ struct OperandOwnershipKindBuiltinClassifier
                                          llvm::Intrinsic::ID id) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be trivial.
-    return OwnershipConstraint::anyValueAcceptingConstraint();
+    return OwnershipConstraint::any();
   }
 
   // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
@@ -720,7 +720,7 @@ struct OperandOwnershipKindBuiltinClassifier
 #define ANY_OWNERSHIP_BUILTIN(ID)                                              \
   OwnershipConstraint OperandOwnershipKindBuiltinClassifier::visit##ID(        \
       BuiltinInst *, StringRef) {                                              \
-    return OwnershipConstraint::anyValueAcceptingConstraint();                 \
+    return OwnershipConstraint::any();                                         \
   }
 ANY_OWNERSHIP_BUILTIN(ErrorInMain)
 ANY_OWNERSHIP_BUILTIN(UnexpectedError)

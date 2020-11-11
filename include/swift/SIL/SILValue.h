@@ -597,7 +597,9 @@ public:
     return lifetimeConstraint;
   }
 
-  static OwnershipConstraint anyValueAcceptingConstraint() {
+  /// Return a constraint that is appropriate for an operand that can accept a
+  /// value with any ownership kind without ending said value's lifetime.
+  static OwnershipConstraint any() {
     return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
   }
 
