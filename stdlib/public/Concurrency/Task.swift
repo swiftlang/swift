@@ -148,7 +148,7 @@ extension Task {
   /// This is a port of the C++ FlagSet.
   struct JobFlags {
     /// Kinds of schedulable jobs.
-    enum Kind : Int {
+    enum Kind: Int {
       case task = 0
     };
 
@@ -215,54 +215,6 @@ extension Task {
 // ==== Detached Tasks ---------------------------------------------------------
 
 extension Task {
-  /// Run given `operation` as part of a new top-level task.
-  ///
-  /// Creating detached tasks should, generally, be avoided in favor of using
-  /// `async` functions, `async let` declarations and `await` expressions - as
-  /// those benefit from structured, bounded concurrency which is easier to reason
-  /// about, as well as automatically inheriting the parent tasks priority,
-  /// task-local storage, deadlines, as well as being cancelled automatically
-  /// when their parent task is cancelled. Detached tasks do not get any of those
-  /// benefits, and thus should only be used when an operation is impossible to
-  /// be modelled with child tasks.
-  ///
-  /// ### Cancellation
-  /// A detached task always runs to completion unless it is explicitly cancelled.
-  /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
-  /// cancel given task.
-  ///
-  /// Canceling a task must be performed explicitly via `handle.cancel()`.
-  ///
-  /// - Note: it is generally preferable to use child tasks rather than detached
-  ///   tasks. Child tasks automatically carry priorities, task-local state,
-  ///   deadlines and have other benefits resulting from the structured
-  ///   concurrency concepts that they model. Consider using detached tasks only
-  ///   when strictly necessary and impossible to model operations otherwise.
-  ///
-  /// - Parameters:
-  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
-  ///   - operation: the operation to execute
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
-  ///     tasks result or `cancel` it.
-  public static func runDetached<T>(
-    priority: Priority = .default,
-    operation: @escaping () async -> T
-  ) -> Handle<T> {
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority
-    flags.isFuture = true
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-    return Handle<T>(task: task)
-  }
-
   /// Run given throwing `operation` as part of a new top-level task.
   ///
   /// Creating detached tasks should, generally, be avoided in favor of using
@@ -288,7 +240,7 @@ extension Task {
   ///   when strictly necessary and impossible to model operations otherwise.
   ///
   /// - Parameters:
-  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
+  ///   - priority: priority of the task
   ///   - operation: the operation to execute
   /// - Returns: handle to the task, allowing to `await handle.get()` on the
   ///     tasks result or `cancel` it. If the operation fails the handle will
@@ -404,6 +356,19 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
 
   return task
 }
+
+//@_silgen_name("swift_task_get_priority") // TODO: not quite this way?
+//public func getTaskPriority(_ task: __owned Builtin.NativeObject) -> JobPriority
+
+struct RawTaskFutureWaitResult {
+  let hadErrorResult: Bool
+  let storage: UnsafeRawPointer
+}
+
+@_silgen_name("swift_task_future_wait")
+func taskFutureWait(
+  on task: Builtin.NativeObject
+) async -> RawTaskFutureWaitResult
 
 #if _runtime(_ObjC)
 

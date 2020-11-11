@@ -177,11 +177,11 @@ extension Collection {
   // DEMO-05-03: structured spawning of much work
   // func map                <T>(                                        _ transform: (Element) throws -> T)             rethrows -> [T] {
   // func mapAsync           <T>(parallelism: Int = 0/*system default*/, _ transform: (Element) async throws -> T) async rethrows -> [T] {
-  func mapAsync<T>(
+  func map<T>(
     parallelism requestedParallelism: Int? = nil/*system default*/,
     // ordered: Bool = true, /
     _ transform: (Element) async throws -> T
-  ) async rethrows -> [T] {
+  ) async throws -> [T] { // TODO: can't use rethrows here, maybe that's just life though; rdar://71479187 (rethrows is a bit limiting with async functions that use task groups)
     let defaultParallelism = 2
     let parallelism = requestedParallelism ?? defaultParallelism
 
