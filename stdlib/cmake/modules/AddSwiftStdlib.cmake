@@ -1291,6 +1291,10 @@ function(_add_swift_target_library_single target name)
         endif()
       endif()
     endif()
+
+    # Silence warnings about global initializers. We already have clang
+    # emitting warnings about global initializers when it compiles the code.
+    list(APPEND swiftlib_link_flags_all "-Xlinker -no_warn_inits")
   endif()
   target_link_libraries(${target} PRIVATE
     ${link_libraries})
