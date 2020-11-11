@@ -129,6 +129,8 @@ jobs:
           sudo xcode-select --switch /Applications/Xcode_12.2.app/Contents/Developer/
           xcodebuild -version
           ./utils/webassembly/ci.sh
+        env:
+          SKIP_XCODE_VERSION_CHECK: 1 # Skip upstream update the compatible Xcode version
       - name: Upload macOS installable archive
         uses: actions/upload-artifact@v1
         with:
