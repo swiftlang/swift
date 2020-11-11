@@ -334,9 +334,10 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1,
     ThrowsIsSet : 1,
-    Throws : 1
+    Throws : 1,
+    ImplicitlyAsync : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CallExpr, ApplyExpr, 1+1+16,
@@ -4308,6 +4309,7 @@ protected:
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
     assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
+    Bits.ApplyExpr.ImplicitlyAsync = false;
   }
 
 public:
@@ -4344,6 +4346,29 @@ public:
     assert(!Bits.ApplyExpr.ThrowsIsSet);
     Bits.ApplyExpr.ThrowsIsSet = true;
     Bits.ApplyExpr.Throws = throws;
+  }
+
+  /// Is this application _implicitly_ required to be an async call?
+  /// Note that this is _not_ a check for whether the callee is async!
+  /// Only meaningful after complete type-checking.
+  ///
+  /// Generally, this comes up only when we have a non-self call to an actor
+  /// instance's synchronous method. Such calls are conceptually treated as if
+  /// they are wrapped with an async closure. For example,
+  ///
+  ///   act.syncMethod(a, b) 
+  ///
+  /// is equivalent to the eta-expanded version of act.syncMethod,
+  ///
+  ///   { (a1, b1) async in act.syncMethod(a1, b1) }(a, b)
+  ///
+  /// where the new closure is declared to be async.
+  ///
+  bool implicitlyAsync() const {
+    return Bits.ApplyExpr.ImplicitlyAsync;
+  }
+  void setImplicitlyAsync(bool flag) {
+    Bits.ApplyExpr.ImplicitlyAsync = flag;
   }
 
   ValueDecl *getCalledValue() const;

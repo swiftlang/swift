@@ -463,7 +463,7 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    bool isAsync = fnType->isAsync();
+    bool isAsync = fnType->isAsync() || E->implicitlyAsync();
     
     // If the function doesn't throw at all, we're done here.
     if (!fnType->isThrowing())
