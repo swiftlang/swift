@@ -56,3 +56,16 @@ public func singleMemberTypeValueInit() {
 public func deletedConstructor(a: UnsafeMutablePointer<Int32>) {
   let deletedExplicitly = DefaultConstructorDeleted(a: a)
 }
+
+// CHECK-LABEL: sil [ossa] @$s4main20templatedConstructoryyF : $@convention(thin) () -> ()
+// CHECK: [[TEMPL:%.*]] = alloc_stack $TemplatedConstructor
+// CHECK: [[ARG:%.*]] = alloc_stack $ArgType
+// CHECK: [[ARG_VAL:%.*]] = load [trivial] [[ARG]] : $*ArgType
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN20TemplatedConstructorC1I7ArgTypeEET_|\?\?\$\?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z}} : $@convention(c) (ArgType) -> @out TemplatedConstructor
+// CHECK: apply [[FN]]([[TEMPL]], [[ARG_VAL]]) : $@convention(c) (ArgType) -> @out TemplatedConstructor
+// CHECK-LABEL: end sil function '$s4main20templatedConstructoryyF'
+
+// CHECK-LABEL: sil hidden_external [clang TemplatedConstructor.init] @{{_ZN20TemplatedConstructorC1I7ArgTypeEET_|\?\?\$\?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z}} : $@convention(c) (ArgType) -> @out TemplatedConstructor
+public func templatedConstructor() {
+  let templated = TemplatedConstructor(ArgType())
+}
