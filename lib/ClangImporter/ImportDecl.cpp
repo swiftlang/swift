@@ -3738,7 +3738,8 @@ namespace {
     ParameterList *getNonSelfParamList(
         DeclContext *dc, const clang::FunctionDecl *decl,
         Optional<unsigned> selfIdx, ArrayRef<Identifier> argNames,
-        bool allowNSUIntegerAsInt, bool isAccessor) {
+        bool allowNSUIntegerAsInt, bool isAccessor,
+        ArrayRef<GenericTypeParamDecl *> genericParams) {
       if (bool(selfIdx)) {
         assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
                (*selfIdx < decl->getNumParams()) && "where's self?");
@@ -3754,7 +3755,7 @@ namespace {
       }
       return Impl.importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
-          argNames, /*genericParams=*/{});
+          argNames, genericParams);
     }
 
     Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
@@ -3892,7 +3893,7 @@ namespace {
 
         bodyParams =
             getNonSelfParamList(dc, decl, selfIdx, name.getArgumentNames(),
-                                allowNSUIntegerAsInt, !name);
+                                allowNSUIntegerAsInt, !name, templateParams);
 
         importedType =
             Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
