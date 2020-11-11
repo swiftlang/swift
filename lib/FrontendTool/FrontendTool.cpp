@@ -48,6 +48,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/UUID.h"
+#include "swift/Option/Options.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -1786,11 +1787,13 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     assert(ctx.getLoadedModules().begin()->second == Instance.getMainModule());
   }
 
-  // Verify the AST for all the modules we've loaded.
-  ctx.verifyAllLoadedModules();
+  if (!opts.AllowModuleWithCompilerErrors) {
+    // Verify the AST for all the modules we've loaded.
+    ctx.verifyAllLoadedModules();
 
-  // Verify generic signatures if we've been asked to.
-  verifyGenericSignaturesIfNeeded(Invocation, ctx);
+    // Verify generic signatures if we've been asked to.
+    verifyGenericSignaturesIfNeeded(Invocation, ctx);
+  }
 
   // Emit any additional outputs that we only need for a successful compilation.
   // We don't want to unnecessarily delay getting any errors back to the user.
@@ -1842,6 +1845,51 @@ static bool printSwiftVersion(const CompilerInvocation &Invocation) {
   return false;
 }
 
+static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
+                                   llvm::raw_ostream &OS) {
+  if (table.getOption(id).hasFlag(options::FrontendOption)) {
+    auto name = StringRef(table.getOptionName(id));
+    if (!name.empty()) {
+      OS << "    \"" << name << "\",\n";
+    }
+  }
+}
+
+static bool printSwiftFeature(CompilerInstance &instance) {
+  ASTContext &context = instance.getASTContext();
+  const CompilerInvocation &invocation = instance.getInvocation();
+  const FrontendOptions &opts = invocation.getFrontendOptions();
+  std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+
+  if (out.has_error() || EC) {
+    context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
+                           EC.message());
+    out.clear_error();
+    return true;
+  }
+  std::unique_ptr<llvm::opt::OptTable> table = createSwiftOptTable();
+
+  out << "{\n";
+  SWIFT_DEFER {
+    out << "}\n";
+  };
+  out << "  \"SupportedArguments\": [\n";
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  printSingleFrontendOpt(*table, swift::options::OPT_##ID, out);
+#include "swift/Option/Options.inc"
+#undef OPTION
+  out << "    \"LastOption\"\n";
+  out << "  ],\n";
+  out << "  \"SupportedFeatures\": [\n";
+  // Print supported featur names here.
+  out << "    \"LastFeature\"\n";
+  out << "  ]\n";
+  return false;
+}
+
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
                      llvm::function_ref<bool(CompilerInstance &)> cont) {
@@ -1867,7 +1915,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
-  if (Instance.getASTContext().hadError())
+  if (Instance.getASTContext().hadError() &&
+      !opts.AllowModuleWithCompilerErrors)
     return true;
 
   return cont(Instance);
@@ -1904,6 +1953,8 @@ static bool performAction(CompilerInstance &Instance,
     return Context.hadError();
   case FrontendOptions::ActionType::PrintVersion:
     return printSwiftVersion(Instance.getInvocation());
+  case FrontendOptions::ActionType::PrintFeature:
+    return printSwiftFeature(Instance);
   case FrontendOptions::ActionType::REPL:
     llvm::report_fatal_error("Compiler-internal integrated REPL has been "
                              "removed; use the LLDB-enhanced REPL instead.");
@@ -2048,7 +2099,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Instance.hasASTContext() &&
       FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
-    hadError |= Instance.getASTContext().hadError();
+    if (!opts.AllowModuleWithCompilerErrors)
+      hadError |= Instance.getASTContext().hadError();
   }
   return hadError;
 }
@@ -2334,7 +2386,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (PSPs.haveModuleOrModuleDocOutputPaths()) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      return Context.hadError();
+      return Context.hadError() && !opts.AllowModuleWithCompilerErrors;
     }
   }
 
@@ -2352,7 +2404,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())
-    return true;
+    return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
 
@@ -2671,6 +2723,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
   INITIALIZE_LLVM();
+  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   PrintingDiagnosticConsumer PDC;
@@ -2694,8 +2747,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     DiagnosticInfo errorInfo(
         DiagID(0), SourceLoc(), DiagnosticKind::Error,
-        "fatal error encountered during compilation; please file a bug report "
-        "with your project and the crash log",
+        "fatal error encountered during compilation; " SWIFT_BUG_REPORT_MESSAGE,
         {}, SourceLoc(), {}, {}, {}, false);
     DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note,
                             reason, {}, SourceLoc(), {}, {}, {}, false);

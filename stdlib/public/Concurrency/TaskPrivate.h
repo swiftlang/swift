@@ -24,7 +24,7 @@ class AsyncTask;
 /// Initialize the task-local allocator in the given task.
 void _swift_task_alloc_initialize(AsyncTask *task);
 
-/// Destsroy the task-local allocator in the given task.
+/// Destroy the task-local allocator in the given task.
 void _swift_task_alloc_destroy(AsyncTask *task);
 
 } // end namespace swift

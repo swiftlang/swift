@@ -421,10 +421,6 @@ struct ASTContext::Implementation {
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
-    /// The set of builtin protocol conformances.
-    llvm::DenseMap<std::pair<Type, ProtocolDecl *>,
-                   BuiltinProtocolConformance *> BuiltinConformances;
-
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
@@ -2186,24 +2182,6 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
   return entry;
 }
 
-/// Produce the builtin conformance for some non-nominal to some protocol.
-BuiltinProtocolConformance *
-ASTContext::getBuiltinConformance(Type type, ProtocolDecl *protocol,
-                                ArrayRef<ProtocolConformanceRef> conformances) {
-  auto key = std::make_pair(type, protocol);
-  auto &builtinConformances =
-    getImpl().getArena(AllocationArena::Permanent).BuiltinConformances;
-  auto &entry = builtinConformances[key];
-  if (!entry) {
-    auto size = BuiltinProtocolConformance::
-        totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
-    auto mem = this->Allocate(size, alignof(BuiltinProtocolConformance),
-                              AllocationArena::Permanent);
-    entry = new (mem) BuiltinProtocolConformance(type, protocol, conformances);
-  }
-  return entry;
-}
-
 /// If one of the ancestor conformances already has a matching type, use
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
@@ -2220,7 +2198,6 @@ static ProtocolConformance *collapseSpecializedConformance(
     case ProtocolConformanceKind::Normal:
     case ProtocolConformanceKind::Inherited:
     case ProtocolConformanceKind::Self:
-    case ProtocolConformanceKind::Builtin:
       // If the conformance matches, return it.
       if (conformance->getType()->isEqual(type)) {
         for (auto subConformance : substitutions.getConformances())
@@ -2443,7 +2420,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
-    // BuiltinConformances ?
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(

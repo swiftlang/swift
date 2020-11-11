@@ -21,6 +21,7 @@
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -446,8 +447,15 @@ bool SILDeclRef::isTransparent() const {
 
   if (hasAutoClosureExpr()) {
     auto *ace = getAutoClosureExpr();
-    if (ace->getThunkKind() == AutoClosureExpr::Kind::None)
+    switch (ace->getThunkKind()) {
+    case AutoClosureExpr::Kind::None:
       return true;
+
+    case AutoClosureExpr::Kind::AsyncLet:
+    case AutoClosureExpr::Kind::DoubleCurryThunk:
+    case AutoClosureExpr::Kind::SingleCurryThunk:
+      break;
+    }
   }
 
   if (hasDecl()) {
@@ -717,6 +725,16 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
             return SS.str();
           }
           return namedClangDecl->getName().str();
+        } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+          if (objcDecl->isDirectMethod()) {
+            std::string storage;
+            llvm::raw_string_ostream SS(storage);
+            clang::ASTContext &ctx = clangDecl->getASTContext();
+            std::unique_ptr<clang::MangleContext> mangler(ctx.createMangleContext());
+            mangler->mangleObjCMethodName(objcDecl, SS, /*includePrefixByte=*/true,
+                                          /*includeCategoryNamespace=*/false);
+            return SS.str();
+          }
         }
       }
     }

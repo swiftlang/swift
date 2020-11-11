@@ -7,7 +7,7 @@ func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp() + asyncfp()
   _ = await asyncfp() + fp()
   _ = await fp() + 42  // expected-warning {{no calls to 'async' functions occur within 'await' expression}}
-  _ = asyncfp() // expected-error {{call is 'async' but is not marked with 'await'}}
+  _ = asyncfp() // expected-error {{call is 'async' but is not marked with 'await'}}{{7-7=await }}
 }
 
 func getInt() async -> Int { return 5 }
@@ -49,13 +49,13 @@ struct HasAsyncBad {
 }
 
 func testAutoclosure() async {
-  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}{{32-32=await }}
   await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 
   await acceptAutoclosureAsync(await getInt())
   await acceptAutoclosureNonAsync(await getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 
-  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+  await acceptAutoclosureAsync(getInt()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}{{32-32=await }}
   await acceptAutoclosureNonAsync(getInt()) // expected-error{{'async' in an autoclosure that does not support concurrency}}
 }
 
@@ -93,7 +93,7 @@ func testThrowingAndAsync() async throws {
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to handle error as optional value?}}
   // expected-note@-3{{did you mean to disable error propagation?}}
-  _ = try throwingAndAsync() // expected-error{{call is 'async' but is not marked with 'await'}}
+  _ = try throwingAndAsync() // expected-error{{call is 'async' but is not marked with 'await'}}{{11-11=await }}
 }
 
 func testExhaustiveDoCatch() async {
@@ -144,3 +144,53 @@ func invalidAsyncFunction() async {
 func validAsyncFunction() async throws {
   _ = try await throwingAndAsync()
 }
+
+// Async let checking
+func mightThrow() throws { }
+
+func getIntUnsafely() throws -> Int { 0 }
+func getIntUnsafelyAsync() async throws -> Int { 0 }
+
+extension Error {
+  var number: Int { 0 }
+}
+
+func testAsyncLet() async throws {
+  async let x = await getInt()
+  print(x) // expected-error{{reference to async let 'x' is not marked with 'await'}}
+  print(await x)
+
+  do {
+    try mightThrow()
+  } catch let e where e.number == x { // expected-error{{async let 'x' cannot be referenced in a catch guard expression}}
+  } catch {
+  }
+
+  async let x1 = getIntUnsafely() // expected-error{{call can throw but is not marked with 'try'}}
+  // expected-note@-1{{did you mean to use 'try'}}
+  // expected-note@-2{{did you mean to handle error as optional value?}}
+  // expected-note@-3{{did you mean to disable error propagation?}}
+
+  async let x2 = getInt() // expected-error{{call is 'async' in an 'async let' initializer that is not marked with 'await'}}
+
+  async let x3 = try getIntUnsafely()
+  async let x4 = try! getIntUnsafely()
+  async let x5 = try? getIntUnsafely()
+
+  _ = await x1 // expected-error{{reading 'async let' can throw but is not marked with 'try'}}
+  _ = await x2
+  _ = await try x3
+  _ = await x4
+  _ = await x5
+}
+
+// expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}}
+// expected-note@+1 4{{add '@asyncHandler' to function 'testAsyncLetOutOfAsync()' to create an implicit asynchronous context}}
+func testAsyncLetOutOfAsync() {
+  async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}
+  // FIXME: expected-error@-1{{'async' in a function that does not support concurrency}}
+
+  _ = await x  // expected-error{{'async let' in a function that does not support concurrency}}
+  _ = x // expected-error{{'async let' in a function that does not support concurrency}}
+}
+

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1947,6 +1947,17 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
+
+  // If all function bodies are being skipped there's no reason to do any
+  // SIL generation.
+  if (desc.opts.SkipFunctionBodies == FunctionBodySkipping::All)
+    return silMod;
+
+  // Skip emitting SIL if there's been any compilation errors
+  if (silMod->getASTContext().hadError() &&
+      silMod->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+    return silMod;
+
   SILGenModuleRAII scope(*silMod);
 
   // Emit a specific set of SILDeclRefs if needed.

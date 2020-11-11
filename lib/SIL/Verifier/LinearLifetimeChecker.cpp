@@ -29,6 +29,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -305,10 +306,14 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
   // must be instructions in the given block. Make sure that the non consuming
   // user is strictly before the consuming user.
   for (auto *nonConsumingUse : nonConsumingUsesInBlock) {
-    if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
-                     [&nonConsumingUse](const SILInstruction &i) -> bool {
-                       return nonConsumingUse->getUser() == &i;
-                     }) == userBlock->end()) {
+    if (nonConsumingUse->getUser() != consumingUse->getUser()) {
+      if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
+                       [&nonConsumingUse](const SILInstruction &i) -> bool {
+                         return nonConsumingUse->getUser() == &i;
+                       }) == userBlock->end()) {
+        continue;
+      }
+    } else if (isReborrowInstruction(consumingUse->getUser())) {
       continue;
     }
 
@@ -545,7 +550,8 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
     Optional<function_ref<void(Operand *)>>
         nonConsumingUseOutsideLifetimeCallback) {
-  assert((!consumingUses.empty() || !deadEndBlocks.empty()) &&
+  assert((!consumingUses.empty()
+          || deadEndBlocks.isDeadEnd(value->getParentBlock())) &&
          "Must have at least one consuming user?!");
 
   State state(value, visitedBlocks, errorBuilder, leakingBlockCallback,

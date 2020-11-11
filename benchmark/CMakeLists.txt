@@ -98,6 +98,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/Histogram
     single-source/HTTP2StateMachine
+    single-source/IndexPathTest
     single-source/InsertCharacter
     single-source/IntegerParsing
     single-source/Integrate

@@ -74,7 +74,24 @@ namespace swift {
       typedef T type;
     };
   }
-    
+
+  /// A family of wrapper types for compiler data types that forces its
+  /// underlying data to be formatted with full qualification.
+  ///
+  /// So far, this is only useful for \c Type, hence the SFINAE'ing.
+  template <typename T, typename = void> struct FullyQualified {};
+
+  template <typename T>
+  struct FullyQualified<
+      T, typename std::enable_if<std::is_convertible<T, Type>::value>::type> {
+    Type t;
+
+  public:
+    FullyQualified(T t) : t(t){};
+
+    Type getType() const { return t; }
+  };
+
   /// Describes the kind of diagnostic argument we're storing.
   ///
   enum class DiagnosticArgumentKind {
@@ -86,6 +103,7 @@ namespace swift {
     ValueDecl,
     Type,
     TypeRepr,
+    FullyQualifiedType,
     PatternKind,
     SelfAccessKind,
     ReferenceOwnership,
@@ -116,6 +134,7 @@ namespace swift {
       ValueDecl *TheValueDecl;
       Type TypeVal;
       TypeRepr *TyR;
+      FullyQualified<Type> FullyQualifiedTypeVal;
       PatternKind PatternKindVal;
       SelfAccessKind SelfAccessKindVal;
       ReferenceOwnership ReferenceOwnershipVal;
@@ -171,6 +190,10 @@ namespace swift {
     DiagnosticArgument(TypeRepr *T)
       : Kind(DiagnosticArgumentKind::TypeRepr), TyR(T) {
     }
+
+    DiagnosticArgument(FullyQualified<Type> FQT)
+        : Kind(DiagnosticArgumentKind::FullyQualifiedType),
+          FullyQualifiedTypeVal(FQT) {}
 
     DiagnosticArgument(const TypeLoc &TL) {
       if (TypeRepr *tyR = TL.getTypeRepr()) {
@@ -268,7 +291,12 @@ namespace swift {
       assert(Kind == DiagnosticArgumentKind::TypeRepr);
       return TyR;
     }
-    
+
+    FullyQualified<Type> getAsFullyQualifiedType() const {
+      assert(Kind == DiagnosticArgumentKind::FullyQualifiedType);
+      return FullyQualifiedTypeVal;
+    }
+
     PatternKind getAsPatternKind() const {
       assert(Kind == DiagnosticArgumentKind::PatternKind);
       return PatternKindVal;

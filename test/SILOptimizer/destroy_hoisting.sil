@@ -159,10 +159,8 @@ bb3:
 // CHECK:        [[OOX:%[0-9]+]] = struct_element_addr %0 : $*Outer, #Outer.ox
 // CHECK-NEXT:   destroy_addr [[OOX]]
 // CHECK:        [[OS:%[0-9]+]] = struct_element_addr %0 : $*Outer, #Outer.s
-// CHECK:        cond_br undef, bb2, bb1
+// CHECK:        cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK-NEXT:   br bb3
-// CHECK:      bb2:
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
@@ -186,19 +184,23 @@ bb0(%0 : $*Outer, %1 : $*Outer):
   cond_br undef, bb1, bb2
 bb1:
   %a1 = apply %f(%2) : $@convention(thin) (@in_guaranteed S) -> ()
-  br bb2
+  br bb3
 bb2:
   br bb3
 bb3:
+  br bb4
+bb4:
   %4 = struct_element_addr %1 : $*Outer, #Outer.s
   %a2 = apply %f(%4) : $@convention(thin) (@in_guaranteed S) -> ()
-  cond_br undef, bb3, bb4
-bb4:
+  cond_br undef, bb5, bb6
+bb5:
+  br bb4
+bb6:
   destroy_addr %2 : $*S
   %3 = struct_element_addr %0 : $*Outer, #Outer.ox
   destroy_addr %3 : $*X
-  br bb5
-bb5:
+  br bb7
+bb7:
   destroy_addr %1 : $*Outer
   %r = tuple ()
   return %r : $()
@@ -270,18 +272,22 @@ bb1:
 
 // CHECK-LABEL: sil [ossa] @test_infinite_loop
 // CHECK-NOT:     destroy_addr
-// CHECK:       bb3:
+// CHECK:       bb4:
 // CHECK-NEXT:    destroy_addr %1
 // CHECK-NOT:     destroy_addr
 // CHECK:       } // end sil function 'test_infinite_loop'
 sil [ossa] @test_infinite_loop : $@convention(thin) (@in_guaranteed S, @in S) -> () {
 bb0(%0 : $*S, %1 : $*S):
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb4
 bb1:
-  br bb1
+  br bb2
 bb2:
   br bb3
 bb3:
+  br bb2
+bb4:
+  br bb5
+bb5:
   destroy_addr %1 : $*S
   %r = tuple ()
   return %r : $()

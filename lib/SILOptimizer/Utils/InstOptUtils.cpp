@@ -69,6 +69,16 @@ const std::function<void(SingleValueInstruction *, SILValue)>
           i->eraseFromParent();
         };
 
+Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
+  if (isa<SingleValueInstruction>(val)) {
+    return std::next(cast<SingleValueInstruction>(val)->getIterator());
+  }
+  if (isa<SILArgument>(val)) {
+    return cast<SILArgument>(val)->getParentBlock()->begin();
+  }
+  return None;
+}
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.
@@ -393,7 +403,7 @@ static void destroyConsumedOperandOfDeadInst(Operand &operand) {
   assert(!isEndOfScopeMarker(deadInst) && !isa<DestroyValueInst>(deadInst) &&
          !isa<DestroyAddrInst>(deadInst) &&
          "lifetime ending instruction is deleted without its operand");
-  if (operand.isConsumingUse()) {
+  if (operand.isLifetimeEnding()) {
     // Since deadInst cannot be an end-of-scope instruction (asserted above),
     // this must be a consuming use of an owned value.
     assert(operandValue.getOwnershipKind() == ValueOwnershipKind::Owned);

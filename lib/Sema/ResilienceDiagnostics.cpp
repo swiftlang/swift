@@ -29,7 +29,7 @@ using namespace swift;
 
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
-                                                 ExportContext where) {
+                                                 const ExportContext &where) {
   auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None)
     return false;
@@ -112,7 +112,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 bool
 TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
                                           const ValueDecl *D,
-                                          ExportContext where) {
+                                          const ExportContext &where) {
   // Accessors cannot have exportability that's different than the storage,
   // so skip them for now.
   if (isa<AccessorDecl>(D))
@@ -160,17 +160,16 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
 bool
 TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                               const RootProtocolConformance *rootConf,
-                                              ExportContext where) {
+                                              const ExtensionDecl *ext,
+                                              const ExportContext &where) {
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
-  auto originKind = getDisallowedOriginKind(
-      rootConf->getDeclContext()->getAsDecl(),
-      where);
+  auto originKind = getDisallowedOriginKind(ext, where);
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+  ModuleDecl *M = ext->getParentModule();
   ASTContext &ctx = M->getASTContext();
 
   auto reason = where.getExportabilityReason();

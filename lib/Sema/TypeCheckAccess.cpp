@@ -1448,7 +1448,7 @@ public:
 /// Local variant to swift::getDisallowedOriginKind for downgrade to warnings.
 DisallowedOriginKind
 swift::getDisallowedOriginKind(const Decl *decl,
-                               ExportContext where,
+                               const ExportContext &where,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
@@ -1496,11 +1496,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     if (allowUnavailableProtocol)
       flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-    auto loc = context->getLoc();
-    if (auto *varDecl = dyn_cast<VarDecl>(context))
-      loc = varDecl->getNameLoc();
-
-    diagnoseTypeAvailability(typeRepr, type, loc,
+    diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
                              Where.withReason(reason), flags);
   }
 
@@ -1595,10 +1591,18 @@ public:
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD);
 
     // Check the property wrapper types.
-    if (anyVar)
-      for (auto attr : anyVar->getAttachedPropertyWrappers())
+    if (anyVar) {
+      for (auto attr : anyVar->getAttachedPropertyWrappers()) {
         checkType(attr->getType(), attr->getTypeRepr(), anyVar,
                   ExportabilityReason::PropertyWrapper);
+      }
+
+      if (auto attr = anyVar->getAttachedResultBuilder()) {
+        checkType(anyVar->getResultBuilderType(),
+                  attr->getTypeRepr(), anyVar,
+                  ExportabilityReason::ResultBuilder);
+      }
+    }
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -1687,6 +1691,12 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     visitAbstractFunctionDecl(FD);
     checkType(FD->getResultInterfaceType(), FD->getResultTypeRepr(), FD);
+
+    if (auto attr = FD->getAttachedResultBuilder()) {
+      checkType(FD->getResultBuilderType(),
+                attr->getTypeRepr(), FD,
+                ExportabilityReason::ResultBuilder);
+    }
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
@@ -1830,7 +1840,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
 }
 
 DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
-                                                    ExportContext where) {
+                                                    const ExportContext &where) {
   auto downgradeToWarning = DowngradeToWarning::No;
   return getDisallowedOriginKind(decl, where, downgradeToWarning);
 }

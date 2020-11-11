@@ -2,6 +2,16 @@
 
 // REQUIRES: OS=macosx
 
+@available(*, unavailable)
+@resultBuilder
+struct UnavailableBuilder {
+// expected-note@-1 {{'UnavailableBuilder' has been explicitly marked unavailable here}}
+  static func buildBlock() {}
+}
+
+@UnavailableBuilder public func usesUnavailableBuilder() {}
+// expected-error@-1 {{'UnavailableBuilder' is unavailable}}
+
 enum Either<T,U> {
   case first(T)
   case second(U)

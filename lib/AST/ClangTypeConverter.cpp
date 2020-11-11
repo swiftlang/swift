@@ -623,13 +623,44 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
 }
 
 clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type) {
-  // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangTypeInfo().getType(), 0);
+  const clang::Type *clangTy = nullptr;
+  auto repr = type->getRepresentation();
+  bool useClangTypes = type->getASTContext().LangOpts.UseClangFunctionTypes;
+  if (useClangTypes && (getSILFunctionLanguage(convertRepresentation(repr)) ==
+                        SILFunctionLanguage::C)) {
+    clangTy = type->getClangTypeInfo().getType();
+  } else if (!useClangTypes || repr == FunctionTypeRepresentation::Swift) {
+    // C function pointer types themselves are not bridged but their components
+    // can be. If a component is an @convention(block) function, it may be
+    // bridged to a Swift function type.
+    auto newRepr = (repr == FunctionTypeRepresentation::Swift
+                        ? FunctionTypeRepresentation::Block
+                        : repr);
+    clangTy = getFunctionType(type->getParams(), type->getResult(), newRepr);
+  }
+  return clang::QualType(clangTy, 0);
 }
 
 clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) {
-  // We must've already computed it before if applicable.
-  return clang::QualType(type->getClangTypeInfo().getType(), 0);
+  const clang::Type *clangTy = nullptr;
+  auto repr = type->getRepresentation();
+  bool useClangTypes = type->getASTContext().LangOpts.UseClangFunctionTypes;
+  if (useClangTypes &&
+      (getSILFunctionLanguage(repr) == SILFunctionLanguage::C)) {
+    clangTy = type->getClangTypeInfo().getType();
+  } else if (!useClangTypes || repr == SILFunctionTypeRepresentation::Thick) {
+    // C function pointer types themselves are not bridged but their components
+    // can be. If a component is an @convention(block) function, it may be
+    // bridged to a Swift function type.
+    auto newRepr = (repr == SILFunctionTypeRepresentation::Thick
+                        ? SILFunctionTypeRepresentation::Block
+                        : repr);
+    auto results = type->getResults();
+    auto optionalResult =
+        results.empty() ? None : llvm::Optional<SILResultInfo>(results[0]);
+    clangTy = getFunctionType(type->getParameters(), optionalResult, newRepr);
+  }
+  return clang::QualType(clangTy, 0);
 }
 
 clang::QualType

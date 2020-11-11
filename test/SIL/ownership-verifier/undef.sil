@@ -20,34 +20,38 @@ struct MyInt {
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
-// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: owned: Yes. Liveness: LifetimeEnding
 // CHECK-NEXT: guaranteed:  No.
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: any: Yes. Liveness: NonLifetimeEnding
 // CHECK: Visiting: {{.*}}%1 = mark_uninitialized [var] undef : $Klass
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
-// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: owned: Yes. Liveness: LifetimeEnding
 // CHECK-NEXT: guaranteed:  No.
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: any: Yes. Liveness: NonLifetimeEnding
 // CHECK: Visiting: {{.*}}%3 = mark_uninitialized [var] undef : $*Builtin.Int32
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: invalid:  No.
 // CHECK-NEXT: unowned:  No.
-// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: owned: Yes. Liveness: LifetimeEnding
 // CHECK-NEXT: guaranteed:  No.
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: any: Yes. Liveness: NonLifetimeEnding
 // CHECK: Visiting: {{.*}}%4 = struct $MyInt (undef : $Builtin.Int32)
 // CHECK-NEXT: Operand Ownership Map:
 // CHECK-NEXT: Op #: 0
 // CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  Yes. Liveness: MustBeLive
-// CHECK-NEXT: owned: Yes. Liveness: MustBeLive
-// CHECK-NEXT: guaranteed:  Yes. Liveness: MustBeLive
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: invalid:  No.
+// CHECK-NEXT: unowned:  No.
+// CHECK-NEXT: owned: No.
+// CHECK-NEXT: guaranteed:  No.
+// CHECK-NEXT: any: Yes. Liveness: NonLifetimeEnding
 sil [ossa] @undef_addresses_have_any_ownership : $@convention(thin) () -> () {
 bb0:
   %0 = mark_uninitialized [var] undef : $*Klass

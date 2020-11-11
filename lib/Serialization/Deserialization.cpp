@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -559,34 +559,6 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     auto conformance =
       ctx.getInheritedConformance(conformingType,
                                   inheritedConformance.getConcrete());
-    return ProtocolConformanceRef(conformance);
-  }
-
-  case BUILTIN_PROTOCOL_CONFORMANCE: {
-    TypeID conformingTypeID;
-    DeclID protoID;
-    size_t numConformances;
-    BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                 protoID, numConformances);
-
-    Type conformingType = getType(conformingTypeID);
-
-    auto decl = getDeclChecked(protoID);
-    if (!decl)
-      return decl.takeError();
-
-    auto proto = cast<ProtocolDecl>(decl.get());
-
-    // Read the conformances.
-    SmallVector<ProtocolConformanceRef, 4> conformances;
-    conformances.reserve(numConformances);
-    for (unsigned i : range(numConformances)) {
-      (void)i;
-      conformances.push_back(readConformance(Cursor));
-    }
-
-    auto conformance = getContext().getBuiltinConformance(conformingType, proto,
-                                                          conformances);
     return ProtocolConformanceRef(conformance);
   }
 
@@ -2983,7 +2955,7 @@ public:
     declOrOffset = param;
 
     auto paramTy = MF.getType(interfaceTypeID);
-    if (paramTy->hasError()) {
+    if (paramTy->hasError() && !MF.isAllowModuleWithCompilerErrorsEnabled()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
       DC->printContext(llvm::errs());
@@ -5698,6 +5670,23 @@ public:
 
     return UnboundGenericType::get(genericDecl, parentTy, ctx);
   }
+
+  Expected<Type> deserializeErrorType(ArrayRef<uint64_t> scratch,
+                                      StringRef blobData) {
+    if (!MF.isAllowModuleWithCompilerErrorsEnabled())
+      MF.fatal();
+
+    TypeID origID;
+    decls_block::ErrorTypeLayout::readRecord(scratch, origID);
+
+    auto origTy = MF.getTypeChecked(origID);
+    if (!origTy)
+      return origTy.takeError();
+
+    if (!origTy.get())
+      return ErrorType::get(ctx);
+    return ErrorType::get(origTy.get());
+  }
 };
 }
 
@@ -5721,7 +5710,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError()) {
+  if (typeOrOffset.get()->hasError() &&
+      !isAllowModuleWithCompilerErrorsEnabled()) {
     typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
@@ -5781,6 +5771,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(Dictionary)
   CASE(Optional)
   CASE(UnboundGeneric)
+  CASE(Error)
 
 #undef CASE
 

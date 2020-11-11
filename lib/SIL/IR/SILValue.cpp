@@ -198,6 +198,8 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 
 StringRef ValueOwnershipKind::asString() const {
   switch (Value) {
+  case ValueOwnershipKind::Invalid:
+    return "invalid";
   case ValueOwnershipKind::Unowned:
     return "unowned";
   case ValueOwnershipKind::Owned:
@@ -215,21 +217,27 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os << kind.asString();
 }
 
-Optional<ValueOwnershipKind>
-ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
-  auto LHSVal = Value;
-  auto RHSVal = RHS.Value;
+ValueOwnershipKind ValueOwnershipKind::merge(ValueOwnershipKind rhs) const {
+  auto lhsVal = Value;
+  auto rhsVal = rhs.Value;
 
-  // Any merges with anything.
-  if (LHSVal == ValueOwnershipKind::None) {
-    return ValueOwnershipKind(RHSVal);
-  }
-  // Any merges with anything.
-  if (RHSVal == ValueOwnershipKind::None) {
-    return ValueOwnershipKind(LHSVal);
-  }
+  // If either lhs or rhs are invalid, return invalid.
+  if (lhsVal == ValueOwnershipKind::Invalid ||
+      rhsVal == ValueOwnershipKind::Invalid)
+    return ValueOwnershipKind::Invalid;
 
-  return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : llvm::None;
+  // None merges with anything.
+  if (lhsVal == ValueOwnershipKind::None)
+    return ValueOwnershipKind(rhsVal);
+  if (rhsVal == ValueOwnershipKind::None)
+    return ValueOwnershipKind(lhsVal);
+
+  // At this point, if the two ownership kinds don't line up, the merge fails.
+  if (lhsVal != rhsVal)
+    return ValueOwnershipKind::Invalid;
+
+  // Otherwise, we are good, return *this.
+  return *this;
 }
 
 ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
@@ -321,11 +329,11 @@ void OperandOwnershipKindMap::dump() const { print(llvm::dbgs()); }
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      UseLifetimeConstraint constraint) {
   switch (constraint) {
-  case UseLifetimeConstraint::MustBeLive:
-    os << "MustBeLive";
+  case UseLifetimeConstraint::NonLifetimeEnding:
+    os << "NonLifetimeEnding";
     break;
-  case UseLifetimeConstraint::MustBeInvalidated:
-    os << "MustBeInvalidated";
+  case UseLifetimeConstraint::LifetimeEnding:
+    os << "LifetimeEnding";
     break;
   }
   return os;

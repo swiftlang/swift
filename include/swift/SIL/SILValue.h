@@ -40,7 +40,8 @@ class SILInstruction;
 class SILLocation;
 class DeadEndBlocks;
 class ValueBaseUseIterator;
-class ValueUseIterator;
+class ConsumingUseIterator;
+class NonConsumingUseIterator;
 class SILValue;
 
 /// An enumeration which contains values for all the concrete ValueBase
@@ -62,15 +63,16 @@ static inline llvm::hash_code hash_value(ValueKind K) {
 /// What constraint does the given use of an SSA value put on the lifetime of
 /// the given SSA value.
 ///
-/// There are two possible constraints: MustBeLive and
-/// MustBeInvalidated. MustBeLive means that the SSA value must be able to be
-/// used in a valid way at the given use point. MustBeInvalidated means that any
-/// use of given SSA value after this instruction on any path through this
-/// instruction.
+/// There are two possible constraints: NonLifetimeEnding and
+/// LifetimeEnding. NonLifetimeEnding means that the SSA value must be
+/// able to be used in a valid way at the given use
+/// point. LifetimeEnding means that the value has been invalidated at
+/// the given use point and any uses reachable from that point are
+/// invalid in SIL causing a SIL verifier error.
 enum class UseLifetimeConstraint {
   /// This use requires the SSA value to be live after the given instruction's
   /// execution.
-  MustBeLive,
+  NonLifetimeEnding,
 
   /// This use invalidates the given SSA value.
   ///
@@ -80,7 +82,7 @@ enum class UseLifetimeConstraint {
   /// guaranteed (i.e. shared borrow) semantics this means that the program
   /// has left the scope of the borrowed SSA value and said value can not be
   /// used.
-  MustBeInvalidated,
+  LifetimeEnding,
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -90,6 +92,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// have.
 struct ValueOwnershipKind {
   enum innerty : uint8_t {
+    /// A value used to signal that two merged ValueOwnershipKinds were
+    /// incompatible.
+    Invalid = 0,
+
     /// A SILValue with `Unowned` ownership kind is an independent value that
     /// has a lifetime that is only guaranteed to last until the next program
     /// visible side-effect. To maintain the lifetime of an unowned value, it
@@ -154,7 +160,10 @@ struct ValueOwnershipKind {
     return Value == b;
   }
 
-  Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
+  /// Returns true if this ValueOwnershipKind is not invalid.
+  explicit operator bool() const { return Value != Invalid; }
+
+  ValueOwnershipKind merge(ValueOwnershipKind RHS) const;
 
   /// Given that there is an aggregate value (like a struct or enum) with this
   /// ownership kind, and a subobject of type Proj is being projected from the
@@ -170,12 +179,14 @@ struct ValueOwnershipKind {
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
     switch (Value) {
+    case ValueOwnershipKind::Invalid:
+      llvm_unreachable("Invalid ownership doesnt have a lifetime constraint!");
     case ValueOwnershipKind::None:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
-      return UseLifetimeConstraint::MustBeLive;
+      return UseLifetimeConstraint::NonLifetimeEnding;
     case ValueOwnershipKind::Owned:
-      return UseLifetimeConstraint::MustBeInvalidated;
+      return UseLifetimeConstraint::LifetimeEnding;
     }
     llvm_unreachable("covered switch");
   }
@@ -186,7 +197,7 @@ struct ValueOwnershipKind {
   /// The reason why we do not compare directy is to allow for
   /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
-    return merge(other).hasValue();
+    return bool(merge(other));
   }
 
   /// Returns isCompatibleWith(other.getOwnershipKind()).
@@ -195,16 +206,14 @@ struct ValueOwnershipKind {
   /// dependencies.
   bool isCompatibleWith(SILValue other) const;
 
-  template <typename RangeTy>
-  static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
-    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
-    return accumulate(
-        std::forward<RangeTy>(r), initial,
-        [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
-          if (!acc)
-            return acc;
-          return acc.getValue().merge(x);
-        });
+  template <typename RangeTy> static ValueOwnershipKind merge(RangeTy &&r) {
+    auto initial = ValueOwnershipKind::None;
+    return accumulate(std::forward<RangeTy>(r), initial,
+                      [](ValueOwnershipKind acc, ValueOwnershipKind x) {
+                        if (!acc)
+                          return acc;
+                        return acc.merge(x);
+                      });
   }
 
   StringRef asString() const;
@@ -263,9 +272,19 @@ public:
 
   using use_iterator = ValueBaseUseIterator;
   using use_range = iterator_range<use_iterator>;
+  using consuming_use_iterator = ConsumingUseIterator;
+  using consuming_use_range = iterator_range<consuming_use_iterator>;
+  using non_consuming_use_iterator = NonConsumingUseIterator;
+  using non_consuming_use_range = iterator_range<non_consuming_use_iterator>;
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
+
+  inline consuming_use_iterator consuming_use_begin() const;
+  inline consuming_use_iterator consuming_use_end() const;
+
+  inline non_consuming_use_iterator non_consuming_use_begin() const;
+  inline non_consuming_use_iterator non_consuming_use_end() const;
 
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
@@ -284,6 +303,12 @@ public:
   /// Returns .some(single user) if this value is non-trivial, we are in ossa,
   /// and it has a single consuming user. Returns .none otherwise.
   inline Operand *getSingleConsumingUse() const;
+
+  /// Returns a range of all consuming uses
+  inline consuming_use_range getConsumingUses() const;
+
+  /// Returns a range of all non consuming uses
+  inline non_consuming_use_range getNonConsumingUses() const;
 
   template <class T>
   inline T *getSingleUserOfType() const;
@@ -506,7 +531,8 @@ struct OperandOwnershipKindMap {
       if (ValueOwnershipKind(index) == kind) {
         continue;
       }
-      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
+      map.add(ValueOwnershipKind(index),
+              UseLifetimeConstraint::NonLifetimeEnding);
     }
     return map;
   }
@@ -531,7 +557,8 @@ struct OperandOwnershipKindMap {
     unsigned index = 0;
     unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
     while (index != end) {
-      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
+      map.add(ValueOwnershipKind(index),
+              UseLifetimeConstraint::NonLifetimeEnding);
       ++index;
     }
     return map;
@@ -557,7 +584,7 @@ struct OperandOwnershipKindMap {
 
   void addCompatibilityConstraint(ValueOwnershipKind kind,
                                   UseLifetimeConstraint constraint) {
-    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
+    add(ValueOwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding);
     add(kind, constraint);
   }
 
@@ -675,23 +702,19 @@ public:
   /// potentially have to the UseLifetimeConstraint associated with that
   /// ownership kind
   ///
-  /// NOTE: This is implemented in OperandOwnershipKindMapClassifier.cpp.
-  ///
-  /// NOTE: The default argument isSubValue is a temporary staging flag that
-  /// will be removed once borrow scoping is checked by the normal verifier.
-  OperandOwnershipKindMap
-  getOwnershipKindMap(bool isForwardingSubValue = false) const;
+  /// NOTE: This is implemented in OperandOwnership.cpp.
+  OperandOwnershipKindMap getOwnershipKindMap() const;
 
   /// Returns true if this operand acts as a use that consumes its associated
   /// value.
-  bool isConsumingUse() const {
+  bool isLifetimeEnding() const {
     // Type dependent uses can never be consuming and do not have valid
     // ownership maps since they do not participate in the ownership system.
     if (isTypeDependent())
       return false;
     auto map = getOwnershipKindMap();
     auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
-    return constraint == UseLifetimeConstraint::MustBeInvalidated;
+    return constraint == UseLifetimeConstraint::LifetimeEnding;
   }
 
   SILBasicBlock *getParentBlock() const;
@@ -711,8 +734,10 @@ private:
     TheValue->FirstUse = this;
   }
 
+  friend class ValueBase;
   friend class ValueBaseUseIterator;
-  friend class ValueUseIterator;
+  friend class ConsumingUseIterator;
+  friend class NonConsumingUseIterator;
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
@@ -729,6 +754,7 @@ using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 /// An iterator over all uses of a ValueBase.
 class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
                                                   Operand*, ptrdiff_t> {
+protected:
   Operand *Cur;
 public:
   ValueBaseUseIterator() = default;
@@ -770,6 +796,74 @@ inline ValueBase::use_iterator ValueBase::use_end() const {
 inline iterator_range<ValueBase::use_iterator> ValueBase::getUses() const {
   return { use_begin(), use_end() };
 }
+
+class ConsumingUseIterator : public ValueBaseUseIterator {
+public:
+  explicit ConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
+  ConsumingUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    assert(Cur->isLifetimeEnding());
+    while ((Cur = Cur->NextUse)) {
+      if (Cur->isLifetimeEnding())
+        break;
+    }
+    return *this;
+  }
+
+  ConsumingUseIterator operator++(int unused) {
+    ConsumingUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::consuming_use_iterator
+ValueBase::consuming_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && !cur->isLifetimeEnding()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::consuming_use_iterator(cur);
+}
+
+inline ValueBase::consuming_use_iterator ValueBase::consuming_use_end() const {
+  return ValueBase::consuming_use_iterator(nullptr);
+}
+
+class NonConsumingUseIterator : public ValueBaseUseIterator {
+public:
+  explicit NonConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
+  NonConsumingUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    assert(!Cur->isLifetimeEnding());
+    while ((Cur = Cur->NextUse)) {
+      if (!Cur->isLifetimeEnding())
+        break;
+    }
+    return *this;
+  }
+
+  NonConsumingUseIterator operator++(int unused) {
+    NonConsumingUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::non_consuming_use_iterator
+ValueBase::non_consuming_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && cur->isLifetimeEnding()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::non_consuming_use_iterator(cur);
+}
+
+inline ValueBase::non_consuming_use_iterator
+ValueBase::non_consuming_use_end() const {
+  return ValueBase::non_consuming_use_iterator(nullptr);
+}
+
 inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
@@ -796,7 +890,7 @@ inline Operand *ValueBase::getSingleUse() const {
 inline Operand *ValueBase::getSingleConsumingUse() const {
   Operand *result = nullptr;
   for (auto *op : getUses()) {
-    if (op->isConsumingUse()) {
+    if (op->isLifetimeEnding()) {
       if (result) {
         return nullptr;
       }
@@ -804,6 +898,15 @@ inline Operand *ValueBase::getSingleConsumingUse() const {
     }
   }
   return result;
+}
+
+inline ValueBase::consuming_use_range ValueBase::getConsumingUses() const {
+  return {consuming_use_begin(), consuming_use_end()};
+}
+
+inline ValueBase::non_consuming_use_range
+ValueBase::getNonConsumingUses() const {
+  return {non_consuming_use_begin(), non_consuming_use_end()};
 }
 
 inline bool ValueBase::hasTwoUses() const {

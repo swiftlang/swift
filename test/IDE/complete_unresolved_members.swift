@@ -127,6 +127,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_OPT | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_FUNCTY | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE_FUNCTY_OPT | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUGAR_TYPE | %FileCheck %s -check-prefix=SUGAR_TYPE
 
 enum SomeEnum1 {
   case South
@@ -842,4 +843,28 @@ func testAutoclosreFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@a
   // Same as UNRESOLVED_3
   fnOpt(.#^AUTOCLOSURE_FUNCTY_OPT^#)
   // Same as UNRESOLVED_3_OPT
+}
+
+func testSameType() {
+  typealias EnumAlias = SomeEnum1
+  func testSugarType(_ arg: Optional<SomeEnum1>, arg2: Int8) {}
+  func testSugarType(_ arg: SomeEnum1?, arg2: Int16) {}
+  func testSugarType(_ arg: Optional<EnumAlias>, arg2: Int32) {}
+  func testSugarType(_ arg: EnumAlias?, arg2: Int64) {}
+  func testSugarType(_ arg: SomeEnum1, arg2: Int) {}
+  func testSugarType(_ arg: EnumAlias, arg2: String) {}
+
+  testSugarType(.#^SUGAR_TYPE^#
+// Ensure results aren't duplicated.
+// SUGAR_TYPE: Begin completions, 21 items
+// SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#];
+// SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#];
+// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
+// SUGAR_TYPE-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Optional<SomeEnum1>#];
+// SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#];
+// SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
+// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
+// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
+// SUGAR_TYPE: End completions
 }

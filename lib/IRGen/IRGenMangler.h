@@ -122,6 +122,11 @@ public:
     return mangleTypeSymbol(type, "MN");
   }
 
+  std::string mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
+      const NominalTypeDecl *decl) {
+    return mangleNominalTypeSymbol(decl, "Mz");
+  }
+
   std::string mangleNoncanonicalSpecializedGenericTypeMetadataCache(Type type) {
     return mangleTypeSymbol(type, "MJ");
   }

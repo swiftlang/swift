@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,18 +18,19 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
-#include "swift/Config.h"
+#include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
+#include "swift/Config.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
 
 // SWIFT_ENABLE_TENSORFLOW
 #include "clang/Basic/InMemoryOutputFileSystem.h"
@@ -97,6 +98,9 @@ namespace swift {
 
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
+
+    /// Should conformance availability violations be diagnosed as errors?
+    bool EnableConformanceAvailabilityErrors = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
@@ -247,6 +251,9 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+    /// Disable the implicit import of the _Concurrency module.
+    bool DisableImplicitConcurrencyModuleImport = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -368,6 +375,10 @@ namespace swift {
     /// recovery issues won't bring down the debugger.
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
+
+    // Allow errors during module generation. See corresponding option in
+    // FrontendOptions.
+    bool AllowModuleWithCompilerErrors = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -498,9 +509,8 @@ namespace swift {
     /// dumped to llvm::errs().
     bool DebugTimeExpressions = false;
 
-    /// Indicate that the type checker should skip type-checking non-inlinable
-    /// function bodies.
-    bool SkipNonInlinableFunctionBodies = false;
+    /// Controls the function bodies to skip during type-checking.
+    FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
     ///
     /// Flags for developers

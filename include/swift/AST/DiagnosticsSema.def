@@ -766,7 +766,7 @@ ERROR(serialization_target_too_new_repl,none,
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
-      "please file a bug report with your project and the crash log",
+      SWIFT_BUG_REPORT_MESSAGE,
       (StringRef))
 NOTE(serialization_misc_version,none,
      "module '%0' full misc version is '%1'",
@@ -802,7 +802,8 @@ NOTE(invalid_redecl_implicit_wrapper,none,
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
 ERROR(invalid_member_type,none,
-      "%0 is not a member type of %1", (DeclNameRef, Type))
+      "%0 is not a member type of %1 %2",
+      (DeclNameRef, DescriptiveDeclKind, FullyQualified<Type>))
 ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
@@ -2735,6 +2736,7 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
 
 ERROR(decl_from_hidden_module,none,
       "cannot use %0 %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
@@ -2743,24 +2745,22 @@ ERROR(decl_from_hidden_module,none,
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
       "cannot use %0 %1 %select{in SPI|as property wrapper in SPI|"
+      "as result builder in SPI|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
+      "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
-ERROR(assoc_conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %select{%2 has been imported as implementation-only|"
-      "the conformance is declared as SPI in %2|"
-      "the conformance is declared as SPI}5",
-      (Type, Identifier, Identifier, Type, Type, unsigned))
+NOTE(assoc_conformance_from_implementation_only_module,none,
+     "in associated type %0 (inferred as %1)", (Type, Type))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
@@ -3139,8 +3139,6 @@ ERROR(differentiable_attr_layout_req_unsupported,none,
       ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
      "candidate is missing explicit '%0' attribute to satisfy requirement %1 "
      "(in protocol %3); explicit attribute is necessary because candidate is "
@@ -3499,7 +3497,7 @@ ERROR(type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report", ())
+      SWIFT_BUG_REPORT_MESSAGE, ())
 
 
 ERROR(missing_protocol,none,
@@ -3780,6 +3778,9 @@ ERROR(converting_noescape_to_type,none,
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
+
+ERROR(reference_to_invalid_decl,none,
+      "cannot reference invalid declaration %0", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
@@ -4122,6 +4123,8 @@ ERROR(throwing_interpolation_without_try,none,
       "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
+ERROR(throwing_async_let_without_try,none,
+      "reading 'async let' can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
       "did you mean to use 'try'?", ())
 NOTE(note_error_to_optional,none,
@@ -4142,6 +4145,9 @@ ERROR(async_call_without_await,none,
       "call is 'async' but is not marked with 'await'", ())
 ERROR(async_call_without_await_in_autoclosure,none,
       "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
+ERROR(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer that is not marked "
+      "with 'await'", ())
 WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
@@ -4153,9 +4159,9 @@ ERROR(await_in_illegal_context,none,
       "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
-      "%select{'async'|'await'}0 in %select{a function|an autoclosure}1 that "
-      "does not support concurrency",
-      (bool, bool))
+      "%select{'async'|'await'|'async let'}0 in "
+      "%select{a function|an autoclosure}1 that does not support concurrency",
+      (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
 NOTE(note_add_asynchandler_to_function,none,
@@ -4173,6 +4179,21 @@ NOTE(protocol_witness_async_conflict,none,
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
+ERROR(async_not_let,none,
+      "'async' can only be used with 'let' declarations", ())
+ERROR(async_let_not_local,none,
+      "'async let' can only be used on local declarations", ())
+ERROR(async_let_not_initialized,none,
+      "'async let' binding requires an initializer expression", ())
+ERROR(async_let_no_variables,none,
+      "'async let' requires at least one named variable", ())
+ERROR(async_let_without_await,none,
+      "reference to async let %0 is not marked with 'await'", (DeclName))
+ERROR(async_let_in_illegal_context,none,
+      "async let %0 cannot be referenced in "
+      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
+      (DeclName, unsigned))
+
 ERROR(asynchandler_non_func,none,
       "'@asyncHandler' can only be applied to functions",
       ())
@@ -4187,6 +4208,9 @@ ERROR(asynchandler_async,none,
       ())
 ERROR(asynchandler_inout_parameter,none,
       "'inout' parameter is not allowed in '@asyncHandler' function",
+      ())
+ERROR(asynchandler_noescape_closure_parameter,none,
+      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
       ())
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
@@ -4320,6 +4344,8 @@ ERROR(global_actor_on_actor_class,none,
       "actor class %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
+ERROR(global_actor_on_struct_property,none,
+      "stored property %0 of a struct cannot have a global actor", (DeclName))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
@@ -4561,6 +4587,9 @@ ERROR(invalid_objc_decl,none,
       "properties, and subscript declarations can be declared @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
+NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
+     "inherit from 'NSObject' to silence this error", ())
+
 ERROR(invalid_nonobjc_decl,none,
       "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
@@ -5069,6 +5098,39 @@ ERROR(availability_macro_in_inlinable, none,
 ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
+
+// Conformance availability checking diagnostics
+
+ERROR(conformance_availability_unavailable, none,
+      "conformance of %0 to %1 is unavailable"
+      "%select{ in %3|}2%select{|: %4}4",
+      (Type, Type, bool, StringRef, StringRef))
+
+NOTE(conformance_availability_marked_unavailable, none,
+     "conformance of %0 to %1 has been explicitly marked "
+     "unavailable here", (Type, Type))
+
+NOTE(conformance_availability_introduced_in_version, none,
+     "conformance of %0 to %1 was introduced in %2 %3",
+     (Type, Type, StringRef, llvm::VersionTuple))
+
+NOTE(conformance_availability_obsoleted, none,
+     "conformance of %0 to %1 was obsoleted in %2 %3",
+     (Type, Type, StringRef, llvm::VersionTuple))
+
+WARNING(conformance_availability_deprecated, none,
+        "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
+        (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+         StringRef))
+
+ERROR(conformance_availability_only_version_newer, none,
+      "conformance of %0 to %1 is only available in %2 %3 or newer",
+      (Type, Type, StringRef, llvm::VersionTuple))
+
+WARNING(conformance_availability_only_version_newer_warn, none,
+        "conformance of %0 to %1 is only available in %2 %3 or newer",
+        (Type, Type, StringRef, llvm::VersionTuple))
 
 //------------------------------------------------------------------------------
 // MARK: @discardableResult

@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "CSDiagnostics.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -3416,6 +3417,30 @@ static bool diagnoseAmbiguity(
 
   auto &DE = cs.getASTContext().Diags;
 
+  llvm::SmallPtrSet<ValueDecl *, 4> localAmbiguity;
+  {
+    for (auto &entry : aggregateFix) {
+      const auto &solution = entry.first;
+      const auto &overload = solution->getOverloadChoice(ambiguity.locator);
+      auto *choice = overload.choice.getDeclOrNull();
+
+      // It's not possible to diagnose different kinds of overload choices.
+      if (!choice)
+        return false;
+
+      localAmbiguity.insert(choice);
+    }
+  }
+
+  if (localAmbiguity.empty())
+    return false;
+
+  // If all of the fixes are rooted in the same choice.
+  if (localAmbiguity.size() == 1) {
+    auto &primaryFix = aggregateFix.front();
+    return primaryFix.second->diagnose(*primaryFix.first);
+  }
+
   {
     auto fixKind = aggregateFix.front().second->getKind();
     if (llvm::all_of(
@@ -3430,10 +3455,7 @@ static bool diagnoseAmbiguity(
     }
   }
 
-  auto *decl = ambiguity.choices.front().getDeclOrNull();
-  if (!decl)
-    return false;
-
+  auto *decl = *localAmbiguity.begin();
   auto *commonCalleeLocator = ambiguity.locator;
 
   bool diagnosed = true;
@@ -4679,7 +4701,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
-                                             bool isDefaultWrappedValue) {
+                                             bool isDefaultWrappedValue,
+                                             bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -4700,6 +4723,9 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
       expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
+
+  if (isAsyncLetWrapper)
+    closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
 
@@ -5075,7 +5101,8 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   }
 
   // If not, let's check contextual unavailability.
-  auto result = TypeChecker::checkDeclarationAvailability(D, loc, DC);
+  ExportContext where = ExportContext::forFunctionBody(DC, loc);
+  auto result = TypeChecker::checkDeclarationAvailability(D, where);
   return result.hasValue();
 }
 
@@ -5260,8 +5287,9 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
+    ExportContext where = ExportContext::forFunctionBody(DC, referenceLoc);
     auto maybeUnavail =
-        TypeChecker::checkDeclarationAvailability(setter, referenceLoc, DC);
+        TypeChecker::checkDeclarationAvailability(setter, where);
     if (maybeUnavail.hasValue()) {
       return true;
     }

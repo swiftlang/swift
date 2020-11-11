@@ -125,7 +125,7 @@ void SplitterStep::computeFollowupSteps(
     unsigned solutionIndex = components[i].solutionIndex;
 
     // If there are no dependencies, build a normal component step.
-    if (components[i].dependsOn.empty()) {
+    if (components[i].getDependencies().empty()) {
       steps.push_back(std::make_unique<ComponentStep>(
           CS, solutionIndex, &Components[i], std::move(components[i]),
           PartialSolutions[solutionIndex]));
@@ -135,7 +135,7 @@ void SplitterStep::computeFollowupSteps(
     // Note that the partial results from any dependencies of this component
     // need not be included in the final merged results, because they'll
     // already be part of the partial results for this component.
-    for (auto dependsOn : components[i].dependsOn) {
+    for (auto dependsOn : components[i].getDependencies()) {
       IncludeInMergedResults[dependsOn] = false;
     }
 
@@ -265,13 +265,13 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
 
   // Figure out the sets of partial solutions that this component depends on.
   SmallVector<const SmallVector<Solution, 4> *, 2> dependsOnSets;
-  for (auto index : Component.dependsOn) {
+  for (auto index : Component.getDependencies()) {
     dependsOnSets.push_back(&AllPartialSolutions[index]);
   }
 
   // Produce all combinations of partial solutions for the inputs.
   SmallVector<std::unique_ptr<SolverStep>, 4> followup;
-  SmallVector<unsigned, 2> indices(Component.dependsOn.size(), 0);
+  SmallVector<unsigned, 2> indices(Component.getDependencies().size(), 0);
   auto dependsOnSetsRef = llvm::makeArrayRef(dependsOnSets);
   do {
     // Form the set of input partial solutions.
@@ -296,8 +296,9 @@ StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
 
 void DependentComponentSplitterStep::print(llvm::raw_ostream &Out) {
   Out << "DependentComponentSplitterStep for dependencies on [";
-  interleave(Component.dependsOn, [&](unsigned index) { Out << index; },
-             [&] { Out << ", "; });
+  interleave(
+      Component.getDependencies(), [&](unsigned index) { Out << index; },
+      [&] { Out << ", "; });
   Out << "]\n";
 }
 
@@ -578,13 +579,15 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
+  bool hasAsyncMismatch = delta.Data[SK_AsyncSyncMismatch] > 0;
   auto isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only
-  // if the disjunction choice we are comparing to did not involve
-  // selecting unavailable overloads or result in fixes being
-  // applied to reach a solution.
-  return !hasUnavailableOverloads && !hasFixes &&
+  // if the disjunction choice we are comparing to did not involve:
+  //   1. selecting unavailable overloads
+  //   2. result in fixes being applied to reach a solution
+  //   3. selecting an overload that results in an async/sync mismatch
+  return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
          (isBeginningOfPartition ||
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
@@ -614,21 +617,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
 
-  // If the successfully applied constraint is favored, we'll consider that to
-  // be the "best".
-  if (lastSuccessfulChoice->isFavored() && !currentChoice->isFavored()) {
-#if !defined(NDEBUG)
-    if (lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload) {
-      auto overloadChoice = lastSuccessfulChoice->getOverloadChoice();
-      assert((!overloadChoice.isDecl() ||
-              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
-             "Unavailable decl should not be favored!");
-    }
-#endif
-
-    return true;
-  }
-
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
@@ -654,15 +642,6 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // Implicit conversions are better than checked casts.
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
-
-  // If we have a SIMD operator, and the prior choice was not a SIMD
-  // Operator, we're done.
-  if (currentChoice->getKind() == ConstraintKind::BindOverload &&
-      isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
-      lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl())) {
-    return true;
-  }
 
   return false;
 }

@@ -9,7 +9,11 @@ func globalAsyncFunction() async -> Int { 0 }
   let _ = await globalAsyncFunction()
 }
 
-@asyncHandler func asyncHandler2(fn: @autoclosure () async -> Int ) {
+@asyncHandler func asyncHandler2(fn: @autoclosure @escaping () async -> Int ) {
+  // okay, it's an async context
+}
+
+@asyncHandler func asyncHandler3(fn: @escaping () -> Int) {
   // okay, it's an async context
 }
 
@@ -28,6 +32,10 @@ func asyncHandlerBad3() throws { }
 @asyncHandler
 func asyncHandlerBad4(result: inout Int) { }
 // expected-error@-1{{'inout' parameter is not allowed in '@asyncHandler' function}}
+
+@asyncHandler
+func asyncHandlerBad5(result: () -> Int) { }
+// expected-error@-1{{non-escaping closure parameter is not allowed in '@asyncHandler' function}}
 
 actor class X {
   @asyncHandler func asyncHandlerMethod() { }

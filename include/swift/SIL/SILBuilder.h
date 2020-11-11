@@ -1935,6 +1935,10 @@ public:
         getSILDebugLocation(Loc), Operand, Index));
   }
 
+  //===--------------------------------------------------------------------===//
+  // Concurrency instructions
+  //===--------------------------------------------------------------------===//
+
   GetAsyncContinuationInst *createGetAsyncContinuation(SILLocation Loc,
                                                        SILType ContinuationTy) {
     return insert(new (getModule()) GetAsyncContinuationInst(getSILDebugLocation(Loc),
@@ -1949,6 +1953,11 @@ public:
                                                                  ContinuationTy));
   }
 
+  HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor) {
+    return insert(new (getModule()) HopToExecutorInst(getSILDebugLocation(Loc),
+                                                      Actor, hasOwnership()));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
@@ -1960,7 +1969,7 @@ public:
 
   ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {
     return insertTerminator(new (getModule()) ReturnInst(
-        getSILDebugLocation(Loc), ReturnValue));
+        getFunction(), getSILDebugLocation(Loc), ReturnValue));
   }
 
   ThrowInst *createThrow(SILLocation Loc, SILValue errorValue) {
@@ -2491,6 +2500,10 @@ public:
                                SILInstruction *InheritScopeFrom)
       : SILBuilder(BB, InheritScopeFrom->getDebugScope(),
                    B.getBuilderContext()) {}
+
+  explicit SILBuilderWithScope(SILBasicBlock *BB, SILBuilderContext &C,
+                               const SILDebugScope *debugScope)
+      : SILBuilder(BB, debugScope, C) {}
 
   /// Creates a new SILBuilder with an insertion point at the
   /// beginning of BB and the debug scope from the first

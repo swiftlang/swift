@@ -772,6 +772,32 @@ private:
   MutexHandle Handle;
 };
 
+/// A "small" variant of a Mutex. This allocates the mutex on the heap, for
+/// places where having the mutex inline takes up too much space.
+///
+/// TODO: On OSes that provide a smaller mutex type (e.g. os_unfair_lock on
+/// Darwin), make SmallMutex use that and store it inline, or make Mutex use it
+/// and this can become a typedef there.
+class SmallMutex {
+  SmallMutex(const SmallMutex &) = delete;
+  SmallMutex &operator=(const SmallMutex &) = delete;
+  SmallMutex(SmallMutex &&) = delete;
+  SmallMutex &operator=(SmallMutex &&) = delete;
+
+public:
+  explicit SmallMutex(bool checked = false) { Ptr = new Mutex(checked); }
+  ~SmallMutex() { delete Ptr; }
+
+  void lock() { Ptr->lock(); }
+
+  void unlock() { Ptr->unlock(); }
+
+  bool try_lock() { return Ptr->try_lock(); }
+
+private:
+  Mutex *Ptr;
+};
+
 // Enforce literal requirements for static variants.
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
 static_assert(std::is_literal_type<StaticMutex>::value,

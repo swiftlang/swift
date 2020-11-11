@@ -1,0 +1,27 @@
+sil_stage raw // CHECK: sil_stage canonical
+
+import Builtin
+import Swift
+
+actor class Act { }
+
+@_transparent public func serialize_all() {
+}
+
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_hop_to_executor
+sil [transparent] [serialized] @test_hop_to_executor : $@convention(thin) (@guaranteed Act) -> () {
+bb0(%0 : $Act):
+  // CHECK: hop_to_executor %0 : $Act
+  hop_to_executor %0 : $Act
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [transparent] [serialized] @$s15def_concurrency13serialize_allyyF : $@convention(thin) () -> () {
+bb0:
+  %91 = function_ref @test_hop_to_executor : $@convention(thin) (@guaranteed Act) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+

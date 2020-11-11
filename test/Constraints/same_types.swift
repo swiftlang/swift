@@ -141,7 +141,7 @@ func test8b<T: Barrable, U: Barrable>(_ t: T, u: U)
 }
 
 // rdar://problem/19137463
-func rdar19137463<T>(_ t: T) where T.a == T {} // expected-error{{'a' is not a member type of 'T'}}
+func rdar19137463<T>(_ t: T) where T.a == T {} // expected-error{{'a' is not a member type of type 'T'}}
 rdar19137463(1)
 
 

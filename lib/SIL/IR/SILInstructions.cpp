@@ -1817,54 +1817,6 @@ SelectEnumAddrInst *SelectEnumAddrInst::create(
       false /*HasOwnership*/);
 }
 
-SwitchEnumInstBase::SwitchEnumInstBase(
-    SILInstructionKind Kind, SILDebugLocation Loc, SILValue Operand,
-    SILBasicBlock *DefaultBB,
-    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount)
-    : TermInst(Kind, Loc), Operands(this, Operand) {
-  SILInstruction::Bits.SwitchEnumInstBase.HasDefault = bool(DefaultBB);
-  SILInstruction::Bits.SwitchEnumInstBase.NumCases = CaseBBs.size();
-  // Initialize the case and successor arrays.
-  auto *cases = getCaseBuf();
-  auto *succs = getSuccessorBuf();
-  for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
-    cases[i] = CaseBBs[i].first;
-    if (CaseCounts) {
-      ::new (succs + i)
-          SILSuccessor(this, CaseBBs[i].second, CaseCounts.getValue()[i]);
-    } else {
-      ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
-    }
-  }
-
-  if (hasDefault()) {
-    ::new (succs + getNumCases()) SILSuccessor(this, DefaultBB, DefaultCount);
-  }
-}
-
-void SwitchEnumInstBase::swapCase(unsigned i, unsigned j) {
-  assert(i < getNumCases() && "First index is out of bounds?!");
-  assert(j < getNumCases() && "Second index is out of bounds?!");
-
-  auto *succs = getSuccessorBuf();
-
-  // First grab our destination blocks.
-  SILBasicBlock *iBlock = succs[i].getBB();
-  SILBasicBlock *jBlock = succs[j].getBB();
-
-  // Then destroy the sil successors and reinitialize them with the new things
-  // that they are pointing at.
-  succs[i].~SILSuccessor();
-  ::new (succs + i) SILSuccessor(this, jBlock);
-  succs[j].~SILSuccessor();
-  ::new (succs + j) SILSuccessor(this, iBlock);
-
-  // Now swap our cases.
-  auto *cases = getCaseBuf();
-  std::swap(cases[i], cases[j]);
-}
-
 namespace {
   template <class Inst> EnumElementDecl *
   getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {
@@ -1927,20 +1879,13 @@ NullablePtr<EnumElementDecl> SelectEnumInstBase::getSingleTrueElement() const {
   return *TrueElement;
 }
 
-SwitchEnumInstBase::~SwitchEnumInstBase() {
-  // Destroy the successor records to keep the CFG up to date.
-  auto *succs = getSuccessorBuf();
-  for (unsigned i = 0, end = getNumCases() + hasDefault(); i < end; ++i) {
-    succs[i].~SILSuccessor();
-  }
-}
-
-template <typename SWITCH_ENUM_INST>
-SWITCH_ENUM_INST *SwitchEnumInstBase::createSwitchEnum(
+template <typename BaseTy>
+template <typename SWITCH_ENUM_INST, typename... RestTys>
+SWITCH_ENUM_INST *SwitchEnumInstBase<BaseTy>::createSwitchEnum(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
     SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-    ProfileCounter DefaultCount) {
+    ProfileCounter DefaultCount, RestTys &&... restArgs) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
@@ -1951,41 +1896,9 @@ SWITCH_ENUM_INST *SwitchEnumInstBase::createSwitchEnum(
       sizeof(SWITCH_ENUM_INST) + sizeof(EnumElementDecl *) * numCases +
           sizeof(SILSuccessor) * numSuccessors,
       alignof(SWITCH_ENUM_INST));
-  return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs,
-                                      CaseCounts, DefaultCount);
-}
-
-NullablePtr<EnumElementDecl> SwitchEnumInstBase::getUniqueCaseForDefault() {
-  return getUniqueCaseForDefaultValue(this, getOperand());
-}
-
-NullablePtr<EnumElementDecl>
-SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
-  SILValue value = getOperand();
-  SILType enumType = value->getType();
-  EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
-  assert(decl && "switch_enum operand is not an enum");
-  (void)decl;
-
-  EnumElementDecl *D = nullptr;
-  for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
-    auto Entry = getCase(i);
-    if (Entry.second == BB) {
-      if (D != nullptr)
-        return nullptr;
-      D = Entry.first;
-    }
-  }
-  if (!D && hasDefault() && getDefaultBB() == BB) {
-    return getUniqueCaseForDefault();
-  }
-  return D;
-}
-
-NullablePtr<SILBasicBlock> SwitchEnumInstBase::getDefaultBBOrNull() const {
-  if (!hasDefault())
-    return nullptr;
-  return getDefaultBB();
+  return ::new (buf)
+      SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs, CaseCounts,
+                       DefaultCount, std::forward<RestTys>(restArgs)...);
 }
 
 SwitchEnumInst *SwitchEnumInst::create(
@@ -2949,4 +2862,32 @@ bool GetAsyncContinuationInstBase::throws() const {
   // The continuation throws if it's an UnsafeThrowingContinuation
   return getType().castTo<BoundGenericType>()->getDecl()
     == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
+}
+
+ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
+                       SILValue returnValue)
+    : UnaryInstructionBase(debugLoc, returnValue),
+      ownershipKind(ValueOwnershipKind::None) {
+  // If we have a trivial value, leave our ownership kind as none.
+  if (returnValue->getType().isTrivial(func))
+    return;
+
+  SILFunctionConventions fnConv = func.getConventions();
+
+  // If we do not have any direct SIL results, we should accept a tuple
+  // argument, meaning that we should have a none ownership kind.
+  auto results = fnConv.getDirectSILResults();
+  if (results.empty())
+    return;
+
+  auto ownershipKindRange =
+      makeTransformRange(results, [&](const SILResultInfo &info) {
+        return info.getOwnershipKind(func, func.getLoweredFunctionType());
+      });
+
+  // Then merge all of our ownership kinds. Assert if we fail to merge.
+  ownershipKind = ValueOwnershipKind::merge(ownershipKindRange);
+  assert(ownershipKind != ValueOwnershipKind::Invalid &&
+         "Conflicting ownership kinds when creating term inst from function "
+         "result info?!");
 }

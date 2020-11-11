@@ -149,7 +149,7 @@ CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
-CONSTANT_OWNERSHIP_INST(Unowned, GetAsyncContinuationAddr)
+CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
 #undef CONSTANT_OWNERSHIP_INST
 
@@ -225,7 +225,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
         return op.get().getOwnershipKind();
       }));
 
-  if (!mergedValue.hasValue()) {
+  if (!mergedValue) {
     // If we have mismatched SILOwnership and sil ownership is not enabled,
     // just return None for staging purposes. If SILOwnership is enabled, then
     // we must assert!
@@ -235,7 +235,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return mergedValue.getValue();
+  return mergedValue;
 }
 
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
@@ -341,7 +341,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return *mergedOwnershipKind;
+  return mergedOwnershipKind;
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
@@ -541,6 +541,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, GetCurrentAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

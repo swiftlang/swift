@@ -86,6 +86,7 @@ import Hanoi
 import Hash
 import Histogram
 import HTTP2StateMachine
+import IndexPathTest
 import InsertCharacter
 import IntegerParsing
 import Integrate
@@ -274,6 +275,7 @@ registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
 registerBenchmark(HTTP2StateMachine)
+registerBenchmark(IndexPathTest)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegerParsing)
 registerBenchmark(IntegrateTest)

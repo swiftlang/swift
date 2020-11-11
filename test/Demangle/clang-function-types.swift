@@ -16,6 +16,7 @@
 // check that here again.
 
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
 import ctypes
 

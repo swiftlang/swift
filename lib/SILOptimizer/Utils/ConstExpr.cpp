@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "ConstExpr"
+
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -26,6 +26,8 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
@@ -1918,14 +1920,12 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     return {destBB->begin(), None};
   }
 
-  if (isa<SwitchEnumAddrInst>(inst) || isa<SwitchEnumInst>(inst)) {
+  if (auto switchInst = SwitchEnumTermInst(inst)) {
     SymbolicValue value;
-    SwitchEnumInstBase *switchInst = dyn_cast<SwitchEnumInst>(inst);
-    if (switchInst) {
-      value = getConstantValue(switchInst->getOperand());
+    if (isa<SwitchEnumInst>(*switchInst)) {
+      value = getConstantValue(switchInst.getOperand());
     } else {
-      switchInst = cast<SwitchEnumAddrInst>(inst);
-      value = getConstAddrAndLoadResult(switchInst->getOperand());
+      value = getConstAddrAndLoadResult(switchInst.getOperand());
     }
     if (!value.isConstant())
       return {None, value};
@@ -1933,8 +1933,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     assert(value.getKind() == SymbolicValue::Enum ||
            value.getKind() == SymbolicValue::EnumWithPayload);
 
-    SILBasicBlock *caseBB =
-        switchInst->getCaseDestination(value.getEnumValue());
+    SILBasicBlock *caseBB = switchInst.getCaseDestination(value.getEnumValue());
     if (caseBB->getNumArguments() == 0)
       return {caseBB->begin(), None};
 
@@ -1945,7 +1944,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     assert(caseBB->getNumArguments() == 1);
 
     if (caseBB->getParent()->hasOwnership() &&
-        switchInst->getDefaultBBOrNull() == caseBB) {
+        switchInst.getDefaultBBOrNull() == caseBB) {
       // If we are visiting the default block and we are in ossa, then we may
       // have uses of the failure parameter. That means we need to map the
       // original value to the argument.

@@ -171,7 +171,7 @@ DECL_NODES = [
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating', 'indirect', '__consuming',
-                       'actor'
+                       'actor', 'async'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),

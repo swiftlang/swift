@@ -927,6 +927,7 @@ public:
       // Ignore everything in getAccessProjectionOperand that is an access
       // projection with no affect on the access path.
       assert(isa<OpenExistentialAddrInst>(projectedAddr)
+             || isa<InitEnumDataAddrInst>(projectedAddr)
              || isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
              || isa<ProjectBoxInst>(projectedAddr));
     }
@@ -1390,6 +1391,10 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
   }
 
+  case SILInstructionKind::InitEnumDataAddrInst:
+    pushUsers(svi, dfs);
+    return IgnoredUse;
+
   // open_existential_addr and unchecked_take_enum_data_addr are classified as
   // access projections, but they also modify memory. Both see through them and
   // also report them as uses.
@@ -1799,6 +1804,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::TSanInoutAccess:
+    case BuiltinValueKind::CancelAsyncTask:
+    case BuiltinValueKind::CreateAsyncTask:
       return;
 
     // General memory access to a pointer in first operand position.
