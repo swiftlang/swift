@@ -92,6 +92,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// have.
 struct ValueOwnershipKind {
   enum innerty : uint8_t {
+    /// A value used to signal that two merged ValueOwnershipKinds were
+    /// incompatible.
+    Invalid = 0,
+
     /// A SILValue with `Unowned` ownership kind is an independent value that
     /// has a lifetime that is only guaranteed to last until the next program
     /// visible side-effect. To maintain the lifetime of an unowned value, it
@@ -156,7 +160,10 @@ struct ValueOwnershipKind {
     return Value == b;
   }
 
-  Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
+  /// Returns true if this ValueOwnershipKind is not invalid.
+  explicit operator bool() const { return Value != Invalid; }
+
+  ValueOwnershipKind merge(ValueOwnershipKind RHS) const;
 
   /// Given that there is an aggregate value (like a struct or enum) with this
   /// ownership kind, and a subobject of type Proj is being projected from the
@@ -172,6 +179,8 @@ struct ValueOwnershipKind {
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
     switch (Value) {
+    case ValueOwnershipKind::Invalid:
+      llvm_unreachable("Invalid ownership doesnt have a lifetime constraint!");
     case ValueOwnershipKind::None:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
@@ -188,7 +197,7 @@ struct ValueOwnershipKind {
   /// The reason why we do not compare directy is to allow for
   /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
-    return merge(other).hasValue();
+    return bool(merge(other));
   }
 
   /// Returns isCompatibleWith(other.getOwnershipKind()).
@@ -197,16 +206,14 @@ struct ValueOwnershipKind {
   /// dependencies.
   bool isCompatibleWith(SILValue other) const;
 
-  template <typename RangeTy>
-  static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
-    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
-    return accumulate(
-        std::forward<RangeTy>(r), initial,
-        [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
-          if (!acc)
-            return acc;
-          return acc.getValue().merge(x);
-        });
+  template <typename RangeTy> static ValueOwnershipKind merge(RangeTy &&r) {
+    auto initial = ValueOwnershipKind::None;
+    return accumulate(std::forward<RangeTy>(r), initial,
+                      [](ValueOwnershipKind acc, ValueOwnershipKind x) {
+                        if (!acc)
+                          return acc;
+                        return acc.merge(x);
+                      });
   }
 
   StringRef asString() const;

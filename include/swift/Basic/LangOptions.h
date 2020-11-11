@@ -367,6 +367,10 @@ namespace swift {
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
 
+    // Allow errors during module generation. See corresponding option in
+    // FrontendOptions.
+    bool AllowModuleWithCompilerErrors = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

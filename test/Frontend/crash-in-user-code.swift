@@ -7,6 +7,7 @@
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
+// UNSUPPORTED: MSVC_VER=15.0
 
 // CHECK: Stack dump:
 // CHECK-NEXT: Program arguments:

@@ -98,7 +98,8 @@ class ExtendedValidationInfo {
     unsigned IsSIB : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
-    unsigned IsImplicitDynamicEnabled: 1;
+    unsigned IsImplicitDynamicEnabled : 1;
+    unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -137,6 +138,12 @@ public:
   }
   void setResilienceStrategy(ResilienceStrategy resilience) {
     Bits.ResilienceStrategy = unsigned(resilience);
+  }
+  bool isAllowModuleWithCompilerErrorsEnabled() {
+    return Bits.IsAllowModuleWithCompilerErrorsEnabled;
+  }
+  void setAllowModuleWithCompilerErrorsEnabled(bool val) {
+    Bits.IsAllowModuleWithCompilerErrorsEnabled = val;
   }
 };
 

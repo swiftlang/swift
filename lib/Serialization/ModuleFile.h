@@ -465,6 +465,12 @@ public:
     return Core->Bits.IsImplicitDynamicEnabled;
   }
 
+  /// Whether this module is compiled while allowing errors
+  /// ('-experimental-allow-module-with-compiler-errors').
+  bool isAllowModuleWithCompilerErrorsEnabled() const {
+    return Core->Bits.IsAllowModuleWithCompilerErrorsEnabled;
+  }
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 

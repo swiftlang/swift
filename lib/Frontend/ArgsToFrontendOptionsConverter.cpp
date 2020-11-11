@@ -217,6 +217,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.AllowModuleWithCompilerErrors = Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);

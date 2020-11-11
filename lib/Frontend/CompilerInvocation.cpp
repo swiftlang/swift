@@ -683,6 +683,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DisableAvailabilityChecking = true;
   }
 
+  if (FrontendOpts.AllowModuleWithCompilerErrors) {
+    Opts.AllowModuleWithCompilerErrors = true;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
