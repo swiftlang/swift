@@ -490,3 +490,20 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
   if (EmitUnreachable)
     Builder.CreateUnreachable();
 }
+
+Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
+  auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {getAsyncTask(), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+  auto address = Address(call, alignment);
+  return address;
+}
+
+void IRGenFunction::emitTaskDealloc(Address address) {
+  auto *call = Builder.CreateCall(IGM.getTaskDeallocFn(),
+                                  {getAsyncTask(), address.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+}

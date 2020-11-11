@@ -397,9 +397,6 @@ namespace irgen {
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
 
-  Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
-                        Alignment alignment);
-  void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
   void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
 
   /// Emit a class to swift_task_create[_f] with the given flags, parent task,
@@ -408,19 +405,9 @@ namespace irgen {
     IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
     llvm::Value *taskFunction, llvm::Value *localContextInfo);
 
-  /// Allocate task local storage for the specified layout but using the
-  /// provided dynamic size.  Allowing the size to be specified dynamically is
-  /// necessary for applies of thick functions the sizes of whose async contexts
-  /// are dependent on the underlying, already partially applied, called
-  /// function.  The provided sizeLowerBound will be used to track the lifetime
-  /// of the allocation that is known statically.
-  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
-                                                 AsyncContextLayout layout,
-                                                 llvm::Value *sizeValue,
-                                                 Size sizeLowerBound);
-  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
-                                                 AsyncContextLayout layout);
-  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);
+  /// Allocate task local storage for the provided dynamic size.
+  Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
+  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context);
 
   void emitAsyncFunctionEntry(IRGenFunction &IGF, SILFunction *asyncFunc);
 

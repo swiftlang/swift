@@ -330,10 +330,6 @@ AsyncContextLayout::AsyncContextLayout(
 #endif
 }
 
-static Size getAsyncContextSize(AsyncContextLayout layout) {
-  return layout.getSize();
-}
-
 static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
 }
@@ -2240,7 +2236,6 @@ class AsyncCallEmission final : public CallEmission {
   using super = CallEmission;
 
   Address contextBuffer;
-  Size contextSize;
   Address context;
   llvm::Value *calleeFunction = nullptr;
   llvm::Value *currentResumeFn = nullptr;
@@ -2285,8 +2280,7 @@ public:
         CurCallee.getFunctionPointer(), thickContext);
     auto *dynamicContextSize =
         IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
-    std::tie(contextBuffer, contextSize) = emitAllocAsyncContext(
-        IGF, layout, dynamicContextSize, getAsyncContextSize(layout));
+    contextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
     context = layout.emitCastTo(IGF, contextBuffer.getAddress());
     if (layout.canHaveError()) {
       auto fieldLayout = layout.getErrorLayout();
@@ -2299,7 +2293,7 @@ public:
   void end() override {
     assert(contextBuffer.isValid());
     assert(context.isValid());
-    emitDeallocAsyncContext(IGF, contextBuffer, contextSize);
+    emitDeallocAsyncContext(IGF, contextBuffer);
     super::end();
   }
   void setFromCallee() override {
@@ -3523,8 +3517,7 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto size = getAsyncContextLayout(IGM, asyncFunction).getSize();
   auto asyncFuncPointer = IGF.Builder.CreateBitOrPointerCast(
-      IGM.getAddrOfAsyncFunctionPointer(asyncFunction, NotForDefinition),
-      IGM.Int8PtrTy);
+      IGM.getAddrOfAsyncFunctionPointer(asyncFunction), IGM.Int8PtrTy);
   auto *id = IGF.Builder.CreateIntrinsicCall(
       llvm::Intrinsic::coro_id_async,
       {llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
@@ -3590,28 +3583,6 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
   IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
 }
 
-Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
-                             Alignment alignment) {
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskAllocFn(),
-                                      {IGF.getAsyncTask(), size});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
-  auto address = Address(call, alignment);
-  return address;
-}
-
-void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
-                            llvm::Value *size) {
-  auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskDeallocFn(), {IGF.getAsyncTask(), address.getAddress()});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
-}
-
 void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
   if (task->getType() != IGF.IGM.SwiftTaskPtrTy) {
     task = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftTaskPtrTy);
@@ -3663,28 +3634,17 @@ llvm::Value *irgen::emitTaskCreate(
   return result;
 }
 
-std::pair<Address, Size> irgen::emitAllocAsyncContext(IRGenFunction &IGF,
-                                                      AsyncContextLayout layout,
-                                                      llvm::Value *sizeValue,
-                                                      Size sizeLowerBound) {
+Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
+                                     llvm::Value *sizeValue) {
   auto alignment = getAsyncContextAlignment(IGF.IGM);
-  auto address = emitTaskAlloc(IGF, sizeValue, alignment);
-  IGF.Builder.CreateLifetimeStart(address, sizeLowerBound);
-  return {address, sizeLowerBound};
+  auto address = IGF.emitTaskAlloc(sizeValue, alignment);
+  IGF.Builder.CreateLifetimeStart(address, Size(-1) /*dynamic size*/);
+  return address;
 }
 
-std::pair<Address, Size>
-irgen::emitAllocAsyncContext(IRGenFunction &IGF, AsyncContextLayout layout) {
-  auto size = getAsyncContextSize(layout);
-  auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
-  return emitAllocAsyncContext(IGF, layout, sizeValue, size);
-}
-
-void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context,
-                                    Size size) {
-  auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
-  emitTaskDealloc(IGF, context, sizeValue);
-  IGF.Builder.CreateLifetimeEnd(context, size);
+void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context) {
+  IGF.emitTaskDealloc(context);
+  IGF.Builder.CreateLifetimeEnd(context, Size(-1) /*dynamic size*/);
 }
 
 llvm::Value *irgen::emitYield(IRGenFunction &IGF,

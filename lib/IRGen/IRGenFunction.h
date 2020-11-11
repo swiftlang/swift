@@ -456,6 +456,10 @@ public:
   llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
                                          unsigned verificationType);
 
+  Address emitTaskAlloc(llvm::Value *size,
+                        Alignment alignment);
+  void emitTaskDealloc(Address address);
+
   //--- Expression emission
   //------------------------------------------------------
 public:
