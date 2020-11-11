@@ -22,10 +22,17 @@ class FrontendOptions;
 class InputFile;
 class ModuleDecl;
 
+/// Emit the names of the modules imported by \c mainModule.
+bool emitImportedModules(ModuleDecl *mainModule, const FrontendOptions &opts);
 bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                   DependencyTracker *depTracker,
                                   const FrontendOptions &opts,
                                   const InputFile &input);
+bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
+                                   DependencyTracker *depTracker,
+                                   const FrontendOptions &opts,
+                                   const InputFile &input);
+
 } // end namespace swift
 
 #endif
