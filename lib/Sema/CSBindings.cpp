@@ -462,7 +462,6 @@ void ConstraintSystem::PotentialBindings::finalize(
   // If there are no bindings, typeVar may be a hole.
   if (cs.shouldAttemptFixes() && Bindings.empty() &&
       TypeVar->getImpl().canBindToHole()) {
-    IsHole = true;
     // If the base of the unresolved member reference like `.foo`
     // couldn't be resolved we'd want to bind it to a hole at the
     // very last moment possible, just like generic parameters.
@@ -695,7 +694,7 @@ bool ConstraintSystem::PotentialBindings::isViable(
 
 bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     Constraint *disjunction) const {
-  if (IsHole || FullyBound)
+  if (isHole() || FullyBound)
     return false;
 
   // If this bindings are for a closure and there are no holes,

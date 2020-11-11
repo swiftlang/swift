@@ -4730,9 +4730,6 @@ private:
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
 
-    /// Whether this type variable is considered a hole in the constraint system.
-    bool IsHole = false;
-
     /// Whether the bindings represent (potentially) incomplete set,
     /// there is no way to say with absolute certainty if that's the
     /// case, but that could happen when certain constraints like
@@ -4761,6 +4758,17 @@ private:
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
+    /// If there is only one binding and it's to a hole type, consider
+    /// this type variable to be a hole in a constraint system regardless
+    /// of where hole type originated.
+    bool isHole() const {
+      if (Bindings.size() != 1)
+        return false;
+
+      auto &binding = Bindings.front();
+      return binding.BindingType->is<HoleType>();
+    }
+
     /// Determine if the bindings only constrain the type variable from above
     /// with an existential type; such a binding is not very helpful because
     /// it's impossible to enumerate the existential type's subtypes.
@@ -4784,7 +4792,7 @@ private:
       auto numDefaults = b.getNumDefaultableBindings();
       auto hasNoDefaultableBindings = b.Bindings.size() > numDefaults;
 
-      return std::make_tuple(b.IsHole,
+      return std::make_tuple(b.isHole(),
                              !hasNoDefaultableBindings,
                              b.FullyBound,
                              b.isSubtypeOfExistentialType(),
@@ -4820,7 +4828,7 @@ private:
       // for "subtype" type variable to attempt more bindings later.
       // This is required because algorithm can't currently infer
       // bindings for subtype transitively through superclass ones.
-      if (!(x.IsHole && y.IsHole)) {
+      if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
         if (x.isSubtypeOf(y.TypeVar))
           return false;
 
