@@ -352,8 +352,8 @@ bool Operand::satisfiesConstraints() const {
 bool Operand::isLifetimeEnding() const {
   auto constraint = getOwnershipConstraint();
 
-  // If we got back none, then our operand is for a type dependent operand. So
-  // return false.
+  // If we got back Optional::None, then our operand is for a type dependent
+  // operand. So return false.
   if (!constraint)
     return false;
 
@@ -361,19 +361,15 @@ bool Operand::isLifetimeEnding() const {
   if (!constraint->isLifetimeEnding())
     return false;
 
-  // Otherwise, we may have a lifetime ending use. If we narrowed to None then
-  // we have a non lifetime ending use, otherwise we still have a lifetime
-  // ending use. If our value was not None, then obviously narrowing didn't
-  // happen.
-  if (get().getOwnershipKind() != OwnershipKind::None)
-    return true;
-
-  // Otherwise, narrowing only happened if our ownership constraint did not have
-  // an OwnershipKind of None, but we disallow that in any case, so we can just
-  // unconditionally return false.
-  assert(constraint->getPreferredKind() != OwnershipKind::None &&
-         "None values should never have a lifetime ending constraint");
-  return false;
+  // Otherwise, we may have a lifetime ending use. We consider two cases here:
+  // the case where our value has OwnershipKind::None and one where it has some
+  // other OwnershipKind. Note that values with OwnershipKind::None ownership
+  // can not have their lifetime ended since they are outside of the ownership
+  // system. Given such a case, if we have such a value we return
+  // isLifetimeEnding() as false even if the constraint itself has a constraint
+  // that says a value is LifetimeEnding. If we have a value that has a
+  // non-OwnershipKind::None ownership then we just return true as expected.
+  return get().getOwnershipKind() != OwnershipKind::None;
 }
 
 //===----------------------------------------------------------------------===//
