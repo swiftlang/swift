@@ -2851,7 +2851,13 @@ PropertyWrapperWrappedValueVarRequest::evaluate(Evaluator &evaluator,
   localVar->setImplicit();
   localVar->getAttrs() = var->getAttrs();
   localVar->overwriteAccess(var->getFormalAccess());
-  localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
+
+  auto mutability = *var->getPropertyWrapperMutability();
+  if (mutability.Setter == PropertyWrapperMutability::Nonmutating) {
+    localVar->setImplInfo(StorageImplInfo::getMutableComputed());
+  } else {
+    localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
+  }
 
   evaluator.cacheOutput(PropertyWrapperBackingPropertyInfoRequest{localVar},
                         std::move(wrapperInfo));
