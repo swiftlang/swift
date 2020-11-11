@@ -36,3 +36,12 @@
 // CHECK-NEXT:   var i: Int32
 // CHECK-NEXT:   init(_ Arg: ArgType)
 // CHECK-NEXT: }
+// CHECK:      struct TemplatedConstructor {
+// CHECK-NEXT:   var value: ArgType
+// CHECK-NEXT:   init<T>(_ value: T)
+// CHECK-NEXT: }
+// CHECK:      struct TemplatedConstructorWithExtraArg {
+// CHECK-NEXT:   init<T>(_: Int32, _ value: T)
+// CHECK-NEXT:   init<T>(_ value: T, _: Int32)
+// CHECK-NEXT:   init<T, U>(_ value: T, _ other: U)
+// CHECK-NEXT: }

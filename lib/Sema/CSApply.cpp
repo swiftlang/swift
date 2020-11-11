@@ -107,12 +107,19 @@ Solution::computeSubstitutions(GenericSignature sig,
 }
 
 static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
-    ASTContext &ctx, FuncDecl *oldDecl, SubstitutionMap subst,
+    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
     clang::FunctionDecl *specialized) {
   // Create a new ParameterList with the substituted type.
   auto oldFnType =
       cast<GenericFunctionType>(oldDecl->getInterfaceType().getPointer());
   auto newFnType = oldFnType->substGenericArgs(subst);
+  // The constructor type is a function type as follows:
+  //   (CType.Type) -> (Generic) -> CType
+  // But we only want the result of that function type because that is the
+  // function type with the generic params that need to be substituted:
+  //   (Generic) -> CType
+  if (isa<ConstructorDecl>(oldDecl))
+    newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
   SmallVector<ParamDecl *, 4> newParams;
   unsigned i = 0;
   for (auto paramTy : newFnType->getParams()) {
@@ -125,6 +132,16 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   }
   auto *newParamList =
       ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
+
+  if (isa<ConstructorDecl>(oldDecl)) {
+    DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
+    auto newCtorDecl = ConstructorDecl::createImported(
+        ctx, specialized, ctorName, oldDecl->getLoc(), /*failable=*/false,
+        /*failabilityLoc=*/SourceLoc(), /*throws=*/false,
+        /*throwsLoc=*/SourceLoc(), newParamList, /*genericParams=*/nullptr,
+        oldDecl->getDeclContext());
+    return ConcreteDeclRef(newCtorDecl);
+  }
 
   // Generate a name for the specialized function.
   std::string newNameStr;
@@ -139,8 +156,8 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
 
   auto newFnDecl = FuncDecl::createImported(
       ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
-      /*Async*/ false, oldDecl->hasThrows(), newParamList,
-      newFnType->getResult(), /*GenericParams*/ nullptr,
+      /*Async=*/false, oldDecl->hasThrows(), newParamList,
+      newFnType->getResult(), /*GenericParams=*/nullptr,
       oldDecl->getDeclContext(), specialized);
   return ConcreteDeclRef(newFnDecl);
 }
@@ -168,7 +185,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
                     cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
                 subst);
     return generateDeclRefForSpecializedCXXFunctionTemplate(
-        decl->getASTContext(), cast<FuncDecl>(decl), subst, newFn);
+        decl->getASTContext(), cast<AbstractFunctionDecl>(decl), subst, newFn);
   }
 
   return ConcreteDeclRef(decl, subst);
