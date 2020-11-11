@@ -19,7 +19,7 @@ if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
   set(INT_FEATURE_FILE "${SWIFT_RUNTIME_OUTPUT_INTDIR}/SupportedFeatures.json")
   add_custom_command(TARGET swift-frontend POST_BUILD
                      COMMAND "${CMAKE_COMMAND}" "-E" "touch" "${DUMMY_SWIFT_INPUT}"
-                     COMMAND "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-frontend"
+                     COMMAND "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swift-frontend"
                              "-emit-supported-features" "-o"
                              "${INT_FEATURE_FILE}"
                              "${DUMMY_SWIFT_INPUT}")
