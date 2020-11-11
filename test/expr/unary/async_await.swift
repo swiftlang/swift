@@ -38,6 +38,10 @@ struct SomeStruct {
 
 func acceptAutoclosureNonAsync(_: @autoclosure () -> Int) async { }
 func acceptAutoclosureAsync(_: @autoclosure () async -> Int) async { }
+func acceptAutoclosureAsyncThrows(_: @autoclosure () async throws -> Int) async { }
+func acceptAutoclosureAsyncThrowsRethrows(_: @autoclosure () async throws -> Int) async rethrows { }
+func acceptEscapingAsyncThrowsRethrows(_: @escaping (inout String) async throws -> Int) async rethrows { }
+func acceptEscapingAsyncThrowsRethrows<R>(_: (inout String) async throws -> Int) async rethrows -> R { }
 
 func acceptAutoclosureNonAsyncBad(_: @autoclosure () async -> Int) -> Int { 0 }
 // expected-error@-1{{'async' autoclosure parameter in a non-'async' function}}
