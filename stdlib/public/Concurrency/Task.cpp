@@ -351,3 +351,7 @@ void swift::swift_task_future_wait(
 void swift::swift_task_run(AsyncTask *taskToRun) {
   taskToRun->run(ExecutorRef::noPreference());
 }
+
+//JobPriority swift::swift_task_get_priority(AsyncTask *task) {
+//  return task->getPriority();
+//}
