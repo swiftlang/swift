@@ -72,19 +72,22 @@ class SwiftPM(product.Product):
         dispatch_build_dir = os.path.join(
             build_root, '%s-%s' % ("libdispatch", host_target))
 
-        if os.path.exists(dispatch_build_dir):
-            helper_cmd += [
-                "--dispatch-build-dir", dispatch_build_dir
-            ]
+        # SWIFT_ENABLE_TENSORFLOW
+        # Don't pass in these args since they interfere with yams.
+        # if os.path.exists(dispatch_build_dir):
+        #     helper_cmd += [
+        #         "--dispatch-build-dir", dispatch_build_dir
+        #     ]
 
         # Pass Foundation directory down if we built it
         foundation_build_dir = os.path.join(
             build_root, '%s-%s' % ("foundation", host_target))
 
-        if os.path.exists(foundation_build_dir):
-            helper_cmd += [
-                "--foundation-build-dir", foundation_build_dir
-            ]
+        # if os.path.exists(foundation_build_dir):
+        #     helper_cmd += [
+        #         "--foundation-build-dir", foundation_build_dir
+        #     ]
+        # SWIFT_ENABLE_TENSORFLOW END
 
         # Pass Cross compile host info
         if self.has_cross_compile_hosts(self.args):
