@@ -155,41 +155,41 @@ SILLocation SILValue::getLoc() const {
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
-    : Value() {
+    : value(OwnershipKind::Any) {
   auto &M = F.getModule();
 
   // Trivial types can be passed using a variety of conventions. They always
   // have trivial ownership.
   if (Type.isTrivial(F)) {
-    Value = ValueOwnershipKind::None;
+    value = OwnershipKind::None;
     return;
   }
 
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Indirect_In_Constant:
-    Value = SILModuleConventions(M).useLoweredAddresses()
-                ? ValueOwnershipKind::None
-                : ValueOwnershipKind::Owned;
+    value = SILModuleConventions(M).useLoweredAddresses()
+                ? OwnershipKind::None
+                : OwnershipKind::Owned;
     break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
-    Value = SILModuleConventions(M).useLoweredAddresses()
-                ? ValueOwnershipKind::None
-                : ValueOwnershipKind::Guaranteed;
+    value = SILModuleConventions(M).useLoweredAddresses()
+                ? OwnershipKind::None
+                : OwnershipKind::Guaranteed;
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:
-    Value = ValueOwnershipKind::None;
+    value = OwnershipKind::None;
     return;
   case SILArgumentConvention::Direct_Owned:
-    Value = ValueOwnershipKind::Owned;
+    value = OwnershipKind::Owned;
     return;
   case SILArgumentConvention::Direct_Unowned:
-    Value = ValueOwnershipKind::Unowned;
+    value = OwnershipKind::Unowned;
     return;
   case SILArgumentConvention::Direct_Guaranteed:
-    Value = ValueOwnershipKind::Guaranteed;
+    value = OwnershipKind::Guaranteed;
     return;
   case SILArgumentConvention::Direct_Deallocating:
     llvm_unreachable("Not handled");
@@ -197,16 +197,16 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 }
 
 StringRef ValueOwnershipKind::asString() const {
-  switch (Value) {
-  case ValueOwnershipKind::Invalid:
-    return "invalid";
-  case ValueOwnershipKind::Unowned:
+  switch (value) {
+  case OwnershipKind::Any:
+    return "any";
+  case OwnershipKind::Unowned:
     return "unowned";
-  case ValueOwnershipKind::Owned:
+  case OwnershipKind::Owned:
     return "owned";
-  case ValueOwnershipKind::Guaranteed:
+  case OwnershipKind::Guaranteed:
     return "guaranteed";
-  case ValueOwnershipKind::None:
+  case OwnershipKind::None:
     return "any";
   }
   llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
@@ -217,46 +217,24 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os << kind.asString();
 }
 
-ValueOwnershipKind ValueOwnershipKind::merge(ValueOwnershipKind rhs) const {
-  auto lhsVal = Value;
-  auto rhsVal = rhs.Value;
-
-  // If either lhs or rhs are invalid, return invalid.
-  if (lhsVal == ValueOwnershipKind::Invalid ||
-      rhsVal == ValueOwnershipKind::Invalid)
-    return ValueOwnershipKind::Invalid;
-
-  // None merges with anything.
-  if (lhsVal == ValueOwnershipKind::None)
-    return ValueOwnershipKind(rhsVal);
-  if (rhsVal == ValueOwnershipKind::None)
-    return ValueOwnershipKind(lhsVal);
-
-  // At this point, if the two ownership kinds don't line up, the merge fails.
-  if (lhsVal != rhsVal)
-    return ValueOwnershipKind::Invalid;
-
-  // Otherwise, we are good, return *this.
-  return *this;
-}
-
-ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
-  auto Result = llvm::StringSwitch<Optional<ValueOwnershipKind::innerty>>(S)
-                    .Case("unowned", ValueOwnershipKind::Unowned)
-                    .Case("owned", ValueOwnershipKind::Owned)
-                    .Case("guaranteed", ValueOwnershipKind::Guaranteed)
-                    .Case("any", ValueOwnershipKind::None)
+ValueOwnershipKind::ValueOwnershipKind(StringRef S)
+    : value(OwnershipKind::Any) {
+  auto Result = llvm::StringSwitch<Optional<OwnershipKind::innerty>>(S)
+                    .Case("unowned", OwnershipKind::Unowned)
+                    .Case("owned", OwnershipKind::Owned)
+                    .Case("guaranteed", OwnershipKind::Guaranteed)
+                    .Case("any", OwnershipKind::None)
                     .Default(None);
   if (!Result.hasValue())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
-  Value = Result.getValue();
+  value = Result.getValue();
 }
 
 ValueOwnershipKind
 ValueOwnershipKind::getProjectedOwnershipKind(const SILFunction &F,
                                               SILType Proj) const {
   if (Proj.isTrivial(F))
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
   return *this;
 }
 
@@ -307,7 +285,7 @@ void OperandOwnershipKindMap::print(llvm::raw_ostream &os) const {
   os << "-- OperandOwnershipKindMap --\n";
 
   unsigned index = 0;
-  unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
+  unsigned end = unsigned(OwnershipKind::LastValueOwnershipKind) + 1;
   while (index != end) {
     auto kind = ValueOwnershipKind(index);
     if (canAcceptKind(kind)) {

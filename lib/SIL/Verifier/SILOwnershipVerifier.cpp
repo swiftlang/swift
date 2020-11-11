@@ -221,7 +221,7 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
   bool foundError = false;
 
   auto ownershipKind = value.getOwnershipKind();
-  bool isOwned = ownershipKind == ValueOwnershipKind::Owned;
+  bool isOwned = ownershipKind == OwnershipKind::Owned;
 
   // Since we are dealing with a non-guaranteed user, we do not have to recurse.
   for (auto *op : value->getUses()) {
@@ -296,7 +296,7 @@ bool SILValueOwnershipChecker::gatherUsers(
   // we need to look through subobject uses for more uses. Otherwise, if we are
   // forwarding, we do not create any lifetime ending users/non lifetime ending
   // users since we verify against our base.
-  if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
+  if (value.getOwnershipKind() != OwnershipKind::Guaranteed) {
     return !gatherNonGuaranteedUsers(lifetimeEndingUsers,
                                      nonLifetimeEndingUsers);
   }
@@ -328,7 +328,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     // First check if this recursive use is compatible with our values
     // ownership kind. If not, flag the error and continue so that we can
     // report more errors.
-    if (!isCompatibleDefUse(op, ValueOwnershipKind::Guaranteed)) {
+    if (!isCompatibleDefUse(op, OwnershipKind::Guaranteed)) {
       foundError = true;
       continue;
     }
@@ -418,14 +418,14 @@ bool SILValueOwnershipChecker::gatherUsers(
     // uses of all of User's results to the worklist.
     if (user->getResults().size()) {
       for (SILValue result : user->getResults()) {
-        if (result.getOwnershipKind() == ValueOwnershipKind::None) {
+        if (result.getOwnershipKind() == OwnershipKind::None) {
           continue;
         }
 
         // Now, we /must/ have a guaranteed subobject, so let's assert that
         // the user is actually guaranteed and add the subobject's users to
         // our worklist.
-        assert(result.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+        assert(result.getOwnershipKind() == OwnershipKind::Guaranteed &&
                "Our value is guaranteed and this is a forwarding instruction. "
                "Should have guaranteed ownership as well.");
         llvm::copy(result->getUses(), std::back_inserter(users));
@@ -460,14 +460,13 @@ bool SILValueOwnershipChecker::gatherUsers(
         // needing to be verified. If it isn't verified appropriately,
         // assert when the verifier is destroyed.
         auto succArgOwnershipKind = succArg->getOwnershipKind();
-        if (!succArgOwnershipKind.isCompatibleWith(
-                ValueOwnershipKind::Guaranteed)) {
+        if (!succArgOwnershipKind.isCompatibleWith(OwnershipKind::Guaranteed)) {
           // This is where the error would go.
           continue;
         }
 
         // If we have an any value, just continue.
-        if (succArgOwnershipKind == ValueOwnershipKind::None)
+        if (succArgOwnershipKind == OwnershipKind::None)
           continue;
 
         // Otherwise add all users of this BBArg to the worklist to visit
@@ -487,13 +486,13 @@ bool SILValueOwnershipChecker::gatherUsers(
 bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     SILFunctionArgument *arg) {
   switch (arg->getOwnershipKind()) {
-  case ValueOwnershipKind::Invalid:
-    llvm_unreachable("Invalid ownership kind used?!");
-  case ValueOwnershipKind::Guaranteed:
-  case ValueOwnershipKind::Unowned:
-  case ValueOwnershipKind::None:
+  case OwnershipKind::Any:
+    llvm_unreachable("Value can not have any ownership kind?!");
+  case OwnershipKind::Guaranteed:
+  case OwnershipKind::Unowned:
+  case OwnershipKind::None:
     return true;
-  case ValueOwnershipKind::Owned:
+  case OwnershipKind::Owned:
     break;
   }
 
@@ -509,12 +508,12 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
 bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     BeginApplyResult *yield, ArrayRef<Operand *> regularUses) {
   switch (yield->getOwnershipKind()) {
-  case ValueOwnershipKind::Invalid:
-    llvm_unreachable("Invalid ownership kind used?!");
-  case ValueOwnershipKind::Unowned:
-  case ValueOwnershipKind::None:
+  case OwnershipKind::Any:
+    llvm_unreachable("value with any ownership kind?!");
+  case OwnershipKind::Unowned:
+  case OwnershipKind::None:
     return true;
-  case ValueOwnershipKind::Owned:
+  case OwnershipKind::Owned:
     if (deadEndBlocks.isDeadEnd(yield->getParent()->getParent()))
       return true;
 
@@ -522,7 +521,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
       llvm::errs() << "Owned yield without life ending uses!\n"
                    << "Value: " << *yield << '\n';
     });
-  case ValueOwnershipKind::Guaranteed:
+  case OwnershipKind::Guaranteed:
     // NOTE: If we returned false here, we would catch any error caught below as
     // an out of lifetime use of the yielded value. That being said, that would
     // be confusing from a code perspective since we would be validating
@@ -574,11 +573,11 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
   // have lifetime ending uses, since our lifetime is guaranteed by our
   // operand, so there is nothing further to do. So just return true.
   if (isGuaranteedForwardingValue(value) &&
-      value.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+      value.getOwnershipKind() == OwnershipKind::Guaranteed)
     return true;
 
   // If we have an unowned value, then again there is nothing left to do.
-  if (value.getOwnershipKind() == ValueOwnershipKind::Unowned)
+  if (value.getOwnershipKind() == OwnershipKind::Unowned)
     return true;
 
   if (auto *parentBlock = value->getParentBlock()) {
@@ -592,7 +591,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
 
   if (!isValueAddressOrTrivial(value)) {
     return !errorBuilder.handleMalformedSIL([&] {
-      if (value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+      if (value.getOwnershipKind() == OwnershipKind::Owned) {
         llvm::errs() << "Error! Found a leaked owned value that was never "
                         "consumed.\n";
       } else {
@@ -610,7 +609,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
 bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
     SILFunctionArgument *arg,
     const llvm::SmallVectorImpl<Operand *> &lifetimeEndingUsers) const {
-  if (arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+  if (arg->getOwnershipKind() != OwnershipKind::Guaranteed)
     return true;
 
   return errorBuilder.handleMalformedSIL([&] {
@@ -693,7 +692,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
   if (isGuaranteedForwardingValue(value) &&
-      value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+      value.getOwnershipKind() == OwnershipKind::Guaranteed) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
       return false;

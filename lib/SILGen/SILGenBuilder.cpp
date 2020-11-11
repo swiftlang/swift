@@ -149,7 +149,7 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
          "value");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::None) {
+      originalValue.getOwnershipKind() == OwnershipKind::None) {
     return originalValue;
   }
 
@@ -189,20 +189,20 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
 
 ManagedValue SILGenBuilder::createOwnedPhiArgument(SILType type) {
   SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Owned);
+      getInsertionBB()->createPhiArgument(type, OwnershipKind::Owned);
   return SGF.emitManagedRValueWithCleanup(arg);
 }
 
 ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
   SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Guaranteed);
+      getInsertionBB()->createPhiArgument(type, OwnershipKind::Guaranteed);
   return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
 }
 
 ManagedValue
 SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
   SILPhiArgument *arg =
-      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Guaranteed);
+      getInsertionBB()->createPhiArgument(type, OwnershipKind::Guaranteed);
   return ManagedValue::forUnmanaged(arg);
 }
 
@@ -291,7 +291,7 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                       "address only type");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::None) {
+      originalValue.getOwnershipKind() == OwnershipKind::None) {
     return originalValue;
   }
 
@@ -475,7 +475,7 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
   assert(value->getType().isObject() && "Expected only objects here");
 
   // If we have a trivial value, just return without a cleanup.
-  if (operand.getOwnershipKind() != ValueOwnershipKind::Owned) {
+  if (operand.getOwnershipKind() != OwnershipKind::Owned) {
     return ManagedValue::forUnmanaged(value);
   }
 
@@ -486,7 +486,7 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
 ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
                                        EnumElementDecl *decl, SILType type) {
   SILValue result = createEnum(loc, payload.forward(SGF), decl, type);
-  if (result.getOwnershipKind() != ValueOwnershipKind::Owned)
+  if (result.getOwnershipKind() != OwnershipKind::Owned)
     return ManagedValue::forUnmanaged(result);
   return SGF.emitManagedRValueWithCleanup(result);
 }
@@ -685,7 +685,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         SILValue address,
                                         StoreOwnershipQualifier qualifier) {
   CleanupCloner cloner(*this, value);
-  if (value.getOwnershipKind() == ValueOwnershipKind::None)
+  if (value.getOwnershipKind() == OwnershipKind::None)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -716,14 +716,14 @@ createValueMetatype(SILLocation loc, SILType metatype,
 
 void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
                                       SILValue address) {
-  assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
   createStoreBorrow(loc, value.getValue(), address);
 }
 
 void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
                                                ManagedValue value,
                                                SILValue address) {
-  if (value.getOwnershipKind() == ValueOwnershipKind::None) {
+  if (value.getOwnershipKind() == OwnershipKind::None) {
     createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
     return;
   }
@@ -792,7 +792,7 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // We need to look for the first value without .none ownership and use that as
   // our cleanup cloner value.
   auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
-    return mv.getOwnershipKind() != ValueOwnershipKind::None;
+    return mv.getOwnershipKind() != OwnershipKind::None;
   });
 
   llvm::SmallVector<SILValue, 8> forwardedValues;
