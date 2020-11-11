@@ -513,17 +513,6 @@ void ConstraintSystem::PotentialBindings::finalize(
       std::rotate(AnyTypePos, AnyTypePos + 1, Bindings.end());
     }
   }
-
-  // Determine if the bindings only constrain the type variable from above with
-  // an existential type; such a binding is not very helpful because it's
-  // impossible to enumerate the existential type's subtypes.
-  if (!Bindings.empty()) {
-    SubtypeOfExistentialType =
-        llvm::all_of(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isExistentialType() &&
-                 binding.Kind == AllowedBindingKind::Subtypes;
-        });
-  }
 }
 
 Optional<ConstraintSystem::PotentialBindings>

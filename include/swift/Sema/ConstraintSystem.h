@@ -4744,9 +4744,6 @@ private:
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
 
-    /// Whether this type variable is only bound above by existential types.
-    bool SubtypeOfExistentialType = false;
-
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
@@ -4764,6 +4761,19 @@ private:
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
+    /// Determine if the bindings only constrain the type variable from above
+    /// with an existential type; such a binding is not very helpful because
+    /// it's impossible to enumerate the existential type's subtypes.
+    bool isSubtypeOfExistentialType() const {
+      if (Bindings.empty())
+        return false;
+
+      return llvm::all_of(Bindings, [](const PotentialBinding &binding) {
+        return binding.BindingType->isExistentialType() &&
+               binding.Kind == AllowedBindingKind::Subtypes;
+      });
+    }
+
     unsigned getNumDefaultableBindings() const {
       return llvm::count_if(Bindings, [](const PotentialBinding &binding) {
         return binding.isDefaultableBinding();
@@ -4777,7 +4787,7 @@ private:
       return std::make_tuple(b.IsHole,
                              !hasNoDefaultableBindings,
                              b.FullyBound,
-                             b.SubtypeOfExistentialType,
+                             b.isSubtypeOfExistentialType(),
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - numDefaults));
@@ -4925,7 +4935,7 @@ public:
         out << "potentially_incomplete ";
       if (FullyBound)
         out << "fully_bound ";
-      if (SubtypeOfExistentialType)
+      if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
       if (LiteralBinding != LiteralBindingKind::None)
         out << "literal=" << static_cast<int>(LiteralBinding) << " ";
