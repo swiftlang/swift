@@ -29,6 +29,9 @@ struct I : P {
   init(int: Int64)
 }
 
+// CHECK-LL: @I_printMeAD =
+// CHECK-LL: @I_P_printMeAD =
+
 // CHECK-LL-LABEL: define hidden swiftcc void @I_printMe(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @I_printMe : $@async @convention(method) (I) -> Int64 {
 bb0(%self : $I):

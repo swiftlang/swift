@@ -2531,12 +2531,12 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(fnPtr, authInfo, signature);
+    return FunctionPointer(methodType, fnPtr, authInfo, signature);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
-    return FunctionPointer::forDirect(fnPtr, signature);
+    return FunctionPointer::forDirect(methodType, fnPtr, signature);
   }
   }
   

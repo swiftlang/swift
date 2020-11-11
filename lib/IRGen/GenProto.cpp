@@ -3341,7 +3341,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto &schema = IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot, member);
 
-  return FunctionPointer(witnessFnPtr, authInfo, signature);
+  return FunctionPointer(fnType, witnessFnPtr, authInfo, signature);
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(

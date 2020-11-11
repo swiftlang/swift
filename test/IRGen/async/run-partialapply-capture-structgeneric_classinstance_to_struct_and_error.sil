@@ -39,6 +39,9 @@ entry(%value : $A2<A3>):
   return %result : $()
 }
 
+// CHECK-LL: @amethodAD =
+// CHECK-LL: @repoAD =
+
 // CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @amethod(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil @amethod : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error) {
 entry(%a2_at_a3_addr : $*A2<A3>):

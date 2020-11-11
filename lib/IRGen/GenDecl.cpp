@@ -2543,7 +2543,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
   LinkEntity keyEntity =
       LinkEntity::forDynamicallyReplaceableFunctionKey(f);
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto silFunctionType = f->getLoweredFunctionType();
+  Signature signature = getSignature(silFunctionType);
 
   // Create and initialize the first link entry for the chain of replacements.
   // The first implementation is initialized with 'implFn'.
@@ -2602,9 +2603,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto authEntity = PointerAuthEntity(f);
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
 
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, authInfo,
-                                                     signature),
-                                     forwardedArgs);
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(silFunctionType, realReplFn, authInfo, signature),
+      forwardedArgs);
   Res->setTailCall();
   if (IGF.CurFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2657,8 +2658,10 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
                         ? PointerAuthEntity(keyEntity.getSILFunction())
                         : PointerAuthEntity::Special::TypeDescriptor;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
-  auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+  auto *Res =
+      IGF.Builder.CreateCall(FunctionPointer(FunctionPointer::KindTy::Function,
+                                             typeFnPtr, authInfo, signature),
+                             forwardedArgs);
 
   Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
@@ -2730,7 +2733,8 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
 
   auto entity = LinkEntity::forSILFunction(f, true);
 
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto fnType = f->getLoweredFunctionType();
+  Signature signature = getSignature(fnType);
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
@@ -2774,7 +2778,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       IGF, schema, fnPtrAddr,
       PointerAuthEntity(f->getDynamicallyReplacedFunction()));
   auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+      FunctionPointer(fnType, typeFnPtr, authInfo, signature), forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();

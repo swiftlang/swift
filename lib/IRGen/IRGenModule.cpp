@@ -590,9 +590,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
+                                            {RelativeAddressTy, Int32Ty});
   SwiftContextTy = createStructType(*this, "swift.context", {});
   SwiftTaskTy = createStructType(*this, "swift.task", {});
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});
+  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);

@@ -32,6 +32,7 @@ sil_witness_table <T> BaseProducer<T> : Q module main {
 public class WeakBox<T> {}
 sil_vtable WeakBox {}
 
+// CHECK-LL: @takingQAD =
 // CHECK-LL: define hidden swiftcc void @takingQ(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @takingQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> () {
 entry(%box : $WeakBox<τ_0_0>):
