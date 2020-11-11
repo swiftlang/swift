@@ -2,6 +2,7 @@ set_swift_llvm_is_available()
 add_swift_host_library(swiftFrontendTool STATIC
   FrontendTool.cpp
   ImportedModules.cpp
+  MakeStyleDependencies.cpp
   ScanDependencies.cpp
   TBD.cpp)
 add_dependencies(swiftFrontendTool
