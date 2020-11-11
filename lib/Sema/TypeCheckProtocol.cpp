@@ -1566,7 +1566,7 @@ isUnsatisfiedReq(ConformanceChecker &checker,
         if (otherReq == req)
           continue;
 
-        if (conformance->hasWitness(otherReq))
+        if (conformance->getWitness(otherReq))
           return false;
       }
     }
