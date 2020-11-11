@@ -496,3 +496,33 @@ bb0(%0 : @owned $NotTrivial):
   %6 = tuple ()
   return %6 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @struct_with_obj_fields_multiple_stores :
+// CHECK: bb0([[ARG_0:%[0-9]+]] : @owned $NotTrivial, [[ARG_1:%[0-9]+]] : @owned $NotTrivial):
+// CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $Obj
+// CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Obj
+// CHECK:   ([[VAR_4:%[0-9]+]], [[VAR_6:%[0-9]+]]) = destructure_struct [[ARG_0]]
+// CHECK:   store [[VAR_4]] to [init] [[VAR_1]] : $*Obj
+// CHECK:   store [[VAR_6]] to [init] [[VAR_2]] : $*Obj
+// CHECK:   ([[VAR_4a:%[0-9]+]], [[VAR_6a:%[0-9]+]]) = destructure_struct [[ARG_1]]
+// Make sure we use [assign] here
+// CHECK:   store [[VAR_4a]] to [assign] [[VAR_1]] : $*Obj
+// CHECK:   store [[VAR_6a]] to [assign] [[VAR_2]] : $*Obj
+// CHECK-LABEL: } // end sil function 'struct_with_obj_fields_multiple_stores'
+sil [ossa] @struct_with_obj_fields_multiple_stores : $@convention(thin) (@owned NotTrivial, @owned NotTrivial) -> () {
+bb0(%0 : @owned $NotTrivial, %1 : @owned $NotTrivial):
+  %stk = alloc_stack $NotTrivial
+  store %0 to [init] %stk : $*NotTrivial
+  %3 = struct_element_addr %stk : $*NotTrivial, #NotTrivial.y
+  %4 = load [copy] %3 : $*Obj
+  %2 = function_ref @use_obj : $@convention(thin) (@owned Obj) -> ()
+  apply %2(%4) : $@convention(thin) (@owned Obj) -> ()
+  store %1 to [assign] %stk : $*NotTrivial
+  %4a = load [copy] %3 : $*Obj
+  apply %2(%4a) : $@convention(thin) (@owned Obj) -> ()
+  %5 = load [take] %stk : $*NotTrivial
+  destroy_value %5 : $NotTrivial
+  dealloc_stack %stk : $*NotTrivial
+  %6 = tuple ()
+  return %6 : $()
+}
