@@ -27,6 +27,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -141,7 +142,8 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
 SILFunction *
 SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                          CanSILFunctionType blockType,
-                                         CanType continuationTy) {
+                                         CanType continuationTy,
+                                         ForeignAsyncConvention convention) {
   // Extract the result type from the continuation type.
   auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
   
@@ -184,10 +186,125 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   if (F->empty()) {
     // TODO: Emit the implementation.
     SILGenFunction SGF(*this, *F, SwiftModule);
-    SmallVector<ManagedValue, 4> params;
-    SGF.collectThunkParams(loc, params);
+    {
+      Scope scope(SGF, loc);
+      SmallVector<ManagedValue, 4> params;
+      SGF.collectThunkParams(loc, params);
 
-    SGF.B.createUnreachable(loc);
+      // Get the continuation out of the block object.
+      auto blockStorage = params[0].getValue();
+      auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
+      auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
+                                           LoadOwnershipQualifier::Trivial);
+      auto continuation = ManagedValue::forUnmanaged(continuationVal);
+      
+      // Check for an error if the convention includes one.
+      auto errorIndex = convention.completionHandlerErrorParamIndex();
+    
+      FuncDecl *resumeIntrinsic, *errorIntrinsic;
+
+      SILBasicBlock *returnBB = nullptr;
+      if (errorIndex) {
+        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
+        errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
+        
+        auto errorArgument = params[*errorIndex + 1];
+        auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+        auto noneErrorBB = SGF.createBasicBlock();
+        returnBB = SGF.createBasicBlockAfter(noneErrorBB);
+
+        auto &C = SGF.getASTContext();
+        std::pair<EnumElementDecl *, SILBasicBlock *> switchErrorBBs[] = {
+          {C.getOptionalSomeDecl(), someErrorBB},
+          {C.getOptionalNoneDecl(), noneErrorBB}
+        };
+        
+        SGF.B.createSwitchEnum(loc, errorArgument.borrow(SGF, loc).getValue(),
+                               /*default*/ nullptr,
+                               switchErrorBBs);
+        
+        SGF.B.emitBlock(someErrorBB);
+        
+        auto matchedErrorTy = errorArgument.getType().getOptionalObjectType();
+        auto matchedError = SGF.B
+          .createGuaranteedTransformingTerminatorArgument(matchedErrorTy);
+        
+        // Resume the continuation as throwing the given error, bridged to a
+        // native Swift error.
+        auto nativeError = SGF.emitBridgedToNativeError(loc, matchedError);
+        Type replacementTypes[] = {resumeType};
+        auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
+                                         replacementTypes,
+                                         ArrayRef<ProtocolConformanceRef>{});
+        SGF.emitApplyOfLibraryIntrinsic(loc, errorIntrinsic, subs,
+                                        {continuation, nativeError},
+                                        SGFContext());
+        
+        SGF.B.createBranch(loc, returnBB);
+        SGF.B.emitBlock(noneErrorBB);
+      } else {
+        resumeIntrinsic = getResumeUnsafeContinuation();
+      }
+            
+      auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                                resumeType);
+      
+      // Prepare the argument for the resume intrinsic, using the non-error
+      // arguments to the callback.
+      {
+        Scope resumeScope(SGF, loc);
+        unsigned errorIndexBoundary = errorIndex ? *errorIndex : ~0u;
+        auto resumeArgBuf = SGF.emitTemporaryAllocation(loc,
+                                              loweredResumeTy.getAddressType());
+
+        auto prepareArgument = [&](SILValue destBuf, ManagedValue arg) {
+          // Convert the ObjC argument to the bridged Swift representation we
+          // want.
+          ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(loc,
+                                       arg,
+                                       arg.getType().getASTType(),
+                                       // FIXME: pass down formal type
+                                       destBuf->getType().getASTType(),
+                                       destBuf->getType().getObjectType());
+          bridgedArg.forwardInto(SGF, loc, destBuf);
+        };
+
+        if (auto resumeTuple = dyn_cast<TupleType>(resumeType)) {
+          assert(params.size() == resumeTuple->getNumElements()
+                                   + 1 + (bool)errorIndex);
+          for (auto i : indices(resumeTuple.getElementTypes())) {
+            auto resumeEltBuf = SGF.B.createTupleElementAddr(loc,
+                                                             resumeArgBuf, i);
+            auto arg = params[1 + i + (i >= errorIndexBoundary)];
+            prepareArgument(resumeEltBuf, arg);
+          }
+        } else {
+          assert(params.size() == 2 + (bool)errorIndex);
+          prepareArgument(resumeArgBuf, params[1 + (errorIndexBoundary == 0)]);
+        }
+        
+        
+        // Resume the continuation with the composed bridged result.
+        ManagedValue resumeArg = SGF.emitManagedBufferWithCleanup(resumeArgBuf);
+        Type replacementTypes[] = {resumeType};
+        auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
+                                         replacementTypes,
+                                         ArrayRef<ProtocolConformanceRef>{});
+        SGF.emitApplyOfLibraryIntrinsic(loc, resumeIntrinsic, subs,
+                                        {continuation, resumeArg},
+                                        SGFContext());
+      }
+      
+      // Now we've resumed the continuation one way or another. Return from the
+      // completion callback.
+      if (returnBB) {
+        SGF.B.createBranch(loc, returnBB);
+        SGF.B.emitBlock(returnBB);
+      }
+    }
+
+    SGF.B.createReturn(loc,
+                       SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F));
   }
   
   return F;

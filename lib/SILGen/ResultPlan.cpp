@@ -507,7 +507,8 @@ public:
       .getInterfaceType());
     SILFunction *impl = SGF.SGM
       .getOrCreateForeignAsyncCompletionHandlerImplFunction(implTy,
-                                                            continuationTy);
+                                                continuationTy,
+                                                *calleeTypeInfo.foreign.async);
     auto implRef = SGF.B.createFunctionRef(loc, impl);
     
     // Initialize the block object for the completion handler.

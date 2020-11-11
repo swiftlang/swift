@@ -27,6 +27,7 @@
 
 namespace swift {
   class SILBasicBlock;
+  class ForeignAsyncConvention;
 
 namespace Lowering {
   class TypeConverter;
@@ -118,6 +119,10 @@ public:
 
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
+  Optional<FuncDecl*> ResumeUnsafeContinuation;
+  Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
+  Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
+
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
 
@@ -169,7 +174,8 @@ public:
   /// as `async` in Swift.
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                            CanSILFunctionType blockType,
-                                           CanType continuationTy);
+                                           CanType continuationTy,
+                                           ForeignAsyncConvention convention);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -466,6 +472,13 @@ public:
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
+
+  /// Retrieve the _Concurrency._resumeUnsafeContinuation intrinsic.
+  FuncDecl *getResumeUnsafeContinuation();
+  /// Retrieve the _Concurrency._resumeUnsafeThrowingContinuation intrinsic.
+  FuncDecl *getResumeUnsafeThrowingContinuation();
+  /// Retrieve the _Concurrency._resumeUnsafeThrowingContinuationWithError intrinsic.
+  FuncDecl *getResumeUnsafeThrowingContinuationWithError();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);
