@@ -240,7 +240,7 @@ static void handleInternalUIDRequest(xpc_object_t XVal,
 
 static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t conn);
 
-void sourcekitd::initialize() {
+static void initializeXPCClient() {
   assert(!GlobalConn);
   GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);
 
@@ -309,9 +309,19 @@ void sourcekitd::initialize() {
   xpc_connection_resume(GlobalConn);
 }
 
-void sourcekitd::shutdown() {
-  assert(GlobalConn);
-  xpc_connection_cancel(GlobalConn);
+void sourcekitd_initialize(void) {
+  if (sourcekitd::initializeClient()) {
+    LOG_INFO_FUNC(High, "initializing");
+    initializeXPCClient();
+  }
+}
+
+void sourcekitd_shutdown(void) {
+  if (sourcekitd::shutdownClient()) {
+    LOG_INFO_FUNC(High, "shutting down");
+    assert(GlobalConn);
+    xpc_connection_cancel(GlobalConn);
+  }
 }
 
 static xpc_connection_t getGlobalConnection() {

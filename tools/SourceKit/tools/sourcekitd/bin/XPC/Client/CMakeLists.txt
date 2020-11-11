@@ -2,7 +2,7 @@ set(public_headers
   ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
 )
 
-set(EXPORTED_SYMBOL_FILE "${SOURCEKITD_SOURCE_DIR}/bin/sourcekitd.exports")
+set(EXPORTED_SYMBOL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/sourcekitd.exports")
 
 # FIXME: If you delete sourcekitd.framework, the soft links inside it need
 # a CMake reconfigure in order for them to be created.

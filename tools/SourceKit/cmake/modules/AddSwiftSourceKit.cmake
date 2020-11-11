@@ -363,11 +363,10 @@ macro(add_sourcekit_xpc_service name framework_target)
 
   add_dependencies(${framework_target} ${name})
 
-  # This is necessary to avoid having an rpath with an absolute build directory.
-  # Without this, such an rpath is added during build time and preserved at install time.
+  # Add rpath for sourcekitdInProc
   set_target_properties(${name} PROPERTIES
                         BUILD_WITH_INSTALL_RPATH On
-                        INSTALL_RPATH "@loader_path/../lib"
+                        INSTALL_RPATH "@loader_path/../../../../../../.."
                         INSTALL_NAME_DIR "@rpath")
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
