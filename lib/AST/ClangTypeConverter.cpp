@@ -572,7 +572,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     return ClangASTContext.getPointerType(clangTy);
   }
   case StructKind::UnsafePointer: {
-    return ClangASTContext.getPointerType(convert(argCanonicalTy).withConst());
+    auto clangTy = convert(argCanonicalTy);
+    if (clangTy.isNull())
+      return clang::QualType();
+    return ClangASTContext.getPointerType(clangTy.withConst());
   }
 
   case StructKind::CFunctionPointer: {
@@ -592,6 +595,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
 
   case StructKind::SIMD: {
     clang::QualType scalarTy = convert(argCanonicalTy);
+    if (scalarTy.isNull())
+      return clang::QualType();
     auto numEltsString = swiftStructDecl->getName().str();
     numEltsString.consume_front("SIMD");
     unsigned numElts;
