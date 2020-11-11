@@ -162,6 +162,23 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
       CoerceToCheckedCast(cs, fromType, toType, locator);
 }
 
+bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  ArrayLiteralToDictionaryConversionFailure failure(solution,
+                                                    getToType(), getFromType(),
+                                                    getLocator());
+  return failure.diagnose(asNote);
+};
+
+TreatArrayLiteralAsDictionary *
+TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
+                                      Type dictionaryTy, Type arrayTy,
+                                      ConstraintLocator *locator) {
+  assert(getAsExpr<ArrayExpr>(locator->getAnchor())->getNumElements() <= 1);
+  return new (cs.getAllocator())
+      TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, locator);
+};
+
 bool MarkExplicitlyEscaping::diagnose(const Solution &solution,
                                       bool asNote) const {
   NoEscapeFuncToTypeConversionFailure failure(solution, getFromType(),

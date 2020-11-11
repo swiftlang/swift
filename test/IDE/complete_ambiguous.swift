@@ -14,6 +14,18 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNAMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=UNAMBIGUOUSCLOSURE_ARG
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=AMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=AMBIGUOUSCLOSURE_ARG
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=AMBIGUOUSCLOSURE_ARG_RETURN | %FileCheck %s --check-prefix=AMBIGUOUSCLOSURE_ARG_RETURN
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_OPTIONAL | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_NESTED | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_ASSIGN | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_NESTED | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_CALL | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_CALL_OPT | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_RETURN | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_GENERIC | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_TUPLE | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_TUPLE
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_ARRAY | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_TUPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_FOO | %FileCheck %s --check-prefix=OVERLOADEDFUNC_FOO
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_BAR | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BAR
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGLABEL | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BOTH
@@ -164,6 +176,45 @@ takesAnonClosure { TestRelations.#^AMBIGUOUSCLOSURE_ARG_RETURN^# }
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN: End completions
+
+func takesDictAB(_ x: [A: B]) {}
+func takesOptDictAB(_ x: [A: B]?) {}
+func overloadedGivesAorB(_ x: A) -> A {}
+func overloadedGivesAorB(_ x: B) -> B {}
+var assignDict: [A : B] = [:]
+
+let _: [A : B] = [TestRelations.#^PARSED_AS_ARRAY^#]
+let _: [A : B]? = [TestRelations.#^PARSED_AS_ARRAY_OPTIONAL^#]
+let _: [[A : B]] = [[TestRelations.#^PARSED_AS_ARRAY_NESTED^#]]
+assignDict = [TestRelations.#^PARSED_AS_ARRAY_ASSIGN^#]
+let _: [A: B] = [overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT^#)]
+let _: [[A: B]] = [[overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_NESTED^#)]]
+takesDictAB([overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_CALL^#)]);
+takesOptDictAB([overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_CALL_OPT^#)]);
+func testReturnLiteralMismatch() -> [A: B] { return [overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_RETURN^#)] }
+func arrayLiteralDictionaryMismatch<T>(a: inout T) where T: ExpressibleByDictionaryLiteral, T.Key == A, T.Value == B {
+  a = [TestRelations.#^PARSED_AS_ARRAY_GENERIC^#]
+}
+
+// PARSED_AS_ARRAY_KEY: Begin completions, 6 items
+// PARSED_AS_ARRAY_KEY-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: a[#A#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: b[#B#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: ab[#(A, B)#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY: End completions
+
+let _: [(A, B) : B] = [TestRelations.#^PARSED_AS_ARRAY_TUPLE^#]
+let _: [(A, B)] = [TestRelations.#^PARSED_AS_ARRAY_ARRAY^#]
+// PARSED_AS_ARRAY_TUPLE: Begin completions, 6 items
+// PARSED_AS_ARRAY_TUPLE-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal: a[#A#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal: b[#B#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE: End completions
 
 
 func testMissingArgs() {
@@ -344,4 +395,3 @@ CreateThings {
     }
     Thing. // ErrorExpr
 }
-

@@ -690,6 +690,18 @@ protected:
   getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 };
 
+/// Diagnose errors related to using an array literal where a
+/// dictionary is expected.
+class ArrayLiteralToDictionaryConversionFailure final : public ContextualFailure {
+public:
+  ArrayLiteralToDictionaryConversionFailure(const Solution &solution,
+                                            Type arrayTy, Type dictTy,
+                                            ConstraintLocator *locator)
+      : ContextualFailure(solution, arrayTy, dictTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose errors related to converting function type which
 /// isn't explicitly '@escaping' to some other type.
 class NoEscapeFuncToTypeConversionFailure final : public ContextualFailure {
