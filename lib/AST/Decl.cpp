@@ -7526,6 +7526,20 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }
 
+ConstructorDecl *ConstructorDecl::createImported(
+    ASTContext &ctx, ClangNode clangNode, DeclName name,
+    SourceLoc constructorLoc, bool failable, SourceLoc failabilityLoc,
+    bool throws, SourceLoc throwsLoc, ParameterList *bodyParams,
+    GenericParamList *genericParams, DeclContext *parent) {
+  void *declPtr = allocateMemoryForDecl<ConstructorDecl>(
+      ctx, sizeof(ConstructorDecl), true);
+  auto ctor = ::new (declPtr)
+      ConstructorDecl(name, constructorLoc, failable, failabilityLoc, throws,
+                      throwsLoc, bodyParams, genericParams, parent);
+  ctor->setClangNode(clangNode);
+  return ctor;
+}
+
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   // The initializer must have a single, non-empty argument name.
   if (getName().getArgumentNames().size() != 1 ||
