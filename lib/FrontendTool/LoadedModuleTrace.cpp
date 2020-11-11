@@ -699,7 +699,7 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
-  StringRef loadedModuleTracePath = input.loadedModuleTracePath();
+  auto loadedModuleTracePath = input.loadedModuleTracePath();
   if (loadedModuleTracePath.empty())
     return false;
   std::error_code EC;

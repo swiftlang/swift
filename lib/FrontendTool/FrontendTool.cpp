@@ -116,8 +116,8 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
                                              const FrontendOptions &opts) {
   opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-        return emitLoadedModuleTraceIfNeeded(mainModule, depTracker, opts,
-                                             input);
+        return swift::emitLoadedModuleTraceIfNeeded(mainModule, depTracker,
+                                                    opts, input);
       });
 }
 
