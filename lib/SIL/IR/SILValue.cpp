@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -150,6 +151,30 @@ SILLocation SILValue::getLoc() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                               OwnershipKind
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OwnershipKind &kind) {
+  return os << kind.asString();
+}
+
+StringRef OwnershipKind::asString() const {
+  switch (value) {
+  case OwnershipKind::Any:
+    return "any";
+  case OwnershipKind::Unowned:
+    return "unowned";
+  case OwnershipKind::Owned:
+    return "owned";
+  case OwnershipKind::Guaranteed:
+    return "guaranteed";
+  case OwnershipKind::None:
+    return "none";
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                             ValueOwnershipKind
 //===----------------------------------------------------------------------===//
 
@@ -197,19 +222,7 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 }
 
 StringRef ValueOwnershipKind::asString() const {
-  switch (value) {
-  case OwnershipKind::Any:
-    return "any";
-  case OwnershipKind::Unowned:
-    return "unowned";
-  case OwnershipKind::Owned:
-    return "owned";
-  case OwnershipKind::Guaranteed:
-    return "guaranteed";
-  case OwnershipKind::None:
-    return "any";
-  }
-  llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
+  return value.asString();
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
@@ -278,29 +291,6 @@ StringRef swift::getSILValueName(ValueKind Kind) {
 #endif
 
 //===----------------------------------------------------------------------===//
-//                          OperandOwnershipKindMap
-//===----------------------------------------------------------------------===//
-
-void OperandOwnershipKindMap::print(llvm::raw_ostream &os) const {
-  os << "-- OperandOwnershipKindMap --\n";
-
-  unsigned index = 0;
-  unsigned end = unsigned(OwnershipKind::LastValueOwnershipKind) + 1;
-  while (index != end) {
-    auto kind = ValueOwnershipKind(index);
-    if (canAcceptKind(kind)) {
-      os << kind << ": Yes. Liveness: " << getLifetimeConstraint(kind) << "\n";
-    } else {
-      os << kind << ":  No."
-         << "\n";
-    }
-    ++index;
-  }
-}
-
-void OperandOwnershipKindMap::dump() const { print(llvm::dbgs()); }
-
-//===----------------------------------------------------------------------===//
 //                           UseLifetimeConstraint
 //===----------------------------------------------------------------------===//
 
@@ -329,4 +319,71 @@ SILBasicBlock *Operand::getParentBlock() const {
 SILFunction *Operand::getParentFunction() const {
   auto *self = const_cast<Operand *>(this);
   return self->getUser()->getFunction();
+}
+
+bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
+  auto constraint = getOwnershipConstraint();
+  if (!constraint)
+    return false;
+
+  if (constraint->satisfiesConstraint(kind))
+    return true;
+
+  // Then see if our preferred ownership constraint was not guaranteed or our
+  // use lifetime constraint was LifetimeEnding. If it wasn't, then we fail
+  // since we do not allow for implicit borrows in such situations.
+  if (kind == OwnershipKind::Owned && !isLifetimeEnding()) {
+    // Otherwise, we now know that our constraint is non lifetime ending
+    // and guaranteed and our value had owned ownership. If our user
+    // allows for implicit borrows and thus can accept owned values,
+    // return true.
+    if (auto borrowingOperand = BorrowingOperand::get(this))
+      if (borrowingOperand->canAcceptOwnedValues())
+        return true;
+  }
+
+  return false;
+}
+
+bool Operand::satisfiesConstraints() const {
+  return canAcceptKind(get().getOwnershipKind());
+}
+
+bool Operand::isLifetimeEnding() const {
+  auto constraint = getOwnershipConstraint();
+
+  // If we got back none, then our operand is for a type dependent operand. So
+  // return false.
+  if (!constraint)
+    return false;
+
+  // If our use lifetime constraint is NonLifetimeEnding, just return false.
+  if (!constraint->isLifetimeEnding())
+    return false;
+
+  // Otherwise, we may have a lifetime ending use. If we narrowed to None then
+  // we have a non lifetime ending use, otherwise we still have a lifetime
+  // ending use. If our value was not None, then obviously narrowing didn't
+  // happen.
+  if (get().getOwnershipKind() != OwnershipKind::None)
+    return true;
+
+  // Otherwise, narrowing only happened if our ownership constraint did not have
+  // an OwnershipKind of None, but we disallow that in any case, so we can just
+  // unconditionally return false.
+  assert(constraint->getPreferredKind() != OwnershipKind::None &&
+         "None values should never have a lifetime ending constraint");
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                             OperandConstraint
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     OwnershipConstraint constraint) {
+  return os << "<Constraint "
+               "Kind:" << constraint.getPreferredKind()
+            << " LifetimeConstraint:" << constraint.getLifetimeConstraint()
+            << ">";
 }

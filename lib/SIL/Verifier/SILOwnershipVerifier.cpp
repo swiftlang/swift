@@ -181,36 +181,21 @@ bool SILValueOwnershipChecker::check() {
 bool SILValueOwnershipChecker::isCompatibleDefUse(
     Operand *op, ValueOwnershipKind ownershipKind) {
   auto *user = op->getUser();
-  auto opOwnershipKindMap = op->getOwnershipKindMap();
+
   // If our ownership kind doesn't match, track that we found an error, emit
   // an error message optionally and then continue.
-  if (opOwnershipKindMap.canAcceptKind(ownershipKind)) {
+  if (op->satisfiesConstraints()) {
     return true;
   }
 
-  // If we did not support /any/ ownership kind, it means that we found a
-  // conflicting answer so the kind map that was returned is the empty
-  // map. Put out a more specific error here.
-  if (!opOwnershipKindMap.data.any()) {
-    errorBuilder.handleMalformedSIL([&]() {
-      llvm::errs() << "Ill-formed SIL! Unable to compute ownership kind "
-                      "map for user?!\n"
-                   << "For terminator users, check that successors have "
-                      "compatible ownership kinds.\n"
-                   << "Value: " << op->get() << "User: " << *user
-                   << "Operand Number: " << op->getOperandNumber() << '\n'
-                   << "Conv: " << ownershipKind << "\n\n";
-    });
-    return false;
-  }
-
+  auto constraint = *op->getOwnershipConstraint();
   errorBuilder.handleMalformedSIL([&]() {
     llvm::errs() << "Have operand with incompatible ownership?!\n"
                  << "Value: " << op->get() << "User: " << *user
                  << "Operand Number: " << op->getOperandNumber() << '\n'
                  << "Conv: " << ownershipKind << '\n'
-                 << "OwnershipMap:\n"
-                 << opOwnershipKindMap << '\n';
+                 << "Constraint:\n"
+                 << constraint << '\n';
   });
   return false;
 }
@@ -749,17 +734,18 @@ void SILInstruction::verifyOperandOwnership() const {
   } else {
     errorBuilder.emplace(*getFunction(), BehaviorKind::PrintMessageAndAssert);
   }
+
   for (const Operand &op : getAllOperands()) {
     // Skip type dependence operands.
     if (isTypeDependentOperand(op))
       continue;
-    SILValue opValue = op.get();
 
-    auto operandOwnershipKindMap = op.getOwnershipKindMap();
-    auto valueOwnershipKind = opValue.getOwnershipKind();
-    if (operandOwnershipKindMap.canAcceptKind(valueOwnershipKind))
+    if (op.satisfiesConstraints())
       continue;
 
+    auto constraint = *op.getOwnershipConstraint();
+    SILValue opValue = op.get();
+    auto valueOwnershipKind = opValue.getOwnershipKind();
     errorBuilder->handleMalformedSIL([&] {
       llvm::errs() << "Found an operand with a value that is not compatible "
                       "with the operand's operand ownership kind map.\n";
@@ -767,7 +753,7 @@ void SILInstruction::verifyOperandOwnership() const {
       llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
       llvm::errs() << "Instruction:\n";
       printInContext(llvm::errs());
-      llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
+      llvm::errs() << "Constraint: " << constraint << "\n";
     });
   }
 }
