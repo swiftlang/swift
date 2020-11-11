@@ -4747,9 +4747,6 @@ private:
     /// Whether this type variable is only bound above by existential types.
     bool SubtypeOfExistentialType = false;
 
-    /// The number of defaultable bindings.
-    unsigned NumDefaultableBindings = 0;
-
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
 
@@ -4767,35 +4764,45 @@ private:
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
-    /// Whether there are any non-defaultable bindings.
-    bool hasNonDefaultableBindings() const {
-      return Bindings.size() > NumDefaultableBindings;
+    unsigned getNumDefaultableBindings() const {
+      return llvm::count_if(Bindings, [](const PotentialBinding &binding) {
+        return binding.isDefaultableBinding();
+      });
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
+      auto numDefaults = b.getNumDefaultableBindings();
+      auto hasNoDefaultableBindings = b.Bindings.size() > numDefaults;
+
       return std::make_tuple(b.IsHole,
-                             !b.hasNonDefaultableBindings(),
+                             !hasNoDefaultableBindings,
                              b.FullyBound,
                              b.SubtypeOfExistentialType,
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),
-                             -(b.Bindings.size() - b.NumDefaultableBindings));
+                             -(b.Bindings.size() - numDefaults));
     }
 
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      if (formBindingScore(x) < formBindingScore(y))
+      auto xScore = formBindingScore(x);
+      auto yScore = formBindingScore(y);
+
+      if (xScore < yScore)
         return true;
 
-      if (formBindingScore(y) < formBindingScore(x))
+      if (yScore < xScore)
         return false;
+
+      auto xDefaults = x.Bindings.size() + std::get<6>(xScore);
+      auto yDefaults = y.Bindings.size() + std::get<6>(yScore);
 
       // If there is a difference in number of default types,
       // prioritize bindings with fewer of them.
-      if (x.NumDefaultableBindings != y.NumDefaultableBindings)
-        return x.NumDefaultableBindings < y.NumDefaultableBindings;
+      if (xDefaults != yDefaults)
+        return xDefaults < yDefaults;
 
       // If neither type variable is a "hole" let's check whether
       // there is a subtype relationship between them and prefer
@@ -4924,8 +4931,10 @@ public:
         out << "literal=" << static_cast<int>(LiteralBinding) << " ";
       if (InvolvesTypeVariables)
         out << "involves_type_vars ";
-      if (NumDefaultableBindings > 0)
-        out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
+
+      auto numDefaultable = getNumDefaultableBindings();
+      if (numDefaultable > 0)
+        out << "#defaultable_bindings=" << numDefaultable << " ";
 
       PrintOptions PO;
       PO.PrintTypesForDebugging = true;

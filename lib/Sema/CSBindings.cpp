@@ -678,9 +678,6 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (!isViable(binding))
     return;
 
-  if (binding.isDefaultableBinding())
-    ++NumDefaultableBindings;
-
   Bindings.push_back(std::move(binding));
 }
 
