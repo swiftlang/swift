@@ -461,10 +461,9 @@ static bool compileLLVMIR(CompilerInstance &Instance) {
                      Module.get(), inputsAndOutputs.getSingleOutputFilename());
 }
 
-static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation,
+static void verifyGenericSignaturesIfNeeded(const FrontendOptions &opts,
                                             ASTContext &Context) {
-  auto verifyGenericSignaturesInModule =
-      Invocation.getFrontendOptions().VerifyGenericSignaturesInModule;
+  auto verifyGenericSignaturesInModule = opts.VerifyGenericSignaturesInModule;
   if (verifyGenericSignaturesInModule.empty())
     return;
   if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
@@ -932,7 +931,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     ctx.verifyAllLoadedModules();
 
     // Verify generic signatures if we've been asked to.
-    verifyGenericSignaturesIfNeeded(Invocation, ctx);
+    verifyGenericSignaturesIfNeeded(Invocation.getFrontendOptions(), ctx);
   }
 
   // Emit any additional outputs that we only need for a successful compilation.
