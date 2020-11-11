@@ -161,7 +161,7 @@ private:
            "pullback struct element values");
     for (auto pair : llvm::zip(pbStructDecl->getStoredProperties(), values)) {
       assert(std::get<1>(pair).getOwnershipKind() !=
-                 ValueOwnershipKind::Guaranteed &&
+                 OwnershipKind::Guaranteed &&
              "Pullback struct elements must be @owned");
       auto insertion =
           pullbackStructElements.insert({std::get<0>(pair), std::get<1>(pair)});
@@ -1928,7 +1928,7 @@ bool PullbackCloner::Implementation::run() {
         // Create and register pullback block argument for the active value.
         auto *pullbackArg = pullbackBB->createPhiArgument(
             getRemappedTangentType(activeValue->getType()),
-            ValueOwnershipKind::Owned);
+            OwnershipKind::Owned);
         activeValuePullbackBBArgumentMap[{origBB, activeValue}] = pullbackArg;
         recordTemporary(pullbackArg);
         break;
@@ -1936,8 +1936,8 @@ bool PullbackCloner::Implementation::run() {
       }
     }
     // Add a pullback struct argument.
-    auto *pbStructArg = pullbackBB->createPhiArgument(
-        pbStructLoweredType, ValueOwnershipKind::Owned);
+    auto *pbStructArg = pullbackBB->createPhiArgument(pbStructLoweredType,
+                                                      OwnershipKind::Owned);
     pullbackStructArguments[origBB] = pbStructArg;
     // Destructure the pullback struct to get the elements.
     builder.setInsertionPoint(pullbackBB);
@@ -1963,7 +1963,7 @@ bool PullbackCloner::Implementation::run() {
       auto enumEltType = remapType(enumLoweredTy.getEnumElementType(
           enumEltDecl, getModule(), TypeExpansionContext::minimal()));
       pullbackTrampolineBB->createPhiArgument(enumEltType,
-                                              ValueOwnershipKind::Owned);
+                                              OwnershipKind::Owned);
     }
   }
 
@@ -2145,7 +2145,7 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
   builder.setInsertionPoint(pullbackEntry);
   // Destroy all owned arguments.
   for (auto *arg : pullbackEntry->getArguments())
-    if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned)
       builder.emitDestroyOperation(pbLoc, arg);
   // Return zero for each result.
   SmallVector<SILValue, 4> directResults;

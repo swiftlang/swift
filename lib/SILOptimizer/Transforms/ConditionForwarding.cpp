@@ -246,8 +246,8 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       SILArgument *NewArg = nullptr;
       if (NeedEnumArg.insert(UseBlock).second) {
         // The first Enum use in this UseBlock.
-        NewArg = UseBlock->createPhiArgument(Arg->getType(),
-                                             ValueOwnershipKind::Owned);
+        NewArg =
+            UseBlock->createPhiArgument(Arg->getType(), OwnershipKind::Owned);
       } else {
         // We already inserted the Enum argument for this UseBlock.
         assert(UseBlock->getNumArguments() >= 1);

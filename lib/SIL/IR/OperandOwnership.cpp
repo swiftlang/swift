@@ -70,7 +70,7 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getOwnershipKind() == ValueOwnershipKind::None;
+    return getOwnershipKind() == OwnershipKind::None;
   }
 
   OperandOwnershipKindMap
@@ -137,7 +137,7 @@ SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,               \
+    return Map::compatibilityMap(OwnershipKind::Guaranteed,                    \
                                  UseLifetimeConstraint::NonLifetimeEnding);    \
   }
 INTERIOR_POINTER_PROJECTION(RefElementAddr)
@@ -150,7 +150,7 @@ INTERIOR_POINTER_PROJECTION(RefTailAddr)
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
     return Map::compatibilityMap(                                              \
-        ValueOwnershipKind::OWNERSHIP,                                         \
+        OwnershipKind::OWNERSHIP,                                              \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialValue)
@@ -240,7 +240,7 @@ CONSTANT_OWNERSHIP_INST(None, NonLifetimeEnding, DeallocValueBuffer)
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
     return Map::compatibilityMap(                                              \
-        ValueOwnershipKind::OWNERSHIP,                                         \
+        OwnershipKind::OWNERSHIP,                                              \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding, CheckedCastValueBranch)
@@ -330,7 +330,7 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
            "Expected an ownership forwarding inst");                           \
     OperandOwnershipKindMap map;                                               \
     map.addCompatibilityConstraint(                                            \
-        ValueOwnershipKind::OWNERSHIP,                                         \
+        OwnershipKind::OWNERSHIP,                                              \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
     return map;                                                                \
   }
@@ -350,7 +350,7 @@ OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitDeallocPartialRefInst(
     DeallocPartialRefInst *i) {
   if (getValue() == i->getInstance()) {
-    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+    return Map::compatibilityMap(OwnershipKind::Owned,
                                  UseLifetimeConstraint::LifetimeEnding);
   }
 
@@ -400,7 +400,7 @@ OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
   // If we have a guaranteed parameter, treat this as consuming.
-  if (destBlockArgOwnershipKind == ValueOwnershipKind::Guaranteed) {
+  if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
     return Map::compatibilityMap(destBlockArgOwnershipKind,
                                  UseLifetimeConstraint::LifetimeEnding);
   }
@@ -444,13 +444,13 @@ OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitEndBorrowInst(EndBorrowInst *i) {
   /// An end_borrow is modeled as invalidating the guaranteed value preventing
   /// any further uses of the value.
-  return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+  return Map::compatibilityMap(OwnershipKind::Guaranteed,
                                UseLifetimeConstraint::LifetimeEnding);
 }
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitThrowInst(ThrowInst *i) {
-  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+  return Map::compatibilityMap(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
 }
 
@@ -471,7 +471,7 @@ OperandOwnershipKindClassifier::visitThrowInst(ThrowInst *i) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   if (getValue() == i->getSrc()) {
-    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+    return Map::compatibilityMap(OwnershipKind::Guaranteed,
                                  UseLifetimeConstraint::NonLifetimeEnding);
   }
   return Map::allLive();
@@ -486,12 +486,12 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   case ParameterConvention::Indirect_In_Constant:
     assert(!SILModuleConventions(mod).isSILIndirect(
                                       SILParameterInfo(substCalleeType, conv)));
-    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+    return Map::compatibilityMap(OwnershipKind::Owned,
                                  UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Indirect_In_Guaranteed:
     assert(!SILModuleConventions(mod).isSILIndirect(
                                       SILParameterInfo(substCalleeType, conv)));
-    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+    return Map::compatibilityMap(OwnershipKind::Guaranteed,
                                  UseLifetimeConstraint::NonLifetimeEnding);
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
@@ -499,7 +499,7 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   case ParameterConvention::Direct_Unowned:
     return Map::allLive();
   case ParameterConvention::Direct_Owned:
-    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+    return Map::compatibilityMap(OwnershipKind::Owned,
                                  UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Direct_Guaranteed:
     if (substCalleeType->isNoEscape())
@@ -507,10 +507,9 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
     // We want to accept guaranteed/owned in this position since we
     // treat the use of an owned parameter as an instantaneously
     // borrowed value for the duration of the call.
-    return Map::compatibilityMap({{ValueOwnershipKind::Guaranteed,
-                                   UseLifetimeConstraint::NonLifetimeEnding},
-                                  {ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::NonLifetimeEnding}});
+    return Map::compatibilityMap(
+        {{OwnershipKind::Guaranteed, UseLifetimeConstraint::NonLifetimeEnding},
+         {OwnershipKind::Owned, UseLifetimeConstraint::NonLifetimeEnding}});
   }
 
   llvm_unreachable("Unhandled ParameterConvention in switch.");
@@ -524,10 +523,10 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
 
   // Check against the passed in convention. We allow for owned to be passed to
   // apply parameters.
-  if (kind != ValueOwnershipKind::Owned) {
-    return Map::compatibilityMap({{kind, requirement},
-                                  {ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::NonLifetimeEnding}});
+  if (kind != OwnershipKind::Owned) {
+    return Map::compatibilityMap(
+        {{kind, requirement},
+         {OwnershipKind::Owned, UseLifetimeConstraint::NonLifetimeEnding}});
   }
   return Map::compatibilityMap(kind, requirement);
 }
@@ -557,7 +556,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
 
   switch (paramInfo.getConvention()) {
   case ParameterConvention::Direct_Owned:
-    return visitApplyParameter(ValueOwnershipKind::Owned,
+    return visitApplyParameter(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Direct_Unowned:
     return Map::allLive();
@@ -568,7 +567,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
       return Map::allLive();
     }
     // TODO: Once trivial is subsumed in any, this goes away.
-    auto map = visitApplyParameter(ValueOwnershipKind::Owned,
+    auto map = visitApplyParameter(OwnershipKind::Owned,
                                    UseLifetimeConstraint::LifetimeEnding);
     return map;
   }
@@ -578,7 +577,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     if (conv.useLoweredAddresses()) {
       return Map::allLive();
     }
-    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+    return visitApplyParameter(OwnershipKind::Guaranteed,
                                UseLifetimeConstraint::NonLifetimeEnding);
   }
 
@@ -594,7 +593,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     // point of view, this is just like a normal non-consuming use.
     // Direct_Guaranteed only accepts non-trivial types, but trivial types are
     // already handled above.
-    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+    return visitApplyParameter(OwnershipKind::Guaranteed,
                                UseLifetimeConstraint::NonLifetimeEnding);
   }
   llvm_unreachable("unhandled convension");
@@ -623,7 +622,7 @@ OperandOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *i) {
 
   return Map::compatibilityMap(
       // All non-trivial types should be captured.
-      ValueOwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding);
+      OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding);
 }
 
 // TODO: FIX THIS
@@ -640,7 +639,7 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
   switch (yieldInfo.getConvention()) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Owned:
-    return visitApplyParameter(ValueOwnershipKind::Owned,
+    return visitApplyParameter(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
@@ -648,7 +647,7 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
     return Map::allLive();
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
-    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+    return visitApplyParameter(OwnershipKind::Guaranteed,
                                UseLifetimeConstraint::NonLifetimeEnding);
   // The following conventions should take address types.
   case ParameterConvention::Indirect_Inout:
@@ -664,7 +663,7 @@ OperandOwnershipKindClassifier::visitAssignInst(AssignInst *i) {
     return Map::allLive();
   }
 
-  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+  return Map::compatibilityMap(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
 }
 
@@ -674,7 +673,7 @@ OperandOwnershipKindClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i)
     return Map::allLive();
   }
 
-  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+  return Map::compatibilityMap(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
 }
 
@@ -684,7 +683,7 @@ OperandOwnershipKindClassifier::visitStoreInst(StoreInst *i) {
     return Map::allLive();
   }
 
-  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+  return Map::compatibilityMap(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
 }
 
@@ -693,7 +692,7 @@ OperandOwnershipKindClassifier::visitCopyBlockWithoutEscapingInst(
     CopyBlockWithoutEscapingInst *i) {
   // Consumes the closure parameter.
   if (getValue() == i->getClosure()) {
-    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+    return Map::compatibilityMap(OwnershipKind::Owned,
                                  UseLifetimeConstraint::LifetimeEnding);
   }
 
@@ -705,7 +704,7 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
   // If we are analyzing "the value", we forward ownership.
   if (getValue() == mdi->getValue()) {
     auto kind = mdi->getOwnershipKind();
-    if (kind == ValueOwnershipKind::None)
+    if (kind == OwnershipKind::None)
       return Map::allLive();
     auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
     return Map::compatibilityMap(kind, lifetimeConstraint);
@@ -722,7 +721,7 @@ OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitKeyPathInst(KeyPathInst *I) {
   // KeyPath moves the value in memory out of address operands, but the
   // ownership checker doesn't reason about that yet.
-  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+  return Map::compatibilityMap(OwnershipKind::Owned,
                                UseLifetimeConstraint::LifetimeEnding);
 }
 
@@ -912,7 +911,7 @@ ANY_OWNERSHIP_BUILTIN(IntInstrprofIncrement)
   OperandOwnershipKindMap OperandOwnershipKindBuiltinClassifier::visit##ID(    \
       BuiltinInst *, StringRef) {                                              \
     return Map::compatibilityMap(                                              \
-        ValueOwnershipKind::OWNERSHIP,                                         \
+        OwnershipKind::OWNERSHIP,                                              \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, LifetimeEnding, COWBufferForReading)

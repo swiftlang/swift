@@ -253,7 +253,7 @@ private:
 
 public:
   static Optional<BorrowedValueKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
       return None;
     switch (value->getKind()) {
     default:
@@ -571,7 +571,7 @@ private:
 
 public:
   static Optional<OwnedValueIntroducerKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
+    if (value.getOwnershipKind() != OwnershipKind::Owned)
       return None;
 
     switch (value->getKind()) {
