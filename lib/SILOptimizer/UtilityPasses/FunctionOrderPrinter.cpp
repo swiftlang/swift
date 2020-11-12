@@ -35,10 +35,8 @@ class FunctionOrderPrinterPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
     BCA = getAnalysis<BasicCalleeAnalysis>();
-    // SWIFT_ENABLE_TENSORFLOW
-    BottomUpFunctionOrder Orderer(BCA);
-    Orderer.computeBottomUpOrder(getModule());
-    // SWIFT_ENABLE_TENSORFLOW END
+    auto &M = *getModule();
+    BottomUpFunctionOrder Orderer(M, BCA);
 
     llvm::outs() << "Bottom up function order:\n";
     auto SCCs = Orderer.getSCCs();
