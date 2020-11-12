@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/external-cascade/* %t
 
+// rdar://70772320
+// REQUIRES: !(optimized_stdlib)
+
 //
 // This test establishes a chain of modules that all depend on a set of
 // bridging headers. This test ensures that changes to external dependencies -
