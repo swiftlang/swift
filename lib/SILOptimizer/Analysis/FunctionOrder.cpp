@@ -73,3 +73,8 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
     TheSCCs.push_back(CurrentSCC);
   }
 }
+
+void BottomUpFunctionOrder::FindSCCs(SILModule &M) {
+  for (auto &F : M)
+    DFS(&F);
+}
