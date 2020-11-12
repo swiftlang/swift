@@ -242,15 +242,12 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
   if (!mayAlias(LI->getOperand()))
     return MemBehavior::None;
 
+  // A take is modelled as a write. See MemoryBehavior::MayWrite.
+  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      return MemBehavior::MayReadWrite;
+
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
-                             "pointer. ");
-
-  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-    LLVM_DEBUG(llvm::dbgs() << "Is a take so return MayReadWrite.\n");
-    return MemBehavior::MayReadWrite;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "Not a take so returning MayRead.\n");
+                             "pointer. Returning may read.\n");
   return MemBehavior::MayRead;
 }
 
@@ -260,17 +257,15 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   if (isLetValue() && (getAccessBase(SI->getDest()) != getValueAddress())) {
     return MemBehavior::None;
   }
-  // If the store dest cannot alias the pointer in question and we are not
-  // releasing anything due to an assign, then the specified value cannot be
-  // modified by the store.
-  if (!mayAlias(SI->getDest()) &&
-      SI->getOwnershipQualifier() != StoreOwnershipQualifier::Assign)
+  // If the store dest cannot alias the pointer in question, then the
+  // specified value cannot be modified by the store.
+  if (!mayAlias(SI->getDest()))
     return MemBehavior::None;
 
   // Otherwise, a store just writes.
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
-                             "Returning default mem behavior.\n");
-  return SI->getMemoryBehavior();
+                             "Returning MayWrite.\n");
+  return MemBehavior::MayWrite;
 }
 
 MemBehavior MemoryBehaviorVisitor::visitCopyAddrInst(CopyAddrInst *CAI) {
