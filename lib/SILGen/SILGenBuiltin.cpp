@@ -1386,7 +1386,7 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
   // Now convert our unownedNonTrivialRef from unowned ownership to guaranteed
   // ownership and create a cleanup for it.
   SILValue guaranteedNonTrivialRef = SGF.B.createUncheckedOwnershipConversion(
-      loc, unownedNonTrivialRef, ValueOwnershipKind::Guaranteed);
+      loc, unownedNonTrivialRef, OwnershipKind::Guaranteed);
   auto guaranteedNonTrivialRefMV =
       SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
   // Now create a mark dependence on our base and return the result.

@@ -879,12 +879,15 @@ protected:
                                      SILDebugLocation debugLoc, SILType ty,
                                      ValueOwnershipKind ownershipKind)
       : SingleValueInstruction(kind, debugLoc, ty),
-        ownershipKind(ownershipKind) {}
+        ownershipKind(ownershipKind) {
+    assert(ownershipKind);
+  }
 
 public:
   ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
   void setOwnershipKind(ValueOwnershipKind newOwnershipKind) {
     ownershipKind = newOwnershipKind;
+    assert(ownershipKind);
   }
 };
 
@@ -5232,8 +5235,8 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
              unsigned NumBaseElements, bool HasOwnership)
       : InstructionBaseWithTrailingOperands(
             Elements, DebugLoc, Ty,
-            HasOwnership ? *mergeSILValueOwnership(Elements)
-                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
+            HasOwnership ? mergeSILValueOwnership(Elements)
+                         : ValueOwnershipKind(OwnershipKind::None)) {
     SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
@@ -5279,8 +5282,8 @@ class TupleInst final : public InstructionBaseWithTrailingOperands<
             bool HasOwnership)
       : InstructionBaseWithTrailingOperands(
             Elems, DebugLoc, Ty,
-            HasOwnership ? *mergeSILValueOwnership(Elems)
-                         : ValueOwnershipKind(ValueOwnershipKind::None)) {}
+            HasOwnership ? mergeSILValueOwnership(Elems)
+                         : ValueOwnershipKind(OwnershipKind::None)) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -5356,7 +5359,7 @@ class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
            EnumElementDecl *Element, SILType ResultTy)
       : InstructionBase(DebugLoc, ResultTy,
                         Operand ? Operand.getOwnershipKind()
-                                : ValueOwnershipKind(ValueOwnershipKind::None)),
+                                : ValueOwnershipKind(OwnershipKind::None)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5648,8 +5651,8 @@ private:
       : InstructionBaseWithTrailingOperands(
             Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
             DefaultCount,
-            HasOwnership ? *mergeSILValueOwnership(CaseValues)
-                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
+            HasOwnership ? mergeSILValueOwnership(CaseValues)
+                         : ValueOwnershipKind(OwnershipKind::None)) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());

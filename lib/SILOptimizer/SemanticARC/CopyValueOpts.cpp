@@ -408,7 +408,7 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
   // First do a quick check if our operand is owned. If it is not owned, we can
   // not join live ranges.
   SILValue operand = cvi->getOperand();
-  if (operand.getOwnershipKind() != ValueOwnershipKind::Owned) {
+  if (operand.getOwnershipKind() != OwnershipKind::Owned) {
     return false;
   }
 

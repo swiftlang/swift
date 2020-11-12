@@ -66,7 +66,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
     for (auto *succBlock : branchInst->getSuccessorBlocks()) {
       auto *phiArg = cast<SILPhiArgument>(
           succBlock->getArgument(borrowLifetimeEndOp->getOperandNumber()));
-      assert(phiArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+      assert(phiArg->getOwnershipKind() == OwnershipKind::Guaranteed);
 
       SILValue newBaseVal = baseVal;
       // If the previous base value was also passed as a phi arg, that will be

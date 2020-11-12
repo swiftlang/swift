@@ -675,8 +675,6 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
 
-bool typeCheckCatchPattern(CaseStmt *S, DeclContext *dc);
-
 /// Coerce a pattern to the given type.
 ///
 /// \param pattern The contextual pattern.

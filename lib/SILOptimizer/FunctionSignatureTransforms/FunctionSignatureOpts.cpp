@@ -605,12 +605,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue =
-        NormalBlock->createPhiArgument(ResultType, ValueOwnershipKind::Owned);
+        NormalBlock->createPhiArgument(ResultType, OwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getInterfaceType());
-    auto *ErrorArg =
-        ErrorBlock->createPhiArgument(Error, ValueOwnershipKind::Owned);
+    auto *ErrorArg = ErrorBlock->createPhiArgument(Error, OwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, Subs, ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);

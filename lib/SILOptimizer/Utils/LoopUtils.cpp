@@ -32,7 +32,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   llvm::SmallVector<SILValue, 8> Args;
   for (auto *HeaderArg : Header->getArguments()) {
     Args.push_back(Preheader->createPhiArgument(HeaderArg->getType(),
-                                                ValueOwnershipKind::Owned));
+                                                OwnershipKind::Owned));
   }
 
   // Create the branch to the header.
@@ -127,8 +127,8 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
   for (auto *BBArg : Header->getArguments()) {
-    BBArgs.push_back(BEBlock->createPhiArgument(BBArg->getType(),
-                                                ValueOwnershipKind::Owned));
+    BBArgs.push_back(
+        BEBlock->createPhiArgument(BBArg->getType(), OwnershipKind::Owned));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.
