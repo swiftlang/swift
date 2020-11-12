@@ -785,6 +785,8 @@ enum ScoreKind {
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
   SK_DisfavoredOverload,
+  /// A member for an \c UnresolvedMemberExpr found via unwrapped optional base.
+  SK_UnresolvedMemberViaOptional,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.

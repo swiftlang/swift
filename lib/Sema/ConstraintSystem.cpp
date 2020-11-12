@@ -2802,6 +2802,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       choice.getDecl()->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
     increaseScore(SK_DisfavoredOverload);
   }
+
+  if (choice.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional &&
+      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+    increaseScore(SK_UnresolvedMemberViaOptional);
+  }
 }
 
 Type ConstraintSystem::simplifyTypeImpl(Type type,
