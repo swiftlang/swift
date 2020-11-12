@@ -847,4 +847,15 @@ CastsTests.test("Failing cast from Any to Optional<Protocol> [SR-6279]") {
   expectNotNil(f)
 }
 
+protocol SuperProtocol{}
+CastsTests.test("Casting Objects retained from KeyPaths to Protocols is not working properly") {
+  // This is the simplified reproduction from rdar://59844232 which doesn't
+  // actually use KeyPaths
+  class SubClass : SuperProtocol{}
+  let value = SubClass() as Any? as Any
+
+  expectNotNil(value as? SubClass)
+  expectNotNil(value as? SuperProtocol)
+}
+
 runAllTests()
