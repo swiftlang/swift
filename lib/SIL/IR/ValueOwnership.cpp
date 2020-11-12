@@ -583,6 +583,19 @@ ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
 //===----------------------------------------------------------------------===//
 
 ValueOwnershipKind SILValue::getOwnershipKind() const {
+  // If we do not have an undef, we should always be able to get to our function
+  // here. If we do not have ownership enabled, just return none for everything
+  // to short circuit ownership optimizations. If we have an undef we may still
+  // get some results that are slightly wonky but hopefully when we lower
+  // ownership we remove that.
+  //
+  // We assume that any time we are in SILBuilder and call this without having a
+  // value in a block yet, ossa is enabled.
+  if (auto *block = Value->getParentBlock())
+    if (auto *f = block->getParent())
+      if (!f->hasOwnership())
+        return OwnershipKind::None;
+
   ValueOwnershipKindClassifier Classifier;
   auto result = Classifier.visit(const_cast<ValueBase *>(Value));
   assert(result && "Returned ownership kind invalid on values");
