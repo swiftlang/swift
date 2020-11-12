@@ -351,7 +351,7 @@
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "swift-tools-support-core": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
-                "swift-argument-parser": "0.3.1",
+                "swift-argument-parser": "main",
                 "swift-driver": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
@@ -365,7 +365,7 @@
                 "yams": "3.0.1-tensorflow",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-10-27-a",
-                "PythonKit": "175e90e4dbafd21c129a6b0d002524be5f98b272",
+                "PythonKit": "59a868e84e1d6a5e01569cf92086554033415fa4",
                 "swift-format": "main",
                 "tensorflow": "v2.3.0",
                 "tensorflow-swift-apis": "tensorflow-0.12"
