@@ -13,21 +13,21 @@
 // WARNING: module 'SwiftOnoneSupport' cannot be built with -experimental-skip-non-inlinable-function-bodies; this option has been automatically disabled
 
 // Check skipped bodies are neither typechecked nor SILgen'd
-// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s -o %t/Skip.noninlinable.sil
-// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -O -experimental-skip-all-function-bodies -debug-forbid-typecheck-prefix ALLNOTYPECHECK %s -o %t/Skip.all.sil
-// %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY < %t/Skip.noninlinable.sil
-// %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY < %t/Skip.all.sil
+// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s -o %t/Skip.noninlinable.sil
+// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-all-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix ALLNOTYPECHECK %s -o %t/Skip.all.sil
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-SIL < %t/Skip.noninlinable.sil
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY < %t/Skip.all.sil
 
 // Emit the module interface and check it against the same set of strings.
 // RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Skip.noninlinable.swiftinterface -experimental-skip-non-inlinable-function-bodies
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY < %t/Skip.noninlinable.swiftinterface
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-TEXTUAL < %t/Skip.noninlinable.swiftinterface
 // RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Skip.all.swiftinterface -experimental-skip-all-function-bodies
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY < %t/Skip.all.swiftinterface
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY,CHECK-NONINLINE-TEXTUAL < %t/Skip.all.swiftinterface
 
 // Emit the module interface normally, it should be the same as when skipping
 // non-inlinable.
 // RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Skip.swiftinterface
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY < %t/Skip.swiftinterface
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-TEXTUAL < %t/Skip.swiftinterface
 // RUN: diff -u %t/Skip.noninlinable.swiftinterface %t/Skip.swiftinterface
 
 @usableFromInline
@@ -58,16 +58,14 @@ public class InlinableDeinit {
 @_fixed_layout
 public class InlineAlwaysDeinit {
   @inline(__always) deinit {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("@inline(__always) deinit body") // CHECK-NOT: "@inline(__always) deinit body"
   }
 }
 
 public class NormalDeinit {
   deinit {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("regular deinit body") // CHECK-NOT: "regular deinit body"
   }
 }
@@ -80,52 +78,44 @@ public class NormalDeinit {
 }
 
 @inline(__always) public func inlineAlwaysFunc() {
-  let ALLNOTYPECHECK_local = 1
-  let INLINENOTYPECHECK_local = 1
+  let NEVERTYPECHECK_local = 1
   _blackHole("@inline(__always) func body") // CHECK-NOT: "@inline(__always) func body"
 }
 
 func internalFunc() {
-  let ALLNOTYPECHECK_local = 1
-  let INLINENOTYPECHECK_local = 1
+  let NEVERTYPECHECK_local = 1
   _blackHole("internal func body") // CHECK-NOT: "internal func body"
 }
 
 public func publicFunc() {
-  let ALLNOTYPECHECK_local = 1
-  let INLINENOTYPECHECK_local = 1
+  let NEVERTYPECHECK_local = 1
   _blackHole("public func body") // CHECK-NOT: "public func body"
 }
 
 private func privateFunc() {
-  let ALLNOTYPECHECK_local = 1
-  let INLINENOTYPECHECK_local = 1
+  let NEVERTYPECHECK_local = 1
   _blackHole("private func body") // CHECK-NOT: "private func body"
 }
 
 @inline(__always) public func inlineAlwaysLocalTypeFunc() {
-  let ALLNOTYPECHECK_outerLocal = 1
-  let INLINENOTYPECHECK_outerLocal = 1
+  let NEVERTYPECHECK_outerLocal = 1
 
   typealias InlineAlwaysLocalType = Int
   _blackHole("@inline(__always) func body with local type") // CHECK-NOT: "@inline(__always) func body with local type"
   func takesInlineAlwaysLocalType(_ x: InlineAlwaysLocalType) {
-    let ALLNOTYPECHECK_innerLocal = 1
-    let INLINENOTYPECHECK_innerLocal = 1
+    let NEVERTYPECHECK_innerLocal = 1
     _blackHole("nested func body inside @inline(__always) func body taking local type") // CHECK-NOT: "nested func body inside @inline(__always) func body taking local type"
   }
   takesInlineAlwaysLocalType(0)
 }
 
 public func publicLocalTypeFunc() {
-  let ALLNOTYPECHECK_outerLocal = 1
-  let INLINENOTYPECHECK_outerLocal = 1
+  let NEVERTYPECHECK_outerLocal = 1
 
   typealias LocalType = Int
   _blackHole("public func body with local type") // CHECK-NOT: "public func body with local type"
   func takesLocalType(_ x: LocalType) {
-    let ALLNOTYPECHECK_innerLocal = 1
-    let INLINENOTYPECHECK_innerLocal = 1
+    let NEVERTYPECHECK_innerLocal = 1
     _blackHole("nested func body inside public func body taking local type") // CHECK-NOT: "nested func body inside public func body taking local type"
   }
   takesLocalType(0)
@@ -206,8 +196,7 @@ public struct Struct {
 
   @inline(__always)
   public func inlineAlwaysFunc() {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("@inline(__always) method body") // CHECK-NOT: "@inline(__always) method body"
   }
 
@@ -236,13 +225,6 @@ public struct Struct {
     }
   }
 
-  public var didSetVar: Int = 1 {
-    didSet {
-      // Body typechecked regardless
-      _blackHole("didSet body") // CHECK-NOT: "didSet body"
-    }
-  }
-
   @_transparent
   public func transparentFunc() {
     let ALLNOTYPECHECK_local = 1
@@ -252,20 +234,17 @@ public struct Struct {
   }
 
   func internalFunc() {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("internal method body") // CHECK-NOT: "internal method body"
   }
 
   public func publicFunc() {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("public method body") // CHECK-NOT: "public method body"
   }
 
   private func privateFunc() {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("private method body") // CHECK-NOT: "private method body"
   }
 
@@ -276,6 +255,14 @@ public struct Struct {
     // CHECK-ALL-ONLY-NOT: "@_transparent init body"
   }
 
+  public var didSetVar: Int = 1 {
+    didSet {
+      // Body typechecked regardless
+      _blackHole("didSet body") // CHECK-NONINLINE-SIL: "didSet body"
+      // CHECK-NONINLINE-TEXTUAL-NOT: "didSet body"
+    }
+  }
+
   @inlinable public init() {
     let ALLNOTYPECHECK_local = 1
     _blackHole("@inlinable init body")
@@ -284,26 +271,22 @@ public struct Struct {
   }
 
   @inline(__always) public init(a: Int) {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("@inline(__always) init body") // CHECK-NOT: "@inline(__always) init body"
   }
 
   init(c: Int) {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("internal init body") // CHECK-NOT: "internal init body"
   }
 
   public init(d: Int) {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("public init body") // CHECK-NOT: "public init body"
   }
 
   private init(e: Int) {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("private init body") // CHECK-NOT: "private init body"
   }
 
@@ -316,8 +299,7 @@ public struct Struct {
   }
 
   @inline(__always) public subscript(a: Int, b: Int) -> Int {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("@inline(__always) subscript getter") // CHECK-NOT: "@inline(__always) subscript getter"
     return 0
   }
@@ -333,36 +315,31 @@ public struct Struct {
   }
 
   subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("internal subscript getter") // CHECK-NOT: "internal subscript getter"
     return 0
   }
 
   public subscript(a: Int, b: Int, c: Int, d: Int, e: Int) -> Int {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("public subscript getter") // CHECK-NOT: "public subscript getter"
     return 0
   }
 
   private subscript(e: Int) -> Int {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("private subscript getter") // CHECK-NOT: "private subscript getter"
     return 0
   }
 
   @inline(__always) public var inlineAlwaysVar: Int {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("@inline(__always) getter body") // CHECK-NOT: "@inline(__always) getter body"
     return 0
   }
 
   public var publicVar: Int {
-    let ALLNOTYPECHECK_local = 1
-    let INLINENOTYPECHECK_local = 1
+    let NEVERTYPECHECK_local = 1
     _blackHole("public getter body") // CHECK-NOT: "public getter body"
     return 0
   }
@@ -370,8 +347,7 @@ public struct Struct {
   public var inlineAlwaysSetter: Int {
     get { 0 }
     @inline(__always) set {
-      let ALLNOTYPECHECK_local = 1
-      let INLINENOTYPECHECK_local = 1
+      let NEVERTYPECHECK_local = 1
       _blackHole("@inline(__always) setter body") // CHECK-NOT: "@inline(__always) setter body"
     }
   }
@@ -379,8 +355,7 @@ public struct Struct {
   public var regularSetter: Int {
     get { 0 }
     set {
-      let ALLNOTYPECHECK_local = 1
-      let INLINENOTYPECHECK_local = 1
+      let NEVERTYPECHECK_local = 1
       _blackHole("@inline(__always) setter body") // CHECK-NOT: "regular setter body"
     }
   }
