@@ -827,4 +827,24 @@ CastsTests.test("Cannot cast from Any? to Existential [SR-1999]") {
   expectNotNil(d)
 }
 
+protocol A {}
+CastsTests.test("Failing cast from Any to Optional<Protocol> [SR-6279]") {
+  struct B: A {}
+
+  // If we have an optional instance, stored as an `Any`
+  let b: A? = B()
+  let c = b as Any
+
+  // This fails to cast, should succeed.
+  let d = c as? A
+  expectNotNil(d)
+
+  // There is a workaround, but not ideal.
+  func cast<T, U>(_ t: T, to: U.Type) -> U? {
+    return t as? U
+  }
+  let f = cast(c, to: Any?.self) as? A
+  expectNotNil(f)
+}
+
 runAllTests()
