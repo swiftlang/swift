@@ -168,9 +168,25 @@ extension MutableCollection {
       DiscontiguousSlice(base: self, subranges: subranges)
     }
     set {
-      for i in newValue.indices {
-        self[i.base] = newValue[i]
+      var indexOfReplacement = newValue.startIndex
+      for range in subranges.ranges {
+        _debugPrecondition(!range.isEmpty, "Empty range in a range set")
+        
+        var indexToReplace = range.lowerBound
+        repeat {
+          _precondition(
+            indexOfReplacement < newValue.endIndex,
+            "Attempt to replace discontinuous slice with too few elements")
+          
+          self[indexToReplace] = newValue[indexOfReplacement]
+          self.formIndex(after: &indexToReplace)
+          newValue.formIndex(after: &indexOfReplacement)
+        } while indexToReplace < range.upperBound
       }
+      
+      _precondition(
+        indexOfReplacement == newValue.endIndex,
+        "Attempt to replace discontinuous slice with too many elements")
     }
   }
 }
