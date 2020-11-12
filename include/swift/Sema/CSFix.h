@@ -285,6 +285,10 @@ enum class FixKind : uint8_t {
   /// Allow expressions to reference invalid declarations by turning
   /// them into holes.
   AllowRefToInvalidDecl,
+
+  /// Treat empty and single-element array literals as if they were incomplete
+  /// dictionary literals when used as such.
+  TreatArrayLiteralAsDictionary,
 };
 
 class ConstraintFix {
@@ -549,6 +553,25 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+class TreatArrayLiteralAsDictionary final : public ContextualMismatch {
+  TreatArrayLiteralAsDictionary(ConstraintSystem &cs, Type dictionaryTy,
+                                Type arrayTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::TreatArrayLiteralAsDictionary,
+                           dictionaryTy, arrayTy, locator) {
+      }
+
+public:
+  std::string getName() const override {
+    return "treat array literal as dictionary";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static TreatArrayLiteralAsDictionary *create(ConstraintSystem &cs,
+                                               Type dictionaryTy, Type arrayTy,
+                                               ConstraintLocator *loc);
 };
 
 /// Mark function type as explicitly '@escaping'.
