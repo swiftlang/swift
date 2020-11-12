@@ -8879,7 +8879,20 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
         if (!member)
           continue;
 
-        enumDecl->addMember(member);
+        // If the decl we're looking into is a namespace decl that has already
+        // been added as a member, we avoid adding it again.
+        bool isANamespace = isa<clang::NamespaceDecl>(member->getClangDecl());
+        auto existingNamespaceMember = llvm::find_if(
+            enumDecl->getMembers(), [&member, isANamespace](const Decl *memberOfEnum) {
+              if (isANamespace) {
+                return member == memberOfEnum;
+              }
+              return false;
+            });
+
+        if (existingNamespaceMember == enumDecl->getMembers().end()) {
+          enumDecl->addMember(member);
+        }
       }
     }
     return;

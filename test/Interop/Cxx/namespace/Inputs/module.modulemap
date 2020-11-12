@@ -1,0 +1,3 @@
+module NamespaceDeclA {
+  header "namespace-decl-a.h"
+}
