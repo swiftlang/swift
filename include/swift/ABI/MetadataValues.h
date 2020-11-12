@@ -1936,9 +1936,10 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask  = 24,
-    Task_IsFuture     = 25,
-    Task_IsTaskGroup  = 26,
+    Task_IsChildTask    = 24,
+    Task_IsFuture       = 25,
+    Task_IsTaskGroup    = 26,
+    Task_HasLocalValues = 27
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -1965,11 +1966,12 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsFuture,
                                 task_isFuture,
                                 task_setIsFuture)
-
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskGroup,
                                 task_isTaskGroup,
                                 task_setIsTaskGroup)
-
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasLocalValues,
+                                task_hasLocalValues,
+                                task_setHasLocalValues)
 };
 
 /// Kinds of task status record.

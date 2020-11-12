@@ -74,6 +74,7 @@ extension Task {
     groupFlags.isChildTask = true
     groupFlags.isTaskGroup = true
     groupFlags.isFuture = true
+    groupFlags.hasLocalValues = true // _taskHasTaskLocalValues(parent)
 
     let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in

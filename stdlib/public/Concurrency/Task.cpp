@@ -135,7 +135,11 @@ SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
 
-  // For a group, destroy the queues and results.
+  fprintf(stderr, "destroy task (%d): %d\n",
+          task->hasTaskLocalValues(), task);
+
+
+// For a group, destroy the queues and results.
   if (task->isTaskGroup()) {
     task->groupFragment()->destroy();
   }
@@ -143,6 +147,11 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // For a future, destroy the result.
   if (task->isFuture()) {
     task->futureFragment()->destroy();
+  }
+
+  // release any objects potentially held as task local values.
+  if (task->hasTaskLocalValues()) {
+    task->localValuesFragment()->destroy();
   }
 
   // The task execution itself should always hold a reference to it, so
@@ -233,6 +242,16 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
 
+  bool needsTaskLocalsFragment =
+      flags.task_hasLocalValues() || (parent && parent->hasTaskLocalValues());
+  fprintf(stderr, "error: %s [%s:%d] prepare task taskHasTaskLocals=%d parentHasLocals=%d needsLocals=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
+          flags.task_hasLocalValues(), (parent && parent->hasTaskLocalValues()), needsTaskLocalsFragment);
+  if (needsTaskLocalsFragment) {
+    headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
+    fprintf(stderr, "error: %s [%s:%d] adding values fragment size=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
+        sizeof(AsyncTask::TaskLocalValuesFragment));
+  }
+
   if (flags.task_isTaskGroup()) {
     headerSize += sizeof(AsyncTask::GroupFragment);
   }
@@ -268,12 +287,19 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
-  // Initialize the channel fragment if applicable.
-  if (flags.task_isTaskGroup()) {
+  if (needsTaskLocalsFragment) {
+    assert(task->hasTaskLocalValues());
+    auto taskLocalsFragment = task->localValuesFragment();
+    new (taskLocalsFragment) AsyncTask::TaskLocalValuesFragment();
+    taskLocalsFragment->initializeLinkParent(task, parent);
+  }
+
+  // Initialize the task group fragment if applicable.
+    if (flags.task_isTaskGroup()) {
     auto groupFragment = task->groupFragment();
     new (groupFragment) GroupFragment();
   }
-
+  
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     assert(task->isFuture());
@@ -303,6 +329,9 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   // TODO: consider providing an initial pre-allocated first slab to the
   //       allocator.
   _swift_task_alloc_initialize(task);
+
+  fprintf(stderr, "error: %s [%s:%d] prepared task=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
+          task);
 
   return {task, initialContext};
 }
@@ -464,8 +493,9 @@ void swift::swift_task_runAndBlockThread(const void *function,
   RunAndBlockSemaphore semaphore;
 
   // Set up a task that runs the runAndBlock async function above.
-  auto pair = swift_task_create_f(JobFlags(JobKind::Task,
-                                           JobPriority::Default),
+  auto flags = JobFlags(JobKind::Task, JobPriority::Default);
+  flags.task_setHasLocalValues(true);
+  auto pair = swift_task_create_f(flags,
                                   /*parent*/ nullptr,
                                   &runAndBlock_start,
                                   sizeof(RunAndBlockContext));
@@ -483,6 +513,39 @@ void swift::swift_task_runAndBlockThread(const void *function,
 
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
+}
+
+void swift::swift_task_localValuePush(AsyncTask *task,
+                       const Metadata *keyType,
+                       /* +1 */ OpaqueValue *value, const Metadata *valueType) {
+  fprintf(stderr, "error: %s [%s:%d] PUSH keyType=%d value=%d *value=%d\n",
+          __FUNCTION__, __FILE_NAME__, __LINE__,
+          keyType, value, *reinterpret_cast<int*>(value));
+  assert(task->hasTaskLocalValues());
+  task->localValuesFragment()->pushValue(task, keyType, value, valueType);
+}
+
+void swift::swift_task_localValuePop(AsyncTask *task, int count) {
+  assert(task->hasTaskLocalValues());
+  auto fragment = task->localValuesFragment();
+  for (int i = 0; i < count; i++) {
+    fprintf(stderr, "error: %s [%s:%d] POP task=%d %d / %d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
+            task, i, count);
+    fragment->popValue(task);
+  }
+}
+
+OpaqueValue* swift::swift_task_localValueGet(AsyncTask *task,
+                                             const Metadata *keyType) {
+  auto value = task->localValueGet(keyType);
+  fprintf(stderr, "error: %s [%s:%d] lookup keyType=%d value=%d\n",
+          __FUNCTION__, __FILE_NAME__, __LINE__,
+          keyType, value);
+  return value;
+}
+
+bool swift::swift_task_hasTaskLocalValues(AsyncTask *task) {
+  return task->hasTaskLocalValues();
 }
 
 namespace {
