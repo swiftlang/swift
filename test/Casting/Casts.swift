@@ -813,4 +813,18 @@ CastsTests.test("Cast failure for Any! holding Error struct [SR-8964]") {
   expectTrue(b is Error)
 }
 
+CastsTests.test("Cannot cast from Any? to Existential [SR-1999]") {
+  let a = Float(1) as Any as? Float
+  expectNotNil(a)
+
+  let b = Float(1) as Any as? CustomStringConvertible
+  expectNotNil(b)
+
+  let c = Optional.some(Float(1)) as Any as? Float
+  expectNotNil(c)
+
+  let d = Optional.some(Float(1)) as Any as? CustomStringConvertible
+  expectNotNil(d)
+}
+
 runAllTests()
