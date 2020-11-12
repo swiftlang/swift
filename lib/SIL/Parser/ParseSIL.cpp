@@ -5880,8 +5880,11 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       };
 
       do {
-        if (FunctionState.parseSILBasicBlock(B))
+        auto startLoc = P.Tok.getLoc();
+        if (FunctionState.parseSILBasicBlock(B)) {
+          P.Diags.diagnose(startLoc, diag::sil_failed_parse_basicblock);
           return true;
+        }
       } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
 
       SourceLoc RBraceLoc;
