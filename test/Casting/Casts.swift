@@ -795,4 +795,15 @@ CastsTests.test("AnyObject.Type -> AnyObject") {
 }
 #endif
 
+protocol Fruit {}
+CastsTests.test("Generic type validation [SR-13812]") {
+  func check<A, B>(a: A.Type, b: B.Type) -> Bool {
+    return (a is B.Type)
+  }
+  struct Apple: Fruit {}
+  expectFalse(check(a: Apple.self, b: Fruit.self))
+  expectFalse(Apple.self is Fruit.Protocol)
+  expectTrue(Apple.self is Fruit.Type)
+}
+
 runAllTests()
