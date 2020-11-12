@@ -806,4 +806,11 @@ CastsTests.test("Generic type validation [SR-13812]") {
   expectTrue(Apple.self is Fruit.Type)
 }
 
+CastsTests.test("Cast failure for Any! holding Error struct [SR-8964]") {
+  struct MyError: Error {}
+  let a: Any! = MyError()
+  let b: Any = a
+  expectTrue(b is Error)
+}
+
 runAllTests()
