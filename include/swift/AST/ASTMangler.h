@@ -155,6 +155,15 @@ public:
                                              Type SelfType,
                                              ModuleDecl *Module);
 
+  /// Mangle a completion handler block implementation function, used for importing ObjC
+  /// APIs as async.
+  ///
+  /// - If `predefined` is true, this mangles the symbol name of the completion handler
+  /// predefined in the Swift runtime for the given type signature.
+  std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
+                                                   CanType ResultType,
+                                                   bool predefined);
+  
   /// Mangle the derivative function (JVP/VJP) for the given:
   /// - Mangled original function name.
   /// - Derivative function kind.
