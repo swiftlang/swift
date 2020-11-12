@@ -4765,12 +4765,9 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 
   // If we're hashing the type body separately, record the curly braces but
   // nothing inside for the interface hash.
-  Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> MemberHashingScope;
-  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
-    recordTokenHash("{");
-    recordTokenHash("}");
-    MemberHashingScope.emplace(CurrentTokenHash, llvm::MD5());
-  }
+  llvm::SaveAndRestore<Optional<llvm::MD5>> MemberHashingScope{CurrentTokenHash, llvm::MD5()};
+  recordTokenHash("{");
+  recordTokenHash("}");
 
   std::vector<Decl *> decls;
   ParserStatus Status;
@@ -4802,8 +4799,7 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
     hadError = true;
 
   llvm::MD5::MD5Result result;
-  auto declListHash = MemberHashingScope ? *CurrentTokenHash : llvm::MD5();
-  declListHash.final(result);
+  CurrentTokenHash->final(result);
   llvm::SmallString<32> tokenHashString;
   llvm::MD5::stringifyResult(result, tokenHashString);
   return std::make_pair(decls, tokenHashString.str().str());
