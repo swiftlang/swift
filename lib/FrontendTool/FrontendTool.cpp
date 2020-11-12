@@ -127,7 +127,7 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile &SF, StringRef OutputFilename) {
+static bool emitSyntax(const SourceFile &SF, StringRef OutputFilename) {
   auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
   if (!os) return true;
 
@@ -221,8 +221,8 @@ class JSONFixitWriter
 public:
   JSONFixitWriter(std::string fixitsOutputPath,
                   const DiagnosticOptions &DiagOpts)
-    : FixitsOutputPath(fixitsOutputPath),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
+      : FixitsOutputPath(std::move(fixitsOutputPath)),
+        FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
   void handleDiagnostic(SourceManager &SM,
@@ -1612,10 +1612,13 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
-    (void) index::indexAndRecord(Instance.getMainModule(), opts.InputsAndOutputs.copyOutputFilenames(),
+    (void) index::indexAndRecord(Instance.getMainModule(),
+                                 opts.InputsAndOutputs.copyOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
-                                 opts.IndexSystemModules, opts.IndexIgnoreStdlib,
-                                 isDebugCompilation, Invocation.getTargetTriple(),
+                                 opts.IndexSystemModules,
+                                 opts.IndexIgnoreStdlib,
+                                 isDebugCompilation,
+                                 Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker());
   }
 }
@@ -1683,11 +1686,12 @@ createSerializedDiagnosticConsumerIfNeeded(
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
       [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string serializedDiagnosticsPath = input.serializedDiagnosticsPath();
-    if (serializedDiagnosticsPath.empty())
-      return nullptr;
-    return serialized_diagnostics::createConsumer(serializedDiagnosticsPath);
-  });
+        auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
+        if (serializedDiagnosticsPath.empty())
+          return nullptr;
+        return serialized_diagnostics::createConsumer(
+            serializedDiagnosticsPath);
+      });
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
@@ -1704,12 +1708,12 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   return createDispatchingDiagnosticConsumerIfNeeded(
       invocation.getFrontendOptions().InputsAndOutputs,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string fixItsOutputPath = input.fixItsOutputPath();
-    if (fixItsOutputPath.empty())
-      return nullptr;
-    return std::make_unique<JSONFixitWriter>(
-        fixItsOutputPath, invocation.getDiagnosticOptions());
-  });
+        auto fixItsOutputPath = input.getFixItsOutputPath();
+        if (fixItsOutputPath.empty())
+          return nullptr;
+        return std::make_unique<JSONFixitWriter>(
+            fixItsOutputPath.str(), invocation.getDiagnosticOptions());
+      });
 }
 
 /// Print information about a
