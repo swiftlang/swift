@@ -7377,6 +7377,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 }
 
 void PrintingCodeCompletionConsumer::handleResults(
+    CodeCompletionContext &context) {
+  auto results = context.takeResults();
+  handleResults(results);
+}
+
+void PrintingCodeCompletionConsumer::handleResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
@@ -7545,7 +7551,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
                        &context.getResultSink());
   }
 
-  handleResults(context.takeResults());
+  handleResults(context);
 }
 
 //===----------------------------------------------------------------------===//

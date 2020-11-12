@@ -995,8 +995,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
                                DeclContext *DCForModules) override;
 
   /// Clients should override this method to receive \p Results.
-  virtual void handleResults(
-      MutableArrayRef<CodeCompletionResult *> Results) = 0;
+  virtual void handleResults(CodeCompletionContext &context) = 0;
 };
 
 /// A code completion result consumer that prints the results to a
@@ -1018,7 +1017,8 @@ public:
        IncludeComments(IncludeComments),
        PrintAnnotatedDescription(PrintAnnotatedDescription) {}
 
- void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override;
+ void handleResults(CodeCompletionContext &context) override;
+ void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
 };
 
 /// Create a factory for code completion callbacks.
