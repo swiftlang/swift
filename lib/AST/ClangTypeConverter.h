@@ -94,6 +94,8 @@ public:
       SmallVectorImpl<clang::TemplateArgument> &templateArgs);
 
 private:
+  friend ASTContext; // HACK: expose `convert` method to ASTContext
+
   clang::QualType convert(Type type);
 
   clang::QualType convertMemberType(NominalTypeDecl *DC,
