@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -41,9 +41,16 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<()>) -> ()
   await slowServer.serverRestart("somewhere")
 
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeThrowingContinuation<(String, Int)>, Optional<NSString>, Int, Optional<NSError>) -> ()
+  let (_, _): (String, Int) = try await slowServer.findMultipleAnswers()
+
+  let (_, _): (Bool, Bool) = try await slowServer.findDifferentlyFlavoredBooleans()
+
   // CHECK: [[ERROR]]([[ERROR_VALUE:%.*]] : @owned $Error):
-  // CHECK: dealloc_stack [[RESUME_BUF]]
-  // CHECK: throw [[ERROR_VALUE]]
+  // CHECK:   dealloc_stack [[RESUME_BUF]]
+  // CHECK:   br [[THROWBB:bb[0-9]+]]([[ERROR_VALUE]]
+  // CHECK: [[THROWBB]]([[ERROR_VALUE:%.*]] : @owned $Error):
+  // CHECK:   throw [[ERROR_VALUE]]
 
 }
 
@@ -85,3 +92,12 @@ func testSlowServer(slowServer: SlowServer) async throws {
 // CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $()
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeUnsafeContinuation
 // CHECK:   apply [[RESUME]]<()>([[CONT]], [[RESULT_BUF]])
+
+// CHECK: sil{{.*}}@[[NSSTRING_INT_THROW_COMPLETION_BLOCK]]
+// CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $(String, Int)
+// CHECK:   [[RESULT_0_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 0
+// CHECK:   [[BRIDGE:%.*]] = function_ref @{{.*}}unconditionallyBridgeFromObjectiveC
+// CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE]]
+// CHECK:   store [[BRIDGED]] to [init] [[RESULT_0_BUF]]
+// CHECK:   [[RESULT_1_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 1
+// CHECK:   store %2 to [trivial] [[RESULT_1_BUF]]
