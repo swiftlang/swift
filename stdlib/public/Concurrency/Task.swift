@@ -240,6 +240,89 @@ extension Task {
   }
 }
 
+// ==== Task Local -------------------------------------------------------------
+
+extension Task {
+
+  /// Namespace for keys
+  public struct LocalValues {}
+
+  /// Provides access to "task local" value, identified by the provided
+  /* @instantaneous */
+  public static func local<Key>(
+    _ keyPath: KeyPath<Task.LocalValues, Key>
+  ) async -> Key.Value? where Key: TaskLocalKey {
+    fatalError("\(#function) is not implemented yet")
+  }
+
+  /// Binds the task local value for the duration of the `body` execution.
+  ///
+  /// - Parameters:
+  ///   - keyPath:
+  ///   - value: if nil, the value for the given key will be removed (if present)
+  ///   - body:
+  public static func withTaskLocal<BodyResult, Key>(
+    _ keyPath: KeyPath<Task.LocalValues, Key>, boundTo value: Key.Value?,
+    body: () async throws -> BodyResult
+  ) async rethrows -> BodyResult where Key: TaskLocalKey {
+    fatalError("\(#function) is not implemented yet")
+  }
+}
+
+// ==== Task Local, value handle style -----------------------------------------
+
+public struct TaskLocalValue<Value> {
+
+  public init() {
+    fatalError("\(#function) is not implemented yet")
+  }
+
+  public static func withDefault(_ value: Value) -> TaskLocalValue { // TODO with default "type"
+    fatalError("\(#function) is not implemented yet")
+  }
+
+  public func boundTo<BodyValue>(
+    _ value: Value?,
+    body: () async throws -> BodyValue
+  ) async rethrows -> BodyValue {
+    fatalError("\(#function) is not implemented yet")
+  }
+
+  /* @instantaneous */
+  public func get() async -> Value? {
+    fatalError("\(#function) is not implemented yet")
+  }
+}
+
+// ==== Task Local, keys -------------------------------------------------------
+
+public protocol TaskLocalKey {
+  /// The type of `Value` uniquely identified by this key.
+  associatedtype Value
+
+  // TODO: absolute minimum imported from swift tracing; it has a bit more features that we ignore here
+}
+
+/// A type-erased `TaskLocalKey` used when iterating through the `Baggage` using its `forEach` method.
+struct AnyTaskLocalKey {
+  /// The key's type represented erased to an `Any.Type`.
+  public let keyType: Any.Type
+
+  init<Key>(_ keyType: Key.Type) where Key: TaskLocalKey {
+    self.keyType = keyType
+  }
+}
+
+extension AnyTaskLocalKey: Hashable {
+  static func == (lhs: AnyTaskLocalKey, rhs: AnyTaskLocalKey) -> Bool {
+    return ObjectIdentifier(lhs.keyType) == ObjectIdentifier(rhs.keyType)
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self.keyType))
+  }
+}
+
 // ==== UnsafeContinuation -----------------------------------------------------
 
 extension Task {
