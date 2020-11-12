@@ -1022,8 +1022,11 @@ public:
     assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
-    if (!F->hasOwnership())
+    if (!F->hasOwnership()) {
+      require(SILValue(V).getOwnershipKind() == OwnershipKind::None,
+              "Once ownership is gone, all values should have none ownership");
       return;
+    }
     SILValue(V).verifyOwnership(&DEBlocks);
   }
 
@@ -1100,7 +1103,7 @@ public:
               "instruction's operand's owner isn't the instruction");
       require(isInValueUses(&operand), "operand value isn't used by operand");
 
-      if (I->isTypeDependentOperand(operand)) {
+      if (operand.isTypeDependent()) {
         require(isa<SILInstruction>(I),
                "opened archetype operand should refer to a SILInstruction");
       }
@@ -1108,6 +1111,28 @@ public:
       // Make sure that if operand is generic that its primary archetypes match
       // the function context.
       checkLegalType(I->getFunction(), operand.get(), I);
+
+      // If we are not in OSSA, our operand constraint should be invalid for a
+      // type dependent operand (that is Optional::None) and if we have a non
+      // type dependent operand then we should have a constraint of
+      // OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding.
+      if (!I->getFunction()->hasOwnership()) {
+        if (operand.isTypeDependent()) {
+          require(
+              !operand.getOwnershipConstraint(),
+              "Non Optional::None constraint for a type dependent operand?!");
+        } else {
+          auto constraint = operand.getOwnershipConstraint();
+          require(constraint.hasValue(),
+                  "All non-type dependent operands must have a "
+                  "non-Optional::None constraint?!");
+          require(constraint->getPreferredKind() == OwnershipKind::Any &&
+                      constraint->getLifetimeConstraint() ==
+                          UseLifetimeConstraint::NonLifetimeEnding,
+                  "In non-ossa all non-type dependent operands must have a "
+                  "constraint of Any, NonLifetimeEnding");
+        }
+      }
     }
 
     // TODO: There should be a use of an opened archetype inside the instruction for
