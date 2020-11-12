@@ -49,6 +49,33 @@ AsyncTaskAndContext swift_task_create_f(JobFlags flags,
                                         AsyncFunctionType<void()> *function,
                                         size_t initialContextSize);
 
+/// Create a task object with a future which will run the given
+/// function.
+///
+/// The task is not yet scheduled.
+///
+/// If a parent task is provided, flags.task_hasChildFragment() must
+/// be true, and this must be called synchronously with the parent.
+/// The parent is responsible for creating a ChildTaskStatusRecord.
+/// TODO: should we have a single runtime function for creating a task
+/// and doing this child task status record management?
+///
+/// flags.task_isFuture must be set. \c futureResultType is the type
+///
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_future(
+    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    const AsyncFunctionPointer<void()> *function,
+    size_t resultOffset, size_t errorOffset);
+
+/// Create a task object with no future which will run the given
+/// function.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_future_f(
+    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    AsyncFunctionType<void()> *function, size_t initialContextSize,
+    size_t resultOffset, size_t errorOffset);
+
 /// Allocate memory in a task.
 ///
 /// This must be called synchronously with the task.
@@ -82,6 +109,34 @@ void swift_task_cancel(AsyncTask *task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_escalate(AsyncTask *task, JobPriority newPriority);
+
+/// The result of waiting for a task future.
+struct TaskFutureWaitResult {
+  enum Kind : uintptr_t {
+    /// The waiting task has been added to the future's wait queue, and will
+    /// be scheduled once the future has completed.
+    Waiting,
+
+    /// The future succeeded and produced a result value. \c storage points
+    /// at that value.
+    Success,
+
+    /// The future finished by throwing an error. \c storage is that error
+    /// existential.
+    Error,
+  };
+
+  Kind kind;
+  OpaqueValue *storage;
+};
+
+/// Wait for a future task to complete.
+///
+/// This can be called from any thread.
+///
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskFutureWaitResult
+swift_task_future_wait(AsyncTask *task, AsyncTask *waitingTask);
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.

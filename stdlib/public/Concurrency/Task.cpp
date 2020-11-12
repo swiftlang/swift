@@ -21,12 +21,121 @@
 #include "TaskPrivate.h"
 
 using namespace swift;
+using FutureFragment = AsyncTask::FutureFragment;
+
+size_t FutureFragment::fragmentSize(const Metadata *resultType) {
+  return storageOffset(resultType) + resultType->vw_size();
+}
+
+void FutureFragment::destroy() {
+  switch (status.load()) {
+  case Status::Executing:
+    assert(false && "destroying a task that never completed");
+
+  case Status::Success:
+    resultType->vw_destroy(getStoragePtr());
+    break;
+
+  case Status::Error:
+    swift_unknownObjectRelease(getStoragePtr());
+    break;
+  }
+}
+
+FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
+  assert(isFuture());
+  auto fragment = futureFragment();
+
+  auto currentStatus = fragment->status.load();
+  switch (currentStatus) {
+  case FutureFragment::Status::Error:
+  case FutureFragment::Status::Success:
+    // The task is done; we don't need to wait.
+    return currentStatus;
+
+  case FutureFragment::Status::Executing:
+    break;
+  }
+
+  // Put the waiting task at the beginning of the wait queue.
+  while (true) {
+    waitingTask->NextWaitingTask = fragment->waitQueue.load();
+    if (fragment->waitQueue.compare_exchange_strong(
+            waitingTask->NextWaitingTask, waitingTask)) {
+      // Escalate the priority of this task based on the priority
+      // of the waiting task.
+      swift_task_escalate(this, waitingTask->Flags.getPriority());
+      break;
+    }
+  }
+
+  return FutureFragment::Status::Executing;
+}
+
+void AsyncTask::completeFuture(AsyncContext *context) {
+  assert(isFuture());
+  auto fragment = futureFragment();
+  auto storagePtr = fragment->getStoragePtr();
+
+  // Check for an error.
+  if (unsigned errorOffset = fragment->errorOffset) {
+    // Find the error object in the context.
+    auto errorPtrPtr = reinterpret_cast<char *>(context) + errorOffset;
+    OpaqueValue *errorObject = *reinterpret_cast<OpaqueValue **>(errorPtrPtr);
+
+    // If there is an error, take it and we're done.
+    if (errorObject) {
+      *reinterpret_cast<OpaqueValue **>(storagePtr) = errorObject;
+      fragment->status = FutureFragment::Status::Error;
+      return;
+    }
+  }
+
+  // Take the success value.
+  auto resultPtr = reinterpret_cast<OpaqueValue *>(
+      reinterpret_cast<char *>(context) + fragment->resultOffset);
+  fragment->resultType->vw_initializeWithTake(storagePtr, resultPtr);
+  fragment->status = FutureFragment::Status::Success;
+}
+
+void AsyncTask::scheduleWaitingTasks(ExecutorRef executor) {
+  assert(isFuture());
+  auto fragment = futureFragment();
+
+  auto waitingTask = fragment->waitQueue.load();
+
+  // Unnecessary, but useful for the assertion at the end.
+  fragment->waitQueue = nullptr;
+
+  while (waitingTask) {
+    // Find the next waiting task.
+    auto nextWaitingTask = waitingTask->NextWaitingTask;
+
+    // Remove this task from the list.
+    waitingTask->NextWaitingTask = nullptr;
+
+    // TODO: schedule this task on the executor.
+
+    // Move to the next task.
+    waitingTask = nextWaitingTask;
+  }
+
+  // Nobody should be able to add anything to the queue in this function.
+  assert(!fragment->waitQueue.load());
+}
 
 SWIFT_CC(swift)
-static void destroySimpleTask(SWIFT_CONTEXT HeapObject *_obj) {
-  auto obj = static_cast<AsyncTask*>(_obj);
+static void destroySimpleTask(SWIFT_CONTEXT HeapObject *obj) {
+  auto task = static_cast<AsyncTask*>(obj);
 
-  assert(!obj->isFuture());
+  // FIXME: "Simple task" seems like it's not that useful a concept. We might
+  // also have task-local storage to destroy.
+  // assert(!task->isFuture());
+
+  // For a future, destroy the result.
+  if (task->isFuture()) {
+    task->futureFragment()->destroy();
+  }
 
   // The task execution itself should always hold a reference to it, so
   // if we get here, we know the task has finished running, which means
@@ -34,7 +143,7 @@ static void destroySimpleTask(SWIFT_CONTEXT HeapObject *_obj) {
   // the task-local allocator.  There's actually nothing else to clean up
   // here.
 
-  free(obj);
+  free(task);
 }
 
 /// Heap metadata for a simple asynchronous task that does not
@@ -62,10 +171,17 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   // to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
 
+  if (task->isFuture()) {
+    // Complete the future, taking the result from the context.
+    task->completeFuture(context);
+
+    // Schedule tasks that are waiting on the future.
+    task->scheduleWaitingTasks(executor);
+  }
+
   // TODO: set something in the status?
   // TODO: notify the parent somehow?
   // TODO: remove this task from the child-task chain?
-  // TODO: notify tasks waiting on the future?
 
   // Release the task, balancing the retain that a running task
   // has on itself.
@@ -83,12 +199,36 @@ AsyncTaskAndContext
 swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
                            AsyncFunctionType<void()> *function,
                            size_t initialContextSize) {
-  assert(!flags.task_isFuture() && "function doesn't support creating futures");
+  return swift_task_create_future_f(
+      flags, parent, nullptr, function, initialContextSize, 0, 0);
+}
+
+AsyncTaskAndContext swift::swift_task_create_future(
+    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    const AsyncFunctionPointer<void()> *function,
+    size_t resultOffset, size_t errorOffset) {
+  return swift_task_create_future_f(
+      flags, parent, futureResultType, function->Function.get(),
+      function->ExpectedContextSize, resultOffset, errorOffset);
+}
+
+AsyncTaskAndContext swift::swift_task_create_future_f(
+    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    AsyncFunctionType<void()> *function, size_t initialContextSize,
+    size_t resultOffset, size_t errorOffset) {
+  assert((futureResultType != nullptr) == flags.task_isFuture());
+  assert((resultOffset != 0) == flags.task_isFuture());
   assert((parent != nullptr) == flags.task_isChildTask());
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
   if (parent) headerSize += sizeof(AsyncTask::ChildFragment);
+
+  if (futureResultType) {
+    headerSize += FutureFragment::fragmentSize(futureResultType);
+  }
+
+  headerSize = llvm::alignTo(headerSize, llvm::Align(alignof(AsyncContext)));
 
   // Allocate the initial context together with the job.
   // This means that we never get rid of this allocation.
@@ -118,6 +258,19 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
+  // Initialize the future fragment if applicable.
+  if (futureResultType) {
+    auto futureFragment = task->futureFragment();
+    new (futureFragment) FutureFragment(
+        futureResultType, resultOffset, errorOffset);
+
+    // Zero out the error, so the task does not need to do it.
+    if (errorOffset) {
+      auto errorPtrPtr = reinterpret_cast<char *>(initialContext) + errorOffset;
+      *reinterpret_cast<OpaqueValue **>(errorPtrPtr) = nullptr;
+    }
+  }
+
   // Configure the initial context.
   //
   // FIXME: if we store a null pointer here using the standard ABI for
@@ -134,6 +287,25 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
   _swift_task_alloc_initialize(task);
 
   return {task, initialContext};
+}
+
+TaskFutureWaitResult
+swift::swift_task_future_wait(AsyncTask *task, AsyncTask *waitingTask) {
+  assert(task->isFuture());
+  switch (task->waitFuture(waitingTask)) {
+  case FutureFragment::Status::Executing:
+    return TaskFutureWaitResult{TaskFutureWaitResult::Waiting, nullptr};
+
+  case FutureFragment::Status::Success:
+    return TaskFutureWaitResult{
+        TaskFutureWaitResult::Success, task->futureFragment()->getStoragePtr()};
+
+   case FutureFragment::Status::Error:
+      return TaskFutureWaitResult{
+          TaskFutureWaitResult::Error,
+          *reinterpret_cast<OpaqueValue **>(
+            task->futureFragment()->getStoragePtr())};
+  }
 }
 
 // TODO: Remove this hack.

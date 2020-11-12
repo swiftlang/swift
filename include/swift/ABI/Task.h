@@ -19,6 +19,7 @@
 
 #include "swift/Basic/RelativePointer.h"
 #include "swift/ABI/HeapObject.h"
+#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
@@ -29,6 +30,7 @@ class AsyncTask;
 class AsyncContext;
 class Executor;
 class Job;
+struct OpaqueValue;
 class TaskStatusRecord;
 
 /// An ExecutorRef isn't necessarily just a pointer to an executor
@@ -188,12 +190,16 @@ public:
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
 
+  /// The next task in the linked list of waiting tasks.
+  AsyncTask *NextWaitingTask;
+
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
             AsyncContext *initialContext)
     : HeapObject(metadata), Job(flags, run),
       ResumeContext(initialContext),
-      Status(ActiveTaskStatus()) {
+      Status(ActiveTaskStatus()),
+      NextWaitingTask(nullptr) {
     assert(flags.isAsyncTask());
   }
 
@@ -230,15 +236,109 @@ public:
     }
   };
 
-  bool isFuture() const { return Flags.task_isFuture(); }
-
   bool hasChildFragment() const { return Flags.task_isChildTask(); }
   ChildFragment *childFragment() {
     assert(hasChildFragment());
     return reinterpret_cast<ChildFragment*>(this + 1);
   }
 
-  // TODO: Future fragment
+  class FutureFragment {
+  public:
+    /// Describes the status of the future.
+    ///
+    /// Futures always being in the "Executing" state, and will always
+    /// make a single state change to either Success or Error.
+    enum class Status : uintptr_t {
+      /// The future is executing or ready to execute. The storage
+      /// is not accessible.
+      Executing = 0,
+
+      /// The future has completed with result (of type \c resultType).
+      Success,
+
+      /// The future has completed by throwing an error (an \c Error
+      /// existential).
+      Error,
+    };
+
+  private:
+    /// Status of the future.
+    std::atomic<Status> status;
+
+    /// Queue containing all of the tasks that are waiting in `get()`.
+    /// FIXME: do we also need a context pointer for each?
+    std::atomic<AsyncTask*> waitQueue;
+
+    /// The type of the result that will be produced by the future.
+    const Metadata *resultType;
+
+    /// The offset of the result in the initial asynchronous context.
+    unsigned resultOffset;
+
+    /// The offset of the error in the initial asynchronous context.
+    unsigned errorOffset;
+
+    // Trailing storage for the result itself. The storage will be uninitialized,
+    // contain an instance of \c resultType, or contaon an an \c Error.
+
+    friend class AsyncTask;
+
+  public:
+    FutureFragment(
+        const Metadata *resultType, size_t resultOffset, size_t errorOffset)
+      : status(Status::Success), waitQueue(nullptr), resultType(resultType),
+        resultOffset(resultOffset), errorOffset(errorOffset) { }
+
+    /// Destroy the storage associated with the future.
+    void destroy();
+
+    /// Retrieve a pointer to the storage of result.
+    OpaqueValue *getStoragePtr() {
+      return reinterpret_cast<OpaqueValue *>(
+          reinterpret_cast<char *>(this) + storageOffset(resultType));
+    }
+
+    /// Retrieve a reference to the storage of the 
+
+    /// Compute the offset of the storage from the base of the future
+    /// fragment.
+    static size_t storageOffset(const Metadata *resultType)  {
+      size_t offset = sizeof(FutureFragment);
+      size_t alignment = resultType->vw_alignment();
+      return (offset + alignment - 1) & ~(alignment - 1);
+    }
+
+    /// Determine the size of the future fragment given a particular future
+    /// result type.
+    static size_t fragmentSize(const Metadata *resultType);
+  };
+
+  bool isFuture() const { return Flags.task_isFuture(); }
+
+  FutureFragment *futureFragment() {
+    assert(isFuture());
+    if (hasChildFragment()) {
+      return reinterpret_cast<FutureFragment *>(
+          reinterpret_cast<ChildFragment*>(this + 1) + 1);
+    }
+
+    return reinterpret_cast<FutureFragment *>(this + 1);
+  }
+
+  /// Wait for this future to complete.
+  ///
+  /// \returns the status of the future. If this result is
+  /// \c Executing, then \c waitingTask has been added to the
+  /// wait queue and will be scheduled when the future completes or
+  /// is cancelled. Otherwise, the future has completed and can be
+  /// queried.
+  FutureFragment::Status waitFuture(AsyncTask *waitingTask);
+
+  /// Complete this future.
+  void completeFuture(AsyncContext *context);
+
+  /// Schedule waiting tasks now that the future has completed.
+  void scheduleWaitingTasks(ExecutorRef executor);
 
   static bool classof(const Job *job) {
     return job->isAsyncTask();
@@ -246,7 +346,7 @@ public:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
+static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
