@@ -83,8 +83,14 @@ private:
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
 
-  EpilogueARCBlockState &getState(SILBasicBlock *BB) {
-    return IndexToStateMap[*PO->getPONumber(BB)];
+  /// Returns the EpligoyeARCBlockState for \p BB. If \p BB is unreachable,
+  /// returns None
+  Optional<EpilogueARCBlockState *> getState(SILBasicBlock *BB) {
+    // poNumber will be None for unreachable blocks
+    auto poNumber = PO->getPONumber(BB);
+    if (poNumber.hasValue())
+      return &IndexToStateMap[*poNumber];
+    return None;
   }
 
   /// Return true if this is a function exiting block this epilogue ARC
@@ -113,7 +119,10 @@ private:
   }
 
   SILValue getArg(SILBasicBlock *BB) {
-    SILValue A = getState(BB).LocalArg;
+    auto state = getState(BB);
+    if (!state)
+      return SILValue();
+    SILValue A = state.getValue()->LocalArg;
     if (A)
       return A;
     return Arg;
