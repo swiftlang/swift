@@ -1706,10 +1706,13 @@ namespace {
   public:
     /// Construct a never-null Type. If \p Ty is null, a fatal error is thrown.
     NeverNullType(Type Ty) : WrappedTy(Ty) {
-      if (Ty.isNull()) {
+      if (WrappedTy.isNull()) {
         llvm::report_fatal_error("Resolved to null type!");
       }
     }
+
+    /// Construct a never-null Type. If \p TyB is null, a fatal error is thrown.
+    NeverNullType(TypeBase *TyB) : NeverNullType(Type(TyB)) {}
 
     operator Type() const { return WrappedTy; }
     Type get() const { return WrappedTy; }
