@@ -1024,11 +1024,6 @@ Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
 
 bool IterableDeclContext::areTokensHashedForThisBodyInsteadOfInterfaceHash()
     const {
-  // Do not keep separate hashes for extension bodies because the dependencies
-  // can miss the addition of a member in an extension because there is nothing
-  // corresponding to the fingerprinted nominal dependency node.
-  if (isa<ExtensionDecl>(this))
-    return false;
   return true;
 }
 
