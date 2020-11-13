@@ -77,6 +77,9 @@ struct VariableStyle {
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
+// ==== ----------------------------------------------------------------------------------------------------------------
+// ==== ----------------------------------------------------------------------------------------------------------------
+// MARK: Progress - exploring what APIs might look like
 
 // FIXME: Remove all this, just experimenting IF or how things could be used to store and report progress as well
 
@@ -143,3 +146,120 @@ extension Progress {
     fatalError("\(#function) not implemented")
   }
 }
+
+// ==== ----------------------------------------------------------------------------------------------------------------
+// MARK: Progress - How it looks with thread locals today.
+class Sync_ThreadLocals {
+
+  func run() throws {
+    let overallProgress = Progress(totalUnitCount: 100)
+    print("\(#file):\(#line) > overall: \(overallProgress.completedUnitCount) / \(overallProgress.totalUnitCount)")
+
+    // Set the overallProgress as the current progress object of the current thread and specifies
+    // the portion of work to be performed by the next child progress object of the receiver.
+    overallProgress.becomeCurrent(withPendingUnitCount: 50)
+    print("overall", overallProgress)
+    work1()
+    print("overall", overallProgress)
+    // Balance the most recent previous invocation of becomeCurrent(withPendingUnitCount:)
+    // on the same thread by restoring the current progress object to what it was before
+    // becomeCurrent(withPendingUnitCount:) was invoked.
+    overallProgress.resignCurrent()
+    print("overall", overallProgress)
+
+
+    overallProgress.becomeCurrent(withPendingUnitCount: 50)
+    print("overall", overallProgress)
+    work2()
+    print("overall", overallProgress)
+    overallProgress.resignCurrent()
+    print("overall", overallProgress)
+  }
+
+  func work1() {
+    let firstTaskProgress = Progress(totalUnitCount: 10) // attaches to 'current'
+    print(#function, firstTaskProgress)
+
+    DispatchQueue.global().async {
+      // ...
+    }
+
+    firstTaskProgress.completedUnitCount = 5
+    print(#function, firstTaskProgress)
+
+    firstTaskProgress.completedUnitCount += 5
+    print(#function, firstTaskProgress)
+  }
+
+  func work2() {
+    let secondTaskProgress = Progress(totalUnitCount: 10) // attaches to 'current'
+    print(#function, secondTaskProgress)
+
+    DispatchQueue.global().async {
+      // ...
+    }
+
+    secondTaskProgress.completedUnitCount = 5
+    print(#function, secondTaskProgress)
+
+    secondTaskProgress.completedUnitCount += 5
+    print(#function, secondTaskProgress)
+  }
+}
+
+// ==== ----------------------------------------------------------------------------------------------------------------
+// MARK: Progress - How it looks with explicit passing today
+
+class Sync_Explicit {
+
+  func run() throws {
+    let overallProgress = Progress(totalUnitCount: 100)
+    print("overall", overallProgress)
+
+    work1(overallProgress: overallProgress)
+    print("overall", overallProgress)
+
+    work2(overallProgress: overallProgress)
+    print("overall", overallProgress)
+  }
+
+  func work1(overallProgress: Progress) {
+    if #available(macOS 10.11, *) {
+      let firstTaskProgress = Progress(totalUnitCount: 10)
+      overallProgress.addChild(firstTaskProgress, withPendingUnitCount: 50)
+
+      DispatchQueue.global().async {
+        // ...
+      }
+
+      firstTaskProgress.completedUnitCount = 5
+      print(#function, firstTaskProgress)
+      print("overall", overallProgress)
+
+      firstTaskProgress.completedUnitCount += 5
+      print(#function, firstTaskProgress)
+      print("overall", overallProgress)
+    }
+  }
+
+  func work2(overallProgress: Progress) {
+    if #available(macOS 10.11, *) {
+      let secondTaskProgress = Progress(totalUnitCount: 10) // attaches to 'current'
+      overallProgress.addChild(secondTaskProgress, withPendingUnitCount: 50)
+
+      DispatchQueue.global().async {
+        // ...
+      }
+
+      secondTaskProgress.completedUnitCount = 5
+      print(#function, secondTaskProgress)
+      print("overall", overallProgress)
+
+      secondTaskProgress.completedUnitCount += 5
+      print(#function, secondTaskProgress)
+      print("overall", overallProgress)
+    }
+  }
+
+}
+
