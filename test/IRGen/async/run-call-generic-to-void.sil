@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 
 import Builtin
@@ -19,6 +20,7 @@ import _Concurrency
 
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 
+// CHECK-LL: @genericToVoidAD =
 // CHECK-LL: define hidden swiftcc void @genericToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @genericToVoid : $@async @convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%instance : $*T):

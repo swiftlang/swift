@@ -2522,7 +2522,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
   switch (methodInfo.getKind()) {
   case ClassMetadataLayout::MethodInfo::Kind::Offset: {
-    auto offset = methodInfo.getOffsett();
+    auto offset = methodInfo.getOffset();
 
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
@@ -2531,12 +2531,12 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(fnPtr, authInfo, signature);
+    return FunctionPointer(methodType, fnPtr, authInfo, signature);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
-    return FunctionPointer::forDirect(fnPtr, signature);
+    return FunctionPointer::forDirect(methodType, fnPtr, signature);
   }
   }
   

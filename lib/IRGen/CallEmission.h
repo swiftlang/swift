@@ -67,6 +67,7 @@ protected:
   void emitToUnmappedExplosion(Explosion &out);
   virtual void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) = 0;
   void emitYieldsToExplosion(Explosion &out);
+  virtual FunctionPointer getCalleeFunctionPointer() = 0;
   llvm::CallInst *emitCallSite();
 
   CallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)

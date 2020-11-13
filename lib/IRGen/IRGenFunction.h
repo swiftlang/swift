@@ -206,7 +206,9 @@ public:
   emitLoadOfRelativeIndirectablePointer(Address addr, bool isFar,
                                         llvm::PointerType *expectedType,
                                         const llvm::Twine &name = "");
-
+  llvm::Value *emitLoadOfRelativePointer(Address addr, bool isFar,
+                                         llvm::PointerType *expectedType,
+                                         const llvm::Twine &name = "");
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
