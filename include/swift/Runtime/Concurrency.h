@@ -65,16 +65,14 @@ AsyncTaskAndContext swift_task_create_f(JobFlags flags,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    const AsyncFunctionPointer<void()> *function,
-    size_t resultOffset, size_t errorOffset);
+    const AsyncFunctionPointer<void()> *function);
 
 /// Create a task object with a future which will run the given
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    AsyncFunctionType<void()> *function, size_t initialContextSize,
-    size_t resultOffset, size_t errorOffset);
+    AsyncFunctionType<void()> *function, size_t initialContextSize);
 
 /// Allocate memory in a task.
 ///

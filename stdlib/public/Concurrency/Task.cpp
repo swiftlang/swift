@@ -79,27 +79,13 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 
   assert(isFuture());
   auto fragment = futureFragment();
-  auto storagePtr = fragment->getStoragePtr();
 
-  // Check for an error.
+  // If an error was thrown, save it in the future fragment.
+  auto futureContext = static_cast<FutureAsyncContext *>(context);
   bool hadErrorResult = false;
-  if (unsigned errorOffset = fragment->errorOffset) {
-    // Find the error object in the context.
-    auto errorPtrPtr = reinterpret_cast<char *>(context) + errorOffset;
-    OpaqueValue *errorObject = *reinterpret_cast<OpaqueValue **>(errorPtrPtr);
-
-    // If there is an error, take it and we're done.
-    if (errorObject) {
-      *reinterpret_cast<OpaqueValue **>(storagePtr) = errorObject;
-      hadErrorResult = true;
-    }
-  }
-
-  if (!hadErrorResult) {
-    // Take the success value.
-    auto resultPtr = reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(context) + fragment->resultOffset);
-    fragment->resultType->vw_initializeWithTake(storagePtr, resultPtr);
+  if (auto errorObject = futureContext->errorResult) {
+    fragment->getError() = errorObject;
+    hadErrorResult = true;
   }
 
   // Update the status to signal completion.
@@ -197,24 +183,22 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
                            AsyncFunctionType<void()> *function,
                            size_t initialContextSize) {
   return swift_task_create_future_f(
-      flags, parent, nullptr, function, initialContextSize, 0, 0);
+      flags, parent, nullptr, function, initialContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_future(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    const AsyncFunctionPointer<void()> *function,
-    size_t resultOffset, size_t errorOffset) {
+    const AsyncFunctionPointer<void()> *function) {
   return swift_task_create_future_f(
       flags, parent, futureResultType, function->Function.get(),
-      function->ExpectedContextSize, resultOffset, errorOffset);
+      function->ExpectedContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_future_f(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    AsyncFunctionType<void()> *function, size_t initialContextSize,
-    size_t resultOffset, size_t errorOffset) {
+    AsyncFunctionType<void()> *function, size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
-  assert((resultOffset != 0) == flags.task_isFuture());
+  assert((futureResultType != nullptr) == flags.task_isFuture());
   assert((parent != nullptr) == flags.task_isChildTask());
 
   // Figure out the size of the header.
@@ -258,14 +242,13 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     auto futureFragment = task->futureFragment();
-    new (futureFragment) FutureFragment(
-        futureResultType, resultOffset, errorOffset);
+    new (futureFragment) FutureFragment(futureResultType);
 
-    // Zero out the error, so the task does not need to do it.
-    if (errorOffset) {
-      auto errorPtrPtr = reinterpret_cast<char *>(initialContext) + errorOffset;
-      *reinterpret_cast<OpaqueValue **>(errorPtrPtr) = nullptr;
-    }
+    // Set up the context for the future so there is no error, and a successful
+    // result will be written into the future fragment's storage.
+    auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
+    futureContext->errorResult = nullptr;
+    futureContext->indirectResult = futureFragment->getStoragePtr();
   }
 
   // Configure the initial context.

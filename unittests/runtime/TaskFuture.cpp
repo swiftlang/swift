@@ -30,16 +30,11 @@ using InvokeFunctionRef =
 using BodyFunctionRef =
   llvm::function_ref<void(AsyncTask *task)>;
 
-template <class Storage> struct PODFutureContext : AsyncContext {
-  alignas(Storage) char resultStorage[sizeof(Storage)];
-  void *errorStorage;
-};
-
-template <class Storage> struct FutureContext : PODFutureContext<Storage> {
+template <class Storage> struct FutureContext : FutureAsyncContext {
   InvokeFunctionRef<Storage> storedInvokeFn;
 
   Storage& getStorage() {
-    return *reinterpret_cast<Storage *>(&this->resultStorage[0]);
+    return *reinterpret_cast<Storage *>(this->indirectResult);
   }
 };
 
@@ -72,9 +67,7 @@ static void withFutureTask(const Metadata *resultType,
   auto taskAndContext =
     swift_task_create_future_f(flags, /*parent*/ nullptr, resultType,
                                &futureTaskInvokeFunction<T>,
-                               sizeof(FutureContext<T>),
-                               offsetof(PODFutureContext<T>, resultStorage),
-                               offsetof(PODFutureContext<T>, errorStorage));
+                               sizeof(FutureContext<T>));
 
   auto futureContext =
     static_cast<FutureContext<T>*>(taskAndContext.InitialContext);
@@ -139,7 +132,7 @@ TEST(TaskFutureTest, intFuture) {
     EXPECT_EQ(42, context->getStorage());
 
     // The error storage should have been cleared out for us.
-    EXPECT_EQ(nullptr, context->errorStorage);
+    EXPECT_EQ(nullptr, context->errorResult);
 
     // Store something in the future.
     context->getStorage() = 17;
@@ -173,7 +166,7 @@ TEST(TaskFutureTest, objectFuture) {
     object = allocTestObject(&objectValueOnComplete, 25);
 
     // The error storage should have been cleared out for us.
-    EXPECT_EQ(nullptr, context->errorStorage);
+    EXPECT_EQ(nullptr, context->errorResult);
 
     // Store the object in the future.
     context->getStorage() = object;
@@ -202,5 +195,4 @@ TEST(TaskFutureTest, objectFuture) {
     swift_release(task);
     assert(objectValueOnComplete == 25);
   });
-
 }

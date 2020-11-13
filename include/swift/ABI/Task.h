@@ -297,23 +297,15 @@ public:
     /// The type of the result that will be produced by the future.
     const Metadata *resultType;
 
-    /// The offset of the result in the initial asynchronous context.
-    unsigned resultOffset;
-
-    /// The offset of the error in the initial asynchronous context.
-    unsigned errorOffset;
-
     // Trailing storage for the result itself. The storage will be uninitialized,
     // contain an instance of \c resultType, or contaon an an \c Error.
 
     friend class AsyncTask;
 
   public:
-    FutureFragment(
-        const Metadata *resultType, size_t resultOffset, size_t errorOffset)
+    explicit FutureFragment(const Metadata *resultType)
       : waitQueue(WaitQueueItem::get(Status::Executing, nullptr)),
-        resultType(resultType), resultOffset(resultOffset),
-        errorOffset(errorOffset) { }
+        resultType(resultType) { }
 
     /// Destroy the storage associated with the future.
     void destroy();
@@ -334,14 +326,15 @@ public:
     /// fragment.
     static size_t storageOffset(const Metadata *resultType)  {
       size_t offset = sizeof(FutureFragment);
-      size_t alignment = resultType->vw_alignment();
+      size_t alignment = std::max(resultType->vw_alignment(), alignof(void *));
       return (offset + alignment - 1) & ~(alignment - 1);
     }
 
     /// Determine the size of the future fragment given a particular future
     /// result type.
     static size_t fragmentSize(const Metadata *resultType) {
-      return storageOffset(resultType) + resultType->vw_size();
+      return storageOffset(resultType) +
+          std::max(resultType->vw_size(), sizeof(void *));
     }
   };
 
@@ -463,6 +456,19 @@ public:
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Yielding;
   }
+};
+
+/// An asynchronous context within a task that describes a general "Future".
+/// task.
+///
+/// This type matches the ABI of a function `<T> () async throws -> T`, which
+/// is used to describe futures.
+class FutureAsyncContext : public AsyncContext {
+public:
+  SwiftError *errorResult = nullptr;
+  OpaqueValue *indirectResult;
+
+  using AsyncContext::AsyncContext;
 };
 
 } // end namespace swift
