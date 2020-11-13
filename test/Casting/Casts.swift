@@ -858,4 +858,25 @@ CastsTests.test("Casting Objects retained from KeyPaths to Protocols is not work
   expectNotNil(value as? SuperProtocol)
 }
 
+// Known to still be broken, but we can document the issue here
+public protocol SomeProtocol {}
+extension NSString: SomeProtocol {}
+CastsTests.test("NSDictionary -> Dictionary casting [SR-12025]") {
+  // Create NSDictionary with one entry
+  var a = NSMutableDictionary()
+  a[NSString("key")] = NSString("value")
+
+  let v = NSString("value")
+  let v2 = v as? SomeProtocol
+  expectNotNil(v2)
+
+  // Test casting of the dictionary
+  let b = a as? [String:SomeProtocol]
+  expectFailure { expectNotNil(b) } // Expect non-nil, but see nil
+  let c = a as? [String:Any]
+  expectNotNil(c)  // Non-nil (as expected)
+  let d = c as? [String:SomeProtocol]
+  expectNotNil(d) // Non-nil (as expected)
+}
+
 runAllTests()
