@@ -196,7 +196,7 @@ TEST(TaskFutureTest, objectFuture) {
     EXPECT_EQ(object, *reinterpret_cast<TestObject **>(waitResult.storage));
 
     // Make sure the object hasn't been destroyed.
-    EXPECT_EQ(7, objectValueOnComplete);
+    EXPECT_EQ(size_t(7), objectValueOnComplete);
 
     // Okay, release the task. This should destroy the object.
     swift_release(task);

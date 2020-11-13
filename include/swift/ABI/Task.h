@@ -88,6 +88,13 @@ public:
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job {
+protected:
+  // Indices into SchedulerPrivate, for use by the runtime.
+  enum {
+    /// The next waiting task link, an AsyncTask that is waiting on a future.
+    NextWaitingTaskIndex = 0,
+  };
+
 public:
   // Reserved for the use of the scheduler.
   void *SchedulerPrivate[2];
@@ -190,16 +197,12 @@ public:
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
 
-  /// The next task in the linked list of waiting tasks.
-  AsyncTask *NextWaitingTask;
-
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
             AsyncContext *initialContext)
     : HeapObject(metadata), Job(flags, run),
       ResumeContext(initialContext),
-      Status(ActiveTaskStatus()),
-      NextWaitingTask(nullptr) {
+      Status(ActiveTaskStatus()) {
     assert(flags.isAsyncTask());
   }
 
@@ -265,9 +268,9 @@ public:
     /// head of the list of tasks.
     struct WaitQueueItem {
       /// Mask used for the low status bits in a wait queue item.
-      const uintptr_t statusMask = 0x03;
+      static const uintptr_t statusMask = 0x03;
 
-      uintptr_t storage;
+      const uintptr_t storage;
 
       Status getStatus() const {
         return static_cast<Status>(storage & statusMask);
@@ -359,13 +362,20 @@ public:
   /// executor.
   void completeFuture(AsyncContext *context, ExecutorRef executor);
 
+  /// Access the next waiting task, which establishes a singly linked list of
+  /// tasks that are waiting on a future.
+  AsyncTask *&getNextWaitingTask() {
+    return reinterpret_cast<AsyncTask *&>(
+        SchedulerPrivate[NextWaitingTaskIndex]);
+  }
+
   static bool classof(const Job *job) {
     return job->isAsyncTask();
   }
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
+static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");

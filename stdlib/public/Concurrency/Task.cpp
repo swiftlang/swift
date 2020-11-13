@@ -64,7 +64,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     }
 
     // Put the waiting task at the beginning of the wait queue.
-    waitingTask->NextWaitingTask = queueHead.getTask();
+    waitingTask->getNextWaitingTask() = queueHead.getTask();
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
     if (fragment->waitQueue.compare_exchange_weak(
             queueHead, newQueueHead, std::memory_order_release,
@@ -119,10 +119,10 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
     // Find the next waiting task.
-    auto nextWaitingTask = waitingTask->NextWaitingTask;
+    auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
     // Remove this task from the list.
-    waitingTask->NextWaitingTask = nullptr;
+    waitingTask->getNextWaitingTask() = nullptr;
 
     // TODO: schedule this task on the executor rather than running it
     // directly.
