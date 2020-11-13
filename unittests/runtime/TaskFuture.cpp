@@ -63,6 +63,7 @@ static void futureTaskInvokeFunction(AsyncTask *task, ExecutorRef executor,
 
 template <class T>
 static void withFutureTask(const Metadata *resultType,
+                           const T& initialValue,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   JobFlags flags = JobKind::Task;
@@ -77,7 +78,7 @@ static void withFutureTask(const Metadata *resultType,
 
   auto futureContext =
     static_cast<FutureContext<T>*>(taskAndContext.InitialContext);
-  futureContext->getStorage() = 42; // Magic number.
+  futureContext->getStorage() = initialValue; // Magic number.
   futureContext->storedInvokeFn = invokeFn;
 
   // Forward our owning reference to the task into its execution,
@@ -92,12 +93,46 @@ static ExecutorRef createFakeExecutor(uintptr_t value) {
 
 extern const FullMetadata<OpaqueMetadata> METADATA_SYM(Si);
 
+struct TestObject : HeapObject {
+  constexpr TestObject(HeapMetadata const *newMetadata)
+    : HeapObject(newMetadata, InlineRefCounts::Immortal)
+    , Addr(NULL), Value(0) {}
+
+  size_t *Addr;
+  size_t Value;
+};
+
+static SWIFT_CC(swift) void destroyTestObject(SWIFT_CONTEXT HeapObject *_object) {
+  auto object = static_cast<TestObject*>(_object);
+  assert(object->Addr && "object already deallocated");
+  *object->Addr = object->Value;
+  object->Addr = nullptr;
+  swift_deallocObject(object, sizeof(TestObject), alignof(TestObject) - 1);
+}
+
+static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
+  { { &destroyTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
+  { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
+};
+
+/// Create an object that, when deallocated, stores the given value to
+/// the given pointer.
+static TestObject *allocTestObject(size_t *addr, size_t value) {
+  auto result =
+    static_cast<TestObject *>(swift_allocObject(&TestClassObjectMetadata,
+                                                sizeof(TestObject),
+                                                alignof(TestObject) - 1));
+  result->Addr = addr;
+  result->Value = value;
+  return result;
+}
+
 TEST(TaskFutureTest, intFuture) {
   auto createdExecutor = createFakeExecutor(1234);
   bool hasRun = false;
 
   withFutureTask<intptr_t>(
-      reinterpret_cast<const Metadata *>(&METADATA_SYM(Si)),
+      reinterpret_cast<const Metadata *>(&METADATA_SYM(Si)), 42,
       [&](AsyncTask *task, ExecutorRef executor,
           FutureContext<intptr_t> *context) {
     // The storage should be what we initialized it to earlier.
@@ -125,3 +160,47 @@ TEST(TaskFutureTest, intFuture) {
   });
 }
 
+TEST(TaskFutureTest, objectFuture) {
+  auto createdExecutor = createFakeExecutor(1234);
+  bool hasRun = false;
+
+  size_t objectValueOnComplete = 7;
+  TestObject *object = nullptr;
+  withFutureTask<TestObject *>(
+      &TestClassObjectMetadata, nullptr,
+      [&](AsyncTask *task, ExecutorRef executor,
+          FutureContext<TestObject *> *context) {
+    object = allocTestObject(&objectValueOnComplete, 25);
+
+    // The error storage should have been cleared out for us.
+    EXPECT_EQ(nullptr, context->errorStorage);
+
+    // Store the object in the future.
+    context->getStorage() = object;
+
+    hasRun = true;
+  }, [&](AsyncTask *task) {
+    // Retain the task, so it won't be destroyed when it is executed.
+    swift_retain(task);
+
+    // Run the task, which should fill in the future.
+    EXPECT_FALSE(hasRun);
+    task->run(createdExecutor);
+    EXPECT_TRUE(hasRun);
+
+    // "Wait" for the future, which must have completed by now.
+    auto waitResult = swift_task_future_wait(task, nullptr);
+    EXPECT_EQ(TaskFutureWaitResult::Success, waitResult.kind);
+
+    // Make sure we got the result value we expect.
+    EXPECT_EQ(object, *reinterpret_cast<TestObject **>(waitResult.storage));
+
+    // Make sure the object hasn't been destroyed.
+    EXPECT_EQ(7, objectValueOnComplete);
+
+    // Okay, release the task. This should destroy the object.
+    swift_release(task);
+    assert(objectValueOnComplete == 25);
+  });
+
+}
