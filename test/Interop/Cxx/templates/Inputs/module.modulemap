@@ -61,3 +61,7 @@ module ClassTemplateWithTypedef {
 module ClassTemplateInNamespace {
   header "class-template-in-namespace.h"
 }
+
+module MemberTemplates {
+  header "member-templates.h"
+}
