@@ -3425,18 +3425,23 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getModuleByIdentifier(M->getName());
-    if (overlay == M) {
-      overlay = nullptr;
-    } else {
-      // FIXME: This bizarre and twisty invariant is due to nested
-      // re-entrancy in both clang module loading and overlay module loading.
-      auto *sharedModuleRef = Ctx.getLoadedModule(M->getName());
-      assert(!sharedModuleRef || sharedModuleRef == overlay ||
-             sharedModuleRef == M);
+    auto overlay = Ctx.getOverlayModule(this);
+    if (overlay) {
       Ctx.addLoadedModule(overlay);
+    } else {
+      // FIXME: This is the awful legacy of the old implementation of overlay
+      // loading laid bare. Because the previous implementation used
+      // ASTContext::getModuleByIdentifier, it consulted the clang importer
+      // recursively which forced the current module, its dependencies, and
+      // the overlays of those dependencies to load and
+      // become visible in the current context. All of the callers of
+      // ClangModuleUnit::getOverlayModule are relying on this behavior, and
+      // untangling them is going to take a heroic amount of effort.
+      // Clang module loading should *never* *ever* be allowed to load unrelated
+      // Swift modules.
+      ImportPath::Module::Builder builder(M->getName());
+      (void) owner.loadModule(SourceLoc(), std::move(builder).get());
     }
-
     auto mutableThis = const_cast<ClangModuleUnit *>(this);
     mutableThis->overlayModule.setPointerAndInt(overlay, true);
   }
