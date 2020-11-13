@@ -246,7 +246,7 @@ public:
   public:
     /// Describes the status of the future.
     ///
-    /// Futures always being in the "Executing" state, and will always
+    /// Futures always begin in the "Executing" state, and will always
     /// make a single state change to either Success or Error.
     enum class Status : uintptr_t {
       /// The future is executing or ready to execute. The storage
@@ -266,7 +266,6 @@ public:
     std::atomic<Status> status;
 
     /// Queue containing all of the tasks that are waiting in `get()`.
-    /// FIXME: do we also need a context pointer for each?
     std::atomic<AsyncTask*> waitQueue;
 
     /// The type of the result that will be produced by the future.
@@ -298,8 +297,6 @@ public:
           reinterpret_cast<char *>(this) + storageOffset(resultType));
     }
 
-    /// Retrieve a reference to the storage of the 
-
     /// Compute the offset of the storage from the base of the future
     /// fragment.
     static size_t storageOffset(const Metadata *resultType)  {
@@ -329,9 +326,8 @@ public:
   ///
   /// \returns the status of the future. If this result is
   /// \c Executing, then \c waitingTask has been added to the
-  /// wait queue and will be scheduled when the future completes or
-  /// is cancelled. Otherwise, the future has completed and can be
-  /// queried.
+  /// wait queue and will be scheduled when the future completes. Otherwise,
+  /// the future has completed and can be queried.
   FutureFragment::Status waitFuture(AsyncTask *waitingTask);
 
   /// Complete this future.
