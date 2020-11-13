@@ -2351,6 +2351,14 @@ public:
         FunctionBodySkipping::All)
       return true;
 
+    // If we want all types (for LLDB) we can't skip functions with nested
+    // types. We could probably improve upon this and type-check only the
+    // nested types instead for better performances.
+    if (AFD->hasNestedTypeDeclarations() &&
+        getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
+          FunctionBodySkipping::NonInlinableWithoutTypes)
+      return false;
+
     // Only skip functions where their body won't be serialized
     return AFD->getResilienceExpansion() != ResilienceExpansion::Minimal;
   }
