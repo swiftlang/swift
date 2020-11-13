@@ -41,7 +41,6 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
-#include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -49,7 +48,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Option/Options.h"
-#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
@@ -64,13 +62,9 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
-
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -78,15 +72,10 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/Remarks/RemarkSerializer.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/Timer.h"
-#include "llvm/Support/YAMLTraits.h"
-#include "llvm/Target/TargetMachine.h"
 
 #include <algorithm>
 #include <memory>
@@ -138,7 +127,7 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile &SF, StringRef OutputFilename) {
+static bool emitSyntax(const SourceFile &SF, StringRef OutputFilename) {
   auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
   if (!os) return true;
 
@@ -232,8 +221,8 @@ class JSONFixitWriter
 public:
   JSONFixitWriter(std::string fixitsOutputPath,
                   const DiagnosticOptions &DiagOpts)
-    : FixitsOutputPath(fixitsOutputPath),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
+      : FixitsOutputPath(std::move(fixitsOutputPath)),
+        FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
   void handleDiagnostic(SourceManager &SM,
@@ -1623,10 +1612,13 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
-    (void) index::indexAndRecord(Instance.getMainModule(), opts.InputsAndOutputs.copyOutputFilenames(),
+    (void) index::indexAndRecord(Instance.getMainModule(),
+                                 opts.InputsAndOutputs.copyOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
-                                 opts.IndexSystemModules, opts.IndexIgnoreStdlib,
-                                 isDebugCompilation, Invocation.getTargetTriple(),
+                                 opts.IndexSystemModules,
+                                 opts.IndexIgnoreStdlib,
+                                 isDebugCompilation,
+                                 Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker());
   }
 }
@@ -1694,11 +1686,12 @@ createSerializedDiagnosticConsumerIfNeeded(
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
       [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string serializedDiagnosticsPath = input.serializedDiagnosticsPath();
-    if (serializedDiagnosticsPath.empty())
-      return nullptr;
-    return serialized_diagnostics::createConsumer(serializedDiagnosticsPath);
-  });
+        auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
+        if (serializedDiagnosticsPath.empty())
+          return nullptr;
+        return serialized_diagnostics::createConsumer(
+            serializedDiagnosticsPath);
+      });
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
@@ -1715,12 +1708,12 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   return createDispatchingDiagnosticConsumerIfNeeded(
       invocation.getFrontendOptions().InputsAndOutputs,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string fixItsOutputPath = input.fixItsOutputPath();
-    if (fixItsOutputPath.empty())
-      return nullptr;
-    return std::make_unique<JSONFixitWriter>(
-        fixItsOutputPath, invocation.getDiagnosticOptions());
-  });
+        auto fixItsOutputPath = input.getFixItsOutputPath();
+        if (fixItsOutputPath.empty())
+          return nullptr;
+        return std::make_unique<JSONFixitWriter>(
+            fixItsOutputPath.str(), invocation.getDiagnosticOptions());
+      });
 }
 
 /// Print information about a

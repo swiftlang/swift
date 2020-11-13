@@ -91,7 +91,7 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
                                          const FrontendOptions &opts,
                                          const InputFile &input) {
-  const std::string &dependenciesFilePath = input.dependenciesFilePath();
+  auto dependenciesFilePath = input.getDependenciesFilePath();
   if (dependenciesFilePath.empty())
     return false;
 
