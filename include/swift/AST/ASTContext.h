@@ -909,6 +909,13 @@ public:
   /// \returns The requested module, or NULL if the module cannot be found.
   ModuleDecl *getModule(ImportPath::Module ModulePath);
 
+  /// Attempts to load the matching overlay module for the given clang
+  /// module into this ASTContext.
+  ///
+  /// \returns The Swift overlay module corresponding to the given Clang module,
+  /// or NULL if the overlay module cannot be found.
+  ModuleDecl *getOverlayModule(const FileUnit *ClangModule);
+
   ModuleDecl *getModuleByName(StringRef ModuleName);
 
   ModuleDecl *getModuleByIdentifier(Identifier ModuleID);

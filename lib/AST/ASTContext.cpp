@@ -1928,6 +1928,27 @@ ASTContext::getModule(ImportPath::Module ModulePath) {
   return nullptr;
 }
 
+ModuleDecl *ASTContext::getOverlayModule(const FileUnit *FU) {
+  assert(FU && FU->getKind() == FileUnitKind::ClangModule &&
+         "Overlays can only be retrieved for clang modules!");
+  ImportPath::Module::Builder builder(FU->getParentModule()->getName());
+  auto ModPath = builder.get();
+  if (auto *Existing = getLoadedModule(ModPath)) {
+    if (!Existing->isNonSwiftModule())
+      return Existing;
+  }
+
+  for (auto &importer : getImpl().ModuleLoaders) {
+    if (importer.get() == getClangModuleLoader())
+      continue;
+    if (ModuleDecl *M = importer->loadModule(SourceLoc(), ModPath)) {
+      return M;
+    }
+  }
+
+  return nullptr;
+}
+
 ModuleDecl *ASTContext::getModuleByName(StringRef ModuleName) {
   ImportPath::Module::Builder builder(*this, ModuleName, /*separator=*/'.');
   return getModule(builder.get());
