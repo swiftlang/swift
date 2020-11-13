@@ -184,11 +184,6 @@ public func != <T: Equatable>(lhs: T, rhs: T) -> Bool
 // rather than rawValue; the difference is subtle, but it can be fatal.)
 extension RawRepresentable where RawValue: Hashable, Self: Hashable {
   @inlinable // trivial
-  public var hashValue: Int {
-    return rawValue.hashValue
-  }
-
-  @inlinable // trivial
   public func hash(into hasher: inout Hasher) {
     hasher.combine(rawValue)
   }
