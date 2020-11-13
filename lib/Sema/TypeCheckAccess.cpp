@@ -25,13 +25,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/SourceFile.h"
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "clang/AST/Type.h"
-#include "clang/Basic/Module.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 
@@ -1446,47 +1440,6 @@ public:
     }
   }
 };
-
-void getVisibleModules(
-    llvm::SmallPtrSetImpl<const clang::Module *> &visibleModules,
-    swift::SourceFile *SF) {
-  llvm::SmallPtrSet<swift::ModuleDecl *, 4> seenModules;
-  llvm::SmallVector<swift::ModuleDecl *, 4> stack;
-
-  auto filter = ModuleDecl::ImportFilter(
-      {ModuleDecl::ImportFilterKind::Exported,
-       ModuleDecl::ImportFilterKind::Default,
-       ModuleDecl::ImportFilterKind::SPIAccessControl,
-       ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay});
-
-  SmallVector<ImportedModule, 4> sfImportedModules;
-
-  SF->getImportedModules(sfImportedModules, filter);
-
-  for (auto importedModule : sfImportedModules) {
-    stack.push_back(importedModule.importedModule);
-    seenModules.insert(importedModule.importedModule);
-  }
-
-  while (!stack.empty()) {
-    auto module = stack.pop_back_val();
-    if (auto clangModule = module->findUnderlyingClangModule()) {
-        visibleModules.insert(clangModule);
-        continue;
-    }
-
-    SmallVector<ImportedModule, 4> importedModules;
-    module->getImportedModules(importedModules, filter);
-
-    for (auto &importedModule : importedModules) {
-      auto moduleDecl = importedModule.importedModule;
-      if (!seenModules.contains(moduleDecl)) {
-        seenModules.insert(moduleDecl);
-        stack.push_back(moduleDecl);
-      }
-    }
-  }
-}
 } // end anonymous namespace
 
 /// Returns the kind of origin, implementation-only import or SPI declaration,
@@ -1499,9 +1452,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
                                DowngradeToWarning &downgradeToWarning) {
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
-  
   auto *SF = where.getDeclContext()->getParentSourceFile();
-  
   if (SF->isImportedImplementationOnly(M)) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
@@ -1510,27 +1461,36 @@ swift::getDisallowedOriginKind(const Decl *decl,
 
     // Even if the current module is @_implementationOnly, Swift should
     // not report an error in the cases where the decl is also exported from
-    // a non @_implementationOnly module. Thus, we look at all the visible
-    // modules and see if we can find the decl in a non @_implementationOnly
-    // module.
-    llvm::SmallPtrSet<const clang::Module *, 4> visibleModules;
-    getVisibleModules(visibleModules, SF);
-
+    // a non @_implementationOnly module. Thus, we check to see if there is
+    // a visible access path to the Clang decl, and only error out in case
+    // there is none.
+    auto filter = ModuleDecl::ImportFilter(
+        {ModuleDecl::ImportFilterKind::Exported,
+         ModuleDecl::ImportFilterKind::Default,
+         ModuleDecl::ImportFilterKind::SPIAccessControl,
+         ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay});
+    SmallVector<ImportedModule, 4> sfImportedModules;
+    SF->getImportedModules(sfImportedModules, filter);
     if (auto clangDecl = decl->getClangDecl()) {
       for (auto redecl : clangDecl->redecls()) {
-        if (!visibleModules.contains(redecl->getOwningModule())) {
-          continue;
-        }
-
-        if (auto tagRedecl = dyn_cast<clang::TagDecl>(redecl)) {
-          // This is a forward declaration.
-          // We ignore visibility of these.
-          if (tagRedecl->getBraceRange().isInvalid()) {
+        if (auto tagReDecl = dyn_cast<clang::TagDecl>(redecl)) {
+          // This is a forward declaration. We ignore visibility of those.
+          if (tagReDecl->getBraceRange().isInvalid()) {
             continue;
           }
         }
-        
-        return DisallowedOriginKind::None;
+        auto moduleWrapper =
+            decl->getASTContext().getClangModuleLoader()->getWrapperForModule(
+                redecl->getOwningModule());
+        auto visibleAccessPath =
+            find_if(sfImportedModules, [&moduleWrapper](auto importedModule) {
+              return importedModule.importedModule == moduleWrapper ||
+                     !importedModule.importedModule
+                          ->isImportedImplementationOnly(moduleWrapper);
+            });
+        if (visibleAccessPath != sfImportedModules.end()) {
+          return DisallowedOriginKind::None;
+        }
       }
     }
     // Implementation-only imported, cannot be reexported.
