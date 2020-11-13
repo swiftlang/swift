@@ -1524,6 +1524,7 @@ public:
 
   SILValue visitBase(SILValue base, AccessedStorage::Kind kind) {
     assert(false && "access base cannot be cloned");
+    return SILValue();
   }
 
   SILValue visitNonAccess(SILValue base) {
