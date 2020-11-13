@@ -261,12 +261,34 @@ public:
       Error,
     };
 
-  private:
-    /// Status of the future.
-    std::atomic<Status> status;
+    /// An item within the wait queue, which includes the status and the
+    /// head of the list of tasks.
+    struct WaitQueueItem {
+      /// Mask used for the low status bits in a wait queue item.
+      const uintptr_t statusMask = 0x03;
 
+      uintptr_t storage;
+
+      Status getStatus() const {
+        return static_cast<Status>(storage & statusMask);
+      }
+
+      AsyncTask *getTask() const {
+        return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+      }
+
+      static WaitQueueItem get(Status status, AsyncTask *task) {
+        return WaitQueueItem{
+          reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+      }
+    };
+
+  private:
     /// Queue containing all of the tasks that are waiting in `get()`.
-    std::atomic<AsyncTask*> waitQueue;
+    ///
+    /// The low bits contain the status, the rest of the pointer is the
+    /// AsyncTask.
+    std::atomic<WaitQueueItem> waitQueue;
 
     /// The type of the result that will be produced by the future.
     const Metadata *resultType;
@@ -285,8 +307,9 @@ public:
   public:
     FutureFragment(
         const Metadata *resultType, size_t resultOffset, size_t errorOffset)
-      : status(Status::Success), waitQueue(nullptr), resultType(resultType),
-        resultOffset(resultOffset), errorOffset(errorOffset) { }
+      : waitQueue(WaitQueueItem::get(Status::Executing, nullptr)),
+        resultType(resultType), resultOffset(resultOffset),
+        errorOffset(errorOffset) { }
 
     /// Destroy the storage associated with the future.
     void destroy();
@@ -331,10 +354,10 @@ public:
   FutureFragment::Status waitFuture(AsyncTask *waitingTask);
 
   /// Complete this future.
-  void completeFuture(AsyncContext *context);
-
-  /// Schedule waiting tasks now that the future has completed.
-  void scheduleWaitingTasks(ExecutorRef executor);
+  ///
+  /// Upon completion, any waiting tasks will be scheduled on the given
+  /// executor.
+  void completeFuture(AsyncContext *context, ExecutorRef executor);
 
   static bool classof(const Job *job) {
     return job->isAsyncTask();

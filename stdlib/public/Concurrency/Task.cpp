@@ -28,7 +28,8 @@ size_t FutureFragment::fragmentSize(const Metadata *resultType) {
 }
 
 void FutureFragment::destroy() {
-  switch (status.load()) {
+  auto queueHead = waitQueue.load(std::memory_order_acquire);
+  switch (queueHead.getStatus()) {
   case Status::Executing:
     assert(false && "destroying a task that never completed");
 
@@ -43,41 +44,49 @@ void FutureFragment::destroy() {
 }
 
 FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
+  using Status = FutureFragment::Status;
+  using WaitQueueItem = FutureFragment::WaitQueueItem;
+
   assert(isFuture());
   auto fragment = futureFragment();
 
-  auto currentStatus = fragment->status.load();
-  switch (currentStatus) {
-  case FutureFragment::Status::Error:
-  case FutureFragment::Status::Success:
-    // The task is done; we don't need to wait.
-    return currentStatus;
-
-  case FutureFragment::Status::Executing:
-    break;
-  }
-
-  // Put the waiting task at the beginning of the wait queue.
+  auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
   while (true) {
-    waitingTask->NextWaitingTask = fragment->waitQueue.load();
-    if (fragment->waitQueue.compare_exchange_strong(
-            waitingTask->NextWaitingTask, waitingTask)) {
+    switch (queueHead.getStatus()) {
+    case Status::Error:
+    case Status::Success:
+      // The task is done; we don't need to wait.
+      return queueHead.getStatus();
+
+    case Status::Executing:
+      // Task is now complete. We'll need to add ourselves to the queue.
+      break;
+    }
+
+    // Put the waiting task at the beginning of the wait queue.
+    waitingTask->NextWaitingTask = queueHead.getTask();
+    auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
+    if (fragment->waitQueue.compare_exchange_weak(
+            queueHead, newQueueHead, std::memory_order_release,
+            std::memory_order_acquire)) {
       // Escalate the priority of this task based on the priority
       // of the waiting task.
       swift_task_escalate(this, waitingTask->Flags.getPriority());
-      break;
+      return FutureFragment::Status::Executing;
     }
   }
-
-  return FutureFragment::Status::Executing;
 }
 
-void AsyncTask::completeFuture(AsyncContext *context) {
+void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
+  using Status = FutureFragment::Status;
+  using WaitQueueItem = FutureFragment::WaitQueueItem;
+
   assert(isFuture());
   auto fragment = futureFragment();
   auto storagePtr = fragment->getStoragePtr();
 
   // Check for an error.
+  bool hadErrorResult = false;
   if (unsigned errorOffset = fragment->errorOffset) {
     // Find the error object in the context.
     auto errorPtrPtr = reinterpret_cast<char *>(context) + errorOffset;
@@ -86,27 +95,28 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     // If there is an error, take it and we're done.
     if (errorObject) {
       *reinterpret_cast<OpaqueValue **>(storagePtr) = errorObject;
-      fragment->status = FutureFragment::Status::Error;
-      return;
+      hadErrorResult = true;
     }
   }
 
-  // Take the success value.
-  auto resultPtr = reinterpret_cast<OpaqueValue *>(
-      reinterpret_cast<char *>(context) + fragment->resultOffset);
-  fragment->resultType->vw_initializeWithTake(storagePtr, resultPtr);
-  fragment->status = FutureFragment::Status::Success;
-}
+  if (!hadErrorResult) {
+    // Take the success value.
+    auto resultPtr = reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(context) + fragment->resultOffset);
+    fragment->resultType->vw_initializeWithTake(storagePtr, resultPtr);
+  }
 
-void AsyncTask::scheduleWaitingTasks(ExecutorRef executor) {
-  assert(isFuture());
-  auto fragment = futureFragment();
+  // Update the status to signal completion.
+  auto newQueueHead = WaitQueueItem::get(
+    hadErrorResult ? Status::Error : Status::Success,
+    nullptr
+  );
+  auto queueHead = fragment->waitQueue.exchange(
+      newQueueHead, std::memory_order_acquire);
+  assert(queueHead.getStatus() == Status::Executing);
 
-  auto waitingTask = fragment->waitQueue.load();
-
-  // Unnecessary, but useful for the assertion at the end.
-  fragment->waitQueue = nullptr;
-
+  // Notify every
+  auto waitingTask = queueHead.getTask();
   while (waitingTask) {
     // Find the next waiting task.
     auto nextWaitingTask = waitingTask->NextWaitingTask;
@@ -114,14 +124,13 @@ void AsyncTask::scheduleWaitingTasks(ExecutorRef executor) {
     // Remove this task from the list.
     waitingTask->NextWaitingTask = nullptr;
 
-    // TODO: schedule this task on the executor.
+    // TODO: schedule this task on the executor rather than running it
+    // directly.
+    waitingTask->run(executor);
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
   }
-
-  // Nobody should be able to add anything to the queue in this function.
-  assert(!fragment->waitQueue.load());
 }
 
 SWIFT_CC(swift)
@@ -171,12 +180,9 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   // to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
 
+  // Complete the future.
   if (task->isFuture()) {
-    // Complete the future, taking the result from the context.
-    task->completeFuture(context);
-
-    // Schedule tasks that are waiting on the future.
-    task->scheduleWaitingTasks(executor);
+    task->completeFuture(context, executor);
   }
 
   // TODO: set something in the status?

@@ -68,7 +68,7 @@ AsyncTaskAndContext swift_task_create_future(
     const AsyncFunctionPointer<void()> *function,
     size_t resultOffset, size_t errorOffset);
 
-/// Create a task object with no future which will run the given
+/// Create a task object with a future which will run the given
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
