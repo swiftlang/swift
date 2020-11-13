@@ -20,6 +20,7 @@
 #include "ClassMetadataVisitor.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
+#include "GenCall.h"
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenHeap.h"
@@ -31,6 +32,7 @@
 #include "MetadataLayout.h"
 #include "ProtocolInfo.h"
 #include "Signature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/IR/Function.h"
@@ -79,14 +81,32 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
   // Load the metadata, or use the 'self' value if we have a static method.
   llvm::Value *self;
 
-  // Non-throwing class methods always have the 'self' parameter at the end.
-  // Throwing class methods have 'self' right before the error parameter.
-  //
-  // FIXME: Should find a better way of expressing this.
-  if (funcTy->hasErrorResult())
-    self = (IGF.CurFn->arg_end() - 2);
-  else
-    self = (IGF.CurFn->arg_end() - 1);
+  if (funcTy->isAsync()) {
+    auto originalType = funcTy;
+    auto forwardingSubstitutionMap =
+        decl->getGenericEnvironment()
+            ? decl->getGenericEnvironment()->getForwardingSubstitutionMap()
+            : SubstitutionMap();
+    auto substitutedType = originalType->substGenericArgs(
+        IGF.IGM.getSILModule(), forwardingSubstitutionMap,
+        IGF.IGM.getMaximalTypeExpansionContext());
+    auto layout = getAsyncContextLayout(IGF.IGM, originalType, substitutedType,
+                                        forwardingSubstitutionMap);
+    assert(layout.hasLocalContext());
+    auto context = layout.emitCastTo(IGF, IGF.getAsyncContext());
+    auto localContextAddr =
+        layout.getLocalContextLayout().project(IGF, context, llvm::None);
+    self = IGF.Builder.CreateLoad(localContextAddr);
+  } else {
+    // Non-throwing class methods always have the 'self' parameter at the end.
+    // Throwing class methods have 'self' right before the error parameter.
+    //
+    // FIXME: Should find a better way of expressing this.
+    if (funcTy->hasErrorResult())
+      self = (IGF.CurFn->arg_end() - 2);
+    else
+      self = (IGF.CurFn->arg_end() - 1);
+  }
 
   auto selfTy = funcTy->getSelfParameter().getSILStorageType(
       IGF.IGM.getSILModule(), funcTy, IGF.IGM.getMaximalTypeExpansionContext());
@@ -109,13 +129,15 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   }
 
   IRGenFunction IGF(*this, f);
+  IGF.setAsync(declRef.getAbstractFunctionDecl()->hasAsync());
 
   // Look up the method.
   auto fn = lookupMethod(IGF, declRef);
 
   // Call the witness, forwarding all of the parameters.
   auto params = IGF.collectParameters();
-  auto result = IGF.Builder.CreateCall(fn, params.claimAll());
+  auto result =
+      IGF.Builder.CreateCall(fn.getAsFunction(IGF), params.claimAll());
 
   // Return the result, if we have one.
   if (result->getType()->isVoidTy())
