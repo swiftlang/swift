@@ -26,9 +26,10 @@ entry(%int : $Int64):
   %result = apply %printInt64(%int) : $@convention(thin) (Int64) -> () // CHECK: 9999
   return %result : $()
 }
+// Defined in _Concurrency
+sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
-sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil @test_case : $@convention(thin) @async () -> () {
   %int64ToVoid = function_ref @int64ToVoid : $@async @convention(thin) (Int64) -> ()
   %int64ToVoidThick = thin_to_thick_function %int64ToVoid : $@convention(thin) @async (Int64) -> () to $@async @callee_guaranteed (Int64) -> ()
   %int64ThrowsToVoid = convert_function %int64ToVoidThick : $@async @callee_guaranteed (Int64) -> () to $@async @callee_guaranteed (Int64) -> @error Error
@@ -37,11 +38,23 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   try_apply %int64ThrowsToVoid(%int) : $@async @callee_guaranteed (Int64) -> @error Error, normal success, error failure
 
 success(%value : $()):
-  %out_literal = integer_literal $Builtin.Int32, 0
-  %out = struct $Int32 (%out_literal : $Builtin.Int32)
-  return %out : $Int32
+  %result = tuple()
+  return %result : $()
 
 failure(%error : $Error):
   %end = builtin "errorInMain"(%error : $Error) : $()
   unreachable
+}
+
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
 }

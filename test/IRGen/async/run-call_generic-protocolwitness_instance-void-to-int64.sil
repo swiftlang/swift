@@ -61,8 +61,10 @@ bb0(%t : $*T):
   return %result : $Int64
 }
 
-sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// Defined in _Concurrency
+sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
   %i_type = metatype $@thin I.Type
   %i_int_literal = integer_literal $Builtin.Int64, 99
   %i_int = struct $Int64 (%i_int_literal : $Builtin.Int64)
@@ -75,12 +77,25 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 99
 
-  %out_literal = integer_literal $Builtin.Int32, 0
-  %out = struct $Int32 (%out_literal : $Builtin.Int32)
-  return %out : $Int32
+
+  %void = tuple()
+  return %void : $()
 }
+
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
+}
+
 
 sil_witness_table hidden I: P module main {
   method #P.printMe: <Self where Self : P> (Self) -> () async -> Int64 : @I_P_printMe
 }
-
