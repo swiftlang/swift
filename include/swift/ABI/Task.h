@@ -31,6 +31,7 @@ class AsyncContext;
 class Executor;
 class Job;
 struct OpaqueValue;
+struct SwiftError;
 class TaskStatusRecord;
 
 /// An ExecutorRef isn't necessarily just a pointer to an executor
@@ -321,6 +322,12 @@ public:
     OpaqueValue *getStoragePtr() {
       return reinterpret_cast<OpaqueValue *>(
           reinterpret_cast<char *>(this) + storageOffset(resultType));
+    }
+
+    /// Retrieve the error.
+    SwiftError *&getError() {
+      return *reinterpret_cast<SwiftError **>(
+           reinterpret_cast<char *>(this) + storageOffset(resultType));
     }
 
     /// Compute the offset of the storage from the base of the future

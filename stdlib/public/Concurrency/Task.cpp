@@ -34,7 +34,7 @@ void FutureFragment::destroy() {
     break;
 
   case Status::Error:
-    swift_unknownObjectRelease(getStoragePtr());
+    swift_unknownObjectRelease(reinterpret_cast<OpaqueValue *>(getError()));
     break;
   }
 }
@@ -300,8 +300,7 @@ swift::swift_task_future_wait(AsyncTask *task, AsyncTask *waitingTask) {
    case FutureFragment::Status::Error:
       return TaskFutureWaitResult{
           TaskFutureWaitResult::Error,
-          *reinterpret_cast<OpaqueValue **>(
-            task->futureFragment()->getStoragePtr())};
+          reinterpret_cast<OpaqueValue *>(task->futureFragment()->getError())};
   }
 }
 
