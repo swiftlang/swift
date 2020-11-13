@@ -4730,12 +4730,6 @@ private:
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
 
-    /// Whether the bindings represent (potentially) incomplete set,
-    /// there is no way to say with absolute certainty if that's the
-    /// case, but that could happen when certain constraints like
-    /// `bind param` are present in the system.
-    bool PotentiallyIncomplete = false;
-
     ASTNode AssociatedCodeCompletionToken = ASTNode();
 
     /// Whether this type variable has literal bindings.
@@ -4752,11 +4746,16 @@ private:
     llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
     llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
 
-    PotentialBindings(TypeVariableType *typeVar)
-        : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
+    PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
+
+    /// Whether the bindings represent (potentially) incomplete set,
+    /// there is no way to say with absolute certainty if that's the
+    /// case, but that could happen when certain constraints like
+    /// `bind param` are present in the system.
+    bool isPotentiallyIncomplete() const;
 
     /// If there is only one binding and it's to a hole type, consider
     /// this type variable to be a hole in a constraint system regardless
@@ -4838,7 +4837,7 @@ private:
 
       // As a last resort, let's check if the bindings are
       // potentially incomplete, and if so, let's de-prioritize them.
-      return x.PotentiallyIncomplete < y.PotentiallyIncomplete;
+      return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -4939,7 +4938,7 @@ public:
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
-      if (PotentiallyIncomplete)
+      if (isPotentiallyIncomplete())
         out << "potentially_incomplete ";
       if (FullyBound)
         out << "fully_bound ";

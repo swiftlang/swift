@@ -22,6 +22,64 @@
 using namespace swift;
 using namespace constraints;
 
+bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
+  // Generic parameters are always potentially incomplete.
+  if (isGenericParameter())
+    return true;
+
+  // If current type variable is associated with a code completion token
+  // it's possible that it doesn't have enough contextual information
+  // to be resolved to anything so let's delay considering it until everything
+  // else is resolved.
+  if (AssociatedCodeCompletionToken)
+    return true;
+
+  auto *locator = TypeVar->getImpl().getLocator();
+  if (!locator)
+    return false;
+
+  if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+    // If subtyping is allowed and this is a result of an implicit member chain,
+    // let's delay binding it to an optional until its object type resolved too or
+    // it has been determined that there is no possibility to resolve it. Otherwise
+    // we might end up missing solutions since it's allowed to implicitly unwrap
+    // base type of the chain but it can't be done early - type variable
+    // representing chain's result type has a different l-valueness comparing
+    // to generic parameter of the optional.
+    if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
+          if (binding.Kind != AllowedBindingKind::Subtypes)
+            return false;
+
+          auto objectType = binding.BindingType->getOptionalObjectType();
+          return objectType && objectType->isTypeVariableOrMember();
+        }))
+      return true;
+  }
+
+  if (isHole()) {
+    // If the base of the unresolved member reference like `.foo`
+    // couldn't be resolved we'd want to bind it to a hole at the
+    // very last moment possible, just like generic parameters.
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
+      return true;
+
+    // Delay resolution of the code completion expression until
+    // the very end to give it a chance to be bound to some
+    // contextual type even if it's a hole.
+    if (locator->directlyAt<CodeCompletionExpr>())
+      return true;
+
+    // Delay resolution of the `nil` literal to a hole until
+    // the very end to give it a change to be bound to some
+    // other type, just like code completion expression which
+    // relies solely on contextual information.
+    if (locator->directlyAt<NilLiteralExpr>())
+      return true;
+  }
+
+  return false;
+}
+
 void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
     const ConstraintSystem &cs,
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
@@ -466,25 +524,19 @@ void ConstraintSystem::PotentialBindings::finalize(
     // couldn't be resolved we'd want to bind it to a hole at the
     // very last moment possible, just like generic parameters.
     auto *locator = TypeVar->getImpl().getLocator();
-    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
-      PotentiallyIncomplete = true;
 
     // Delay resolution of the code completion expression until
     // the very end to give it a chance to be bound to some
     // contextual type even if it's a hole.
-    if (locator->directlyAt<CodeCompletionExpr>()) {
+    if (locator->directlyAt<CodeCompletionExpr>())
       FullyBound = true;
-      PotentiallyIncomplete = true;
-    }
 
     // Delay resolution of the `nil` literal to a hole until
     // the very end to give it a change to be bound to some
     // other type, just like code completion expression which
     // relies solely on contextual information.
-    if (locator->directlyAt<NilLiteralExpr>()) {
+    if (locator->directlyAt<NilLiteralExpr>())
       FullyBound = true;
-      PotentiallyIncomplete = true;
-    }
 
     // If this type variable is associated with a code completion token
     // and it failed to infer any bindings let's adjust hole's locator
@@ -874,10 +926,8 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // bindings and use it when forming a hole if there are no other bindings
     // available.
     if (auto *locator = bindingTypeVar->getImpl().getLocator()) {
-      if (locator->directlyAt<CodeCompletionExpr>()) {
+      if (locator->directlyAt<CodeCompletionExpr>())
         result.AssociatedCodeCompletionToken = locator->getAnchor();
-        result.PotentiallyIncomplete = true;
-      }
     }
 
     switch (constraint->getKind()) {
@@ -914,24 +964,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     if (typeVar->getImpl().canBindToLValue() !=
         otherTypeVar->getImpl().canBindToLValue())
       return None;
-  }
-
-  // If subtyping is allowed and this is a result of an implicit member chain,
-  // let's delay binding it to an optional until its object type resolved too or
-  // it has been determined that there is no possibility to resolve it. Otherwise
-  // we might end up missing solutions since it's allowed to implicitly unwrap
-  // base type of the chain but it can't be done early - type variable
-  // representing chain's result type has a different l-valueness comparing
-  // to generic parameter of the optional.
-  if (kind == AllowedBindingKind::Subtypes) {
-    auto *locator = typeVar->getImpl().getLocator();
-    if (locator &&
-        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
-      auto objectType = type->getOptionalObjectType();
-      if (objectType && objectType->isTypeVariableOrMember()) {
-        result.PotentiallyIncomplete = true;
-      }
-    }
   }
 
   if (type->is<InOutType>() && !typeVar->getImpl().canBindToInOut())
