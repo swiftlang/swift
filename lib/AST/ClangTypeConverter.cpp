@@ -12,13 +12,14 @@
 //
 // This file implements generation of Clang AST types from Swift AST types for
 // types that are representable in Objective-C interfaces.
-// Large chunks of the code are lightly modified versions of the code in
-// IRGen/GenClangType.cpp (which should eventually go away), so make sure
-// to keep the two in sync.
-// The three major differences are that, in this file:
+//
+// The usage of ClangTypeConverter at the AST level means that we may
+// encounter ill-formed types and/or sugared types. To avoid crashing and
+// keeping sugar as much as possible (in case the generated Clang type needs
+// to be surfaced to the user):
+//
 // 1. We fail gracefully instead of asserting/UB.
 // 2. We try to keep clang sugar instead of discarding it.
-// 3. We use getAs instead of cast as we handle Swift types with sugar.
 //
 //===----------------------------------------------------------------------===//
 
