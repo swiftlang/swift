@@ -132,3 +132,8 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
 
   return {task, initialContext};
 }
+
+// TODO: Remove this hack.
+void swift::swift_task_run(AsyncTask *taskToRun) {
+  taskToRun->run(ExecutorRef::noPreference());
+}
