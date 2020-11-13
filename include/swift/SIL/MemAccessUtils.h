@@ -1369,7 +1369,7 @@ public:
   // Result visitNonAccess(SILValue base);
   // Result visitPhi(SILPhiArgument *phi);
   // Result visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper);
-  // Result visitAccessProjection(SingleValueInstruction *cast,
+  // Result visitAccessProjection(SingleValueInstruction *projectedAddr,
   //                              Operand *sourceOper);
 
   Result visit(SILValue sourceAddr);
@@ -1476,6 +1476,82 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     return asImpl().visitUnidentified(sourceAddr);
 
   return asImpl().visitNonAccess(sourceAddr);
+}
+
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
+//                          AccessUseDefChainCloner
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Clone all projections and casts on the access use-def chain until either the
+/// specified predicate is true or the access base is reached.
+///
+/// This will not clone ref_element_addr or ref_tail_addr because those aren't
+/// part of the access chain.
+template <typename UnaryPredicate>
+class AccessUseDefChainCloner
+    : public AccessUseDefChainVisitor<AccessUseDefChainCloner<UnaryPredicate>,
+                                      SILValue> {
+  UnaryPredicate predicate;
+  SILInstruction *insertionPoint;
+
+public:
+  AccessUseDefChainCloner(UnaryPredicate predicate,
+                          SILInstruction *insertionPoint)
+      : predicate(predicate), insertionPoint(insertionPoint) {}
+
+  // Recursive main entry point
+  SILValue cloneUseDefChain(SILValue addr) {
+    if (!predicate(addr))
+      return addr;
+
+    return this->visit(addr);
+  }
+
+  // Recursively clone an address on the use-def chain.
+  SingleValueInstruction *cloneProjection(SingleValueInstruction *projectedAddr,
+                                          Operand *sourceOper) {
+    SILValue projectedSource = cloneUseDefChain(sourceOper->get());
+    SILInstruction *clone = projectedAddr->clone(insertionPoint);
+    clone->setOperand(sourceOper->getOperandNumber(), projectedSource);
+    return cast<SingleValueInstruction>(clone);
+  }
+
+  // MARK: Visitor implementation
+
+  SILValue visitBase(SILValue base, AccessedStorage::Kind kind) {
+    assert(false && "access base cannot be cloned");
+  }
+
+  SILValue visitNonAccess(SILValue base) {
+    assert(false && "unknown address root cannot be cloned");
+    return SILValue();
+  }
+
+  SILValue visitPhi(SILPhiArgument *phi) {
+    assert(false && "unexpected phi on access path");
+    return SILValue();
+  }
+
+  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+    return cloneProjection(cast, sourceOper);
+  }
+
+  SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
+                                 Operand *sourceOper) {
+    return cloneProjection(projectedAddr, sourceOper);
+  }
+};
+
+template <typename UnaryPredicate>
+SILValue cloneUseDefChain(SILValue addr, SILInstruction *insertionPoint,
+                          UnaryPredicate shouldFollowUse) {
+  return AccessUseDefChainCloner<UnaryPredicate>(shouldFollowUse,
+                                                 insertionPoint)
+      .cloneUseDefChain(addr);
 }
 
 } // end namespace swift
