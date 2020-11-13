@@ -372,7 +372,7 @@ protected:
     // Number of cases 
     NumCases : 31 - NumTermInstBits;
     template <typename BaseTy>
-    friend class SwitchEnumInstBase;
+    friend class SwitchEnumInstBase
   );
 
 #define SEIB_BITFIELD_EMPTY(T, U) \
