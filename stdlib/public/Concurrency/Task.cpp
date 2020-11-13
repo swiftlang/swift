@@ -134,12 +134,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 }
 
 SWIFT_CC(swift)
-static void destroySimpleTask(SWIFT_CONTEXT HeapObject *obj) {
+static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
-
-  // FIXME: "Simple task" seems like it's not that useful a concept. We might
-  // also have task-local storage to destroy.
-  // assert(!task->isFuture());
 
   // For a future, destroy the result.
   if (task->isFuture()) {
@@ -155,24 +151,23 @@ static void destroySimpleTask(SWIFT_CONTEXT HeapObject *obj) {
   free(task);
 }
 
-/// Heap metadata for a simple asynchronous task that does not
-/// include a future.
-static FullMetadata<HeapMetadata> simpleTaskHeapMetadata = {
+/// Heap metadata for an asynchronous task.
+static FullMetadata<HeapMetadata> taskHeapMetadata = {
   {
     {
-      &destroySimpleTask
+      &destroyTask
     },
     {
       /*value witness table*/ nullptr
     }
   },
   {
-    MetadataKind::SimpleTask
+    MetadataKind::Task
   }
 };
 
 /// The function that we put in the context of a simple task
-/// (one with no future) to handle the final return.
+/// to handle the final return.
 SWIFT_CC(swift)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
                          AsyncContext *context) {
@@ -254,7 +249,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task =
-    new(allocation) AsyncTask(&simpleTaskHeapMetadata, flags,
+    new(allocation) AsyncTask(&taskHeapMetadata, flags,
                               function, initialContext);
 
   // Initialize the child fragment if applicable.
