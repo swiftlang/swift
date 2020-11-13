@@ -1028,5 +1028,20 @@ keyPath.test("tail allocated c array") {
   expectEqual(4, offset)
 }
 
+keyPath.test("ReferenceWritableKeyPath statically typed as WritableKeyPath") {
+  let inner = C<Int>(x: 42, y: nil, z: 43)
+  var outer = C<C<Int>>(x: 44, y: nil, z: inner)
+  let keyPath = \C<C<Int>>.z.x
+  let upcastKeyPath = keyPath as WritableKeyPath
+
+  expectEqual(outer[keyPath: keyPath], 42)
+  outer[keyPath: keyPath] = 43
+  expectEqual(outer[keyPath: keyPath], 43)
+
+  expectEqual(outer[keyPath: upcastKeyPath], 43)
+  outer[keyPath: upcastKeyPath] = 44
+  expectEqual(outer[keyPath: upcastKeyPath], 44)
+}
+
 runAllTests()
 
