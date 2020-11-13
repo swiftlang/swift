@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
+import Foundation
+
 extension Task.LocalValues {
 
   // TODO: can't get away with static var...
@@ -72,5 +74,72 @@ struct VariableStyle {
       await bar(expected: expectedInBar)
     }
   }
+}
 
+// ==== ----------------------------------------------------------------------------------------------------------------
+
+// FIXME: Remove all this, just experimenting IF or how things could be used to store and report progress as well
+
+let exampleProgress = TaskLocalValue<Progress>()
+
+class ExampleProgress {
+  let worker = Worker()
+
+  func run() async throws {
+    let overallProgress = Progress(totalUnitCount: 100)
+
+    await exampleProgress.boundTo(overallProgress) {
+      async let result1 = await overallProgress.childTask(pendingUnitCount: 50) {
+         await work()
+      } // once this returns, definitely 50 units have progressed
+
+      async let result2 = await overallProgress.childTask(pendingUnitCount: 50) {
+        // do some work in different actor
+        await worker.work()
+      }  // once this returns, definitely the remaining 50 units have progressed
+
+      _ = await result1
+      _ = await result2
+    }
+  }
+
+  // @TaskProgress(totalUnitCount: 10)
+  func work() async -> Int {
+    await exampleProgress.get()?.completedUnitCount = 10
+
+    return 42
+  }
+
+}
+
+actor class Worker {
+  // @TaskProgress(totalUnitCount: 20)
+  func work() async -> Int {
+    await exampleProgress.get()?.completedUnitCount = 20
+
+    return 42
+  }
+}
+
+extension Progress {
+
+  // See: https://developer.apple.com/documentation/foundation/progress#1661050
+
+  // TODO: we can't really build this... can we?
+  //       we never have real access to child tasks, or any tasks at all.
+  //       we'd want to say "this is a child task, set a new progress value for the scope"
+  //
+  // This API mirrors the `addChild(_:withPendingUnitCount:)` explicit API for the Task oriented world.
+  //
+  // > As of iOS 9.0 and OS X v10.11 you can explicitly add a child to a progress tree.
+  // >
+  // > To add a child, call addChild(_:withPendingUnitCount:) on the parent.
+  // > The value for pending unit count is the amount of the parent’s totalUnitCount
+  // > consumed by the child. The child usually follows the ProgressReporting protocol.
+  func childTask<BodyResult>(
+    pendingUnitCount: Int,
+    body: () async throws -> BodyResult
+  ) async rethrows -> BodyResult {
+    fatalError("\(#function) not implemented")
+  }
 }
