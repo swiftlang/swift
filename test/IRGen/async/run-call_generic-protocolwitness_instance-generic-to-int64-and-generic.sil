@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -45,6 +46,7 @@ bb0(%out_addr : $*T, %in_addr : $*T, %self : $I):
   return %value : $Int64
 }
 
+// CHECK-LL: @I_P_printMeAD =
 // CHECK-LL: define internal swiftcc void @I_P_printMe(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil private [transparent] [thunk] @I_P_printMe : $@convention(witness_method: P) @async <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed I) -> (Int64, @out τ_0_0) {
 bb0(%out_addr : $*τ_0_0, %in_addr : $*τ_0_0, %self_addr : $*I):

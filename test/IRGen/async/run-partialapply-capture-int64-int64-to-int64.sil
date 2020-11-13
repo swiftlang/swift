@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -45,6 +46,7 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   return %out : $Int32
 }
 
+// CHECK-LL: @closureAD =
 // CHECK-LL: define internal swiftcc void @closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
 // CHECK-LL: define internal swiftcc void @"$s7closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}}
 sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64 {

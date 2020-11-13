@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -61,6 +62,7 @@ sil_vtable C {
 
 struct S { var x: C, y: C }
 
+// CHECK-LL: @structClassInstanceClassInstanceAndInt64ToInt64AD =
 // CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @structClassInstanceClassInstanceAndInt64ToInt64(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 // CHECK-LL: define internal swiftcc void @"$s019structClassInstancebc10AndInt64ToE0TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
 sil @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64 {

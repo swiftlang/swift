@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -101,6 +102,7 @@ bb0(%0 : $@thin Big.Type):
   return %62 : $Big
 }
 
+// CHECK-LL: @getBigAD =
 // CHECK-LL: define hidden swiftcc void @getBig(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @getBig : $@async @convention(thin) () -> Big {
 bb0:
