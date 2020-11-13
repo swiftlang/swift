@@ -122,13 +122,14 @@ public:
       phiArg->getIncomingPhiValues(pointerWorklist);
   }
 
-  void visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+  void visitStorageCast(SingleValueInstruction *projectedAddr,
+                        Operand *sourceOper) {
     // Allow conversions to/from pointers and addresses on disjoint phi paths
     // only if the underlying useDefVisitor allows it.
     if (storageCastTy == IgnoreStorageCast)
       pointerWorklist.push_back(sourceOper->get());
     else
-      visitNonAccess(cast);
+      visitNonAccess(projectedAddr);
   }
 
   void visitAccessProjection(SingleValueInstruction *projectedAddr,
@@ -206,7 +207,8 @@ public:
     return this->asImpl().visitNonAccess(phiArg);
   }
 
-  SILValue visitStorageCast(SingleValueInstruction *, Operand *sourceAddr) {
+  SILValue visitStorageCast(SingleValueInstruction *projectedAddr,
+                            Operand *sourceAddr) {
     assert(storageCastTy == IgnoreStorageCast);
     return sourceAddr->get();
   }
@@ -301,11 +303,12 @@ public:
   }
 
   // Override visitStorageCast to avoid seeing through arbitrary address casts.
-  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceAddr) {
+  SILValue visitStorageCast(SingleValueInstruction *projectedAddr,
+                            Operand *sourceAddr) {
     if (storageCastTy == StopAtStorageCast)
-      return visitNonAccess(cast);
+      return visitNonAccess(projectedAddr);
 
-    return SuperTy::visitStorageCast(cast, sourceAddr);
+    return SuperTy::visitStorageCast(projectedAddr, sourceAddr);
   }
 };
 
