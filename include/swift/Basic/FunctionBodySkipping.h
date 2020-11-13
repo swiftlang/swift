@@ -23,6 +23,9 @@ enum class FunctionBodySkipping : uint8_t {
   None,
   /// Only non-inlinable function bodies should be skipped.
   NonInlinable,
+  /// Only non-inlinable functions bodies without type definitions should
+  /// be skipped.
+  NonInlinableWithoutTypes,
   /// All function bodies should be skipped, where not otherwise required
   /// for type inference.
   All

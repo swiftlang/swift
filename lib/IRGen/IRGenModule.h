@@ -964,9 +964,6 @@ private:
   friend TypeConverter;
 
   const clang::ASTContext *ClangASTContext;
-  ClangTypeConverter *ClangTypes;
-  void initClangTypeConverter();
-  void destroyClangTypeConverter();
 
   llvm::DenseMap<Decl*, MetadataLayout*> MetadataLayouts;
   void destroyMetadataLayoutMap();

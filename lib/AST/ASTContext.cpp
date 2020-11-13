@@ -54,6 +54,7 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/SyntaxArena.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -4589,6 +4590,10 @@ ASTContext::getSwiftDeclForExportedClangDecl(const clang::Decl *decl) {
   return impl.Converter->getSwiftDeclForExportedClangDecl(decl);
 }
 
+const clang::Type *
+ASTContext::getClangTypeForIRGen(Type ty) {
+  return getClangTypeConverter().convert(ty).getTypePtrOrNull();
+}
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
