@@ -97,7 +97,7 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
       newQueueHead, std::memory_order_acquire);
   assert(queueHead.getStatus() == Status::Executing);
 
-  // Notify every
+  // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
     // Find the next waiting task.

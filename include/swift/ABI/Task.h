@@ -364,15 +364,16 @@ public:
   /// executor.
   void completeFuture(AsyncContext *context, ExecutorRef executor);
 
+  static bool classof(const Job *job) {
+    return job->isAsyncTask();
+  }
+
+private:
   /// Access the next waiting task, which establishes a singly linked list of
   /// tasks that are waiting on a future.
   AsyncTask *&getNextWaitingTask() {
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
-  }
-
-  static bool classof(const Job *job) {
-    return job->isAsyncTask();
   }
 };
 
