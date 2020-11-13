@@ -302,12 +302,24 @@ namespace irgen {
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap);
 
-  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
-                                          AsyncContextLayout layout,
-                                          CanSILFunctionType functionType,
-                                          llvm::Value *thickContext);
+  /// Given an async function, get the pointer to the function to be called and
+  /// the size of the context to be allocated.
+  ///
+  /// \param values Whether any code should be emitted to retrieve the function
+  ///               pointer and the size, respectively.  If false is passed, no
+  ///               code will be emitted to generate that value and null will
+  ///               be returned for it.
+  ///
+  /// \return {function, size}
+  std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
+      IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
+      FunctionPointer functionPointer, llvm::Value *thickContext,
+      std::pair<bool, bool> values = {true, true});
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
+
+  Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
+                                      CanSILFunctionType fnType);
 
   /// Does the given function have a self parameter that should be given
   /// the special treatment for self parameters?

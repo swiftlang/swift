@@ -3119,8 +3119,12 @@ namespace {
       // The class is fragile. Emit a direct reference to the vtable entry.
       llvm::Constant *ptr;
       if (entry) {
-        ptr = IGM.getAddrOfSILFunction(entry->getImplementation(),
-                                       NotForDefinition);
+        if (entry->getImplementation()->isAsync()) {
+          ptr = IGM.getAddrOfAsyncFunctionPointer(entry->getImplementation());
+        } else {
+          ptr = IGM.getAddrOfSILFunction(entry->getImplementation(),
+                                         NotForDefinition);
+        }
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
@@ -5280,4 +5284,17 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
              method.print(llvm::dbgs());
              llvm::dbgs() << " can be elided\n");
   return false;
+}
+
+llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
+                                                   SILFunction *function,
+                                                   Size size) {
+  ConstantInitBuilder initBuilder(IGM);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(IGM.AsyncFunctionPointerTy));
+  builder.addRelativeAddress(
+      IGM.getAddrOfSILFunction(function, NotForDefinition));
+  builder.addInt32(size.getValue());
+  return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
+      function, builder.finishAndCreateFuture()));
 }

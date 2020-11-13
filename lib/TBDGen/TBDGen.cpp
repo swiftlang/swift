@@ -720,6 +720,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
                        AFD->getGenericSignature()));
 
   visitDefaultArguments(AFD, AFD->getParameters());
+
+  if (AFD->isAsyncContext()) {
+    addSymbol(LinkEntity::forAsyncFunctionPointer(AFD));
+  }
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {

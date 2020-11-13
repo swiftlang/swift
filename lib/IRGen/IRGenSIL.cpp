@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/IR/Constant.h"
 #define DEBUG_TYPE "irgensil"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
@@ -70,6 +71,7 @@
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenIntegerLiteral.h"
+#include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPointerAuth.h"
@@ -1964,6 +1966,11 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
+  auto funcTy = CurSILFn->getLoweredFunctionType();
+  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift)
+    emitAsyncFunctionPointer(IGM, CurSILFn,
+                             getAsyncContextLayout(*this).getSize());
+
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager
   // TODO: consider using a cheaper analysis at -O0
@@ -1998,7 +2005,6 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Map the LLVM arguments to arguments on the entry point BB.
   Explosion params = collectParameters();
-  auto funcTy = CurSILFn->getLoweredFunctionType();
 
   switch (funcTy->getLanguage()) {
   case SILFunctionLanguage::Swift:
@@ -2282,23 +2288,29 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   diffWitness =
       Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
 
-  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
+  setLoweredFunctionPointer(i, FunctionPointer(fnType, diffWitness, signature));
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
+  auto fnType = fn->getLoweredFunctionType();
 
-  llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(
-      fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
-      isa<PreviousDynamicFunctionRefInst>(i));
-
-  auto sig = IGM.getSignature(fn->getLoweredFunctionType());
+  auto sig = IGM.getSignature(fnType);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
+  auto *fnPtr = IGM.getAddrOfSILFunction(
+      fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
+      isa<PreviousDynamicFunctionRefInst>(i));
+  llvm::Value *value;
+  if (fn->isAsync()) {
+    value = IGM.getAddrOfAsyncFunctionPointer(fn);
+    value = Builder.CreateBitCast(value, fnPtr->getType());
+  } else {
+    value = fnPtr;
+  }
+  FunctionPointer fp = FunctionPointer(fnType, value, sig);
 
-  FunctionPointer fp = FunctionPointer::forDirect(fnPtr, sig);
-  
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
   setLoweredFunctionPointer(i, fp);
@@ -3059,16 +3071,18 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   Explosion llArgs;
 
+  auto &lv = getLoweredValue(i->getCallee());
   if (i->getOrigCalleeType()->isAsync()) {
     auto result = getPartialApplicationFunction(*this, i->getCallee(),
                                                 i->getSubstitutionMap(),
                                                 i->getSubstCalleeType());
     llvm::Value *innerContext = std::get<1>(result);
-    auto layout =
-        getAsyncContextLayout(IGM, i->getOrigCalleeType(),
-                              i->getSubstCalleeType(), i->getSubstitutionMap());
-    auto size = getDynamicAsyncContextSize(
-        *this, layout, i->getOrigCalleeType(), innerContext);
+    llvm::Value *size;
+    llvm::Value *fnPtr;
+    std::tie(fnPtr, size) = getAsyncFunctionAndSize(
+        *this, i->getOrigCalleeType()->getRepresentation(), std::get<0>(result),
+        innerContext, {/*function*/ false, /*size*/ true});
+    assert(fnPtr == nullptr);
     llArgs.add(size);
   }
 
@@ -3084,7 +3098,6 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     }
   }
   
-  auto &lv = getLoweredValue(i->getCallee());
   if (lv.kind == LoweredValue::Kind::ObjCMethod) {
     // Objective-C partial applications require a different path. There's no
     // actual function pointer to capture, and we semantically can't cache
@@ -3347,7 +3360,8 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
                                            coroutine.Buffer.getAddress(),
                                            schemaAndEntity.second);
-  FunctionPointer callee(continuation, pointerAuth, sig);
+  FunctionPointer callee(i->getOrigCalleeType(), continuation, pointerAuth,
+                         sig);
 
   Builder.CreateCall(callee, {
     coroutine.Buffer.getAddress(),
@@ -6086,7 +6100,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
     auto fnType = IGM.getSILTypes().getConstantFunctionType(
         IGM.getMaximalTypeExpansionContext(), member);
     auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnPtr, sig);
+    auto fn = FunctionPointer::forDirect(fnType, fnPtr, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;
@@ -6250,7 +6264,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto authInfo =
       PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
 
-    FunctionPointer fn(fnPtr, authInfo, sig);
+    FunctionPointer fn(methodType, fnPtr, authInfo, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;
@@ -6286,7 +6300,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
                                ResilienceExpansion::Maximal)) {
     auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
-    FunctionPointer fn(fnPtr, sig);
+    FunctionPointer fn(methodType, fnPtr, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;
