@@ -23,10 +23,6 @@
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 
-size_t FutureFragment::fragmentSize(const Metadata *resultType) {
-  return storageOffset(resultType) + resultType->vw_size();
-}
-
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
   switch (queueHead.getStatus()) {

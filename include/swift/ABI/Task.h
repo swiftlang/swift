@@ -333,7 +333,9 @@ public:
 
     /// Determine the size of the future fragment given a particular future
     /// result type.
-    static size_t fragmentSize(const Metadata *resultType);
+    static size_t fragmentSize(const Metadata *resultType) {
+      return storageOffset(resultType) + resultType->vw_size();
+    }
   };
 
   bool isFuture() const { return Flags.task_isFuture(); }
