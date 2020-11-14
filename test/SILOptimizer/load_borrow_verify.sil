@@ -77,3 +77,23 @@ bb0(%0 : @owned $AnyObject):
   %99 = tuple ()
   return %99 : $()
 }
+
+// unchecked_ownership_conversion should not be considered a write to memory.
+class ObjectWrapper {
+  var object: AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed ObjectWrapper) -> @owned ObjectWrapper {
+// CHECK: bb0(%0 : @guaranteed $ObjectWrapper):
+// CHECK:   load_borrow
+// CHECK:   unchecked_ownership_conversion %0 : $ObjectWrapper, @guaranteed to @owned
+// CHECK:   end_borrow
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_conversion_test'
+sil [ossa] @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed ObjectWrapper) -> @owned ObjectWrapper {
+bb0(%0 : @guaranteed $ObjectWrapper):
+  %1 = ref_element_addr %0 : $ObjectWrapper, #ObjectWrapper.object
+  %2 = load_borrow %1 : $*AnyObject
+  %3 = unchecked_ownership_conversion %0 : $ObjectWrapper, @guaranteed to @owned
+  end_borrow %2 : $AnyObject
+  return %3 : $ObjectWrapper
+}
