@@ -1958,6 +1958,17 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkUncheckedOwnershipConversionInst(
+    UncheckedOwnershipConversionInst *uoci) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+    require(!uoci->getType().isAddress(),
+            "cannot convert ownership of an address");
+    require(uoci->getType() == uoci->getOperand()->getType(),
+            "converting ownership does not affect the type");
+  }
+
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
     if (AccessInst->getModule().getStage() != SILStage::Raw) {
