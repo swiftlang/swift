@@ -3595,7 +3595,9 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 
 llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
-    llvm::Value *taskFunction, llvm::Value *localContextInfo) {
+    llvm::Value *futureResultType,
+    llvm::Value *taskFunction, llvm::Value *localContextInfo,
+    SubstitutionMap subs) {
   parentTask = IGF.Builder.CreateBitOrPointerCast(
       parentTask, IGF.IGM.SwiftTaskPtrTy);
   taskFunction = IGF.Builder.CreateBitOrPointerCast(
@@ -3604,18 +3606,34 @@ llvm::Value *irgen::emitTaskCreate(
   // Determine the size of the async context for the closure.
   ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  auto taskFunctionType = FunctionType::get(
-    { }, ctx.TheEmptyTupleType, extInfo);
+  AnyFunctionType *taskFunctionType;
+  if (futureResultType) {
+    auto genericParam = GenericTypeParamType::get(0, 0, ctx);
+    auto genericSig = GenericSignature::get({genericParam}, {});
+    taskFunctionType = GenericFunctionType::get(
+        genericSig, { }, genericParam, extInfo);
+
+    taskFunctionType = Type(taskFunctionType).subst(subs)->castTo<FunctionType>();
+  } else {
+    taskFunctionType = FunctionType::get(
+        { }, ctx.TheEmptyTupleType, extInfo);
+  }
   CanSILFunctionType taskFunctionCanSILType =
       IGF.IGM.getLoweredType(taskFunctionType).castTo<SILFunctionType>();
   auto layout = getAsyncContextLayout(
-      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType,
-      SubstitutionMap());
+      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType, subs);
 
   // Call the function.
-  auto *result = IGF.Builder.CreateCall(
+  llvm::CallInst *result;
+  if (futureResultType) {
+    result = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskCreateFutureFuncFn(),
+      { flags, parentTask, futureResultType, taskFunction });
+  } else {
+    result = IGF.Builder.CreateCall(
       IGF.IGM.getTaskCreateFuncFn(),
       { flags, parentTask, taskFunction });
+  }
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
 
