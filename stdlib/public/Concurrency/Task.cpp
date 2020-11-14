@@ -103,9 +103,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     // Find the next waiting task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
-    // Remove this task from the list.
-    waitingTask->getNextWaitingTask() = nullptr;
-
     // TODO: schedule this task on the executor rather than running it
     // directly.
     waitingTask->run(executor);
@@ -198,7 +195,8 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
     AsyncFunctionType<void()> *function, size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
-  assert((futureResultType != nullptr) == flags.task_isFuture());
+  assert(!flags.task_isFuture() ||
+         initialContextSize >= sizeof(FutureAsyncContext));
   assert((parent != nullptr) == flags.task_isChildTask());
 
   // Figure out the size of the header.

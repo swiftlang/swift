@@ -326,7 +326,8 @@ public:
     /// fragment.
     static size_t storageOffset(const Metadata *resultType)  {
       size_t offset = sizeof(FutureFragment);
-      size_t alignment = std::max(resultType->vw_alignment(), alignof(void *));
+      size_t alignment =
+          std::max(resultType->vw_alignment(), alignof(SwiftError *));
       return (offset + alignment - 1) & ~(alignment - 1);
     }
 
@@ -334,7 +335,7 @@ public:
     /// result type.
     static size_t fragmentSize(const Metadata *resultType) {
       return storageOffset(resultType) +
-          std::max(resultType->vw_size(), sizeof(void *));
+          std::max(resultType->vw_size(), sizeof(SwiftError *));
     }
   };
 
@@ -463,7 +464,8 @@ public:
 /// task.
 ///
 /// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is used to describe futures.
+/// is the type used by `Task.runDetached` and `Task.group.add` to create
+/// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
   SwiftError *errorResult = nullptr;
