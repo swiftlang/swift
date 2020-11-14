@@ -369,8 +369,9 @@ bool swift::isLetAddress(SILValue address) {
 // RC-identical would confuse ARC optimization, which might eliminate a retain
 // of such an object completely.
 //
-// The SILVerifier checks that none of these operations cast a nontrivial value
-// to a reference except unconditional_checked_cast[_value].
+// The SILVerifier checks that none of these operations cast a trivial value to
+// a reference except unconditional_checked_cast[_value], which is checked By
+// SILDynamicCastInst::isRCIdentityPreserving().
 bool swift::isRCIdentityPreservingCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
