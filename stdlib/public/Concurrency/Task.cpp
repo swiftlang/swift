@@ -94,7 +94,10 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
   // This means that we never get rid of this allocation.
   size_t amountToAllocate = headerSize + initialContextSize;
 
-  assert(amountToAllocate % MaximumAlignment == 0);
+  // TODO: if this is necessary we need to teach LLVM lowering to request async
+  // context sizes that are mulitple of that maximum alignment.
+  // For now disable this assert.
+  // assert(amountToAllocate % MaximumAlignment == 0);
 
   void *allocation = malloc(amountToAllocate);
 
@@ -131,4 +134,9 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
   _swift_task_alloc_initialize(task);
 
   return {task, initialContext};
+}
+
+// TODO: Remove this hack.
+void swift::swift_task_run(AsyncTask *taskToRun) {
+  taskToRun->run(ExecutorRef::noPreference());
 }

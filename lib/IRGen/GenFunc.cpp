@@ -2372,3 +2372,56 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   IGF.Builder.CreateStore(descriptorVal,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
+
+llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
+  auto name = "__swift_async_resume_project_context";
+  return cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+      name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto &Builder = IGF.Builder;
+        auto addr = Builder.CreateBitOrPointerCast(&(*it), IGF.IGM.Int8PtrPtrTy);
+        Address callerContextAddr(addr, IGF.IGM.getPointerAlignment());
+        auto callerContext = Builder.CreateLoad(callerContextAddr);
+        Builder.CreateRet(callerContext);
+      },
+      false /*isNoInline*/));
+}
+
+llvm::Function *
+IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
+                                     ArrayRef<llvm::Value *> args) {
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
+  for (auto arg : args) {
+    auto *ty = arg->getType();
+    argTys.push_back(ty);
+  }
+  auto calleeFnPtrType = fnPtr.getRawPointer()->getType();
+  auto *dispatchFnTy =
+      llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
+  llvm::SmallString<40> name;
+  llvm::raw_svector_ostream(name) << "__swift_suspend_dispatch_" << args.size();
+  llvm::Function *dispatch =
+      llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
+                             llvm::StringRef(name), &IGM.Module);
+  dispatch->setCallingConv(IGM.DefaultCC);
+  dispatch->setDoesNotThrow();
+  IRGenFunction dispatchIGF(IGM, dispatch);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(dispatchIGF, dispatch);
+  auto &Builder = dispatchIGF.Builder;
+  auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
+  llvm::Value *ptrArg = &*(it++);
+  SmallVector<llvm::Value *, 8> callArgs;
+  for (; it != end; ++it) {
+    callArgs.push_back(&*it);
+  }
+  ptrArg = Builder.CreateBitOrPointerCast(ptrArg, calleeFnPtrType);
+  auto callee = FunctionPointer(fnPtr.getKind(), ptrArg, fnPtr.getAuthInfo(),
+                                fnPtr.getSignature());
+  auto call = Builder.CreateCall(callee, callArgs);
+  call->setTailCall();
+  Builder.CreateRetVoid();
+  return dispatch;
+}

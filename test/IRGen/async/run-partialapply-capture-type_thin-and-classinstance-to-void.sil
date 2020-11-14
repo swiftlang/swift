@@ -85,8 +85,10 @@ entry(%S_type: $@thin S.Type, %C_instance: $C):
   return %closure : $@async @callee_owned () -> ()
 }
 
-sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// Defined in _Concurrency
+sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
   %c_type = metatype $@thick C.Type
   %allocating_init = function_ref @C_allocating_init : $@convention(method) (@thick C.Type) -> @owned C
   %instance = apply %allocating_init(%c_type) : $@convention(method) (@thick C.Type) -> @owned C
@@ -97,6 +99,18 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   %S_type = metatype $@thin S.Type
   %partiallyApplied = apply %partial_apply_thin_type(%S_type, %instance) : $@async @convention(thin) (@thin S.Type, @owned C) -> @async @callee_owned () -> ()
   %result = apply %partiallyApplied() : $@async @callee_owned () -> ()
+
+  %void = tuple()
+  return %void : $()
+}
+
+sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
   %out_literal = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%out_literal : $Builtin.Int32)

@@ -330,10 +330,6 @@ AsyncContextLayout::AsyncContextLayout(
 #endif
 }
 
-static Size getAsyncContextSize(AsyncContextLayout layout) {
-  return layout.getSize();
-}
-
 static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
 }
@@ -2051,6 +2047,12 @@ public:
     return origConv.getSILArgumentType(
         index, IGF.IGM.getMaximalTypeExpansionContext());
   }
+
+  llvm::CallInst *createCall(const FunctionPointer &fn,
+                             ArrayRef<llvm::Value *> args) override {
+    return IGF.Builder.CreateCall(fn, Args);
+  }
+
   void begin() override { super::begin(); }
   void end() override { super::end(); }
   void setFromCallee() override {
@@ -2242,9 +2244,9 @@ class AsyncCallEmission final : public CallEmission {
   using super = CallEmission;
 
   Address contextBuffer;
-  Size contextSize;
   Address context;
   llvm::Value *calleeFunction = nullptr;
+  llvm::Value *currentResumeFn = nullptr;
   llvm::Value *thickContext = nullptr;
   Optional<AsyncContextLayout> asyncContextLayout;
 
@@ -2286,8 +2288,7 @@ public:
         CurCallee.getFunctionPointer(), thickContext);
     auto *dynamicContextSize =
         IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
-    std::tie(contextBuffer, contextSize) = emitAllocAsyncContext(
-        IGF, layout, dynamicContextSize, getAsyncContextSize(layout));
+    contextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
     context = layout.emitCastTo(IGF, contextBuffer.getAddress());
     if (layout.canHaveError()) {
       auto fieldLayout = layout.getErrorLayout();
@@ -2300,7 +2301,7 @@ public:
   void end() override {
     assert(contextBuffer.isValid());
     assert(context.isValid());
-    emitDeallocAsyncContext(IGF, contextBuffer, contextSize);
+    emitDeallocAsyncContext(IGF, contextBuffer);
     super::end();
   }
   void setFromCallee() override {
@@ -2343,6 +2344,26 @@ public:
         context = emitPointerAuthSign(IGF, context, authInfo);
       }
       explosion.add(context);
+      saveValue(fieldLayout, explosion, isOutlined);
+    }
+    { // Return to caller function.
+      auto fieldLayout = layout.getResumeParentLayout();
+      currentResumeFn = IGF.Builder.CreateIntrinsicCall(
+          llvm::Intrinsic::coro_async_resume, {});
+      auto fnVal = currentResumeFn;
+      // Sign the pointer.
+      // TODO: use a distinct schema.
+      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+        Address fieldAddr =
+            fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
+        fnVal = emitPointerAuthSign(IGF, fnVal, authInfo);
+      }
+      fnVal = IGF.Builder.CreateBitCast(fnVal,
+                                        IGF.IGM.TaskContinuationFunctionPtrTy);
+      Explosion explosion;
+      explosion.add(fnVal);
       saveValue(fieldLayout, explosion, isOutlined);
     }
     { // caller executor
@@ -2404,6 +2425,28 @@ public:
     auto address = errorLayout.project(IGF, context, /*offsets*/ llvm::None);
     return address;
   };
+
+  llvm::CallInst *createCall(const FunctionPointer &fn,
+                             ArrayRef<llvm::Value *> args) override {
+    auto &IGM = IGF.IGM;
+    auto &Builder = IGF.Builder;
+    // Setup the suspend point.
+    SmallVector<llvm::Value *, 8> arguments;
+    arguments.push_back(currentResumeFn);
+    auto resumeProjFn = IGF.getOrCreateResumePrjFn();
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+    auto dispatchFn = IGF.createAsyncDispatchFn(fn, args);
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(dispatchFn, IGM.Int8PtrTy));
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(fn.getRawPointer(), IGM.Int8PtrTy));
+    for (auto arg: args)
+      arguments.push_back(arg);
+    auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
+                                           arguments);
+    return id;
+  }
 };
 
 } // end anonymous namespace
@@ -2472,7 +2515,7 @@ llvm::CallInst *CallEmission::emitCallSite() {
   }
 
   // TODO: exceptions!
-  auto call = IGF.Builder.CreateCall(fn, Args);
+  auto call = createCall(fn, Args);
 
   // Make coroutines calls opaque to LLVM analysis.
   if (IsCoroutine) {
@@ -3481,6 +3524,28 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
   IGF.setCoroutineHandle(hdl);
 }
 
+void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
+                                   SILFunction *asyncFunction) {
+  auto &IGM = IGF.IGM;
+  auto size = getAsyncContextLayout(IGM, asyncFunction).getSize();
+  auto asyncFuncPointer = IGF.Builder.CreateBitOrPointerCast(
+      IGM.getAddrOfAsyncFunctionPointer(asyncFunction), IGM.Int8PtrTy);
+  auto *id = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_id_async,
+      {llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
+       llvm::ConstantInt::get(IGM.Int32Ty, 16),
+       llvm::ConstantInt::get(IGM.Int32Ty, 2), asyncFuncPointer});
+  // Call 'llvm.coro.begin', just for consistency with the normal pattern.
+  // This serves as a handle that we can pass around to other intrinsics.
+  auto hdl = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_begin,
+      {id, llvm::ConstantPointerNull::get(IGM.Int8PtrTy)});
+
+  // Set the coroutine handle; this also flags that is a coroutine so that
+  // e.g. dynamic allocas use the right code generation.
+  IGF.setCoroutineHandle(hdl);
+}
+
 void irgen::emitYieldOnceCoroutineEntry(
     IRGenFunction &IGF, CanSILFunctionType fnType,
     NativeCCEntryPointArgumentEmission &emission) {
@@ -3528,28 +3593,6 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
                                                 Address buffer) {
   auto bufferSize = getYieldManyCoroutineBufferSize(IGF.IGM);
   IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
-}
-
-Address irgen::emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
-                             Alignment alignment) {
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskAllocFn(),
-                                      {IGF.getAsyncTask(), size});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
-  auto address = Address(call, alignment);
-  return address;
-}
-
-void irgen::emitTaskDealloc(IRGenFunction &IGF, Address address,
-                            llvm::Value *size) {
-  auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskDeallocFn(), {IGF.getAsyncTask(), address.getAddress()});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
 }
 
 void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
@@ -3603,28 +3646,17 @@ llvm::Value *irgen::emitTaskCreate(
   return result;
 }
 
-std::pair<Address, Size> irgen::emitAllocAsyncContext(IRGenFunction &IGF,
-                                                      AsyncContextLayout layout,
-                                                      llvm::Value *sizeValue,
-                                                      Size sizeLowerBound) {
+Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
+                                     llvm::Value *sizeValue) {
   auto alignment = getAsyncContextAlignment(IGF.IGM);
-  auto address = emitTaskAlloc(IGF, sizeValue, alignment);
-  IGF.Builder.CreateLifetimeStart(address, sizeLowerBound);
-  return {address, sizeLowerBound};
+  auto address = IGF.emitTaskAlloc(sizeValue, alignment);
+  IGF.Builder.CreateLifetimeStart(address, Size(-1) /*dynamic size*/);
+  return address;
 }
 
-std::pair<Address, Size>
-irgen::emitAllocAsyncContext(IRGenFunction &IGF, AsyncContextLayout layout) {
-  auto size = getAsyncContextSize(layout);
-  auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
-  return emitAllocAsyncContext(IGF, layout, sizeValue, size);
-}
-
-void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context,
-                                    Size size) {
-  auto *sizeValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, size.getValue());
-  emitTaskDealloc(IGF, context, sizeValue);
-  IGF.Builder.CreateLifetimeEnd(context, size);
+void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context) {
+  IGF.emitTaskDealloc(context);
+  IGF.Builder.CreateLifetimeEnd(context, Size(-1) /*dynamic size*/);
 }
 
 llvm::Value *irgen::emitYield(IRGenFunction &IGF,
@@ -4495,4 +4527,37 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
 
 FunctionPointer FunctionPointer::getAsFunction(IRGenFunction &IGF) const {
   return FunctionPointer(KindTy::Function, getPointer(IGF), AuthInfo, Sig);
+}
+
+void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
+                            CanSILFunctionType fnType) {
+  auto contextAddr = asyncLayout.emitCastTo(IGF, IGF.getAsyncContext());
+  auto returnToCallerLayout = asyncLayout.getResumeParentLayout();
+  auto returnToCallerAddr =
+      returnToCallerLayout.project(IGF, contextAddr, llvm::None);
+  Explosion fn;
+  cast<LoadableTypeInfo>(returnToCallerLayout.getType())
+      .loadAsCopy(IGF, returnToCallerAddr, fn);
+  llvm::Value *fnVal = fn.claimNext();
+
+  // TODO: use distinct schema
+  if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+    Address fieldAddr =
+        returnToCallerLayout.project(IGF, contextAddr, /*offsets*/ llvm::None);
+    auto authInfo = PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
+                                          PointerAuthEntity());
+    fnVal = emitPointerAuthAuth(IGF, fnVal, authInfo);
+  }
+
+  auto sig = emitCastOfFunctionPointer(IGF, fnVal, fnType);
+  FunctionPointer fnPtr(FunctionPointer::KindTy::Function, fnVal,
+                        PointerAuthInfo(), sig);
+
+  SmallVector<llvm::Value*, 4> Args;
+  // Get the current task, executor, and async context.
+  Args.push_back(IGF.getAsyncTask());
+  Args.push_back(IGF.getAsyncExecutor());
+  Args.push_back(IGF.getAsyncContext());
+  auto call = IGF.Builder.CreateCall(fnPtr, Args);
+  call->setTailCall();
 }
