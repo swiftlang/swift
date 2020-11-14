@@ -2121,7 +2121,9 @@ public:
       return TC.getReferenceTypeInfo(Kind, ReferenceTI->getReferenceCounting());
 
     if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
-      if (EnumTI->isOptional() && Kind == ReferenceKind::Weak) {
+      if (EnumTI->isOptional() &&
+          (Kind == ReferenceKind::Weak || Kind == ReferenceKind::Unowned ||
+           Kind == ReferenceKind::Unmanaged)) {
         auto *TI = TC.getTypeInfo(EnumTI->getCases()[0].TR, ExternalTypeInfo);
         return rebuildStorageTypeInfo(TI, Kind);
       }
