@@ -145,6 +145,10 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 NearestTaskDeadline
 swift_task_getNearestDeadline(AsyncTask *task);
 
+// TODO: Remove this hack.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_run(AsyncTask *taskToRun);
+
 }
 
 #endif
