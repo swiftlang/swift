@@ -1467,11 +1467,18 @@ ConstraintSystem::getTypeOfMemberReference(
   auto baseObjTy = resolvedBaseTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
 
-  // Indicates whether this is a reference to a static member on a protocol
-  // metatype e.g. existential metatype.
-  bool isStaticMemberRefOnProtocol = resolvedBaseTy->is<MetatypeType>() &&
-                                     baseObjTy->isExistentialType() &&
-                                     value->isStatic();
+  // Indicates whether this is a valid reference to a static member on a
+  // protocol metatype. Such a reference is only valid if performed through
+  // leading dot syntax e.g. `foo(.bar)` where implicit base is a protocol
+  // metatype and `bar` is static member declared in a protocol  or its
+  // extension.
+  bool isStaticMemberRefOnProtocol = false;
+  if (resolvedBaseTy->is<MetatypeType>() && baseObjTy->isExistentialType() &&
+      value->isStatic()) {
+    if (auto last = locator.last())
+      isStaticMemberRefOnProtocol =
+          last->is<LocatorPathElt::UnresolvedMember>();
+  }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");

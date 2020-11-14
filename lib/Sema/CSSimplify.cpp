@@ -5954,9 +5954,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       auto anchor = locator.getAnchor();
 
-      if ((isExpr<UnresolvedDotExpr>(anchor) ||
-           isExpr<UnresolvedMemberExpr>(anchor) ||
-           isExpr<SubscriptExpr>(anchor)) &&
+      if (isExpr<UnresolvedMemberExpr>(anchor) &&
           req->is<LocatorPathElt::TypeParameterRequirement>()) {
         auto signature = path[path.size() - 2]
                              .castTo<LocatorPathElt::OpenedGeneric>()
@@ -6761,7 +6759,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // member conforms to this protocol -- the metatype value itself
         // doesn't give us a witness so there's no static method to bind.
         hasInstanceMethods = true;
-        hasStaticMembers = true;
+        hasStaticMembers |=
+            memberLocator->isLastElement<LocatorPathElt::UnresolvedMember>();
       } else {
         // Metatypes of nominal types and archetypes have instance methods and
         // static members, but not instance properties.
@@ -6851,12 +6850,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                     ->hasTypeParameter()) {
 
       /* We're OK */
-    } else if (baseObjTy->is<MetatypeType>() &&
+    } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&
                instanceTy->isExistentialType()) {
       // Static member lookup on protocol metatype requires that result type
       // of a selected member to conform to protocol this method is being
       // referred from.
-      assert(hasStaticMembers);
 
       // Cannot instantiate a protocol or reference a member on
       // protocol composition type.
