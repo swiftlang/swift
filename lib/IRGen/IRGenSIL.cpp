@@ -856,42 +856,6 @@ public:
     }
   }
 
-  llvm::Value *getAsyncTask() override {
-    // FIXME: (1) Remove this override, (2) mark the IRGenFunction::getAsyncTask
-    //        declaration as non-virtual, and (3) mark IRGenFunction's
-    //        destructor non-virtual once Task.runDetached is available.
-    //        rdar://problem/70597390*/
-    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer) {
-      return llvm::Constant::getNullValue(IGM.SwiftTaskPtrTy);
-    }
-    return IRGenFunction::getAsyncTask();
-  }
-
-  llvm::Value *getAsyncExecutor() override {
-    // FIXME: (1) Remove this override, (2) mark the
-    //        IRGenFunction::getAsyncExecutor declaration as non-virtual, and
-    //        (3) mark IRGenFunction's destructor non-virtual once
-    //        Task.runDetached is available.  rdar://problem/70597390*/
-    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer) {
-      return llvm::Constant::getNullValue(IGM.SwiftExecutorPtrTy);
-    }
-    return IRGenFunction::getAsyncExecutor();
-  }
-
-  llvm::Value *getAsyncContext() override {
-    // FIXME: (1) Remove this override, (2) mark the
-    //        IRGenFunction::getAsyncContext declaration as non-virtual, and
-    //        (3) mark IRGenFunction's destructor non-virtual once
-    //        Task.runDetached is available.  rdar://problem/70597390*/
-    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer) {
-      return llvm::Constant::getNullValue(IGM.SwiftContextPtrTy);
-    }
-    return IRGenFunction::getAsyncContext();
-  }
-
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -1440,11 +1404,7 @@ std::unique_ptr<COrObjCEntryPointArgumentEmission>
 getCOrObjCEntryPointArgumentEmission(IRGenSILFunction &IGF,
                                      SILBasicBlock &entry,
                                      Explosion &allParamValues) {
-  if (IGF.CurSILFn->isAsync() &&
-      !(/*FIXME: Remove this condition once Task.runDetached is
-                            available.  rdar://problem/70597390*/
-        IGF.CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer)) {
+  if (IGF.CurSILFn->isAsync()) {
     llvm_unreachable("unsupported");
   } else {
     return std::make_unique<SyncCOrObjCEntryPointArgumentEmission>(
@@ -3250,12 +3210,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     auto &retTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
     retTI.initialize(IGF, result, IGF.IndirectReturn, false);
     IGF.Builder.CreateRetVoid();
-  } else if (IGF.isAsync() &&
-             !(/*FIXME: Remove this condition once Task.runDetached is
-                  available.  rdar://problem/70597390*/
-               IGF.CurSILFn->getLoweredFunctionType()
-                   ->getRepresentation() ==
-               SILFunctionTypeRepresentation::CFunctionPointer)) {
+  } else if (IGF.isAsync()) {
     // If we're generating an async function, store the result into the buffer.
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
