@@ -1824,10 +1824,15 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
-        if (isa<clang::NamespaceDecl>(clangDC)) return None;
+        // In C, "nested" structs, unions, enums, etc. will become sibilings:
+        //   struct Foo { struct Bar { }; }; -> struct Foo { }; struct Bar { };
+        // Whereas in C++, nested records will actually be nested. So if this is
+        // a C++ record, simply treat it like a namespace and exit early.
+        if (isa<clang::NamespaceDecl>(clangDC) ||
+            isa<clang::CXXRecordDecl>(clangDC))
+          return None;
         assert(clangDC->getRedeclContext()->isTranslationUnit() &&
                "non-top-level Clang types not supported yet");
-        (void)clangDC;
         return ASTMangler::ObjCContext;
       }
     }
