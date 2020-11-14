@@ -120,39 +120,6 @@ static TestObject *allocTestObject(size_t *addr, size_t value) {
   return result;
 }
 
-TEST(TaskFutureTest, intFuture) {
-  auto createdExecutor = createFakeExecutor(1234);
-  bool hasRun = false;
-
-  withFutureTask<intptr_t>(
-      reinterpret_cast<const Metadata *>(&METADATA_SYM(Si)), 42,
-      [&](AsyncTask *task, ExecutorRef executor,
-          FutureContext<intptr_t> *context) {
-    // The storage should be what we initialized it to earlier.
-    EXPECT_EQ(42, context->getStorage());
-
-    // The error storage should have been cleared out for us.
-    EXPECT_EQ(nullptr, context->errorResult);
-
-    // Store something in the future.
-    context->getStorage() = 17;
-
-    hasRun = true;
-  }, [&](AsyncTask *task) {
-    // Run the task, which should fill in the future.
-    EXPECT_FALSE(hasRun);
-    task->run(createdExecutor);
-    EXPECT_TRUE(hasRun);
-
-    // "Wait" for the future, which must have completed by now.
-    auto waitResult = swift_task_future_wait(task, nullptr);
-    EXPECT_EQ(TaskFutureWaitResult::Success, waitResult.kind);
-
-    // Make sure we got the result value we expect.
-    EXPECT_EQ(17, *reinterpret_cast<intptr_t *>(waitResult.storage));
-  });
-}
-
 TEST(TaskFutureTest, objectFuture) {
   auto createdExecutor = createFakeExecutor(1234);
   bool hasRun = false;
