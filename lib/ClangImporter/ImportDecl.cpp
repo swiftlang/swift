@@ -3499,7 +3499,7 @@ namespace {
 
         if (auto dtor = cxxRecordDecl->getDestructor()) {
           if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-            result->setIsCxxNonTrivial(true);
+            return nullptr;
           }
         }
       }
