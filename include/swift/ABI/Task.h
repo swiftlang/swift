@@ -271,7 +271,7 @@ public:
       /// Mask used for the low status bits in a wait queue item.
       static const uintptr_t statusMask = 0x03;
 
-      const uintptr_t storage;
+      uintptr_t storage;
 
       Status getStatus() const {
         return static_cast<Status>(storage & statusMask);
