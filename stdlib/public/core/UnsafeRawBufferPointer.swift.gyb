@@ -432,8 +432,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   public init(
     @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
   ) {
-    _precondition(count >= 0, "${Self} with negative count")
-    _precondition(count == 0 || start != nil,
+    _debugPrecondition(count >= 0, "${Self} with negative count")
+    _debugPrecondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
     _position = start
     _end = start.map { $0 + count }
