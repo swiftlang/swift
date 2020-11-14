@@ -1085,8 +1085,6 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   
   std::string encodingString;
 
-  auto fnClangTy = fnType->getClangTypeInfo().getType();
-
   // Return type.
   {
     auto clangType = IGM.getClangType(resultType.getASTType());
