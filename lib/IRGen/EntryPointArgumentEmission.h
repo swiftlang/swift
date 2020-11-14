@@ -17,15 +17,10 @@ class Value;
 }
 
 namespace swift {
-
-class SILArgument;
-
 namespace irgen {
 
 class Explosion;
 struct GenericRequirement;
-class LoadableTypeInfo;
-class TypeInfo;
 
 class EntryPointArgumentEmission {
 
@@ -49,12 +44,6 @@ public:
   virtual llvm::Value *getSelfWitnessTable() = 0;
   virtual llvm::Value *getSelfMetadata() = 0;
   virtual llvm::Value *getCoroutineBuffer() = 0;
-  virtual Explosion
-  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
-                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
-                     const LoadableTypeInfo &loadableArgTI,
-                     std::function<Explosion(unsigned index, unsigned size)>
-                         explosionForArgument) = 0;
 };
 
 } // end namespace irgen
