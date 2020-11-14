@@ -460,6 +460,8 @@ public:
                         Alignment alignment);
   void emitTaskDealloc(Address address);
 
+  llvm::Value *alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val);
+
   //--- Expression emission
   //------------------------------------------------------
 public:
