@@ -1262,6 +1262,42 @@ public:
   llvm::Value *getCoroutineBuffer() override {
     return allParamValues.claimNext();
   }
+  Explosion
+  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
+                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
+                     const LoadableTypeInfo &loadableArgTI,
+                     std::function<Explosion(unsigned index, unsigned size)>
+                         explosionForArgument) override {
+    Explosion paramValues;
+    // If the explosion must be passed indirectly, load the value from the
+    // indirect address.
+    auto &nativeSchema = loadableArgTI.nativeParameterValueSchema(IGF.IGM);
+    if (nativeSchema.requiresIndirect()) {
+      Explosion paramExplosion = explosionForArgument(index, 1);
+      Address paramAddr =
+          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
+      if (loadableParamTI.getStorageType() != loadableArgTI.getStorageType())
+        paramAddr =
+            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
+                paramAddr.getAddress(),
+                loadableArgTI.getStorageType()->getPointerTo()));
+      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
+    } else {
+      if (!nativeSchema.empty()) {
+        // Otherwise, we map from the native convention to the type's explosion
+        // schema.
+        Explosion nativeParam;
+        unsigned size = nativeSchema.size();
+        Explosion paramExplosion = explosionForArgument(index, size);
+        paramExplosion.transferInto(nativeParam, size);
+        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
+                                                 param->getType());
+      } else {
+        assert(loadableParamTI.getSchema().empty());
+      }
+    }
+    return paramValues;
+  };
 
 public:
   using SyncEntryPointArgumentEmission::requiresIndirectResult;
@@ -1312,10 +1348,8 @@ public:
     return loadValue(contextLayout);
   }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
-    assert(size > 0);
     auto argumentLayout = layout.getArgumentLayout(index);
     auto result = loadExplosion(argumentLayout);
-    assert(result.size() == size);
     return result;
   }
   bool requiresIndirectResult(SILType retType) override { return false; }
@@ -1380,6 +1414,14 @@ public:
     llvm_unreachable(
         "async functions do not use a fixed size coroutine buffer");
   }
+  Explosion
+  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
+                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
+                     const LoadableTypeInfo &loadableArgTI,
+                     std::function<Explosion(unsigned index, unsigned size)>
+                         explosionForArgument) override {
+    return explosionForArgument(index, 1);
+  };
 };
 
 std::unique_ptr<NativeCCEntryPointArgumentEmission>
@@ -1654,8 +1696,9 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
 }
 
 template <typename ExplosionForArgument>
-static void bindParameter(IRGenSILFunction &IGF, unsigned index,
-                          SILArgument *param, SILType paramTy,
+static void bindParameter(IRGenSILFunction &IGF,
+                          NativeCCEntryPointArgumentEmission &emission,
+                          unsigned index, SILArgument *param, SILType paramTy,
                           ExplosionForArgument explosionForArgument) {
   // Pull out the parameter value and its formal type.
   auto &paramTI = IGF.getTypeInfo(IGF.CurSILFn->mapTypeIntoContext(paramTy));
@@ -1664,36 +1707,11 @@ static void bindParameter(IRGenSILFunction &IGF, unsigned index,
   // If the SIL parameter isn't passed indirectly, we need to map it
   // to an explosion.
   if (param->getType().isObject()) {
-    Explosion paramValues;
     auto &loadableParamTI = cast<LoadableTypeInfo>(paramTI);
-    auto &loadableArgTI = cast<LoadableTypeInfo>(paramTI);
-    // If the explosion must be passed indirectly, load the value from the
-    // indirect address.
-    auto &nativeSchema = argTI.nativeParameterValueSchema(IGF.IGM);
-    if (nativeSchema.requiresIndirect()) {
-      Explosion paramExplosion = explosionForArgument(index, 1);
-      Address paramAddr =
-          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
-      if (paramTI.getStorageType() != argTI.getStorageType())
-        paramAddr =
-            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
-                paramAddr.getAddress(),
-                loadableArgTI.getStorageType()->getPointerTo()));
-      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
-    } else {
-      if (!nativeSchema.empty()) {
-        // Otherwise, we map from the native convention to the type's explosion
-        // schema.
-        Explosion nativeParam;
-        unsigned size = nativeSchema.size();
-        Explosion paramExplosion = explosionForArgument(index, size);
-        paramExplosion.transferInto(nativeParam, size);
-        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
-                                                 param->getType());
-      } else {
-        assert(paramTI.getSchema().empty());
-      }
-    }
+    auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
+    auto paramValues =
+        emission.explosionForObject(IGF, index, param, paramTy, loadableParamTI,
+                                    loadableArgTI, explosionForArgument);
     IGF.setLoweredExplosion(param, paramValues);
     return;
   }
@@ -1764,7 +1782,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     params = params.drop_back();
 
     bindParameter(
-        IGF, 0, selfParam,
+        IGF, *emission, 0, selfParam,
         conv.getSILArgumentType(conv.getNumSILArguments() - 1,
                                 IGF.IGM.getMaximalTypeExpansionContext()),
         [&](unsigned startIndex, unsigned size) {
@@ -1788,7 +1806,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   unsigned i = 0;
   for (SILArgument *param : params) {
     auto argIdx = conv.getSILArgIndexOfFirstParam() + i;
-    bindParameter(IGF, i, param,
+    bindParameter(IGF, *emission, i, param,
                   conv.getSILArgumentType(
                       argIdx, IGF.IGM.getMaximalTypeExpansionContext()),
                   [&](unsigned index, unsigned size) {
