@@ -34,7 +34,7 @@
 // CHECK-1-SKIPPED: {{^}$}}
 
 // CHECK-1-SKIPPED: {{^{$}}
-// CHECK-1-SKIPPED-DAG: "kind"{{ ?}} "skipped"
+// CHECK-1-SKIPPED-DAG: "kind"{{ ?}}: "skipped"
 // CHECK-1-SKIPPED-DAG: "name"{{ ?}}: "compile"
 // CHECK-1-SKIPPED-DAG: "{{(\.\\\/)?}}helper.swift"
 // CHECK-1-SKIPPED: {{^}$}}
