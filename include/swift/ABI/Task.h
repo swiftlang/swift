@@ -19,6 +19,7 @@
 
 #include "swift/Basic/RelativePointer.h"
 #include "swift/ABI/HeapObject.h"
+#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
@@ -29,6 +30,8 @@ class AsyncTask;
 class AsyncContext;
 class Executor;
 class Job;
+struct OpaqueValue;
+struct SwiftError;
 class TaskStatusRecord;
 
 /// An ExecutorRef isn't necessarily just a pointer to an executor
@@ -86,6 +89,13 @@ public:
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job {
+protected:
+  // Indices into SchedulerPrivate, for use by the runtime.
+  enum {
+    /// The next waiting task link, an AsyncTask that is waiting on a future.
+    NextWaitingTaskIndex = 0,
+  };
+
 public:
   // Reserved for the use of the scheduler.
   void *SchedulerPrivate[2];
@@ -230,18 +240,141 @@ public:
     }
   };
 
-  bool isFuture() const { return Flags.task_isFuture(); }
-
   bool hasChildFragment() const { return Flags.task_isChildTask(); }
   ChildFragment *childFragment() {
     assert(hasChildFragment());
     return reinterpret_cast<ChildFragment*>(this + 1);
   }
 
-  // TODO: Future fragment
+  class FutureFragment {
+  public:
+    /// Describes the status of the future.
+    ///
+    /// Futures always begin in the "Executing" state, and will always
+    /// make a single state change to either Success or Error.
+    enum class Status : uintptr_t {
+      /// The future is executing or ready to execute. The storage
+      /// is not accessible.
+      Executing = 0,
+
+      /// The future has completed with result (of type \c resultType).
+      Success,
+
+      /// The future has completed by throwing an error (an \c Error
+      /// existential).
+      Error,
+    };
+
+    /// An item within the wait queue, which includes the status and the
+    /// head of the list of tasks.
+    struct WaitQueueItem {
+      /// Mask used for the low status bits in a wait queue item.
+      static const uintptr_t statusMask = 0x03;
+
+      uintptr_t storage;
+
+      Status getStatus() const {
+        return static_cast<Status>(storage & statusMask);
+      }
+
+      AsyncTask *getTask() const {
+        return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+      }
+
+      static WaitQueueItem get(Status status, AsyncTask *task) {
+        return WaitQueueItem{
+          reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+      }
+    };
+
+  private:
+    /// Queue containing all of the tasks that are waiting in `get()`.
+    ///
+    /// The low bits contain the status, the rest of the pointer is the
+    /// AsyncTask.
+    std::atomic<WaitQueueItem> waitQueue;
+
+    /// The type of the result that will be produced by the future.
+    const Metadata *resultType;
+
+    // Trailing storage for the result itself. The storage will be uninitialized,
+    // contain an instance of \c resultType, or contaon an an \c Error.
+
+    friend class AsyncTask;
+
+  public:
+    explicit FutureFragment(const Metadata *resultType)
+      : waitQueue(WaitQueueItem::get(Status::Executing, nullptr)),
+        resultType(resultType) { }
+
+    /// Destroy the storage associated with the future.
+    void destroy();
+
+    /// Retrieve a pointer to the storage of result.
+    OpaqueValue *getStoragePtr() {
+      return reinterpret_cast<OpaqueValue *>(
+          reinterpret_cast<char *>(this) + storageOffset(resultType));
+    }
+
+    /// Retrieve the error.
+    SwiftError *&getError() {
+      return *reinterpret_cast<SwiftError **>(
+           reinterpret_cast<char *>(this) + storageOffset(resultType));
+    }
+
+    /// Compute the offset of the storage from the base of the future
+    /// fragment.
+    static size_t storageOffset(const Metadata *resultType)  {
+      size_t offset = sizeof(FutureFragment);
+      size_t alignment =
+          std::max(resultType->vw_alignment(), alignof(SwiftError *));
+      return (offset + alignment - 1) & ~(alignment - 1);
+    }
+
+    /// Determine the size of the future fragment given a particular future
+    /// result type.
+    static size_t fragmentSize(const Metadata *resultType) {
+      return storageOffset(resultType) +
+          std::max(resultType->vw_size(), sizeof(SwiftError *));
+    }
+  };
+
+  bool isFuture() const { return Flags.task_isFuture(); }
+
+  FutureFragment *futureFragment() {
+    assert(isFuture());
+    if (hasChildFragment()) {
+      return reinterpret_cast<FutureFragment *>(
+          reinterpret_cast<ChildFragment*>(this + 1) + 1);
+    }
+
+    return reinterpret_cast<FutureFragment *>(this + 1);
+  }
+
+  /// Wait for this future to complete.
+  ///
+  /// \returns the status of the future. If this result is
+  /// \c Executing, then \c waitingTask has been added to the
+  /// wait queue and will be scheduled when the future completes. Otherwise,
+  /// the future has completed and can be queried.
+  FutureFragment::Status waitFuture(AsyncTask *waitingTask);
+
+  /// Complete this future.
+  ///
+  /// Upon completion, any waiting tasks will be scheduled on the given
+  /// executor.
+  void completeFuture(AsyncContext *context, ExecutorRef executor);
 
   static bool classof(const Job *job) {
     return job->isAsyncTask();
+  }
+
+private:
+  /// Access the next waiting task, which establishes a singly linked list of
+  /// tasks that are waiting on a future.
+  AsyncTask *&getNextWaitingTask() {
+    return reinterpret_cast<AsyncTask *&>(
+        SchedulerPrivate[NextWaitingTaskIndex]);
   }
 };
 
@@ -325,6 +458,20 @@ public:
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Yielding;
   }
+};
+
+/// An asynchronous context within a task that describes a general "Future".
+/// task.
+///
+/// This type matches the ABI of a function `<T> () async throws -> T`, which
+/// is the type used by `Task.runDetached` and `Task.group.add` to create
+/// futures.
+class FutureAsyncContext : public AsyncContext {
+public:
+  SwiftError *errorResult = nullptr;
+  OpaqueValue *indirectResult;
+
+  using AsyncContext::AsyncContext;
 };
 
 } // end namespace swift
