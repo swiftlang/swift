@@ -83,7 +83,7 @@ public:
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = None);
-  virtual ~IRGenFunction();
+  ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
 
@@ -128,9 +128,9 @@ public:
     CoroutineHandle = handle;
   }
 
-  virtual llvm::Value *getAsyncTask();
-  virtual llvm::Value *getAsyncExecutor();
-  virtual llvm::Value *getAsyncContext();
+  llvm::Value *getAsyncTask();
+  llvm::Value *getAsyncExecutor();
+  llvm::Value *getAsyncContext();
 
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
