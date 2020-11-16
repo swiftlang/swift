@@ -1754,9 +1754,12 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 
     // Even if we don't have a 'self', if we have an error result, we
     // should have a placeholder argument here.
-  } else if (funcTy->hasErrorResult() ||
-           funcTy->getRepresentation() == SILFunctionTypeRepresentation::Thick)
-  {
+    //
+    // For async functions, there will be a thick context within the async
+    // context whenever there is no self context.
+  } else if (funcTy->isAsync() || funcTy->hasErrorResult() ||
+             funcTy->getRepresentation() ==
+                 SILFunctionTypeRepresentation::Thick) {
     llvm::Value *contextPtr = emission->getContext();
     (void)contextPtr;
     assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
