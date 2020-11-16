@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CFG_H
 #define SWIFT_SILOPTIMIZER_UTILS_CFG_H
 
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -60,18 +61,37 @@ public:
   /// ValueLifetimeAnalysis with misc iterators including transform
   /// iterators.
   template <typename RangeTy>
-  ValueLifetimeAnalysis(decltype(defValue) def, const RangeTy &userRange)
-      : defValue(def), userSet(userRange.begin(), userRange.end()) {
+  ValueLifetimeAnalysis(SILArgument *def, const RangeTy &useRange)
+      : defValue(def), userSet() {
+    for (SILInstruction *use : useRange)
+      userSet.insert(use);
     propagateLiveness();
   }
 
-  /// Constructor for the value \p def considering all the value's uses.
-  ValueLifetimeAnalysis(SILInstruction *def) : defValue(def) {
-    for (auto result : def->getResults()) {
-      for (Operand *op : result->getUses()) {
-        userSet.insert(op->getUser());
-      }
-    }
+  ValueLifetimeAnalysis(
+      SILArgument *def,
+      llvm::iterator_range<ValueBaseUseIterator> useRange)
+      : defValue(def), userSet() {
+    for (Operand *use : useRange)
+      userSet.insert(use->getUser());
+    propagateLiveness();
+  }
+
+  template <typename RangeTy>
+  ValueLifetimeAnalysis(
+      SILInstruction *def, const RangeTy &useRange)
+      : defValue(def), userSet() {
+    for (SILInstruction *use : useRange)
+      userSet.insert(use);
+    propagateLiveness();
+  }
+
+  ValueLifetimeAnalysis(
+      SILInstruction *def,
+      llvm::iterator_range<ValueBaseUseIterator> useRange)
+      : defValue(def), userSet() {
+    for (Operand *use : useRange)
+      userSet.insert(use->getUser());
     propagateLiveness();
   }
 
