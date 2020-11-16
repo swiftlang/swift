@@ -879,6 +879,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, LifetimeEnding, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, LifetimeEnding, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, CancelAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, CreateAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, CreateAsyncTaskFuture)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
