@@ -7,12 +7,13 @@
 // RUN: not %target-swift-frontend -c %s -experimental-skip-non-inlinable-function-bodies-without-types %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -emit-ir %s -experimental-skip-all-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -c %s -experimental-skip-all-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
-// ERROR: -experimental-skip-*-function-bodies do not support emitting IR
+// ERROR: the -experimental-skip-*-function-bodies* flags do not support emitting IR
 
-// Warn when trying to build SwiftONoneSupport with skip non-inlinable
-// function bodies enabled
+// Warn when trying to build SwiftONoneSupport with any skip enabled
 // RUN: %target-swift-frontend -typecheck -experimental-skip-non-inlinable-function-bodies -module-name SwiftOnoneSupport %s 2>&1 | %FileCheck %s --check-prefix WARNING
-// WARNING: module 'SwiftOnoneSupport' cannot be built with -experimental-skip-non-inlinable-function-bodies; this option has been automatically disabled
+// RUN: %target-swift-frontend -typecheck -experimental-skip-non-inlinable-function-bodies-without-types -module-name SwiftOnoneSupport %s 2>&1 | %FileCheck %s --check-prefix WARNING
+// RUN: %target-swift-frontend -typecheck -experimental-skip-all-function-bodies -module-name SwiftOnoneSupport %s 2>&1 | %FileCheck %s --check-prefix WARNING
+// WARNING: module 'SwiftOnoneSupport' cannot be built with any of the -experimental-skip-*-function-bodies* flags; they have been automatically disabled
 
 // Check skipped bodies are neither typechecked nor SILgen'd
 // RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s -o %t/Skip.noninlinable.sil
