@@ -744,15 +744,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
     Opts.SkipFunctionBodies = FunctionBodySkipping::All;
 
-  if (Opts.SkipFunctionBodies == FunctionBodySkipping::NonInlinable &&
+  if (Opts.SkipFunctionBodies != FunctionBodySkipping::None &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
-    // Disable this optimization if we're compiling SwiftOnoneSupport, because
-    // we _definitely_ need to look inside every declaration to figure out
-    // what gets prespecialized.
+    // Disable these optimizations if we're compiling SwiftOnoneSupport,
+    // because we _definitely_ need to look inside every declaration to figure
+    // out what gets prespecialized.
     Opts.SkipFunctionBodies = FunctionBodySkipping::None;
     Diags.diagnose(
         SourceLoc(),
-        diag::module_incompatible_with_skip_non_inlinable_function_bodies,
+        diag::module_incompatible_with_skip_function_bodies,
         SWIFT_ONONE_SUPPORT);
   }
 
