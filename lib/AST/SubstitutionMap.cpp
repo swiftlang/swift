@@ -456,13 +456,26 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   if (empty()) return SubstitutionMap();
 
   SmallVector<Type, 4> newSubs;
-  for (Type type : getReplacementTypesBuffer()) {
-    if (!type) {
-      // Non-canonical parameter.
-      newSubs.push_back(Type());
-      continue;
+  newSubs.reserve(getReplacementTypesBuffer().size());
+  {
+    bool isIdentitySubstitution = true;
+    for (const auto &oldTy : getReplacementTypesBuffer()) {
+      if (!oldTy) {
+        // Non-canonical parameter.
+        newSubs.push_back(Type());
+        continue;
+      }
+
+      const auto newTy = oldTy.subst(subs, conformances, options);
+      newSubs.push_back(newTy);
+
+      isIdentitySubstitution &= newTy && newTy->isEqual(oldTy);
     }
-    newSubs.push_back(type.subst(subs, conformances, options));
+
+    if (isIdentitySubstitution) {
+      // The replacement types have not changed.
+      return *this;
+    }
   }
 
   SmallVector<ProtocolConformanceRef, 4> newConformances;
