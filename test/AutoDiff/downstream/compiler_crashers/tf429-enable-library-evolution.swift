@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-emit-sil -enable-library-evolution %s
+// RUN: %target-swift-emit-sil -enable-library-evolution %s
 // REQUIRES: asserts
 
 // TF-429: Differentiation transform does not support
