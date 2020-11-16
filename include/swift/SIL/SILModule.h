@@ -238,7 +238,7 @@ private:
   llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
 
   /// This is the set of undef values we've created, for uniquing purposes.
-  llvm::DenseMap<std::pair<SILType, unsigned>, SILUndef *> UndefValues;
+  llvm::DenseMap<SILType, SILUndef *> UndefValues;
 
   /// The stage of processing this module is at.
   SILStage Stage;
