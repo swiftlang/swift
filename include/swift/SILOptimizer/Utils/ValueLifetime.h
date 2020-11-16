@@ -54,6 +54,10 @@ public:
   /// end the value's lifetime.
   using Frontier = SmallVector<SILInstruction *, 4>;
 
+  /// A type erased version of frontier so callers can customize the inline
+  /// size.
+  using FrontierImpl = SmallVectorImpl<SILInstruction *>;
+
   /// Constructor for the value \p def with a specific range of users.
   ///
   /// We templatize over the RangeTy so that we can initialize
@@ -106,7 +110,7 @@ public:
   ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
   /// prevents unreachable-blocks to be included in the frontier.
-  bool computeFrontier(Frontier &frontier, Mode mode,
+  bool computeFrontier(FrontierImpl &frontier, Mode mode,
                        DeadEndBlocks *deBlocks = nullptr);
 
   ArrayRef<std::pair<TermInst *, unsigned>> getCriticalEdges() {
@@ -125,7 +129,7 @@ public:
   }
 
   /// Checks if there is a dealloc_ref inside the value's live range.
-  bool containsDeallocRef(const Frontier &frontier);
+  bool containsDeallocRef(const FrontierImpl &frontier);
 
   /// For debug dumping.
   void dump() const;
@@ -159,7 +163,7 @@ private:
 /// Otherwise \p valueOrStackLoc must be a value type and in this case, inserts
 /// destroy_value at each instruction of the \p frontier.
 void endLifetimeAtFrontier(SILValue valueOrStackLoc,
-                           const ValueLifetimeAnalysis::Frontier &frontier,
+                           const ValueLifetimeAnalysis::FrontierImpl &frontier,
                            SILBuilderContext &builderCtxt,
                            InstModCallbacks callbacks);
 

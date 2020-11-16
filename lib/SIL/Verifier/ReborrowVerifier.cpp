@@ -52,11 +52,9 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
     std::tie(borrowLifetimeEndOp, baseVal) = worklist.pop_back_val();
     auto *borrowLifetimeEndUser = borrowLifetimeEndOp->getUser();
 
-    // TODO: Add a ReborrowOperand ADT if we need to treat more instructions as
-    // a reborrow
-    if (!isReborrowInstruction(borrowLifetimeEndUser)) {
+    auto borrowingOperand = BorrowingOperand::get(borrowLifetimeEndOp);
+    if (!borrowingOperand || !borrowingOperand->isReborrow())
       continue;
-    }
 
     if (isVisitedOp(borrowLifetimeEndOp, baseVal))
       continue;
