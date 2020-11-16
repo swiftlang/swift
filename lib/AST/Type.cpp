@@ -829,6 +829,11 @@ bool TypeBase::isCGFloatType() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isDoubleType() {
+  auto *NTD = getAnyNominal();
+  return NTD ? NTD->getDecl() == getASTContext().getDoubleDecl() : false;
+}
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (auto *structType = getAs<BoundGenericStructType>()) {
     auto &ctx = getASTContext();
