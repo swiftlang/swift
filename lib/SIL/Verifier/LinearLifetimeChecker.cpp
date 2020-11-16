@@ -313,7 +313,8 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
                        }) == userBlock->end()) {
         continue;
       }
-    } else if (isReborrowInstruction(consumingUse->getUser())) {
+    } else if (auto borrowingOperand = BorrowingOperand::get(consumingUse)) {
+      assert(borrowingOperand->isReborrow());
       continue;
     }
 
