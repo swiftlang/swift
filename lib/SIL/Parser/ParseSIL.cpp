@@ -499,8 +499,7 @@ bool SILParser::parseVerbatim(StringRef name) {
 SILParser::~SILParser() {
   for (auto &Entry : ForwardRefLocalValues) {
     if (ValueBase *dummyVal = LocalValues[Entry.first()]) {
-      dummyVal->replaceAllUsesWith(
-          SILUndef::get(dummyVal->getType(), SILMod, OwnershipKind::None));
+      dummyVal->replaceAllUsesWith(SILUndef::get(dummyVal->getType(), SILMod));
       SILInstruction::destroy(cast<GlobalAddrInst>(dummyVal));
       SILMod.deallocateInst(cast<GlobalAddrInst>(dummyVal));
     }
