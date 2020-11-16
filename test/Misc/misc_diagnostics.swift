@@ -220,4 +220,12 @@ func test_implicit_cgfloat_conversion() {
 
     let c: Double = (a ?? 0) as CGFloat // Ok with implicit conversion
   }
+
+  func test_loading_tuple_elements(values: inout (CGFloat, CGFloat)) {
+    struct S {
+      init(x: Double, y: Double) {}
+      init(x: CGFloat, y: CGFloat) {}
+    }
+    _ = S(x: 0.0, y: values.0) // Ok
+  }
 }

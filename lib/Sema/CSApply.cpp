@@ -6697,6 +6697,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto *argExpr = locator.trySimplifyToExpr();
       assert(argExpr);
 
+      // Load the value for conversion.
+      argExpr = cs.coerceToRValue(argExpr);
+
       auto *implicitInit =
           CallExpr::createImplicit(ctx, TypeExpr::createImplicit(toType, ctx),
                                    /*args=*/{argExpr},
