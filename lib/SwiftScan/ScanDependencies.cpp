@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ScanDependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -27,6 +26,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Strings.h"
+#include "swift/SwiftScan/ScanDependencies.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -794,12 +794,9 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
   return false;
 }
 
-bool swift::scanDependencies(CompilerInstance &instance) {
+bool swift::scanAndOutputDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
-  ModuleDecl *mainModule = instance.getMainModule();
-  const CompilerInvocation &invocation = instance.getInvocation();
-  const FrontendOptions &opts = invocation.getFrontendOptions();
-
+  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
@@ -810,6 +807,17 @@ bool swift::scanDependencies(CompilerInstance &instance) {
     out.clear_error();
     return true;
   }
+
+  // Execute scan, writing JSON output to the output stream
+  return scanDependencies(instance, out);
+}
+
+bool swift::scanDependencies(CompilerInstance &instance,
+                             llvm::raw_ostream &out) {
+  ASTContext &Context = instance.getASTContext();
+  ModuleDecl *mainModule = instance.getMainModule();
+  const CompilerInvocation &invocation = instance.getInvocation();
+  const FrontendOptions &opts = invocation.getFrontendOptions();
 
   // Main module file name.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);

@@ -24,8 +24,13 @@ class CompilerInstance;
 bool batchScanModuleDependencies(CompilerInstance &instance,
                                  llvm::StringRef batchInputFile);
 
+/// Scans the dependencies of the main module of \c instance and writes out
+/// the result in JSON
+bool scanAndOutputDependencies(CompilerInstance &instance);
+
 /// Scans the dependencies of the main module of \c instance.
-bool scanDependencies(CompilerInstance &instance);
+bool scanDependencies(CompilerInstance &instance,
+                      llvm::raw_ostream &out);
 
 /// Scans the dependencies of the underlying clang module of the main module
 /// of \c instance.

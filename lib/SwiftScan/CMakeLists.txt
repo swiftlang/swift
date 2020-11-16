@@ -1,23 +1,18 @@
 set_swift_llvm_is_available()
-add_swift_host_library(swiftFrontendTool STATIC
-  FrontendTool.cpp
-  ImportedModules.cpp
-  LoadedModuleTrace.cpp
-  MakeStyleDependencies.cpp
-  ScanDependencies.cpp
-  TBD.cpp)
-add_dependencies(swiftFrontendTool
+add_swift_host_library(SwiftScanTool STATIC
+  DependencyScanningTool.cpp
+  ScanDependencies.cpp)
+add_dependencies(SwiftScanTool
   swift-syntax-generated-headers
-  SwiftScanTool
   SwiftOptions)
-target_link_libraries(swiftFrontendTool INTERFACE
+
+target_link_libraries(SwiftScanTool INTERFACE
   clangAPINotes
-  SwiftScanTool
   clangBasic)
-target_link_libraries(swiftFrontendTool PRIVATE
+
+target_link_libraries(SwiftScanTool PRIVATE
     swiftClangImporter
     swiftDemangling
-    SwiftScanTool
     swiftFrontend
     swiftIDE
     swiftImmediate

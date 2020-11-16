@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,8 +21,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "Dependencies.h"
-#include "ScanDependencies.h"
+#include "swift/SwiftScan/ScanDependencies.h"
+#include "ImportedModules.h"
 #include "TBD.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -1135,7 +1135,7 @@ static bool performScanDependencies(CompilerInstance &Instance) {
   auto batchScanInput =
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
   if (batchScanInput.empty()) {
-    return scanDependencies(Instance);
+    return scanAndOutputDependencies(Instance);
   } else {
     return batchScanModuleDependencies(Instance, batchScanInput);
   }
