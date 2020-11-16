@@ -84,6 +84,14 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   if (hadError) {
     // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
     // a parsing error, just return an empty SIL module.
+    //
+    // Because the SIL parser's notion of failing with an error is distinct from
+    // the ASTContext's notion of having emitted a diagnostic, it's possible for
+    // the parser to fail silently without emitting a diagnostic. This assertion
+    // ensures that +asserts builds will fail fast. If you crash here, please go
+    // back and add a diagnostic after identifying where the SIL parser failed.
+    assert(SF->getASTContext().hadError() &&
+           "Failed to parse SIL but did not emit any errors!");
     return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
   return silMod;
@@ -491,8 +499,7 @@ bool SILParser::parseVerbatim(StringRef name) {
 SILParser::~SILParser() {
   for (auto &Entry : ForwardRefLocalValues) {
     if (ValueBase *dummyVal = LocalValues[Entry.first()]) {
-      dummyVal->replaceAllUsesWith(
-          SILUndef::get(dummyVal->getType(), SILMod, OwnershipKind::None));
+      dummyVal->replaceAllUsesWith(SILUndef::get(dummyVal->getType(), SILMod));
       SILInstruction::destroy(cast<GlobalAddrInst>(dummyVal));
       SILMod.deallocateInst(cast<GlobalAddrInst>(dummyVal));
     }

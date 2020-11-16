@@ -277,9 +277,10 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
   // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, SILMod, OwnershipKind::None);
-  else if (Id == 1)
-    return SILUndef::get(Type, SILMod, OwnershipKind::Owned);
+    return SILUndef::get(Type, SILMod);
+  assert(Id != 1 && "This used to be for SILUndef with OwnershipKind::Owned... "
+                    "but we don't support that anymore. Make sure no one "
+                    "changes that without updating this code if needed");
 
   // Check to see if this is already defined.
   ValueBase *Entry = LocalValues.lookup(Id);

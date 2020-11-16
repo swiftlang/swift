@@ -302,12 +302,24 @@ namespace irgen {
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap);
 
-  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
-                                          AsyncContextLayout layout,
-                                          CanSILFunctionType functionType,
-                                          llvm::Value *thickContext);
+  /// Given an async function, get the pointer to the function to be called and
+  /// the size of the context to be allocated.
+  ///
+  /// \param values Whether any code should be emitted to retrieve the function
+  ///               pointer and the size, respectively.  If false is passed, no
+  ///               code will be emitted to generate that value and null will
+  ///               be returned for it.
+  ///
+  /// \return {function, size}
+  std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
+      IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
+      FunctionPointer functionPointer, llvm::Value *thickContext,
+      std::pair<bool, bool> values = {true, true});
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
+
+  Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
+                                      CanSILFunctionType fnType);
 
   /// Does the given function have a self parameter that should be given
   /// the special treatment for self parameters?
@@ -385,9 +397,6 @@ namespace irgen {
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
 
-  Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
-                        Alignment alignment);
-  void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
   void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
 
   /// Emit a class to swift_task_create[_f] with the given flags, parent task,
@@ -396,19 +405,11 @@ namespace irgen {
     IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
     llvm::Value *taskFunction, llvm::Value *localContextInfo);
 
-  /// Allocate task local storage for the specified layout but using the
-  /// provided dynamic size.  Allowing the size to be specified dynamically is
-  /// necessary for applies of thick functions the sizes of whose async contexts
-  /// are dependent on the underlying, already partially applied, called
-  /// function.  The provided sizeLowerBound will be used to track the lifetime
-  /// of the allocation that is known statically.
-  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
-                                                 AsyncContextLayout layout,
-                                                 llvm::Value *sizeValue,
-                                                 Size sizeLowerBound);
-  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
-                                                 AsyncContextLayout layout);
-  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);
+  /// Allocate task local storage for the provided dynamic size.
+  Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
+  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context);
+
+  void emitAsyncFunctionEntry(IRGenFunction &IGF, SILFunction *asyncFunc);
 
   /// Yield the given values from the current continuation.
   ///
@@ -423,6 +424,9 @@ namespace irgen {
     Executor = 1,
     Context = 2,
   };
+
+  void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
+                       CanSILFunctionType fnType);
 } // end namespace irgen
 } // end namespace swift
 

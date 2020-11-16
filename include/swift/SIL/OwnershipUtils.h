@@ -178,7 +178,9 @@ struct BorrowingOperand {
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
-  bool consumesGuaranteedValues() const {
+  ///
+  /// TODO: tuple, struct, destructure_tuple, destructure_struct.
+  bool isReborrow() const {
     switch (kind) {
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::BeginApply:

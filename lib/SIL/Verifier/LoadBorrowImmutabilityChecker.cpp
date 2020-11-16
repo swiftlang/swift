@@ -243,6 +243,18 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return false;
   }
 
+  if (auto *pa = dyn_cast<PartialApplyInst>(user)) {
+    auto argConv = ApplySite(user).getArgumentConvention(*op);
+    if (pa->isOnStack() &&
+        argConv == SILArgumentConvention::Indirect_In_Guaranteed) {
+      return true;
+    }
+
+    // For all other conventions, the underlying address could be mutated
+    writeAccumulator.push_back(op);
+    return true;
+  }
+
   // Handle a capture-by-address like a write.
   if (auto as = ApplySite::isa(user)) {
     writeAccumulator.push_back(op);

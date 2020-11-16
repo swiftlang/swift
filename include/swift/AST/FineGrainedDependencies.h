@@ -351,7 +351,7 @@ private:
 ///
 /// \Note The returned graph should not be escaped from the callback.
 bool withReferenceDependencies(
-    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
     const DependencyTracker &depTracker, StringRef outputPath,
     bool alsoEmitDotFile, llvm::function_ref<bool(SourceFileDepGraph &&)>);
 

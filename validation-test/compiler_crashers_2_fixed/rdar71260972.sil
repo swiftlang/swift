@@ -1,0 +1,26 @@
+// RUN: %target-swift-frontend %s -emit-ir -enable-experimental-concurrency -parse-sil
+
+import Swift
+
+struct Pack {
+  public let a: Bool
+  public let b: Bool
+  public let c: Bool
+  public let d: Bool
+  public let e: Bool
+}
+
+public struct Strukt {
+  public let rawValue: Int
+}
+
+class Clazz { }
+
+sil_vtable Clazz {
+}
+
+sil @$foo : $@convention(method) @async (@guaranteed Pack, @guaranteed Array<Strukt>, @guaranteed Clazz) -> () {
+bb0(%0 : $Pack, %1 : $Array<Strukt>, %2 : $Clazz):
+  %result = tuple ()
+  return %result : $()
+}

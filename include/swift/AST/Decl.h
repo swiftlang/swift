@@ -391,7 +391,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -415,7 +415,11 @@ protected:
     Synthesized : 1,
 
     /// Whether this member's body consists of a single expression.
-    HasSingleExpressionBody : 1
+    HasSingleExpressionBody : 1,
+
+    /// Whether peeking into this function detected nested type declarations.
+    /// This is set when skipping over the decl at parsing.
+    HasNestedTypeDeclarations : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
@@ -5567,6 +5571,7 @@ protected:
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.Synthesized = false;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
+    Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -5711,6 +5716,16 @@ public:
   /// Provide the parsed body for the function.
   void setBodyParsed(BraceStmt *S) {
     setBody(S, BodyKind::Parsed);
+  }
+
+  /// Was there a nested type declaration detected when parsing this
+  /// function was skipped?
+  bool hasNestedTypeDeclarations() const {
+    return Bits.AbstractFunctionDecl.HasNestedTypeDeclarations;
+  }
+
+  void setHasNestedTypeDeclarations(bool value) {
+    Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = value;
   }
 
   /// Note that parsing for the body was delayed.
