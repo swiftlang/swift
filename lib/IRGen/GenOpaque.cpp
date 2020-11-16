@@ -545,6 +545,9 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     } else {
       byteCount = Builder.CreateMul(arraySize, IGM.getSize(Size(eltSize)));
     }
+    // The task allocator wants size increments in the mulitple of
+    // MaximumAlignment.
+    byteCount = alignUpToMaximumAlignment(IGM.SizeTy, byteCount);
     auto address = emitTaskAlloc(byteCount, align);
     return {address, address.getAddress()};
   // In coroutines, call llvm.coro.alloca.alloc.
