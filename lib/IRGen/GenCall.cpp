@@ -156,6 +156,8 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   typeInfos.push_back(&errorTypeInfo);
   valTypes.push_back(errorType);
 
+  bool canHaveValidError = substitutedType->hasErrorResult();
+
   //   IndirectResultTypes *indirectResults...;
   auto indirectResults = fnConv.getIndirectSILResults();
   for (auto indirectResult : indirectResults) {
@@ -196,13 +198,33 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   }
 
   //   SelfType self?;
-  bool hasLocalContextParameter = hasSelfContextParameter(substitutedType);
-  bool canHaveValidError = substitutedType->hasErrorResult();
-  bool hasLocalContext = (hasLocalContextParameter || canHaveValidError);
+  bool hasSelf = hasSelfContextParameter(substitutedType);
   SILParameterInfo localContextParameter =
-      hasLocalContextParameter ? parameters.back() : SILParameterInfo();
-  if (hasLocalContextParameter) {
+      hasSelf ? parameters.back() : SILParameterInfo();
+  if (hasSelf) {
     parameters = parameters.drop_back();
+  }
+
+  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
+  if (hasSelf) {
+    assert(originalType->getRepresentation() !=
+           SILFunctionTypeRepresentation::Thick);
+    SILType ty = IGM.silConv.getSILType(localContextParameter, substitutedType,
+                                        IGM.getMaximalTypeExpansionContext());
+    auto argumentLoweringType =
+        getArgumentLoweringType(ty.getASTType(), localContextParameter,
+                                /*isNoEscape*/ true);
+
+    auto &ti = IGM.getTypeInfoForLowered(argumentLoweringType);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    localContextInfo = {ty, localContextParameter.getConvention()};
+  } else {
+    auto &ti = IGM.getNativeObjectTypeInfo();
+    SILType ty = SILType::getNativeObjectType(IGM.Context);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    localContextInfo = {ty, substitutedType->getCalleeConvention()};
   }
 
   //   ArgTypes formalArguments...;
@@ -229,31 +251,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     valTypes.push_back(SILType());
     typeInfos.push_back(&bindingsTI);
   }
-
-  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
-  if (hasLocalContext) {
-    if (hasLocalContextParameter) {
-      SILType ty =
-          IGM.silConv.getSILType(localContextParameter, substitutedType,
-                                 IGM.getMaximalTypeExpansionContext());
-      auto argumentLoweringType =
-          getArgumentLoweringType(ty.getASTType(), localContextParameter,
-                                  /*isNoEscape*/ true);
-
-      auto &ti = IGM.getTypeInfoForLowered(argumentLoweringType);
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      localContextInfo = {ty, localContextParameter.getConvention()};
-    } else {
-      // TODO: DETERMINE: Is there a field in this case to match the sync ABI?
-      auto &ti = IGM.getNativeObjectTypeInfo();
-      SILType ty = SILType::getNativeObjectType(IGM.Context);
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      localContextInfo = {ty, substitutedType->getCalleeConvention()};
-    }
-  }
-
 
   Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
   if (originalType->getRepresentation() ==
@@ -778,10 +775,6 @@ void SignatureExpansion::addAsyncParameters() {
   ParamIRTypes.push_back(IGM.SwiftTaskPtrTy);
   ParamIRTypes.push_back(IGM.SwiftExecutorPtrTy);
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
-  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Thick) {
-    IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
-    ParamIRTypes.push_back(IGM.RefCountedPtrTy);
-  }
 }
 
 void SignatureExpansion::addCoroutineContextParameter() {
@@ -2314,10 +2307,6 @@ public:
     asyncExplosion.add(IGF.getAsyncTask());
     asyncExplosion.add(IGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer.getAddress());
-    if (getCallee().getRepresentation() ==
-        SILFunctionTypeRepresentation::Thick) {
-      asyncExplosion.add(getCallee().getSwiftContext());
-    }
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                   IGF.getSILModule());
@@ -2380,11 +2369,18 @@ public:
       auto bindingsAddr = bindingLayout.project(IGF, context, /*offsets*/ None);
       layout.getBindings().save(IGF, bindingsAddr, llArgs);
     }
-    if (selfValue) {
-      Explosion selfExplosion;
-      selfExplosion.add(selfValue);
+    auto isThick =
+        getCallee().getRepresentation() == SILFunctionTypeRepresentation::Thick;
+    if (selfValue || isThick) {
+      Explosion localExplosion;
+      if (selfValue) {
+        assert(!isThick);
+        localExplosion.add(selfValue);
+      } else {
+        localExplosion.add(getCallee().getSwiftContext());
+      }
       auto fieldLayout = layout.getLocalContextLayout();
-      saveValue(fieldLayout, selfExplosion, isOutlined);
+      saveValue(fieldLayout, localExplosion, isOutlined);
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
