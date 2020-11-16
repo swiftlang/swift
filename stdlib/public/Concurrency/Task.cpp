@@ -213,10 +213,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   // This means that we never get rid of this allocation.
   size_t amountToAllocate = headerSize + initialContextSize;
 
-  // TODO: if this is necessary we need to teach LLVM lowering to request async
-  // context sizes that are mulitple of that maximum alignment.
-  // For now disable this assert.
-  // assert(amountToAllocate % MaximumAlignment == 0);
+  assert(amountToAllocate % MaximumAlignment == 0);
 
   void *allocation = malloc(amountToAllocate);
 

@@ -225,9 +225,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask) {
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) {
     auto flags = args.claimNext();
     auto parentTask = args.claimNext();
+    auto futureResultType =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture)
+          ? args.claimNext()
+          : nullptr;
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
@@ -237,7 +242,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, parentTask, taskFunction, taskContext);
+        IGF, flags, parentTask, futureResultType, taskFunction, taskContext,
+        substitutions);
 
     // Cast back to NativeObject/RawPointer.
     auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
@@ -248,6 +254,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(newContext);
     return;
   }
+
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
