@@ -3794,23 +3794,44 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   if (IGM.ObjCInterop) {
     switch (strategy) {
     case ClassMetadataStrategy::Resilient:
-      // Even non-@objc classes can have Objective-C categories attached, so
-      // we always emit a resilient class stub as long as -enable-objc-interop
-      // is set.
+      // We always emit a resilient class stub as long as -enable-objc-interop
+      // is set. You can define @objc members in an extension of a resilient
+      // class across a module boundary, and this category is attached to the
+      // class stub.
       if (IGM.hasObjCResilientClassStub(classDecl)) {
-        IGM.emitObjCResilientClassStub(classDecl);
+        auto *stub = IGM.emitObjCResilientClassStub(
+            classDecl, /*isPublic=*/true);
 
-        if (classDecl->isObjC()) {
-          auto *stub = IGM.getAddrOfObjCResilientClassStub(
-              classDecl, NotForDefinition,
-              TypeMetadataAddress::AddressPoint);
+        // If the class has Objective-C ancestry but does *not* have generic
+        // ancestry, it appears in the generated header. We emit an Objective-C
+        // class symbol aliased to the class stub for Clang to reference.
+        if (classDecl->isObjC())
           emitObjCClassSymbol(IGM, classDecl, stub);
 
+        // Note that if the class has generic ancestry, isObjC() is false.
+        // This is because such classes cannot appear in the generated header,
+        // because their generic superclasses cannot appear in the generated
+        // header either. However, we still want to emit the class stub in
+        // the __objc_stublist section of the binary, so that they are visited
+        // by objc_copyClassList().
+        if (classDecl->checkAncestry(AncestryFlags::ObjC))
+          IGM.addObjCClassStub(stub);
+      }
+      break;
+
+    case ClassMetadataStrategy::Singleton:
+      // If the class has Objective-C ancestry, we emit the class stub and
+      // add it to the __obj_stublist. Note that the stub is not public in
+      // this case, since there is no reason to reference directly; it only
+      // exists so that objc_copyClassList() can find it.
+      if (IGM.hasObjCResilientClassStub(classDecl)) {
+        if (classDecl->checkAncestry(AncestryFlags::ObjC)) {
+          auto *stub = IGM.emitObjCResilientClassStub(
+              classDecl, /*isPublic=*/false);
           IGM.addObjCClassStub(stub);
         }
       }
-      break;
-    case ClassMetadataStrategy::Singleton:
+
       break;
     
     case ClassMetadataStrategy::Update:
@@ -3820,7 +3841,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
         emitObjCClassSymbol(IGM, classDecl, var);
 
       IGM.addObjCClass(var,
-                classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+          classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
       break;
     }
   }
