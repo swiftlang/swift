@@ -554,7 +554,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                                  MainInputFilenameForDebugInfo,
                                                      PrivateDiscriminator);
 
-  initClangTypeConverter();
+  if (auto loader = Context.getClangModuleLoader()) {
+    ClangASTContext =
+        &static_cast<ClangImporter *>(loader)->getClangASTContext();
+  }
 
   if (ClangASTContext) {
     auto atomicBoolTy = ClangASTContext->getAtomicType(ClangASTContext->BoolTy);
@@ -595,9 +598,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
+                                            {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = createStructType(*this, "swift.context", {});
   SwiftTaskTy = createStructType(*this, "swift.task", {});
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});
+  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
@@ -619,7 +625,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 }
 
 IRGenModule::~IRGenModule() {
-  destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   destroyPointerAuthCaches();
   delete &Types;

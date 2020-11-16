@@ -3275,14 +3275,15 @@ private:
     if (Foreign.async
         && Foreign.async->completionHandlerParamIndex() == Args.size()) {
       SILParameterInfo param = claimNextParameters(1).front();
+      (void)param;
 
-      // TODO: Get or create the completion handler block implementation
-      // function for the given argument type, then create a block containing
-      // the current continuation. (This probably needs to be deferred to right
-      // before the actual call, since evaluating other arguments to the call
-      // may suspend the task)
-      auto argTy = SILType::getPrimitiveObjectType(param.getInterfaceType());
-      Args.push_back(ManagedValue::forUnmanaged(SILUndef::get(argTy, SGF.F)));
+      // Leave a placeholder in the position. We'll fill this in with a block
+      // capturing the current continuation right before we invoke the
+      // function.
+      // (We can't do this immediately, because evaluating other arguments
+      // may require suspending the async task, which is not allowed while its
+      // continuation is active.)
+      Args.push_back(ManagedValue::forInContext());
     } else if (Foreign.error
                && Foreign.error->getErrorParameterIndex() == Args.size()) {
       SILParameterInfo param = claimNextParameters(1).front();
@@ -4326,14 +4327,21 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // If there's a foreign error or async parameter, fill it in.
   ManagedValue errorTemp;
-  if (calleeTypeInfo.foreign.async) {
-    // TODO: prepare the callback continuation and block here.
-    
-  } else if (calleeTypeInfo.foreign.error) {
-    unsigned errorParamIndex =
-        calleeTypeInfo.foreign.error->getErrorParameterIndex();
+  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
 
-    // This is pretty evil.
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
+
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(*this, loc);
+
+  } else if (auto foreignError = calleeTypeInfo.foreign.error) {
+    unsigned errorParamIndex =
+        foreignError->getErrorParameterIndex();
+
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
     auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
 
     std::tie(errorTemp, errorArgSlot) =
@@ -4444,9 +4452,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                           *foreignError);
   }
   
-  // TODO(async): If there's a foreign async convention, await the continuation
-  // to get the result from the completion callback.
-
   auto directResultsArray = makeArrayRef(directResults);
   RValue result =
     resultPlan->finish(*this, loc, substResultType, directResultsArray);

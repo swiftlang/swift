@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 
 import Builtin
@@ -29,6 +30,7 @@ class S {
   init()
 }
 
+// CHECK-LL: @classinstanceSVoidToVoidAD =
 // CHECK-LL: define hidden swiftcc void @classinstanceSVoidToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @classinstanceSVoidToVoid : $@async @convention(method) (@guaranteed S) -> () {
 bb0(%instance : $S):
@@ -85,9 +87,10 @@ sil_vtable S {
   #S.deinit!deallocator: @S_deallocating_deinit
 }
 
-sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// Defined in _Concurrency
+sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
+sil @test_case : $@convention(thin) @async () -> () {
   %s_type = metatype $@thick S.Type
   %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S
   %instance = apply %allocating_init(%s_type) : $@convention(method) (@thick S.Type) -> @owned S
@@ -96,9 +99,19 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %result = apply %classinstanceSVoidToVoid(%instance) : $@convention(method) @async (@guaranteed S) -> () // CHECK: main.S
   strong_release %instance : $S
 
-  %2 = integer_literal $Builtin.Int32, 0
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
-  return %3 : $Int32                              // id: %4
+  %void = tuple()
+  return %void : $()
 }
 
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
+}

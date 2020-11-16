@@ -125,15 +125,6 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
   return isOwnershipForwardingValueKind(SILNodeKind(i->getKind()));
 }
 
-bool swift::isReborrowInstruction(const SILInstruction *i) {
-  switch (i->getKind()) {
-  case SILInstructionKind::BranchInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                           Borrowing Operand
 //===----------------------------------------------------------------------===//
@@ -247,7 +238,7 @@ void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     // single guaranteed scope.
     value.visitLocalScopeEndingUses([&](Operand *valueUser) {
       if (auto subBorrowScopeOp = BorrowingOperand::get(valueUser)) {
-        if (subBorrowScopeOp->consumesGuaranteedValues()) {
+        if (subBorrowScopeOp->isReborrow()) {
           subBorrowScopeOp->visitUserResultConsumingUses(func);
           return;
         }

@@ -308,6 +308,24 @@ void IRGenFunction::emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
 }
 
 llvm::Value *
+IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
+                                         llvm::PointerType *expectedType,
+                                         const llvm::Twine &name) {
+  llvm::Value *value = Builder.CreateLoad(addr);
+  assert(value->getType() ==
+         (isFar ? IGM.FarRelativeAddressTy : IGM.RelativeAddressTy));
+  if (!isFar) {
+    value = Builder.CreateSExt(value, IGM.IntPtrTy);
+  }
+  auto *addrInt = Builder.CreatePtrToInt(addr.getAddress(), IGM.IntPtrTy);
+  auto *uncastPointerInt = Builder.CreateAdd(addrInt, value);
+  auto *uncastPointer = Builder.CreateIntToPtr(uncastPointerInt, IGM.Int8PtrTy);
+  auto uncastPointerAddress = Address(uncastPointer, IGM.getPointerAlignment());
+  auto pointer = Builder.CreateBitCast(uncastPointerAddress, expectedType);
+  return pointer.getAddress();
+}
+
+llvm::Value *
 IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
                                                 bool isFar,
                                                 llvm::PointerType *expectedType,
@@ -471,4 +489,21 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
   Builder.CreateNonMergeableTrap(IGM, failureMessage);
   if (EmitUnreachable)
     Builder.CreateUnreachable();
+}
+
+Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
+  auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {getAsyncTask(), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+  auto address = Address(call, alignment);
+  return address;
+}
+
+void IRGenFunction::emitTaskDealloc(Address address) {
+  auto *call = Builder.CreateCall(IGM.getTaskDeallocFn(),
+                                  {getAsyncTask(), address.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
 }

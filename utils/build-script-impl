@@ -419,6 +419,7 @@ function verify_host_is_supported() {
       | watchos-armv7k          \
       | android-armv7           \
       | android-aarch64         \
+      | android-x86_64          \
       | wasi-wasm32)
         ;;
       *)
@@ -462,6 +463,10 @@ function set_build_options_for_host() {
         android-armv7)
             SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
             llvm_target_arch="ARM"
+            ;;
+        android-x86_64)
+            SWIFT_HOST_TRIPLE="x86_64-unknown-linux-android${ANDROID_API_LEVEL}"
+            llvm_target_arch="X86"
             ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
@@ -2166,6 +2171,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
 
                     -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                     -DLLBUILD_SUPPORT_BINDINGS:=Swift
@@ -2238,6 +2244,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
@@ -2306,6 +2313,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                  -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}

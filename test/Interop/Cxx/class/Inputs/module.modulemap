@@ -41,3 +41,7 @@ module SynthesizedInitializers {
 module DebugInfo {
   header "debug-info.h"
 }
+
+module NestedRecords {
+  header "nested-records.h"
+}

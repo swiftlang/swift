@@ -352,6 +352,9 @@ def apply_default_arguments(toolchain, args):
         elif args.android_arch == "aarch64":
             args.stdlib_deployment_targets.append(
                 StdlibDeploymentTarget.Android.aarch64.name)
+        elif args.android_arch == "x86_64":
+            args.stdlib_deployment_targets.append(
+                StdlibDeploymentTarget.Android.x86_64.name)
     if args.wasm:
         args.stdlib_deployment_targets.append(
             StdlibDeploymentTarget.WASI.wasm32.name)

@@ -216,20 +216,20 @@ func passAvailableConformance1a(x: HasAvailableConformance1) {
 
 // Associated conformance with unavailability
 protocol Rider {
-	associatedtype H : Horse
+  associatedtype H : Horse
 }
 
 struct AssocConformanceUnavailable : Rider {
 // expected-error@-1 {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasUnavailableConformance1')}}
-	typealias H = HasUnavailableConformance1
+  typealias H = HasUnavailableConformance1
 }
 
 // Associated conformance with deprecation
 struct AssocConformanceDeprecated : Rider {
 // expected-warning@-1 {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasDeprecatedConformance1')}}
-	typealias H = HasDeprecatedConformance1
+  typealias H = HasDeprecatedConformance1
 }
 
 // Associated conformance with availability
@@ -237,12 +237,12 @@ struct AssocConformanceAvailable1 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
 // expected-note@-3 {{add @available attribute to enclosing struct}}
-	typealias H = HasAvailableConformance1
+  typealias H = HasAvailableConformance1
 }
 
 @available(macOS 100, *)
 struct AssocConformanceAvailable2 : Rider {
-	typealias H = HasAvailableConformance1
+  typealias H = HasAvailableConformance1
 }
 
 struct AssocConformanceAvailable3 {}
@@ -251,12 +251,74 @@ extension AssocConformanceAvailable3 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
 // expected-note@-3 {{add @available attribute to enclosing extension}}
-	typealias H = HasAvailableConformance1
+  typealias H = HasAvailableConformance1
 }
 
 struct AssocConformanceAvailable4 {}
 
 @available(macOS 100, *)
 extension AssocConformanceAvailable4 : Rider {
-	typealias H = HasAvailableConformance1
+  typealias H = HasAvailableConformance1
+}
+
+// Solution ranking should down-rank solutions involving unavailable conformances
+protocol First {}
+extension First {
+  func doStuff<T>(_: T) -> Bool {}
+}
+
+protocol Second {}
+extension Second {
+  func doStuff(_: Int) -> Int {}
+}
+
+struct ConformingType1 {}
+
+extension ConformingType1 : First {}
+
+@available(macOS 100, *)
+extension ConformingType1 : Second {}
+
+func usesConformingType1(_ c: ConformingType1) {
+  // We should pick First.doStuff() here, since Second.doStuff() is unavailable
+  let result = c.doStuff(123)
+  let _: Bool = result
+}
+
+@available(macOS 100, *)
+func usesConformingType1a(_ c: ConformingType1) {
+  // We should pick Second.doStuff() here, since it is more specialized than
+  // First.doStuff()
+  let result = c.doStuff(123)
+  let _: Int = result
+}
+
+// Same as above but unconditionally unavailable
+struct ConformingType2 {}
+
+extension ConformingType2 : First {}
+
+@available(*, unavailable)
+extension ConformingType2 : Second {}
+
+func usesConformingType2(_ c: ConformingType2) {
+  // We should pick First.doStuff() here, since Second.doStuff() is unavailable
+  let result = c.doStuff(123)
+  let _: Bool = result
+}
+
+// Make sure this also works for synthesized conformances
+struct UnavailableHashable {
+  let x: Int
+  let y: Int
+}
+
+@available(macOS 100, *)
+extension UnavailableHashable : Hashable {}
+
+func usesUnavailableHashable(_ c: UnavailableHashable) {
+  // expected-note@-1 2 {{add @available attribute to enclosing global function}}
+  _ = Set([c])
+  // expected-error@-1 2 {{conformance of 'UnavailableHashable' to 'Hashable' is only available in macOS 100 or newer}}
+  // expected-note@-2 2 {{add 'if #available' version check}}
 }

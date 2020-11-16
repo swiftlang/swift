@@ -1114,10 +1114,10 @@ def create_argument_parser():
                     android.adb.commands.DEVICE_TEMP_DIR))
 
     option('--android-arch', store,
-           choices=['armv7', 'aarch64'],
+           choices=['armv7', 'aarch64', 'x86_64'],
            default='armv7',
-           help='The Android target architecture when building for Android. '
-                'Currently only armv7 and aarch64 are supported. '
+           help='The target architecture when building for Android. '
+                'Currently, only armv7, aarch64, and x86_64 are supported. '
                 '%(default)s is the default.')
 
     # -------------------------------------------------------------------------

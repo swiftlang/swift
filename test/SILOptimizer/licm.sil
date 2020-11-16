@@ -634,15 +634,19 @@ struct Index {
 // -----------------------------------------------------------------------------
 // Test combined load/store hoisting/sinking with obvious aliasing loads
 
+// The loop contains loads and stores to the same accesspath: %3 alloc_stack -> #0 -> #0
+// However, they don't share the same projection instructions.
+// LICM should still hoist the loads and sink the stores in a combined transformation.
+//
 // CHECK-LABEL: sil shared @testCombinedLdStAliasingLoad : $@convention(method) (Int64) -> Int64 {
 // CHECK: bb0(%0 : $Int64):
-// CHECK: store
+// CHECK: store {{.*}} to %{{.*}} : $*Int64
+// CHECK: load %{{.*}} : $*Int64
+// CHECK: br bb1
 // CHECK-NOT: {{(load|store)}}
-// CHECK: bb1:
-// CHECK-NEXT: load %{{.*}} : $*Builtin.Int64
-// CHECK-NEXT: store %{{.*}} to %{{.*}} : $*Int64
-// CHECK-NEXT: load %{{.*}} : $*Builtin.Int64
-// CHECK-NEXT: cond_br
+// CHECK: bb3:
+// CHECK-NOT: {{(load|store)}}
+// CHECK: store %{{.*}} to %{{.*}} : $*Int64
 // CHECK-NOT: {{(load|store)}}
 // CHECK-LABEL: } // end sil function 'testCombinedLdStAliasingLoad'
 sil shared @testCombinedLdStAliasingLoad : $@convention(method) (Int64) -> Int64 {
@@ -768,25 +772,10 @@ sil @getRange : $@convention(thin) () -> Range<Int64>
 // CHECK-LABEL: sil shared @testLICMReducedCombinedLdStExtraProjection : $@convention(method) (Int64) -> Int64 {
 // CHECK: bb0(%0 : $Int64):
 // CHECK:   store %0 to %{{.*}} : $*Int64
+// CHECK:   load %{{.*}} : $*Int64
 // CHECK-NOT: {{(load|store)}}
-// CHECK: bb1(%{{.*}} : $Builtin.Int64):
-// CHECK:   builtin "sadd_with_overflow_Int64"
-// CHECK:   load %{{.*}} : $*Builtin.Int64
-// CHECK:   builtin "sadd_with_overflow_Int64"
-// CHECK:   builtin "cmp_eq_Int64"
-// CHECK-NEXT: cond_br
-// CHECK: bb3:
-// CHECK:   store %{{.*}} to %{{.*}} : $*Int64
-// CHECK: bb4:
-// CHECK:   store %{{.*}} to %{{.*}} : $*Int64
-// CHECK: bb5:
-// CHECK:   function_ref @getRange : $@convention(thin) () -> Range<Int64>
-// CHECK:   apply %{{.*}}() : $@convention(thin) () -> Range<Int64>
-// CHECK:   store %{{.*}} to %{{.*}} : $*Int64
-// CHECK: bb6:
-// CHECK:   load %{{.*}} : $*Builtin.Int64
-// CHECK:   builtin "cmp_eq_Int64"
-// CHECK:   cond_br
+// CHECK: bb7:
+// CHECK-NEXT: store %{{.*}} to %{{.*}} : $*Int64
 // CHECK-NOT: {{(load|store)}}
 // CHECK-LABEL: } // end sil function 'testLICMReducedCombinedLdStExtraProjection'
 sil shared @testLICMReducedCombinedLdStExtraProjection : $@convention(method) (Int64) -> Int64 {
@@ -932,4 +921,400 @@ bb4:
 bb5:
   %99 = tuple ()
   return %99 : $()
+}
+
+// Test load splitting with a loop-invariant stored value. The loop
+// will be empty after combined load/store hoisting/sinking.
+//
+// TODO: sink a struct_extract (or other non-side-effect instructions)
+//        with no uses in the loop.
+//
+// CHECK-LABEL: sil shared @testLoadSplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK:         [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
+// CHECK:         [[STOREDVAL:%.*]] = struct_extract %0 : $Int64, #Int64._value
+// CHECK:         br bb1([[PRELOAD]] : $Int64)
+// CHECK:       bb1([[PHI:%.*]] : $Int64):
+// CHECK-NEXT:    [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1(%0 : $Int64)
+// CHECK:       bb3:
+// CHECK-NEXT:    store %0 to %{{.*}} : $*Int64
+// CHECK-NEXT:    tuple ([[OUTERVAL]] : $Index, [[PHI]] : $Int64, [[STOREDVAL]] : $Builtin.Int64)
+// CHECK-LABEL: } // end sil function 'testLoadSplit'
+sil shared @testLoadSplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
+  %middleAddr1 = struct_element_addr %outerAddr1 : $*Index, #Index.value
+  br bb1
+
+bb1:
+  %val1 = load %outerAddr1 : $*Index
+  %val2 = load %middleAddr1 : $*Int64
+  %outerAddr2 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
+  %middleAddr2 = struct_element_addr %outerAddr2 : $*Index, #Index.value
+  store %0 to %middleAddr2 : $*Int64
+  %innerAddr1 = struct_element_addr %middleAddr1 : $*Int64, #Int64._value
+  %val3 = load %innerAddr1 : $*Builtin.Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %result = tuple (%val1 : $Index, %val2 : $Int64, %val3 : $Builtin.Int64)
+  return %result : $(Index, Int64, Builtin.Int64)
+}
+
+// Test load splitting with a loop-varying stored value.
+// CHECK-LABEL: sil shared @testLoadSplitPhi : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK:        [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
+// CHECK:        br bb1(%4 : $Int64)
+// CHECK:      bb1([[PHI:%.*]] : $Int64):
+// CHECK-NEXT:   [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
+// CHECK-NEXT:   [[EXTRACT:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
+// CHECK-NEXT:   builtin "uadd_with_overflow_Int32"([[EXTRACT]] : $Builtin.Int64
+// CHECK-NEXT:   tuple_extract
+// CHECK-NEXT:   [[ADD:%.*]] = struct $Int64
+// CHECK-NEXT:   cond_br undef, bb2, bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb1([[ADD]] : $Int64)
+// CHECK:      bb3:
+// CHECK-NEXT:   store [[ADD]] to %{{.*}} : $*Int64
+// CHECK-NEXT:   tuple ([[OUTERVAL]] : $Index, [[ADD]] : $Int64, [[EXTRACT]] : $Builtin.Int64)
+// CHECK-LABEL: } // end sil function 'testLoadSplitPhi'
+sil shared @testLoadSplitPhi : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
+  %middleAddr1 = struct_element_addr %outerAddr1 : $*Index, #Index.value
+  %innerAddr1 = struct_element_addr %middleAddr1 : $*Int64, #Int64._value
+  br bb1
+
+bb1:
+  %outerVal = load %outerAddr1 : $*Index
+  %innerVal = load %innerAddr1 : $*Builtin.Int64
+  %one = integer_literal $Builtin.Int64, 1
+  %zero = integer_literal $Builtin.Int1, 0
+  %add = builtin "uadd_with_overflow_Int32"(%innerVal : $Builtin.Int64, %one : $Builtin.Int64, %zero : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %inc = tuple_extract %add : $(Builtin.Int64, Builtin.Int1), 0
+  %outerAddr2 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
+  %middleAddr2 = struct_element_addr %outerAddr2 : $*Index, #Index.value
+  %newVal = struct $Int64 (%inc : $Builtin.Int64)
+  store %newVal to %middleAddr2 : $*Int64
+  %middleVal = load %middleAddr1 : $*Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %result = tuple (%outerVal : $Index, %middleVal : $Int64, %innerVal : $Builtin.Int64)
+  return %result : $(Index, Int64, Builtin.Int64)
+}
+
+struct State {
+  @_hasStorage var valueSet: (Int64, Int64, Int64) { get set }
+  @_hasStorage var singleValue: Int64 { get set }
+}
+
+// Test the we can remove a store to an individual tuple element when
+// the struct containing the tuple is used within the loop.
+// The optimized loop should only contain the add operation and a phi, with no memory access.
+//
+// CHECK-LABEL: sil shared @testTupleSplit : $@convention(method) (Builtin.RawPointer) -> State {
+// CHECK:   bb0(%0 : $Builtin.RawPointer):
+// CHECK:     [[HOISTADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
+// ...Preload stored element #1
+// CHECK:     [[PRELOADADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
+// CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
+// ...Split element 0
+// CHECK:     [[SPLIT0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
+// CHECK:     [[ELT0:%.*]] = load [[SPLIT0]] : $*Int64
+// ...Split element 2
+// CHECK:     [[SPLIT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
+// CHECK:     [[ELT2:%.*]] = load [[SPLIT2]] : $*Int64
+// ...Split State.singlevalue
+// CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
+// CHECK:     [[SINGLEVAL:%.*]] = load [[SINGLEADR]] : $*Int64
+// ...Hoisted element 0
+// CHECK:     [[HOISTLOAD:%.*]] = load [[HOISTADR]] : $*Int64
+// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[HOISTLOAD]] : $Int64, #Int64._value
+// CHECK:     br bb1([[PRELOAD]] : $Int64)
+// ...Loop
+// CHECK:   bb1([[PHI:%.*]] : $Int64):
+// CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[ELT0]] : $Int64, [[PHI]] : $Int64, [[ELT2]] : $Int64)
+// CHECK-NEXT: [[STRUCT:%.*]] = struct $State ([[TUPLE]] : $(Int64, Int64, Int64), [[SINGLEVAL]] : $Int64)
+// CHECK-NEXT: [[ADDEND:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
+// CHECK-NEXT: [[UADD:%.*]] = builtin "uadd_with_overflow_Int32"([[HOISTVAL]] : $Builtin.Int64, [[ADDEND]] : $Builtin.Int64, %{{.*}} : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+// CHECK-NEXT: [[ADDVAL:%.*]] = tuple_extract [[UADD]] : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK-NEXT: [[ADDINT:%.*]] = struct $Int64 ([[ADDVAL]] : $Builtin.Int64)
+// CHECK-NEXT: cond_br undef, bb2, bb3
+// CHECK:   bb2:
+// CHECK-NEXT: br bb1([[ADDINT]] : $Int64)
+// CHECK:   bb3:
+// CHECK-NEXT:  store [[ADDINT]] to [[PRELOADADR]] : $*Int64
+// CHECK-NEXT:  return [[STRUCT]] : $State
+// CHECK-LABEL: } // end sil function 'testTupleSplit'
+sil shared @testTupleSplit : $@convention(method) (Builtin.RawPointer) -> State {
+bb0(%0 : $Builtin.RawPointer):
+  %stateAddr = pointer_to_address %0 : $Builtin.RawPointer to $*State
+  %tupleAddr0 = struct_element_addr %stateAddr : $*State, #State.valueSet
+  %elementAddr0 = tuple_element_addr %tupleAddr0 : $*(Int64, Int64, Int64), 0
+  %tupleAddr1 = struct_element_addr %stateAddr : $*State, #State.valueSet
+  %elementAddr1 = tuple_element_addr %tupleAddr1 : $*(Int64, Int64, Int64), 1
+  %tupleAddr11 = struct_element_addr %stateAddr : $*State, #State.valueSet
+  %elementAddr11 = tuple_element_addr %tupleAddr11 : $*(Int64, Int64, Int64), 1
+  br bb1
+
+bb1:
+  %state = load %stateAddr : $*State
+  %element0 = load %elementAddr0 : $*Int64
+  %val0 = struct_extract %element0 : $Int64, #Int64._value
+  %element1 = load %elementAddr1 : $*Int64
+  %val1 = struct_extract %element1 : $Int64, #Int64._value
+  %zero = integer_literal $Builtin.Int1, 0
+  %add = builtin "uadd_with_overflow_Int32"(%val0 : $Builtin.Int64, %val1 : $Builtin.Int64, %zero : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %addVal = tuple_extract %add : $(Builtin.Int64, Builtin.Int1), 0
+  %addInt = struct $Int64 (%addVal : $Builtin.Int64)
+  store %addInt to %elementAddr11 : $*Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %state : $State
+}
+
+// Test multiple stores to disjoint access paths with a single load
+// that spans both of them. The load should be split and hosited and
+// and the stores be sunk.
+// testCommonSplitLoad
+// CHECK-LABEL: sil shared @testCommonSplitLoad : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, Int64, Int64) {
+// CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+// CHECK:   [[ELT0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
+// CHECK:   [[V0:%.*]] = load [[ELT0]] : $*Int64
+// CHECK:   [[ELT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
+// CHECK:   [[V2:%.*]] = load [[ELT2]] : $*Int64
+// CHECK:   [[ELT1:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
+// CHECK:   [[V1:%.*]] = load [[ELT1]] : $*Int64
+// CHECK:   br bb1([[V0]] : $Int64, [[V2]] : $Int64)
+//
+// Nothing in this loop except phis...
+// CHECK: bb1([[PHI0:%.*]] : $Int64, [[PHI2:%.*]] : $Int64):
+// CHECK-NEXT: [[RESULT:%.*]] = tuple ([[PHI0]] : $Int64, [[V1]] : $Int64, [[PHI2]] : $Int64)
+// CHECK-NEXT: cond_br undef, bb2, bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb1(%0 : $Int64, %0 : $Int64)
+//
+// Stores are all sunk...
+// CHECK: bb3:
+// CHECK:   store %0 to [[ELT2]] : $*Int64
+// CHECK:   store %0 to [[ELT0]] : $*Int64
+// CHECK:   return [[RESULT]] : $(Int64, Int64, Int64)
+// CHECK-LABEL: } // end sil function 'testCommonSplitLoad'
+sil shared @testCommonSplitLoad : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, Int64, Int64) {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*(Int64, Int64, Int64)
+  br bb1
+
+bb1:
+  %val1 = load %outerAddr1 : $*(Int64, Int64, Int64)
+  %elementAddr0 = tuple_element_addr %outerAddr1 : $*(Int64, Int64, Int64), 0
+  store %0 to %elementAddr0 : $*Int64
+  %elementAddr2 = tuple_element_addr %outerAddr1 : $*(Int64, Int64, Int64), 2
+  store %0 to %elementAddr2 : $*Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %val1 : $(Int64, Int64, Int64)
+}
+
+// Two stores, one to the outer tuple and one to the inner tuple. This
+// results in two access paths that are only loaded/stored to.  First
+// split the outer tuple when processing the outer access path, then
+// the inner tuple when processing the inner access path. All loads
+// should be hoisted and all stores should be sunk.
+//
+// CHECK-LABEL: sil shared @testResplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
+// CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+// CHECK:   [[ELT_0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 0
+// CHECK:   [[V0:%.*]] = load [[ELT_0]] : $*Int64
+// CHECK:   [[ELT_1a:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 1
+// CHECK:   [[ELT_1_0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64), 0
+// CHECK:   [[V_1_0:%.*]] = load [[ELT_1_0]] : $*Int64
+// CHECK:   [[ELT_1b:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 1
+// CHECK:   [[ELT_1_1:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64), 1
+// CHECK:   [[V_1_1:%.*]] = load [[ELT_1_1]] : $*Int64
+// CHECK: br bb1([[V_0:%.*]] : $Int64, [[V_1_0]] : $Int64)
+//
+// Nothing in this loop except phis and tuple reconstruction...
+// CHECK: bb1([[PHI_0:%.*]] : $Int64, [[PHI_1_0:%.*]] : $Int64):
+// CHECK:   [[INNER:%.*]] = tuple ([[PHI_1_0]] : $Int64, [[V_1_1]] : $Int64)
+// CHECK:   [[OUTER:%.*]] = tuple ([[PHI_0]] : $Int64, [[INNER]] : $(Int64, Int64))
+// CHECK:   cond_br undef, bb2, bb3
+// CHECK: bb2:
+// CHECK:   br bb1(%0 : $Int64, %0 : $Int64)
+//
+// The two stores are sunk...
+// CHECK: bb3:
+// CHECK:   store %0 to [[ELT_1_0]] : $*Int64
+// CHECK:   store %0 to [[ELT_0]] : $*Int64
+// CHECK:   return [[OUTER]] : $(Int64, (Int64, Int64))
+// CHECK-LABEL: } // end sil function 'testResplit'
+sil shared @testResplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*(Int64, (Int64, Int64))
+  br bb1
+
+bb1:
+  %val1 = load %outerAddr1 : $*(Int64, (Int64, Int64))
+  %elementAddr0 = tuple_element_addr %outerAddr1 : $*(Int64, (Int64, Int64)), 0
+  store %0 to %elementAddr0 : $*Int64
+  %elementAddr1 = tuple_element_addr %outerAddr1 : $*(Int64, (Int64, Int64)), 1
+  %elementAddr10 = tuple_element_addr %elementAddr1 : $*(Int64, Int64), 0
+  store %0 to %elementAddr10 : $*Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %val1 : $(Int64, (Int64, Int64))
+}
+
+// Two stores to overlapping accesspaths. Combined load/store hoisting
+// cannot currently handle stores to overlapping accesspaths, so
+// nothing is optimized.
+// CHECK-LABEL: sil shared @testTwoStores : $@convention(method) (Int64, Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
+// CHECK-LABEL: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
+// CHECK-NOT: load
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   load %{{.*}} : $*(Int64, (Int64, Int64))
+// CHECK:   store {{.*}} : $*(Int64, Int64)
+// CHECK:   store {{.*}} : $*Int64
+// CHECK:   cond_br undef, bb2, bb3
+// CHECK-NOT: store
+// CHECK-LABEL: } // end sil function 'testTwoStores'
+sil shared @testTwoStores : $@convention(method) (Int64, Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
+bb0(%0 : $Int64, %1: $Int64, %2 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %2 : $Builtin.RawPointer to $*(Int64, (Int64, Int64))
+  br bb1
+
+bb1:
+  %val1 = load %outerAddr1 : $*(Int64, (Int64, Int64))
+  %elementAddr1 = tuple_element_addr %outerAddr1 : $*(Int64, (Int64, Int64)), 1
+  %tuple = tuple (%0 : $Int64, %1: $Int64)
+  store %tuple to %elementAddr1 : $*(Int64, Int64)
+  %elementAddr10 = tuple_element_addr %elementAddr1 : $*(Int64, Int64), 0
+  store %1 to %elementAddr10 : $*Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %val1 : $(Int64, (Int64, Int64))
+}
+
+// Two wide loads. The first can be successfully split and the second
+// half hoisted. The second cannot be split because of a pointer
+// cast. Make sure two remaining loads and the store are still in the loop.
+//
+// CHECK-LABEL: sil hidden @testSplitNonStandardProjection : $@convention(method) (Int64, Builtin.RawPointer) -> ((Int64, (Int64, Int64)), (Int64, Int64)) {
+// CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+//
+// The first load was split, so one half is hoisted.
+// CHECK:   [[V1:%.*]] = load %{{.*}} : $*Int64
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   [[V0:%.*]] = load %{{.*}} : $*Int64
+// CHECK:   [[INNER:%.*]] = tuple ([[V0]] : $Int64, [[V1]] : $Int64)
+// CHECK:   store %0 to %{{.*}} : $*Int64
+// CHECK:   [[OUTER:%.*]] = load %{{.*}} : $*(Int64, (Int64, Int64))
+// CHECK:   cond_br undef, bb2, bb3
+// CHECK: bb2:
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   [[RESULT:%.*]] = tuple ([[OUTER]] : $(Int64, (Int64, Int64)), [[INNER]] : $(Int64, Int64))
+// CHECK:   return [[RESULT]] : $((Int64, (Int64, Int64)), (Int64, Int64))
+// CHECK-LABEL: } // end sil function 'testSplitNonStandardProjection'
+sil hidden @testSplitNonStandardProjection  : $@convention(method) (Int64, Builtin.RawPointer) -> ((Int64, (Int64, Int64)), (Int64, Int64)) {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*(Int64, (Int64, Int64))
+  br bb1
+
+bb1:
+  %elt1 = tuple_element_addr %outerAddr1 : $*(Int64, (Int64, Int64)), 1
+  %ptr = address_to_pointer %elt1 : $*(Int64, Int64) to $Builtin.RawPointer
+  %ptrAdr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*(Int64, Int64)
+  %val2 = load %ptrAdr : $*(Int64, Int64)
+  %eltptr0 = tuple_element_addr %ptrAdr : $*(Int64, Int64), 0
+  store %0 to %eltptr0 : $*Int64
+  // Process the outermost load after splitting the inner load
+  %val1 = load %outerAddr1 : $*(Int64, (Int64, Int64))
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %result = tuple (%val1 : $(Int64, (Int64, Int64)), %val2 : $(Int64, Int64))
+  return %result : $((Int64, (Int64, Int64)), (Int64, Int64))
+}
+
+// CHECK-LABEL: sil shared @testSameTwoStores : $@convention(method) (Int64, Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
+// CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
+// CHECK: [[ELT_1:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 1
+// CHECK: [[V1:%.*]] = load %4 : $*(Int64, Int64)
+// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
+// CHECK: [[V0:%.*]] = load %6 : $*Int64
+// CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
+// CHECK: [[ARG0_0:%.*]] = tuple_extract %8 : $(Int64, Int64), 0
+// CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
+// CHECK:   br bb1([[V1]] : $(Int64, Int64))
+// CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):
+// CHECK:   [[LOOPVAL:%.*]] = tuple ([[V0]] : $Int64, [[PHI]] : $(Int64, Int64))
+// CHECK:   cond_br undef, bb2, bb3
+// CHECK: bb2:
+// CHECK:   br bb1([[ARG1]] : $(Int64, Int64))
+// CHECK: bb3:
+// CHECK:   store [[ARG1]] to [[ELT_1]] : $*(Int64, Int64)
+// CHECK:   [[EXTRACT0:%.*]] = tuple_extract [[LOOPVAL]] : $(Int64, (Int64, Int64)), 0
+// CHECK:   [[EXTRACT1:%.*]] = tuple_extract [[LOOPVAL]] : $(Int64, (Int64, Int64)), 1
+// CHECK:   [[EXTRACT1_1:%.*]] = tuple_extract [[EXTRACT1]] : $(Int64, Int64), 1
+// CHECK:   [[TUPLE1:%.*]] = tuple ([[ARG0_0]] : $Int64, [[EXTRACT1_1]] : $Int64)
+// CHECK:   [[RESULT:%.*]] = tuple ([[EXTRACT0]] : $Int64, [[TUPLE1]] : $(Int64, Int64))
+// CHECK:   return [[RESULT]] : $(Int64, (Int64, Int64))
+// CHECK-LABEL: } // end sil function 'testSameTwoStores'
+sil shared @testSameTwoStores : $@convention(method) (Int64, Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
+bb0(%0 : $Int64, %1: $Int64, %2 : $Builtin.RawPointer):
+  %outerAddr1 = pointer_to_address %2 : $Builtin.RawPointer to $*(Int64, (Int64, Int64))
+  br bb1
+
+bb1:
+  %val = load %outerAddr1 : $*(Int64, (Int64, Int64))
+  %elementAddr1 = tuple_element_addr %outerAddr1 : $*(Int64, (Int64, Int64)), 1
+  %tupleA = tuple (%0 : $Int64, %0: $Int64)
+  store %tupleA to %elementAddr1 : $*(Int64, Int64)
+  %elementAddr10 = tuple_element_addr %elementAddr1 : $*(Int64, Int64), 0
+  %val10 = load %elementAddr10 : $*Int64
+  %tupleB = tuple (%1 : $Int64, %1: $Int64)
+  store %tupleB to %elementAddr1 : $*(Int64, Int64)
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %extract0 = tuple_extract %val : $(Int64, (Int64, Int64)), 0
+  %extract1 = tuple_extract %val : $(Int64, (Int64, Int64)), 1
+  %extract11 = tuple_extract %extract1 : $(Int64, Int64), 1
+  %inner = tuple (%val10 : $Int64, %extract11: $Int64)
+  %outer = tuple (%extract0 : $Int64, %inner: $(Int64, Int64))
+  return %outer : $(Int64, (Int64, Int64))
 }

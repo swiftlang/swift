@@ -121,17 +121,17 @@ public:
   // FrontendInputsAndOutputs. They merely make the call sites
   // a bit shorter. Add more forwarding methods as needed.
 
-  std::string dependenciesFilePath() const {
+  StringRef getDependenciesFilePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.DependenciesFilePath;
   }
-  std::string loadedModuleTracePath() const {
+  StringRef getLoadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
   }
-  std::string serializedDiagnosticsPath() const {
+  StringRef getSerializedDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs
         .SerializedDiagnosticsPath;
   }
-  std::string fixItsOutputPath() const {
+  StringRef getFixItsOutputPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;
   }
 };

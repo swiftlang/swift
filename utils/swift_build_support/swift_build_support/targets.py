@@ -201,7 +201,7 @@ class StdlibDeploymentTarget(object):
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
-    Android = AndroidPlatform("android", archs=["armv7", "aarch64"])
+    Android = AndroidPlatform("android", archs=["armv7", "aarch64", "x86_64"])
 
     Windows = Platform("windows", archs=["x86_64"])
 
