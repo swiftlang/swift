@@ -1042,7 +1042,6 @@ class AsyncPartialApplicationForwarderEmission
   llvm::Value *contextBuffer;
   Size contextSize;
   Address context;
-  llvm::Value *heapContextBuffer;
   unsigned currentArgumentIndex;
   struct DynamicFunction {
     using Kind = DynamicFunctionKind;
@@ -1095,13 +1094,13 @@ public:
     task = origParams.claimNext();
     executor = origParams.claimNext();
     contextBuffer = origParams.claimNext();
-    heapContextBuffer = origParams.claimNext();
   }
 
   void begin() override {
     super::begin();
+    assert(task);
+    assert(executor);
     assert(contextBuffer);
-    assert(heapContextBuffer);
     context = layout.emitCastTo(subIGF, contextBuffer);
   }
   bool transformArgumentToNative(SILParameterInfo origParamInfo, Explosion &in,
@@ -1148,7 +1147,9 @@ public:
   SILParameterInfo getParameterInfo(unsigned index) override {
     return origType->getParameters()[index];
   }
-  llvm::Value *getContext() override { return heapContextBuffer; }
+  llvm::Value *getContext() override {
+    return loadValue(layout.getLocalContextLayout());
+  }
   llvm::Value *getDynamicFunctionPointer() override {
     assert(dynamicFunction && dynamicFunction->pointer);
     auto *context = dynamicFunction->context;
@@ -1271,8 +1272,15 @@ public:
     asyncExplosion.add(contextBuffer);
     if (dynamicFunction &&
         dynamicFunction->kind == DynamicFunction::Kind::PartialApply) {
+      // Just before making the call, replace the old thick context with the
+      // new thick context so that (1) the new thick context is never used by
+      // this partial apply forwarder and (2) the old thick context is never
+      // used by the callee partial apply forwarder.
       assert(dynamicFunction->context);
-      asyncExplosion.add(dynamicFunction->context);
+      auto fieldLayout = layout.getLocalContextLayout();
+      Explosion explosion;
+      explosion.add(dynamicFunction->context);
+      saveValue(fieldLayout, explosion);
     }
 
     return subIGF.Builder.CreateCall(fnPtr.getAsFunction(subIGF),
