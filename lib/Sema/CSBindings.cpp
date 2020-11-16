@@ -510,6 +510,39 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
+  // Since Double and CGFloat are effectively the same type due to an
+  // implicit conversion between them, always prefer Double over CGFloat
+  // when possible.
+  //
+  // Note: This optimization can't be performed for closure parameters
+  //       because their type could be converted only at the point of
+  //       use in the closure body.
+  if (!TypeVar->getImpl().isClosureParameterType()) {
+    auto type = binding.BindingType;
+
+    if (type->isCGFloatType() &&
+        llvm::any_of(Bindings, [](const PotentialBinding &binding) {
+          return binding.BindingType->isDoubleType();
+        }))
+      return;
+
+    if (type->isDoubleType()) {
+      auto inferredCGFloat =
+          llvm::find_if(Bindings, [](const PotentialBinding &binding) {
+            return binding.BindingType->isCGFloatType();
+          });
+
+      // TODO: If CGFloat has been already inferred, we can't simply remove it
+      // because that would break supertype join logic - index stored in
+      // `lastSupertypeIndex` would get invalidated. Instead let's replace type
+      // of an existing binding with Double.
+      if (inferredCGFloat != Bindings.end()) {
+        inferredCGFloat->BindingType = type;
+        return;
+      }
+    }
+  }
+
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
