@@ -354,7 +354,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       // BorrowScopeOperand and if so, add its end scope instructions as
       // implicit regular users of our value.
       if (auto scopedOperand = BorrowingOperand::get(op)) {
-        assert(!scopedOperand->consumesGuaranteedValues());
+        assert(!scopedOperand->isReborrow());
 
         std::function<void(Operand *)> onError = [&](Operand *op) {
           errorBuilder.handleMalformedSIL([&] {

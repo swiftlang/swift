@@ -1920,6 +1920,12 @@ func _setAtWritableKeyPath<Root, Value>(
   keyPath: WritableKeyPath<Root, Value>,
   value: __owned Value
 ) {
+  if type(of: keyPath).kind == .reference {
+    return _setAtReferenceWritableKeyPath(root: root,
+      keyPath: _unsafeUncheckedDowncast(keyPath,
+        to: ReferenceWritableKeyPath<Root, Value>.self),
+      value: value)
+  }
   // TODO: we should be able to do this more efficiently than projecting.
   let (addr, owner) = keyPath._projectMutableAddress(from: &root)
   addr.pointee = value

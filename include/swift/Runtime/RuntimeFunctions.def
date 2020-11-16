@@ -1497,14 +1497,13 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create_f(
-//     size_t flags, AsyncTask *task, AsyncFunctionType<void()> *function,
-//     size_t initialContextSize);
+// AsyncTaskAndContext swift_task_create(
+//     size_t flags, AsyncTask *task, AsyncFunctionPointer *function);
 FUNCTION(TaskCreateFunc,
-         swift_task_create_f, SwiftCC,
+         swift_task_create, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy, SwiftTaskPtrTy, TaskContinuationFunctionPtrTy, SizeTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, AsyncFunctionPointerPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS

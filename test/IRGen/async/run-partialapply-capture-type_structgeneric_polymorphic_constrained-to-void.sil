@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -32,6 +33,7 @@ sil_witness_table <T> BaseProducer<T> : Q module main {
 public class WeakBox<T> {}
 sil_vtable WeakBox {}
 
+// CHECK-LL: @takingQAD =
 // CHECK-LL: define hidden swiftcc void @takingQ(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @takingQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> () {
 entry(%box : $WeakBox<τ_0_0>):
@@ -53,8 +55,10 @@ bb0(%0 : $*τ_0_1):
   return %9 : $@callee_owned @async (@owned WeakBox<BaseProducer<τ_0_1>>) -> ()
 }
 
-sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// Defined in _Concurrency
+sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
   %bind_polymorphic_param_from_forwarder_parameter = function_ref @bind_polymorphic_param_from_forwarder_parameter : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @callee_owned @async (@owned WeakBox<BaseProducer<τ_0_1>>) -> ()
   %int_literal = integer_literal $Builtin.Int64, 9999
   %int = struct $Int64 (%int_literal : $Builtin.Int64)
@@ -66,7 +70,20 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   %box = alloc_ref $WeakBox<BaseProducer<Int64>>
   %result = apply %partiallyApplied(%box) : $@callee_owned @async (@owned WeakBox<BaseProducer<Int64>>) -> ()
 
-  %out_literal = integer_literal $Builtin.Int32, 0
-  %out = struct $Int32 (%out_literal : $Builtin.Int32)
-  return %out : $Int32
+
+  %void = tuple()
+  return %void : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
 }

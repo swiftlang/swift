@@ -32,6 +32,7 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;
+  struct SILDeclRef;
   class SILType;
   class VarDecl;
   enum class SpecialProtocol : uint8_t;
@@ -181,6 +182,8 @@ namespace irgen {
                                           GenericSignature sig,
                                           ArrayRef<Requirement> requirements);
 
+  llvm::GlobalValue *emitAsyncFunctionPointer(IRGenModule &IGM,
+                                              SILFunction *function, Size size);
 } // end namespace irgen
 } // end namespace swift
 

@@ -3134,9 +3134,15 @@ public:
         });
   }
 
-  /// Determine whether given declaration is unavailable in the current context.
+  /// Determine whether the given declaration is unavailable from the
+  /// current context.
   bool isDeclUnavailable(const Decl *D,
                          ConstraintLocator *locator = nullptr) const;
+
+  /// Determine whether the given conformance is unavailable from the
+  /// current context.
+  bool isConformanceUnavailable(ProtocolConformanceRef conformance,
+                                ConstraintLocator *locator = nullptr) const;
 
 public:
 

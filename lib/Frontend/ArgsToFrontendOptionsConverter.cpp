@@ -198,7 +198,9 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction) &&
       (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
-       Args.hasArg(OPT_experimental_skip_all_function_bodies))) {
+       Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
+       Args.hasArg(
+         OPT_experimental_skip_non_inlinable_function_bodies_without_types))) {
     Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
     return true;
   }

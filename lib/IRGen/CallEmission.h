@@ -30,6 +30,7 @@ namespace irgen {
 class Explosion;
 class LoadableTypeInfo;
 struct WitnessMetadata;
+class FunctionPointer;
 
 /// A plan for emitting a series of calls.
 class CallEmission {
@@ -67,7 +68,11 @@ protected:
   void emitToUnmappedExplosion(Explosion &out);
   virtual void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) = 0;
   void emitYieldsToExplosion(Explosion &out);
+  virtual FunctionPointer getCalleeFunctionPointer() = 0;
   llvm::CallInst *emitCallSite();
+
+  virtual llvm::CallInst *createCall(const FunctionPointer &fn,
+                                     ArrayRef<llvm::Value *> args) = 0;
 
   CallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
       : IGF(IGF), selfValue(selfValue), CurCallee(std::move(callee)) {}

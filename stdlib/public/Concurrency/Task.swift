@@ -306,3 +306,11 @@ extension Task {
     fatalError("\(#function) not implemented yet.")
   }
 }
+
+@_silgen_name("swift_task_run")
+public func runTask(_ task: __owned Builtin.NativeObject)
+
+public func runAsync(_ asyncFun: @escaping () async -> ()) {
+  let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
+  runTask(childTask.0)
+}
