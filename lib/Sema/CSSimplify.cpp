@@ -5083,14 +5083,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
-      auto isDoubleType = [&](NominalType *NTD) {
-        return NTD->getDecl() == getASTContext().getDoubleDecl();
-      };
-
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
-           (isDoubleType(nominal1) || isDoubleType(nominal2)))) {
+           (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
         SmallVector<LocatorPathElt, 4> path;
         auto anchor = locator.getLocatorParts(path);
 
@@ -10531,7 +10527,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto defaultImpact =
         restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 2;
 
-    auto numConversions = CurrentScore.Data[SK_ImplicitValueConversion];
+    auto numConversions = ImplicitValueConversions.size();
     increaseScore(SK_ImplicitValueConversion,
                   defaultImpact * (numConversions + 1));
 
@@ -10572,6 +10568,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addConstraint(ConstraintKind::ApplicableFunction,
                   FunctionType::get({FunctionType::Param(type1)}, type2),
                   memberTy, applicationLoc);
+
+    ImplicitValueConversions.push_back(
+        {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
   }

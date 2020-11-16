@@ -1177,6 +1177,10 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
+  /// Implicit value conversions applied for a given locator.
+  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+      ImplicitValueConversions;
+
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
@@ -2210,6 +2214,11 @@ private:
   std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
       trailingClosureMatchingChoices;
 
+  /// The set of implicit value conversions performed by the solver on
+  /// a current path to reach a solution.
+  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+      ImplicitValueConversions;
+
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
   ConstraintList ActiveConstraints;
@@ -2737,6 +2746,9 @@ public:
 
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
+
+    /// The length of \c ImplicitValueConversions.
+    unsigned numImplicitValueConversions;
 
     /// The previous score.
     Score PreviousScore;

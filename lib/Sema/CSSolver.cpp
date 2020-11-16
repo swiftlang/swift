@@ -193,6 +193,11 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
+  // Remember implicit value conversions.
+  for (const auto &valueConversion : ImplicitValueConversions) {
+    solution.ImplicitValueConversions.push_back(valueConversion);
+  }
+
   return solution;
 }
 
@@ -280,6 +285,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
     appliedPropertyWrappers.insert(appliedWrapper);
+  }
+
+  for (auto &valueConversion : solution.ImplicitValueConversions) {
+    ImplicitValueConversions.push_back(valueConversion);
   }
 
   // Register any fixes produced along this path.
@@ -488,6 +497,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numContextualTypes = cs.contextualTypes.size();
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
+  numImplicitValueConversions = cs.ImplicitValueConversions.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -577,6 +587,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
+
+  // Remove any implicit value conversions.
+  truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
