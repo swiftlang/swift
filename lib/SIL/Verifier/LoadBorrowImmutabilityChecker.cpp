@@ -245,7 +245,8 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
   if (auto *pa = dyn_cast<PartialApplyInst>(user)) {
     auto argConv = ApplySite(user).getArgumentConvention(*op);
-    if (argConv == SILArgumentConvention::Indirect_In_Guaranteed) {
+    if (pa->isOnStack() &&
+        argConv == SILArgumentConvention::Indirect_In_Guaranteed) {
       return true;
     }
 
