@@ -4627,6 +4627,17 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   setLoweredExplosion(i, out);
 }
 
+static bool isCallToSwiftTaskAlloc(llvm::Value *val) {
+  auto *call = dyn_cast<llvm::CallInst>(val);
+  if (!call)
+    return false;
+  auto *callee = call->getCalledFunction();
+  if (!callee)
+    return false;
+  auto isTaskAlloc = callee->getName().equals("swift_task_alloc");
+  return isTaskAlloc;
+}
+
 void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                                   const TypeInfo &type,
                                                   llvm::Value *addr) {
@@ -4644,6 +4655,11 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     else if (auto *CoroAllocaGet = dyn_cast<llvm::IntrinsicInst>(Op0)) {
       if (CoroAllocaGet->getIntrinsicID() == llvm::Intrinsic::coro_alloca_get)
         addr = CoroAllocaGet;
+    } else if (auto *call = dyn_cast<llvm::CallInst>(Op0)) {
+      addr = call;
+      bool isTaskAlloc = isCallToSwiftTaskAlloc(call);
+      assert(isTaskAlloc && "expecting call to swift_task_alloc");
+      (void)isTaskAlloc;
     }
   }
 
@@ -4659,7 +4675,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   // At this point addr must be an alloca or an undef.
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
-         isa<llvm::IntrinsicInst>(addr));
+         isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr));
 
   auto Indirection = DirectValue;
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
