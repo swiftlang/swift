@@ -1369,6 +1369,20 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
       getAsyncTaskAndContextType(ctx));
 }
 
+static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder);
+  builder.addParameter(
+      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheNativeObjectType)));
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+  return builder.build(id);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -2503,6 +2517,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncTaskFuture:
+    return getCreateAsyncTaskFuture(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

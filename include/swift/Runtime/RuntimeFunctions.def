@@ -1506,6 +1506,17 @@ FUNCTION(TaskCreateFunc,
          ARGS(SizeTy, SwiftTaskPtrTy, AsyncFunctionPointerPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// AsyncTaskAndContext swift_task_create_future(
+//     size_t flags, AsyncTask *task, const Metadata *futureResultType,
+//     AsyncFunctionPointer *function);
+FUNCTION(TaskCreateFutureFunc,
+         swift_task_create_future, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, TypeMetadataPtrTy,
+              AsyncFunctionPointerPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
