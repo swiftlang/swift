@@ -1799,7 +1799,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     }
 
   // Pass a placeholder for thin function calls.
-  } else if (origType->hasErrorResult()) {
+  } else if (origType->hasErrorResult() && !origType->isAsync()) {
     emission->addArgument(llvm::UndefValue::get(IGM.RefCountedPtrTy));
   }
 
