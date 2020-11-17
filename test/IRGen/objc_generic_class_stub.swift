@@ -5,6 +5,8 @@
 
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar71476765
+
 import Foundation
 
 public class GenericNSObjectSubclass<T> : NSObject {}
