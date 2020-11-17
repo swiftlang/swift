@@ -14,7 +14,7 @@
 //  performs IR generation for function bodies.
 //
 //===----------------------------------------------------------------------===//
-
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/IRGen/Linking.h"
@@ -506,4 +506,10 @@ void IRGenFunction::emitTaskDealloc(Address address) {
                                   {getAsyncTask(), address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
+}
+
+llvm::Value *IRGenFunction::alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val) {
+  auto *alignMask = llvm::ConstantInt::get(sizeTy, MaximumAlignment - 1);
+  auto *invertedMask = Builder.CreateNot(alignMask);
+  return Builder.CreateAnd(Builder.CreateAdd(val, alignMask), invertedMask);
 }

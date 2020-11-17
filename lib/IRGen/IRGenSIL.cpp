@@ -1754,9 +1754,12 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 
     // Even if we don't have a 'self', if we have an error result, we
     // should have a placeholder argument here.
-  } else if (funcTy->hasErrorResult() ||
-           funcTy->getRepresentation() == SILFunctionTypeRepresentation::Thick)
-  {
+    //
+    // For async functions, there will be a thick context within the async
+    // context whenever there is no self context.
+  } else if (funcTy->isAsync() || funcTy->hasErrorResult() ||
+             funcTy->getRepresentation() ==
+                 SILFunctionTypeRepresentation::Thick) {
     llvm::Value *contextPtr = emission->getContext();
     (void)contextPtr;
     assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
@@ -4627,6 +4630,17 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   setLoweredExplosion(i, out);
 }
 
+static bool isCallToSwiftTaskAlloc(llvm::Value *val) {
+  auto *call = dyn_cast<llvm::CallInst>(val);
+  if (!call)
+    return false;
+  auto *callee = call->getCalledFunction();
+  if (!callee)
+    return false;
+  auto isTaskAlloc = callee->getName().equals("swift_task_alloc");
+  return isTaskAlloc;
+}
+
 void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                                   const TypeInfo &type,
                                                   llvm::Value *addr) {
@@ -4644,6 +4658,11 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     else if (auto *CoroAllocaGet = dyn_cast<llvm::IntrinsicInst>(Op0)) {
       if (CoroAllocaGet->getIntrinsicID() == llvm::Intrinsic::coro_alloca_get)
         addr = CoroAllocaGet;
+    } else if (auto *call = dyn_cast<llvm::CallInst>(Op0)) {
+      addr = call;
+      bool isTaskAlloc = isCallToSwiftTaskAlloc(call);
+      assert(isTaskAlloc && "expecting call to swift_task_alloc");
+      (void)isTaskAlloc;
     }
   }
 
@@ -4659,7 +4678,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   // At this point addr must be an alloca or an undef.
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
-         isa<llvm::IntrinsicInst>(addr));
+         isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr));
 
   auto Indirection = DirectValue;
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&

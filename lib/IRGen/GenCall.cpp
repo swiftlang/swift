@@ -156,6 +156,8 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   typeInfos.push_back(&errorTypeInfo);
   valTypes.push_back(errorType);
 
+  bool canHaveValidError = substitutedType->hasErrorResult();
+
   //   IndirectResultTypes *indirectResults...;
   auto indirectResults = fnConv.getIndirectSILResults();
   for (auto indirectResult : indirectResults) {
@@ -196,13 +198,33 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   }
 
   //   SelfType self?;
-  bool hasLocalContextParameter = hasSelfContextParameter(substitutedType);
-  bool canHaveValidError = substitutedType->hasErrorResult();
-  bool hasLocalContext = (hasLocalContextParameter || canHaveValidError);
+  bool hasSelf = hasSelfContextParameter(substitutedType);
   SILParameterInfo localContextParameter =
-      hasLocalContextParameter ? parameters.back() : SILParameterInfo();
-  if (hasLocalContextParameter) {
+      hasSelf ? parameters.back() : SILParameterInfo();
+  if (hasSelf) {
     parameters = parameters.drop_back();
+  }
+
+  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
+  if (hasSelf) {
+    assert(originalType->getRepresentation() !=
+           SILFunctionTypeRepresentation::Thick);
+    SILType ty = IGM.silConv.getSILType(localContextParameter, substitutedType,
+                                        IGM.getMaximalTypeExpansionContext());
+    auto argumentLoweringType =
+        getArgumentLoweringType(ty.getASTType(), localContextParameter,
+                                /*isNoEscape*/ true);
+
+    auto &ti = IGM.getTypeInfoForLowered(argumentLoweringType);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    localContextInfo = {ty, localContextParameter.getConvention()};
+  } else {
+    auto &ti = IGM.getNativeObjectTypeInfo();
+    SILType ty = SILType::getNativeObjectType(IGM.Context);
+    valTypes.push_back(ty);
+    typeInfos.push_back(&ti);
+    localContextInfo = {ty, substitutedType->getCalleeConvention()};
   }
 
   //   ArgTypes formalArguments...;
@@ -229,31 +251,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     valTypes.push_back(SILType());
     typeInfos.push_back(&bindingsTI);
   }
-
-  Optional<AsyncContextLayout::ArgumentInfo> localContextInfo = llvm::None;
-  if (hasLocalContext) {
-    if (hasLocalContextParameter) {
-      SILType ty =
-          IGM.silConv.getSILType(localContextParameter, substitutedType,
-                                 IGM.getMaximalTypeExpansionContext());
-      auto argumentLoweringType =
-          getArgumentLoweringType(ty.getASTType(), localContextParameter,
-                                  /*isNoEscape*/ true);
-
-      auto &ti = IGM.getTypeInfoForLowered(argumentLoweringType);
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      localContextInfo = {ty, localContextParameter.getConvention()};
-    } else {
-      // TODO: DETERMINE: Is there a field in this case to match the sync ABI?
-      auto &ti = IGM.getNativeObjectTypeInfo();
-      SILType ty = SILType::getNativeObjectType(IGM.Context);
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      localContextInfo = {ty, substitutedType->getCalleeConvention()};
-    }
-  }
-
 
   Optional<AsyncContextLayout::TrailingWitnessInfo> trailingWitnessInfo;
   if (originalType->getRepresentation() ==
@@ -778,10 +775,6 @@ void SignatureExpansion::addAsyncParameters() {
   ParamIRTypes.push_back(IGM.SwiftTaskPtrTy);
   ParamIRTypes.push_back(IGM.SwiftExecutorPtrTy);
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
-  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Thick) {
-    IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
-    ParamIRTypes.push_back(IGM.RefCountedPtrTy);
-  }
 }
 
 void SignatureExpansion::addCoroutineContextParameter() {
@@ -2314,10 +2307,6 @@ public:
     asyncExplosion.add(IGF.getAsyncTask());
     asyncExplosion.add(IGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer.getAddress());
-    if (getCallee().getRepresentation() ==
-        SILFunctionTypeRepresentation::Thick) {
-      asyncExplosion.add(getCallee().getSwiftContext());
-    }
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                   IGF.getSILModule());
@@ -2380,11 +2369,18 @@ public:
       auto bindingsAddr = bindingLayout.project(IGF, context, /*offsets*/ None);
       layout.getBindings().save(IGF, bindingsAddr, llArgs);
     }
-    if (selfValue) {
-      Explosion selfExplosion;
-      selfExplosion.add(selfValue);
+    auto isThick =
+        getCallee().getRepresentation() == SILFunctionTypeRepresentation::Thick;
+    if (selfValue || isThick) {
+      Explosion localExplosion;
+      if (selfValue) {
+        assert(!isThick);
+        localExplosion.add(selfValue);
+      } else {
+        localExplosion.add(getCallee().getSwiftContext());
+      }
       auto fieldLayout = layout.getLocalContextLayout();
-      saveValue(fieldLayout, selfExplosion, isOutlined);
+      saveValue(fieldLayout, localExplosion, isOutlined);
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
@@ -3595,41 +3591,64 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 
 llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
-    llvm::Value *taskFunction, llvm::Value *localContextInfo) {
+    llvm::Value *futureResultType,
+    llvm::Value *taskFunction, llvm::Value *localContextInfo,
+    SubstitutionMap subs) {
   parentTask = IGF.Builder.CreateBitOrPointerCast(
       parentTask, IGF.IGM.SwiftTaskPtrTy);
-  taskFunction = IGF.Builder.CreateBitOrPointerCast(
-      taskFunction, IGF.IGM.AsyncFunctionPointerPtrTy);
 
   // Determine the size of the async context for the closure.
   ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  auto taskFunctionType = FunctionType::get(
-    { }, ctx.TheEmptyTupleType, extInfo);
+  AnyFunctionType *taskFunctionType;
+  if (futureResultType) {
+    auto genericParam = GenericTypeParamType::get(0, 0, ctx);
+    auto genericSig = GenericSignature::get({genericParam}, {});
+    taskFunctionType = GenericFunctionType::get(
+        genericSig, { }, genericParam, extInfo);
+
+    taskFunctionType = Type(taskFunctionType).subst(subs)->castTo<FunctionType>();
+  } else {
+    taskFunctionType = FunctionType::get(
+        { }, ctx.TheEmptyTupleType, extInfo);
+  }
   CanSILFunctionType taskFunctionCanSILType =
       IGF.IGM.getLoweredType(taskFunctionType).castTo<SILFunctionType>();
   auto layout = getAsyncContextLayout(
-      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType,
-      SubstitutionMap());
+      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType, subs);
 
   // Call the function.
-  auto *result = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCreateFuncFn(),
-      { flags, parentTask, taskFunction });
+  llvm::CallInst *result;
+  llvm::Value *theSize, *theFunction;
+  std::tie(theFunction, theSize) =
+      getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
+                              FunctionPointer::forExplosionValue(
+                                  IGF, taskFunction, taskFunctionCanSILType),
+                              localContextInfo);
+  theFunction = IGF.Builder.CreateBitOrPointerCast(
+      theFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
+  theSize = IGF.Builder.CreateZExtOrBitCast(theSize, IGF.IGM.SizeTy);
+  if (futureResultType) {
+    result = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskCreateFutureFuncFn(),
+      { flags, parentTask, futureResultType, theFunction, theSize });
+  } else {
+    result = IGF.Builder.CreateCall(IGF.IGM.getTaskCreateFuncFn(),
+                                    {flags, parentTask, theFunction, theSize});
+  }
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
 
   // Write the local context information into the initial context for the task.
-  if (layout.hasLocalContext()) {
-    // Dig out the initial context returned from task creation.
-    auto initialContext = IGF.Builder.CreateExtractValue(result, { 1 });
-    Address initialContextAddr = layout.emitCastTo(IGF, initialContext);
+  assert(layout.hasLocalContext());
+  // Dig out the initial context returned from task creation.
+  auto initialContext = IGF.Builder.CreateExtractValue(result, {1});
+  Address initialContextAddr = layout.emitCastTo(IGF, initialContext);
 
-    auto localContextLayout = layout.getLocalContextLayout();
-    auto localContextAddr = localContextLayout.project(
-        IGF, initialContextAddr, llvm::None);
-    IGF.Builder.CreateStore(localContextInfo, localContextAddr);
-  }
+  auto localContextLayout = layout.getLocalContextLayout();
+  auto localContextAddr =
+      localContextLayout.project(IGF, initialContextAddr, llvm::None);
+  IGF.Builder.CreateStore(localContextInfo, localContextAddr);
 
   return result;
 }

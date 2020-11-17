@@ -24,30 +24,39 @@ sil hidden @createAndInvokeClosure : $@async @convention(thin) () -> () {
 bb0:
   %captured_literal = integer_literal $Builtin.Int64, 783247897
   %captured = struct $Int64 (%captured_literal : $Builtin.Int64)
-  %createPartialApply = function_ref @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64
-  %partialApply = apply %createPartialApply(%captured) : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64
-  strong_retain %partialApply : $@async @callee_guaranteed (Int64) -> Int64
+  %createPartialApply = function_ref @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  %partialApply = apply %createPartialApply(%captured) : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  strong_retain %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
   %applied_literal = integer_literal $Builtin.Int64, 7823478
   %applied = struct $Int64 (%applied_literal : $Builtin.Int64)
-  %sum = apply %partialApply(%applied) : $@async @callee_guaranteed (Int64) -> Int64
-  strong_release %partialApply : $@async @callee_guaranteed (Int64) -> Int64
+  try_apply %partialApply(%applied) : $@async @callee_guaranteed (Int64) -> (Int64, @error Error), normal success, error failure
+
+success(%sum : $Int64):
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %result = apply %printInt64(%sum) : $@convention(thin) (Int64) -> () // CHECK: 791071375
-  strong_release %partialApply : $@async @callee_guaranteed (Int64) -> Int64
-  return %result : $()
+  br exit
+
+failure(%error : $Error):
+  br exit
+
+exit:
+  strong_release %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  strong_release %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  %out = tuple ()
+  return %out : $()
 }
 
 // CHECK-LL: @closureAD =
 // CHECK-LL: define internal swiftcc void @closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
 // CHECK-LL: define internal swiftcc void @"$s7closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
-sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
+sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error) {
 bb0(%captured : $Int64):
-  %closure = function_ref @closure : $@async @convention(thin) (Int64, Int64) -> Int64
-  %partialApply = partial_apply [callee_guaranteed] %closure(%captured) : $@async @convention(thin) (Int64, Int64) -> Int64
-  return %partialApply : $@async @callee_guaranteed (Int64) -> Int64
+  %closure = function_ref @closure : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error)
+  %partialApply = partial_apply [callee_guaranteed] %closure(%captured) : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error)
+  return %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
 }
 
-sil private @closure : $@async @convention(thin) (Int64, Int64) -> Int64 {
+sil private @closure : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error) {
 bb0(%one : $Int64, %two : $Int64):
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %printInt64_1 = apply %printInt64(%one) : $@convention(thin) (Int64) -> ()
@@ -85,3 +94,4 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %7 = struct $Int32 (%6 : $Builtin.Int32)
   return %7 : $Int32
 }
+

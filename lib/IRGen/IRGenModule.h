@@ -1638,7 +1638,7 @@ public:
   bool hasObjCResilientClassStub(ClassDecl *D);
 
   /// Emit a resilient class stub.
-  void emitObjCResilientClassStub(ClassDecl *D);
+  llvm::Constant *emitObjCResilientClassStub(ClassDecl *D, bool isPublic);
 
 private:
   llvm::Constant *

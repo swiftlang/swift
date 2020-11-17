@@ -128,7 +128,8 @@ ERROR(error_mode_cannot_emit_interface,none,
 ERROR(error_mode_cannot_emit_module_summary,none,
       "this mode does not support emitting module summary files", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
-      "-experimental-skip-*-function-bodies do not support emitting IR", ())
+      "the -experimental-skip-*-function-bodies* flags do not support "
+      "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -415,9 +416,9 @@ ERROR(expectation_missing_opening_braces,none,
 ERROR(expectation_missing_closing_braces,none,
       "didn't find '}}' to match '{{' in expectation", ())
 
-WARNING(module_incompatible_with_skip_non_inlinable_function_bodies,none,
-        "module '%0' cannot be built with "
-        "-experimental-skip-non-inlinable-function-bodies; this option has "
+WARNING(module_incompatible_with_skip_function_bodies,none,
+        "module '%0' cannot be built with any of the "
+        "-experimental-skip-*-function-bodies* flags; they have "
         "been automatically disabled", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

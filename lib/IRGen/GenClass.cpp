@@ -2144,13 +2144,17 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// ancestry. This lets us attach categories to the class even though it
 /// does not have statically-emitted metadata.
 bool IRGenModule::hasObjCResilientClassStub(ClassDecl *D) {
-  assert(getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
+#ifndef NDEBUG
+  auto strategy = getClassMetadataStrategy(D);
+  assert(strategy == ClassMetadataStrategy::Resilient ||
+         strategy == ClassMetadataStrategy::Singleton);
+#endif
+
   return ObjCInterop && !D->isGenericContext();
 }
 
-void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
-  assert(hasObjCResilientClassStub(D));
-
+llvm::Constant *IRGenModule::emitObjCResilientClassStub(
+    ClassDecl *D, bool isPublic) {
   ConstantInitBuilder builder(*this);
   auto fields = builder.beginStruct(ObjCFullResilientClassStubTy);
   fields.addInt(SizeTy, 0); // reserved
@@ -2178,9 +2182,13 @@ void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
   objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
       ObjCResilientClassStubTy->getPointerTo());
 
-  entity = LinkEntity::forObjCResilientClassStub(
-      D, TypeMetadataAddress::AddressPoint);
-  defineAlias(entity, objcStub);
+  if (isPublic) {
+    entity = LinkEntity::forObjCResilientClassStub(
+        D, TypeMetadataAddress::AddressPoint);
+    defineAlias(entity, objcStub);
+  }
+
+  return objcStub;
 }
 
 static llvm::Constant *doEmitClassPrivateData(

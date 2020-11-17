@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
 
 // Tests here are patterns we should not consider as broken
 
@@ -37,6 +38,7 @@ bb0(%0 :  $*WrapperStruct):
   return %res : $()
 }
 
+// CHECK-NOT: Function: 'caller1'
 sil [ossa] @caller1 : $@convention(thin) (@owned WrapperStruct) -> () {
 bb0(%0 :  @owned $WrapperStruct):
   %stk = alloc_stack $WrapperStruct
@@ -49,6 +51,9 @@ bb0(%0 :  @owned $WrapperStruct):
   return %res : $()
 }
 
+// CHECK-LABEL: Begin Error in function caller2
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK-LABEL: End Error in function caller2
 sil [ossa] @caller2 : $@convention(thin) (@owned WrapperStruct) -> () {
 bb0(%0 :  @owned $WrapperStruct):
   %stk = alloc_stack $WrapperStruct
