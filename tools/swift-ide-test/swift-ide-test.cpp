@@ -3820,6 +3820,7 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
+  InitInvok.getLangOptions().DisableParserLookup = true;
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
   InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
