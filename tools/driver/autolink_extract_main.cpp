@@ -33,7 +33,10 @@
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/Wasm.h"
+#include "llvm/Object/IRObjectFile.h"
 #include "llvm/BinaryFormat/Wasm.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Constants.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -172,6 +175,27 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
   return false;
 }
 
+static bool
+extractLinkerFlagsFromObjectFile(const llvm::object::IRObjectFile *ObjectFile,
+                                 std::vector<std::string> &LinkerFlags,
+                                 CompilerInstance &Instance) {
+  for (const auto &M : ObjectFile->modules()) {
+    llvm::GlobalVariable *var = M.getGlobalVariable("_swift1_autolink_entries", true);
+    if (!var) continue;
+    if (auto Entries = dyn_cast<llvm::ConstantDataArray>(var->getInitializer())) {
+      StringRef SegmentData = Entries->getAsString();
+      // entries are null-terminated, so extract them and push them into
+      // the set.
+      llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
+      SegmentData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
+                         /*KeepEmpty=*/false);
+      for (const auto &Flag : SplitFlags)
+        LinkerFlags.push_back(Flag.str());
+    }
+  }
+  return false;
+}
+
 /// Look inside the binary 'Bin' and append any linker flags found in its
 /// ".swift1_autolink_entries" section to 'LinkerFlags'. If 'Bin' is an archive,
 /// recursively look inside all children within the archive. Return 'true' if
@@ -184,6 +208,8 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
     return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
   } else if (auto *ObjectFile = llvm::dyn_cast<llvm::object::WasmObjectFile>(Bin)) {
     return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
+  } else if (auto *BitCodeFile = llvm::dyn_cast<llvm::object::IRObjectFile>(Bin)) {
+    return extractLinkerFlagsFromObjectFile(BitCodeFile, LinkerFlags, Instance);
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();
     for (const auto &Child : Archive->children(Error)) {
@@ -215,6 +241,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
+  llvm::LLVMContext Context;
   Instance.addDiagnosticConsumer(&PDC);
 
   AutolinkExtractInvocation Invocation;
@@ -231,12 +258,20 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 
   // Extract the linker flags from the objects.
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
-    auto BinaryOwner = llvm::object::createBinary(BinaryFileName);
-    if (!BinaryOwner) {
+    auto FileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(BinaryFileName, /*FileSize=*/-1,
+                                                        /*RequiresNullTerminator=*/false);
+    if (std::error_code EC = FileOrErr.getError()) {
+      Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                   BinaryFileName, EC.message());
+      return 1;
+    }
+    std::unique_ptr<llvm::MemoryBuffer> &Buffer = FileOrErr.get();
+    auto Binary = llvm::object::createBinary(Buffer->getMemBufferRef(), &Context);
+    if (!Binary) {
       std::string message;
       {
         llvm::raw_string_ostream os(message);
-        logAllUnhandledErrors(BinaryOwner.takeError(), os, "");
+        logAllUnhandledErrors(Binary.takeError(), os, "");
       }
 
       Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
@@ -244,7 +279,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       return 1;
     }
 
-    if (extractLinkerFlags(BinaryOwner->getBinary(), Instance, BinaryFileName,
+    if (extractLinkerFlags(Binary->get(), Instance, BinaryFileName,
                            LinkerFlags)) {
       return 1;
     }
