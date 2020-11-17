@@ -720,7 +720,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
         Builder.CreateBitOrPointerCast(getAsyncExecutor(), IGM.Int8PtrTy));
     arguments.push_back(Builder.CreateBitOrPointerCast(
         AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
-    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async, arguments);
+    emitSuspendAsyncCall(arguments);
 
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, null, one,
