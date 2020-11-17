@@ -1201,6 +1201,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       if (TypeChecker::typeCheckExpression(
               exprToCheck, ED,
               /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+        checkEnumElementActorIsolation(elt, exprToCheck);
         TypeChecker::checkEnumElementEffects(elt, exprToCheck);
       }
     }
