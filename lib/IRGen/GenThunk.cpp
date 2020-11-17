@@ -64,24 +64,10 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
 static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
   auto expansionContext = IGF.IGM.getMaximalTypeExpansionContext();
   auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
-
-  // Protocol case.
-  if (isa<ProtocolDecl>(decl->getDeclContext())) {
-    // Find the witness table.
-    llvm::Value *wtable = (IGF.CurFn->arg_end() - 1);
-
-    // Find the witness we're interested in.
-    return emitWitnessMethodValue(IGF, wtable, declRef);
-  }
-
-  // Class case.
   auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(
       expansionContext, declRef);
 
-  // Load the metadata, or use the 'self' value if we have a static method.
-  llvm::Value *self;
-
-  if (funcTy->isAsync()) {
+  auto getAsyncContextLayout = [&]() {
     auto originalType = funcTy;
     auto forwardingSubstitutionMap =
         decl->getGenericEnvironment()
@@ -90,8 +76,37 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
     auto substitutedType = originalType->substGenericArgs(
         IGF.IGM.getSILModule(), forwardingSubstitutionMap,
         IGF.IGM.getMaximalTypeExpansionContext());
-    auto layout = getAsyncContextLayout(IGF.IGM, originalType, substitutedType,
-                                        forwardingSubstitutionMap);
+    auto layout = irgen::getAsyncContextLayout(
+        IGF.IGM, originalType, substitutedType, forwardingSubstitutionMap);
+    return layout;
+  };
+
+  // Protocol case.
+  if (isa<ProtocolDecl>(decl->getDeclContext())) {
+    // Find the witness table.
+    llvm::Value *wtable;
+    if (funcTy->isAsync()) {
+      auto layout = getAsyncContextLayout();
+      assert(layout.hasTrailingWitnesses());
+      auto context = layout.emitCastTo(IGF, IGF.getAsyncContext());
+      auto wtableAddr =
+          layout.getSelfWitnessTableLayout().project(IGF, context, llvm::None);
+      wtable = IGF.Builder.CreateLoad(wtableAddr);
+    } else {
+      wtable = (IGF.CurFn->arg_end() - 1);
+    }
+
+    // Find the witness we're interested in.
+    return emitWitnessMethodValue(IGF, wtable, declRef);
+  }
+
+  // Class case.
+
+  // Load the metadata, or use the 'self' value if we have a static method.
+  llvm::Value *self;
+
+  if (funcTy->isAsync()) {
+    auto layout = getAsyncContextLayout();
     assert(layout.hasLocalContext());
     auto context = layout.emitCastTo(IGF, IGF.getAsyncContext());
     auto localContextAddr =
