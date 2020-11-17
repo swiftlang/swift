@@ -266,3 +266,23 @@ func testWritePrefixIterator() {
   var underflow = (1..<10).makeIterator()
   var (writtenCount, afterLastWritten) = a.writePrefix(from: underflow) // expected-error {{passing value of type 'IndexingIterator<(Range<Int>)>' to an inout parameter requires explicit '&'}} {{62-62=&}}
 }
+
+// rdar://problem/71356981 - wrong error message for state passed as inout with ampersand within parentheses
+func look_through_parens_when_checking_inout() {
+  struct Point {
+    var x: Int = 0
+    var y: Int = 0
+  }
+
+  func modifyPoint(_ point: inout Point, _: Int = 42) {}
+  func modifyPoint(_ point: inout Point, msg: String) {}
+  func modifyPoint(source: inout Point) {}
+
+  var point = Point(x: 0, y: 0)
+  modifyPoint((&point)) // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
+  modifyPoint(((&point))) // expected-error {{use of extraneous '&}} {{17-18=(}} {{15-16=&}}
+  modifyPoint(source: (&point)) // expected-error {{use of extraneous '&}} {{24-25=(}} {{23-24=&}}
+  modifyPoint(source: ((&point))) // expected-error {{use of extraneous '&}} {{25-26=(}} {{23-24=&}}
+  modifyPoint((&point), 0) // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
+  modifyPoint((&point), msg: "") // expected-error {{use of extraneous '&}} {{16-17=(}} {{15-16=&}}
+}
