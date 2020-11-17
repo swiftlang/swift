@@ -635,7 +635,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       // Don't evaluate if it's in '-parse' mode, etc.
       shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
-      !getScopeInfo().isInactiveConfigBlock() &&
+      !InInactiveClauseEnvironment &&
       // If this directive contains code completion location, 'isActive' is
       // determined solely by which block has the completion token.
       !codeCompletionClauseLoc.isValid();
