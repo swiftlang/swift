@@ -22,7 +22,7 @@
 
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/SwiftScan/ScanDependencies.h"
-#include "ImportedModules.h"
+#include "Dependencies.h"
 #include "TBD.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -1134,6 +1134,7 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 static bool performScanDependencies(CompilerInstance &Instance) {
   auto batchScanInput =
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+  ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
     return scanAndOutputDependencies(Instance);
   } else {

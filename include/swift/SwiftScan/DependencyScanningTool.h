@@ -35,7 +35,7 @@ public:
   ///
   /// \returns a \c StringError with the diagnostic output if clang errors
   /// occurred, \c FullDependencies otherwise.
-  std::string
+  llvm::ErrorOr<std::string>
   getFullDependencies(ArrayRef<const char *> Command,
                       const llvm::StringSet<> &InputFiles,
                       const llvm::StringSet<> &PlaceholderModules);
@@ -43,7 +43,7 @@ public:
 private:
   /// Shared cache of module dependencies, re-used by individual queries
   /// during the lifetime of this Tool
-  ModuleDependenciesCache GlobalCache;
+  std::unique_ptr<ModuleDependenciesCache> SharedCache;
   
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;

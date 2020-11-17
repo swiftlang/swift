@@ -160,7 +160,7 @@ export *\n\
                         " -I " + CHeadersDirPath +
                         " -I " + StdLibDir.str().str() +
                         " -I " + ShimsLibDir.str().str();
-  std::string deps = ScannerTool.getFullDependencies(Command.c_str(),
+  llvm::ErrorOr<std::string> deps = ScannerTool.getFullDependencies(Command.c_str(),
                                                      {TestPathStr.c_str()}, {});
 
   // TODO: Output/verify dependency graph correctness

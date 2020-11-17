@@ -19,22 +19,26 @@ namespace swift {
 
 class CompilerInvocation;
 class CompilerInstance;
+class ModuleDependenciesCache;
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
 bool batchScanModuleDependencies(CompilerInstance &instance,
                                  llvm::StringRef batchInputFile);
 
 /// Scans the dependencies of the main module of \c instance and writes out
-/// the result in JSON
+/// the resulting JSON according to the instance's output parameters.
+/// This method is used for swift-frontend invocations in dependency scanning mode
+/// (-scan-dependencies), where the module dependency cache is not shared.
 bool scanAndOutputDependencies(CompilerInstance &instance);
-
-/// Scans the dependencies of the main module of \c instance.
-bool scanDependencies(CompilerInstance &instance,
-                      llvm::raw_ostream &out);
 
 /// Scans the dependencies of the underlying clang module of the main module
 /// of \c instance.
 bool scanClangDependencies(CompilerInstance &instance);
+
+/// Scans the dependencies of the main module of \c instance.
+bool scanDependencies(CompilerInstance &instance,
+                      ModuleDependenciesCache &cache,
+                      llvm::raw_ostream &out);
 
 } // end namespace swift
 

@@ -670,6 +670,7 @@ static bool diagnoseCycle(CompilerInstance &instance,
 }
 
 static bool scanModuleDependencies(CompilerInstance &instance,
+                                   ModuleDependenciesCache &cache,
                                    StringRef moduleName,
                                    bool isClang,
                                    StringRef outputPath) {
@@ -681,10 +682,6 @@ static bool scanModuleDependencies(CompilerInstance &instance,
 
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
                   std::set<ModuleDependencyID>> allModules;
-  // Retrieve the instance's module dependency cache.
-  ModuleDependenciesCache *cache = instance.getModuleDependencyCache();
-  assert(cache &&
-         "Dependency Scanner expected a ModuleDependenciesCache on a compiler instance.");
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
                                               ctx.ClangImporterOpts,
@@ -700,11 +697,11 @@ static bool scanModuleDependencies(CompilerInstance &instance,
   if (isClang) {
     // Loading the clang module using Clang importer.
     // This action will populate the cache with the main module's dependencies.
-    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/true, *cache,
+    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/true, cache,
                                          ASTDelegate);
   } else {
     // Loading the swift module's dependencies.
-    rootDeps = ctx.getSwiftModuleDependencies(moduleName, *cache, ASTDelegate);
+    rootDeps = ctx.getSwiftModuleDependencies(moduleName, cache, ASTDelegate);
   }
   if (!rootDeps.hasValue()) {
     // We cannot find the clang module, abort.
@@ -726,16 +723,17 @@ static bool scanModuleDependencies(CompilerInstance &instance,
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(instance, module, *cache, ASTDelegate);
+        resolveDirectDependencies(instance, module, cache, ASTDelegate);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
   // Write out the JSON description.
-  writeJSON(out, instance, *cache, ASTDelegate, allModules.getArrayRef());
+  writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
   return false;
 }
 
 bool swift::scanClangDependencies(CompilerInstance &instance) {
-  return scanModuleDependencies(instance,
+  ModuleDependenciesCache cache;
+  return scanModuleDependencies(instance, cache,
                                 instance.getMainModule()->getNameStr(),
                                 /*isClang*/true,
                                 instance.getInvocation().getFrontendOptions()
@@ -745,6 +743,9 @@ bool swift::scanClangDependencies(CompilerInstance &instance) {
 bool swift::batchScanModuleDependencies(CompilerInstance &instance,
                                         llvm::StringRef batchInputFile) {
   const CompilerInvocation &invok = instance.getInvocation();
+  // The primary cache used for scans carried out with the compiler instance
+  // we have created
+  ModuleDependenciesCache cache;
 
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
@@ -755,20 +756,31 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
     return true;
   auto &diags = instance.getDiags();
   ForwardingDiagnosticConsumer FDC(diags);
-  // Keep track of all compiler instances we have created.
-  llvm::StringMap<std::unique_ptr<CompilerInstance>> subInstanceMap;
+
+  // Keep track of all compiler instances and dependency caches we have created.
+  // TODO: Re-use a single cache across all invocations, once `alreadySeen`
+  // state is no longer shared.
+  llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
+                            std::unique_ptr<ModuleDependenciesCache>>> subInstanceMap;
   for (auto &entry: *results) {
     CompilerInstance *pInstance = nullptr;
+    ModuleDependenciesCache *pCache = nullptr;
     if (entry.arguments.empty()) {
       // Use the compiler's instance if no arguments are specified.
       pInstance = &instance;
+      pCache = &cache;
     } else if (subInstanceMap.count(entry.arguments)) {
       // Use the previously created instance if we've seen the arguments before.
-      pInstance = subInstanceMap[entry.arguments].get();
+      pInstance = subInstanceMap[entry.arguments].first.get();
+      pCache = subInstanceMap[entry.arguments].second.get();
     } else {
       // Create a new instance by the arguments and save it in the map.
-      pInstance = subInstanceMap.insert({entry.arguments,
-        std::make_unique<CompilerInstance>()}).first->getValue().get();
+      subInstanceMap.insert({entry.arguments,
+                  std::make_pair(std::make_unique<CompilerInstance>(),
+                                 std::make_unique<ModuleDependenciesCache>())});
+
+      pInstance = subInstanceMap[entry.arguments].first.get();
+      pCache = subInstanceMap[entry.arguments].second.get();
       SmallVector<const char*, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvok = invok;
@@ -786,8 +798,8 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
     }
     assert(pInstance);
     // Scan using the chosen compiler instance.
-    if (scanModuleDependencies(*pInstance, entry.moduleName, !entry.isSwift,
-                               entry.outputPath)) {
+    if (scanModuleDependencies(*pInstance, *pCache, entry.moduleName,
+                               !entry.isSwift, entry.outputPath)) {
       return true;
     }
   }
@@ -801,6 +813,8 @@ bool swift::scanAndOutputDependencies(CompilerInstance &instance) {
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
 
+  ModuleDependenciesCache SingleUseCache;
+
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -809,10 +823,11 @@ bool swift::scanAndOutputDependencies(CompilerInstance &instance) {
   }
 
   // Execute scan, writing JSON output to the output stream
-  return scanDependencies(instance, out);
+  return scanDependencies(instance, SingleUseCache, out);
 }
 
 bool swift::scanDependencies(CompilerInstance &instance,
+                             ModuleDependenciesCache &cache,
                              llvm::raw_ostream &out) {
   ASTContext &Context = instance.getASTContext();
   ModuleDecl *mainModule = instance.getMainModule();
@@ -900,11 +915,7 @@ bool swift::scanDependencies(CompilerInstance &instance,
   
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
 
-  // Retrieve the instance's module dependency cache.
-  ModuleDependenciesCache *cache = instance.getModuleDependencyCache();
-  assert(cache &&
-         "Dependency Scanner expected a ModuleDependenciesCache on a compiler instance.");
-  cache->recordDependencies(mainModuleName, std::move(mainDependencies));
+  cache.recordDependencies(mainModuleName, std::move(mainDependencies));
 
   auto &ctx = instance.getASTContext();
   auto ModuleCachePath = getModuleCachePathFromClang(ctx
@@ -927,28 +938,28 @@ bool swift::scanDependencies(CompilerInstance &instance,
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(instance, module, *cache, ASTDelegate);
+        resolveDirectDependencies(instance, module, cache, ASTDelegate);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
 
   // We have all explicit imports now, resolve cross import overlays.
   discoverCrosssImportOverlayDependencies(instance, mainModuleName,
-      /*All transitive dependencies*/allModules.getArrayRef().slice(1), *cache,
+      /*All transitive dependencies*/allModules.getArrayRef().slice(1), cache,
       ASTDelegate, [&](ModuleDependencyID id) {
     allModules.insert(id);
   });
 
   // Dignose cycle in dependency graph.
-  if (diagnoseCycle(instance, *cache, /*MainModule*/allModules.front(), ASTDelegate))
+  if (diagnoseCycle(instance, cache, /*MainModule*/allModules.front(), ASTDelegate))
     return true;
 
   // Write out the JSON description.
-  writeJSON(out, instance, *cache, ASTDelegate, allModules.getArrayRef());
+  writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
 
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
-      auto deps = cache->findDependencies(module.first, module.second);
+      auto deps = cache.findDependencies(module.first, module.second);
       if (!deps)
         continue;
 

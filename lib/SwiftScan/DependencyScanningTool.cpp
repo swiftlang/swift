@@ -26,12 +26,10 @@ namespace swift {
 namespace dependencies {
 
 DependencyScanningTool::DependencyScanningTool()
-: GlobalCache(), Alloc(), Saver(Alloc) {
-  
+: SharedCache(std::make_unique<ModuleDependenciesCache>()),
+  Alloc(), Saver(Alloc) {}
 
-}
-
-std::string
+llvm::ErrorOr<std::string>
 DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
                                             const llvm::StringSet<> &InputFiles,
                                             const llvm::StringSet<> &PlaceholderModules) {
@@ -43,7 +41,7 @@ DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
   // Basic error checking on the arguments
   if (Command.empty()) {
     Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
-    return "Error";
+    return std::make_error_code(std::errc::not_supported);
   }
 
   CompilerInvocation Invocation;
@@ -59,7 +57,7 @@ DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
   SmallVector<const char*, 4> Args;
   llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
   if (Invocation.parseArgs(Args, Instance->getDiags())) {
-    return "Error";
+    return std::make_error_code(std::errc::not_supported);
   }
 
   // Setup the instance
@@ -67,7 +65,7 @@ DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
 
   std::string JSONOutput;
   llvm::raw_string_ostream Oss(JSONOutput);
-  scanDependencies(*Instance, Oss);
+  scanDependencies(*Instance, *SharedCache, Oss);
   Oss.flush();
   
   return JSONOutput;
