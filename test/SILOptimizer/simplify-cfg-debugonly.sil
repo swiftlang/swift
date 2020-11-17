@@ -1,0 +1,86 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -simplify-cfg -debug-only=sil-simplify-cfg %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+import Builtin
+import Swift
+
+import Builtin
+import Swift
+
+protocol OtherKlass : class {}
+
+class Klass {}
+
+sil @getKlass : $@convention(thin) () -> @owned Klass
+
+// Verify that checked-cast jump-threading kicks in and generates verifiable SIL.
+//
+// CHECK: Condition is the same if reached over {{.*}} parent @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned OtherKlass }
+// CHECK-NEXT: bb3(%{{.*}} : $OtherKlass):
+// CHECK-NEXT:   br bb5(%{{.*}} : $Klass)
+sil shared @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned OtherKlass {
+bb0(%0 : $Klass):
+  %1 = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = apply %1() : $@convention(thin) () -> @owned Klass
+  checked_cast_br %3 : $Klass to OtherKlass, bb1, bb2
+
+bb1(%5 : $OtherKlass):
+  %6 = integer_literal $Builtin.Int1, -1
+  br bb3(%6 : $Builtin.Int1)
+
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+
+bb3(%10 : $Builtin.Int1):
+  cond_br %10, bb5, bb6
+
+bb4:
+  unreachable
+
+bb5:
+  br bb7(%3 : $Klass)
+
+bb6:
+  strong_release %3 : $Klass
+  br bb10(%2 : $Builtin.Int64)
+
+bb7(%16 : $Klass):
+  checked_cast_br %16 : $Klass to OtherKlass, bb9, bb8
+
+bb8:
+  strong_release %16 : $Klass
+  br bb4
+
+bb9(%20 : $OtherKlass):
+  return %20 : $OtherKlass
+
+bb10(%22 : $Builtin.Int64):
+  %23 = apply %1() : $@convention(thin) () -> @owned Klass
+  checked_cast_br %23 : $Klass to OtherKlass, bb11, bb12
+
+bb11(%25 : $OtherKlass):
+  %26 = integer_literal $Builtin.Int1, -1
+  br bb13(%26 : $Builtin.Int1)
+
+bb12:
+  %28 = integer_literal $Builtin.Int1, 0
+  br bb13(%28 : $Builtin.Int1)
+
+bb13(%30 : $Builtin.Int1):
+  cond_br %30, bb14, bb15
+
+bb14:
+  br bb7(%23 : $Klass)
+
+bb15:
+  cond_br undef, bb16, bb17
+
+bb16:
+  br bb4
+
+bb17:
+  br bb10(undef : $Builtin.Int64)
+}
