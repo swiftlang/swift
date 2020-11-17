@@ -2067,9 +2067,9 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   if (!hadError)
     performAbstractFuncDeclDiagnostics(AFD);
 
+  TypeChecker::computeCaptures(AFD);
   checkFunctionActorIsolation(AFD);
   TypeChecker::checkFunctionEffects(AFD);
-  TypeChecker::computeCaptures(AFD);
 
   return hadError ? errorBody() : body;
 }
