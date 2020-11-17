@@ -608,6 +608,7 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
+        closure->setActorIsolation(determineClosureIsolation(closure));
         contextStack.push_back(closure);
         return { true, expr };
       }
@@ -715,11 +716,8 @@ namespace {
       while (useContext != defContext) {
         // If we find an escaping closure, it can be run concurrently.
         if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-          if (auto type = closure->getType()) {
-            if (auto fnType = type->getAs<AnyFunctionType>())
-              if (!fnType->isNoEscape())
-                return true;
-          }
+          if (isEscapingClosure(closure))
+            return true;
         }
 
         // If we find a local function, it can escape and be run concurrently.
@@ -1015,6 +1013,111 @@ namespace {
         return diagnoseReferenceToUnsafe(member, memberLoc);
       }
       llvm_unreachable("unhandled actor isolation kind!");
+    }
+
+    /// Determine whether this closure is escaping.
+    static bool isEscapingClosure(const AbstractClosureExpr *closure) {
+      if (auto type = closure->getType()) {
+        if (auto fnType = type->getAs<AnyFunctionType>())
+          return !fnType->isNoEscape();
+      }
+
+      return true;
+    }
+
+    /// Determine the isolation of a particular closure.
+    ///
+    /// This function assumes that enclosing closures have already had their
+    /// isolation checked.
+    ClosureActorIsolation determineClosureIsolation(
+        AbstractClosureExpr *closure) {
+      // An escaping closure is always actor-independent.
+      if (isEscapingClosure(closure))
+        return ClosureActorIsolation::forIndependent();
+
+      // A non-escaping closure gets its isolation from its context.
+      Optional<ActorIsolation> parentIsolation;
+      auto parentDC = closure->getParent();
+      switch (parentDC->getContextKind()) {
+      case DeclContextKind::AbstractClosureExpr: {
+        auto parentClosureIsolation = cast<AbstractClosureExpr>(parentDC)
+          ->getActorIsolation();
+        switch (parentClosureIsolation) {
+        case ClosureActorIsolation::Independent:
+          parentIsolation = ActorIsolation::forIndependent(
+              ActorIndependentKind::Safe);
+          break;
+
+        case ClosureActorIsolation::ActorInstance: {
+          auto selfDecl = parentClosureIsolation.getActorInstance();
+          auto actorClass = selfDecl->getType()->getRValueType()
+              ->getClassOrBoundGenericClass();
+          assert(actorClass && "Bad closure actor isolation?");
+          parentIsolation = ActorIsolation::forActorInstance(actorClass);
+          break;
+        }
+
+        case ClosureActorIsolation::GlobalActor:
+          parentIsolation = ActorIsolation::forGlobalActor(
+              parentClosureIsolation.getGlobalActor());
+          break;
+        }
+        break;
+      }
+
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::SubscriptDecl:
+        parentIsolation = getActorIsolation(
+            cast<ValueDecl>(parentDC->getAsDecl()));
+        break;
+
+      case DeclContextKind::EnumElementDecl:
+      case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::Initializer:
+      case DeclContextKind::Module:
+      case DeclContextKind::SerializedLocal:
+      case DeclContextKind::TopLevelCodeDecl:
+        return ClosureActorIsolation::forIndependent();
+      }
+
+      // We must have parent isolation determined to get here.
+      assert(parentIsolation && "Missing parent isolation?");
+      switch (*parentIsolation) {
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::Unspecified:
+        return ClosureActorIsolation::forIndependent();
+
+      case ActorIsolation::GlobalActor: {
+        Type globalActorType = closure->mapTypeIntoContext(
+            parentIsolation->getGlobalActor()->mapTypeOutOfContext());
+        return ClosureActorIsolation::forGlobalActor(globalActorType);
+      }
+
+      case ActorIsolation::ActorInstance: {
+        SmallVector<CapturedValue, 2> localCaptures;
+        closure->getCaptureInfo().getLocalCaptures(localCaptures);
+        for (const auto &localCapture : localCaptures) {
+          if (localCapture.isDynamicSelfMetadata())
+            continue;
+
+          auto var = dyn_cast_or_null<VarDecl>(localCapture.getDecl());
+          if (!var)
+            continue;
+
+          // If we have captured the 'self' parameter, the closure is isolated
+          // to that actor instance.
+          if (var->isSelfParameter()) {
+            return ClosureActorIsolation::forActorInstance(var);
+          }
+        }
+
+        // When 'self' is not captured, this closure is actor-independent.
+        return ClosureActorIsolation::forIndependent();
+      }
+    }
     }
   };
 }
