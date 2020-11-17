@@ -726,15 +726,6 @@ bool swift::dependencies::executeSingleModuleScan(CompilerInstance &instance,
   return false;
 }
 
-bool swift::dependencies::scanClangDependencies(CompilerInstance &instance) {
-  ModuleDependenciesCache cache;
-  return executeSingleModuleScan(instance, cache,
-                                 instance.getMainModule()->getNameStr(),
-                                 /*isClang*/true,
-                                 instance.getInvocation().getFrontendOptions()
-                                 .InputsAndOutputs.getSingleOutputFilename());
-}
-
 bool
 swift::dependencies::batchScanDependencies(CompilerInstance &instance,
                                            llvm::StringRef batchInputFile) {

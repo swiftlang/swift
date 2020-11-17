@@ -40,10 +40,6 @@ struct BatchScanInput {
 /// (-scan-dependencies), where the module dependency cache is not shared.
 bool scanAndOutputDependencies(CompilerInstance &instance);
 
-/// Scans the dependencies of the underlying clang module of the main module
-/// of \c instance.
-bool scanClangDependencies(CompilerInstance &instance);
-
 /// Scans the dependencies of the main module of \c instance.
 bool scanDependencies(CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
