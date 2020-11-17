@@ -1689,8 +1689,9 @@ public:
   parseFreestandingGenericWhereClause(GenericContext *genCtx);
 
   ParserStatus parseGenericWhereClause(
-      SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
-      bool &FirstTypeInComplete, bool AllowLayoutConstraints = false);
+      SourceLoc &WhereLoc, SourceLoc &EndLoc,
+      SmallVectorImpl<RequirementRepr> &Requirements,
+      bool AllowLayoutConstraints = false);
 
   ParserStatus
   parseProtocolOrAssociatedTypeWhereClause(TrailingWhereClause *&trailingWhere,

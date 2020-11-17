@@ -324,6 +324,9 @@ public:
     if (WhereLoc.isInvalid())
       return SourceRange();
 
+    if (Requirements.empty())
+      return WhereLoc;
+
     auto endLoc = Requirements.back().getSourceRange().End;
     return SourceRange(WhereLoc, endLoc);
   }
@@ -352,16 +355,18 @@ class alignas(RequirementRepr) TrailingWhereClause final :
   friend TrailingObjects;
 
   SourceLoc WhereLoc;
+  SourceLoc EndLoc;
 
   /// The number of requirements. The actual requirements are tail-allocated.
   unsigned NumRequirements;
 
-  TrailingWhereClause(SourceLoc whereLoc,
+  TrailingWhereClause(SourceLoc whereLoc, SourceLoc endLoc,
                       ArrayRef<RequirementRepr> requirements);
 
 public:
   /// Create a new trailing where clause with the given set of requirements.
-  static TrailingWhereClause *create(ASTContext &ctx, SourceLoc whereLoc,
+  static TrailingWhereClause *create(ASTContext &ctx,
+                                     SourceLoc whereLoc, SourceLoc endLoc,
                                      ArrayRef<RequirementRepr> requirements);
 
   /// Retrieve the location of the 'where' keyword.
@@ -379,8 +384,7 @@ public:
 
   /// Compute the source range containing this trailing where clause.
   SourceRange getSourceRange() const {
-    return SourceRange(WhereLoc,
-                       getRequirements().back().getSourceRange().End);
+    return SourceRange(WhereLoc, EndLoc);
   }
 
   void print(llvm::raw_ostream &OS, bool printWhereKeyword) const;
