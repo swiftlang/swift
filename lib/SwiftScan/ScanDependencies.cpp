@@ -40,15 +40,10 @@
 #include <set>
 
 using namespace swift;
+using namespace swift::dependencies;
 using namespace llvm::yaml;
 
 namespace {
-struct BatchScanInput {
-  StringRef moduleName;
-  StringRef arguments;
-  StringRef outputPath;
-  bool isSwift;
-};
 
 static std::string getScalaNodeText(Node *N) {
   SmallString<32> Buffer;
@@ -669,11 +664,11 @@ static bool diagnoseCycle(CompilerInstance &instance,
   return false;
 }
 
-static bool scanModuleDependencies(CompilerInstance &instance,
-                                   ModuleDependenciesCache &cache,
-                                   StringRef moduleName,
-                                   bool isClang,
-                                   StringRef outputPath) {
+bool swift::dependencies::executeSingleModuleScan(CompilerInstance &instance,
+                                                  ModuleDependenciesCache &cache,
+                                                  StringRef moduleName,
+                                                  bool isClang,
+                                                  StringRef outputPath) {
   ASTContext &ctx = instance.getASTContext();
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
@@ -731,18 +726,18 @@ static bool scanModuleDependencies(CompilerInstance &instance,
   return false;
 }
 
-bool swift::scanClangDependencies(CompilerInstance &instance) {
+bool swift::dependencies::scanClangDependencies(CompilerInstance &instance) {
   ModuleDependenciesCache cache;
-  return scanModuleDependencies(instance, cache,
-                                instance.getMainModule()->getNameStr(),
-                                /*isClang*/true,
-                                instance.getInvocation().getFrontendOptions()
-                                  .InputsAndOutputs.getSingleOutputFilename());
+  return executeSingleModuleScan(instance, cache,
+                                 instance.getMainModule()->getNameStr(),
+                                 /*isClang*/true,
+                                 instance.getInvocation().getFrontendOptions()
+                                 .InputsAndOutputs.getSingleOutputFilename());
 }
 
-bool swift::batchScanModuleDependencies(CompilerInstance &instance,
-                                        llvm::StringRef batchInputFile) {
-  const CompilerInvocation &invok = instance.getInvocation();
+bool
+swift::dependencies::batchScanDependencies(CompilerInstance &instance,
+                                           llvm::StringRef batchInputFile) {
   // The primary cache used for scans carried out with the compiler instance
   // we have created
   ModuleDependenciesCache cache;
@@ -754,6 +749,16 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
                                          batchInputFile, saver);
   if (!results.hasValue())
     return true;
+
+  return executeBatchModuleScan(instance, cache, saver, *results);
+}
+
+bool
+swift::dependencies::executeBatchModuleScan(CompilerInstance &instance,
+                                            ModuleDependenciesCache &cache,
+                                            llvm::StringSaver &saver,
+                                            const std::vector<BatchScanInput> &batchInput) {
+  const CompilerInvocation &invok = instance.getInvocation();
   auto &diags = instance.getDiags();
   ForwardingDiagnosticConsumer FDC(diags);
 
@@ -762,7 +767,7 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
   // state is no longer shared.
   llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
                             std::unique_ptr<ModuleDependenciesCache>>> subInstanceMap;
-  for (auto &entry: *results) {
+  for (auto &entry: batchInput) {
     CompilerInstance *pInstance = nullptr;
     ModuleDependenciesCache *pCache = nullptr;
     if (entry.arguments.empty()) {
@@ -797,16 +802,17 @@ bool swift::batchScanModuleDependencies(CompilerInstance &instance,
       }
     }
     assert(pInstance);
+    assert(pCache);
     // Scan using the chosen compiler instance.
-    if (scanModuleDependencies(*pInstance, *pCache, entry.moduleName,
-                               !entry.isSwift, entry.outputPath)) {
+    if (executeSingleModuleScan(*pInstance, *pCache, entry.moduleName,
+                                !entry.isSwift, entry.outputPath)) {
       return true;
     }
   }
   return false;
 }
 
-bool swift::scanAndOutputDependencies(CompilerInstance &instance) {
+bool swift::dependencies::scanAndOutputDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
@@ -826,9 +832,9 @@ bool swift::scanAndOutputDependencies(CompilerInstance &instance) {
   return scanDependencies(instance, SingleUseCache, out);
 }
 
-bool swift::scanDependencies(CompilerInstance &instance,
-                             ModuleDependenciesCache &cache,
-                             llvm::raw_ostream &out) {
+bool swift::dependencies::scanDependencies(CompilerInstance &instance,
+                                           ModuleDependenciesCache &cache,
+                                           llvm::raw_ostream &out) {
   ASTContext &Context = instance.getASTContext();
   ModuleDecl *mainModule = instance.getMainModule();
   const CompilerInvocation &invocation = instance.getInvocation();

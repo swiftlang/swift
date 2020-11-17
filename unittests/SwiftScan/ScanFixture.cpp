@@ -19,13 +19,11 @@ using namespace swift;
 using namespace swift::unittest;
 using namespace swift::dependencies;
 
-ScanTest::ScanTest()
-  : ScannerTool(),
-    StdLibDir(SWIFTLIB_DIR) {
-    INITIALIZE_LLVM();
-    // Create a temporary filesystem workspace for this test.
-    llvm::sys::fs::createUniqueDirectory(
-                 "ScanTest.Workspace", TemporaryTestWorkspace);
+ScanTest::ScanTest() : ScannerTool(), StdLibDir(SWIFTLIB_DIR) {
+  INITIALIZE_LLVM();
+  // Create a temporary filesystem workspace for this test.
+  llvm::sys::fs::createUniqueDirectory("ScanTest.Workspace",
+                                       TemporaryTestWorkspace);
 }
 
 ScanTest::~ScanTest() {

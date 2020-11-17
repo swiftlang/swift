@@ -13,9 +13,9 @@
 #include "ScanFixture.h"
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::unittest;
@@ -51,12 +51,12 @@ TEST_F(ScanTest, TestModuleDeps) {
   llvm::sys::path::append(TestFilePath, "foo.swift");
   std::string TestPathStr = llvm::Twine(TestFilePath).str();
 
-  ASSERT_FALSE(emitFileWithContents(TemporaryTestWorkspace, "foo.swift",
-                                    "import A\n"));
+  ASSERT_FALSE(
+      emitFileWithContents(TemporaryTestWorkspace, "foo.swift", "import A\n"));
 
   // Create includes
-  std::string IncludeDirPath = createFilename(TemporaryTestWorkspace,
-                                              "include");
+  std::string IncludeDirPath =
+      createFilename(TemporaryTestWorkspace, "include");
   ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
 
   std::string CHeadersDirPath = createFilename(IncludeDirPath, "CHeaders");
@@ -66,24 +66,24 @@ TEST_F(ScanTest, TestModuleDeps) {
 
   // Create imported module Swift interface files
   ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "A.swiftinterface",
-"// swift-interface-format-version: 1.0\n\
+                                    "// swift-interface-format-version: 1.0\n\
 // swift-module-flags: -module-name A\n\
 import Swift\n\
 @_exported import A\n\
 public func overlayFuncA() { }\n"));
   ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "E.swiftinterface",
-"// swift-interface-format-version: 1.0\n\
+                                    "// swift-interface-format-version: 1.0\n\
 // swift-module-flags: -module-name E\n\
 import Swift\n\
 public func funcE()\n"));
   ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "F.swiftinterface",
-"// swift-interface-format-version: 1.0\n\
+                                    "// swift-interface-format-version: 1.0\n\
 // swift-module-flags: -module-name\n\
 import Swift\n\
 @_exported import F\n\
 public func funcF() { }"));
   ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "G.swiftinterface",
-"// swift-interface-format-version: 1.0\n\
+                                    "// swift-interface-format-version: 1.0\n\
 // swift-module-flags: -module-name G -swift-version 5 -target x86_64-apple-macosx10.9\n\
 #if swift(>=5.0)\n\
 @_exported import G\n\
@@ -93,35 +93,34 @@ let stringG : String = \"Build\"\n\
 #endif"));
 
   // Create imported module C modulemap/headers
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "A.h",
-"void funcA(void);"));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "B.h",
-"#include \"A.h\"\
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "A.h", "void funcA(void);"));
+  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "B.h", "#include \"A.h\"\
 void funcB(void);"));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "C.h",
-"#include \"B.h\"\n\
+  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "C.h", "#include \"B.h\"\n\
 void funcC(void);\
 const char* stringC() { return \"Module\"; }"));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "D.h",
-"void funcD(void);"));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "F.h",
-"void funcF(void);"));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "G.h",
-"#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 110000\n\
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "D.h", "void funcD(void);"));
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "F.h", "void funcF(void);"));
+  ASSERT_FALSE(emitFileWithContents(
+      CHeadersDirPath, "G.h",
+      "#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 110000\n\
 #include \"X.h\"\n\
 #endif\n\
 void funcG(void);"));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "X.h",
-"void funcX(void);"));
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "X.h", "void funcX(void);"));
   ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "Bridging.h",
-"#include \"BridgingOther.h\"\n\
+                                    "#include \"BridgingOther.h\"\n\
 int bridging_other(void);"));
   ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "BridgingOther.h",
-"#include \"F.h\"\n\
+                                    "#include \"F.h\"\n\
 int bridging_other(void);"));
 
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "module.modulemap",
-"module A {\n\
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "module.modulemap", "module A {\n\
 header \"A.h\"\n\
 export *\n\
 }\n\
@@ -156,13 +155,12 @@ export *\n\
   auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
   llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
 
-  std::string Command = TestPathStr + " -I " + SwiftDirPath +
-                        " -I " + CHeadersDirPath +
-                        " -I " + StdLibDir.str().str() +
+  std::string Command = TestPathStr + " -I " + SwiftDirPath + " -I " +
+                        CHeadersDirPath + " -I " + StdLibDir.str().str() +
                         " -I " + ShimsLibDir.str().str();
-  llvm::ErrorOr<std::string> deps = ScannerTool.getFullDependencies(Command.c_str(),
-                                                     {TestPathStr.c_str()}, {});
+  llvm::ErrorOr<std::string> deps = ScannerTool.getDependencies(
+      Command.c_str(), {});
 
   // TODO: Output/verify dependency graph correctness
-  //llvm::dbgs() << "Deps: " << deps << "\n";
+  // llvm::dbgs() << "Deps: " << deps << "\n";
 }

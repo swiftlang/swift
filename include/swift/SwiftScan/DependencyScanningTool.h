@@ -14,11 +14,13 @@
 #define SWIFT_DEPENDENCY_SCANNING_TOOL_H
 
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/SwiftScan/ScanDependencies.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 namespace dependencies {
@@ -30,21 +32,37 @@ public:
   /// Construct a dependency scanning tool.
   DependencyScanningTool();
 
-  /// Collect the full module depenedency graph for the input, ignoring any placeholder
-  /// modules.
+  /// Collect the full module depenedency graph for the input, ignoring any
+  /// placeholder modules.
   ///
-  /// \returns a \c StringError with the diagnostic output if clang errors
+  /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c FullDependencies otherwise.
   llvm::ErrorOr<std::string>
-  getFullDependencies(ArrayRef<const char *> Command,
-                      const llvm::StringSet<> &InputFiles,
-                      const llvm::StringSet<> &PlaceholderModules);
+  getDependencies(ArrayRef<const char *> Command,
+                  const llvm::StringSet<> &PlaceholderModules);
+
+  /// Collect the full module depenedency graph for the input collection of
+  /// module names (batch inputs) and output them to the
+  /// BatchScanInput-specified output locations.
+  ///
+  /// \returns a \c StringError with the diagnostic output if errors
+  /// occurred.
+  std::error_code getDependencies(ArrayRef<const char *> Command,
+                                  const std::vector<BatchScanInput> &BatchInput,
+                                  const llvm::StringSet<> &PlaceholderModules);
 
 private:
+  /// Using the specified invocation command, instantiate a CompilerInstance
+  /// that will be used for this scan.
+  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
+  initCompilerInstanceForScan(ArrayRef<const char *> Command);
+
   /// Shared cache of module dependencies, re-used by individual queries
   /// during the lifetime of this Tool
   std::unique_ptr<ModuleDependenciesCache> SharedCache;
-  
+
+  /// A shared consumer that, for now, just prints the encountered diagnostics
+  PrintingDiagnosticConsumer PDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };

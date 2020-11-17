@@ -1136,9 +1136,9 @@ static bool performScanDependencies(CompilerInstance &Instance) {
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
   ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
-    return scanAndOutputDependencies(Instance);
+    return dependencies::scanAndOutputDependencies(Instance);
   } else {
-    return batchScanModuleDependencies(Instance, batchScanInput);
+    return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 
@@ -1226,7 +1226,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::ScanDependencies:
     return performScanDependencies(Instance);
   case FrontendOptions::ActionType::ScanClangDependencies:
-    return scanClangDependencies(Instance);
+    return dependencies::scanClangDependencies(Instance);
 
   // MARK: General Compilation Actions
   case FrontendOptions::ActionType::Parse:

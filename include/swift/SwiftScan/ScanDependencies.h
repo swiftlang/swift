@@ -15,15 +15,24 @@
 
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+class StringSaver;
+}
+
 namespace swift {
 
 class CompilerInvocation;
 class CompilerInstance;
 class ModuleDependenciesCache;
 
-/// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool batchScanModuleDependencies(CompilerInstance &instance,
-                                 llvm::StringRef batchInputFile);
+namespace dependencies {
+
+struct BatchScanInput {
+  StringRef moduleName;
+  StringRef arguments;
+  StringRef outputPath;
+  bool isSwift;
+};
 
 /// Scans the dependencies of the main module of \c instance and writes out
 /// the resulting JSON according to the instance's output parameters.
@@ -40,6 +49,26 @@ bool scanDependencies(CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
                       llvm::raw_ostream &out);
 
+/// Batch scan the dependencies for modules specified in \c batchInputFile.
+bool batchScanDependencies(CompilerInstance &instance,
+                                 llvm::StringRef batchInputFile);
+
+
+/// Batch scan the dependencies for modules specified in \c batchInputFile.
+bool executeBatchModuleScan(CompilerInstance &instance,
+                            ModuleDependenciesCache &cache,
+                            llvm::StringSaver &saver,
+                            const std::vector<BatchScanInput> &BatchInput);
+
+/// Scan for dependencies of a module with a specified name, producing the resulting output
+/// at the specified output path.
+bool executeSingleModuleScan(CompilerInstance &instance,
+                             ModuleDependenciesCache &cache,
+                             StringRef moduleName,
+                             bool isClang,
+                             StringRef outputPath);
+
+} // end namespace dependencies
 } // end namespace swift
 
 #endif

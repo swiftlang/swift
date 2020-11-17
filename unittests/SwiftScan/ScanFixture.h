@@ -35,6 +35,5 @@ protected:
   llvm::SmallString<128> StdLibDir;
 };
 
-
 } // end namespace unittest
 } // end namespace swift

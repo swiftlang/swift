@@ -11,11 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SwiftScan/DependencyScanningTool.h"
-#include "swift/SwiftScan/ScanDependencies.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -26,14 +24,44 @@ namespace swift {
 namespace dependencies {
 
 DependencyScanningTool::DependencyScanningTool()
-: SharedCache(std::make_unique<ModuleDependenciesCache>()),
-  Alloc(), Saver(Alloc) {}
+    : SharedCache(std::make_unique<ModuleDependenciesCache>()), PDC(), Alloc(),
+      Saver(Alloc) {}
 
-llvm::ErrorOr<std::string>
-DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
-                                            const llvm::StringSet<> &InputFiles,
-                                            const llvm::StringSet<> &PlaceholderModules) {
-  PrintingDiagnosticConsumer PDC;
+llvm::ErrorOr<std::string> DependencyScanningTool::getDependencies(
+    ArrayRef<const char *> Command,
+    const llvm::StringSet<> &PlaceholderModules) {
+  // The primary instance used to scan the query Swift source-code
+  auto InstanceOrErr = initCompilerInstanceForScan(Command);
+  if (std::error_code EC = InstanceOrErr.getError())
+    return EC;
+  auto Instance = std::move(*InstanceOrErr);
+
+  std::string JSONOutput;
+  llvm::raw_string_ostream OSS(JSONOutput);
+  scanDependencies(*Instance.get(), *SharedCache, OSS);
+  OSS.flush();
+
+  // TODO: swiftch to an in-memory representation
+  return JSONOutput;
+}
+
+std::error_code DependencyScanningTool::getDependencies(
+    ArrayRef<const char *> Command,
+    const std::vector<BatchScanInput> &BatchInput,
+    const llvm::StringSet<> &PlaceholderModules) {
+  // The primary instance used to scan Swift modules
+  auto InstanceOrErr = initCompilerInstanceForScan(Command);
+  if (std::error_code EC = InstanceOrErr.getError())
+    return EC;
+  auto Instance = std::move(*InstanceOrErr);
+
+  executeBatchModuleScan(*Instance.get(), *SharedCache, Saver, BatchInput);
+  return std::error_code();
+}
+
+llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
+DependencyScanningTool::initCompilerInstanceForScan(
+    ArrayRef<const char *> Command) {
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&PDC);
@@ -41,7 +69,7 @@ DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
   // Basic error checking on the arguments
   if (Command.empty()) {
     Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
-    return std::make_error_code(std::errc::not_supported);
+    return std::make_error_code(std::errc::invalid_argument);
   }
 
   CompilerInvocation Invocation;
@@ -54,21 +82,18 @@ DependencyScanningTool::getFullDependencies(ArrayRef<const char *> Command,
     CommandString.append(c);
     CommandString.append(" ");
   }
-  SmallVector<const char*, 4> Args;
+  SmallVector<const char *, 4> Args;
   llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
   if (Invocation.parseArgs(Args, Instance->getDiags())) {
-    return std::make_error_code(std::errc::not_supported);
+    return std::make_error_code(std::errc::invalid_argument);
   }
 
   // Setup the instance
   Instance->setup(Invocation);
+  (void)Instance->getMainModule();
 
-  std::string JSONOutput;
-  llvm::raw_string_ostream Oss(JSONOutput);
-  scanDependencies(*Instance, *SharedCache, Oss);
-  Oss.flush();
-  
-  return JSONOutput;
+  return Instance;
 }
-}
-}
+
+} // namespace dependencies
+} // namespace swift
