@@ -843,6 +843,10 @@ public:
                       Type resultType, DeclContext *DC,
                       bool throws, SourceLoc throwsLoc);
 
+  /// Initializes 'actor' with the loaded shared instance of the \p globalActor
+  /// type.
+  void loadGlobalActor(Type globalActor);
+
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
   void bindParameterForForwarding(ParamDecl *param,
