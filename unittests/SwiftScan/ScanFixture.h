@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SwiftScan/DependencyScanningTool.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "gtest/gtest.h"
 #include <string>
 

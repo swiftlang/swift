@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "swift/SwiftScan/ScanDependencies.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "Dependencies.h"
 #include "TBD.h"
 #include "swift/Subsystems.h"

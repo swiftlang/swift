@@ -4,7 +4,7 @@ add_swift_unittest(swiftScanTests
 
 target_link_libraries(swiftScanTests
   PRIVATE
-    SwiftScanTool)
+    SwiftScan)
 
 target_compile_definitions(swiftScanTests PRIVATE
   SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")

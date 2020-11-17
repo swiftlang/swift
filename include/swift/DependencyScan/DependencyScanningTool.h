@@ -15,7 +15,7 @@
 
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SwiftScan/ScanDependencies.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -45,8 +45,7 @@ public:
   /// module names (batch inputs) and output them to the
   /// BatchScanInput-specified output locations.
   ///
-  /// \returns a \c StringError with the diagnostic output if errors
-  /// occurred.
+  /// \returns a \c std::error_code if errors occured during scan.
   std::error_code getDependencies(ArrayRef<const char *> Command,
                                   const std::vector<BatchScanInput> &BatchInput,
                                   const llvm::StringSet<> &PlaceholderModules);
@@ -58,10 +57,10 @@ private:
   initCompilerInstanceForScan(ArrayRef<const char *> Command);
 
   /// Shared cache of module dependencies, re-used by individual queries
-  /// during the lifetime of this Tool
+  /// during the lifetime of this Tool.
   std::unique_ptr<ModuleDependenciesCache> SharedCache;
 
-  /// A shared consumer that, for now, just prints the encountered diagnostics
+  /// A shared consumer that, for now, just prints the encountered diagnostics.
   PrintingDiagnosticConsumer PDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;

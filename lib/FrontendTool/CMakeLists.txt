@@ -7,16 +7,16 @@ add_swift_host_library(swiftFrontendTool STATIC
   TBD.cpp)
 add_dependencies(swiftFrontendTool
   swift-syntax-generated-headers
-  SwiftScanTool
+  SwiftScan
   SwiftOptions)
 target_link_libraries(swiftFrontendTool INTERFACE
   clangAPINotes
-  SwiftScanTool
+  SwiftScan
   clangBasic)
 target_link_libraries(swiftFrontendTool PRIVATE
     swiftClangImporter
     swiftDemangling
-    SwiftScanTool
+    SwiftScan
     swiftFrontend
     swiftIDE
     swiftImmediate
