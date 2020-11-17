@@ -252,8 +252,7 @@ ParserResult<TypeRepr> Parser::parseType() {
 }
 
 ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
-                                               const TypeAttributes &attrs,
-                                               Optional<Scope> &GenericsScope) {
+                                               const TypeAttributes &attrs) {
   auto LBraceLoc = consumeToken(tok::l_brace);
   
   SmallVector<SILBoxTypeRepr::Field, 4> Fields;
@@ -286,11 +285,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   }
   
   auto RBraceLoc = consumeToken(tok::r_brace);
-  
-  // The generic arguments are taken from the enclosing scope. Pop the
-  // box layout's scope now.
-  GenericsScope.reset();
-  
+
   SourceLoc LAngleLoc, RAngleLoc;
   SmallVector<TypeRepr*, 4> Args;
   if (startsWithLess(Tok)) {
@@ -339,28 +334,19 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   TypeAttributes attrs;
   parseTypeAttributeList(specifier, specifierLoc, attrs);
 
-  Optional<Scope> GenericsScope;
-  Optional<Scope> patternGenericsScope;
-
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
   SourceLoc substitutedLoc;
   GenericParamList *patternGenerics = nullptr;
   if (isInSILMode()) {
-    // If this is part of a sil function decl, generic parameters are visible in
-    // the function body; otherwise, they are visible when parsing the type.
-    if (!IsSILFuncDecl)
-      GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
     
     if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
       consumeToken(tok::at_sign);
       substitutedLoc = consumeToken(tok::identifier);
-      patternGenericsScope.emplace(this, ScopeKind::Generics);
       patternGenerics = maybeParseGenericParams().getPtrOrNull();
       if (!patternGenerics) {
         diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
-        patternGenericsScope.reset();
       }
     }
   }
@@ -369,9 +355,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   if (isInSILMode() && Tok.is(tok::l_brace)) {
     if (patternGenerics) {
       diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
-      patternGenericsScope.reset();
     }
-    return parseSILBoxType(generics, attrs, GenericsScope);
+    return parseSILBoxType(generics, attrs);
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
@@ -519,10 +504,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       // Parse pattern substitutions.  These must exist if we had pattern
       // generics above.
       if (patternGenerics) {
-        // These substitutions are outside of the scope of the
-        // pattern generics.
-        patternGenericsScope.reset();
-
         auto result = parseSubstitutions(patternSubsTypes);
         if (!result || patternSubsTypes.empty()) {
           diagnose(Tok, diag::sil_function_subst_expected_subs);
@@ -533,10 +514,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
 
       if (generics) {
-        // These substitutions are outside of the scope of the
-        // invocation generics.
-        GenericsScope.reset();
-
         if (auto result = parseSubstitutions(invocationSubsTypes))
           if (!*result) return makeParserError();
       }
@@ -555,8 +532,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
-    GenericsScope.reset();
-    patternGenericsScope.reset();
 
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {
@@ -772,12 +747,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 
   IdentTypeRepr *ITR = nullptr;
   if (!ComponentsR.empty()) {
-    // Lookup element #0 through our current scope chains in case it is some
-    // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
-      if (auto *TD = dyn_cast<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(TD, nullptr);
-
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
 

@@ -1506,7 +1506,6 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         if (P.Tok.is(tok::oper_binary_unspaced) && P.Tok.getText() == ".<") {
           P.consumeStartingCharacterOfCurrentToken(tok::period);
           // Create a new scope to avoid type redefinition errors.
-          Scope genericsScope(&P, ScopeKind::Generics);
           auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
           assert(genericParams);
           auto *derivativeGenEnv = handleSILGenericParams(genericParams, &P.SF);
@@ -2025,8 +2024,6 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
   GenericSignature witnessGenSig = GenericSignature();
   SourceLoc witnessGenSigStartLoc = P.getEndOfPreviousLoc();
   {
-    // Create a new scope to avoid type redefinition errors.
-    Scope genericsScope(&P, ScopeKind::Generics);
     auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
     if (genericParams) {
       auto *witnessGenEnv = handleSILGenericParams(genericParams, &P.SF);
@@ -2097,10 +2094,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   // Type of the SILDeclRef is optional to be compatible with the old format.
   if (!P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")) {
     // Parse the type for SILDeclRef.
-    Optional<Scope> GenericsScope;
-    GenericsScope.emplace(&P, ScopeKind::Generics);
     ParserResult<TypeRepr> TyR = P.parseType();
-    GenericsScope.reset();
     if (TyR.isNull())
       return true;
 
@@ -3134,7 +3128,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     StringRef objcString;
     SmallVector<SILType, 4> operandTypes;
     {
-      Scope genericsScope(&P, ScopeKind::Generics);
       patternParams = P.maybeParseGenericParams().getPtrOrNull();
       patternEnv = handleSILGenericParams(patternParams, &P.SF);
 
@@ -5763,7 +5756,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SILType FnType;
   SourceLoc FnNameLoc;
 
-  Scope S(&P, ScopeKind::TopLevel);
   bool isTransparent = false;
   IsSerialized_t isSerialized = IsNotSerialized;
   bool isCanonical = false;
@@ -5798,7 +5790,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   {
     // Construct a Scope for the function body so TypeAliasDecl can be added to
     // the scope.
-    Scope Body(&P, ScopeKind::FunctionBody);
     GenericEnvironment *GenericEnv = nullptr;
     GenericParamList *GenericParams = nullptr;
     if (FunctionState.parseSILType(FnType, GenericEnv, GenericParams,
@@ -6011,7 +6002,6 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   bool isLet = false;
 
-  Scope S(&P, ScopeKind::TopLevel);
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
@@ -6077,8 +6067,6 @@ bool SILParserState::parseSILProperty(Parser &P) {
   
   GenericParamList *patternParams;
   GenericEnvironment *patternEnv;
-  Scope toplevelScope(&P, ScopeKind::TopLevel);
-  Scope genericsScope(&P, ScopeKind::Generics);
   patternParams = P.maybeParseGenericParams().getPtrOrNull();
   patternEnv = handleSILGenericParams(patternParams, &P.SF);
 
@@ -6169,7 +6157,6 @@ bool SILParserState::parseSILVTable(Parser &P) {
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*P.L);
-  Scope S(&P, ScopeKind::TopLevel);
   // Parse the entry list.
   std::vector<SILVTable::Entry> vtableEntries;
   if (P.Tok.isNot(tok::r_brace)) {
@@ -6374,10 +6361,6 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
     ProtocolDecl *&proto,
     GenericEnvironment *&genericEnv,
     GenericParamList *&genericParams) {
-  // Parse generic params for the protocol conformance. We need to make sure
-  // they have the right scope.
-  Scope GenericsScope(&P, ScopeKind::Generics);
-
   // Make sure we don't leave it uninitialized in the caller
   genericEnv = nullptr;
 
@@ -6658,12 +6641,6 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            WitnessState, M))
     return true;
 
-  Scope S(&P, ScopeKind::TopLevel);
-  // We should use WitnessTableBody. This ensures that the generic params
-  // are visible.
-  Optional<Scope> BodyScope;
-  BodyScope.emplace(&P, ScopeKind::FunctionBody);
-
   // Parse the protocol conformance.
   ProtocolDecl *proto;
   GenericEnvironment *witnessEnv = nullptr;
@@ -6694,7 +6671,6 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
     // We ignore empty witness table without normal protocol conformance.
     if (!wt && theConformance)
       wt = SILWitnessTable::create(M, *Linkage, theConformance);
-    BodyScope.reset();
     return false;
   }
 
@@ -6735,7 +6711,6 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
     wt->setLinkage(*Linkage);
   wt->convertToDefinition(witnessEntries, conditionalConformances,
                           isSerialized);
-  BodyScope.reset();
   return false;
 }
 
@@ -6755,12 +6730,6 @@ bool SILParserState::parseSILDefaultWitnessTable(Parser &P) {
   Optional<SILLinkage> Linkage;
   parseSILLinkage(Linkage, P);
   
-  Scope S(&P, ScopeKind::TopLevel);
-  // We should use WitnessTableBody. This ensures that the generic params
-  // are visible.
-  Optional<Scope> BodyScope;
-  BodyScope.emplace(&P, ScopeKind::FunctionBody);
-
   // Parse the protocol.
   ProtocolDecl *protocol = parseProtocolDecl(P, WitnessState);
   if (!protocol)
@@ -6800,7 +6769,6 @@ bool SILParserState::parseSILDefaultWitnessTable(Parser &P) {
     Linkage = SILLinkage::Public;
 
   SILDefaultWitnessTable::create(M, *Linkage, protocol, witnessEntries);
-  BodyScope.reset();
   return false;
 }
 
@@ -6841,9 +6809,6 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
-  Scope scope(&P, ScopeKind::TopLevel);
-  Scope body(&P, ScopeKind::FunctionBody);
-
   // We need to turn on InSILBody to parse the function references.
   Lexer::SILBodyRAII tmp(*P.L);
 
@@ -6882,7 +6847,6 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
-      Scope body(&P, ScopeKind::FunctionBody);
       if (State.parseSILFunctionRef(silLoc, jvp))
         return true;
     }
@@ -6891,7 +6855,6 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
-      Scope body(&P, ScopeKind::FunctionBody);
       if (State.parseSILFunctionRef(silLoc, vjp))
         return true;
     }
@@ -7093,8 +7056,6 @@ bool SILParserState::parseSILScope(Parser &P) {
     Lexer::SILBodyRAII Tmp(*P.L);
     GenericEnvironment *IgnoredEnv = nullptr;
     GenericParamList *IgnoredParams = nullptr;
-    Scope S(&P, ScopeKind::TopLevel);
-    Scope Body(&P, ScopeKind::FunctionBody);
     if ((ScopeState.parseGlobalName(FnName)) ||
         P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
         ScopeState.parseSILType(Ty, IgnoredEnv, IgnoredParams, true))

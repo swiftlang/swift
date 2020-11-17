@@ -136,13 +136,6 @@ public:
 
   void recordTokenHash(StringRef token);
 
-  /// DisabledVars is a list of variables for whom local name lookup is
-  /// disabled.  This is used when parsing a PatternBindingDecl to reject self
-  /// uses and to disable uses of the bound variables in a let/else block.  The
-  /// diagnostic to emit is stored in DisabledVarReason.
-  ArrayRef<VarDecl *> DisabledVars;
-  Diag<> DisabledVarReason;
-  
   enum {
     /// InVarOrLetPattern has this value when not parsing a pattern.
     IVOLP_NotInVarOrLet,
@@ -790,23 +783,6 @@ public:
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
                                          size_t Len = 1);
 
-  swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
-
-  /// Add the given Decl to the current scope.
-  void addToScope(ValueDecl *D, bool diagnoseRedefinitions = true) {
-    if (Context.LangOpts.DisableParserLookup)
-      return;
-
-    getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
-  }
-
-  ValueDecl *lookupInScope(DeclNameRef Name) {
-    if (Context.LangOpts.DisableParserLookup)
-          return nullptr;
-
-    return getScopeInfo().lookupValueName(Name);
-  }
-
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
 
@@ -1171,9 +1147,6 @@ public:
   ParserResult<DestructorDecl>
   parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
-  void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
-  void addParametersToScope(ParameterList *PL);
-
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
   ParserResult<OperatorDecl> parseDeclOperatorImpl(SourceLoc OperatorLoc,
@@ -1224,8 +1197,7 @@ public:
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
-                                         const TypeAttributes &attrs,
-                                         Optional<Scope> &GenericsScope);
+                                         const TypeAttributes &attrs);
   
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
