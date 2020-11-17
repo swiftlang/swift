@@ -172,3 +172,55 @@ func test_taskGroup_quorum_thenCancel() async {
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
 }
 
+extension Collection {
+
+  // DEMO-05-03: structured spawning of much work
+  // func map                <T>(                                        _ transform: (Element) throws -> T)             rethrows -> [T] {
+  // func mapAsync           <T>(parallelism: Int = 0/*system default*/, _ transform: (Element) async throws -> T) async rethrows -> [T] {
+  func mapAsync<T>(
+    parallelism requestedParallelism: Int? = nil/*system default*/,
+    // ordered: Bool = true, /
+    _ transform: (Element) async throws -> T
+  ) async rethrows -> [T] {
+    let defaultParallelism = 2
+    let parallelism = requestedParallelism ?? defaultParallelism
+
+    let n = self.count
+    if n == 0 {
+      return []
+    }
+
+    return await try Task.withGroup(resultType: (Int, T).self) { group in
+      var result = ContiguousArray<T>()
+      result.reserveCapacity(n)
+
+      var i = self.startIndex
+      var submitted = 0
+
+      func submitNext() async throws {
+        await group.add {
+          let value = await try transform(self[i])
+          return (submitted, value)
+        }
+        submitted += 1
+        formIndex(after: &i)
+      }
+
+      // submit first initial tasks
+      for _ in 0..<parallelism {
+        await try submitNext()
+      }
+
+      while let (index, taskResult) = await try group.next() {
+        result[index] = taskResult
+
+        try await Task.checkCancellation()
+        await try submitNext()
+      }
+
+      assert(result.count == n)
+      return Array(result)
+    }
+  }
+}
+
