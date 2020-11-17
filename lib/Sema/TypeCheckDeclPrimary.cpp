@@ -401,9 +401,6 @@ template<typename T>
 static void diagnoseDuplicateDecls(const T &decls) {
   llvm::SmallDenseMap<DeclBaseName, const ValueDecl *> names;
   for (auto *current : decls) {
-    if (!current->getASTContext().LangOpts.DisableParserLookup)
-      return;
-
     if (!current->hasName() || current->isImplicit())
       continue;
 
@@ -528,13 +525,11 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       otherDefinitions.append(found.begin(), found.end());
     }
   } else if (currentDC->isLocalContext()) {
-    if (ctx.LangOpts.DisableParserLookup) {
-      if (!current->isImplicit()) {
-        ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
-                                   current->getLoc(),
-                                   /*stopAfterInnermostBraceStmt=*/true,
-                                   otherDefinitions);
-      }
+    if (!current->isImplicit()) {
+      ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+                                 current->getLoc(),
+                                 /*stopAfterInnermostBraceStmt=*/true,
+                                 otherDefinitions);
     }
   } else {
     assert(currentDC->isModuleScopeContext());
@@ -910,11 +905,13 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
   }
 
-  TypeChecker::checkInitializerEffects(dc, initExpr);
-
   // Walk the checked initializer and contextualize any closures
   // we saw there.
   TypeChecker::contextualizeInitializer(dc, initExpr);
+
+  checkInitializerActorIsolation(dc, initExpr);
+  TypeChecker::checkInitializerEffects(dc, initExpr);
+
   return initExpr;
 }
 
@@ -1622,7 +1619,8 @@ public:
           Ctx.evaluator, PatternBindingEntryRequest{PBD, i}, nullptr);
       assert(entry && "No pattern binding entry?");
 
-      PBD->getPattern(i)->forEachVariable([&](VarDecl *var) {
+      const auto *Pat = PBD->getPattern(i);
+      Pat->forEachVariable([&](VarDecl *var) {
         this->visitBoundVariable(var);
 
         if (PBD->isInitialized(i)) {
@@ -1680,7 +1678,10 @@ public:
           }
 
           var->diagnose(diag::static_requires_initializer,
-                        var->getCorrectStaticSpelling());
+                        var->getCorrectStaticSpelling(),
+                        var->isLet());
+          var->diagnose(diag::static_requires_initializer_add_init)
+            .fixItInsert(Pat->getEndLoc(), " = <#initializer#>");
           markVarAndPBDInvalid();
           return;
         }
@@ -1697,6 +1698,8 @@ public:
           }
 
           var->diagnose(diag::global_requires_initializer, var->isLet());
+          var->diagnose(diag::static_requires_initializer_add_init)
+            .fixItInsert(Pat->getEndLoc(), " = <#initializer#>");
           markVarAndPBDInvalid();
           return;
         }
@@ -1739,9 +1742,9 @@ public:
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               PBD->getInitContext(i));
           if (initContext) {
-            // Check safety of error-handling in the declaration, too.
-            TypeChecker::checkInitializerEffects(initContext, init);
             TypeChecker::contextualizeInitializer(initContext, init);
+            checkInitializerActorIsolation(initContext, init);
+            TypeChecker::checkInitializerEffects(initContext, init);
           }
         }
       }
@@ -2344,6 +2347,14 @@ public:
     if (getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
         FunctionBodySkipping::All)
       return true;
+
+    // If we want all types (for LLDB) we can't skip functions with nested
+    // types. We could probably improve upon this and type-check only the
+    // nested types instead for better performances.
+    if (AFD->hasNestedTypeDeclarations() &&
+        getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
+          FunctionBodySkipping::NonInlinableWithoutTypes)
+      return false;
 
     // Only skip functions where their body won't be serialized
     return AFD->getResilienceExpansion() != ResilienceExpansion::Minimal;

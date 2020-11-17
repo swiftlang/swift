@@ -81,3 +81,33 @@ public func createStructWithSubobjectCopyConstructorAndValue() {
   let member = StructWithCopyConstructorAndValue()
   let obj = StructWithSubobjectCopyConstructorAndValue(member: member)
 }
+
+public func createTemplatedConstructor() {
+  // ITANIUM_X64-LABEL: define swiftcc void @"$ss26createTemplatedConstructoryyF"()
+  // ITANIUM_X64: [[OBJ:%.*]] = alloca %TSo20TemplatedConstructorV
+  // ITANIUM_X64: [[IVAL:%.*]] = load i32, i32*
+  // ITANIUM_X64: [[OBJ_AS_STRUCT:%.*]] = bitcast %TSo20TemplatedConstructorV* [[OBJ]] to %struct.TemplatedConstructor*
+  // ITANIUM_X64: call void @_ZN20TemplatedConstructorC1I7ArgTypeEET_(%struct.TemplatedConstructor* [[OBJ_AS_STRUCT]], i32 [[IVAL]])
+  // ITANIUM_X64: ret void
+  
+  // ITANIUM_X64-LABEL: define linkonce_odr void @_ZN20TemplatedConstructorC1I7ArgTypeEET_(%struct.TemplatedConstructor* %this, i32 %value.coerce)
+  
+  // ITANIUM_ARM-LABEL: define protected swiftcc void @"$ss26createTemplatedConstructoryyF"()
+  // ITANIUM_ARM: [[OBJ:%.*]] = alloca %TSo20TemplatedConstructorV
+  // ITANIUM_ARM: [[IVAL:%.*]] = load [1 x i32], [1 x i32]*
+  // ITANIUM_ARM: [[OBJ_AS_STRUCT:%.*]] = bitcast %TSo20TemplatedConstructorV* [[OBJ]] to %struct.TemplatedConstructor*
+  // ITANIUM_ARM:  call %struct.TemplatedConstructor* @_ZN20TemplatedConstructorC2I7ArgTypeEET_(%struct.TemplatedConstructor* [[OBJ_AS_STRUCT]], [1 x i32] [[IVAL]])
+  // ITANIUM_ARM: ret void
+  
+  // ITANIUM_ARM-LABEL: define linkonce_odr %struct.TemplatedConstructor* @_ZN20TemplatedConstructorC2I7ArgTypeEET_(%struct.TemplatedConstructor* returned %this, [1 x i32] %value.coerce)
+
+  // MICROSOFT_X64-LABEL: define dllexport swiftcc void @"$ss26createTemplatedConstructoryyF"()
+  // MICROSOFT_X64: [[OBJ:%.*]] = alloca %TSo20TemplatedConstructorV
+  // MICROSOFT_X64: [[IVAL:%.*]] = load i32, i32*
+  // MICROSOFT_X64: [[OBJ_AS_STRUCT:%.*]] = bitcast %TSo20TemplatedConstructorV* [[OBJ]] to %struct.TemplatedConstructor*
+  // MICROSOFT_X64: call %struct.TemplatedConstructor* @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(%struct.TemplatedConstructor* [[OBJ_AS_STRUCT]], i32 [[IVAL]])
+  // MICROSOFT_X64: ret void
+  
+  // MICROSOFT_X64-LABEL: define linkonce_odr dso_local %struct.TemplatedConstructor* @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(%struct.TemplatedConstructor* returned %this, i32 %value.coerce)
+  let templated = TemplatedConstructor(ArgType())
+}

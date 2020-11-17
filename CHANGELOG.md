@@ -6,6 +6,7 @@ CHANGELOG
 
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
+| [Swift 5.4](#swift-54) |            |             |
 | [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
 | [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
 | [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
@@ -24,8 +25,8 @@ CHANGELOG
 
 </details>
 
-Swift Next
-----------
+Swift 5.4
+---------
 
 * [SR-10069][]:
 

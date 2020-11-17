@@ -39,14 +39,12 @@ void PersistentParserState::setCodeCompletionDelayedDeclState(
     prevOffset = SM.getLocOffsetInBuffer(PreviousLoc, BufferID);
 
   CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
-      Kind, Flags, ParentContext, ScopeInfo.saveCurrentScope(), startOffset,
-      endOffset, prevOffset));
+      Kind, Flags, ParentContext, startOffset, endOffset, prevOffset));
 }
 
 void PersistentParserState::restoreCodeCompletionDelayedDeclState(
     const CodeCompletionDelayedDeclState &other) {
   CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
       other.Kind, other.Flags, other.ParentContext,
-      ScopeInfo.saveCurrentScope(), other.StartOffset, other.EndOffset,
-      other.PrevOffset));
+      other.StartOffset, other.EndOffset, other.PrevOffset));
 }

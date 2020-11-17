@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 // N.B. Validating the pattern binding initializer for `pickMe` used to cause
 // recursive validation of the VarDecl. Check that we don't regress now that

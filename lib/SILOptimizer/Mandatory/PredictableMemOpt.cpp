@@ -264,8 +264,8 @@ public:
   AvailableValue emitBeginBorrow(SILBuilder &b, SILLocation loc) const {
     // If we do not have ownership or already are guaranteed, just return a copy
     // of our state.
-    if (!b.hasOwnership() || Value.getOwnershipKind().isCompatibleWith(
-                                 ValueOwnershipKind::Guaranteed)) {
+    if (!b.hasOwnership() ||
+        Value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
       return {Value, SubElementNumber, InsertionPoints};
     }
 
@@ -602,8 +602,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
   if (TupleType *tupleType = LoadTy.getAs<TupleType>()) {
     SILValue result =
         aggregateTupleSubElts(tupleType, LoadTy, Address, FirstElt);
-    if (isTopLevel &&
-        result.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+    if (isTopLevel && result.getOwnershipKind() == OwnershipKind::Guaranteed) {
       SILValue borrowedResult = result;
       SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
@@ -624,8 +623,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
   if (auto *structDecl = getFullyReferenceableStruct(LoadTy)) {
     SILValue result =
         aggregateStructSubElts(structDecl, LoadTy, Address, FirstElt);
-    if (isTopLevel &&
-        result.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+    if (isTopLevel && result.getOwnershipKind() == OwnershipKind::Guaranteed) {
       SILValue borrowedResult = result;
       SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
@@ -728,7 +726,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
 
   // Finally, grab the value from the SSA updater.
   SILValue result = updater.getValueInMiddleOfBlock(B.getInsertionBB());
-  assert(result.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+  assert(result.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
   if (isTake() || !B.hasOwnership()) {
     return result;
   }
@@ -844,9 +842,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     SILBuilderWithScope builder(insertPts[0], &insertedInsts);
     SILLocation loc = insertPts[0]->getLoc();
     SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
-    assert(
-        !builder.hasOwnership() ||
-        eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+    assert(!builder.hasOwnership() ||
+           eltVal.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
     assert(eltVal->getType() == loadTy && "Subelement types mismatch");
 
     if (!builder.hasOwnership()) {
@@ -871,9 +868,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     SILBuilderWithScope builder(i, &insertedInsts);
     SILLocation loc = i->getLoc();
     SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
-    assert(
-        !builder.hasOwnership() ||
-        eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+    assert(!builder.hasOwnership() ||
+           eltVal.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
 
     if (!singularValue.hasValue()) {
       singularValue = eltVal;
@@ -904,7 +900,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // Finally, grab the value from the SSA updater.
   SILValue eltVal = updater.getValueInMiddleOfBlock(insertBlock);
   assert(!B.hasOwnership() ||
-         eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+         eltVal.getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
   assert(eltVal->getType() == loadTy && "Subelement types mismatch");
   if (!B.hasOwnership())
     return eltVal;
@@ -1121,7 +1117,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     auto *phi = insertedPhiNodes[i];
 
     // If our phi is not owned, continue. No fixes are needed.
-    if (phi->getOwnershipKind() != ValueOwnershipKind::Owned)
+    if (phi->getOwnershipKind() != OwnershipKind::Owned)
       continue;
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting inserted phi: " << *phi);
@@ -1141,7 +1137,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
 
       // If we had a non-trivial type with non-owned ownership, we will not see
       // a copy_value, so skip them here.
-      if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
+      if (value.getOwnershipKind() != OwnershipKind::Owned)
         continue;
 
       // Otherwise, value should be from a copy_value or a phi node.

@@ -2505,6 +2505,22 @@ public:
     printCommon(E, name);
     PrintWithColorRAII(OS, DiscriminatorColor)
       << " discriminator=" << E->getDiscriminator();
+
+    switch (auto isolation = E->getActorIsolation()) {
+    case ClosureActorIsolation::Independent:
+      break;
+
+    case ClosureActorIsolation::ActorInstance:
+      PrintWithColorRAII(OS, CapturesColor) << " actor-isolated="
+        << isolation.getActorInstance()->printRef();
+      break;
+
+    case ClosureActorIsolation::GlobalActor:
+      PrintWithColorRAII(OS, CapturesColor) << " global-actor-isolated="
+        << isolation.getGlobalActor().getString();
+      break;
+    }
+
     if (!E->getCaptureInfo().isTrivial()) {
       OS << " ";
       E->getCaptureInfo().print(PrintWithColorRAII(OS, CapturesColor).getOS());

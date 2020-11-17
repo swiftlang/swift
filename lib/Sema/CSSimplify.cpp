@@ -3206,6 +3206,58 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   return true;
 }
 
+static bool repairArrayLiteralUsedAsDictionary(
+    ConstraintSystem &cs, Type arrayType, Type dictType,
+    ConstraintKind matchKind,
+    SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+    ConstraintLocator *loc) {
+
+  if (!cs.isArrayType(arrayType))
+    return false;
+
+  // Determine the ArrayExpr from the locator.
+  auto *expr = getAsExpr(simplifyLocatorToAnchor(loc));
+  if (!expr)
+    return false;
+
+  if (auto *AE = dyn_cast<AssignExpr>(expr))
+    expr = AE->getSrc();
+
+  auto *arrayExpr = dyn_cast<ArrayExpr>(expr);
+  if (!arrayExpr)
+    return false;
+
+  // This fix currently only handles empty and single-element arrays:
+  //   [] => [:] and [1] => [1:_]
+  if (arrayExpr->getNumElements() > 1)
+    return false;
+
+  // This fix only applies if the array is used as a dictionary.
+  auto unwrappedDict = dictType->lookThroughAllOptionalTypes();
+  if (unwrappedDict->isTypeVariableOrMember())
+    return false;
+
+  if (!conformsToKnownProtocol(
+          cs.DC, unwrappedDict,
+          KnownProtocolKind::ExpressibleByDictionaryLiteral))
+    return false;
+
+  // Ignore any attempts at promoting the value to an optional as even after
+  // stripping off all optionals above the underlying types don't match (array
+  // vs dictionary).
+  conversionsOrFixes.erase(llvm::remove_if(conversionsOrFixes,
+                                           [&](RestrictionOrFix &E) {
+    if (auto restriction = E.getRestriction())
+      return *restriction == ConversionRestrictionKind::ValueToOptional;
+    return false;
+  }), conversionsOrFixes.end());
+
+  auto argLoc = cs.getConstraintLocator(arrayExpr);
+  conversionsOrFixes.push_back(TreatArrayLiteralAsDictionary::create(
+      cs, dictType, arrayType, argLoc));
+  return true;
+}
+
 /// Let's check whether this is an out-of-order argument in binary
 /// operator/function with concrete type parameters e.g.
 /// `func ^^(x: Int, y: String)` called as `"" ^^ 42` instead of
@@ -3480,6 +3532,11 @@ bool ConstraintSystem::repairFailures(
         recordPotentialHole(typeVar);
     });
   };
+
+  if (repairArrayLiteralUsedAsDictionary(*this, lhs, rhs, matchKind,
+                                         conversionsOrFixes,
+                                         getConstraintLocator(locator)))
+    return true;
 
   if (path.empty()) {
     if (!anchor)
@@ -5612,11 +5669,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Unsolved;
   }
 
+  auto *loc = getConstraintLocator(locator);
+
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
     // Record the conformance.
-    CheckedConformances.push_back({getConstraintLocator(locator), conformance});
+    CheckedConformances.push_back({loc, conformance});
+
+    if (isConformanceUnavailable(conformance, loc))
+      increaseScore(SK_Unavailable);
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
@@ -5664,7 +5726,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   auto protocolTy = protocol->getDeclaredInterfaceType();
 
   // If this conformance has been fixed already, let's just consider this done.
-  if (isFixedRequirement(getConstraintLocator(locator), protocolTy))
+  if (isFixedRequirement(loc, protocolTy))
     return SolutionKind::Solved;
 
   // If this is a generic requirement let's try to record that
@@ -5711,7 +5773,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto dstType = getType(assignment->getDest());
 
       auto *fix = IgnoreAssignmentDestinationType::create(
-          *this, srcType, dstType, getConstraintLocator(locator));
+          *this, srcType, dstType, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
@@ -5722,8 +5784,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // let's record it as a "contextual mismatch" because diagnostic
     // is going to be dependent on other contextual information.
     if (path.back().is<LocatorPathElt::ContextualType>()) {
-      auto *fix = ContextualMismatch::create(*this, type, protocolTy,
-                                             getConstraintLocator(locator));
+      auto *fix = ContextualMismatch::create(*this, type, protocolTy, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
@@ -5761,7 +5822,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    auto *loc = getConstraintLocator(locator);
     if (loc->isResultOfKeyPathDynamicMemberLookup() ||
         loc->isKeyPathSubscriptComponent()) {
       if (protocol ==
@@ -10183,6 +10243,44 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       impact += 3;
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::TreatArrayLiteralAsDictionary: {
+    ArrayExpr *AE = getAsExpr<ArrayExpr>(fix->getAnchor());
+    assert(AE);
+
+    // If the array was empty, there's nothing to do.
+    if (AE->getNumElements() == 0)
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+
+    // For arrays with a single element, match the element type to the
+    // dictionary's key type.
+    SmallVector<Type, 2> optionals;
+    auto dictTy = type2->lookThroughAllOptionalTypes(optionals);
+
+    // If the fix is worse than the best solution, there's no point continuing.
+    if (recordFix(fix, optionals.size() + 1))
+      return SolutionKind::Error;
+
+    // Extract the dictionary key type.
+    ProtocolDecl *dictionaryProto =
+        Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    auto keyAssocTy = dictionaryProto->getAssociatedType(Context.Id_Key);
+    auto valueBaseTy = createTypeVariable(getConstraintLocator(locator),
+                                      TVO_CanBindToLValue |
+                                        TVO_CanBindToNoEscape |
+                                        TVO_CanBindToHole);
+    assignFixedType(valueBaseTy, dictTy);
+    auto dictionaryKeyTy = DependentMemberType::get(valueBaseTy, keyAssocTy);
+
+    // Extract the array element type.
+    auto elemTy = isArrayType(type1);
+
+    ConstraintLocator *elemLoc = getConstraintLocator(AE->getElement(0));
+    ConstraintKind kind = isDictionaryType(dictTy)
+        ? ConstraintKind::Conversion
+        : ConstraintKind::Equal;
+    return matchTypes(*elemTy, dictionaryKeyTy, kind, subflags, elemLoc);
   }
 
   case FixKind::ContextualMismatch: {

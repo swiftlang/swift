@@ -1,9 +1,7 @@
 include(CheckIncludeFiles)
 check_include_files("xpc/xpc.h" HAVE_XPC_H)
 
-swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
-
-if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT AND NOT SOURCEKIT_INSTALLING_INPROC)
+if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT)
   set(BUILD_SOURCEKIT_XPC_SERVICE TRUE)
 else()
   set(BUILD_SOURCEKIT_XPC_SERVICE FALSE)

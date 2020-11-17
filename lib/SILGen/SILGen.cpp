@@ -327,6 +327,53 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
+static FuncDecl *
+lookUpResumeContinuationIntrinsic(ASTContext &C,
+                                  Optional<FuncDecl*> &cache,
+                                  StringRef name) {
+  if (cache)
+    return *cache;
+  
+  auto *module = C.getLoadedModule(C.Id_Concurrency);
+  if (!module) {
+    cache = nullptr;
+    return nullptr;
+  }
+  
+  SmallVector<ValueDecl *, 1> decls;
+  module->lookupQualified(module,
+                     DeclNameRef(C.getIdentifier(name)),
+                     NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                     decls);
+
+  if (decls.size() != 1) {
+    cache = nullptr;
+    return nullptr;
+  }
+  auto func = dyn_cast<FuncDecl>(decls[0]);
+  cache = func;
+  return func;
+}
+
+FuncDecl *
+SILGenModule::getResumeUnsafeContinuation() {
+  return lookUpResumeContinuationIntrinsic(getASTContext(),
+                                           ResumeUnsafeContinuation,
+                                           "_resumeUnsafeContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeUnsafeThrowingContinuation() {
+  return lookUpResumeContinuationIntrinsic(getASTContext(),
+                                           ResumeUnsafeThrowingContinuation,
+                                           "_resumeUnsafeThrowingContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
+  return lookUpResumeContinuationIntrinsic(getASTContext(),
+                                 ResumeUnsafeThrowingContinuationWithError,
+                                 "_resumeUnsafeThrowingContinuationWithError");
+}
+
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)
     return *NSErrorConformanceToError;
@@ -1809,7 +1856,7 @@ public:
         if (SGF.B.hasValidInsertionPoint())
           SGF.B.createBranch(returnLoc, returnBB, returnValue);
         returnValue =
-            returnBB->createPhiArgument(returnType, ValueOwnershipKind::Owned);
+            returnBB->createPhiArgument(returnType, OwnershipKind::Owned);
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.

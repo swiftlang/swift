@@ -89,6 +89,9 @@ public:
     BeginBorrow,
     BeginApply,
     Branch,
+    Apply,
+    TryApply,
+    Yield,
   };
 
 private:
@@ -109,6 +112,12 @@ public:
       return BorrowingOperandKind(BeginApply);
     case SILInstructionKind::BranchInst:
       return BorrowingOperandKind(Branch);
+    case SILInstructionKind::ApplyInst:
+      return BorrowingOperandKind(Apply);
+    case SILInstructionKind::TryApplyInst:
+      return BorrowingOperandKind(TryApply);
+    case SILInstructionKind::YieldInst:
+      return BorrowingOperandKind(Yield);
     }
   }
 
@@ -142,7 +151,8 @@ struct BorrowingOperand {
     return *this;
   }
 
-  /// If value is a borrow introducer return it after doing some checks.
+  /// If \p op is a borrow introducing operand return it after doing some
+  /// checks.
   static Optional<BorrowingOperand> get(Operand *op) {
     auto *user = op->getUser();
     auto kind = BorrowingOperandKind::get(user->getKind());
@@ -151,14 +161,32 @@ struct BorrowingOperand {
     return BorrowingOperand(*kind, op);
   }
 
+  /// If \p op is a borrow introducing operand return it after doing some
+  /// checks.
+  static Optional<BorrowingOperand> get(const Operand *op) {
+    return get(const_cast<Operand *>(op));
+  }
+
+  /// If this borrowing operand results in the underlying value being borrowed
+  /// over a region of code instead of just for a single instruction, visit
+  /// those uses.
+  ///
+  /// Example: An apply performs an instantaneous recursive borrow of a
+  /// guaranteed value but a begin_apply borrows the value over the entire
+  /// region of code corresponding to the coroutine.
   void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
-  bool consumesGuaranteedValues() const {
+  ///
+  /// TODO: tuple, struct, destructure_tuple, destructure_struct.
+  bool isReborrow() const {
     switch (kind) {
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
+    case BorrowingOperandKind::Yield:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -170,8 +198,14 @@ struct BorrowingOperand {
   /// for owned values.
   bool canAcceptOwnedValues() const {
     switch (kind) {
+    // begin_borrow can take any parameter
     case BorrowingOperandKind::BeginBorrow:
+    // Yield can implicit borrow owned values.
+    case BorrowingOperandKind::Yield:
+    // FullApplySites can implicit borrow owned values.
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
       return true;
     case BorrowingOperandKind::Branch:
       return false;
@@ -189,6 +223,9 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Branch:
       return true;
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
+    case BorrowingOperandKind::Yield:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -253,7 +290,7 @@ private:
 
 public:
   static Optional<BorrowedValueKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
       return None;
     switch (value->getKind()) {
     default:
@@ -571,7 +608,7 @@ private:
 
 public:
   static Optional<OwnedValueIntroducerKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
+    if (value.getOwnershipKind() != OwnershipKind::Owned)
       return None;
 
     switch (value->getKind()) {

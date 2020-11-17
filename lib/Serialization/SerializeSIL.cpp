@@ -366,10 +366,10 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 
   if (auto *Undef = dyn_cast<SILUndef>(Val)) {
     // The first two IDs are reserved for SILUndef.
-    if (Undef->getOwnershipKind() == ValueOwnershipKind::None)
+    if (Undef->getOwnershipKind() == OwnershipKind::None)
       return 0;
 
-    assert(Undef->getOwnershipKind() == ValueOwnershipKind::Owned);
+    assert(Undef->getOwnershipKind() == OwnershipKind::Owned);
     return 1;
   }
   ValueID id = ValueIDs[Val];

@@ -1029,6 +1029,36 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
                              MemoryBehavior::MayHaveSideEffects;
   }
 
+  if (auto *li = dyn_cast<LoadInst>(this)) {
+    switch (li->getOwnershipQualifier()) {
+    case LoadOwnershipQualifier::Unqualified:
+    case LoadOwnershipQualifier::Trivial:
+      return MemoryBehavior::MayRead;
+    case LoadOwnershipQualifier::Take:
+      // Take deinitializes the underlying memory. Until we separate notions of
+      // memory writing from deinitialization (since a take doesn't actually
+      // write to the memory), lets be conservative and treat it as may read
+      // write.
+      return MemoryBehavior::MayReadWrite;
+    case LoadOwnershipQualifier::Copy:
+      return MemoryBehavior::MayHaveSideEffects;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  if (auto *si = dyn_cast<StoreInst>(this)) {
+    switch (si->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+    case StoreOwnershipQualifier::Trivial:
+    case StoreOwnershipQualifier::Init:
+      return MemoryBehavior::MayWrite;
+    case StoreOwnershipQualifier::Assign:
+      // For the release.
+      return MemoryBehavior::MayHaveSideEffects;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   switch (getKind()) {
 #define FULL_INST(CLASS, TEXTUALNAME, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)  \
   case SILInstructionKind::CLASS:                                              \
@@ -1138,6 +1168,18 @@ bool SILInstruction::mayRelease() const {
     }
     return true;
   }
+  case SILInstructionKind::StoreInst:
+    switch (cast<StoreInst>(this)->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+    case StoreOwnershipQualifier::Init:
+    case StoreOwnershipQualifier::Trivial:
+      return false;
+    case StoreOwnershipQualifier::Assign:
+      // Assign destroys the old value that was in the memory location before we
+      // write the new value into the location.
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 }
 

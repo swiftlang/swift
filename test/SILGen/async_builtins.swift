@@ -25,4 +25,16 @@ public struct X {
       print("child is done")
     }
   }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV12launchFutureyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> ()
+  func launchFuture<T>(_ value: T) {
+    // CHECK: builtin "createAsyncTaskFuture"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    let task = Builtin.createAsyncTaskFuture(0, nil) { () async throws -> T in
+      return value
+    }
+  }
+
+  public func launchRocker<T>(closure: @escaping () async throws -> T) {
+    _ = Builtin.createAsyncTaskFuture(0, nil, closure)
+  }
 }

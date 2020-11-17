@@ -112,6 +112,17 @@ struct StructWithSubobjectPrivateDefaultedDestructor {
   StructWithPrivateDefaultedDestructor subobject;
 };
 
+struct StructWithDeletedDestructor {
+  ~StructWithDeletedDestructor() = delete;
+};
+
+struct StructWithInheritedDeletedDestructor
+    : StructWithDeletedDestructor {};
+
+struct StructWithSubobjectDeletedDestructor {
+  StructWithDeletedDestructor subobject;
+};
+
 // Tests for common sets of special member functions.
 
 struct StructTriviallyCopyableMovable {

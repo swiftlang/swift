@@ -3134,9 +3134,15 @@ public:
         });
   }
 
-  /// Determine whether given declaration is unavailable in the current context.
+  /// Determine whether the given declaration is unavailable from the
+  /// current context.
   bool isDeclUnavailable(const Decl *D,
                          ConstraintLocator *locator = nullptr) const;
+
+  /// Determine whether the given conformance is unavailable from the
+  /// current context.
+  bool isConformanceUnavailable(ProtocolConformanceRef conformance,
+                                ConstraintLocator *locator = nullptr) const;
 
 public:
 
@@ -4730,25 +4736,10 @@ private:
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
 
-    /// Whether this type variable is considered a hole in the constraint system.
-    bool IsHole = false;
-
-    /// Whether the bindings represent (potentially) incomplete set,
-    /// there is no way to say with absolute certainty if that's the
-    /// case, but that could happen when certain constraints like
-    /// `bind param` are present in the system.
-    bool PotentiallyIncomplete = false;
-
     ASTNode AssociatedCodeCompletionToken = ASTNode();
 
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
-
-    /// Whether this type variable is only bound above by existential types.
-    bool SubtypeOfExistentialType = false;
-
-    /// The number of defaultable bindings.
-    unsigned NumDefaultableBindings = 0;
 
     /// Tracks the position of the last known supertype in the group.
     Optional<unsigned> lastSupertypeIndex;
@@ -4761,41 +4752,80 @@ private:
     llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
     llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
 
-    PotentialBindings(TypeVariableType *typeVar)
-        : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
+    PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
 
-    /// Whether there are any non-defaultable bindings.
-    bool hasNonDefaultableBindings() const {
-      return Bindings.size() > NumDefaultableBindings;
+    /// Whether the bindings represent (potentially) incomplete set,
+    /// there is no way to say with absolute certainty if that's the
+    /// case, but that could happen when certain constraints like
+    /// `bind param` are present in the system.
+    bool isPotentiallyIncomplete() const;
+
+    /// If there is only one binding and it's to a hole type, consider
+    /// this type variable to be a hole in a constraint system regardless
+    /// of where hole type originated.
+    bool isHole() const {
+      if (Bindings.size() != 1)
+        return false;
+
+      auto &binding = Bindings.front();
+      return binding.BindingType->is<HoleType>();
+    }
+
+    /// Determine if the bindings only constrain the type variable from above
+    /// with an existential type; such a binding is not very helpful because
+    /// it's impossible to enumerate the existential type's subtypes.
+    bool isSubtypeOfExistentialType() const {
+      if (Bindings.empty())
+        return false;
+
+      return llvm::all_of(Bindings, [](const PotentialBinding &binding) {
+        return binding.BindingType->isExistentialType() &&
+               binding.Kind == AllowedBindingKind::Subtypes;
+      });
+    }
+
+    unsigned getNumDefaultableBindings() const {
+      return llvm::count_if(Bindings, [](const PotentialBinding &binding) {
+        return binding.isDefaultableBinding();
+      });
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
-      return std::make_tuple(b.IsHole,
-                             !b.hasNonDefaultableBindings(),
+      auto numDefaults = b.getNumDefaultableBindings();
+      auto hasNoDefaultableBindings = b.Bindings.size() > numDefaults;
+
+      return std::make_tuple(b.isHole(),
+                             !hasNoDefaultableBindings,
                              b.FullyBound,
-                             b.SubtypeOfExistentialType,
+                             b.isSubtypeOfExistentialType(),
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),
-                             -(b.Bindings.size() - b.NumDefaultableBindings));
+                             -(b.Bindings.size() - numDefaults));
     }
 
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x,
                           const PotentialBindings &y) {
-      if (formBindingScore(x) < formBindingScore(y))
+      auto xScore = formBindingScore(x);
+      auto yScore = formBindingScore(y);
+
+      if (xScore < yScore)
         return true;
 
-      if (formBindingScore(y) < formBindingScore(x))
+      if (yScore < xScore)
         return false;
+
+      auto xDefaults = x.Bindings.size() + std::get<6>(xScore);
+      auto yDefaults = y.Bindings.size() + std::get<6>(yScore);
 
       // If there is a difference in number of default types,
       // prioritize bindings with fewer of them.
-      if (x.NumDefaultableBindings != y.NumDefaultableBindings)
-        return x.NumDefaultableBindings < y.NumDefaultableBindings;
+      if (xDefaults != yDefaults)
+        return xDefaults < yDefaults;
 
       // If neither type variable is a "hole" let's check whether
       // there is a subtype relationship between them and prefer
@@ -4803,7 +4833,7 @@ private:
       // for "subtype" type variable to attempt more bindings later.
       // This is required because algorithm can't currently infer
       // bindings for subtype transitively through superclass ones.
-      if (!(x.IsHole && y.IsHole)) {
+      if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
         if (x.isSubtypeOf(y.TypeVar))
           return false;
 
@@ -4813,7 +4843,7 @@ private:
 
       // As a last resort, let's check if the bindings are
       // potentially incomplete, and if so, let's de-prioritize them.
-      return x.PotentiallyIncomplete < y.PotentiallyIncomplete;
+      return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -4914,18 +4944,20 @@ public:
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
-      if (PotentiallyIncomplete)
+      if (isPotentiallyIncomplete())
         out << "potentially_incomplete ";
       if (FullyBound)
         out << "fully_bound ";
-      if (SubtypeOfExistentialType)
+      if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
       if (LiteralBinding != LiteralBindingKind::None)
         out << "literal=" << static_cast<int>(LiteralBinding) << " ";
       if (InvolvesTypeVariables)
         out << "involves_type_vars ";
-      if (NumDefaultableBindings > 0)
-        out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
+
+      auto numDefaultable = getNumDefaultableBindings();
+      if (numDefaultable > 0)
+        out << "#defaultable_bindings=" << numDefaultable << " ";
 
       PrintOptions PO;
       PO.PrintTypesForDebugging = true;

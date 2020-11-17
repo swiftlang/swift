@@ -186,4 +186,5 @@ func SR13442<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
 func testSR13442() {
   _ = SR13442(\.!.count) // OK
   _ = SR13442(\String?.!.count) // OK
+  let _: KeyPath<Int?, Int> = \Optional.!
 }

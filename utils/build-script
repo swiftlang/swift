@@ -351,6 +351,9 @@ def apply_default_arguments(toolchain, args):
         elif args.android_arch == "aarch64":
             args.stdlib_deployment_targets.append(
                 StdlibDeploymentTarget.Android.aarch64.name)
+        elif args.android_arch == "x86_64":
+            args.stdlib_deployment_targets.append(
+                StdlibDeploymentTarget.Android.x86_64.name)
 
     # Infer platform flags from manually-specified configure targets.
     # This doesn't apply to Darwin platforms, as they are
@@ -705,18 +708,6 @@ class BuildScriptInvocation(object):
         if toolchain.libtool is not None:
             impl_args += [
                 "--host-libtool", toolchain.libtool,
-            ]
-        if args.native_clang_tools_path is not None:
-            impl_args += [
-                "--native-clang-tools-path=%s" % args.native_clang_tools_path
-            ]
-        if args.native_llvm_tools_path is not None:
-            impl_args += [
-                "--native-llvm-tools-path=%s" % args.native_llvm_tools_path
-            ]
-        if args.native_swift_tools_path is not None:
-            impl_args += [
-                "--native-swift-tools-path=%s" % args.native_swift_tools_path
             ]
 
         # If we have extra_swift_args, combine all of them together and then

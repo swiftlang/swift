@@ -992,7 +992,7 @@ namespace {
         } else {
           // switch enum always start as @owned.
           SILValue sourceObjectValue = someBB->createPhiArgument(
-              loweredSourceObjectType, ValueOwnershipKind::Owned);
+              loweredSourceObjectType, OwnershipKind::Owned);
           objectSource = Source(sourceObjectValue, sourceObjectType);
         }
 
@@ -1029,8 +1029,8 @@ namespace {
       if (target.isAddress()) {
         return target.asAddressSource();
       } else {
-        SILValue result = contBB->createPhiArgument(target.LoweredType,
-                                                    ValueOwnershipKind::Owned);
+        SILValue result =
+            contBB->createPhiArgument(target.LoweredType, OwnershipKind::Owned);
         return target.asScalarSource(result);
       }
     }

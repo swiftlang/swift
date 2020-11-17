@@ -937,7 +937,8 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     // release it explicitly when the partial_apply is released.
     if (Apply.getKind() == ApplySiteKind::PartialApplyInst) {
       if (PAFrontier.empty()) {
-        ValueLifetimeAnalysis VLA(cast<PartialApplyInst>(Apply));
+        auto *PAI = cast<PartialApplyInst>(Apply);
+        ValueLifetimeAnalysis VLA(PAI, PAI->getUses());
         pass.CFGChanged |= !VLA.computeFrontier(
             PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
         assert(!PAFrontier.empty() &&

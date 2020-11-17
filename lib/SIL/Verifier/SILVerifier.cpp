@@ -1030,8 +1030,11 @@ public:
     assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
-    if (!F->hasOwnership())
+    if (!F->hasOwnership()) {
+      require(SILValue(V).getOwnershipKind() == OwnershipKind::None,
+              "Once ownership is gone, all values should have none ownership");
       return;
+    }
     SILValue(V).verifyOwnership(&DEBlocks);
   }
 
@@ -1108,7 +1111,7 @@ public:
               "instruction's operand's owner isn't the instruction");
       require(isInValueUses(&operand), "operand value isn't used by operand");
 
-      if (I->isTypeDependentOperand(operand)) {
+      if (operand.isTypeDependent()) {
         require(isa<SILInstruction>(I),
                "opened archetype operand should refer to a SILInstruction");
       }
@@ -1116,6 +1119,28 @@ public:
       // Make sure that if operand is generic that its primary archetypes match
       // the function context.
       checkLegalType(I->getFunction(), operand.get(), I);
+
+      // If we are not in OSSA, our operand constraint should be invalid for a
+      // type dependent operand (that is Optional::None) and if we have a non
+      // type dependent operand then we should have a constraint of
+      // OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding.
+      if (!I->getFunction()->hasOwnership()) {
+        if (operand.isTypeDependent()) {
+          require(
+              !operand.getOwnershipConstraint(),
+              "Non Optional::None constraint for a type dependent operand?!");
+        } else {
+          auto constraint = operand.getOwnershipConstraint();
+          require(constraint.hasValue(),
+                  "All non-type dependent operands must have a "
+                  "non-Optional::None constraint?!");
+          require(constraint->getPreferredKind() == OwnershipKind::Any &&
+                      constraint->getLifetimeConstraint() ==
+                          UseLifetimeConstraint::NonLifetimeEnding,
+                  "In non-ossa all non-type dependent operands must have a "
+                  "constraint of Any, NonLifetimeEnding");
+        }
+      }
     }
 
     // TODO: There should be a use of an opened archetype inside the instruction for
@@ -1947,6 +1972,17 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkUncheckedOwnershipConversionInst(
+    UncheckedOwnershipConversionInst *uoci) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+    require(!uoci->getType().isAddress(),
+            "cannot convert ownership of an address");
+    require(uoci->getType() == uoci->getOperand()->getType(),
+            "converting ownership does not affect the type");
+  }
+
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
     if (AccessInst->getModule().getStage() != SILStage::Raw) {
@@ -2091,7 +2127,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(*SI->getFunction()) ||
-                  Src.getOwnershipKind() == ValueOwnershipKind::None,
+                  Src.getOwnershipKind() == OwnershipKind::None,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -2939,8 +2975,8 @@ public:
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
                 "parent forwarding ownership kind");
-        require(parentKind != ValueOwnershipKind::None ||
-                    result.getOwnershipKind() == ValueOwnershipKind::None,
+        require(parentKind != OwnershipKind::None ||
+                    result.getOwnershipKind() == OwnershipKind::None,
                 "destructure with none ownership kind operand and non-none "
                 "ownership kind result?!");
       }
@@ -2958,8 +2994,8 @@ public:
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
                 "parent forwarding ownership kind");
-        require(parentKind != ValueOwnershipKind::None ||
-                    result.getOwnershipKind() == ValueOwnershipKind::None,
+        require(parentKind != OwnershipKind::None ||
+                    result.getOwnershipKind() == OwnershipKind::None,
                 "destructure with none ownership kind operand and non-none "
                 "ownership kind result?!");
       }
@@ -3009,7 +3045,7 @@ public:
             "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetypeOf(lookupType)) {
+    if (getOpenedArchetypeOf(lookupType) || isa<DynamicSelfType>(lookupType)) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
       verifyOpenedArchetype(AMI, lookupType);
@@ -3017,7 +3053,7 @@ public:
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
     }
-    if (!isa<ArchetypeType>(lookupType)) {
+    if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
@@ -4915,7 +4951,7 @@ public:
               "error successor argument must have Error type");
       
       if (AACI->getFunction()->hasOwnership()) {
-        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "error successor argument must be owned");
       }
     }
@@ -4930,7 +4966,7 @@ public:
       requireSameType(arg->getType(), cont->getLoweredResumeType(),
                       "resume successor must take an argument of the continuation resume type");
       if (AACI->getFunction()->hasOwnership()) {
-        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "resume successor argument must be owned");
       }
     }

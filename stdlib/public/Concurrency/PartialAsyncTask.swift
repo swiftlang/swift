@@ -24,15 +24,46 @@ public struct PartialAsyncTask {
 public struct UnsafeContinuation<T> {
   private var context: UnsafeRawPointer
 
-  public func resume(_: T) { }
+  public func resume(_: __owned T) { }
 }
 
 @frozen
 public struct UnsafeThrowingContinuation<T> {
   private var context: UnsafeRawPointer
 
-  public func resume(_: T) { }
-  public func fail(_: Error) { }
+  public func resume(_: __owned T) { }
+  public func fail(_: __owned Error) { }
 }
 
+#if _runtime(_ObjC)
 
+// Intrinsics used by SILGen to resume or fail continuations
+// for
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _resumeUnsafeContinuation<T>(
+  _ continuation: UnsafeContinuation<T>,
+  _ value: __owned T
+) {
+  continuation.resume(value)
+}
+
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _resumeUnsafeThrowingContinuation<T>(
+  _ continuation: UnsafeThrowingContinuation<T>,
+  _ value: __owned T
+) {
+  continuation.resume(value)
+}
+
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _resumeUnsafeThrowingContinuationWithError<T>(
+  _ continuation: UnsafeThrowingContinuation<T>,
+  _ error: __owned Error
+) {
+  continuation.fail(error)
+}
+
+#endif

@@ -374,15 +374,6 @@ def create_argument_parser():
     option('--host-cxx', store_path(executable=True),
            help='the absolute path to CXX, the "clang++" compiler for the '
                 'host platform. Default is auto detected.')
-    option('--native-swift-tools-path', store_path,
-           help='the path to a directory that contains prebuilt Swift tools '
-                'that are executable on the host platform')
-    option('--native-clang-tools-path', store_path,
-           help='the path to a directory that contains prebuilt Clang tools '
-                'that are executable on the host platform')
-    option('--native-llvm-tools-path', store_path,
-           help='the path to a directory that contains prebuilt LLVM tools '
-                'that are executable on the host platform')
     option('--cmake-c-launcher', store_path(executable=True),
            default=os.environ.get('C_COMPILER_LAUNCHER', None),
            help='the absolute path to set CMAKE_C_COMPILER_LAUNCHER')
@@ -1102,10 +1093,10 @@ def create_argument_parser():
                     android.adb.commands.DEVICE_TEMP_DIR))
 
     option('--android-arch', store,
-           choices=['armv7', 'aarch64'],
+           choices=['armv7', 'aarch64', 'x86_64'],
            default='armv7',
-           help='The Android target architecture when building for Android. '
-                'Currently only armv7 and aarch64 are supported. '
+           help='The target architecture when building for Android. '
+                'Currently, only armv7, aarch64, and x86_64 are supported. '
                 '%(default)s is the default.')
 
     # -------------------------------------------------------------------------

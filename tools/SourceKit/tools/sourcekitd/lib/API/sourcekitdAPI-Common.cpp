@@ -224,11 +224,11 @@ void sourcekitd::enableLogging(StringRef LoggerName) {
 static llvm::sys::Mutex GlobalInitMtx;
 static unsigned gInitRefCount = 0;
 
-void sourcekitd_initialize(void) {
+bool sourcekitd::initializeClient() {
   llvm::sys::ScopedLock L(GlobalInitMtx);
   ++gInitRefCount;
   if (gInitRefCount > 1)
-    return;
+    return false;
 
   static std::once_flag flag;
   std::call_once(flag, []() {
@@ -236,18 +236,15 @@ void sourcekitd_initialize(void) {
     sourcekitd::enableLogging("sourcekit");
   });
 
-  LOG_INFO_FUNC(High, "initializing");
-  sourcekitd::initialize();
+  return true;
 }
 
-void sourcekitd_shutdown(void) {
+bool sourcekitd::shutdownClient() {
   llvm::sys::ScopedLock L(GlobalInitMtx);
   --gInitRefCount;
   if (gInitRefCount > 0)
-    return;
-
-  LOG_INFO_FUNC(High, "shutting down");
-  sourcekitd::shutdown();
+    return false;
+  return true;
 }
 
 void

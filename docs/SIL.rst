@@ -5894,6 +5894,25 @@ This instruction is assumed to forward a fixed ownership (set upon its
 construction) and lowers to 'unchecked_bitwise_cast' in non-ossa code. This
 causes the cast to lose its guarantee of layout-compatibility.
 
+unchecked_ownership_conversion
+``````````````````````````````
+::
+
+   sil-instruction ::= 'unchecked_ownership_conversion' sil-operand ',' sil-value-ownership-kind 'to' sil-value-ownership-kind
+
+   %1 = unchecked_ownership_conversion %0 : $A, @guaranteed to @owned
+
+Converts its operand to an identical value of the same type but with
+different ownership without performing any semantic operations
+normally required by for ownership conversion.
+
+This is used in Objective-C compatible destructors to convert a
+guaranteed parameter to an owned parameter without performing a
+semantic copy.
+
+The resulting value must meet the usual ownership requirements; for
+example, a trivial type must have '.none' ownership.
+
 ref_to_raw_pointer
 ``````````````````
 ::

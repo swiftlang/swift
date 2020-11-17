@@ -434,9 +434,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
   
-  Opts.DisableParserLookup |= Args.hasFlag(OPT_disable_parser_lookup,
-                                           OPT_enable_parser_lookup,
-                                           /*default*/ true);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -729,6 +726,12 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
 
+  // Check for SkipFunctionBodies arguments in order from skipping less to
+  // skipping more.
+  if (Args.hasArg(
+        OPT_experimental_skip_non_inlinable_function_bodies_without_types))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
   if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -738,15 +741,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
     Opts.SkipFunctionBodies = FunctionBodySkipping::All;
 
-  if (Opts.SkipFunctionBodies == FunctionBodySkipping::NonInlinable &&
+  if (Opts.SkipFunctionBodies != FunctionBodySkipping::None &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
-    // Disable this optimization if we're compiling SwiftOnoneSupport, because
-    // we _definitely_ need to look inside every declaration to figure out
-    // what gets prespecialized.
+    // Disable these optimizations if we're compiling SwiftOnoneSupport,
+    // because we _definitely_ need to look inside every declaration to figure
+    // out what gets prespecialized.
     Opts.SkipFunctionBodies = FunctionBodySkipping::None;
     Diags.diagnose(
         SourceLoc(),
-        diag::module_incompatible_with_skip_non_inlinable_function_bodies,
+        diag::module_incompatible_with_skip_function_bodies,
         SWIFT_ONONE_SUPPORT);
   }
 

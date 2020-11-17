@@ -152,6 +152,7 @@ public:
   PostDominanceInfo(SILFunction *F);
 
   bool properlyDominates(SILInstruction *A, SILInstruction *B);
+  bool properlyDominates(SILValue A, SILInstruction *B);
 
   void verify() const;
 

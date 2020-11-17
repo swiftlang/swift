@@ -1424,7 +1424,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
 
             // First check if we are not compatible with guaranteed. This means
             // we would be Owned or Unowned. If so, return SILValue().
-            if (!ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+            if (!ownershipKind.isCompatibleWith(OwnershipKind::Guaranteed))
               return SILValue();
 
             // Otherwise check if our operand is non-trivial and None. In cases
@@ -1432,7 +1432,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
             // where we lost that our underlying value is None due to
             // intermediate aggregate literal operations. In that case, we /do
             // not/ want to eliminate the destructure.
-            if (ownershipKind == ValueOwnershipKind::None &&
+            if (ownershipKind == OwnershipKind::None &&
                 !operandValue->getType().isTrivial(*Struct->getFunction()))
               return SILValue();
 
@@ -1458,7 +1458,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
 
             // First check if we are not compatible with guaranteed. This means
             // we would be Owned or Unowned. If so, return SILValue().
-            if (!ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+            if (!ownershipKind.isCompatibleWith(OwnershipKind::Guaranteed))
               return SILValue();
 
             // Otherwise check if our operand is non-trivial and None. In cases
@@ -1466,7 +1466,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
             // where we lost that our underlying value is None due to
             // intermediate aggregate literal operations. In that case, we /do
             // not/ want to eliminate the destructure.
-            if (ownershipKind == ValueOwnershipKind::None &&
+            if (ownershipKind == OwnershipKind::None &&
                 !operandValue->getType().isTrivial(*Tuple->getFunction()))
               return SILValue();
 

@@ -45,9 +45,7 @@ bb0(%0 : $@differentiable @callee_guaranteed (Float) -> Float):
 // CHECK: bb0([[ARG:%.*]] : $@differentiable @callee_guaranteed (Float) -> Float):
 // CHECK:   [[ORIG_FN:%.*]] = differentiable_function_extract [original] [[ARG]]
 // CHECK:   [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[ARG]]
-// CHECK:   strong_retain [[JVP_FN]]
 // CHECK:   [[VJP_FN:%.*]] = differentiable_function_extract [vjp] [[ARG]]
-// CHECK:   strong_retain [[VJP_FN]]
 // CHECK:   differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : {{.*}} with_derivative {[[JVP_FN]] : {{.*}}, [[VJP_FN]] : {{.*}}}
 // CHECK: }
 
@@ -134,8 +132,6 @@ bb0(%0 : $Class):
 // CHECK-LABEL: sil @test_class_method_partial_apply
 // CHECK: bb0([[ARG:%.*]] : $Class):
 // CHECK:  [[ORIG_FN:%.*]] = class_method [[ARG]] : $Class, #Class.method
-// CHECK:  strong_retain [[ARG]]
-// CHECK:  strong_retain [[ARG]]
 // CHECK:  [[ORIG_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[ORIG_FN]]([[ARG]])
 // CHECK:  [[JVP_FN:%.*]] = class_method [[ARG]] : $Class, #Class.method!jvp.SU
 // CHECK:  [[JVP_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[JVP_FN]]([[ARG]])
