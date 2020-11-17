@@ -10,3 +10,6 @@ let a = 12
 
 // rdar://problem/38162017
 // REQUIRES: OS=macosx
+
+// FIXME: this test is failing (rarely) in CI
+// REQUIRES: rdar71468441
