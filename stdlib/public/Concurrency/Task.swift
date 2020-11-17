@@ -146,6 +146,11 @@ extension Task {
     public func cancel() {
       Builtin.cancelAsyncTask(task)
     }
+
+    @available(*, deprecated, message: "This is a temporary hack")
+    public func run() {
+      runTask(task)
+    }
   }
 }
 
@@ -267,9 +272,6 @@ extension Task {
     let (task, context) =
       Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
 
-    // FIXME: Launch the task on an executor... somewhere....
-    runTask(task)
-
     return Handle<T>(task: task)
   }
 
@@ -316,11 +318,6 @@ extension Task {
     // Create the asynchronous task future.
     let (task, context) =
       Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
-
-    print(task)
-
-    // FIXME: Launch the task on an executor... somewhere....
-    runTask(task)
 
     return Handle<T>(task: task)
   }
