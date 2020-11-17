@@ -121,7 +121,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   /// The default visitor.
   bool visitSILInstruction(SILInstruction *i) {
-    assert(!isGuaranteedForwardingInst(i) &&
+    assert(!isGuaranteedForwardingValueKind(SILNodeKind(i->getKind())) &&
            "Should have forwarding visitor for all ownership forwarding "
            "instructions");
     return false;
