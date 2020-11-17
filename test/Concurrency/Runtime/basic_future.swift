@@ -16,9 +16,14 @@ extension DispatchQueue {
   }
 }
 
+func formGreeting(name: String) async -> String {
+  return "Hello \(name) from async world"
+}
+
 func test(name: String) {
   let taskHandle = DispatchQueue.main.async { () async -> String in
-    return "Hello \(name) from async world"
+    let greeting = await formGreeting(name: name)
+    return greeting + "!"
   }
 
   _ = DispatchQueue.main.async { () async in
@@ -28,7 +33,7 @@ func test(name: String) {
     let result = await try! taskHandle.get()
     // CHECK: Hello Ted from async world
     print(result)
-    assert(result == "Hello Ted from async world")
+    assert(result == "Hello Ted from async world!")
     exit(0)
   }
 
