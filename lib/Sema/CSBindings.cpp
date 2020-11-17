@@ -140,6 +140,25 @@ bool PotentialBindings::isPotentiallyIncomplete() const {
   if (!locator)
     return false;
 
+  if (locator->isLastElement<LocatorPathElt::MemberRefBase>() &&
+      !Bindings.empty()) {
+    // If the base of the unresolved member reference like `.foo`
+    // couldn't be resolved we'd want to bind it to a hole at the
+    // very last moment possible, just like generic parameters.
+    if (isHole())
+      return true;
+
+    auto &binding = Bindings.front();
+    // If base type of a member chain is inferred to be a protocol type,
+    // let's consider this binding set to be potentially incomplete since
+    // that's done as a last resort effort at resolving first member.
+    if (auto *constraint = binding.getSource()) {
+      if (binding.BindingType->is<ProtocolType>() &&
+          constraint->getKind() == ConstraintKind::ConformsTo)
+        return true;
+    }
+  }
+
   if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
     // If subtyping is allowed and this is a result of an implicit member chain,
     // let's delay binding it to an optional until its object type resolved too or
@@ -159,12 +178,6 @@ bool PotentialBindings::isPotentiallyIncomplete() const {
   }
 
   if (isHole()) {
-    // If the base of the unresolved member reference like `.foo`
-    // couldn't be resolved we'd want to bind it to a hole at the
-    // very last moment possible, just like generic parameters.
-    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
-      return true;
-
     // Delay resolution of the code completion expression until
     // the very end to give it a chance to be bound to some
     // contextual type even if it's a hole.
@@ -428,7 +441,6 @@ void PotentialBindings::finalize(
               {protocolTy, AllowedBindingKind::Exact, constraint});
         }
 
-        PotentiallyIncomplete = true;
         FullyBound = true;
       }
     }
