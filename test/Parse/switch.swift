@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>

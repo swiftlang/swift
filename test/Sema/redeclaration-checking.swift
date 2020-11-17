@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 // Test redeclaration checking in local context.
 

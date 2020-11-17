@@ -1958,7 +1958,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   ParserStatus Status;
   {
-    Scope S(this, ScopeKind::Brace);
     SmallVector<ASTNode, 4> Stmts;
 
     // Make the variable which will contain our temporary value.
@@ -1968,7 +1967,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setUserAccessible(false);
-    addToScope(InterpolationVar);
     setLocalDiscriminator(InterpolationVar);
     
     Stmts.push_back(InterpolationVar);
@@ -2203,54 +2201,13 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = nullptr;
-  // When doing incremental re-parsing for SwiftSyntax this check may emit bogus
-  // diagnostic. Also really the syntactic parser should not be doing name
-  // lookups, so disable this check when parsing for SwiftSyntax.
-  if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
-    D = lookupInScope(name);
-
-    if (!Context.LangOpts.DisableParserLookup) {
-      // FIXME: We want this to work: "var x = { x() }", but for now it's better
-      // to disallow it than to crash.
-      if (D) {
-        for (auto activeVar : DisabledVars) {
-          if (activeVar == D) {
-            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-            return new (Context) ErrorExpr(loc.getSourceRange());
-          }
-        }
-      } else {
-        for (auto activeVar : DisabledVars) {
-          if (activeVar->getName() == name.getFullName()) {
-            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-            return new (Context) ErrorExpr(loc.getSourceRange());
-          }
-        }
-      }
-    }
+  if (name.getBaseName().isEditorPlaceholder()) {
+    IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
+    return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
   }
-  
-  Expr *E;
-  if (D == nullptr || D->getAttrs().hasAttribute<CustomAttr>()) {
-    if (name.getBaseName().isEditorPlaceholder()) {
-      IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
-      return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
-    }
 
-    auto refKind = DeclRefKind::Ordinary;
-    E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-  } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    // When parsing default argument expressions for generic functions,
-    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
-    // to the FuncDecl yet. Other than that, we should only ever find
-    // global or local declarations here.
-    assert(!TD->getDeclContext()->isTypeContext() ||
-           isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc, TD, /*DC*/ nullptr);
-  } else {
-    E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-  }
+  auto refKind = DeclRefKind::Ordinary;
+  Expr *E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   
   if (hasGenericArgumentList) {
     E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
@@ -2773,14 +2730,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   auto *closure = new (Context) ClosureExpr(
       bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc, arrowLoc,
       inLoc, explicitResultType, discriminator, CurDeclContext);
-  // The arguments to the func are defined in their own scope.
-  Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
   if (params) {
-    // Add the parameters into scope.
-    addParametersToScope(params);
     setLocalDiscriminatorToParamList(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
@@ -2789,10 +2742,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // users who are refactoring code by adding names.
     AnonClosureVars.push_back({{}, leftBrace});
   }
-  
-  // Add capture list variables to scope.
-  for (auto c : captureList)
-    addToScope(c.Var);
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
@@ -3644,23 +3593,6 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
     diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
         .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
   }
-}
-
-void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
-  for (Pattern *Pat : Patterns) {
-    Pat->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasName()) {
-        // Add any variable declarations to the current scope.
-        addToScope(VD);
-      }
-    });
-  }
-}
-
-void Parser::addParametersToScope(ParameterList *PL) {
-  for (auto param : *PL)
-    if (param->hasName())
-      addToScope(param);
 }
 
 
