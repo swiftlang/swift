@@ -3596,8 +3596,6 @@ llvm::Value *irgen::emitTaskCreate(
     SubstitutionMap subs) {
   parentTask = IGF.Builder.CreateBitOrPointerCast(
       parentTask, IGF.IGM.SwiftTaskPtrTy);
-  taskFunction = IGF.Builder.CreateBitOrPointerCast(
-      taskFunction, IGF.IGM.AsyncFunctionPointerPtrTy);
 
   // Determine the size of the async context for the closure.
   ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
@@ -3621,29 +3619,36 @@ llvm::Value *irgen::emitTaskCreate(
 
   // Call the function.
   llvm::CallInst *result;
+  llvm::Value *theSize, *theFunction;
+  std::tie(theFunction, theSize) =
+      getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
+                              FunctionPointer::forExplosionValue(
+                                  IGF, taskFunction, taskFunctionCanSILType),
+                              localContextInfo);
+  theFunction = IGF.Builder.CreateBitOrPointerCast(
+      theFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
+  theSize = IGF.Builder.CreateZExtOrBitCast(theSize, IGF.IGM.SizeTy);
   if (futureResultType) {
     result = IGF.Builder.CreateCall(
       IGF.IGM.getTaskCreateFutureFuncFn(),
-      { flags, parentTask, futureResultType, taskFunction });
+      { flags, parentTask, futureResultType, theFunction, theSize });
   } else {
-    result = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCreateFuncFn(),
-      { flags, parentTask, taskFunction });
+    result = IGF.Builder.CreateCall(IGF.IGM.getTaskCreateFuncFn(),
+                                    {flags, parentTask, theFunction, theSize});
   }
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
 
   // Write the local context information into the initial context for the task.
-  if (layout.hasLocalContext()) {
-    // Dig out the initial context returned from task creation.
-    auto initialContext = IGF.Builder.CreateExtractValue(result, { 1 });
-    Address initialContextAddr = layout.emitCastTo(IGF, initialContext);
+  assert(layout.hasLocalContext());
+  // Dig out the initial context returned from task creation.
+  auto initialContext = IGF.Builder.CreateExtractValue(result, {1});
+  Address initialContextAddr = layout.emitCastTo(IGF, initialContext);
 
-    auto localContextLayout = layout.getLocalContextLayout();
-    auto localContextAddr = localContextLayout.project(
-        IGF, initialContextAddr, llvm::None);
-    IGF.Builder.CreateStore(localContextInfo, localContextAddr);
-  }
+  auto localContextLayout = layout.getLocalContextLayout();
+  auto localContextAddr =
+      localContextLayout.project(IGF, initialContextAddr, llvm::None);
+  IGF.Builder.CreateStore(localContextInfo, localContextAddr);
 
   return result;
 }
