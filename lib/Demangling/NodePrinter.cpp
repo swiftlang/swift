@@ -2145,6 +2145,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ImplFunctionConventionName:
     assert(false && "Already handled in ImplFunctionConvention");
+    return nullptr;
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
     printChildren(Node, " ");
