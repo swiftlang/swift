@@ -1118,14 +1118,6 @@ def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable parser lookup & use ASTScope lookup only (experimental)">;
-
-def enable_parser_lookup : Flag<["-"], "enable-parser-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable parser lookup">;
-
 def enable_request_based_incremental_dependencies : Flag<["-"],
   "enable-request-based-incremental-dependencies">,
   Flags<[FrontendOption]>,

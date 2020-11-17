@@ -366,7 +366,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
   tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
-  langOpts.DisableParserLookup = true;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
@@ -444,17 +443,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
                            1);
     SM.setCodeCompletionPoint(newBufferID, newOffset);
 
-    // Construct dummy scopes. We don't need to restore the original scope
-    // because they are probably not 'isResolvable()' anyway.
-    auto &SI = oldState->getScopeInfo();
-    assert(SI.getCurrentScope() == nullptr);
-    Scope Top(SI, ScopeKind::TopLevel);
-    Scope Body(SI, ScopeKind::FunctionBody);
-
-    assert(oldInfo.Kind == CodeCompletionDelayedDeclKind::FunctionBody &&
-           "If the interface hash is the same as old one, the previous kind "
-           "must be FunctionBody too. Otherwise, hashing is too weak");
-    oldInfo.Kind = CodeCompletionDelayedDeclKind::FunctionBody;
     oldInfo.ParentContext = DC;
     oldInfo.StartOffset = newInfo.StartOffset;
     oldInfo.EndOffset = newInfo.EndOffset;

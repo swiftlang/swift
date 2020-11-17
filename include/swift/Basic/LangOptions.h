@@ -258,9 +258,6 @@ namespace swift {
     /// This is a staging flag; eventually it will be removed.
     bool EnableDeserializationRecovery = true;
 
-    /// Someday, ASTScopeLookup will supplant lookup in the parser
-    bool DisableParserLookup = false;
-
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;

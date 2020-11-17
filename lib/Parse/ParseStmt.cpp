@@ -289,15 +289,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   bool isConditionalBlock = isActiveConditionalBlock ||
     ConditionalBlockKind == BraceItemListKind::InactiveConditionalBlock;
 
-  // If we're not parsing an active #if block, form a new lexical scope.
-  Optional<Scope> initScope;
-  if (!isActiveConditionalBlock) {
-    auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace;
-    initScope.emplace(this, scopeKind,
-                      ConditionalBlockKind ==
-                        BraceItemListKind::InactiveConditionalBlock);
-  }
-
   ParserStatus BraceItemsStatus;
 
   bool PreviousHadSemi = true;
@@ -1125,7 +1116,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
       P.setLocalDiscriminator(VD);
-      if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
 
@@ -1136,7 +1126,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     // same number and same names in this pattern as were declared in a
     // previous pattern (and later we will make sure they have the same
     // types).
-    Scope guardScope(&P, ScopeKind::CaseVars);
     SmallVector<VarDecl*, 4> repeatedDecls;
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
       if (!VD->hasName())
@@ -1156,8 +1145,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       }
       repeatedDecls.push_back(VD);
       P.setLocalDiscriminator(VD);
-      if (VD->hasName())
-        P.addToScope(VD);
     });
     
     for (auto previous : boundDecls) {
@@ -1594,8 +1581,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   // them as being having a non-pattern-binding initializer.
   ThePattern.get()->forEachVariable([&](VarDecl *VD) {
     setLocalDiscriminator(VD);
-    if (VD->hasName())
-      addToScope(VD);
   });
   return Status;
 }
@@ -1691,8 +1676,6 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
   // A scope encloses the condition and true branch for any variables bound
   // by a conditional binding. The else branch does *not* see these variables.
   {
-    Scope S(this, ScopeKind::IfVars);
-
     auto recoverWithCond = [&](ParserStatus Status,
                                StmtCondition Condition) -> ParserResult<Stmt> {
       if (Condition.empty()) {
@@ -1835,19 +1818,6 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
       return recoverWithCond(Status, Condition);
   }
 
-  // Before parsing the body, disable all of the bound variables so that they
-  // cannot be used unbound.
-  SmallVector<VarDecl *, 4> Vars;
-  for (auto &elt : Condition)
-    if (auto pattern = elt.getPatternOrNull())
-      pattern->collectVariables(Vars);
-  Vars.append(DisabledVars.begin(), DisabledVars.end());
-  llvm::SaveAndRestore<decltype(DisabledVars)>
-  RestoreCurVars(DisabledVars, Vars);
-
-  llvm::SaveAndRestore<decltype(DisabledVarReason)>
-  RestoreReason(DisabledVarReason, diag::bound_var_guard_body);
-
   Body = parseBraceItemList(diag::expected_lbrace_after_guard);
   if (Body.isNull())
     return recoverWithCond(Status, Condition);
@@ -1865,8 +1835,6 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
   SyntaxContext->setCreateSyntax(SyntaxKind::WhileStmt);
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
-  Scope S(this, ScopeKind::WhileVars);
-  
   ParserStatus Status;
   StmtCondition Condition;
 
@@ -2050,8 +2018,6 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
 ParserResult<CaseStmt> Parser::parseStmtCatch() {
   SyntaxParsingContext CatchClauseCtxt(SyntaxContext, SyntaxKind::CatchClause);
   // A catch block has its own scope for variables bound out of the pattern.
-  Scope S(this, ScopeKind::CatchVars);
-
   SourceLoc catchLoc = consumeToken(tok::kw_catch);
 
   SmallVector<VarDecl*, 4> boundDecls;
@@ -2090,17 +2056,9 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
     caseBodyDecls.emplace(Result);
   }
 
-  // Add a scope so that the parser can find our body bound decls if it emits
-  // optimized accesses.
-  Optional<Scope> BodyScope;
   if (caseBodyDecls) {
-    BodyScope.emplace(this, ScopeKind::CatchVars);
     for (auto *v : *caseBodyDecls) {
       setLocalDiscriminator(v);
-      // If we had any bad redefinitions, we already diagnosed them against the
-      // first case label item.
-      if (v->hasName())
-        addToScope(v, false /*diagnoseRedefinitions*/);
     }
   }
 
@@ -2235,16 +2193,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
       // Recover.
       skipUntilDeclStmtRBrace(tok::l_brace, tok::kw_where);
   }
-
-  // Introduce a new scope and place the variables in the pattern into that
-  // scope.
-  // FIXME: We may want to merge this scope with the scope introduced by
-  // the stmt-brace, as in C++.
-  Scope S(this, ScopeKind::ForeachVars);
   
-  // Introduce variables to the current scope.
-  addPatternVariablesToScope(pattern.get());
-
   // Parse the 'where' expression if present.
   ParserResult<Expr> Where;
   SourceLoc WhereLoc;
@@ -2519,8 +2468,6 @@ struct FallthroughFinder : ASTWalker {
 
 ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SyntaxParsingContext CaseContext(SyntaxContext, SyntaxKind::SwitchCase);
-  // A case block has its own scope for variables bound out of the pattern.
-  Scope S(this, ScopeKind::CaseVars, !IsActive);
 
   ParserStatus Status;
 
@@ -2571,17 +2518,9 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
 
-  // Add a scope so that the parser can find our body bound decls if it emits
-  // optimized accesses.
-  Optional<Scope> BodyScope;
   if (CaseBodyDecls) {
-    BodyScope.emplace(this, ScopeKind::CaseVars);
     for (auto *v : *CaseBodyDecls) {
       setLocalDiscriminator(v);
-      // If we had any bad redefinitions, we already diagnosed them against the
-      // first case label item.
-      if (v->hasName())
-        addToScope(v, false /*diagnoseRedefinitions*/);
     }
   }
 
