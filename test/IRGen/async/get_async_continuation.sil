@@ -1,0 +1,74 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s
+
+// REQUIRES: concurrency
+
+import Builtin
+import Swift
+import _Concurrency
+
+sil @not_async_test : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: define{{.*}} @async_continuation(
+sil @async_continuation : $@async () -> () {
+entry:
+  %c = get_async_continuation $Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+
+bb1(%r : $Builtin.Int32):
+  %t = tuple()
+  return %t : $()
+}
+
+sil @async_continuation_throws : $@async () -> () {
+entry:
+  %c = get_async_continuation [throws] $Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+bb1(%r : $Builtin.Int32):
+  br bb3
+bb2(%e : $Error):
+  br bb3
+
+bb3:
+  %t = tuple()
+  return %t : $()
+}
+
+sil @async_continuation_addr : $@async () -> () {
+entry:
+  %a = alloc_stack $Builtin.Int32
+  %c = get_async_continuation_addr $Builtin.Int32, %a : $*Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  %t = tuple()
+  return %t : $()
+}
+
+sil @async_continuation_throws_addr : $@async () -> () {
+entry:
+  %a = alloc_stack $Builtin.Int32
+  %c = get_async_continuation_addr [throws] $Builtin.Int32, %a : $*Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  %t = tuple()
+  return %t : $()
+}

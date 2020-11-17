@@ -135,6 +135,17 @@ public:
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
+  llvm::Function *getOrCreateAwaitAsyncSupendFn();
+
+  void emitGetAsyncContinuation(SILType silTy, StackAddress optionalResultAddr,
+                                Explosion &out);
+
+  void emitAwaitAsyncContinuation(SILType unsafeContinuationTy,
+                                  bool isIndirectResult,
+                                  Explosion &outDirectResult,
+                                  llvm::BasicBlock *&normalBB,
+                                  llvm::PHINode *&optionalErrorPhi,
+                                  llvm::BasicBlock *&optionalErrorBB);
 
 private:
   void emitPrologue();
@@ -145,7 +156,15 @@ private:
   llvm::Value *CalleeErrorResultSlot = nullptr;
   llvm::Value *CallerErrorResultSlot = nullptr;
   llvm::Value *CoroutineHandle = nullptr;
+  llvm::Value *AsyncCoroutineCurrentResume = nullptr;
+  llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
   bool IsAsync = false;
+
+  /// The unique block that calls @llvm.coro.end.
+  llvm::BasicBlock *CoroutineExitBlock = nullptr;
+
+public:
+  void emitCoroutineOrAsyncExit();
 
 //--- Helper methods -----------------------------------------------------------
 public:

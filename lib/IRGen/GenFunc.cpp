@@ -2433,3 +2433,31 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   Builder.CreateRetVoid();
   return dispatch;
 }
+
+llvm::Function *IRGenFunction::getOrCreateAwaitAsyncSupendFn() {
+  auto name = "__swift_async_await_async_suspend";
+  return cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+      name, IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto &Builder = IGF.Builder;
+        auto *fnTy = llvm::FunctionType::get(
+            IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
+            false /*vaargs*/);
+        llvm::Value *fn = &*(it++);
+        SmallVector<llvm::Value *, 8> callArgs;
+        for (auto end = IGF.CurFn->arg_end(); it != end; ++it)
+          callArgs.push_back(&*it);
+        auto signature =
+            Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftCC);
+        auto fnPtr = FunctionPointer(
+            FunctionPointer::KindTy::Function,
+            Builder.CreateBitOrPointerCast(fn, fnTy->getPointerTo()),
+            PointerAuthInfo(), signature);
+        auto call = Builder.CreateCall(fnPtr, callArgs);
+        call->setTailCall();
+        call->setCallingConv(IGM.SwiftCC);
+        Builder.CreateRetVoid();
+      },
+      false /*isNoInline*/));
+}
