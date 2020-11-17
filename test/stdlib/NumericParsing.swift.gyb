@@ -181,11 +181,10 @@ tests.test("${Self}/Basics") {
   expectNil(${Self}("0 "))  // Trailing whitespace
   expectNil(${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
 
-  // Overflow to infinity, underflow to zero.
-  expectEqual(.infinity, ${Self}("2e99999999999999"))
-  expectEqual(0.0, ${Self}("2e-99999999999999"))
-  expectEqual(-.infinity, ${Self}("-2e99999999999999"))
-  expectEqual(0.0, ${Self}("-2e-99999999999999"))
+  // Values that are too large/small:
+  // * Early versions of Swift returned `nil` for e.g., 1e99999 or 1e-99999
+  // * After 5.3, large/small values return .infinity or zero, respectively
+  // These are tested in NumericParsing2.swift.gyb
 }
 
 % if Self == 'Float80':
