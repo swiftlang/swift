@@ -22,14 +22,19 @@
 
 namespace swift {
 
+class AbstractFunctionDecl;
 class ActorIsolation;
 class ASTContext;
 class ClassDecl;
 class ConcreteDeclRef;
 class Decl;
 class DeclContext;
+class EnumElementDecl;
 class Expr;
 class FuncDecl;
+class Initializer;
+class PatternBindingDecl;
+class TopLevelCodeDecl;
 class TypeBase;
 class ValueDecl;
 
@@ -38,7 +43,12 @@ class ValueDecl;
 void addAsyncNotes(FuncDecl *func);
 
 /// Check actor isolation rules.
-void checkActorIsolation(const Expr *expr, const DeclContext *dc);
+void checkTopLevelActorIsolation(TopLevelCodeDecl *decl);
+void checkFunctionActorIsolation(AbstractFunctionDecl *decl);
+void checkInitializerActorIsolation(Initializer *init, Expr *expr);
+void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
+void checkPropertyWrapperActorIsolation(
+    PatternBindingDecl *binding, Expr *expr);
 
 /// The isolation restriction in effect for a given declaration that is
 /// referenced from source.

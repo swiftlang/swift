@@ -578,8 +578,10 @@ findMemberReference(Expr *expr) {
   return None;
 }
 
-void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
-  class ActorIsolationWalker : public ASTWalker {
+namespace {
+  /// Check for adherence to the actor isolation rules, emitting errors
+  /// when actor-isolated declarations are used in an unsafe manner.
+  class ActorIsolationChecker : public ASTWalker {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
 
@@ -588,17 +590,21 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
     }
 
   public:
-    ActorIsolationWalker(const DeclContext *dc) : ctx(dc->getASTContext()) {
+    ActorIsolationChecker(const DeclContext *dc) : ctx(dc->getASTContext()) {
       contextStack.push_back(dc);
-    }
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
+
+    bool walkToDeclPre(Decl *D) override {
+      // Don't walk into functions; they'll be handled separately.
+      if (isa<AbstractFunctionDecl>(D))
+        return false;
+
+      return true;
+    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
@@ -1011,9 +1017,38 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       llvm_unreachable("unhandled actor isolation kind!");
     }
   };
+}
 
-  ActorIsolationWalker walker(dc);
-  const_cast<Expr *>(expr)->walk(walker);
+void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
+  ActorIsolationChecker checker(decl);
+  decl->getBody()->walk(checker);
+}
+
+void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
+  ActorIsolationChecker checker(decl);
+  if (auto body = decl->getBody()) {
+    body->walk(checker);
+  }
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl))
+    if (auto superInit = ctor->getSuperInitCall())
+      superInit->walk(checker);
+}
+
+void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
+  ActorIsolationChecker checker(init);
+  expr->walk(checker);
+}
+
+void swift::checkEnumElementActorIsolation(
+    EnumElementDecl *element, Expr *expr) {
+  ActorIsolationChecker checker(element);
+  expr->walk(checker);
+}
+
+void swift::checkPropertyWrapperActorIsolation(
+   PatternBindingDecl *binding, Expr *expr) {
+  ActorIsolationChecker checker(binding->getDeclContext());
+  expr->walk(checker);
 }
 
 /// Determine actor isolation solely from attributes.
