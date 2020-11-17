@@ -380,6 +380,10 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
     ValueDecl *localDeclAfterUse = nullptr;
     auto isValid = [&](ValueDecl *D) {
+      // References to variables injected by lldb are always valid.
+      if (isa<VarDecl>(D) && cast<VarDecl>(D)->isDebuggerVar())
+        return true;
+
       // If we find something in the current context, it must be a forward
       // reference, because otherwise if it was in scope, it would have
       // been returned by the call to ASTScope::lookupLocalDecls() above.
