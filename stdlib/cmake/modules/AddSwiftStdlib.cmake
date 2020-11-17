@@ -402,10 +402,10 @@ function(_add_target_variant_link_flags)
     list(APPEND library_search_directories
          ${CMAKE_BINARY_DIR}/winsdk_lib_${LFLAGS_ARCH}_symlinks)
   elseif("${LFLAGS_SDK}" STREQUAL "HAIKU")
-    list(APPEND link_libraries "bsd" "atomic")
+    list(APPEND link_libraries "bsd")
     list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND link_libraries "dl" "log" "atomic")
+    list(APPEND link_libraries "dl" "log")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
 
