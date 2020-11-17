@@ -1054,25 +1054,25 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
     return;
 
   auto &ctx = SF->getASTContext();
-  if (ctx.LangOpts.EnableObjCInterop) {
-    // Don't diagnose in a SIL file.
-    if (SF->Kind == SourceFileKind::SIL)
-      return;
 
-    // Don't diagnose for -disable-objc-attr-requires-foundation-module.
-    if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
-      return;
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+      .fixItRemove(attr->getRangeWithAt());
+    return;
   }
+
+  // Don't diagnose in a SIL file.
+  if (SF->Kind == SourceFileKind::SIL)
+    return;
+
+  // Don't diagnose for -disable-objc-attr-requires-foundation-module.
+  if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+    return;
 
   // If we have the Foundation module, @objc is okay.
   auto *foundation = ctx.getLoadedModule(ctx.Id_Foundation);
   if (foundation && ctx.getImportCache().isImportedBy(foundation, SF))
     return;
-
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt());
-  }
 
   ctx.Diags.diagnose(attr->getLocation(),
                      diag::attr_used_without_required_module, attr,
