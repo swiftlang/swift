@@ -2202,7 +2202,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     // argument input file to the linker.
     const auto &Triple = TC.getTriple();
     SmallVector<const Action *, 2> AutolinkExtractInputs;
-    for (const Action *A : AllLinkerInputs)
+    for (const Action *A : AllLinkerInputs) {
       if (A->getType() == file_types::TY_Object) {
         // Shared objects on ELF platforms don't have a swift1_autolink_entries
         // section in them because the section in the .o files is marked as
@@ -2214,12 +2214,14 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
             continue;
         }
         AutolinkExtractInputs.push_back(A);
+      } else if (A->getType() == file_types::TY_LLVM_BC) {
+        AutolinkExtractInputs.push_back(A);
       }
+    }
     const bool AutolinkExtractRequired =
-        ((Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
-         Triple.getObjectFormat() == llvm::Triple::Wasm ||
-         Triple.isOSCygMing()) &&
-        !shouldPerformLTO;
+        ((Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4() && !shouldPerformLTO) ||
+        Triple.getObjectFormat() == llvm::Triple::Wasm ||
+        (Triple.isOSCygMing() && !shouldPerformLTO));
     if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
