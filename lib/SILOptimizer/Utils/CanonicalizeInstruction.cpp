@@ -384,6 +384,65 @@ broadenSingleElementStores(StoreInst *storeInst,
 }
 
 //===----------------------------------------------------------------------===//
+//                            Simple ARC Peepholes
+//===----------------------------------------------------------------------===//
+
+static SILBasicBlock::iterator
+eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
+  auto next = std::next(cvi->getIterator());
+
+  // Eliminate copies that only have destroy_value uses.
+  SmallVector<DestroyValueInst *, 8> destroys;
+  for (auto *use : getNonDebugUses(cvi)) {
+    if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
+      destroys.push_back(dvi);
+      continue;
+    }
+    return next;
+  }
+
+  while (!destroys.empty()) {
+    next = killInstruction(destroys.pop_back_val(), next, pass);
+  }
+
+  next = killInstAndIncidentalUses(cvi, next, pass);
+  return next;
+}
+
+static SILBasicBlock::iterator
+eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
+  auto next = std::next(bbi->getIterator());
+
+  // We know that our borrow is completely within the lifetime of its base value
+  // if the borrow is never reborrowed. We check for reborrows and do not
+  // optimize such cases. Otherwise, we can eliminate our borrow and instead use
+  // our operand.
+  auto base = bbi->getOperand();
+  auto baseOwnership = base.getOwnershipKind();
+  SmallVector<EndBorrowInst *, 8> endBorrows;
+  for (auto *use : getNonDebugUses(bbi)) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+      endBorrows.push_back(ebi);
+      continue;
+    }
+
+    // Otherwise, if we have a use that is non-lifetime ending and can accept
+    // our base ownership, continue.
+    if (!use->isLifetimeEnding() && use->canAcceptKind(baseOwnership))
+      continue;
+
+    return next;
+  }
+
+  while (!endBorrows.empty()) {
+    next = killInstruction(endBorrows.pop_back_val(), next, pass);
+  }
+  bbi->replaceAllUsesWith(base);
+  pass.notifyHasNewUsers(base);
+  return killInstruction(bbi, next, pass);
+}
+
+//===----------------------------------------------------------------------===//
 //                            Top-Level Entry Point
 //===----------------------------------------------------------------------===//
 
@@ -397,6 +456,12 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
 
   if (auto *storeInst = dyn_cast<StoreInst>(inst))
     return broadenSingleElementStores(storeInst, *this);
+
+  if (auto *cvi = dyn_cast<CopyValueInst>(inst))
+    return eliminateSimpleCopies(cvi, *this);
+
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(inst))
+    return eliminateSimpleBorrows(bbi, *this);
 
   // Skip ahead.
   return std::next(inst->getIterator());

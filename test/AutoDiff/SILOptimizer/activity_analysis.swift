@@ -347,31 +347,29 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
 // CHECK: [ACTIVE]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %15 = apply %14<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[ARRAY:%.*]] = apply %14<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 // CHECK: [USEFUL]   %17 = integer_literal $Builtin.Word, 2
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
 // CHECK: [ACTIVE]   %19 = apply %18<Float>(%17) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%20**, %21) = destructure_tuple %19 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] (%20, **%21**) = destructure_tuple %19 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [ACTIVE]   %22 = pointer_to_address %21 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [ACTIVE]   %23 = begin_borrow %15 : $Array<Float>
-// CHECK: [USEFUL]   %24 = integer_literal $Builtin.IntLiteral, 0
-// CHECK: [USEFUL]   %25 = metatype $@thin Int.Type
+// CHECK: [USEFUL]   %23 = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   %24 = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %27 = apply %26(%24, %25) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   %26 = apply %25(%23, %24) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %29 = apply %28<Float>(%22, %27, %23) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
-// CHECK: [VARIED]   %30 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %31 = index_addr %22 : $*Float, %30 : $Builtin.Word
-// CHECK: [ACTIVE]   %32 = begin_borrow %15 : $Array<Float>
-// CHECK: [USEFUL]   %33 = integer_literal $Builtin.IntLiteral, 1
-// CHECK: [USEFUL]   %34 = metatype $@thin Int.Type
+// CHECK: [NONE]   %28 = apply %27<Float>(%22, %26, %15) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [VARIED]   %29 = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   %30 = index_addr %22 : $*Float, %29 : $Builtin.Word
+// CHECK: [USEFUL]   %31 = integer_literal $Builtin.IntLiteral, 1
+// CHECK: [USEFUL]   %32 = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %36 = apply %35(%33, %34) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   %34 = apply %33(%31, %32) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %38 = apply %37<Float>(%31, %36, %32) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [NONE]   %36 = apply %35<Float>(%30, %34, %15) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %40 = apply %39<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   %38 = apply %37<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-978: Test array literal initialized with `apply` indirect results.
 struct Wrapper<T: Differentiable>: Differentiable {
@@ -733,16 +731,13 @@ func testClassModifyAccessor(_ c: inout C) {
 // CHECK: [VARIED]   %4 = load [copy] %3 : $*C
 // CHECK: [ACTIVE]   %6 = begin_access [read] [static] %0 : $*C
 // CHECK: [VARIED]   %7 = load [copy] %6 : $*C
-// CHECK: [VARIED]   %9 = begin_borrow %7 : $C
-// CHECK: [VARIED]   %10 = class_method %9 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
-// CHECK: [VARIED]   %11 = apply %10(%9) : $@convention(method) (@guaranteed C) -> Float
-// CHECK: [VARIED]   %14 = begin_borrow %4 : $C
-// CHECK: [VARIED]   %15 = class_method %14 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
-// CHECK: [VARIED] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
-// CHECK: [VARIED] (%16, **%17**) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED]   %9 = class_method %7 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %10 = apply %9(%7) : $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (**%13**, %14) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (%13, **%14**) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [NONE]   // function_ref static Float.*= infix(_:_:)
-// CHECK: [NONE]   %19 = apply %18(%16, %11, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
-// CHECK: [NONE]   %23 = tuple ()
+// CHECK: [NONE]   %16 = apply %15(%13, %10, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
 
 //===----------------------------------------------------------------------===//
 // Enum differentiation
