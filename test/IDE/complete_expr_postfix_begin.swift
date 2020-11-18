@@ -332,9 +332,11 @@ func foo() -> Undeclared {
   var fooParam = FooStruct()
   #^IN_INVALID_8?check=COMMON^#
 }
-// MY_ALIAS_1: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
-// MY_ALIAS_1: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#MyAlias<Int>#]; name=x
-// MY_ALIAS_1: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#]; name=y
+// MY_ALIAS_1: Begin completions
+// MY_ALIAS_1-DAG: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
+// MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#MyAlias<Int>#]; name=x
+// MY_ALIAS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#]; name=y
+// MY_ALIAS_1: End completions
 
 func testGenericTypealias1() {
   typealias MyAlias<T> = (T, T)
@@ -342,9 +344,11 @@ func testGenericTypealias1() {
   var y: (Int, Int)
   y = #^GENERIC_TYPEALIAS_1?check=MY_ALIAS_1^#
 }
-// MY_ALIAS_2: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
-// MY_ALIAS_2: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#]; name=x
-// MY_ALIAS_2: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#MyAlias<Int>#]; name=y
+// MY_ALIAS_2: Begin completions
+// MY_ALIAS_2-DAG: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
+// MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#]; name=x
+// MY_ALIAS_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#MyAlias<Int>#]; name=y
+// MY_ALIAS_2: End completions
 func testGenericTypealias2() {
   typealias MyAlias<T> = (T, T)
   let x: (Int, Int) = (1, 2)
@@ -468,13 +472,13 @@ func testTuple(localInt: Int) {
   let _: (Int, String) = (#^IN_TUPLE_2^#, "foo")
 }
 // IN_TUPLE_1: Begin completions
-// IN_TUPLE_1: Decl[LocalVar]/Local/TypeRelation[Identical]: localStr[#String#]; name=localStr
-// IN_TUPLE_1: Decl[LocalVar]/Local:               localInt[#Int#]; name=localInt
+// IN_TUPLE_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: localStr[#String#]; name=localStr
+// IN_TUPLE_1-DAG: Decl[LocalVar]/Local:               localInt[#Int#]; name=localInt
 // IN_TUPLE_1: End completions
 
 // IN_TUPLE_2: Begin completions
-// IN_TUPLE_2: Decl[LocalVar]/Local:               localStr[#String#]; name=localStr
-// IN_TUPLE_2: Decl[LocalVar]/Local/TypeRelation[Identical]: localInt[#Int#]; name=localInt
+// IN_TUPLE_2-DAG: Decl[LocalVar]/Local:               localStr[#String#]; name=localStr
+// IN_TUPLE_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: localInt[#Int#]; name=localInt
 // IN_TUPLE_2: End completions
 
 var ownInit1: Int = #^OWN_INIT_1^#
@@ -574,8 +578,7 @@ class InAccessorTestQualified {
     get {
       let _ = self.#^OWN_ACCESSOR_13^#
 // OWN_ACCESSOR_13: Begin completions
-// OWN_ACCESSOR_13-DAG: Decl[InstanceVar]/CurrNominal:      inAccessorProp[#Int#];
-// OWN_ACCESSOR_13: End completions
+// OWN_ACCESSOR_13: Decl[InstanceVar]/CurrNominal:      inAccessorProp[#Int#];
       let _ = \InAccessorTestQualified.#^OWN_ACCESSOR_14?check=OWN_ACCESSOR_13^#
     }
     set {
