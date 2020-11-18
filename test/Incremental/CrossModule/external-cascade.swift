@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/external-cascade/* %t
 
-// rdar://70772320
-// REQUIRES: !(optimized_stdlib)
+// REQUIRES: rdar70772320
 
 //
 // This test establishes a chain of modules that all depend on a set of
