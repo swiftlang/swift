@@ -1647,7 +1647,8 @@ AllowRefToInvalidDecl::create(ConstraintSystem &cs,
 
 bool IgnoreResultBuilderWithReturnStmts::diagnose(const Solution &solution,
                                                   bool asNote) const {
-  return false;
+  InvalidReturnInResultBuilderBody failure(solution, BuilderType, getLocator());
+  return failure.diagnose(asNote);
 }
 
 IgnoreResultBuilderWithReturnStmts *
