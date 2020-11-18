@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/DependencyScan/ModuleInfo.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -38,7 +39,7 @@ llvm::ErrorOr<std::string> DependencyScanningTool::getDependencies(
 
   std::string JSONOutput;
   llvm::raw_string_ostream OSS(JSONOutput);
-  scanDependencies(*Instance.get(), *SharedCache, OSS);
+  performModuleScan(*Instance.get(), *SharedCache, OSS);
   OSS.flush();
 
   // TODO: swiftch to an in-memory representation
@@ -55,7 +56,7 @@ std::error_code DependencyScanningTool::getDependencies(
     return EC;
   auto Instance = std::move(*InstanceOrErr);
 
-  executeBatchModuleScan(*Instance.get(), *SharedCache, Saver, BatchInput);
+  performBatchModuleScan(*Instance.get(), *SharedCache, Saver, BatchInput);
   return std::error_code();
 }
 

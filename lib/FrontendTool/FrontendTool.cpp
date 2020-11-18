@@ -1136,7 +1136,10 @@ static bool performScanDependencies(CompilerInstance &Instance) {
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
   ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
-    return dependencies::scanAndOutputDependencies(Instance);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::prescanMainModuleDependencies(Instance);
+    else
+      return dependencies::scanDependencies(Instance);
   } else {
     return dependencies::batchScanDependencies(Instance, batchScanInput);
   }

@@ -28,41 +28,46 @@ class ModuleDependenciesCache;
 namespace dependencies {
 
 struct BatchScanInput {
-  StringRef moduleName;
-  StringRef arguments;
-  StringRef outputPath;
+  llvm::StringRef moduleName;
+  llvm::StringRef arguments;
+  llvm::StringRef outputPath;
   bool isSwift;
 };
 
+// MARK: swift-frontend -scan-dependencies entry points
 /// Scans the dependencies of the main module of \c instance and writes out
 /// the resulting JSON according to the instance's output parameters.
 /// This method is used for swift-frontend invocations in dependency scanning mode
 /// (-scan-dependencies), where the module dependency cache is not shared.
-bool scanAndOutputDependencies(CompilerInstance &instance);
-
-/// Scans the dependencies of the main module of \c instance.
-bool scanDependencies(CompilerInstance &instance,
-                      ModuleDependenciesCache &cache,
-                      llvm::raw_ostream &out);
+bool scanDependencies(CompilerInstance &instance);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
 bool batchScanDependencies(CompilerInstance &instance,
-                                 llvm::StringRef batchInputFile);
+                           llvm::StringRef batchInputFile);
 
+/// Identify all imports in the translation unit's module.
+bool prescanMainModuleDependencies(CompilerInstance &instance);
+
+
+// MARK: dependency scanning execution
+/// Scans the dependencies of the main module of \c instance.
+bool performModuleScan(CompilerInstance &instance,
+                       ModuleDependenciesCache &cache,
+                       llvm::raw_ostream &out);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool executeBatchModuleScan(CompilerInstance &instance,
+bool performBatchModuleScan(CompilerInstance &instance,
                             ModuleDependenciesCache &cache,
                             llvm::StringSaver &saver,
                             const std::vector<BatchScanInput> &BatchInput);
 
 /// Scan for dependencies of a module with a specified name, producing the resulting output
 /// at the specified output path.
-bool executeSingleModuleScan(CompilerInstance &instance,
-                             ModuleDependenciesCache &cache,
-                             StringRef moduleName,
-                             bool isClang,
-                             StringRef outputPath);
+bool scanBatchModuleEntry(CompilerInstance &instance,
+                          ModuleDependenciesCache &cache,
+                          llvm::StringRef moduleName,
+                          bool isClang,
+                          llvm::StringRef outputPath);
 
 } // end namespace dependencies
 } // end namespace swift

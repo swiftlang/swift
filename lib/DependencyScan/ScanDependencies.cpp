@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -18,11 +19,10 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/DependencyScan/ScanDependencies.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -35,8 +35,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <set>
 
 using namespace swift;
@@ -57,7 +57,8 @@ static std::string getScalaNodeText(Node *N) {
 ///     "output": "../Foo.json"
 ///  },
 static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
-                                   Node *Node, std::vector<BatchScanInput> &result) {
+                                   Node *Node,
+                                   std::vector<BatchScanInput> &result) {
   auto *SN = cast<SequenceNode>(Node);
   if (!SN)
     return true;
@@ -65,9 +66,9 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
     auto *MN = cast<MappingNode>(&*It);
     BatchScanInput entry;
     Optional<std::set<int8_t>> Platforms;
-    for (auto &Pair: *MN) {
+    for (auto &Pair : *MN) {
       auto Key = getScalaNodeText(Pair.getKey());
-      auto* Value = Pair.getValue();
+      auto *Value = Pair.getValue();
       if (Key == "clangModuleName") {
         entry.moduleName = saver.save(getScalaNodeText(Value));
         entry.isSwift = false;
@@ -101,7 +102,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(batchInputPath);
+      llvm::MemoryBuffer::getFile(batchInputPath);
   if (!FileBufOrErr) {
     ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_missing,
                        batchInputPath);
@@ -114,7 +115,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   SourceManager SM;
   yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, batchInputPath),
                       SM.getLLVMSourceMgr());
-  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+  for (auto DI = Stream.begin(); DI != Stream.end(); ++DI) {
     assert(DI != Stream.end() && "Failed to read a document");
     yaml::Node *N = DI->getRoot();
     assert(N && "Failed to find a root");
@@ -126,7 +127,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   }
   return result;
 }
-}
+} // namespace
 
 /// Find all of the imported Clang modules starting with the given module name.
 static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
@@ -137,8 +138,8 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
     return;
   allModules.push_back(moduleName.str());
 
-  auto dependencies = cache.findDependencies(
-      moduleName, ModuleDependenciesKind::Clang);
+  auto dependencies =
+      cache.findDependencies(moduleName, ModuleDependenciesKind::Clang);
   if (!dependencies)
     return;
 
@@ -148,10 +149,10 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
 }
 
 /// Resolve the direct dependencies of the given module.
-static std::vector<ModuleDependencyID> resolveDirectDependencies(
-    CompilerInstance &instance, ModuleDependencyID module,
-    ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &ASTDelegate) {
+static std::vector<ModuleDependencyID>
+resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
+                          ModuleDependenciesCache &cache,
+                          InterfaceSubContextDelegate &ASTDelegate) {
   auto &ctx = instance.getASTContext();
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
   auto isSwift = knownDependencies.isSwiftTextualModule();
@@ -163,8 +164,8 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     bool onlyClangModule = !isSwift || module.first == dependsOn;
 
     // Retrieve the dependencies for this module.
-    if (auto found = ctx.getModuleDependencies(
-            dependsOn, onlyClangModule, cache, ASTDelegate)) {
+    if (auto found = ctx.getModuleDependencies(dependsOn, onlyClangModule,
+                                               cache, ASTDelegate)) {
       result.insert({dependsOn, found->getKind()});
     }
   }
@@ -181,7 +182,8 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
       if (!clangImporter->addBridgingHeaderDependencies(module.first, cache)) {
         // Grab the updated module dependencies.
         // FIXME: This is such a hack.
-        knownDependencies = *cache.findDependencies(module.first, module.second);
+        knownDependencies =
+            *cache.findDependencies(module.first, module.second);
 
         // Add the Clang modules referenced from the bridging header to the
         // set of Clang modules we know about.
@@ -207,9 +209,10 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     for (const auto &clangDep : allClangModules) {
       if (auto found = ctx.getModuleDependencies(
               clangDep, /*onlyClangModule=*/false, cache, ASTDelegate)) {
-        // ASTContext::getModuleDependencies returns dependencies for a module with a given name.
-        // This Clang module may have the same name as the Swift module we are resolving, so we
-        // need to make sure we don't add a dependency from a Swift module to itself.
+        // ASTContext::getModuleDependencies returns dependencies for a module
+        // with a given name. This Clang module may have the same name as the
+        // Swift module we are resolving, so we need to make sure we don't add a
+        // dependency from a Swift module to itself.
         if ((found->getKind() == ModuleDependenciesKind::SwiftTextual ||
              found->getKind() == ModuleDependenciesKind::SwiftBinary ||
              found->getKind() == ModuleDependenciesKind::SwiftPlaceholder) &&
@@ -229,189 +232,176 @@ static void discoverCrosssImportOverlayDependencies(
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
-  for (auto dep: allDependencies) {
+  for (auto dep : allDependencies) {
     auto moduleName = dep.first;
     auto dependencies = *cache.findDependencies(moduleName, dep.second);
     // Collect a map from secondary module name to cross-import overlay names.
     auto overlayMap = dependencies.collectCrossImportOverlayNames(
-      instance.getASTContext(), moduleName);
+        instance.getASTContext(), moduleName);
     if (overlayMap.empty())
       continue;
     std::for_each(allDependencies.begin(), allDependencies.end(),
                   [&](ModuleDependencyID Id) {
-      // check if any explicitly imported modules can serve as a secondary
-      // module, and add the overlay names to the dependencies list.
-      for (auto overlayName: overlayMap[Id.first]) {
-        if (std::find_if(allDependencies.begin(), allDependencies.end(),
-            [&](ModuleDependencyID Id) { return Id.first == overlayName.str(); })
-                == allDependencies.end()) {
-          newOverlays.insert(overlayName);
-        }
-      }
-    });
+                    // check if any explicitly imported modules can serve as a
+                    // secondary module, and add the overlay names to the
+                    // dependencies list.
+                    for (auto overlayName : overlayMap[Id.first]) {
+                      if (std::find_if(allDependencies.begin(),
+                                       allDependencies.end(),
+                                       [&](ModuleDependencyID Id) {
+                                         return Id.first == overlayName.str();
+                                       }) == allDependencies.end()) {
+                        newOverlays.insert(overlayName);
+                      }
+                    }
+                  });
   }
   // No new cross-import overlays are found, return.
   if (newOverlays.empty())
     return;
-  // Construct a dummy main to resolve the newly discovered cross import overlays.
+  // Construct a dummy main to resolve the newly discovered cross import
+  // overlays.
   StringRef dummyMainName = "DummyMainModuleForResolvingCrossImportOverlays";
   auto dummyMainDependencies = ModuleDependencies::forMainSwiftModule({});
 
   // Update main module's dependencies to include these new overlays.
   auto mainDep = *cache.findDependencies(mainModuleName,
                                          ModuleDependenciesKind::SwiftTextual);
-  std::for_each(newOverlays.begin(), newOverlays.end(), [&](Identifier modName) {
-    dummyMainDependencies.addModuleDependency(modName.str());
-    mainDep.addModuleDependency(modName.str());
-  });
-  cache.updateDependencies({mainModuleName.str(),
-                            ModuleDependenciesKind::SwiftTextual}, mainDep);
+  std::for_each(newOverlays.begin(), newOverlays.end(),
+                [&](Identifier modName) {
+                  dummyMainDependencies.addModuleDependency(modName.str());
+                  mainDep.addModuleDependency(modName.str());
+                });
+  cache.updateDependencies(
+      {mainModuleName.str(), ModuleDependenciesKind::SwiftTextual}, mainDep);
 
   // Record the dummy main module's direct dependencies. The dummy main module
   // only directly depend on these newly discovered overlay modules.
   cache.recordDependencies(dummyMainName, dummyMainDependencies);
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                  std::set<ModuleDependencyID>> allModules;
+                  std::set<ModuleDependencyID>>
+      allModules;
 
   // Seed the all module list from the dummpy main module.
   allModules.insert({dummyMainName.str(), dummyMainDependencies.getKind()});
 
   // Explore the dependencies of every module.
-  for (unsigned currentModuleIdx = 0;
-       currentModuleIdx < allModules.size();
+  for (unsigned currentModuleIdx = 0; currentModuleIdx < allModules.size();
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
-    auto discoveredModules = resolveDirectDependencies(instance, module,
-                                                       cache, ASTDelegate);
+    auto discoveredModules =
+        resolveDirectDependencies(instance, module, cache, ASTDelegate);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
   // Report any discovered modules to the clients, which include all overlays
   // and their dependencies.
-  std::for_each(/* +1 to exclude dummy main*/allModules.begin() + 1,
+  std::for_each(/* +1 to exclude dummy main*/ allModules.begin() + 1,
                 allModules.end(), action);
 }
 
 /// Write a single JSON field.
 namespace {
-  template<typename T>
-  void writeJSONSingleField(llvm::raw_ostream &out,
-                            StringRef fieldName,
-                            const T &value,
-                            unsigned indentLevel,
-                            bool trailingComma);
+template <typename T>
+void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
+                          const T &value, unsigned indentLevel,
+                          bool trailingComma);
 
-  /// Write a string value as JSON.
-  void writeJSONValue(llvm::raw_ostream &out,
-                      StringRef value,
-                      unsigned indentLevel) {
-    out << "\"";
-    out << value;
-    out << "\"";
-  }
+/// Write a string value as JSON.
+void writeJSONValue(llvm::raw_ostream &out, StringRef value,
+                    unsigned indentLevel) {
+  out << "\"";
+  out << value;
+  out << "\"";
+}
 
-  /// Write a boolean value as JSON.
-  void writeJSONValue(llvm::raw_ostream &out,
-                      bool value,
-                      unsigned indentLevel) {
-    out.write_escaped(value ? "true" : "false");
-  }
+/// Write a boolean value as JSON.
+void writeJSONValue(llvm::raw_ostream &out, bool value, unsigned indentLevel) {
+  out.write_escaped(value ? "true" : "false");
+}
 
-  /// Write a module identifier.
-  void writeJSONValue(llvm::raw_ostream &out,
-                      const ModuleDependencyID &module,
-                      unsigned indentLevel) {
-    out << "{\n";
-    std::string moduleKind;
-    if (module.second == ModuleDependenciesKind::SwiftTextual)
-      moduleKind = "swift";
-    else if (module.second == ModuleDependenciesKind::SwiftBinary)
-      // FIXME: rename to be consistent in the clients (swift-driver)
-      moduleKind = "swiftPrebuiltExternal";
-    else if (module.second == ModuleDependenciesKind::SwiftPlaceholder)
-      moduleKind = "swiftPlaceholder";
-    else
-      moduleKind = "clang";
+/// Write a module identifier.
+void writeJSONValue(llvm::raw_ostream &out, const ModuleDependencyID &module,
+                    unsigned indentLevel) {
+  out << "{\n";
+  std::string moduleKind;
+  if (module.second == ModuleDependenciesKind::SwiftTextual)
+    moduleKind = "swift";
+  else if (module.second == ModuleDependenciesKind::SwiftBinary)
+    // FIXME: rename to be consistent in the clients (swift-driver)
+    moduleKind = "swiftPrebuiltExternal";
+  else if (module.second == ModuleDependenciesKind::SwiftPlaceholder)
+    moduleKind = "swiftPlaceholder";
+  else
+    moduleKind = "clang";
 
-    writeJSONSingleField(
-        out,
-        moduleKind,
-        module.first,
-        indentLevel + 1,
-        /*trailingComma=*/false);
+  writeJSONSingleField(out, moduleKind, module.first, indentLevel + 1,
+                       /*trailingComma=*/false);
 
-    out.indent(indentLevel * 2);
-    out << "}";
-  }
+  out.indent(indentLevel * 2);
+  out << "}";
+}
 
-  /// Write a JSON array.
-  template<typename T>
-  void writeJSONValue(llvm::raw_ostream &out,
-                      ArrayRef<T> values,
-                      unsigned indentLevel) {
-    out << "[\n";
+/// Write a JSON array.
+template <typename T>
+void writeJSONValue(llvm::raw_ostream &out, ArrayRef<T> values,
+                    unsigned indentLevel) {
+  out << "[\n";
 
-    for (const auto &value: values) {
+  for (const auto &value : values) {
 
-      out.indent((indentLevel + 1) * 2);
+    out.indent((indentLevel + 1) * 2);
 
-      writeJSONValue(out, value, indentLevel + 1);
+    writeJSONValue(out, value, indentLevel + 1);
 
-      if (&value != &values.back()) {
-        out << ",";
-      }
-      out << "\n";
-    }
-
-    out.indent(indentLevel * 2);
-    out << "]";
-  }
-
-  /// Write a JSON array.
-  template<typename T>
-  void writeJSONValue(llvm::raw_ostream &out,
-                      const std::vector<T> &values,
-                      unsigned indentLevel) {
-    writeJSONValue(out, llvm::makeArrayRef(values), indentLevel);
-  }
-
-  /// Write a single JSON field.
-  template<typename T>
-  void writeJSONSingleField(llvm::raw_ostream &out,
-                            StringRef fieldName,
-                            const T &value,
-                            unsigned indentLevel,
-                            bool trailingComma) {
-    out.indent(indentLevel * 2);
-    writeJSONValue(out, fieldName, indentLevel);
-    out << ": ";
-    writeJSONValue(out, value, indentLevel);
-    if (trailingComma)
+    if (&value != &values.back()) {
       out << ",";
+    }
     out << "\n";
   }
+
+  out.indent(indentLevel * 2);
+  out << "]";
 }
+
+/// Write a JSON array.
+template <typename T>
+void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
+                    unsigned indentLevel) {
+  writeJSONValue(out, llvm::makeArrayRef(values), indentLevel);
+}
+
+/// Write a single JSON field.
+template <typename T>
+void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
+                          const T &value, unsigned indentLevel,
+                          bool trailingComma) {
+  out.indent(indentLevel * 2);
+  writeJSONValue(out, fieldName, indentLevel);
+  out << ": ";
+  writeJSONValue(out, value, indentLevel);
+  if (trailingComma)
+    out << ",";
+  out << "\n";
+}
+} // namespace
 
 static void writePrescanJSON(llvm::raw_ostream &out,
                              const ModuleDependencies &mainModuleDependencies) {
   // Write out a JSON containing all main module imports.
   out << "{\n";
-  SWIFT_DEFER {
-    out << "}\n";
-  };
+  SWIFT_DEFER { out << "}\n"; };
 
-  writeJSONSingleField(out, "imports", mainModuleDependencies.getModuleDependencies(), 0, false);
+  writeJSONSingleField(
+      out, "imports", mainModuleDependencies.getModuleDependencies(), 0, false);
 }
 
-static void writeJSON(llvm::raw_ostream &out,
-                      CompilerInstance &instance,
+static void writeJSON(llvm::raw_ostream &out, CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
                       InterfaceSubContextDelegate &ASTDelegate,
                       ArrayRef<ModuleDependencyID> allModules) {
   // Write out a JSON description of all of the dependencies.
   out << "{\n";
-  SWIFT_DEFER {
-    out << "}\n";
-  };
+  SWIFT_DEFER { out << "}\n"; };
 
   // Name of the main module.
   writeJSONSingleField(out, "mainModuleName", allModules.front().first,
@@ -419,13 +409,11 @@ static void writeJSON(llvm::raw_ostream &out,
 
   // Write out all of the modules.
   out << "  \"modules\": [\n";
-  SWIFT_DEFER {
-    out << "  ]\n";
-  };
+  SWIFT_DEFER { out << "  ]\n"; };
   for (const auto &module : allModules) {
     auto directDependencies = resolveDirectDependencies(
-      instance, ModuleDependencyID(module.first, module.second), cache,
-      ASTDelegate);
+        instance, ModuleDependencyID(module.first, module.second), cache,
+        ASTDelegate);
 
     // Grab the completed module dependencies.
     auto moduleDeps = *cache.findDependencies(module.first, module.second);
@@ -479,18 +467,18 @@ static void writeJSON(llvm::raw_ostream &out,
     if (swiftTextualDeps) {
       out << "\"swift\": {\n";
 
-      /// Swift interface file, if there is one. The main module, for example, will not have
-      /// an interface file.
+      /// Swift interface file, if there is one. The main module, for example,
+      /// will not have an interface file.
       if (swiftTextualDeps->swiftInterfaceFile) {
         writeJSONSingleField(out, "moduleInterfacePath",
                              *swiftTextualDeps->swiftInterfaceFile, 5,
                              /*trailingComma=*/true);
-        writeJSONSingleField(out, "contextHash",
-                             swiftTextualDeps->contextHash, 5,
+        writeJSONSingleField(out, "contextHash", swiftTextualDeps->contextHash,
+                             5,
                              /*trailingComma=*/true);
         out.indent(5 * 2);
         out << "\"commandLine\": [\n";
-        for (auto &arg :swiftTextualDeps->buildCommandLine) {
+        for (auto &arg : swiftTextualDeps->buildCommandLine) {
 
           out.indent(6 * 2);
           out << "\"" << arg << "\"";
@@ -502,7 +490,7 @@ static void writeJSON(llvm::raw_ostream &out,
         out << "],\n";
         out.indent(5 * 2);
         out << "\"compiledModuleCandidates\": [\n";
-        for (auto &candidate: swiftTextualDeps->compiledModuleCandidates) {
+        for (auto &candidate : swiftTextualDeps->compiledModuleCandidates) {
           out.indent(6 * 2);
           out << "\"" << candidate << "\"";
           if (&candidate != &swiftTextualDeps->compiledModuleCandidates.back())
@@ -513,10 +501,9 @@ static void writeJSON(llvm::raw_ostream &out,
         out << "],\n";
       }
       writeJSONSingleField(
-          out, "isFramework",
-          swiftTextualDeps->isFramework, 5,
+          out, "isFramework", swiftTextualDeps->isFramework, 5,
           /*trailingComma=*/!swiftTextualDeps->extraPCMArgs.empty() ||
-                           swiftTextualDeps->bridgingHeaderFile.hasValue());
+              swiftTextualDeps->bridgingHeaderFile.hasValue());
       if (!swiftTextualDeps->extraPCMArgs.empty()) {
         out.indent(5 * 2);
         out << "\"extraPcmArgs\": [\n";
@@ -528,16 +515,18 @@ static void writeJSON(llvm::raw_ostream &out,
           out << "\n";
         }
         out.indent(5 * 2);
-        out << (swiftTextualDeps->bridgingHeaderFile.hasValue() ? "],\n" : "]\n");
+        out << (swiftTextualDeps->bridgingHeaderFile.hasValue() ? "],\n"
+                                                                : "]\n");
       }
       /// Bridging header and its source file dependencies, if any.
       if (swiftTextualDeps->bridgingHeaderFile) {
         out.indent(5 * 2);
         out << "\"bridgingHeader\": {\n";
-        writeJSONSingleField(out, "path", *swiftTextualDeps->bridgingHeaderFile, 6,
-                             /*trailingComma=*/true);
-        writeJSONSingleField(out, "sourceFiles", swiftTextualDeps->bridgingSourceFiles,
+        writeJSONSingleField(out, "path", *swiftTextualDeps->bridgingHeaderFile,
                              6,
+                             /*trailingComma=*/true);
+        writeJSONSingleField(out, "sourceFiles",
+                             swiftTextualDeps->bridgingSourceFiles, 6,
                              /*trailingComma=*/true);
         writeJSONSingleField(out, "moduleDependencies",
                              swiftTextualDeps->bridgingModuleDependencies, 6,
@@ -616,16 +605,18 @@ static bool diagnoseCycle(CompilerInstance &instance,
                           ModuleDependencyID mainId,
                           InterfaceSubContextDelegate &astDelegate) {
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                  std::set<ModuleDependencyID>> openSet;
+                  std::set<ModuleDependencyID>>
+      openSet;
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                  std::set<ModuleDependencyID>> closeSet;
+                  std::set<ModuleDependencyID>>
+      closeSet;
   // Start from the main module.
   openSet.insert(mainId);
-  while(!openSet.empty()) {
+  while (!openSet.empty()) {
     auto &lastOpen = openSet.back();
     auto beforeSize = openSet.size();
-    for (auto dep: resolveDirectDependencies(instance, lastOpen, cache,
-                                             astDelegate)) {
+    for (auto dep :
+         resolveDirectDependencies(instance, lastOpen, cache, astDelegate)) {
       if (closeSet.count(dep))
         continue;
       if (openSet.insert(dep)) {
@@ -635,20 +626,22 @@ static bool diagnoseCycle(CompilerInstance &instance,
         auto startIt = std::find(openSet.begin(), openSet.end(), dep);
         assert(startIt != openSet.end());
         llvm::SmallString<64> buffer;
-        for (auto it = startIt; it != openSet.end(); ++ it) {
+        for (auto it = startIt; it != openSet.end(); ++it) {
           buffer.append(it->first);
           buffer.append((it->second == ModuleDependenciesKind::SwiftTextual ||
-                         it->second == ModuleDependenciesKind::SwiftBinary)?
-                        ".swiftmodule": ".pcm");
+                         it->second == ModuleDependenciesKind::SwiftBinary)
+                            ? ".swiftmodule"
+                            : ".pcm");
           buffer.append(" -> ");
         }
         buffer.append(startIt->first);
-        buffer.append((startIt->second == ModuleDependenciesKind::SwiftTextual ||
-                       startIt->second == ModuleDependenciesKind::SwiftBinary)?
-                      ".swiftmodule": ".pcm");
-        instance.getASTContext().Diags.diagnose(SourceLoc(),
-                                                diag::scanner_find_cycle,
-                                                buffer.str());
+        buffer.append(
+            (startIt->second == ModuleDependenciesKind::SwiftTextual ||
+             startIt->second == ModuleDependenciesKind::SwiftBinary)
+                ? ".swiftmodule"
+                : ".pcm");
+        instance.getASTContext().Diags.diagnose(
+            SourceLoc(), diag::scanner_find_cycle, buffer.str());
         return true;
       }
     }
@@ -664,35 +657,34 @@ static bool diagnoseCycle(CompilerInstance &instance,
   return false;
 }
 
-bool swift::dependencies::executeSingleModuleScan(CompilerInstance &instance,
-                                                  ModuleDependenciesCache &cache,
-                                                  StringRef moduleName,
-                                                  bool isClang,
-                                                  StringRef outputPath) {
+bool swift::dependencies::scanBatchModuleEntry(CompilerInstance &instance,
+                                               ModuleDependenciesCache &cache,
+                                               StringRef moduleName,
+                                               bool isClang,
+                                               StringRef outputPath) {
   ASTContext &ctx = instance.getASTContext();
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-  auto ModuleCachePath = getModuleCachePathFromClang(ctx
-    .getClangModuleLoader()->getClangInstance());
+  auto ModuleCachePath = getModuleCachePathFromClang(
+      ctx.getClangModuleLoader()->getClangInstance());
 
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                  std::set<ModuleDependencyID>> allModules;
-  InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
-                                              ctx.SearchPathOpts, ctx.LangOpts,
-                                              ctx.ClangImporterOpts,
-                                              LoaderOpts,
-                                              /*buildModuleCacheDirIfAbsent*/false,
-                                              ModuleCachePath,
-                                              FEOpts.PrebuiltModuleCachePath,
-                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.shouldTrackSystemDependencies());
+                  std::set<ModuleDependencyID>>
+      allModules;
+  InterfaceSubContextDelegateImpl ASTDelegate(
+      ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+      ctx.ClangImporterOpts, LoaderOpts,
+      /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+      FEOpts.PrebuiltModuleCachePath,
+      FEOpts.SerializeModuleInterfaceDependencyHashes,
+      FEOpts.shouldTrackSystemDependencies());
   std::error_code EC;
   llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
   Optional<ModuleDependencies> rootDeps;
   if (isClang) {
     // Loading the clang module using Clang importer.
     // This action will populate the cache with the main module's dependencies.
-    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/true, cache,
+    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/ true, cache,
                                          ASTDelegate);
   } else {
     // Loading the swift module's dependencies.
@@ -703,8 +695,9 @@ bool swift::dependencies::executeSingleModuleScan(CompilerInstance &instance,
     return true;
   }
   // Add the main module.
-  allModules.insert({moduleName.str(), isClang ? ModuleDependenciesKind::Clang:
-                                        ModuleDependenciesKind::SwiftTextual});
+  allModules.insert(
+      {moduleName.str(), isClang ? ModuleDependenciesKind::Clang
+                                 : ModuleDependenciesKind::SwiftTextual});
 
   // Output module prescan.
   if (FEOpts.ImportPrescan) {
@@ -713,8 +706,7 @@ bool swift::dependencies::executeSingleModuleScan(CompilerInstance &instance,
   }
 
   // Explore the dependencies of every module.
-  for (unsigned currentModuleIdx = 0;
-       currentModuleIdx < allModules.size();
+  for (unsigned currentModuleIdx = 0; currentModuleIdx < allModules.size();
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
@@ -726,9 +718,8 @@ bool swift::dependencies::executeSingleModuleScan(CompilerInstance &instance,
   return false;
 }
 
-bool
-swift::dependencies::batchScanDependencies(CompilerInstance &instance,
-                                           llvm::StringRef batchInputFile) {
+bool swift::dependencies::batchScanDependencies(
+    CompilerInstance &instance, llvm::StringRef batchInputFile) {
   // The primary cache used for scans carried out with the compiler instance
   // we have created
   ModuleDependenciesCache cache;
@@ -736,19 +727,17 @@ swift::dependencies::batchScanDependencies(CompilerInstance &instance,
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
-  auto results = parseBatchScanInputFile(instance.getASTContext(),
-                                         batchInputFile, saver);
+  auto results =
+      parseBatchScanInputFile(instance.getASTContext(), batchInputFile, saver);
   if (!results.hasValue())
     return true;
 
-  return executeBatchModuleScan(instance, cache, saver, *results);
+  return performBatchModuleScan(instance, cache, saver, *results);
 }
 
-bool
-swift::dependencies::executeBatchModuleScan(CompilerInstance &instance,
-                                            ModuleDependenciesCache &cache,
-                                            llvm::StringSaver &saver,
-                                            const std::vector<BatchScanInput> &batchInput) {
+bool swift::dependencies::performBatchModuleScan(
+    CompilerInstance &instance, ModuleDependenciesCache &cache,
+    llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
   const CompilerInvocation &invok = instance.getInvocation();
   auto &diags = instance.getDiags();
   ForwardingDiagnosticConsumer FDC(diags);
@@ -757,8 +746,9 @@ swift::dependencies::executeBatchModuleScan(CompilerInstance &instance,
   // TODO: Re-use a single cache across all invocations, once `alreadySeen`
   // state is no longer shared.
   llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
-                            std::unique_ptr<ModuleDependenciesCache>>> subInstanceMap;
-  for (auto &entry: batchInput) {
+                            std::unique_ptr<ModuleDependenciesCache>>>
+      subInstanceMap;
+  for (auto &entry : batchInput) {
     CompilerInstance *pInstance = nullptr;
     ModuleDependenciesCache *pCache = nullptr;
     if (entry.arguments.empty()) {
@@ -771,81 +761,58 @@ swift::dependencies::executeBatchModuleScan(CompilerInstance &instance,
       pCache = subInstanceMap[entry.arguments].second.get();
     } else {
       // Create a new instance by the arguments and save it in the map.
-      subInstanceMap.insert({entry.arguments,
-                  std::make_pair(std::make_unique<CompilerInstance>(),
-                                 std::make_unique<ModuleDependenciesCache>())});
+      subInstanceMap.insert(
+          {entry.arguments,
+           std::make_pair(std::make_unique<CompilerInstance>(),
+                          std::make_unique<ModuleDependenciesCache>())});
 
       pInstance = subInstanceMap[entry.arguments].first.get();
       pCache = subInstanceMap[entry.arguments].second.get();
-      SmallVector<const char*, 4> args;
+      SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvok = invok;
       pInstance->addDiagnosticConsumer(&FDC);
       if (subInvok.parseArgs(args, diags)) {
-        instance.getDiags().diagnose(SourceLoc(), diag::scanner_arguments_invalid,
-                                     entry.arguments);
+        instance.getDiags().diagnose(
+            SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
       if (pInstance->setup(subInvok)) {
-        instance.getDiags().diagnose(SourceLoc(), diag::scanner_arguments_invalid,
-                                     entry.arguments);
+        instance.getDiags().diagnose(
+            SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
     }
     assert(pInstance);
     assert(pCache);
     // Scan using the chosen compiler instance.
-    if (executeSingleModuleScan(*pInstance, *pCache, entry.moduleName,
-                                !entry.isSwift, entry.outputPath)) {
+    if (scanBatchModuleEntry(*pInstance, *pCache, entry.moduleName,
+                             !entry.isSwift, entry.outputPath)) {
       return true;
     }
   }
   return false;
 }
 
-bool swift::dependencies::scanAndOutputDependencies(CompilerInstance &instance) {
-  ASTContext &Context = instance.getASTContext();
-  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
-  std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
-  std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
-
-  ModuleDependenciesCache SingleUseCache;
-
-  if (out.has_error() || EC) {
-    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
-                           EC.message());
-    out.clear_error();
-    return true;
-  }
-
-  // Execute scan, writing JSON output to the output stream
-  return scanDependencies(instance, SingleUseCache, out);
-}
-
-bool swift::dependencies::scanDependencies(CompilerInstance &instance,
-                                           ModuleDependenciesCache &cache,
-                                           llvm::raw_ostream &out) {
-  ASTContext &Context = instance.getASTContext();
+static ModuleDependencies
+identifyMainModuleDependencies(CompilerInstance &instance,
+                               ModuleDependenciesCache &cache) {
   ModuleDecl *mainModule = instance.getMainModule();
-  const CompilerInvocation &invocation = instance.getInvocation();
-  const FrontendOptions &opts = invocation.getFrontendOptions();
-
   // Main module file name.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
   llvm::sys::path::replace_extension(mainModulePath, newExt);
 
-  std::string apinotesVer = (llvm::Twine("-fapinotes-swift-version=")
-    + instance.getASTContext().LangOpts.EffectiveLanguageVersion
-      .asAPINotesVersionString()).str();
+  std::string apinotesVer =
+      (llvm::Twine("-fapinotes-swift-version=") +
+       instance.getASTContext()
+           .LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())
+          .str();
   // Compute the dependencies of the main module.
-  auto mainDependencies =
-    ModuleDependencies::forMainSwiftModule({
-      // ExtraPCMArgs
-      "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
-      "-Xcc", apinotesVer
-    });
+  auto mainDependencies = ModuleDependencies::forMainSwiftModule(
+      {// ExtraPCMArgs
+       "-Xcc", "-target", "-Xcc",
+       instance.getASTContext().LangOpts.Target.str(), "-Xcc", apinotesVer});
 
   // Compute Implicit dependencies of the main module
   {
@@ -873,12 +840,14 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance,
 
     // Add any implicit module names.
     for (const auto &import : importInfo.AdditionalUnloadedImports) {
-      mainDependencies.addModuleDependency(import.module.getModulePath(), &alreadyAddedModules);
+      mainDependencies.addModuleDependency(import.module.getModulePath(),
+                                           &alreadyAddedModules);
     }
 
     // Already-loaded, implicitly imported module names.
     for (const auto &import : importInfo.AdditionalImports) {
-      mainDependencies.addModuleDependency(import.module.importedModule->getNameStr(), &alreadyAddedModules);
+      mainDependencies.addModuleDependency(
+          import.module.importedModule->getNameStr(), &alreadyAddedModules);
     }
 
     // Add the bridging header.
@@ -894,44 +863,96 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance,
     }
   }
 
-  // If import-prescan is specified, discover and serialize main module dependencies only and exit.
-  if (opts.ImportPrescan) {
-    writePrescanJSON(out, mainDependencies);
-    // This process succeeds regardless of whether any errors occurred.
-    // FIXME: We shouldn't need this, but it's masking bugs in our scanning
-    // logic where we don't create a fresh context when scanning Swift interfaces
-    // that includes their own command-line flags.
-    Context.Diags.resetHadAnyError();
-    return false;
+  return mainDependencies;
+}
+
+bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
+  ASTContext &Context = instance.getASTContext();
+  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
+  std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  // `-scan-dependencies` invocations use a single new instance
+  // of a module cache
+  ModuleDependenciesCache cache;
+
+  if (out.has_error() || EC) {
+    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
+                           EC.message());
+    out.clear_error();
+    return true;
   }
+
+  // Execute scan, and write JSON output to the output stream
+  return performModuleScan(instance, cache, out);
+}
+
+bool swift::dependencies::prescanMainModuleDependencies(
+    CompilerInstance &instance) {
+  ASTContext &Context = instance.getASTContext();
+  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
+  std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  // `-scan-dependencies` invocations use a single new instance
+  // of a module cache
+  ModuleDependenciesCache cache;
+
+  if (out.has_error() || EC) {
+    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
+                           EC.message());
+    out.clear_error();
+    return true;
+  }
+
+  // Execute import prescan, and write JSON output to the output stream
+  // First, identify the dependencies of the main module
+  auto mainDependencies = identifyMainModuleDependencies(instance, cache);
+
+  // Serialize and output main module dependencies only and exit.
+  writePrescanJSON(out, mainDependencies);
+  // This process succeeds regardless of whether any errors occurred.
+  // FIXME: We shouldn't need this, but it's masking bugs in our scanning
+  // logic where we don't create a fresh context when scanning Swift interfaces
+  // that includes their own command-line flags.
+  Context.Diags.resetHadAnyError();
+  return false;
+}
+
+bool swift::dependencies::performModuleScan(CompilerInstance &instance,
+                                            ModuleDependenciesCache &cache,
+                                            llvm::raw_ostream &out) {
+  ASTContext &Context = instance.getASTContext();
+  ModuleDecl *mainModule = instance.getMainModule();
+
+  // First, identify the dependencies of the main module
+  auto mainDependencies = identifyMainModuleDependencies(instance, cache);
 
   // Add the main module.
   StringRef mainModuleName = mainModule->getNameStr();
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                  std::set<ModuleDependencyID>> allModules;
-  
+                  std::set<ModuleDependencyID>>
+      allModules;
+
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
 
   cache.recordDependencies(mainModuleName, std::move(mainDependencies));
 
   auto &ctx = instance.getASTContext();
-  auto ModuleCachePath = getModuleCachePathFromClang(ctx
-    .getClangModuleLoader()->getClangInstance());
+  auto ModuleCachePath = getModuleCachePathFromClang(
+      ctx.getClangModuleLoader()->getClangInstance());
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-  InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
-                                              ctx.SearchPathOpts, ctx.LangOpts,
-                                              ctx.ClangImporterOpts,
-                                              LoaderOpts,
-                                              /*buildModuleCacheDirIfAbsent*/false,
-                                              ModuleCachePath,
-                                              FEOpts.PrebuiltModuleCachePath,
-                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.shouldTrackSystemDependencies());
+  InterfaceSubContextDelegateImpl ASTDelegate(
+      ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+      ctx.ClangImporterOpts, LoaderOpts,
+      /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+      FEOpts.PrebuiltModuleCachePath,
+      FEOpts.SerializeModuleInterfaceDependencyHashes,
+      FEOpts.shouldTrackSystemDependencies());
 
   // Explore the dependencies of every module.
-  for (unsigned currentModuleIdx = 0;
-       currentModuleIdx < allModules.size();
+  for (unsigned currentModuleIdx = 0; currentModuleIdx < allModules.size();
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
@@ -940,14 +961,14 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance,
   }
 
   // We have all explicit imports now, resolve cross import overlays.
-  discoverCrosssImportOverlayDependencies(instance, mainModuleName,
-      /*All transitive dependencies*/allModules.getArrayRef().slice(1), cache,
-      ASTDelegate, [&](ModuleDependencyID id) {
-    allModules.insert(id);
-  });
+  discoverCrosssImportOverlayDependencies(
+      instance, mainModuleName,
+      /*All transitive dependencies*/ allModules.getArrayRef().slice(1), cache,
+      ASTDelegate, [&](ModuleDependencyID id) { allModules.insert(id); });
 
   // Dignose cycle in dependency graph.
-  if (diagnoseCycle(instance, cache, /*MainModule*/allModules.front(), ASTDelegate))
+  if (diagnoseCycle(instance, cache, /*MainModule*/ allModules.front(),
+                    ASTDelegate))
     return true;
 
   // Write out the JSON description.
@@ -969,7 +990,8 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance,
           depTracker->addDependency(bridgingSourceFile, /*IsSystem=*/false);
       } else if (auto clangDeps = deps->getAsClangModule()) {
         if (!clangDeps->moduleMapFile.empty())
-          depTracker->addDependency(clangDeps->moduleMapFile, /*IsSystem=*/false);
+          depTracker->addDependency(clangDeps->moduleMapFile,
+                                    /*IsSystem=*/false);
         for (const auto &sourceFile : clangDeps->fileDependencies)
           depTracker->addDependency(sourceFile, /*IsSystem=*/false);
       }
