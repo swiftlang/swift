@@ -1554,7 +1554,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
-        diag::result_builder_disabled_by_return, builderType);
+        diag::result_builder_disabled_by_return_warn, builderType);
 
     // Note that one can remove the result builder attribute.
     auto attr = func->getAttachedResultBuilder();
