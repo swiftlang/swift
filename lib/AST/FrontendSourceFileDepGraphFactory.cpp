@@ -218,23 +218,9 @@ FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
     const SourceFile *SF, StringRef outputPath,
     const DependencyTracker &depTracker, const bool alsoEmitDotFile)
     : AbstractSourceFileDepGraphFactory(
-          SF->getASTContext().hadError(), outputPath, getInterfaceHash(SF),
+          SF->getASTContext().hadError(), outputPath, SF->getInterfaceHash(),
           alsoEmitDotFile, SF->getASTContext().Diags),
       SF(SF), depTracker(depTracker) {}
-
-/// Centralize the invariant that the fingerprint of the whole file is the
-/// interface hash
-std::string
-FrontendSourceFileDepGraphFactory::getFingerprint(const SourceFile *SF) {
-  return getInterfaceHash(SF);
-}
-
-std::string
-FrontendSourceFileDepGraphFactory::getInterfaceHash(const SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
-}
 
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
@@ -520,7 +506,9 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
                                              bool emitDot)
     : AbstractSourceFileDepGraphFactory(Mod->getASTContext().hadError(),
-                                        Mod->getNameStr(), "0xBADBEEF", emitDot,
+                                        Mod->getNameStr(),
+                                        Fingerprint(std::string{Fingerprint::DIGEST_LENGTH, '0'}),
+                                        emitDot,
                                         Mod->getASTContext().Diags),
       Mod(Mod) {}
 

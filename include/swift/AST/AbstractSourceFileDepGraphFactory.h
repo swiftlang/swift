@@ -32,7 +32,7 @@ protected:
   const std::string swiftDeps;
 
   /// The fingerprint of the whole file
-  const std::string fileFingerprint;
+  Fingerprint fileFingerprint;
 
   /// For debugging
   const bool emitDotFileAfterConstruction;
@@ -47,7 +47,7 @@ public:
   /// See the instance variable comments for explanation.
   AbstractSourceFileDepGraphFactory(bool hadCompilationError,
                                     StringRef swiftDeps,
-                                    StringRef fileFingerprint,
+                                    Fingerprint fileFingerprint,
                                     bool emitDotFileAfterConstruction,
                                     DiagnosticEngine &diags);
 
