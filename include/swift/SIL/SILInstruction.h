@@ -7581,9 +7581,15 @@ public:
   SILValue getArg(unsigned i) const { return getAllOperands()[i].get(); }
 
   /// Return the SILPhiArgument for the given operand.
+  const SILPhiArgument *getArgForOperand(const Operand *oper) const {
+    auto *self = const_cast<BranchInst *>(this);
+    return self->getArgForOperand(oper);
+  }
+
+  /// Return the SILPhiArgument for the given operand.
   ///
   /// See SILArgument.cpp.
-  const SILPhiArgument *getArgForOperand(const Operand *oper) const;
+  SILPhiArgument *getArgForOperand(const Operand *oper);
 };
 
 /// A conditional branch.

@@ -300,7 +300,7 @@ TermInst *SILPhiArgument::getSingleTerminator() const {
   return const_cast<SILBasicBlock *>(predBlock)->getTerminator();
 }
 
-const SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) const {
+SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) {
   assert(oper->getUser() == this);
   return cast<SILPhiArgument>(
       getDestBB()->getArgument(oper->getOperandNumber()));
