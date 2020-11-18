@@ -2171,30 +2171,6 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
                       const Metadata *destType,
                       DynamicCastFlags flags)
 {
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-  // Support switching to the old implementation while the new one
-  // is still settling.  Once the new implementation is stable,
-  // I'll rip the old one entirely out.
-  static bool useOldImplementation = false; // Default: NEW Implementation
-  static swift_once_t Predicate;
-  swift_once(
-    &Predicate,
-    [](void *) {
-      // Define SWIFT_OLD_DYNAMIC_CAST_RUNTIME=1 to use the old runtime
-      // dynamic cast logic.
-      auto useOld = getenv("SWIFT_OLD_DYNAMIC_CAST_RUNTIME");
-      if (useOld) {
-        useOldImplementation = true;
-      }
-    }, nullptr);
-  if (useOldImplementation) {
-    return swift_dynamicCast_OLD(destLocation, srcValue,
-                                 srcType, destType, flags);
-  }
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-
   // If the compiler has asked for a "take", we can
   // move pointers without ref-counting overhead.
   bool takeOnSuccess = flags & DynamicCastFlags::TakeOnSuccess;

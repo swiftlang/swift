@@ -346,7 +346,10 @@ static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
     return false;
 
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return shouldIncludeDecl(ED->getExtendedNominal(), ExcludeDoubleUnderscore);
+    auto *extended = ED->getExtendedNominal();
+    if (!extended)
+      return false;
+    return shouldIncludeDecl(extended, ExcludeDoubleUnderscore);
   }
   if (ExcludeDoubleUnderscore && hasDoubleUnderscore(D)) {
     return false;

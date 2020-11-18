@@ -55,7 +55,7 @@ public protocol InvalidProtocol : undefined {
 public struct InvalidStruct : undefined, InvalidProtocol {
   typealias Item = undefined
 
-  public let memberA: Int = undefined {
+  public let memberA: Int {
     willSet(newVal invalid) {
       print("Setting value \(newVal)")
     }
@@ -71,10 +71,10 @@ public struct InvalidStruct : undefined, InvalidProtocol {
       print("Set value \(oldValue)")
     }
   }
-  public var memberC: undefined {
+  public var memberC: undefined = {
     return undefined
   }()
-  public lazy var memberD: undefined {
+  public lazy var memberD: undefined = {
     return undefined
   }()
   public var memberE: undefined {
@@ -84,5 +84,13 @@ public struct InvalidStruct : undefined, InvalidProtocol {
 
   mutating func set(item: Item) {
     undefined
+  }
+}
+
+public extension undefined {
+  public enum ValidEnum: String {
+    case a
+    case b
+    case c
   }
 }
