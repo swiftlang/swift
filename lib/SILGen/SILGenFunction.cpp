@@ -517,7 +517,14 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitStmt(fd->getTypecheckedBody());
+  if (fd->isAsyncHandler()) {
+    // Async handlers are need to have their bodies emitted into a
+    // detached task.
+    // FIXME: Actually implement these properly.
+    B.createBuiltinTrap(fd->getTypecheckedBody());
+  } else {
+    emitStmt(fd->getTypecheckedBody());
+  }
 
   emitEpilog(fd);
 
