@@ -277,6 +277,8 @@ public:
       Identifier,
       llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
 
+  using DeclFingerprintsTable = llvm::MapVector<uint32_t, std::string>;
+
 private:
   /// A map from identifiers to methods and properties with the given name.
   ///

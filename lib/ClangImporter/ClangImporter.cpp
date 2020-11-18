@@ -3831,6 +3831,12 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
+Optional<std::string>
+ClangImporter::Implementation::loadFingerprint(const IterableDeclContext *) {
+  // Clang decls are not fingerprinted in Swift.
+  return None;
+}
+
 TinyPtrVector<ValueDecl *>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {

@@ -566,6 +566,42 @@ public:
   }
 };
 
+class ModuleFileSharedCore::DeclFingerprintsTableInfo {
+public:
+  using internal_key_type = uint32_t;
+  using external_key_type = DeclID;
+  using data_type = std::string;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::hash_value(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    using namespace llvm::support;
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return {sizeof(uint32_t), dataLength};
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    using namespace llvm::support;
+    return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    using namespace llvm::support;
+    return std::string{reinterpret_cast<const char *>(data), length};
+  }
+};
+
 } // end namespace swift
 
 #endif

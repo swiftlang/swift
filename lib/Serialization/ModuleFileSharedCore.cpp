@@ -531,6 +531,18 @@ ModuleFileSharedCore::readDeclMembersTable(ArrayRef<uint64_t> fields,
       base + sizeof(uint32_t), base));
 }
 
+std::unique_ptr<ModuleFileSharedCore::SerializedDeclFingerprintsTable>
+ModuleFileSharedCore::readDeclFingerprintsTable(ArrayRef<uint64_t> fields,
+                                                StringRef blobData) const {
+  uint32_t tableOffset;
+  index_block::DeclFingerprintsLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedDeclFingerprintsTable>;
+  return OwnedTable(SerializedDeclFingerprintsTable::Create(
+      base + tableOffset, base + sizeof(uint32_t), base));
+}
+
 std::unique_ptr<ModuleFileSharedCore::SerializedObjCMethodTable>
 ModuleFileSharedCore::readObjCMethodTable(ArrayRef<uint64_t> fields,
                                     StringRef blobData) const {
@@ -684,6 +696,9 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::DECL_MEMBER_NAMES:
         DeclMemberNames = readDeclMemberNamesTable(scratch, blobData);
+        break;
+      case index_block::DECL_FINGERPRINTS:
+        DeclFingerprints = readDeclFingerprintsTable(scratch, blobData);
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());

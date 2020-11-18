@@ -653,6 +653,9 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
+  virtual Optional<std::string>
+  loadFingerprint(const IterableDeclContext *IDC) override;
+
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
                     SmallVectorImpl<ProtocolConformance*> &Conforms) override;
