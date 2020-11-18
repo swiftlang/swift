@@ -986,7 +986,7 @@ constraints::matchCallArguments(
 }
 
 static Optional<unsigned>
-getCompletionArgIndex(ASTNode anchor, SourceManager &SM) {
+getCompletionArgIndex(ASTNode anchor, ConstraintSystem &CS) {
   Expr *arg = nullptr;
   if (auto *CE = getAsExpr<CallExpr>(anchor))
     arg = CE->getArg();
@@ -998,20 +998,15 @@ getCompletionArgIndex(ASTNode anchor, SourceManager &SM) {
   if (!arg)
     return None;
 
-  auto containsCompletion = [&](Expr *elem) {
-    if (!elem)
-      return false;
-    SourceRange range = elem->getSourceRange();
-    return range.isValid() && SM.rangeContainsCodeCompletionLoc(range);
-  };
-
   if (auto *TE = dyn_cast<TupleExpr>(arg)) {
     auto elems = TE->getElements();
-    auto idx = llvm::find_if(elems, containsCompletion);
+    auto idx = llvm::find_if(elems, [&](Expr *elem) {
+      return CS.containsCodeCompletionLoc(elem);
+    });
     if (idx != elems.end())
       return std::distance(elems.begin(), idx);
   } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
-    if (containsCompletion(PE->getSubExpr()))
+    if (CS.containsCodeCompletionLoc(PE->getSubExpr()))
       return 0;
   }
   return None;
@@ -1069,9 +1064,8 @@ public:
       // completion location, later arguments shouldn't be considered missing
       // (causing the solution to have a worse score) as the user just hasn't
       // written them yet. Early exit to avoid recording them in this case.
-      SourceManager &SM = CS.getASTContext().SourceMgr;
       if (!CompletionArgIdx)
-        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), SM);
+        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), CS);
       if (CompletionArgIdx && *CompletionArgIdx < argInsertIdx)
         return newArgIdx;
     }
@@ -1817,9 +1811,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // code completion location, since they may have just not been written yet.
   if (cs.isForCodeCompletion()) {
     if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-      SourceManager &SM = closure->getASTContext().SourceMgr;
-      SourceRange range = closure->getSourceRange();
-      if (range.isValid() && SM.rangeContainsCodeCompletionLoc(range) &&
+      if (cs.containsCodeCompletionLoc(closure) &&
           (closure->hasAnonymousClosureVars() ||
            (args.empty() && closure->getInLoc().isInvalid())))
           return false;
@@ -3812,9 +3804,7 @@ bool ConstraintSystem::repairFailures(
         // other (explicit) argument's so source range containment alone isn't
         // sufficient.
         bool isSynthesizedArg = arg->isImplicit() && isa<DeclRefExpr>(arg);
-        SourceRange range = arg->getSourceRange();
-        if (!isSynthesizedArg && range.isValid() &&
-            Context.SourceMgr.rangeContainsCodeCompletionLoc(range) &&
+        if (!isSynthesizedArg && containsCodeCompletionLoc(arg) &&
             !lhs->isVoid() && !lhs->isUninhabited())
           return true;
       }

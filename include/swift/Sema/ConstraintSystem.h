@@ -2845,6 +2845,10 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
+  /// Whether the given expression's source range contains the code
+  /// completion location.
+  bool containsCodeCompletionLoc(Expr *expr) const;
+
   void setClosureType(const ClosureExpr *closure, FunctionType *type) {
     assert(closure);
     assert(type && "Expected non-null type");
