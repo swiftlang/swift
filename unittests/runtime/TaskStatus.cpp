@@ -80,7 +80,7 @@ static void withSimpleTask(T &&value,
 }
 
 static ExecutorRef createFakeExecutor(uintptr_t value) {
-  return {reinterpret_cast<Executor*>(value)};
+  return ExecutorRef::forDefaultActor(reinterpret_cast<DefaultActor*>(value));
 }
 
 } // end anonymous namespace
