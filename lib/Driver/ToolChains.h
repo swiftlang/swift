@@ -121,6 +121,9 @@ protected:
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
+  void validateArguments(DiagnosticEngine &diags,
+                         const llvm::opt::ArgList &args,
+                         StringRef defaultTarget) const override;
 
 public:
   WebAssembly(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}

@@ -12,6 +12,8 @@
 
 #include "ToolChains.h"
 
+#include "swift/ABI/System.h"
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -193,6 +195,15 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back("-v");
   }
 
+  // WebAssembly doesn't reserve low addresses But without "extra inhabitants"
+  // of the pointer representation, runtime performance and memory footprint are
+  // worse. So assume that compiler driver uses wasm-ld and --global-base=1024
+  // to reserve low 1KB.
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back(context.Args.MakeArgString(
+      Twine("--global-base=") +
+      std::to_string(SWIFT_ABI_WASM32_LEAST_VALID_POINTER)));
+
   // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
@@ -207,6 +218,23 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   II.allowsResponseFiles = true;
 
   return II;
+}
+
+void validateLinkerArguments(DiagnosticEngine &diags,
+                             ArgStringList linkerArgs) {
+  for (auto arg : linkerArgs) {
+    if (StringRef(arg).startswith("--global-base=")) {
+      diags.diagnose(SourceLoc(), diag::error_option_not_supported, arg,
+                     "wasm32");
+    }
+  }
+}
+void toolchains::WebAssembly::validateArguments(DiagnosticEngine &diags,
+                                                const llvm::opt::ArgList &args,
+                                                StringRef defaultTarget) const {
+  ArgStringList linkerArgs;
+  args.AddAllArgValues(linkerArgs, options::OPT_Xlinker);
+  validateLinkerArguments(diags, linkerArgs);
 }
 
 ToolChain::InvocationInfo
