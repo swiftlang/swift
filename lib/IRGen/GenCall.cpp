@@ -1830,7 +1830,7 @@ void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
 std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
     FunctionPointer functionPointer, llvm::Value *thickContext,
-    std::pair<bool, bool> values) {
+    std::pair<bool, bool> values, Size initialContextSize) {
   assert(values.first || values.second);
   bool emitFunction = values.first;
   bool emitSize = values.second;
@@ -1997,11 +1997,16 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     }
     llvm::Value *size = nullptr;
     if (emitSize) {
-      auto *ptr = functionPointer.getRawPointer();
-      auto *descriptorPtr =
-          IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-      auto *sizePtr = IGF.Builder.CreateStructGEP(descriptorPtr, 1);
-      size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
+      if (functionPointer.useStaticContextSize()) {
+        size = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                      initialContextSize.getValue());
+      }  else {
+        auto *ptr = functionPointer.getRawPointer();
+        auto *descriptorPtr =
+            IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
+        auto *sizePtr = IGF.Builder.CreateStructGEP(descriptorPtr, 1);
+        size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
+      }
     }
     return {fn, size};
   }
@@ -2270,7 +2275,8 @@ public:
     llvm::Value *dynamicContextSize32;
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
         IGF, CurCallee.getOrigFunctionType()->getRepresentation(),
-        CurCallee.getFunctionPointer(), thickContext);
+        CurCallee.getFunctionPointer(), thickContext,
+        std::make_pair(true, true), layout.getSize());
     auto *dynamicContextSize =
         IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
     contextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
@@ -4494,13 +4500,20 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
   switch (Kind.value) {
   case KindTy::Value::Function:
     return Value;
-  case KindTy::Value::AsyncFunctionPointer:
-    auto *descriptorPtr =
-        IGF.Builder.CreateBitCast(Value, IGF.IGM.AsyncFunctionPointerPtrTy);
-    auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
-    return IGF.emitLoadOfRelativePointer(
-        Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
-        /*expectedType*/ getFunctionType()->getPointerTo());
+  case KindTy::Value::AsyncFunctionPointer: {
+    if (!isFunctionPointerWithoutContext) {
+      auto *descriptorPtr =
+          IGF.Builder.CreateBitCast(Value, IGF.IGM.AsyncFunctionPointerPtrTy);
+      auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
+      return IGF.emitLoadOfRelativePointer(
+          Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+          /*expectedType*/ getFunctionType()->getPointerTo());
+    } else {
+      return IGF.Builder.CreateBitOrPointerCast(
+          Value, getFunctionType()->getPointerTo());
+    }
+  }
+
   }
 }
 
