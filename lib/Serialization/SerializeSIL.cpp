@@ -1382,7 +1382,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::MarkUninitializedInst: {
-    unsigned Attr = (unsigned)cast<MarkUninitializedInst>(&SI)->getKind();
+    unsigned Attr =
+        (unsigned)cast<MarkUninitializedInst>(&SI)->getMarkUninitializedKind();
     writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
