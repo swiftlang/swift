@@ -6,7 +6,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
-// CHECK-LABEL: class SlowServer : NSObject {
+// CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
 // CHECK-DAG:     func doSomethingSlow(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
 // CHECK-DAG:     func doSomethingSlow(_ operation: String) async -> Int
 // CHECK-DAG:     func doSomethingDangerous(_ operation: String, completionHandler handler: ((String?, Error?) -> Void)? = nil)
