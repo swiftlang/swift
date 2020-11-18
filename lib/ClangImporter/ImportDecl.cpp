@@ -7459,15 +7459,25 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
 
     // Import the method.
     auto proto = entries[i].second;
-    Impl.forEachDistinctName(objcMethod,
-      [&](ImportedName name, ImportNameVersion version) {
-        if (auto imported =
-              Impl.importMirroredDecl(objcMethod, dc, version, proto)) {
-          if (imported->getDeclContext() == dc)
-            members.push_back(imported);
+    if (auto imported =
+            Impl.importMirroredDecl(objcMethod, dc, getVersion(), proto)) {
+      members.push_back(imported);
+
+      for (auto alternate : Impl.getAlternateDecls(imported)) {
+        if (imported->getDeclContext() == alternate->getDeclContext())
+          members.push_back(alternate);
+      }
+
+      if (Impl.SwiftContext.LangOpts.EnableExperimentalConcurrency &&
+          !getVersion().supportsConcurrency()) {
+        auto asyncVersion = getVersion().withConcurrency(true);
+        if (auto asyncImport = Impl.importMirroredDecl(
+                objcMethod, dc, asyncVersion, proto)) {
+          if (asyncImport != imported)
+            members.push_back(asyncImport);
         }
-        return true;
-    });
+      }
+    }
   }
 }
 
