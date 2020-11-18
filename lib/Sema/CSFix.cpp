@@ -1644,3 +1644,15 @@ AllowRefToInvalidDecl::create(ConstraintSystem &cs,
                               ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowRefToInvalidDecl(cs, locator);
 }
+
+bool IgnoreResultBuilderWithReturnStmts::diagnose(const Solution &solution,
+                                                  bool asNote) const {
+  return false;
+}
+
+IgnoreResultBuilderWithReturnStmts *
+IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
+                                           ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
+}

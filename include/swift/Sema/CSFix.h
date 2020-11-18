@@ -2023,7 +2023,8 @@ public:
                                                ConstraintLocator *locator);
 };
 
-class IgnoreInvalidResultBuilderBody final : public ConstraintFix {
+class IgnoreInvalidResultBuilderBody : public ConstraintFix {
+protected:
   enum class ErrorInPhase {
     PreCheck,
     ConstraintGeneration,
@@ -2060,6 +2061,22 @@ public:
 private:
   static IgnoreInvalidResultBuilderBody *
   create(ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator);
+};
+
+class IgnoreResultBuilderWithReturnStmts final
+    : public IgnoreInvalidResultBuilderBody {
+  Type BuilderType;
+
+  IgnoreResultBuilderWithReturnStmts(ConstraintSystem &cs, Type builderTy,
+                                     ConstraintLocator *locator)
+      : IgnoreInvalidResultBuilderBody(cs, ErrorInPhase::PreCheck, locator),
+        BuilderType(builderTy) {}
+
+public:
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreResultBuilderWithReturnStmts *
+  create(ConstraintSystem &cs, Type builderTy, ConstraintLocator *locator);
 };
 
 class SpecifyContextualTypeForNil final : public ConstraintFix {
