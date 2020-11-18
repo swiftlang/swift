@@ -920,16 +920,15 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
       continue;
     }
 
-    auto Box = O.get();
-    assert(((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
-             isa<CopyValueInst>(Box)) ||
+    SILValue Box = O.get();
+    assert((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
+            isa<CopyValueInst>(Box) ||
             isa<SILFunctionArgument>(Box)) &&
            "Expected either an alloc box or a copy of an alloc box or a "
            "function argument");
-    auto InsertPt = Box->getDefiningInsertionPoint();
-    assert(InsertPt);
-    SILBuilderWithScope B(InsertPt);
-    Args.push_back(B.createProjectBox(Box.getLoc(), Box, 0));
+    SILBuilderWithScope::insertAfter(Box, [&](SILBuilder &B) {
+      Args.push_back(B.createProjectBox(Box.getLoc(), Box, 0));
+    });
 
     // For a partial_apply, if this argument is promoted, it is a box that we're
     // turning into an address because we've proven we can keep this value on
@@ -950,7 +949,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
       // becomes dead.
       for (SILInstruction *FrontierInst : PAFrontier) {
         SILBuilderWithScope Builder(FrontierInst);
-        Builder.createDestroyValue(Apply.getLoc(), Box);
+        Builder.emitDestroyValueOperation(Apply.getLoc(), Box);
       }
     }
   }
