@@ -150,6 +150,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
 
   class ShouldPrintForModuleInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      if (!D)
+        return false;
+
       // Skip anything that is marked `@_implementationOnly` itself.
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
