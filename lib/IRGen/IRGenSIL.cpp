@@ -1092,15 +1092,15 @@ public:
   
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i) {
     //TODO(async)
-    llvm_unreachable("not implemented");
+    //llvm_unreachable("not implemented");
   }
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i) {
     //TODO(async)
-    llvm_unreachable("not implemented");
+    //llvm_unreachable("not implemented");
   }
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i) {
     //TODO(async)
-    llvm_unreachable("not implemented");
+    //llvm_unreachable("not implemented");
   }
 
   void visitHopToExecutorInst(HopToExecutorInst *i) {
