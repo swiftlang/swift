@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/linear/* %t
 
-// rdar://70772320
-// REQUIRES: !(optimized_stdlib)
+// REQUIRES: rdar70772320
 
 //
 // This test establishes a "linear" chain of modules that import one another

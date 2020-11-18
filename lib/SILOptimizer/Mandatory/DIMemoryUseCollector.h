@@ -194,7 +194,7 @@ public:
 
   /// True if this is an initializer that initializes stored properties.
   bool isNonDelegatingInit() const {
-    switch (MemoryInst->getKind()) {
+    switch (MemoryInst->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var:
       return false;
     case MarkUninitializedInst::RootSelf:
@@ -210,7 +210,8 @@ public:
   }
 
   bool isRootSelf() const {
-    return MemoryInst->getKind() == MarkUninitializedInst::RootSelf;
+    return MemoryInst->getMarkUninitializedKind() ==
+           MarkUninitializedInst::RootSelf;
   }
 
   bool isDelegatingSelfAllocated() const {

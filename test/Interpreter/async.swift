@@ -4,6 +4,7 @@
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: concurrency
+// REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: CPU=arm64e
 

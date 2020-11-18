@@ -1362,7 +1362,8 @@ void Serializer::writeASTBlockEntity(
   using namespace decls_block;
 
   // The conformance must be complete, or we can't serialize it.
-  assert(conformance->isComplete());
+  assert(conformance->isComplete() ||
+         getASTContext().LangOpts.AllowModuleWithCompilerErrors);
   assert(NormalConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
@@ -1548,6 +1549,8 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
+    if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+      return false;
     llvm_unreachable("decl should never be a member");
 
   case DeclKind::MissingMember:
@@ -5057,7 +5060,9 @@ static void collectInterestingNestedDeclarations(
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
           nominalParent = DC->getSelfNominalTypeDecl();
-          assert(nominalParent && "parent context is not a type or extension");
+          assert(nominalParent ||
+                 nestedType->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+                 "parent context is not a type or extension");
         }
         nestedTypeDecls[nestedType->getName()].push_back({
           S.addDeclRef(nominalParent),
@@ -5122,8 +5127,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         const NominalTypeDecl *extendedNominal = ED->getExtendedNominal();
-        extensionDecls[extendedNominal->getName()]
-          .push_back({ extendedNominal, addDeclRef(D) });
+        if (extendedNominal) {
+          extensionDecls[extendedNominal->getName()]
+            .push_back({ extendedNominal, addDeclRef(D) });
+        }
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getFixity()), addDeclRef(D) });
