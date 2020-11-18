@@ -1287,9 +1287,9 @@ void
 SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createMarkUninitialized(getOpLocation(Inst->getLoc()),
-                                                 OpValue, Inst->getKind()));
+  recordClonedInstruction(Inst, getBuilder().createMarkUninitialized(
+                                    getOpLocation(Inst->getLoc()), OpValue,
+                                    Inst->getMarkUninitializedKind()));
 }
 
 template<typename ImplClass>

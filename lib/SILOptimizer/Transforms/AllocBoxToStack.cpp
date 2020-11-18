@@ -518,7 +518,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     auto *User = HeapBox->getSingleUse()->getUser();
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
       HeapBox = MUI;
-      Kind = MUI->getKind();
+      Kind = MUI->getMarkUninitializedKind();
     }
   }
 
