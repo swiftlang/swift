@@ -1920,6 +1920,10 @@ public:
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
   JobFlags(JobKind kind) { setKind(kind); }
+  JobFlags(JobKind kind, JobPriority priority) {
+    setKind(kind);
+    setPriority(priority);
+  }
   constexpr JobFlags() {}
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, JobKind,
