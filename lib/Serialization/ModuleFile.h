@@ -653,9 +653,6 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
-  virtual Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) override;
-
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
                     SmallVectorImpl<ProtocolConformance*> &Conforms) override;
@@ -694,6 +691,8 @@ public:
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
   Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
+  Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+
 
   // MARK: Deserialization interface
 

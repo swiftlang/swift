@@ -680,6 +680,15 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+Optional<Fingerprint>
+ModuleDecl::loadFingerprint(const IterableDeclContext *IDC) const {
+  for (auto file : getFiles()) {
+    if (auto FP = file->loadFingerprint(IDC))
+      return FP;
+  }
+  return None;
+}
+
 void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {

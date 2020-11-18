@@ -62,7 +62,11 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    return FingerprintAndMembers{None, ctx.AllocateCopy(members)};
+    Optional<Fingerprint> fp = None;
+    if (!idc->getDecl()->isImplicit()) {
+      fp = idc->getDecl()->getModuleContext()->loadFingerprint(idc);
+    }
+    return FingerprintAndMembers{fp, ctx.AllocateCopy(members)};
   }
 
   unsigned bufferID = *sf->getBufferID();

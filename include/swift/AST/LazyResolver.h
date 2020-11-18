@@ -84,11 +84,6 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) = 0;
 
-  /// Returns the fingerprint associated with the given iterable decl context,
-  /// or \c None if no such fingerprint is available.
-  virtual Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) = 0;
-
   /// Populates the given vector with all conformances for \p D.
   ///
   /// The implementation should \em not call setConformances on \p D.

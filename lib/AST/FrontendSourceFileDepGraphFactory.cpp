@@ -507,7 +507,7 @@ ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
                                              bool emitDot)
     : AbstractSourceFileDepGraphFactory(Mod->getASTContext().hadError(),
                                         Mod->getNameStr(),
-                                        Fingerprint(std::string{Fingerprint::DIGEST_LENGTH, '0'}),
+                                        Fingerprint("00000000000000000000000000000000"),
                                         emitDot,
                                         Mod->getASTContext().Diags),
       Mod(Mod) {}

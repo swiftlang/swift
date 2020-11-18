@@ -1013,13 +1013,6 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 
 Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   auto &ctx = getASTContext();
-  // If this decl comes from a serialized module, grab its fingerprint from
-  // the file.
-  if (!getAsGenericContext()->getParentSourceFile()) {
-    auto ci = ctx.getOrCreateLazyIterableContextData(this,
-                                                     /*lazyLoader=*/nullptr);
-    return ci->loader->loadFingerprint(this);
-  }
   auto mutableThis = const_cast<IterableDeclContext *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
                            FingerprintAndMembers())

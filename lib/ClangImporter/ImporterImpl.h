@@ -1247,9 +1247,6 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
-  virtual Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) override;
-
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
