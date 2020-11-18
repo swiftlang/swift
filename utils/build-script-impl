@@ -3016,20 +3016,20 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 
-function printJSONTimestamp {
+function printJSONTimestamp() {
     local command=$1
     local kind=$2
 
     echo "{ \"command\": \"${command}\", \"${kind}\":  \"$(date "+%Y-%m-%dT%H:%M:%S")\" }"
 }
 
-function printJSONStartTimestamp {
+function printJSONStartTimestamp() {
     local command=$1
 
     printJSONTimestamp ${command} "start"
 }
 
-function printJSONEndTimestamp {
+function printJSONEndTimestamp() {
     local command=$1
 
     printJSONTimestamp ${command} "end"
