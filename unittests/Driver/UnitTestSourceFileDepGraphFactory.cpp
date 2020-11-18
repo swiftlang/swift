@@ -53,10 +53,11 @@ void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
       parseADefinedDecl(s, kind, DeclAspect::interface);
   if (!key)
     return;
-  StringRef fingerprintString = s.split(fingerprintSeparator).second;
-  const Optional<StringRef> fingerprint = fingerprintString.empty()
-                                              ? Optional<StringRef>()
-                                              : StringRef(fingerprintString);
+  auto fingerprintString = s.split(fingerprintSeparator).second.str();
+  fingerprintString.resize(Fingerprint::DIGEST_LENGTH, 'X');
+  const Optional<Fingerprint> fingerprint = fingerprintString.empty()
+                                              ? Optional<Fingerprint>()
+                                              : Fingerprint{fingerprintString};
 
   AbstractSourceFileDepGraphFactory::addADefinedDecl(key.getValue(),
                                                      fingerprint);

@@ -547,10 +547,7 @@ populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
       // -swift-version argument is handled in the argsHashStr check that
       // follows.
       CompilationRecordSwiftVersion = value->getValue(scratch);
-      versionValid = (CompilationRecordSwiftVersion
-                      == version::getSwiftFullVersion(
-                        version::Version::getCurrentLanguageVersion()));
-
+      versionValid = CompilationRecordSwiftVersion.equals(version::getSwiftFullVersion(version::Version::getCurrentLanguageVersion()));
     } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
