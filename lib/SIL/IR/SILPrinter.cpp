@@ -1451,7 +1451,7 @@ public:
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
-    switch (MU->getKind()) {
+    switch (MU->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  *this << "[rootself] "; break;
     case MarkUninitializedInst::CrossModuleRootSelf:
@@ -1466,7 +1466,7 @@ public:
       *this << "[delegatingselfallocated] ";
       break;
     }
-    
+
     *this << getIDAndType(MU->getOperand());
   }
 

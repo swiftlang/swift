@@ -4124,8 +4124,7 @@ private:
         ThisKind(K) {}
 
 public:
-
-  Kind getKind() const { return ThisKind; }
+  Kind getMarkUninitializedKind() const { return ThisKind; }
 
   bool isVar() const { return ThisKind == Var; }
   bool isRootSelf() const {
