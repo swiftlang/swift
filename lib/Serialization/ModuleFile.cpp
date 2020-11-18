@@ -650,7 +650,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   }
 }
 
-Optional<std::string>
+Optional<Fingerprint>
 ModuleFile::loadFingerprint(const IterableDeclContext *IDC) {
   PrettyStackTraceDecl trace("loading fingerprints for", IDC->getDecl());
 

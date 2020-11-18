@@ -1011,7 +1011,7 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
-Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
+Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   auto &ctx = getASTContext();
   // If this decl comes from a serialized module, grab its fingerprint from
   // the file.

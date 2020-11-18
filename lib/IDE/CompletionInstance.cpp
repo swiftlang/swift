@@ -305,7 +305,7 @@ void getInterfaceHashIncludingTypeMembers(SourceFile *SF,
   std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
       [&](IterableDeclContext *IDC) {
         if (auto fp = IDC->getBodyFingerprint())
-          hash.update(*fp);
+          hash.update(fp->getRawValue());
         for (auto *member : IDC->getParsedMembers())
           if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
             hashTypeBodyFingerprints(childIDC);

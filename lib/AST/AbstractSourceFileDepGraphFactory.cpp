@@ -60,11 +60,11 @@ void AbstractSourceFileDepGraphFactory::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
                                                  swiftDeps),
-      StringRef(fileFingerprint));
+      Fingerprint{fileFingerprint});
 }
 
 void AbstractSourceFileDepGraphFactory::addADefinedDecl(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
 
   auto nodePair =
       g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);

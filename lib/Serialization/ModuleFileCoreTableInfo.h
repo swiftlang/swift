@@ -570,7 +570,7 @@ class ModuleFileSharedCore::DeclFingerprintsTableInfo {
 public:
   using internal_key_type = uint32_t;
   using external_key_type = DeclID;
-  using data_type = std::string;
+  using data_type = swift::Fingerprint;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -586,8 +586,8 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     using namespace llvm::support;
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return {sizeof(uint32_t), dataLength};
+    const unsigned dataLen = Fingerprint::DIGEST_LENGTH;
+    return {sizeof(uint32_t), dataLen};
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -598,7 +598,9 @@ public:
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
     using namespace llvm::support;
-    return std::string{reinterpret_cast<const char *>(data), length};
+    auto str = std::string{reinterpret_cast<const char *>(data),
+                           Fingerprint::DIGEST_LENGTH};
+    return Fingerprint{str};
   }
 };
 

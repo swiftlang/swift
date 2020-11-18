@@ -232,7 +232,7 @@ bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
       if (node == nullptr)
         llvm::report_fatal_error("Unexpected FINGERPRINT_NODE record");
 
-      node->setFingerprint(BlobData);
+      node->setFingerprint(Fingerprint{BlobData.str()});
       break;
     }
 
@@ -450,7 +450,7 @@ Serializer::writeFineGrainedDependencyGraph(const SourceFileDepGraph &g,
     if (auto fingerprint = node->getFingerprint()) {
       FingerprintNodeLayout::emitRecord(Out, ScratchRecord,
                                         AbbrCodes[FingerprintNodeLayout::Code],
-                                        *fingerprint);
+                                        fingerprint->getRawValue());
     }
 
     node->forEachDefIDependUpon([&](size_t defIDependOn) {

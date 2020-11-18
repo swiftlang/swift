@@ -3831,7 +3831,7 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
-Optional<std::string>
+Optional<Fingerprint>
 ClangImporter::Implementation::loadFingerprint(const IterableDeclContext *) {
   // Clang decls are not fingerprinted in Swift.
   return None;

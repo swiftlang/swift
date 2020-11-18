@@ -439,8 +439,8 @@ namespace {
   public:
     using key_type = DeclID;
     using key_type_ref = const key_type &;
-    using data_type = std::string;
-    using data_type_ref = llvm::StringRef;
+    using data_type = Fingerprint;
+    using data_type_ref = const data_type &;
     using hash_value_type = uint32_t;
     using offset_type = unsigned;
 
@@ -450,11 +450,10 @@ namespace {
 
     std::pair<unsigned, unsigned>
     EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
-      assert((data.size() == 32) && "Fingerprint must be 32-bytes long!");
       endian::Writer writer(out, little);
-      // No need to write the key length; it's constant.
-      writer.write<uint16_t>(data.size());
-      return {sizeof(uint32_t), data.size()};
+      // No need to write the key or value length; they're both constant.
+      const unsigned valueLen = Fingerprint::DIGEST_LENGTH;
+      return {sizeof(uint32_t), valueLen};
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
@@ -467,6 +466,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == Fingerprint::DIGEST_LENGTH);
       endian::Writer writer(out, little);
       out << data;
     }
@@ -5198,7 +5198,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
         if (auto bodyFP = IDC->getBodyFingerprint()) {
-          declFingerprints[addDeclRef(D)] = *bodyFP;
+          declFingerprints.insert({addDeclRef(D), *bodyFP});
         }
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
@@ -5231,7 +5231,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
         if (auto bodyFP = IDC->getBodyFingerprint()) {
-          declFingerprints[addDeclRef(TD)] = *bodyFP;
+          declFingerprints.insert({addDeclRef(TD), *bodyFP});
         }
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
@@ -5300,7 +5300,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     }
 
     if (!declFingerprints.empty()) {
-      // Write decl fingerprints.
       index_block::DeclFingerprintsLayout DeclsFingerprints(Out);
       writeDeclFingerprintsTable(DeclsFingerprints, declFingerprints);
     }

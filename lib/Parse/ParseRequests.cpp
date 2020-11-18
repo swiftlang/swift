@@ -39,7 +39,7 @@ namespace swift {
 void swift::simple_display(llvm::raw_ostream &out,
                            const FingerprintAndMembers &value) {
   if (value.fingerprint)
-    simple_display(out, value.fingerprint.getValue());
+    simple_display(out, *value.fingerprint);
   else
     out << "<no fingerprint>";
   out << ", ";

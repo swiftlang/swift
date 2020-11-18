@@ -86,7 +86,7 @@ public:
 
   /// Returns the fingerprint associated with the given iterable decl context,
   /// or \c None if no such fingerprint is available.
-  virtual Optional<std::string>
+  virtual Optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) = 0;
 
   /// Populates the given vector with all conformances for \p D.
