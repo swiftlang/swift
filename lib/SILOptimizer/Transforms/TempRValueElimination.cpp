@@ -481,7 +481,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     // our base, we fail since those would be re-initializations.
     if (auto *li = dyn_cast<LoadInst>(user)) {
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
+        return false;
       }
     }
 
@@ -621,7 +621,7 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     // our base, we fail since those would be re-initializations.
     if (auto *li = dyn_cast<LoadInst>(user)) {
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        continue;
+        return {std::next(si->getIterator()), false};
       }
     }
 
