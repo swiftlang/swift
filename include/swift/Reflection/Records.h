@@ -92,6 +92,10 @@ public:
   bool isIndirectCase() const {
     return Flags.isIndirectCase();
   }
+
+  bool isVar() const {
+    return Flags.isVar();
+  }
 };
 
 struct FieldRecordIterator {
