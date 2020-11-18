@@ -1579,7 +1579,7 @@ bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
     return true; // Already diagnosed by `matchResultBuilder`.
   }
 
-  auto *S = getAnchor().get<Stmt *>();
+  auto *S = castToExpr<ClosureExpr>(getAnchor())->getBody();
 
   class PreCheckWalker : public ASTWalker {
     DeclContext *DC;

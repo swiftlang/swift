@@ -286,6 +286,21 @@ struct MyTuplifiedStruct {
   }
 }
 
+func test_invalid_return_type_in_body() {
+  tuplify(true) { _ -> (Void, Int) in
+    tuplify(false) { condition in
+      if condition {
+        return 42 // expected-error {{application of result builder 'TupleBuilder' disabled by explicit 'return' statement}}
+        // expected-note@-1 {{remove 'return' statements to apply the result builder}} {{9-16=}}
+      } else {
+        1
+      }
+    }
+
+    42
+  }
+}
+
 // Check that we're performing syntactic use diagnostics.
 func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
