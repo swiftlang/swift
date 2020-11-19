@@ -57,16 +57,35 @@ namespace {
 /// consistent non-ossa vs ossa code rather than an intermediate state.
 struct OwnershipModelEliminatorVisitor
     : SILInstructionVisitor<OwnershipModelEliminatorVisitor, bool> {
-  SILBuilder &builder;
   SmallVector<SILInstruction *, 8> trackingList;
   SmallBlotSetVector<SILInstruction *, 8> instructionsToSimplify;
+
+  /// Points at either a user passed in SILBuilderContext or points at
+  /// builderCtxStorage.
+  SILBuilderContext builderCtx;
+
   SILOpenedArchetypesTracker openedArchetypesTracker;
 
-  OwnershipModelEliminatorVisitor(SILBuilder &newBuilder)
-      : builder(newBuilder),
-        openedArchetypesTracker(&newBuilder.getFunction()) {
-    newBuilder.setTrackingList(&trackingList);
-    newBuilder.setOpenedArchetypesTracker(&openedArchetypesTracker);
+  /// Construct an OME visitor for eliminating ownership from \p fn.
+  OwnershipModelEliminatorVisitor(SILFunction &fn)
+      : trackingList(), instructionsToSimplify(),
+        builderCtx(fn.getModule(), &trackingList),
+        openedArchetypesTracker(&fn) {
+    builderCtx.setOpenedArchetypesTracker(&openedArchetypesTracker);
+  }
+
+  /// A "syntactic" high level function that combines our insertPt with a
+  /// builder ctx.
+  ///
+  /// Since this is syntactic and we assume that our caller is passing in a
+  /// lambda that if we inline will be eliminated, we mark this function always
+  /// inline.
+  template <typename ResultTy>
+  ResultTy LLVM_ATTRIBUTE_ALWAYS_INLINE
+  withBuilder(SILInstruction *insertPt,
+              llvm::function_ref<ResultTy(SILBuilder &, SILLocation)> visitor) {
+    SILBuilderWithScope builder(insertPt, builderCtx);
+    return visitor(builder, insertPt->getLoc());
   }
 
   void drainTrackingList() {
@@ -83,8 +102,6 @@ struct OwnershipModelEliminatorVisitor
     // Add any elements to the tracking list that we currently have in the
     // tracking list that we haven't added yet.
     drainTrackingList();
-    builder.setInsertionPoint(instToVisit);
-    builder.setCurrentDebugScope(instToVisit->getDebugScope());
   }
 
   void eraseInstruction(SILInstruction *i) {
@@ -137,10 +154,12 @@ struct OwnershipModelEliminatorVisitor
   // We lower this to unchecked_bitwise_cast losing our assumption of layout
   // compatibility.
   bool visitUncheckedValueCastInst(UncheckedValueCastInst *uvci) {
-    auto *newVal = builder.createUncheckedBitwiseCast(
-        uvci->getLoc(), uvci->getOperand(), uvci->getType());
-    eraseInstructionAndRAUW(uvci, newVal);
-    return true;
+    return withBuilder<bool>(uvci, [&](SILBuilder &b, SILLocation loc) {
+      auto *newVal = b.createUncheckedBitwiseCast(loc, uvci->getOperand(),
+                                                  uvci->getType());
+      eraseInstructionAndRAUW(uvci, newVal);
+      return true;
+    });
   }
 
   void splitDestructure(SILInstruction *destructure,
@@ -157,8 +176,10 @@ bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *li) {
   if (qualifier == LoadOwnershipQualifier::Unqualified)
     return false;
 
-  SILValue result = builder.emitLoadValueOperation(
-      li->getLoc(), li->getOperand(), li->getOwnershipQualifier());
+  auto result = withBuilder<SILValue>(li, [&](SILBuilder &b, SILLocation loc) {
+    return b.emitLoadValueOperation(loc, li->getOperand(),
+                                    li->getOwnershipQualifier());
+  });
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
@@ -174,8 +195,10 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *si) {
   if (qualifier == StoreOwnershipQualifier::Unqualified)
     return false;
 
-  builder.emitStoreValueOperation(si->getLoc(), si->getSrc(), si->getDest(),
-                                  si->getOwnershipQualifier());
+  withBuilder<void>(si, [&](SILBuilder &b, SILLocation loc) {
+    b.emitStoreValueOperation(loc, si->getSrc(), si->getDest(),
+                              si->getOwnershipQualifier());
+  });
 
   // Then remove the qualified store.
   eraseInstruction(si);
@@ -184,8 +207,10 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *si) {
 
 bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
     StoreBorrowInst *si) {
-  builder.emitStoreValueOperation(si->getLoc(), si->getSrc(), si->getDest(),
-                                  StoreOwnershipQualifier::Init);
+  withBuilder<void>(si, [&](SILBuilder &b, SILLocation loc) {
+    b.emitStoreValueOperation(loc, si->getSrc(), si->getDest(),
+                              StoreOwnershipQualifier::Unqualified);
+  });
 
   // Then remove the qualified store.
   eraseInstruction(si);
@@ -194,23 +219,28 @@ bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
 
 bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
   // Break down the load borrow into an unqualified load.
-  auto *unqualifiedLoad = builder.createLoad(
-      lbi->getLoc(), lbi->getOperand(), LoadOwnershipQualifier::Unqualified);
+  auto newLoad =
+      withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
+        return b.createLoad(loc, lbi->getOperand(),
+                            LoadOwnershipQualifier::Unqualified);
+      });
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  eraseInstructionAndRAUW(lbi, unqualifiedLoad);
+  eraseInstructionAndRAUW(lbi, newLoad);
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // A copy_value of an address-only type cannot be replaced.
-  if (cvi->getType().isAddressOnly(builder.getFunction()))
+  if (cvi->getType().isAddressOnly(*cvi->getFunction()))
     return false;
 
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  builder.emitCopyValueOperation(cvi->getLoc(), cvi->getOperand());
+  withBuilder<void>(cvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitCopyValueOperation(loc, cvi->getOperand());
+  });
   eraseInstructionAndRAUW(cvi, cvi->getOperand());
   return true;
 }
@@ -219,7 +249,9 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *urvi) {
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  builder.emitCopyValueOperation(urvi->getLoc(), urvi->getOperand());
+  withBuilder<void>(urvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitCopyValueOperation(loc, urvi->getOperand());
+  });
   eraseInstruction(urvi);
   return true;
 }
@@ -228,7 +260,9 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedReleaseValueInst(
     UnmanagedReleaseValueInst *urvi) {
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  builder.emitDestroyValueOperation(urvi->getLoc(), urvi->getOperand());
+  withBuilder<void>(urvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitDestroyValueOperation(loc, urvi->getOperand());
+  });
   eraseInstruction(urvi);
   return true;
 }
@@ -237,8 +271,9 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
     UnmanagedAutoreleaseValueInst *UAVI) {
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  builder.createAutoreleaseValue(UAVI->getLoc(), UAVI->getOperand(),
-                                 UAVI->getAtomicity());
+  withBuilder<void>(UAVI, [&](SILBuilder &b, SILLocation loc) {
+    b.createAutoreleaseValue(loc, UAVI->getOperand(), UAVI->getAtomicity());
+  });
   eraseInstruction(UAVI);
   return true;
 }
@@ -246,12 +281,14 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
     DestroyValueInst *dvi) {
   // A destroy_value of an address-only type cannot be replaced.
-  if (dvi->getOperand()->getType().isAddressOnly(builder.getFunction()))
+  if (dvi->getOperand()->getType().isAddressOnly(*dvi->getFunction()))
     return false;
 
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  builder.emitDestroyValueOperation(dvi->getLoc(), dvi->getOperand());
+  withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitDestroyValueOperation(loc, dvi->getOperand());
+  });
   eraseInstruction(dvi);
   return true;
 }
@@ -310,7 +347,8 @@ void OwnershipModelEliminatorVisitor::splitDestructure(
 
   llvm::SmallVector<Projection, 8> projections;
   Projection::getFirstLevelProjections(
-      opType, M, builder.getTypeExpansionContext(), projections);
+      opType, M, TypeExpansionContext(*destructureInst->getFunction()),
+      projections);
   assert(projections.size() == destructureInst->getNumResults());
 
   auto destructureResults = destructureInst->getResults();
@@ -324,8 +362,10 @@ void OwnershipModelEliminatorVisitor::splitDestructure(
 
     // Otherwise, create a projection.
     const auto &proj = projections[index];
-    SingleValueInstruction *projInst =
-        proj.createObjectProjection(builder, loc, destructureOperand).get();
+    auto *projInst = withBuilder<SingleValueInstruction *>(
+        destructureInst, [&](SILBuilder &b, SILLocation loc) {
+          return proj.createObjectProjection(b, loc, destructureOperand).get();
+        });
 
     // First RAUW Result with ProjInst. This ensures that we have a complete IR
     // before we perform any simplifications.
@@ -362,8 +402,7 @@ static bool stripOwnership(SILFunction &func) {
 
   bool madeChange = false;
   SmallVector<SILInstruction *, 32> createdInsts;
-  SILBuilder builder(func);
-  OwnershipModelEliminatorVisitor visitor(builder);
+  OwnershipModelEliminatorVisitor visitor(func);
 
   for (auto &block : func) {
     // Change all arguments to have OwnershipKind::None.
@@ -382,9 +421,16 @@ static bool stripOwnership(SILFunction &func) {
     }
   }
 
-  // Once we have finished processing all instructions, we should not be
-  // consistently in non-ossa form. Now go through any instructions and simplify
-  // using inst simplify.
+  // Once we have finished processing all instructions, we should be
+  // consistently in non-ossa form meaning that it is now safe for us to invoke
+  // utilities that assume that they are in a consistent ossa or non-ossa form
+  // such as inst simplify. Now go through any instructions and simplify using
+  // inst simplify!
+  //
+  // DISCUSSION: We want our utilities to be able to assume if f.hasOwnership()
+  // is false then the utility is allowed to assume the function the utility is
+  // invoked within is in non-ossa form structurally (e.x.: non-ossa does not
+  // have arguments on the default result of checked_cast_br).
   while (!visitor.instructionsToSimplify.empty()) {
     auto value = visitor.instructionsToSimplify.pop_back_val();
     if (!value.hasValue())
