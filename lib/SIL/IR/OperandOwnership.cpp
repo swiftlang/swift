@@ -319,7 +319,7 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
   OwnershipConstraint OwnershipConstraintClassifier::visit##INST##Inst(        \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    assert(isGuaranteedForwardingInst(i) &&                                    \
+    assert(isGuaranteedForwardingValueKind(SILNodeKind(i->getKind())) &&       \
            "Expected an ownership forwarding inst");                           \
     return {OwnershipKind::OWNERSHIP,                                          \
             UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \

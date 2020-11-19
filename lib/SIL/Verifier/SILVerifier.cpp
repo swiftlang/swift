@@ -1011,7 +1011,7 @@ public:
     // Check the SILLLocation attached to the instruction.
     checkInstructionsSILLocation(I);
 
-    // Check ownership.
+    // Check ownership and types.
     SILFunction *F = I->getFunction();
     assert(F && "Expected value base with parent function");
 
