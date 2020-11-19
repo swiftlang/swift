@@ -674,8 +674,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
       contAwaitSyncAddr->getType()->getPointerElementType(), 1);
   auto results = Builder.CreateAtomicCmpXchg(
       contAwaitSyncAddr, null, one,
-      llvm::AtomicOrdering::AcquireRelease /*success ordering*/,
-      llvm::AtomicOrdering::Monotonic /* failure ordering */,
+      llvm::AtomicOrdering::Release /*success ordering*/,
+      llvm::AtomicOrdering::Acquire /* failure ordering */,
       llvm::SyncScope::System);
   auto firstAtAwait = Builder.CreateExtractValue(results, 1);
   auto contBB = createBasicBlock("await.async.maybe.resume");
@@ -711,8 +711,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
                                            arguments);
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, null, one,
-        llvm::AtomicOrdering::AcquireRelease /*success ordering*/,
-        llvm::AtomicOrdering::Monotonic /* failure ordering */,
+        llvm::AtomicOrdering::Release /*success ordering*/,
+        llvm::AtomicOrdering::Acquire /* failure ordering */,
         llvm::SyncScope::System);
     // Again, are we first at the wait (can only reach that state after
     // continuation.resume/abort is called)? If so abort to wait for the end of
