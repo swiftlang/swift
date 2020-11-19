@@ -656,7 +656,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
                   (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
                   if (currOTK != OTK_None && otherOTK != OTK_None &&
                       currOTK != otherOTK) {
-                    tc.diagnose(current, diag::redecl_by_optionality,
+                    tc.diagnose(current, diag::invalid_redecl_by_optionality,
                                 current->getName(), currParamTy,
                                 otherParamTy);
                     tc.diagnose(other, diag::invalid_redecl_prev,

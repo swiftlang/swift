@@ -780,7 +780,7 @@ ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
 
-ERROR(redecl_by_optionality,none,
+ERROR(invalid_redecl_by_optionality,none,
       "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
       (DeclName, Type, Type))
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
