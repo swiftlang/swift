@@ -253,11 +253,10 @@ extension ${Self}: SIMDScalar {
 %end
 
 %for (Self, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
-%if bits == 16:
-@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
-@available(macOS, unavailable)
-@available(macCatalyst, unavailable)
-%end
+% if bits == 16:
+#if !(os(macOS) && arch(x86_64))
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+% end
 extension ${Self} : SIMDScalar {
 
   public typealias SIMDMaskScalar = Int${bits}
@@ -299,5 +298,8 @@ extension ${Self} : SIMDScalar {
 
 % end
 }
+% if bits == 16:
+#endif
+% end
 
 %end
