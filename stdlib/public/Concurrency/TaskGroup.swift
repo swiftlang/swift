@@ -73,23 +73,23 @@ extension Task {
     // Set up the job flags for a new task.
     var groupFlags = JobFlags()
     groupFlags.kind = .task // TODO: .taskGroup?
-    groupFlags.priority = .default // TODO: parent's priority // await Task.currentPriority()
+    groupFlags.priority = await Task.currentPriority()
     groupFlags.isFuture = true
+    groupFlags.isChildTask = true
 
     // 1. Prepare the Group task
     // FIXME: do we have to rather prepare it inside the task we spawn; and yield it back along with the result instead?
     var group = Task.Group<TaskResult>(parentTask: parent)
 
     let (groupTask, context) =
-      Builtin.createAsyncTaskFuture(groupFlags.bits, nil) { () async throws -> BodyResult in
-        let got = await try body(&group)
-        return got
+      Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
+        await try body(&group)
       }
     let groupHandle = Handle<BodyResult>(task: groupTask)
 
     // 2.0) Run the task!
-    DispatchQueue.global(priority: .default).async {
-      groupHandle.run() // TODO: this synchronously runs
+    DispatchQueue.global(priority: .default).async { // TODO: use executors when they land
+      groupHandle.run()
     }
 
     // 2.1) ensure that if we fail and exit by throwing we will cancel all tasks,
