@@ -758,7 +758,7 @@ public:
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
         IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
-        Storage->getType() == IGM.RefCountedPtrTy || !needsShadowCopy(Storage))
+        !needsShadowCopy(Storage))
       return Storage;
 
     // Emit a shadow copy.
