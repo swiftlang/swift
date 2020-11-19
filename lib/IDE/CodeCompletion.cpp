@@ -18,6 +18,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -437,7 +438,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::OptionalBegin:
     case ChunkKind::CallParameterBegin:
     case ChunkKind::CallParameterTypeBegin:
-    case ChunkKind::GenericParameterBegin:
+    case ChunkKind::GenericParameterListBegin:
       OS << "{#";
       break;
     case ChunkKind::DynamicLookupMethodCallTail:
@@ -1047,7 +1048,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
   --CurrentNestingLevel;
 }
 
-void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
+void CodeCompletionResultBuilder::addTypeAnnotation(Type T,
+                                                    const PrintOptions &PO,
                                                     StringRef suffix) {
   T = T->getReferenceStorageReferent();
 
@@ -1350,6 +1352,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::GenericParameterName:
     case ChunkKind::LeftParen:
     case ChunkKind::LeftBracket:
+    case ChunkKind::LeftAngle:
     case ChunkKind::Equal:
     case ChunkKind::DeclAttrParamKeyword:
     case ChunkKind::DeclAttrKeyword:
@@ -1359,6 +1362,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::TypeIdSystem:
     case ChunkKind::TypeIdUser:
     case ChunkKind::CallParameterBegin:
+    case ChunkKind::GenericParameterListBegin:
       return i;
     case ChunkKind::Dot:
     case ChunkKind::ExclamationMark:
@@ -1368,7 +1372,6 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
       continue;
     case ChunkKind::RightParen:
     case ChunkKind::RightBracket:
-    case ChunkKind::LeftAngle:
     case ChunkKind::RightAngle:
     case ChunkKind::Ellipsis:
     case ChunkKind::Comma:
@@ -1386,7 +1389,6 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::CallParameterClosureType:
     case ChunkKind::CallParameterClosureExpr:
     case ChunkKind::OptionalBegin:
-    case ChunkKind::GenericParameterBegin:
     case ChunkKind::DynamicLookupMethodCallTail:
     case ChunkKind::OptionalMethodCallTail:
     case ChunkKind::TypeAnnotation:
@@ -1410,7 +1412,6 @@ CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
 
 void CodeCompletionString::getName(raw_ostream &OS) const {
   auto FirstTextChunk = getFirstTextChunkIndex();
-  int TextSize = 0;
   if (FirstTextChunk.hasValue()) {
     auto chunks = getChunks().slice(*FirstTextChunk);
 
@@ -1440,7 +1441,6 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       }
 
       if (i->hasText() && shouldPrint) {
-        TextSize += i->getText().size();
         OS << i->getText();
       }
     }
@@ -2231,92 +2231,155 @@ public:
       Builder.addLeadingDot();
   }
 
-  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T,
-                         GenericSignature genericSig = GenericSignature()) {
-    PrintOptions PO;
-    PO.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-      PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
-    Builder.setExpectedTypeRelation(
-        calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
-  }
+  /// Stands for a subtype requirement 'T : P' representing the bounds of
+  /// an archetype that appears in the type signature of a completion result.
+  /// Auxiliary requirements are currently appended to the corresponding type
+  /// annotation in the form of a generic \c where clause.
+  struct AuxiliaryRequirement {
+    Type FirstTy;
+    Type SecondTy;
+  };
 
-  void addTypeAnnotationForImplicitlyUnwrappedOptional(
-      CodeCompletionResultBuilder &Builder, Type T,
-      GenericSignature genericSig = GenericSignature(),
-      bool dynamicOrOptional = false) {
+  llvm::SmallVector<AuxiliaryRequirement, 2>
+  computeAuxiliaryRequirements(Type Ty, GenericSignature GenericSig) {
+    using AuxiliaryRequirements = llvm::SmallVector<AuxiliaryRequirement, 2>;
 
-    std::string suffix;
-    // FIXME: This retains previous behavior, but in reality the type of dynamic
-    // lookups is IUO, not Optional as it is for the @optional attribute.
-    if (dynamicOrOptional) {
-      T = T->getOptionalObjectType();
-      suffix = "?";
-    }
+    class RequirementCollector : public TypeWalker {
+      const ASTContext &Ctx;
+      GenericSignature GenericSig;
+      AuxiliaryRequirements &Reqs;
+      llvm::SmallDenseSet<Type, 2> Visited;
 
-    PrintOptions PO;
-    PO.PrintOptionalAsImplicitlyUnwrapped = true;
-    PO.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-      PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
-    Builder.setExpectedTypeRelation(
-        calculateMaxTypeRelation(T, expectedTypeContext, CurrDeclContext));
-  }
+    public:
+      explicit RequirementCollector(const ASTContext &Ctx,
+                                    GenericSignature GenericSig,
+                                    AuxiliaryRequirements &Reqs)
+          : Ctx(Ctx), GenericSig(GenericSig), Reqs(Reqs) {}
 
-  /// For printing in code completion results, replace archetypes with
-  /// protocol compositions.
-  ///
-  /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature genericSig) {
-    if (!genericSig)
-      return type;
+      Action walkToTypePre(Type Ty) override {
+        if (!Ty->isTypeParameter()) {
+          return Action::Continue;
+        }
 
-    auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
-      SmallVector<Type, 2> types;
-      for (auto proto : protos)
-        types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(Ctx, types,
-                                          /*HasExplicitAnyObject=*/false);
+        if (!Visited.insert(Ty).second) {
+          return Action::SkipChildren;
+        }
+
+        llvm::SmallVector<Type, 2> Bounds;
+        for (auto *const Proto : GenericSig->getRequiredProtocols(Ty)) {
+          Bounds.push_back(Proto->getDeclaredInterfaceType());
+        }
+        if (const auto SuperclassTy = GenericSig->getSuperclassBound(Ty)) {
+          Bounds.push_back(SuperclassTy);
+        }
+
+        if (Bounds.empty()) {
+          return Action::SkipChildren;
+        }
+
+        Reqs.push_back(AuxiliaryRequirement{
+            Ty, ProtocolCompositionType::get(Ctx, Bounds,
+                                             /*HasExplicitAnyObject=*/false)});
+
+        return Action::SkipChildren;
+      }
     };
 
-    if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
-      SmallVector<AnyFunctionType::Param, 8> erasedParams;
-      for (const auto &param : genericFuncType->getParams()) {
-        auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
-        erasedParams.emplace_back(erasedTy, param.getLabel(),
-                                  param.getParameterFlags());
-      }
-      return GenericFunctionType::get(genericSig,
-          erasedParams,
-          eraseArchetypes(genericFuncType->getResult(), genericSig),
-          genericFuncType->getExtInfo());
+    // Don't visit generic signatures.
+    if (auto *const GFT = Ty->getAs<GenericFunctionType>()) {
+      return computeAuxiliaryRequirements(FunctionType::get(GFT->getParams(),
+                                                            GFT->getResult(),
+                                                            GFT->getExtInfo()),
+                                          GenericSig);
     }
 
-    return type.transform([&](Type t) -> Type {
-      // FIXME: Code completion should only deal with one or the other,
-      // and not both.
-      if (auto *archetypeType = t->getAs<ArchetypeType>()) {
-        // Don't erase opaque archetype.
-        if (isa<OpaqueTypeArchetypeType>(archetypeType))
-          return t;
+    // We are only interested in type parameters –
+    AuxiliaryRequirements Result;
+    if (!Ty->hasTypeParameter()) {
+      return Result;
+    }
 
-        auto protos = archetypeType->getConformsTo();
-        if (!protos.empty())
-          return buildProtocolComposition(protos);
-      }
+    Ty.walk(RequirementCollector(Ctx, GenericSig, Result));
 
-      if (t->isTypeParameter()) {
-        const auto protos = genericSig->getRequiredProtocols(t);
-        if (!protos.empty())
-          return buildProtocolComposition(protos);
-      }
-
-      return t;
+    // Use the canonical ordering for dependent types to sort the requirements.
+    llvm::array_pod_sort(Result.begin(), Result.end(),
+                         [](const AuxiliaryRequirement *Req1,
+                            const AuxiliaryRequirement *Req2) {
+      return swift::compareDependentTypes(Req1->FirstTy, Req2->FirstTy);
     });
+
+    return Result;
+  }
+
+  void addAuxiliaryRequirements(CodeCompletionResultBuilder &Builder, Type T,
+                                GenericSignature Sig, const PrintOptions &PO) {
+    const auto Reqs = computeAuxiliaryRequirements(T, Sig);
+    if (Reqs.empty()) {
+      return;
+    }
+
+    if (Builder.shouldAnnotateResults()) {
+      Builder.withNestedGroup(
+          CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
+        Builder.addKeyword(" where ");
+        llvm::interleave(
+            Reqs,
+            [&](const AuxiliaryRequirement &Req) {
+              AnnotatedTypePrinter Printer(Builder);
+              Req.FirstTy.print(Printer, PO);
+              Printer.printText(" : ");
+              Req.SecondTy.print(Printer, PO);
+            },
+            [&] { Builder.addComma(); });
+      });
+    } else {
+      llvm::SmallString<32> Buffer;
+      llvm::raw_svector_ostream OS(Buffer);
+
+      OS << " where ";
+      llvm::interleave(
+          Reqs,
+          [&](const AuxiliaryRequirement &Req) {
+            Req.FirstTy.print(OS, PO);
+            OS << " : ";
+            Req.SecondTy.print(OS, PO);
+          },
+          [&] { OS << ", "; });
+
+      Builder.addTypeAnnotation(Buffer);
+    }
+  }
+
+  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
+    addTypeAnnotation(Builder, T, /*TargetTy=*/nullptr, /*GenericSig=*/nullptr);
+  }
+
+  void addTypeAnnotation(CodeCompletionResultBuilder &Builder,
+                         Type AnnotationTy, Type TargetTy,
+                         GenericSignature GenericSig,
+                         bool PrintOptionalAsImplicitlyUnwrapped = false,
+                         bool DynamicOrOptional = false) {
+    const char *Suffix = "";
+    // FIXME: This retains previous behavior, but in reality the type of dynamic
+    // lookups is IUO, not Optional as it is for the @optional attribute.
+    if (PrintOptionalAsImplicitlyUnwrapped && DynamicOrOptional) {
+      AnnotationTy = AnnotationTy->getOptionalObjectType();
+      Suffix = "?";
+    }
+
+    PrintOptions PO;
+    PO.PrintOptionalAsImplicitlyUnwrapped = PrintOptionalAsImplicitlyUnwrapped;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (auto *TypeContext = CurrDeclContext->getInnermostTypeContext())
+      PO.setBaseType(TypeContext->getDeclaredTypeInContext());
+    Builder.addTypeAnnotation(AnnotationTy, PO, Suffix);
+    Builder.setExpectedTypeRelation(calculateMaxTypeRelation(
+        AnnotationTy, expectedTypeContext, CurrDeclContext));
+
+    if (TargetTy) {
+      addAuxiliaryRequirements(Builder, TargetTy, GenericSig, PO);
+    }
   }
 
   Type getTypeOfMember(const ValueDecl *VD,
@@ -2511,13 +2574,11 @@ public:
       VarType = OptionalType::get(VarType);
     }
 
-    auto genericSig =
-        VD->getInnermostDeclContext()->getGenericSignatureOfContext();
-    if (VD->isImplicitlyUnwrappedOptional())
-      addTypeAnnotationForImplicitlyUnwrappedOptional(
-          Builder, VarType, genericSig, DynamicOrOptional);
-    else
-      addTypeAnnotation(Builder, VarType, genericSig);
+    addTypeAnnotation(Builder, VarType,
+                      // Variables cannot be generic and do not need auxiliary
+                      // requirements.
+                      /*TargetTy=*/Type(), /*GenericSig=*/nullptr,
+                      VD->isImplicitlyUnwrappedOptional(), DynamicOrOptional);
 
     if (isUnresolvedMemberIdealType(VarType))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -2537,6 +2598,26 @@ public:
       }
     }
     return false;
+  }
+
+  static void addGenericParamList(CodeCompletionResultBuilder &Builder,
+                                  const GenericContext *GC) {
+    auto *const GPList = GC->getParsedGenericParams();
+    if (!GPList) {
+      return;
+    }
+
+    Builder.withNestedGroup(
+        CodeCompletionString::Chunk::ChunkKind::GenericParameterListBegin, [&] {
+      Builder.addLeftAngle();
+      llvm::interleave(
+          GPList->getParams(),
+          [&](const auto *Param) {
+            Builder.addGenericParameterName(Param->getName().str());
+          },
+          [&] { Builder.addComma(); });
+      Builder.addRightAngle();
+    });
   }
 
   /// Build argument patterns for calling. Returns \c true if any content was
@@ -2611,8 +2692,7 @@ public:
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         contextTy = typeContext->getDeclaredTypeInContext();
 
-      Builder.addCallParameter(argName, bodyName,
-                               eraseArchetypes(paramTy, genericSig), contextTy,
+      Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
                                isVariadic, isInOut, isIUO, isAutoclosure,
                                /*useUnderscoreLabel=*/false,
                                /*isLabeledTrailingClosure=*/false);
@@ -2723,7 +2803,7 @@ public:
   }
 
   void addSubscriptCallPattern(
-      const AnyFunctionType *AFT, const SubscriptDecl *SD,
+      AnyFunctionType *AFT, const SubscriptDecl *SD,
       const Optional<SemanticContextKind> SemanticContext = None) {
     foundFunction(AFT);
     GenericSignature genericSig;
@@ -2753,16 +2833,13 @@ public:
       Builder.addRightBracket();
     else
       Builder.addAnnotatedRightBracket();
-    if (SD && SD->isImplicitlyUnwrappedOptional())
-      addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
-                                                      AFT->getResult(),
-                                                      genericSig);
-    else
-      addTypeAnnotation(Builder, AFT->getResult(), genericSig);
+
+    addTypeAnnotation(Builder, AFT->getResult(), AFT, genericSig,
+                      SD && SD->isImplicitlyUnwrappedOptional());
   }
 
   void addFunctionCallPattern(
-      const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
+      AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
       const Optional<SemanticContextKind> SemanticContext = None) {
     GenericSignature genericSig;
     if (AFD)
@@ -2799,13 +2876,8 @@ public:
 
       addThrows(Builder, AFT, AFD);
 
-      if (AFD &&
-          AFD->isImplicitlyUnwrappedOptional())
-        addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
-                                                        AFT->getResult(),
-                                                        genericSig);
-      else
-        addTypeAnnotation(Builder, AFT->getResult(), genericSig);
+      addTypeAnnotation(Builder, AFT->getResult(), AFT, genericSig,
+                        AFD && AFD->isImplicitlyUnwrappedOptional());
     };
 
     if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
@@ -2925,14 +2997,15 @@ public:
       Builder.setAssociatedDecl(FD);
       addLeadingDot(Builder);
       addValueBaseName(Builder, Name);
+      addGenericParamList(Builder, FD);
+
       if (IsDynamicLookup)
         Builder.addDynamicLookupMethodCallTail();
       else if (FD->getAttrs().hasAttribute<OptionalAttr>())
         Builder.addOptionalMethodCallTail();
 
       if (!AFT) {
-        addTypeAnnotation(Builder, FunctionType,
-                          FD->getGenericSignatureOfContext());
+        addTypeAnnotation(Builder, FunctionType);
         return;
       }
       if (IsImplicitlyCurriedInstanceMethod) {
@@ -2969,8 +3042,7 @@ public:
       PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         PO.setBaseType(typeContext->getDeclaredTypeInContext());
-      Type AnnotationTy =
-          eraseArchetypes(ResultType, FD->getGenericSignatureOfContext());
+      Type AnnotationTy = ResultType;
       if (Builder.shouldAnnotateResults()) {
         Builder.withNestedGroup(
             CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
@@ -3004,6 +3076,9 @@ public:
         AnnotationTy.print(OS, PO);
         Builder.addTypeAnnotation(TypeStr);
       }
+
+      addAuxiliaryRequirements(Builder, AFT, FD->getGenericSignatureOfContext(),
+                               PO);
 
       Builder.setExpectedTypeRelation(calculateMaxTypeRelation(
           ResultType, expectedTypeContext, CurrDeclContext));
@@ -3067,13 +3142,13 @@ public:
         assert(addName.empty());
         addLeadingDot(Builder);
         Builder.addBaseName("init");
+        addGenericParamList(Builder, CD);
       } else if (!addName.empty()) {
         Builder.addBaseName(addName.str());
       }
 
       if (!ConstructorType) {
-        addTypeAnnotation(Builder, MemberType,
-                          CD->getGenericSignatureOfContext());
+        addTypeAnnotation(Builder, MemberType);
         return;
       }
 
@@ -3096,12 +3171,10 @@ public:
 
       if (!Result.hasValue())
         Result = ConstructorType->getResult();
-      if (CD->isImplicitlyUnwrappedOptional()) {
-        addTypeAnnotationForImplicitlyUnwrappedOptional(
-            Builder, *Result, CD->getGenericSignatureOfContext());
-      } else {
-        addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
-      }
+
+      addTypeAnnotation(Builder, *Result, MemberType,
+                        CD->getGenericSignatureOfContext(),
+                        CD->isImplicitlyUnwrappedOptional());
     };
 
     if (ConstructorType && hasInterestingDefaultValues(CD))
@@ -3166,6 +3239,7 @@ public:
       Builder.addQuestionMark();
     }
 
+    addGenericParamList(Builder, SD);
     Builder.addLeftBracket();
     addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(),
                             SD->getGenericSignatureOfContext(), true);
@@ -3178,7 +3252,9 @@ public:
       // Optional<T> type.
       resultTy = OptionalType::get(resultTy);
     }
-    addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
+
+    addTypeAnnotation(Builder, resultTy, subscriptType,
+                      SD->getGenericSignatureOfContext());
   }
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
@@ -3301,12 +3377,13 @@ public:
     addLeadingDot(Builder);
     addValueBaseName(Builder, EED->getBaseIdentifier());
 
-    // Enum element is of function type; (Self.type) -> Self or
+    // Enum element is of function type; (Self.Type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
     Type EnumType = getTypeOfMember(EED, dynamicLookupInfo);
     if (EnumType->is<AnyFunctionType>())
       EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
 
+    Type AnnotationTy = EnumType;
     if (EnumType->is<FunctionType>()) {
       Builder.addLeftParen();
       addCallArgumentPatterns(Builder, EnumType->castTo<FunctionType>(),
@@ -3315,12 +3392,13 @@ public:
       Builder.addRightParen();
 
       // Extract result as the enum type.
-      EnumType = EnumType->castTo<FunctionType>()->getResult();
+      AnnotationTy = EnumType->castTo<FunctionType>()->getResult();
     }
 
-    addTypeAnnotation(Builder, EnumType, EED->getGenericSignatureOfContext());
+    addTypeAnnotation(Builder, AnnotationTy, EnumType,
+                      EED->getGenericSignatureOfContext());
 
-    if (isUnresolvedMemberIdealType(EnumType))
+    if (isUnresolvedMemberIdealType(AnnotationTy))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
   }
 
@@ -3429,8 +3507,10 @@ public:
       Builder.addRightParen();
     }
 
-    if (funcTy)
-      addTypeAnnotation(Builder, funcTy, AFD->getGenericSignatureOfContext());
+    if (funcTy) {
+      addTypeAnnotation(Builder, funcTy, funcTy,
+                        AFD->getGenericSignatureOfContext());
+    }
 
     return true;
   }

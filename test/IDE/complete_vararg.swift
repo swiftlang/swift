@@ -32,7 +32,7 @@ func testTopLevel() {
 // TOP_LEVEL_1: Begin completions
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc1({#x: Int...#})[#Void#]{{; name=.+$}}
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc2({#x: Int#}, {#y: Int...#})[#Void#]{{; name=.+$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      genericFreeFunc1({#t: T...#})[#Void#]{{; name=.+$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      genericFreeFunc1{#<T>#}({#t: T...#})[#Void#]{{; name=.+$}}
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      interestingType1({#x: (Int, (Int, String))...#})[#Void#]{{; name=.+$}}
 // TOP_LEVEL_1: End completions
 

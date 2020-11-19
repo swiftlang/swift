@@ -146,7 +146,7 @@ struct MyStruct1<X: Comparable> {
 func testSubscriptCallSig<T>(val: MyStruct1<T>) {
   val[#^LABELED_SUBSCRIPT^#
 // LABELED_SUBSCRIPT: Begin completions, 2 items
-// LABELED_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal:        ['[']{#idx1: Int#}, {#idx2: Comparable#}[']'][#Int!#];
+// LABELED_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal:        ['[']{#idx1: Int#}, {#idx2: T#}[']'][#Int!#];
 // LABELED_SUBSCRIPT-DAG: Pattern/CurrModule:                 ['[']{#keyPath: KeyPath<MyStruct1<T>, Value>#}[']'][#Value#];
 // LABELED_SUBSCRIPT: End completions
 }

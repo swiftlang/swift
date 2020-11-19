@@ -434,6 +434,9 @@ inline bool CanGenericSignature::isActuallyCanonicalOrNull() const {
          getPointer()->isCanonical();
 }
 
+/// Canonical ordering for dependent types.
+int compareDependentTypes(Type type1, Type type2);
+
 } // end namespace swift
 
 namespace llvm {

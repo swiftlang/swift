@@ -302,8 +302,8 @@ class C4 {
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#]; name=nil
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#]; name=none
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
-// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
-// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map{#<U>#}({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap{#<U>#}({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
@@ -315,8 +315,8 @@ class C4 {
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1??>#]; name=none
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U) -> U?#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U?) -> U?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map{#<U>#}({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U) -> U?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap{#<U>#}({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws -> U?) -> U?#];
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1??>#})[#(into: inout Hasher) -> Void#];
@@ -339,8 +339,8 @@ func testOptionalWithCustomExtension() {
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Somewhere#})[#Optional<Somewhere>#];
 // UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
-// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U) -> U?#];
-// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U?) -> U?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map{#<U>#}({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U) -> U?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap{#<U>#}({#(self): Optional<Somewhere>#})[#((Somewhere) throws -> U?) -> U?#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<Somewhere>#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_OPT_4-NOT: init({#(some):
 // UNRESOLVED_OPT_4-NOT: init({#nilLiteral:
@@ -678,7 +678,7 @@ func receiveHasStatic<T: HasStatic>(x: T)  {}
 func testingGenericParam1<T: HasStatic>(x: inout T, fn: (T) -> Void) -> T {
   x = .#^GENERICPARAM_1^#
 // GENERICPARAM_1: Begin completions, 1 items
-// GENERICPARAM_1: Decl[StaticVar]/{{ExprSpecific|CurrNominal}}/TypeRelation[Identical]: instance[#HasStatic#]; name=instance
+// GENERICPARAM_1: Decl[StaticVar]/{{ExprSpecific|CurrNominal}}/TypeRelation[Identical]: instance[#{{[A-Z]}}#]
 // GENERICPARAM_1: End completions
 
   /* Parser sync. */;
@@ -786,7 +786,7 @@ func receiveMyStructOfMyProtocol<T: MyProtocol>(value: MyStruct<T>) {}
 func testTypeParamInContextType() {
   receiveMyStructOfMyProtocol(value: .#^TYPEPARAM_IN_CONTEXTTYPE_1^#)
 // TYPEPARAM_IN_CONTEXTTYPE_1: Begin completions, 3 items
-// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:      init()[#MyStruct<MyProtocol>#];
+// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:      init()[#MyStruct<T>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal:        otherProtocolOption[#MyStruct<ConcreteOtherProtocol>#];
 // TYPEPARAM_IN_CONTEXTTYPE_1: End completions

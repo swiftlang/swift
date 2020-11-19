@@ -282,7 +282,7 @@ func testInfix15<T: P where T.T == S2>() {
 }
 // INFIX_15: Begin completions, 4 items
 // INFIX_15-NEXT: Decl[AssociatedType]/CurrNominal:   .T; name=T
-// INFIX_15-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(self: P)
+// INFIX_15-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): T#})[#() -> S2#]; name=foo(self: T)
 // INFIX_15-NEXT: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
 // INFIX_15-NEXT: Keyword/CurrNominal:                .Type[#T.Type#]; name=Type
 // INFIX_15: End completions
@@ -292,7 +292,7 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 2 items
-// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(self): P#})[#() -> S2#]; name=(self: P)
+// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(self): T#})[#() -> S2#]; name=(self: T)
 // INFIX_16-NEXT: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
 // INFIX_16: End completions
 

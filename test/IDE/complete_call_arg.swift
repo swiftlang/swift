@@ -511,8 +511,8 @@ func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
   _ = zip(lhs, #^GENERIC_TO_GENERIC^#)
 }
 // GENERIC_TO_GENERIC: Begin completions
-// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: lhs[#Collection#]; name=lhs
-// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: rhs[#Collection#]; name=rhs
+// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: lhs[#T#]; name=lhs
+// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: rhs[#T#]; name=rhs
 // GENERIC_TO_GENERIC: End completions
 
 func emptyOverload() {}
