@@ -2144,13 +2144,17 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// ancestry. This lets us attach categories to the class even though it
 /// does not have statically-emitted metadata.
 bool IRGenModule::hasObjCResilientClassStub(ClassDecl *D) {
-  assert(getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
+#ifndef NDEBUG
+  auto strategy = getClassMetadataStrategy(D);
+  assert(strategy == ClassMetadataStrategy::Resilient ||
+         strategy == ClassMetadataStrategy::Singleton);
+#endif
+
   return ObjCInterop && !D->isGenericContext();
 }
 
-void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
-  assert(hasObjCResilientClassStub(D));
-
+llvm::Constant *IRGenModule::emitObjCResilientClassStub(
+    ClassDecl *D, bool isPublic) {
   ConstantInitBuilder builder(*this);
   auto fields = builder.beginStruct(ObjCFullResilientClassStubTy);
   fields.addInt(SizeTy, 0); // reserved
@@ -2178,9 +2182,13 @@ void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
   objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
       ObjCResilientClassStubTy->getPointerTo());
 
-  entity = LinkEntity::forObjCResilientClassStub(
-      D, TypeMetadataAddress::AddressPoint);
-  defineAlias(entity, objcStub);
+  if (isPublic) {
+    entity = LinkEntity::forObjCResilientClassStub(
+        D, TypeMetadataAddress::AddressPoint);
+    defineAlias(entity, objcStub);
+  }
+
+  return objcStub;
 }
 
 static llvm::Constant *doEmitClassPrivateData(
@@ -2522,7 +2530,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
   switch (methodInfo.getKind()) {
   case ClassMetadataLayout::MethodInfo::Kind::Offset: {
-    auto offset = methodInfo.getOffsett();
+    auto offset = methodInfo.getOffset();
 
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
@@ -2531,12 +2539,12 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(fnPtr, authInfo, signature);
+    return FunctionPointer(methodType, fnPtr, authInfo, signature);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
-    return FunctionPointer::forDirect(fnPtr, signature);
+    return FunctionPointer::forDirect(methodType, fnPtr, signature);
   }
   }
   

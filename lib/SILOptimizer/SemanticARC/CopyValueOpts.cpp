@@ -296,7 +296,7 @@ static bool canSafelyJoinSimpleRange(SILValue cviOperand,
   // NOTE: This use may be any type of consuming use and may not be a
   // destroy_value.
   auto *cviConsumer = cvi->getSingleConsumingUse();
-  if (!cviConsumer || isOwnedForwardingInstruction(cviConsumer->getUser())) {
+  if (!cviConsumer || isOwnedForwardingUse(cviConsumer)) {
     return false;
   }
 
@@ -408,7 +408,7 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
   // First do a quick check if our operand is owned. If it is not owned, we can
   // not join live ranges.
   SILValue operand = cvi->getOperand();
-  if (operand.getOwnershipKind() != ValueOwnershipKind::Owned) {
+  if (operand.getOwnershipKind() != OwnershipKind::Owned) {
     return false;
   }
 

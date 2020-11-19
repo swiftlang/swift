@@ -408,7 +408,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
     LI->replaceAllUsesWith(builder.createCopyValue(LI->getLoc(), val));
   } else {
     assert(!ASI->getFunction()->hasOwnership() ||
-           val.getOwnershipKind() != ValueOwnershipKind::Guaranteed);
+           val.getOwnershipKind() != OwnershipKind::Guaranteed);
     LI->replaceAllUsesWith(val);
   }
 
@@ -573,12 +573,8 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     // Stop on deallocation.
     if (auto *DSI = dyn_cast<DeallocStackInst>(Inst)) {
-      if (DSI->getOperand() == ASI) {
-        // Reset LastStore.
-        // So that we don't pass RunningVal as a phi arg beyond dealloc_stack
-        LastStore = nullptr;
+      if (DSI->getOperand() == ASI)
         break;
-      }
     }
   }
   if (LastStore) {
@@ -683,7 +679,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createPhiArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
+    Block->createPhiArgument(ASI->getElementType(), OwnershipKind::Owned);
 }
 
 SILValue
@@ -754,21 +750,6 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
 
   addArgumentToBranch(Def, Dest, TI);
   TI->eraseFromParent();
-}
-
-static bool hasOnlyUndefIncomingValues(SILPhiArgument *phiArg) {
-  SmallVector<SILValue, 8> incomingValues;
-  phiArg->getIncomingPhiValues(incomingValues);
-  for (auto predArg : incomingValues) {
-    if (isa<SILUndef>(predArg))
-      continue;
-    if (isa<SILPhiArgument>(predArg) &&
-        hasOnlyUndefIncomingValues(cast<SILPhiArgument>(predArg))) {
-      continue;
-    }
-    return false;
-  }
-  return true;
 }
 
 void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
@@ -852,18 +833,13 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   // If the owned phi arg we added did not have any uses, create end_lifetime to
   // end its lifetime. In asserts mode, make sure we have only undef incoming
   // values for such phi args.
-  if (ASI->getFunction()->hasOwnership()) {
     for (auto Block : PhiBlocks) {
       auto *phiArg = cast<SILPhiArgument>(
           Block->getArgument(Block->getNumArguments() - 1));
-      if (phiArg->getOwnershipKind() == ValueOwnershipKind::Owned &&
-          phiArg->use_empty()) {
-        assert(hasOnlyUndefIncomingValues(phiArg));
-        SILBuilderWithScope(&Block->front())
-            .createEndLifetime(Block->front().getLoc(), phiArg);
+      if (phiArg->use_empty()) {
+        erasePhiArgument(Block, Block->getNumArguments() - 1);
       }
     }
-  }
 }
 
 void StackAllocationPromoter::pruneAllocStackUsage() {

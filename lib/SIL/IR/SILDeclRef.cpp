@@ -447,8 +447,15 @@ bool SILDeclRef::isTransparent() const {
 
   if (hasAutoClosureExpr()) {
     auto *ace = getAutoClosureExpr();
-    if (ace->getThunkKind() == AutoClosureExpr::Kind::None)
+    switch (ace->getThunkKind()) {
+    case AutoClosureExpr::Kind::None:
       return true;
+
+    case AutoClosureExpr::Kind::AsyncLet:
+    case AutoClosureExpr::Kind::DoubleCurryThunk:
+    case AutoClosureExpr::Kind::SingleCurryThunk:
+      break;
+    }
   }
 
   if (hasDecl()) {

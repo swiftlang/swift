@@ -20,3 +20,48 @@ template <class R, class T, class U> R returns_template(T a, U b) {
 
 // Same here:
 template <class T> void cannot_infer_template() {}
+
+// TODO: We should support these types. Until then, make sure we don't crash when importing.
+template<class... Ts>
+void testPackExpansion(Ts...) { }
+
+template<class T>
+void testTypeOfExpr(T a, typeof(a + 1) b) { }
+
+template<class T>
+void testTypeOf(T a, typeof a b) { }
+
+template<class T>
+decltype(auto) testAuto(T arg) {
+  return arg;
+}
+
+// TODO: Add tests for Decltype, UnaryTransform, and TemplateSpecialization with
+// a dependent type once those are supported.
+
+// TODO: Add test for DeducedTemplateSpecializationType once we support class templates.
+
+// TODO(SR-13809): We don't yet support dependent types but we still shouldn't
+// crash when importing one.
+template <class T> struct Dep { using TT = T; };
+
+template <class T> void useDependentType(typename Dep<T>::TT) {}
+
+template <class T> void lvalueReference(T &ref) { ref = 42; }
+
+template <class T> void constLvalueReference(const T &) {}
+
+template <class T> void forwardingReference(T &&) {}
+
+namespace Orbiters {
+
+template<class T>
+void galileo(T) { }
+
+template<class T, class U>
+void cassini(T, U) { }
+
+template<class T>
+void magellan(T&) { }
+
+}

@@ -391,7 +391,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     } else {
       // Pass 'nil' as the return value to the exit BB.
       failureExitArg = failureExitBB->createPhiArgument(
-          resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
+          resultLowering.getLoweredType(), OwnershipKind::Owned);
       SILValue nilResult =
           B.createEnum(ctor, SILValue(), getASTContext().getOptionalNoneDecl(),
                        resultLowering.getLoweredType());
@@ -763,7 +763,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
     failureExitBB = createBasicBlock();
     failureExitArg = failureExitBB->createPhiArgument(
-        resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
+        resultLowering.getLoweredType(), OwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     SILValue nilResult =

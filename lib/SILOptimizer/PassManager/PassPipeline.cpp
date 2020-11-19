@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -116,10 +116,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addClosureLifetimeFixup();
 
 #ifndef NDEBUG
-  // Add a verification pass to check our work when skipping non-inlinable
+  // Add a verification pass to check our work when skipping
   // function bodies.
-  if (Options.SkipNonInlinableFunctionBodies)
-    P.addNonInlinableFunctionSkippingChecker();
+  if (Options.SkipFunctionBodies != FunctionBodySkipping::None)
+    P.addSILSkippingChecker();
 #endif
 
   if (Options.shouldOptimize()) {
@@ -147,6 +147,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Now that we have emitted constant propagation diagnostics, try to eliminate
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
+
+  P.addOptimizeHopToExecutor();
 
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();

@@ -591,7 +591,7 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` othrewise.
 bool typeCheckForCodeCompletion(
-    constraints::SolutionApplicationTarget &target,
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -674,8 +674,6 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// involve \c UnresolvedType (for patterns with no type information) and
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
-
-bool typeCheckCatchPattern(CaseStmt *S, DeclContext *dc);
 
 /// Coerce a pattern to the given type.
 ///
@@ -966,6 +964,7 @@ bool diagnoseDeclRefExportability(SourceLoc loc,
 /// conformance is SPI or visible via an implementation-only import.
 bool diagnoseConformanceExportability(SourceLoc loc,
                                       const RootProtocolConformance *rootConf,
+                                      const ExtensionDecl *ext,
                                       const ExportContext &where);
 
 /// \name Availability checking
@@ -1010,7 +1009,16 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
 Optional<UnavailabilityReason>
-checkDeclarationAvailability(const Decl *D, const ExportContext &where);
+checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
+
+/// Checks whether a conformance should be considered unavailable when
+/// referred to at the given location and, if so, returns the reason why the
+/// declaration is unavailable. Returns None is the declaration is
+/// definitely available.
+Optional<UnavailabilityReason>
+checkConformanceAvailability(const RootProtocolConformance *Conf,
+                             const ExtensionDecl *Ext,
+                             const ExportContext &Where);
 
 /// Checks an "ignored" expression to see if it's okay for it to be ignored.
 ///
@@ -1024,6 +1032,14 @@ void diagnosePotentialUnavailability(const ValueDecl *D,
                                      SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const UnavailabilityReason &Reason);
+
+// Emits a diagnostic, if necessary, for a reference to a declaration
+// that is potentially unavailable at the given source location.
+void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
+                                     const ExtensionDecl *ext,
+                                     SourceLoc loc,
+                                     const DeclContext *dc,
+                                     const UnavailabilityReason &reason);
 
 void
 diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
@@ -1042,12 +1058,16 @@ void diagnosePotentialAccessorUnavailability(
 const AvailableAttr *getDeprecated(const Decl *D);
 
 /// Emits a diagnostic for a reference to a declaration that is deprecated.
-/// Callers can provide a lambda that adds additional information (such as a
-/// fixit hint) to the deprecation diagnostic, if it is emitted.
 void diagnoseIfDeprecated(SourceRange SourceRange,
                           const ExportContext &Where,
                           const ValueDecl *DeprecatedDecl,
                           const ApplyExpr *Call);
+
+/// Emits a diagnostic for a reference to a conformnace that is deprecated.
+bool diagnoseIfDeprecated(SourceLoc loc,
+                          const RootProtocolConformance *rootConf,
+                          const ExtensionDecl *ext,
+                          const ExportContext &where);
 /// @}
 
 /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
@@ -1061,6 +1081,9 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
+
+/// Whether the given expression can throw.
+bool canThrow(Expr *expr);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.

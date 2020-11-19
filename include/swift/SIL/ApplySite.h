@@ -216,6 +216,10 @@ public:
     return SILFunctionConventions(getSubstCalleeType(), getModule());
   }
 
+  bool isAsync() const {
+    return getOrigCalleeType()->isAsync();
+  }
+
   /// Returns true if the callee function is annotated with
   /// @_semantics("programtermination_point")
   bool isCalleeKnownProgramTerminationPoint() const {

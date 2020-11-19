@@ -897,6 +897,11 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
     ObjCNonLazyClasses.push_back(classPtr);
 }
 
+/// Add the given global value to the Objective-C resilient class stub list.
+void IRGenModule::addObjCClassStub(llvm::Constant *classPtr) {
+  ObjCClassStubs.push_back(classPtr);
+}
+
 void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
   RuntimeResolvableTypes.push_back(type);
@@ -992,6 +997,12 @@ void IRGenModule::emitGlobalLists() {
     // name but a magic section.
     emitGlobalList(*this, ObjCClasses, "objc_classes",
                    GetObjCSectionName("__objc_classlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
+
+    // So do resilient class stubs.
+    emitGlobalList(*this, ObjCClassStubs, "objc_class_stubs",
+                   GetObjCSectionName("__objc_stublist",
                                       "regular,no_dead_strip"),
                    llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
@@ -1176,6 +1187,13 @@ static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
     NominalTypeDecl &decl) {
+  // The accessor depends on the existence of canonical metadata records
+  // because their presence determine which runtime function is called.
+  auto *accessor = IGM.getAddrOfTypeMetadataAccessFunction(
+      decl.getDeclaredType()->getCanonicalType(), NotForDefinition);
+  accessor->deleteBody();
+  IGM.IRGen.noteUseOfMetadataAccessor(&decl);
+
   IGM.IRGen.noteLazyReemissionOfNominalTypeDescriptor(&decl);
   // The type context descriptor depends on canonical metadata records because
   // pointers to them are attached as trailing objects to it.
@@ -1218,8 +1236,9 @@ void IRGenerator::emitLazyDefinitions() {
       auto &IGM = *IGMPtr.get();
       // A new canonical prespecialized metadata changes both the type
       // descriptor (adding a new entry to the trailing list of metadata) and
-      // the metadata accessor (adding a new list of generic arguments against
-      // which to compare the arguments to the function).  Consequently, it is
+      // the metadata accessor (calling the appropriate getGenericMetadata
+      // variant depending on whether there are any canonical prespecialized
+      // metadata records to add to the metadata cache).  Consequently, it is
       // necessary to force these to be reemitted.
       if (canonicality == TypeMetadataCanonicality::Canonical) {
         deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
@@ -2524,7 +2543,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
   LinkEntity keyEntity =
       LinkEntity::forDynamicallyReplaceableFunctionKey(f);
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto silFunctionType = f->getLoweredFunctionType();
+  Signature signature = getSignature(silFunctionType);
 
   // Create and initialize the first link entry for the chain of replacements.
   // The first implementation is initialized with 'implFn'.
@@ -2583,9 +2603,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto authEntity = PointerAuthEntity(f);
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
 
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, authInfo,
-                                                     signature),
-                                     forwardedArgs);
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(silFunctionType, realReplFn, authInfo, signature),
+      forwardedArgs);
   Res->setTailCall();
   if (IGF.CurFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2638,8 +2658,10 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
                         ? PointerAuthEntity(keyEntity.getSILFunction())
                         : PointerAuthEntity::Special::TypeDescriptor;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
-  auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+  auto *Res =
+      IGF.Builder.CreateCall(FunctionPointer(FunctionPointer::KindTy::Function,
+                                             typeFnPtr, authInfo, signature),
+                             forwardedArgs);
 
   Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
@@ -2711,7 +2733,8 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
 
   auto entity = LinkEntity::forSILFunction(f, true);
 
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto fnType = f->getLoweredFunctionType();
+  Signature signature = getSignature(fnType);
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
@@ -2755,7 +2778,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       IGF, schema, fnPtrAddr,
       PointerAuthEntity(f->getDynamicallyReplacedFunction()));
   auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+      FunctionPointer(fnType, typeFnPtr, authInfo, signature), forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -3908,6 +3931,24 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type) {
   // Zero-initialize if we're asking for a definition.
   cast<llvm::GlobalVariable>(variable)->setInitializer(
     llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
+
+  return variable;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
+    NominalTypeDecl *decl) {
+  assert(decl->isGenericContext());
+  LinkEntity entity =
+      LinkEntity::forCanonicalPrespecializedGenericTypeCachingOnceToken(decl);
+  if (auto &entry = GlobalVars[entity]) {
+    return entry;
+  }
+  auto variable = getAddrOfLLVMVariable(entity, ForDefinition, DebugTypeInfo());
+
+  // Zero-initialize if we're asking for a definition.
+  cast<llvm::GlobalVariable>(variable)->setInitializer(
+      llvm::ConstantInt::get(OnceTy, 0));
 
   return variable;
 }

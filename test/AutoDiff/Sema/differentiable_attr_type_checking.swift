@@ -291,7 +291,7 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   var y: Float
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   public init(x: Float, y: Float) {
     self.x = x
@@ -299,31 +299,31 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   public init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Float) -> Float'}}
   public func amb(x: Float, y: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}} {{10-10=@differentiable(wrt: x) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(wrt: x)' attribute to satisfy requirement}} {{10-10=@differentiable(wrt: x) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Int) -> Float'}}
   public func amb(x: Float, y: Int) -> Float {
     return x
   }
 
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}}
   public func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}}
   @differentiable(wrt: (self, x))
   public func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
@@ -558,7 +558,7 @@ public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because
   // it is mroe constrained than the requirement's `@differentiable` attribute.
   @differentiable(where T: CustomStringConvertible)
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))'}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(wrt: (x, y))' attribute to satisfy requirement}}
   public func requirement<T: Differentiable>(_ x: T, _ y: T) -> T { x }
 }
 
@@ -632,7 +632,7 @@ class Super: Differentiable {
   // TODO(TF-632): Fix "'TangentVector' is not a member type of 'Self'" diagnostic.
   // The underlying error should appear instead:
   // "covariant 'Self' can only appear at the top level of method result type".
-  // expected-error @+1 2 {{'TangentVector' is not a member type of 'Self'}}
+  // expected-error @+1 2 {{'TangentVector' is not a member type of type 'Self'}}
   func vjpDynamicSelfResult() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { $0 })
   }

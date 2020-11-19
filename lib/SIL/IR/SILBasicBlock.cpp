@@ -189,7 +189,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
   SILFunction *F = getParent();
   SILModule &M = F->getModule();
   if (Ty.isTrivial(*F))
-    Kind = ValueOwnershipKind::None;
+    Kind = OwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old arg!");
 
@@ -215,7 +215,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
   SILFunction *F = getParent();
   SILModule &M = F->getModule();
   if (Ty.isTrivial(*F))
-    Kind = ValueOwnershipKind::None;
+    Kind = OwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
@@ -262,7 +262,7 @@ SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
-    Kind = ValueOwnershipKind::None;
+    Kind = OwnershipKind::None;
   return new (getModule()) SILPhiArgument(this, Ty, Kind, D);
 }
 
@@ -271,7 +271,7 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(arg_iterator Iter, SILType Ty,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
-    Kind = ValueOwnershipKind::None;
+    Kind = OwnershipKind::None;
   return new (getModule()) SILPhiArgument(this, Iter, Ty, Kind, D);
 }
 

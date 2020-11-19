@@ -367,7 +367,7 @@ namespace {
         }
       };
 
-      simplifyBinOpExprTyVars();       
+      simplifyBinOpExprTyVars();
 
       return true;
     }
@@ -1019,9 +1019,7 @@ namespace {
       // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
       // independent of the wider expression containing the ErrorExpr, so
       // there's no point attempting to produce a solution for it.
-      SourceRange range = E->getSourceRange();
-      if (range.isInvalid() ||
-          CS.getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(range))
+      if (CS.containsCodeCompletionLoc(E))
         return nullptr;
 
       return HoleType::get(CS.getASTContext(), E);
@@ -1227,9 +1225,11 @@ namespace {
         if (knownType) {
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
+            auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
+            (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
             if (!CS.hasType(E))
-              CS.setType(E, knownType);
-            return nullptr;
+              CS.setType(E, hole);
+            return hole;
           }
 
           if (!knownType->hasHole()) {
@@ -1258,14 +1258,13 @@ namespace {
         }
       }
 
-      // If we're referring to an invalid declaration, don't type-check.
-      //
-      // FIXME: If the decl is in error, we get no information from this.
-      // We may, alternatively, want to use a type variable in that case,
-      // and possibly infer the type of the variable that way.
+      // If declaration is invalid, let's turn it into a potential hole
+      // and keep generating constraints.
       if (!knownType && E->getDecl()->isInvalid()) {
-        CS.setType(E, E->getDecl()->getInterfaceType());
-        return nullptr;
+        auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
+        (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
+        CS.setType(E, hole);
+        return hole;
       }
 
       // Create an overload choice referencing this declaration and immediately
@@ -1743,33 +1742,31 @@ namespace {
         auto &DE = CS.getASTContext().Diags;
         auto numElements = expr->getNumElements();
 
-        if (numElements == 0) {
-          DE.diagnose(expr->getStartLoc(),
-                      diag::should_use_empty_dictionary_literal)
-              .fixItInsert(expr->getEndLoc(), ":");
+        // Empty and single element array literals with dictionary contextual
+        // types are fixed during solving, so continue as normal in those
+        // cases.
+        if (numElements > 1) {
+          bool isIniting =
+              CS.getContextualTypePurpose(expr) == CTP_Initialization;
+          DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
+                      contextualType->lookThroughAllOptionalTypes(), isIniting);
+
+          auto diagnostic =
+              DE.diagnose(expr->getStartLoc(), diag::meant_dictionary_lit);
+
+          // If there is an even number of elements in the array, let's produce
+          // a fix-it which suggests to replace "," with ":" to form a dictionary
+          // literal.
+          if ((numElements & 1) == 0) {
+            const auto commaLocs = expr->getCommaLocs();
+            if (commaLocs.size() == numElements - 1) {
+              for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+                diagnostic.fixItReplace(commaLocs[i * 2], ":");
+            }
+          }
+
           return nullptr;
         }
-
-        bool isIniting =
-            CS.getContextualTypePurpose(expr) == CTP_Initialization;
-        DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
-                    contextualType->lookThroughAllOptionalTypes(), isIniting);
-
-        auto diagnostic =
-            DE.diagnose(expr->getStartLoc(), diag::meant_dictionary_lit);
-
-        // If there is an even number of elements in the array, let's produce
-        // a fix-it which suggests to replace "," with ":" to form a dictionary
-        // literal.
-        if ((numElements & 1) == 0) {
-          const auto commaLocs = expr->getCommaLocs();
-          if (commaLocs.size() == numElements - 1) {
-            for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-              diagnostic.fixItReplace(commaLocs[i * 2], ":");
-          }
-        }
-
-        return nullptr;
       }
 
       auto arrayTy = CS.createTypeVariable(locator,

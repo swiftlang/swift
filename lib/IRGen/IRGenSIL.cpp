@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/IR/Constant.h"
 #define DEBUG_TYPE "irgensil"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
@@ -36,6 +37,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/TargetInfo.h"
@@ -69,6 +71,7 @@
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenIntegerLiteral.h"
+#include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPointerAuth.h"
@@ -853,42 +856,6 @@ public:
     }
   }
 
-  llvm::Value *getAsyncTask() override {
-    // FIXME: (1) Remove this override, (2) mark the IRGenFunction::getAsyncTask
-    //        declaration as non-virtual, and (3) mark IRGenFunction's
-    //        destructor non-virtual once Task.runDetached is available.
-    //        rdar://problem/70597390*/
-    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer) {
-      return llvm::Constant::getNullValue(IGM.SwiftTaskPtrTy);
-    }
-    return IRGenFunction::getAsyncTask();
-  }
-
-  llvm::Value *getAsyncExecutor() override {
-    // FIXME: (1) Remove this override, (2) mark the
-    //        IRGenFunction::getAsyncExecutor declaration as non-virtual, and
-    //        (3) mark IRGenFunction's destructor non-virtual once
-    //        Task.runDetached is available.  rdar://problem/70597390*/
-    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer) {
-      return llvm::Constant::getNullValue(IGM.SwiftExecutorPtrTy);
-    }
-    return IRGenFunction::getAsyncExecutor();
-  }
-
-  llvm::Value *getAsyncContext() override {
-    // FIXME: (1) Remove this override, (2) mark the
-    //        IRGenFunction::getAsyncContext declaration as non-virtual, and
-    //        (3) mark IRGenFunction's destructor non-virtual once
-    //        Task.runDetached is available.  rdar://problem/70597390*/
-    if (CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer) {
-      return llvm::Constant::getNullValue(IGM.SwiftContextPtrTy);
-    }
-    return IRGenFunction::getAsyncContext();
-  }
-
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -1175,7 +1142,7 @@ public:
 } // end anonymous namespace
 
 static AsyncContextLayout getAsyncContextLayout(IRGenSILFunction &IGF) {
-  return getAsyncContextLayout(IGF, IGF.CurSILFn);
+  return getAsyncContextLayout(IGF.IGM, IGF.CurSILFn);
 }
 
 namespace {
@@ -1259,6 +1226,42 @@ public:
   llvm::Value *getCoroutineBuffer() override {
     return allParamValues.claimNext();
   }
+  Explosion
+  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
+                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
+                     const LoadableTypeInfo &loadableArgTI,
+                     std::function<Explosion(unsigned index, unsigned size)>
+                         explosionForArgument) override {
+    Explosion paramValues;
+    // If the explosion must be passed indirectly, load the value from the
+    // indirect address.
+    auto &nativeSchema = loadableArgTI.nativeParameterValueSchema(IGF.IGM);
+    if (nativeSchema.requiresIndirect()) {
+      Explosion paramExplosion = explosionForArgument(index, 1);
+      Address paramAddr =
+          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
+      if (loadableParamTI.getStorageType() != loadableArgTI.getStorageType())
+        paramAddr =
+            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
+                paramAddr.getAddress(),
+                loadableArgTI.getStorageType()->getPointerTo()));
+      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
+    } else {
+      if (!nativeSchema.empty()) {
+        // Otherwise, we map from the native convention to the type's explosion
+        // schema.
+        Explosion nativeParam;
+        unsigned size = nativeSchema.size();
+        Explosion paramExplosion = explosionForArgument(index, size);
+        paramExplosion.transferInto(nativeParam, size);
+        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
+                                                 param->getType());
+      } else {
+        assert(loadableParamTI.getSchema().empty());
+      }
+    }
+    return paramValues;
+  };
 
 public:
   using SyncEntryPointArgumentEmission::requiresIndirectResult;
@@ -1309,10 +1312,8 @@ public:
     return loadValue(contextLayout);
   }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
-    assert(size > 0);
     auto argumentLayout = layout.getArgumentLayout(index);
     auto result = loadExplosion(argumentLayout);
-    assert(result.size() == size);
     return result;
   }
   bool requiresIndirectResult(SILType retType) override { return false; }
@@ -1377,6 +1378,14 @@ public:
     llvm_unreachable(
         "async functions do not use a fixed size coroutine buffer");
   }
+  Explosion
+  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
+                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
+                     const LoadableTypeInfo &loadableArgTI,
+                     std::function<Explosion(unsigned index, unsigned size)>
+                         explosionForArgument) override {
+    return explosionForArgument(index, 1);
+  };
 };
 
 std::unique_ptr<NativeCCEntryPointArgumentEmission>
@@ -1395,11 +1404,7 @@ std::unique_ptr<COrObjCEntryPointArgumentEmission>
 getCOrObjCEntryPointArgumentEmission(IRGenSILFunction &IGF,
                                      SILBasicBlock &entry,
                                      Explosion &allParamValues) {
-  if (IGF.CurSILFn->isAsync() &&
-      !(/*FIXME: Remove this condition once Task.runDetached is
-                            available.  rdar://problem/70597390*/
-        IGF.CurSILFn->getLoweredFunctionType()->getRepresentation() ==
-        SILFunctionTypeRepresentation::CFunctionPointer)) {
+  if (IGF.CurSILFn->isAsync()) {
     llvm_unreachable("unsupported");
   } else {
     return std::make_unique<SyncCOrObjCEntryPointArgumentEmission>(
@@ -1651,8 +1656,9 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
 }
 
 template <typename ExplosionForArgument>
-static void bindParameter(IRGenSILFunction &IGF, unsigned index,
-                          SILArgument *param, SILType paramTy,
+static void bindParameter(IRGenSILFunction &IGF,
+                          NativeCCEntryPointArgumentEmission &emission,
+                          unsigned index, SILArgument *param, SILType paramTy,
                           ExplosionForArgument explosionForArgument) {
   // Pull out the parameter value and its formal type.
   auto &paramTI = IGF.getTypeInfo(IGF.CurSILFn->mapTypeIntoContext(paramTy));
@@ -1661,36 +1667,11 @@ static void bindParameter(IRGenSILFunction &IGF, unsigned index,
   // If the SIL parameter isn't passed indirectly, we need to map it
   // to an explosion.
   if (param->getType().isObject()) {
-    Explosion paramValues;
     auto &loadableParamTI = cast<LoadableTypeInfo>(paramTI);
-    auto &loadableArgTI = cast<LoadableTypeInfo>(paramTI);
-    // If the explosion must be passed indirectly, load the value from the
-    // indirect address.
-    auto &nativeSchema = argTI.nativeParameterValueSchema(IGF.IGM);
-    if (nativeSchema.requiresIndirect()) {
-      Explosion paramExplosion = explosionForArgument(index, 1);
-      Address paramAddr =
-          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
-      if (paramTI.getStorageType() != argTI.getStorageType())
-        paramAddr =
-            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
-                paramAddr.getAddress(),
-                loadableArgTI.getStorageType()->getPointerTo()));
-      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
-    } else {
-      if (!nativeSchema.empty()) {
-        // Otherwise, we map from the native convention to the type's explosion
-        // schema.
-        Explosion nativeParam;
-        unsigned size = nativeSchema.size();
-        Explosion paramExplosion = explosionForArgument(index, size);
-        paramExplosion.transferInto(nativeParam, size);
-        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
-                                                 param->getType());
-      } else {
-        assert(paramTI.getSchema().empty());
-      }
-    }
+    auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
+    auto paramValues =
+        emission.explosionForObject(IGF, index, param, paramTy, loadableParamTI,
+                                    loadableArgTI, explosionForArgument);
     IGF.setLoweredExplosion(param, paramValues);
     return;
   }
@@ -1748,6 +1729,10 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     break;
   }
 
+  if (funcTy->isAsync()) {
+    emitAsyncFunctionEntry(IGF, IGF.CurSILFn);
+  }
+
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
 
   // The 'self' argument might be in the context position, which is
@@ -1757,7 +1742,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     params = params.drop_back();
 
     bindParameter(
-        IGF, 0, selfParam,
+        IGF, *emission, 0, selfParam,
         conv.getSILArgumentType(conv.getNumSILArguments() - 1,
                                 IGF.IGM.getMaximalTypeExpansionContext()),
         [&](unsigned startIndex, unsigned size) {
@@ -1769,9 +1754,12 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 
     // Even if we don't have a 'self', if we have an error result, we
     // should have a placeholder argument here.
-  } else if (funcTy->hasErrorResult() ||
-           funcTy->getRepresentation() == SILFunctionTypeRepresentation::Thick)
-  {
+    //
+    // For async functions, there will be a thick context within the async
+    // context whenever there is no self context.
+  } else if (funcTy->isAsync() || funcTy->hasErrorResult() ||
+             funcTy->getRepresentation() ==
+                 SILFunctionTypeRepresentation::Thick) {
     llvm::Value *contextPtr = emission->getContext();
     (void)contextPtr;
     assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
@@ -1781,7 +1769,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   unsigned i = 0;
   for (SILArgument *param : params) {
     auto argIdx = conv.getSILArgIndexOfFirstParam() + i;
-    bindParameter(IGF, i, param,
+    bindParameter(IGF, *emission, i, param,
                   conv.getSILArgumentType(
                       argIdx, IGF.IGM.getMaximalTypeExpansionContext()),
                   [&](unsigned index, unsigned size) {
@@ -1963,6 +1951,11 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
+  auto funcTy = CurSILFn->getLoweredFunctionType();
+  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift)
+    emitAsyncFunctionPointer(IGM, CurSILFn,
+                             getAsyncContextLayout(*this).getSize());
+
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager
   // TODO: consider using a cheaper analysis at -O0
@@ -1997,7 +1990,6 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Map the LLVM arguments to arguments on the entry point BB.
   Explosion params = collectParameters();
-  auto funcTy = CurSILFn->getLoweredFunctionType();
 
   switch (funcTy->getLanguage()) {
   case SILFunctionLanguage::Swift:
@@ -2281,23 +2273,32 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   diffWitness =
       Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
 
-  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
+  setLoweredFunctionPointer(i, FunctionPointer(fnType, diffWitness, signature));
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
+  auto fnType = fn->getLoweredFunctionType();
 
-  llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(
-      fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
-      isa<PreviousDynamicFunctionRefInst>(i));
-
-  auto sig = IGM.getSignature(fn->getLoweredFunctionType());
+  auto sig = IGM.getSignature(fnType);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
+  auto *fnPtr = IGM.getAddrOfSILFunction(
+      fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
+      isa<PreviousDynamicFunctionRefInst>(i));
+  llvm::Value *value;
+  auto isSpecialAsyncWithoutCtxtSize =
+      fn->isAsync() && fn->getName().equals("swift_task_future_wait");
+  if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
+    value = IGM.getAddrOfAsyncFunctionPointer(fn);
+    value = Builder.CreateBitCast(value, fnPtr->getType());
+  } else {
+    value = fnPtr;
+  }
+  FunctionPointer fp =
+      FunctionPointer(fnType, value, sig, isSpecialAsyncWithoutCtxtSize);
 
-  FunctionPointer fp = FunctionPointer::forDirect(fnPtr, sig);
-  
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
   setLoweredFunctionPointer(i, fp);
@@ -3058,16 +3059,18 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   Explosion llArgs;
 
+  auto &lv = getLoweredValue(i->getCallee());
   if (i->getOrigCalleeType()->isAsync()) {
     auto result = getPartialApplicationFunction(*this, i->getCallee(),
                                                 i->getSubstitutionMap(),
                                                 i->getSubstCalleeType());
     llvm::Value *innerContext = std::get<1>(result);
-    auto layout =
-        getAsyncContextLayout(*this, i->getOrigCalleeType(),
-                              i->getSubstCalleeType(), i->getSubstitutionMap());
-    auto size = getDynamicAsyncContextSize(
-        *this, layout, i->getOrigCalleeType(), innerContext);
+    llvm::Value *size;
+    llvm::Value *fnPtr;
+    std::tie(fnPtr, size) = getAsyncFunctionAndSize(
+        *this, i->getOrigCalleeType()->getRepresentation(), std::get<0>(result),
+        innerContext, {/*function*/ false, /*size*/ true});
+    assert(fnPtr == nullptr);
     llArgs.add(size);
   }
 
@@ -3083,7 +3086,6 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     }
   }
   
-  auto &lv = getLoweredValue(i->getCallee());
   if (lv.kind == LoweredValue::Kind::ObjCMethod) {
     // Objective-C partial applications require a different path. There's no
     // actual function pointer to capture, and we semantically can't cache
@@ -3168,7 +3170,7 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
   Builder.CreateUnreachable();
 }
 
-static void emitCoroutineExit(IRGenSILFunction &IGF) {
+static void emitCoroutineOrAsyncExit(IRGenSILFunction &IGF) {
   // The LLVM coroutine representation demands that there be a
   // unique call to llvm.coro.end.
 
@@ -3194,12 +3196,13 @@ static void emitCoroutineExit(IRGenSILFunction &IGF) {
 
 static void emitReturnInst(IRGenSILFunction &IGF,
                            SILType resultTy,
-                           Explosion &result) {
+                           Explosion &result,
+                           CanSILFunctionType fnType) {
   // If we're generating a coroutine, just call coro.end.
-  if (IGF.isCoroutine()) {
+  if (IGF.isCoroutine() && !IGF.isAsync()) {
     assert(result.empty() &&
            "coroutines do not currently support non-void returns");
-    emitCoroutineExit(IGF);
+    emitCoroutineOrAsyncExit(IGF);
     return;
   }
 
@@ -3213,12 +3216,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     auto &retTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
     retTI.initialize(IGF, result, IGF.IndirectReturn, false);
     IGF.Builder.CreateRetVoid();
-  } else if (IGF.isAsync() &&
-             !(/*FIXME: Remove this condition once Task.runDetached is
-                  available.  rdar://problem/70597390*/
-               IGF.CurSILFn->getLoweredFunctionType()
-                   ->getRepresentation() ==
-               SILFunctionTypeRepresentation::CFunctionPointer)) {
+  } else if (IGF.isAsync()) {
     // If we're generating an async function, store the result into the buffer.
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
@@ -3235,7 +3233,8 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       cast<LoadableTypeInfo>(fieldLayout.getType())
           .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
     }
-    IGF.Builder.CreateRetVoid();
+    emitAsyncReturn(IGF, layout, fnType);
+    emitCoroutineOrAsyncExit(IGF);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
@@ -3264,7 +3263,8 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
     result = std::move(temp);
   }
 
-  emitReturnInst(*this, i->getOperand()->getType(), result);
+  emitReturnInst(*this, i->getOperand()->getType(), result,
+                 i->getFunction()->getLoweredFunctionType());
 }
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
@@ -3272,6 +3272,14 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
 
   Builder.CreateStore(exn, getCallerErrorResultSlot());
+
+  // Async functions just return to the continuation.
+  if (isAsync()) {
+    auto layout = getAsyncContextLayout(*this);
+    emitAsyncReturn(*this, layout, i->getFunction()->getLoweredFunctionType());
+    emitCoroutineOrAsyncExit(*this);
+    return;
+  }
 
   // Create a normal return, but leaving the return value undefined.
   auto fnTy = CurFn->getType()->getPointerElementType();
@@ -3286,7 +3294,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
 void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
   // Just call coro.end; there's no need to distinguish 'unwind'
   // and 'return' at the LLVM level.
-  emitCoroutineExit(*this);
+  emitCoroutineOrAsyncExit(*this);
 }
 
 void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
@@ -3346,7 +3354,8 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
                                            coroutine.Buffer.getAddress(),
                                            schemaAndEntity.second);
-  FunctionPointer callee(continuation, pointerAuth, sig);
+  FunctionPointer callee(i->getOrigCalleeType(), continuation, pointerAuth,
+                         sig);
 
   Builder.CreateCall(callee, {
     coroutine.Buffer.getAddress(),
@@ -3516,12 +3525,12 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchEnum(
-        IRGenSILFunction &IGF,
-        SmallVectorImpl<std::pair<EnumElementDecl*, llvm::BasicBlock*>> &dests,
-        SwitchEnumInstBase *inst) {
-  for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
-    auto casePair = inst->getCase(i);
-    
+    IRGenSILFunction &IGF,
+    SmallVectorImpl<std::pair<EnumElementDecl *, llvm::BasicBlock *>> &dests,
+    SwitchEnumTermInst inst) {
+  for (unsigned i = 0, e = inst.getNumCases(); i < e; ++i) {
+    auto casePair = inst.getCase(i);
+
     // If the destination BB accepts the case argument, set up a waypoint BB so
     // we can feed the values into the argument's PHI node(s).
     //
@@ -3533,10 +3542,10 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
     else
       dests.push_back({casePair.first, IGF.getLoweredBB(casePair.second).bb});
   }
-  
+
   llvm::BasicBlock *defaultDest = nullptr;
-  if (inst->hasDefault())
-    defaultDest = IGF.getLoweredBB(inst->getDefaultBB()).bb;
+  if (inst.hasDefault())
+    defaultDest = IGF.getLoweredBB(inst.getDefaultBB()).bb;
   return defaultDest;
 }
 
@@ -4624,6 +4633,17 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   setLoweredExplosion(i, out);
 }
 
+static bool isCallToSwiftTaskAlloc(llvm::Value *val) {
+  auto *call = dyn_cast<llvm::CallInst>(val);
+  if (!call)
+    return false;
+  auto *callee = call->getCalledFunction();
+  if (!callee)
+    return false;
+  auto isTaskAlloc = callee->getName().equals("swift_task_alloc");
+  return isTaskAlloc;
+}
+
 void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                                   const TypeInfo &type,
                                                   llvm::Value *addr) {
@@ -4641,6 +4661,11 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     else if (auto *CoroAllocaGet = dyn_cast<llvm::IntrinsicInst>(Op0)) {
       if (CoroAllocaGet->getIntrinsicID() == llvm::Intrinsic::coro_alloca_get)
         addr = CoroAllocaGet;
+    } else if (auto *call = dyn_cast<llvm::CallInst>(Op0)) {
+      addr = call;
+      bool isTaskAlloc = isCallToSwiftTaskAlloc(call);
+      assert(isTaskAlloc && "expecting call to swift_task_alloc");
+      (void)isTaskAlloc;
     }
   }
 
@@ -4656,7 +4681,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   // At this point addr must be an alloca or an undef.
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
-         isa<llvm::IntrinsicInst>(addr));
+         isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr));
 
   auto Indirection = DirectValue;
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
@@ -6085,7 +6110,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
     auto fnType = IGM.getSILTypes().getConstantFunctionType(
         IGM.getMaximalTypeExpansionContext(), member);
     auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnPtr, sig);
+    auto fn = FunctionPointer::forDirect(fnType, fnPtr, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;
@@ -6249,7 +6274,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto authInfo =
       PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
 
-    FunctionPointer fn(fnPtr, authInfo, sig);
+    FunctionPointer fn(methodType, fnPtr, authInfo, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;
@@ -6285,7 +6310,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
                                ResilienceExpansion::Maximal)) {
     auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
-    FunctionPointer fn(fnPtr, sig);
+    FunctionPointer fn(methodType, fnPtr, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;

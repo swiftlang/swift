@@ -18,6 +18,7 @@
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
@@ -1361,7 +1362,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
 
-  return { BraceStmt::create(Ctx, VD->getLoc(), Body, VD->getLoc(),
+  auto Range = InitValue->getSourceRange();
+  return { BraceStmt::create(Ctx, Range.Start, Body, Range.End,
                              /*implicit*/true),
            /*isTypeChecked=*/true };
 }
@@ -2308,6 +2310,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
       // Anything else should not have a synthesized setter.
       LLVM_FALLTHROUGH;
     case WriteImplKind::Immutable:
+      if (accessor->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+        return false;
       llvm_unreachable("should not be synthesizing accessor in this case");
 
     case WriteImplKind::StoredWithObservers:
@@ -2506,6 +2510,7 @@ static void typeCheckSynthesizedWrapperInitializer(
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
     TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
+  checkPropertyWrapperActorIsolation(pbd, initializer);
   TypeChecker::checkPropertyWrapperEffects(pbd, initializer);
 }
 

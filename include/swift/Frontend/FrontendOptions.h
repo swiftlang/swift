@@ -136,6 +136,7 @@ public:
     ScanDependencies,        ///< Scan dependencies of Swift source files
     ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
+    PrintFeature,       ///< Print supported feature of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -288,6 +289,12 @@ public:
   /// This flag is currently only propagated from the driver to
   /// any merge-modules jobs.
   bool EnableExperimentalCrossModuleIncrementalBuild = false;
+
+  /// Best effort to output a .swiftmodule regardless of any compilation
+  /// errors. SIL generation and serialization is skipped entirely when there
+  /// are errors. The resulting serialized AST may include errors types and
+  /// skip nodes entirely, depending on the errors involved.
+  bool AllowModuleWithCompilerErrors = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

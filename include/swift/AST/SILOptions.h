@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,14 +18,15 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
-#include "swift/Basic/Sanitizers.h"
-#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Sanitizers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Remarks/RemarkFormat.h"
-#include <string>
 #include <climits>
+#include <string>
 
 namespace swift {
 
@@ -88,8 +89,8 @@ public:
   /// and go from OSSA to non-ownership SIL.
   bool StopOptimizationBeforeLoweringOwnership = false;
 
-  /// Whether to skip emitting non-inlinable function bodies.
-  bool SkipNonInlinableFunctionBodies = false;
+  // The kind of function bodies to skip emitting.
+  FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;

@@ -525,12 +525,10 @@ public:
   }
 
   /// Output this file's interface hash into the provided string buffer.
-  void getInterfaceHash(llvm::SmallString<32> &str) const;
+  Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
-    llvm::SmallString<32> str;
-    getInterfaceHash(str);
-    out << str << '\n';
+    out << getInterfaceHash() << '\n';
   }
 
   /// If this source file has been told to collect its parsed tokens, retrieve

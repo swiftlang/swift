@@ -34,10 +34,10 @@ using namespace fine_grained_dependencies;
 
 AbstractSourceFileDepGraphFactory::AbstractSourceFileDepGraphFactory(
     bool hadCompilationError, StringRef swiftDeps,
-    StringRef fileFingerprint, bool emitDotFileAfterConstruction,
+    Fingerprint fileFingerprint, bool emitDotFileAfterConstruction,
     DiagnosticEngine &diags)
     : hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
-      fileFingerprint(fileFingerprint.str()),
+      fileFingerprint(fileFingerprint),
       emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags) {
 }
 
@@ -60,11 +60,11 @@ void AbstractSourceFileDepGraphFactory::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface,
                                                  swiftDeps),
-      StringRef(fileFingerprint));
+      Fingerprint{fileFingerprint});
 }
 
 void AbstractSourceFileDepGraphFactory::addADefinedDecl(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
 
   auto nodePair =
       g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);

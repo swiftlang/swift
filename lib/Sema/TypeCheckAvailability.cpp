@@ -222,6 +222,17 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
                        unavailablePlatformKind);
 }
 
+ExportContext ExportContext::forConformance(DeclContext *DC,
+                                            ProtocolDecl *proto) {
+  assert(isa<ExtensionDecl>(DC) || isa<NominalTypeDecl>(DC));
+  auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
+
+  where.Exported &= proto->getFormalAccessScope(
+      DC, /*usableFromInlineAsPublic*/true).isPublic();
+
+  return where;
+}
+
 ExportContext ExportContext::withReason(ExportabilityReason reason) const {
   auto copy = *this;
   copy.Reason = unsigned(reason);
@@ -958,6 +969,13 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
   return UnavailabilityReason::requiresVersionRange(version);
 }
 
+Optional<UnavailabilityReason>
+TypeChecker::checkConformanceAvailability(const RootProtocolConformance *conf,
+                                          const ExtensionDecl *ext,
+                                          const ExportContext &where) {
+  return checkDeclarationAvailability(ext, where);
+}
+
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
 /// contains a target SourceRange and matches a particular criterion.
 /// This class finds the innermost nodes of interest by walking
@@ -1219,7 +1237,8 @@ static const Decl *ancestorMemberLevelDeclForAvailabilityFixit(const Decl *D) {
   while (D) {
     D = relatedDeclForAvailabilityFixit(D);
 
-    if (D->getDeclContext()->isTypeContext() &&
+    if (!D->isImplicit() &&
+        D->getDeclContext()->isTypeContext() &&
         DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Available,
                                                 D)) {
       break;
@@ -1563,13 +1582,6 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
     const UnavailabilityReason &Reason) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
-  // We only emit diagnostics for API unavailability, not for explicitly
-  // weak-linked symbols.
-  if (Reason.getReasonKind() !=
-      UnavailabilityReason::Kind::RequiresOSVersionRange) {
-    return;
-  }
-
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
     auto Err =
@@ -1592,13 +1604,6 @@ void TypeChecker::diagnosePotentialUnavailability(
     const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
   ASTContext &Context = ReferenceDC->getASTContext();
-
-  // We only emit diagnostics for API unavailability, not for explicitly
-  // weak-linked symbols.
-  if (Reason.getReasonKind() !=
-      UnavailabilityReason::Kind::RequiresOSVersionRange) {
-    return;
-  }
 
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
@@ -1652,6 +1657,37 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
+void TypeChecker::diagnosePotentialUnavailability(
+    const RootProtocolConformance *rootConf,
+    const ExtensionDecl *ext,
+    SourceLoc loc,
+    const DeclContext *dc,
+    const UnavailabilityReason &reason) {
+  ASTContext &ctx = dc->getASTContext();
+
+  auto requiredRange = reason.getRequiredOSVersionRange();
+  {
+    auto type = rootConf->getType();
+    auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+
+    auto diagID = (ctx.LangOpts.EnableConformanceAvailabilityErrors
+                   ? diag::conformance_availability_only_version_newer
+                   : diag::conformance_availability_only_version_newer_warn);
+    auto err =
+      ctx.Diags.diagnose(
+               loc, diagID,
+               type, proto, prettyPlatformString(targetPlatform(ctx.LangOpts)),
+               reason.getRequiredOSVersionRange().getLowerEndpoint());
+
+    // Direct a fixit to the error if an existing guard is nearly-correct
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc,
+                                                     requiredRange, ctx, err))
+      return;
+  }
+
+  fixAvailability(loc, dc, requiredRange, ctx);
+}
+
 const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
   if (auto *Attr = D->getAttrs().getDeprecated(D->getASTContext()))
     return Attr;
@@ -1669,7 +1705,7 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
 /// Returns true if the reference or any of its parents is an
 /// unconditional unavailable declaration for the same platform.
 static bool isInsideCompatibleUnavailableDeclaration(
-    const ValueDecl *D, const ExportContext &where,
+    const Decl *D, const ExportContext &where,
     const AvailableAttr *attr) {
   auto referencedPlatform = where.getUnavailablePlatformKind();
   if (!referencedPlatform)
@@ -2148,6 +2184,60 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 }
 
+bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
+                                       const RootProtocolConformance *rootConf,
+                                       const ExtensionDecl *ext,
+                                       const ExportContext &where) {
+  const AvailableAttr *attr = TypeChecker::getDeprecated(ext);
+  if (!attr)
+    return false;
+
+  // We match the behavior of clang to not report deprecation warnings
+  // inside declarations that are themselves deprecated on all deployment
+  // targets.
+  if (where.isDeprecated()) {
+    return false;
+  }
+
+  auto *dc = where.getDeclContext();
+  auto &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.DisableAvailabilityChecking) {
+    AvailabilityContext runningOSVersion = where.getAvailabilityContext();
+    if (runningOSVersion.isKnownUnreachable()) {
+      // Suppress a deprecation warning if the availability checking machinery
+      // thinks the reference program location will not execute on any
+      // deployment target for the current platform.
+      return false;
+    }
+  }
+
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+
+  StringRef platform = attr->prettyPlatformString();
+  llvm::VersionTuple deprecatedVersion;
+  if (attr->Deprecated)
+    deprecatedVersion = attr->Deprecated.getValue();
+
+  if (attr->Message.empty()) {
+    ctx.Diags.diagnose(
+             loc, diag::conformance_availability_deprecated,
+             type, proto, attr->hasPlatform(), platform,
+             attr->Deprecated.hasValue(), deprecatedVersion,
+             /*message*/ StringRef())
+        .highlight(attr->getRange());
+    return true;
+  }
+
+  EncodedDiagnosticMessage encodedMessage(attr->Message);
+  ctx.Diags.diagnose(
+      loc, diag::conformance_availability_deprecated,
+      type, proto, attr->hasPlatform(), platform,
+      attr->Deprecated.hasValue(), deprecatedVersion,
+      encodedMessage.Message)
+    .highlight(attr->getRange());
+  return true;
+}
 
 void swift::diagnoseUnavailableOverride(ValueDecl *override,
                                         const ValueDecl *base,
@@ -2210,6 +2300,102 @@ bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
     fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
   });
+}
+
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
+                                           const RootProtocolConformance *rootConf,
+                                           const ExtensionDecl *ext,
+                                           const ExportContext &where) {
+  auto *attr = AvailableAttr::isUnavailable(ext);
+  if (!attr)
+    return false;
+
+  // Calling unavailable code from within code with the same
+  // unavailability is OK -- the eventual caller can't call the
+  // enclosing code in the same situations it wouldn't be able to
+  // call this code.
+  if (isInsideCompatibleUnavailableDeclaration(ext, where, attr))
+    return false;
+
+  ASTContext &ctx = ext->getASTContext();
+  auto &diags = ctx.Diags;
+
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+
+  StringRef platform;
+  switch (attr->getPlatformAgnosticAvailability()) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
+    llvm_unreachable("shouldn't see deprecations in explicit unavailability");
+
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+    if (attr->Platform != PlatformKind::none) {
+      // This was platform-specific; indicate the platform.
+      platform = attr->prettyPlatformString();
+      break;
+    }
+    LLVM_FALLTHROUGH;
+
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+    // We don't want to give further detail about these.
+    platform = "";
+    break;
+
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    // This API is explicitly unavailable in Swift.
+    platform = "Swift";
+    break;
+  }
+
+  EncodedDiagnosticMessage EncodedMessage(attr->Message);
+  diags.diagnose(loc, diag::conformance_availability_unavailable,
+                 type, proto,
+                 platform.empty(), platform, EncodedMessage.Message);
+
+  switch (attr->getVersionAvailability(ctx)) {
+  case AvailableVersionComparison::Available:
+  case AvailableVersionComparison::PotentiallyUnavailable:
+    llvm_unreachable("These aren't considered unavailable");
+
+  case AvailableVersionComparison::Unavailable:
+    if ((attr->isLanguageVersionSpecific() ||
+         attr->isPackageDescriptionVersionSpecific())
+        && attr->Introduced.hasValue())
+      diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
+                     type, proto,
+                     (attr->isLanguageVersionSpecific() ?
+                      "Swift" : "PackageDescription"),
+                     *attr->Introduced)
+        .highlight(attr->getRange());
+    else
+      diags.diagnose(ext, diag::conformance_availability_marked_unavailable,
+                     type, proto)
+        .highlight(attr->getRange());
+    break;
+
+  case AvailableVersionComparison::Obsoleted:
+    // FIXME: Use of the platformString here is non-awesome for application
+    // extensions.
+
+    StringRef platformDisplayString;
+    if (attr->isLanguageVersionSpecific()) {
+      platformDisplayString = "Swift";
+    } else if (attr->isPackageDescriptionVersionSpecific()) {
+      platformDisplayString = "PackageDescription";
+    } else {
+      platformDisplayString = platform;
+    }
+
+    diags.diagnose(ext, diag::conformance_availability_obsoleted,
+                   type, proto, platformDisplayString, *attr->Obsoleted)
+      .highlight(attr->getRange());
+    break;
+  }
+  return true;
 }
 
 /// Check if this is a subscript declaration inside String or
@@ -3200,29 +3386,81 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
-                                       const ExportContext &where) {
+                                       const ExportContext &where,
+                                       Type depTy, Type replacementTy) {
+  assert(!where.isImplicit());
+
   if (!conformance.isConcrete())
     return false;
+
   const ProtocolConformance *concreteConf = conformance.getConcrete();
+  const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
 
   auto *DC = where.getDeclContext();
+
+  auto maybeEmitAssociatedTypeNote = [&]() {
+    if (!depTy && !replacementTy)
+      return;
+
+    Type selfTy = rootConf->getProtocol()->getProtocolSelfType();
+    if (!depTy->isEqual(selfTy)) {
+      auto &ctx = DC->getASTContext();
+      ctx.Diags.diagnose(
+          loc,
+          diag::assoc_conformance_from_implementation_only_module,
+          depTy, replacementTy->getCanonicalType());
+    }
+  };
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext())) {
+    if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where)) {
+      maybeEmitAssociatedTypeNote();
+      return true;
+    }
+
+    if (diagnoseExplicitUnavailability(loc, rootConf, ext, where)) {
+      maybeEmitAssociatedTypeNote();
+      return true;
+    }
+
+    // Diagnose (and possibly signal) for potential unavailability
+    auto maybeUnavail = TypeChecker::checkConformanceAvailability(
+        rootConf, ext, where);
+    if (maybeUnavail.hasValue()) {
+      TypeChecker::diagnosePotentialUnavailability(rootConf, ext, loc, DC,
+                                                   maybeUnavail.getValue());
+      maybeEmitAssociatedTypeNote();
+      return true;
+    }
+
+    // Diagnose for deprecation
+    if (TypeChecker::diagnoseIfDeprecated(loc, rootConf, ext, where)) {
+      maybeEmitAssociatedTypeNote();
+
+      // Deprecation is just a warning, so keep going with checking the
+      // substitution map below.
+    }
+  }
+
+  // Now, check associated conformances.
   SubstitutionMap subConformanceSubs =
       concreteConf->getSubstitutions(DC->getParentModule());
-  diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where);
-  const RootProtocolConformance *rootConf =
-      concreteConf->getRootConformance();
+  if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
+                                          depTy, replacementTy))
+    return true;
 
-  return TypeChecker::diagnoseConformanceExportability(
-      loc, rootConf, where);
+  return false;
 }
 
 bool
 swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
-                                           const ExportContext &where) {
+                                           const ExportContext &where,
+                                           Type depTy, Type replacementTy) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
-    if (diagnoseConformanceAvailability(loc, conformance, where))
+    if (diagnoseConformanceAvailability(loc, conformance, where,
+                                        depTy, replacementTy))
       hadAnyIssues = true;
   }
   return hadAnyIssues;

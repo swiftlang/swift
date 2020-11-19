@@ -151,9 +151,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createPhiArgument(
-      SILType::getPrimitiveObjectType(SubType),
-      ValueOwnershipKind::Owned);
+  Iden->createPhiArgument(SILType::getPrimitiveObjectType(SubType),
+                          OwnershipKind::Owned);
 
   SILBasicBlock *Continue = Entry->split(It);
 
@@ -195,7 +194,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Create a PHInode for returning the return value from both apply
   // instructions.
   SILArgument *Arg =
-      Continue->createPhiArgument(AI.getType(), ValueOwnershipKind::Owned);
+      Continue->createPhiArgument(AI.getType(), OwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
     if (AI.getSubstCalleeType()->isNoReturnFunction(
             F->getModule(), AI.getFunction()->getTypeExpansionContext())) {
@@ -241,14 +240,14 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
     ErrorBB->createPhiArgument(TAI->getErrorBB()->getArgument(0)->getType(),
-                               ValueOwnershipKind::Owned);
+                               OwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
                          {ErrorBB->getArgument(0)});
 
     auto *NormalBB = TAI->getFunction()->createBasicBlock();
     NormalBB->createPhiArgument(TAI->getNormalBB()->getArgument(0)->getType(),
-                                ValueOwnershipKind::Owned);
+                                OwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
     Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(),
                          {NormalBB->getArgument(0)});

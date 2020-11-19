@@ -518,7 +518,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     auto *User = HeapBox->getSingleUse()->getUser();
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
       HeapBox = MUI;
-      Kind = MUI->getKind();
+      Kind = MUI->getMarkUninitializedKind();
     }
   }
 
@@ -920,16 +920,15 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
       continue;
     }
 
-    auto Box = O.get();
-    assert(((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
-             isa<CopyValueInst>(Box)) ||
+    SILValue Box = O.get();
+    assert((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
+            isa<CopyValueInst>(Box) ||
             isa<SILFunctionArgument>(Box)) &&
            "Expected either an alloc box or a copy of an alloc box or a "
            "function argument");
-    auto InsertPt = Box->getDefiningInsertionPoint();
-    assert(InsertPt);
-    SILBuilderWithScope B(InsertPt);
-    Args.push_back(B.createProjectBox(Box.getLoc(), Box, 0));
+    SILBuilderWithScope::insertAfter(Box, [&](SILBuilder &B) {
+      Args.push_back(B.createProjectBox(Box.getLoc(), Box, 0));
+    });
 
     // For a partial_apply, if this argument is promoted, it is a box that we're
     // turning into an address because we've proven we can keep this value on
@@ -937,7 +936,8 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     // release it explicitly when the partial_apply is released.
     if (Apply.getKind() == ApplySiteKind::PartialApplyInst) {
       if (PAFrontier.empty()) {
-        ValueLifetimeAnalysis VLA(cast<PartialApplyInst>(Apply));
+        auto *PAI = cast<PartialApplyInst>(Apply);
+        ValueLifetimeAnalysis VLA(PAI, PAI->getUses());
         pass.CFGChanged |= !VLA.computeFrontier(
             PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
         assert(!PAFrontier.empty() &&
@@ -949,7 +949,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
       // becomes dead.
       for (SILInstruction *FrontierInst : PAFrontier) {
         SILBuilderWithScope Builder(FrontierInst);
-        Builder.createDestroyValue(Apply.getLoc(), Box);
+        Builder.emitDestroyValueOperation(Apply.getLoc(), Box);
       }
     }
   }

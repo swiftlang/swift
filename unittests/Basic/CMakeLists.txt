@@ -31,7 +31,7 @@ add_swift_unittest(SwiftBasicTests
   TaggedUnionTest.cpp
   ThreadSafeRefCntPointerTest.cpp
   TransformRangeTest.cpp
-  TreeScopedHashTableTest.cpp
+  TypeLookupError.cpp
   UnicodeTest.cpp
   ValueEnumeratorTest.cpp
   ${generated_tests}

@@ -1920,6 +1920,12 @@ func _setAtWritableKeyPath<Root, Value>(
   keyPath: WritableKeyPath<Root, Value>,
   value: __owned Value
 ) {
+  if type(of: keyPath).kind == .reference {
+    return _setAtReferenceWritableKeyPath(root: root,
+      keyPath: _unsafeUncheckedDowncast(keyPath,
+        to: ReferenceWritableKeyPath<Root, Value>.self),
+      value: value)
+  }
   // TODO: we should be able to do this more efficiently than projecting.
   let (addr, owner) = keyPath._projectMutableAddress(from: &root)
   addr.pointee = value
@@ -3351,7 +3357,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
 
     case .pointer:
       // Resolve the sign-extended relative reference.
-      var absoluteID: UnsafeRawPointer? = idValueBase + Int(idValue)
+      var absoluteID: UnsafeRawPointer? = _resolveRelativeAddress(idValueBase, idValue)
 
       // If the pointer ID is unresolved, then it needs work to get to
       // the final value.
@@ -3456,7 +3462,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       for i in externalArgs.indices {
         let base = externalArgs.baseAddress.unsafelyUnwrapped + i
         let offset = base.pointee
-        let metadataRef = UnsafeRawPointer(base) + Int(offset)
+        let metadataRef = _resolveRelativeAddress(UnsafeRawPointer(base), offset)
         let result = _resolveKeyPathGenericArgReference(
                        metadataRef,
                        genericEnvironment: genericEnvironment,

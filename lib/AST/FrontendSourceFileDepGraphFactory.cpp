@@ -193,16 +193,16 @@ std::string DependencyKey::computeNameForProvidedEntity<
 //==============================================================================
 
 bool fine_grained_dependencies::withReferenceDependencies(
-    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
     const DependencyTracker &depTracker, StringRef outputPath,
     bool alsoEmitDotFile,
     llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
-  if (auto *MD = MSF.dyn_cast<ModuleDecl *>()) {
+  if (auto *MD = MSF.dyn_cast<const ModuleDecl *>()) {
     SourceFileDepGraph g =
         ModuleDepGraphFactory(MD, alsoEmitDotFile).construct();
     return cont(std::move(g));
   } else {
-    auto *SF = MSF.get<SourceFile *>();
+    auto *SF = MSF.get<const SourceFile *>();
     SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
                                SF, outputPath, depTracker, alsoEmitDotFile)
                                .construct();
@@ -215,26 +215,12 @@ bool fine_grained_dependencies::withReferenceDependencies(
 //==============================================================================
 
 FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
-    SourceFile *SF, StringRef outputPath, const DependencyTracker &depTracker,
-    const bool alsoEmitDotFile)
+    const SourceFile *SF, StringRef outputPath,
+    const DependencyTracker &depTracker, const bool alsoEmitDotFile)
     : AbstractSourceFileDepGraphFactory(
-          SF->getASTContext().hadError(),
-          outputPath, getInterfaceHash(SF), alsoEmitDotFile,
-          SF->getASTContext().Diags),
+          SF->getASTContext().hadError(), outputPath, SF->getInterfaceHash(),
+          alsoEmitDotFile, SF->getASTContext().Diags),
       SF(SF), depTracker(depTracker) {}
-
-/// Centralize the invariant that the fingerprint of the whole file is the
-/// interface hash
-std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
-  return getInterfaceHash(SF);
-}
-
-std::string
-FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
-}
 
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
@@ -408,20 +394,6 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
       declFinder.classMembers);
 }
 
-/// Given an array of Decls or pairs of them in \p declsOrPairs
-/// create node pairs for context and name
-template <NodeKind kind, typename ContentsT>
-void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
-    std::vector<ContentsT> &contentsVec) {
-  for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp =
-        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
-    addADefinedDecl(
-        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
-        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
-  }
-}
-
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of used Decls
 //==============================================================================
@@ -429,7 +401,7 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
 namespace {
 /// Extracts uses out of a SourceFile
 class UsedDeclEnumerator {
-  SourceFile *SF;
+  const SourceFile *SF;
   const DependencyTracker &depTracker;
   StringRef swiftDeps;
 
@@ -441,7 +413,8 @@ class UsedDeclEnumerator {
 
 public:
   UsedDeclEnumerator(
-      SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
+      const SourceFile *SF, const DependencyTracker &depTracker,
+      StringRef swiftDeps,
       function_ref<void(const DependencyKey &, const DependencyKey &)>
           createDefUse)
       : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
@@ -449,8 +422,7 @@ public:
             DeclAspect::interface, swiftDeps)),
         sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
             DeclAspect::implementation, swiftDeps)),
-        createDefUse(createDefUse) {
-  }
+        createDefUse(createDefUse) {}
 
 public:
   void enumerateAllUses() {
@@ -531,11 +503,21 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 // MARK: ModuleDepGraphFactory
 //==============================================================================
 
-ModuleDepGraphFactory::ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot)
-    : AbstractSourceFileDepGraphFactory(
-          Mod->getASTContext().hadError(),
-          Mod->getNameStr(), "0xBADBEEF", emitDot, Mod->getASTContext().Diags),
-      Mod(Mod) {}
+ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
+                                             bool emitDot)
+    : AbstractSourceFileDepGraphFactory(Mod->getASTContext().hadError(),
+                                        Mod->getNameStr(), Fingerprint::ZERO(),
+                                        emitDot, Mod->getASTContext().Diags),
+
+      Mod(Mod) {
+  // Since a fingerprint only summarizes the state of the module but not
+  // the state of its fingerprinted sub-declarations, and since a module
+  // contains no state other than sub-declarations, its fingerprint does not
+  // matter and can just be some arbitrary value. Should it be the case that a
+  // change in a declaration that does not have a fingerprint must cause
+  // a rebuild of a file outside of the module, this assumption will need
+  // to be revisited.
+}
 
 void ModuleDepGraphFactory::addAllDefinedDecls() {
   // TODO: express the multiple provides and depends streams with variadic
@@ -564,18 +546,4 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
       declFinder.valuesInExtensions);
   addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
       declFinder.classMembers);
-}
-
-/// Given an array of Decls or pairs of them in \p declsOrPairs
-/// create node pairs for context and name
-template <NodeKind kind, typename ContentsT>
-void ModuleDepGraphFactory::addAllDefinedDeclsOfAGivenType(
-    std::vector<ContentsT> &contentsVec) {
-  for (const auto &declOrPair : contentsVec) {
-    Optional<std::string> fp =
-        AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
-    addADefinedDecl(
-        DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
-        fp ? StringRef(fp.getValue()) : Optional<StringRef>());
-  }
 }

@@ -1386,11 +1386,87 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
   // Now convert our unownedNonTrivialRef from unowned ownership to guaranteed
   // ownership and create a cleanup for it.
   SILValue guaranteedNonTrivialRef = SGF.B.createUncheckedOwnershipConversion(
-      loc, unownedNonTrivialRef, ValueOwnershipKind::Guaranteed);
+      loc, unownedNonTrivialRef, OwnershipKind::Guaranteed);
   auto guaranteedNonTrivialRefMV =
       SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
   // Now create a mark dependence on our base and return the result.
   return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
+}
+
+// Emit SIL for the named builtin: getCurrentAsyncTask.
+static ManagedValue emitBuiltinGetCurrentAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetCurrentAsyncTask)),
+      SGF.getLoweredType(ctx.TheNativeObjectType), SubstitutionMap(), { });
+  return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
+}
+
+// Emit SIL for the named builtin: cancelAsyncTask.
+static ManagedValue emitBuiltinCancelAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto argument = args[0].borrow(SGF, loc).forward(SGF);
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
+      SGF.getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
+      { argument });
+  return ManagedValue::forUnmanaged(apply);
+}
+
+// Emit SIL for the named builtin: createAsyncTask.
+static ManagedValue emitBuiltinCreateAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto flags = args[0].forward(SGF);
+  auto parentTask = args[1].borrow(SGF, loc).forward(SGF);
+  auto function = args[2].borrow(SGF, loc).forward(SGF);
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
+      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
+      { flags, parentTask, function });
+  return SGF.emitManagedRValueWithCleanup(apply);
+}
+
+// Emit SIL for the named builtin: createAsyncTaskFuture.
+static ManagedValue emitBuiltinCreateAsyncTaskFuture(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto flags = args[0].forward(SGF);
+  auto parentTask = args[1].borrow(SGF, loc).forward(SGF);
+
+  // Form the metatype of the result type.
+  CanType futureResultType =
+      Type(
+        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext())))
+          .subst(subs)->getCanonicalType();
+  CanType anyTypeType = ExistentialMetatypeType::get(
+      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
+  auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
+  auto &futureResultTL = SGF.getTypeLowering(futureResultType);
+  auto futureResultMetadata = SGF.emitExistentialErasure(
+      loc, futureResultType, futureResultTL, anyTypeTL, { }, C,
+      [&](SGFContext C) -> ManagedValue {
+    return ManagedValue::forTrivialObjectRValue(
+      SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
+  }).borrow(SGF, loc).forward(SGF);
+
+  auto function = args[2].borrow(SGF, loc).forward(SGF);
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::CreateAsyncTaskFuture)),
+      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
+      { flags, parentTask, futureResultMetadata, function });
+  return SGF.emitManagedRValueWithCleanup(apply);
 }
 
 Optional<SpecializedEmitter>

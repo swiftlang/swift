@@ -35,12 +35,13 @@ bool isValueAddressOrTrivial(SILValue v);
 /// These operations forward both owned and guaranteed ownership.
 bool isOwnershipForwardingValueKind(SILNodeKind kind);
 
-/// Is this an instruction that can forward both owned and guaranteed ownership
+/// Is this an operand that can forward both owned and guaranteed ownership
 /// kinds.
-bool isOwnershipForwardingInst(SILInstruction *i);
+bool isOwnershipForwardingUse(Operand *op);
 
-/// Is this an instruction that can forward guaranteed ownership.
-bool isGuaranteedForwardingInst(SILInstruction *i);
+/// Is this an operand that forwards guaranteed ownership from its value to a
+/// result of the using instruction.
+bool isGuaranteedForwardingUse(Operand *op);
 
 /// These operations forward guaranteed ownership, but don't necessarily forward
 /// owned values.
@@ -54,17 +55,38 @@ bool isGuaranteedForwardingValue(SILValue value);
 /// forward guaranteed ownership.
 bool isOwnedForwardingValueKind(SILNodeKind kind);
 
-/// Does this SILInstruction 'forward' owned ownership, but may not be able to
-/// forward guaranteed ownership.
-bool isOwnedForwardingInstruction(SILInstruction *inst);
-
-/// Does this value 'forward' owned ownership, but may not be able to forward
+/// Does this operand 'forward' owned ownership, but may not be able to forward
 /// guaranteed ownership.
+bool isOwnedForwardingUse(Operand *use);
+
+/// Is this value the result of an instruction that 'forward's owned ownership,
+/// but may not be able to forward guaranteed ownership.
 ///
 /// This will be either a multiple value instruction resuilt, a single value
 /// instruction that forwards or an argument that forwards the ownership from a
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
+
+class ForwardingOperand {
+  Operand *use;
+
+  ForwardingOperand(Operand *use) : use(use) {}
+
+public:
+  static Optional<ForwardingOperand> get(Operand *use);
+
+  ValueOwnershipKind getOwnershipKind() const;
+  void setOwnershipKind(ValueOwnershipKind newKind) const;
+  void replaceOwnershipKind(ValueOwnershipKind oldKind,
+                            ValueOwnershipKind newKind) const;
+
+  OwnershipForwardingInst *getUser() const {
+    return cast<OwnershipForwardingInst>(use->getUser());
+  }
+};
+
+/// Returns true if the instruction is a 'reborrow'.
+bool isReborrowInstruction(const SILInstruction *inst);
 
 class BorrowingOperandKind {
 public:
@@ -72,6 +94,9 @@ public:
     BeginBorrow,
     BeginApply,
     Branch,
+    Apply,
+    TryApply,
+    Yield,
   };
 
 private:
@@ -92,6 +117,12 @@ public:
       return BorrowingOperandKind(BeginApply);
     case SILInstructionKind::BranchInst:
       return BorrowingOperandKind(Branch);
+    case SILInstructionKind::ApplyInst:
+      return BorrowingOperandKind(Apply);
+    case SILInstructionKind::TryApplyInst:
+      return BorrowingOperandKind(TryApply);
+    case SILInstructionKind::YieldInst:
+      return BorrowingOperandKind(Yield);
     }
   }
 
@@ -125,7 +156,8 @@ struct BorrowingOperand {
     return *this;
   }
 
-  /// If value is a borrow introducer return it after doing some checks.
+  /// If \p op is a borrow introducing operand return it after doing some
+  /// checks.
   static Optional<BorrowingOperand> get(Operand *op) {
     auto *user = op->getUser();
     auto kind = BorrowingOperandKind::get(user->getKind());
@@ -134,14 +166,32 @@ struct BorrowingOperand {
     return BorrowingOperand(*kind, op);
   }
 
-  void visitEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  /// If \p op is a borrow introducing operand return it after doing some
+  /// checks.
+  static Optional<BorrowingOperand> get(const Operand *op) {
+    return get(const_cast<Operand *>(op));
+  }
+
+  /// If this borrowing operand results in the underlying value being borrowed
+  /// over a region of code instead of just for a single instruction, visit
+  /// those uses.
+  ///
+  /// Example: An apply performs an instantaneous recursive borrow of a
+  /// guaranteed value but a begin_apply borrows the value over the entire
+  /// region of code corresponding to the coroutine.
+  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
-  bool consumesGuaranteedValues() const {
+  ///
+  /// TODO: tuple, struct, destructure_tuple, destructure_struct.
+  bool isReborrow() const {
     switch (kind) {
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
+    case BorrowingOperandKind::Yield:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -153,8 +203,14 @@ struct BorrowingOperand {
   /// for owned values.
   bool canAcceptOwnedValues() const {
     switch (kind) {
+    // begin_borrow can take any parameter
     case BorrowingOperandKind::BeginBorrow:
+    // Yield can implicit borrow owned values.
+    case BorrowingOperandKind::Yield:
+    // FullApplySites can implicit borrow owned values.
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
       return true;
     case BorrowingOperandKind::Branch:
       return false;
@@ -172,6 +228,9 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Branch:
       return true;
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
+    case BorrowingOperandKind::Yield:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -204,7 +263,7 @@ struct BorrowingOperand {
   /// \p errorFunction a callback that if non-null is passed an operand that
   /// triggers a mal-formed SIL error. This is just needed for the ownership
   /// verifier to emit good output.
-  bool getImplicitUses(
+  void getImplicitUses(
       SmallVectorImpl<Operand *> &foundUses,
       std::function<void(Operand *)> *errorFunction = nullptr) const;
 
@@ -236,7 +295,7 @@ private:
 
 public:
   static Optional<BorrowedValueKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
       return None;
     switch (value->getKind()) {
     default:
@@ -554,7 +613,7 @@ private:
 
 public:
   static Optional<OwnedValueIntroducerKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
+    if (value.getOwnershipKind() != OwnershipKind::Owned)
       return None;
 
     switch (value->getKind()) {

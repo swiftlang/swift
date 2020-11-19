@@ -566,6 +566,46 @@ public:
   }
 };
 
+/// Serialization for the table mapping module-level declIDs for serialized
+/// iterable decl contexts to their corresponding \c Fingerprint values.
+class ModuleFileSharedCore::DeclFingerprintsTableInfo {
+public:
+  using internal_key_type = uint32_t;
+  using external_key_type = DeclID;
+  using data_type = swift::Fingerprint;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::hash_value(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    using namespace llvm::support;
+    const unsigned dataLen = Fingerprint::DIGEST_LENGTH;
+    return {sizeof(uint32_t), dataLen};
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    using namespace llvm::support;
+    return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    using namespace llvm::support;
+    auto str = std::string{reinterpret_cast<const char *>(data),
+                           Fingerprint::DIGEST_LENGTH};
+    return Fingerprint{str};
+  }
+};
+
 } // end namespace swift
 
 #endif

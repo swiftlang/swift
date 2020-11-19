@@ -455,6 +455,7 @@ private:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::PostfixOperator:
+    case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
     case Node::Kind::PropertyDescriptor:
@@ -561,6 +562,7 @@ private:
     case Node::Kind::GlobalVariableOnceDeclList:
     case Node::Kind::GlobalVariableOnceFunction:
     case Node::Kind::GlobalVariableOnceToken:
+    case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2143,6 +2145,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ImplFunctionConventionName:
     assert(false && "Already handled in ImplFunctionConvention");
+    return nullptr;
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
     printChildren(Node, " ");
@@ -2533,8 +2536,18 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << ')';
     }
     return nullptr;
+  case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
+    Printer << "predefined ";
+    LLVM_FALLTHROUGH;
   case Node::Kind::ObjCAsyncCompletionHandlerImpl:
     Printer << "@objc completion handler block implementation for ";
+    print(Node->getChild(0));
+    Printer << " with result type ";
+    print(Node->getChild(1));
+    return nullptr;
+  case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+    Printer << "flag for loading of canonical specialized generic type "
+               "metadata for ";
     print(Node->getChild(0));
     return nullptr;
   }

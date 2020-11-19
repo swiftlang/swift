@@ -452,19 +452,72 @@ public:
 };
 
 class ForeignAsyncInitializationPlan final : public ResultPlan {
-  SILGenFunction &SGF;
   SILLocation loc;
+  CalleeTypeInfo calleeTypeInfo;
+  SILType opaqueResumeType;
+  SILValue resumeBuf;
+  SILValue continuation;
+  
 public:
-  ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc)
-    : SGF(SGF), loc(loc) {
+  ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
+                                 const CalleeTypeInfo &calleeTypeInfo)
+    : loc(loc), calleeTypeInfo(calleeTypeInfo)
+  {
+    // Allocate space to receive the resume value when the continuation is
+    // resumed.
+    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                          calleeTypeInfo.substResultType);
+    resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const override {
-    // TODO: Move values from the continuation result buffer to the individual
-    // out argument buffers, unless we were able to emit the resume buffer
-    // in-place.
+    // A foreign async function shouldn't have any indirect results.
+  }
+  
+  ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc)
+  override {
+    // Get the current continuation for the task.
+    auto continuationDecl = calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
+      ? SGF.getASTContext().getUnsafeThrowingContinuationDecl()
+      : SGF.getASTContext().getUnsafeContinuationDecl();
+    
+    auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
+                                                calleeTypeInfo.substResultType)
+      ->getCanonicalType();
+    
+    
+    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
+                               SILType::getPrimitiveObjectType(continuationTy));
+    
+    // Stash it in a buffer for a block object.
+    auto blockStorageTy = SILType::getPrimitiveAddressType(SILBlockStorageType::get(continuationTy));
+    auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
+    auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
+    SGF.B.createStore(loc, continuation, continuationAddr,
+                      StoreOwnershipQualifier::Trivial);
+
+    // Get the block invocation function for the given completion block type.
+    auto completionHandlerIndex = calleeTypeInfo.foreign.async
+      ->completionHandlerParamIndex();
+    auto implTy = cast<SILFunctionType>(calleeTypeInfo.substFnType
+      ->getParameters()[completionHandlerIndex]
+      .getInterfaceType());
+    SILFunction *impl = SGF.SGM
+      .getOrCreateForeignAsyncCompletionHandlerImplFunction(implTy,
+                                                continuationTy,
+                                                *calleeTypeInfo.foreign.async);
+    auto implRef = SGF.B.createFunctionRef(loc, impl);
+    
+    // Initialize the block object for the completion handler.
+    auto block = SGF.B.createInitBlockStorageHeader(loc, blockStorage, implRef,
+                                  SILType::getPrimitiveObjectType(implTy), {});
+    // We don't need to manage the block because it's still on the stack. We
+    // know we won't escape it locally so the callee can be responsible for
+    // _Block_copy-ing it.
+    return ManagedValue::forUnmanaged(block);
   }
   
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
@@ -472,9 +525,44 @@ public:
     // There should be no direct results from the call.
     assert(directResults.empty());
     
-    // TODO: Get the actual result values from the awaited continuation.
-    // For now, produce an undef RValue.
-    return SGF.emitUndefRValue(loc, substType);
+    // Await the continuation we handed off to the completion handler.
+    SILBasicBlock *resumeBlock = SGF.createBasicBlock();
+    SILBasicBlock *errorBlock = nullptr;
+    auto errorParamIndex = calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex();
+    if (errorParamIndex) {
+      errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
+    }
+    
+    SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
+    
+    // Propagate an error if we have one.
+    if (errorBlock) {
+      SGF.B.emitBlock(errorBlock);
+      
+      Scope errorScope(SGF, loc);
+      
+      auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
+        ->getCanonicalType();
+      auto errorVal
+        = SGF.B.createOwnedPhiArgument(SILType::getPrimitiveObjectType(errorTy));
+      
+      SGF.emitThrow(loc, errorVal, true);
+    }
+    
+    SGF.B.emitBlock(resumeBlock);
+    
+    // The incoming value is the maximally-abstracted result type of the
+    // continuation. Move it out of the resume buffer and reabstract it if
+    // necessary.
+    auto resumeResult = SGF.emitLoad(loc, resumeBuf,
+      calleeTypeInfo.origResultType
+         ? *calleeTypeInfo.origResultType
+         : AbstractionPattern(calleeTypeInfo.substResultType),
+                 calleeTypeInfo.substResultType,
+                 SGF.getTypeLowering(calleeTypeInfo.substResultType),
+                 SGFContext(), IsTake);
+    
+    return RValue(SGF, loc, calleeTypeInfo.substResultType, resumeResult);
   }
 };
 
@@ -575,8 +663,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     // Create a result plan that gets the result schema from the completion
     // handler callback's arguments.
     // completion handler.
-    return ResultPlanPtr(new ForeignAsyncInitializationPlan(SGF, loc));
-    
+    return ResultPlanPtr(new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
   } else if (auto foreignError = calleeTypeInfo.foreign.error) {
     // Handle the foreign error first.
     //

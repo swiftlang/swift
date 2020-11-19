@@ -344,6 +344,59 @@ public:
 
     (void)nominal->isGlobalActor();
   }
+
+  void visitAsyncAttr(AsyncAttr *attr) {
+    auto var = dyn_cast<VarDecl>(D);
+    if (!var)
+      return;
+
+    auto patternBinding = var->getParentPatternBinding();
+    if (!patternBinding)
+      return; // already diagnosed
+
+    // "Async" modifier can only be applied to local declarations.
+    if (!patternBinding->getDeclContext()->isLocalContext()) {
+      diagnoseAndRemoveAttr(attr, diag::async_let_not_local);
+      return;
+    }
+
+    // Check each of the pattern binding entries.
+    bool diagnosedVar = false;
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      auto pattern = patternBinding->getPattern(index);
+
+      // Look for variables bound by this pattern.
+      bool foundAnyVariable = false;
+      bool isLet = true;
+      pattern->forEachVariable([&](VarDecl *var) {
+        if (!var->isLet())
+          isLet = false;
+        foundAnyVariable = true;
+      });
+
+      // Each entry must bind at least one named variable, so that there is
+      // something to "await".
+      if (!foundAnyVariable) {
+        diagnose(pattern->getLoc(), diag::async_let_no_variables);
+        attr->setInvalid();
+        return;
+      }
+
+      // Async can only be used on an "async let".
+      if (!isLet && !diagnosedVar) {
+        diagnose(patternBinding->getLoc(), diag::async_not_let)
+          .fixItReplace(patternBinding->getLoc(), "let");
+        diagnosedVar = true;
+      }
+
+      // Each pattern entry must have an initializer expression.
+      if (patternBinding->getEqualLoc(index).isInvalid()) {
+        diagnose(pattern->getLoc(), diag::async_let_not_initialized);
+        attr->setInvalid();
+        return;
+      }
+    }
+  }
 };
 } // end anonymous namespace
 
@@ -998,25 +1051,25 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
     return;
 
   auto &ctx = SF->getASTContext();
-  if (ctx.LangOpts.EnableObjCInterop) {
-    // Don't diagnose in a SIL file.
-    if (SF->Kind == SourceFileKind::SIL)
-      return;
 
-    // Don't diagnose for -disable-objc-attr-requires-foundation-module.
-    if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
-      return;
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+      .fixItRemove(attr->getRangeWithAt());
+    return;
   }
+
+  // Don't diagnose in a SIL file.
+  if (SF->Kind == SourceFileKind::SIL)
+    return;
+
+  // Don't diagnose for -disable-objc-attr-requires-foundation-module.
+  if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+    return;
 
   // If we have the Foundation module, @objc is okay.
   auto *foundation = ctx.getLoadedModule(ctx.Id_Foundation);
   if (foundation && ctx.getImportCache().isImportedBy(foundation, SF))
     return;
-
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt());
-  }
 
   ctx.Diags.diagnose(attr->getLocation(),
                      diag::attr_used_without_required_module, attr,

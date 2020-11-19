@@ -4,7 +4,7 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension RangeSet: ExpressibleByArrayLiteral {
   public init(arrayLiteral elements: Range<Bound>...) {
     self.init(elements)
@@ -21,7 +21,7 @@ extension Collection {
 
 let RangeSetTests = TestSuite("RangeSet")
 
-if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
   let parent = -200..<200
   let source: RangeSet = [1..<5, 8..<10, 20..<22, 27..<29]
 
@@ -356,6 +356,39 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
           Array(discontiguousSlice[disIdx..<disUpper]))
       }
     }
+  }
+
+  RangeSetTests.test("DiscontiguousSliceMutating") {
+    var initial = Array(1...20)
+    let none = initial.subranges(where: { $0.isMultiple(of: 100) })
+    initial[none] = initial[none]
+    expectEqualSequence(1...20, initial)
+    
+    let evens = initial.subranges(where: { $0.isMultiple(of: 2) })
+    let odds = initial.subranges(where: { !$0.isMultiple(of: 2) })
+    initial[evens] = initial[odds]
+    expectEqualSequence(
+      [1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15, 17, 17, 19, 19],
+      initial
+    )
+  }
+
+  RangeSetTests.test("DiscontiguousSliceMutating/TooLarge") {
+    var initial = Array(1...21)
+    let evens = initial.subranges(where: { $0.isMultiple(of: 2) })
+    let odds = initial.subranges(where: { !$0.isMultiple(of: 2) })
+
+    expectCrashLater()
+    initial[evens] = initial[odds]
+  }
+
+  RangeSetTests.test("DiscontiguousSliceMutating/TooSmall") {
+    var initial = Array(1...21)
+    let evens = initial.subranges(where: { $0.isMultiple(of: 2) })
+    let odds = initial.subranges(where: { !$0.isMultiple(of: 2) })
+
+    expectCrashLater()
+    initial[odds] = initial[evens]
   }
 }
 

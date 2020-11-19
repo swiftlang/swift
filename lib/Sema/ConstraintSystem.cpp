@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
@@ -376,6 +377,13 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 
   AlternativeLiteralTypes[index] = allocateCopy(types);
   return *AlternativeLiteralTypes[index];
+}
+
+bool ConstraintSystem::containsCodeCompletionLoc(Expr *expr) const {
+  SourceRange range = expr->getSourceRange();
+  if (range.isInvalid())
+    return false;
+  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
@@ -3399,6 +3407,30 @@ static bool diagnoseAmbiguity(
 
   auto &DE = cs.getASTContext().Diags;
 
+  llvm::SmallPtrSet<ValueDecl *, 4> localAmbiguity;
+  {
+    for (auto &entry : aggregateFix) {
+      const auto &solution = entry.first;
+      const auto &overload = solution->getOverloadChoice(ambiguity.locator);
+      auto *choice = overload.choice.getDeclOrNull();
+
+      // It's not possible to diagnose different kinds of overload choices.
+      if (!choice)
+        return false;
+
+      localAmbiguity.insert(choice);
+    }
+  }
+
+  if (localAmbiguity.empty())
+    return false;
+
+  // If all of the fixes are rooted in the same choice.
+  if (localAmbiguity.size() == 1) {
+    auto &primaryFix = aggregateFix.front();
+    return primaryFix.second->diagnose(*primaryFix.first);
+  }
+
   {
     auto fixKind = aggregateFix.front().second->getKind();
     if (llvm::all_of(
@@ -3413,10 +3445,7 @@ static bool diagnoseAmbiguity(
     }
   }
 
-  auto *decl = ambiguity.choices.front().getDeclOrNull();
-  if (!decl)
-    return false;
-
+  auto *decl = *localAmbiguity.begin();
   auto *commonCalleeLocator = ambiguity.locator;
 
   bool diagnosed = true;
@@ -4662,7 +4691,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
-                                             bool isDefaultWrappedValue) {
+                                             bool isDefaultWrappedValue,
+                                             bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -4683,6 +4713,9 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
       expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
+
+  if (isAsyncLetWrapper)
+    closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
 
@@ -5060,6 +5093,37 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   // If not, let's check contextual unavailability.
   ExportContext where = ExportContext::forFunctionBody(DC, loc);
   auto result = TypeChecker::checkDeclarationAvailability(D, where);
+  return result.hasValue();
+}
+
+bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
+                                                ConstraintLocator *locator) const {
+  if (!conformance.isConcrete())
+    return false;
+
+  auto *concrete = conformance.getConcrete();
+  auto *rootConf = concrete->getRootConformance();
+  auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext());
+  if (ext == nullptr)
+    return false;
+
+  auto &ctx = getASTContext();
+
+  // First check whether this declaration is universally unavailable.
+  if (ext->getAttrs().isUnavailable(ctx))
+    return true;
+
+  SourceLoc loc;
+
+  if (locator) {
+    if (auto anchor = locator->getAnchor())
+      loc = getLoc(anchor);
+  }
+
+  // If not, let's check contextual unavailability.
+  ExportContext where = ExportContext::forFunctionBody(DC, loc);
+  auto result = TypeChecker::checkConformanceAvailability(
+      rootConf, ext, where);
   return result.hasValue();
 }
 

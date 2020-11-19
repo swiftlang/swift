@@ -107,12 +107,19 @@ Solution::computeSubstitutions(GenericSignature sig,
 }
 
 static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
-    ASTContext &ctx, FuncDecl *oldDecl, SubstitutionMap subst,
+    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
     clang::FunctionDecl *specialized) {
   // Create a new ParameterList with the substituted type.
   auto oldFnType =
       cast<GenericFunctionType>(oldDecl->getInterfaceType().getPointer());
   auto newFnType = oldFnType->substGenericArgs(subst);
+  // The constructor type is a function type as follows:
+  //   (CType.Type) -> (Generic) -> CType
+  // But we only want the result of that function type because that is the
+  // function type with the generic params that need to be substituted:
+  //   (Generic) -> CType
+  if (isa<ConstructorDecl>(oldDecl))
+    newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
   SmallVector<ParamDecl *, 4> newParams;
   unsigned i = 0;
   for (auto paramTy : newFnType->getParams()) {
@@ -125,6 +132,16 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   }
   auto *newParamList =
       ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
+
+  if (isa<ConstructorDecl>(oldDecl)) {
+    DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
+    auto newCtorDecl = ConstructorDecl::createImported(
+        ctx, specialized, ctorName, oldDecl->getLoc(), /*failable=*/false,
+        /*failabilityLoc=*/SourceLoc(), /*throws=*/false,
+        /*throwsLoc=*/SourceLoc(), newParamList, /*genericParams=*/nullptr,
+        oldDecl->getDeclContext());
+    return ConcreteDeclRef(newCtorDecl);
+  }
 
   // Generate a name for the specialized function.
   std::string newNameStr;
@@ -139,8 +156,8 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
 
   auto newFnDecl = FuncDecl::createImported(
       ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
-      /*Async*/ false, oldDecl->hasThrows(), newParamList,
-      newFnType->getResult(), /*GenericParams*/ nullptr,
+      /*Async=*/false, oldDecl->hasThrows(), newParamList,
+      newFnType->getResult(), /*GenericParams=*/nullptr,
       oldDecl->getDeclContext(), specialized);
   return ConcreteDeclRef(newFnDecl);
 }
@@ -168,7 +185,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
                     cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
                 subst);
     return generateDeclRefForSpecializedCXXFunctionTemplate(
-        decl->getASTContext(), cast<FuncDecl>(decl), subst, newFn);
+        decl->getASTContext(), cast<AbstractFunctionDecl>(decl), subst, newFn);
   }
 
   return ConcreteDeclRef(decl, subst);
@@ -5813,9 +5830,11 @@ Expr *ExprRewriter::coerceCallArguments(
       //   - new types are propagated to constraint system
       auto *closureType = param.getPlainType()->castTo<FunctionType>();
 
+      auto argLoc = getArgLocator(argIdx, paramIdx, param.getParameterFlags());
+
       arg = coerceToType(
           arg, closureType->getResult(),
-          locator.withPathElement(ConstraintLocator::AutoclosureResult));
+          argLoc.withPathElement(ConstraintLocator::AutoclosureResult));
 
       if (shouldInjectWrappedValuePlaceholder) {
         // If init(wrappedValue:) takes an autoclosure, then we want
@@ -7881,6 +7900,51 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   return diagnosedAnyErrors;
 }
 
+/// For the initializer of an `async let`, wrap it in an autoclosure and then
+/// a call to that autoclosure, so that the code for the child task is captured
+/// entirely within the autoclosure. This captures the semantics of the
+/// operation but not the timing, e.g., the call itself will actually occur
+/// when one of the variables in the async let is referenced.
+static Expr *wrapAsyncLetInitializer(
+      ConstraintSystem &cs, Expr *initializer, DeclContext *dc) {
+  // Form the autoclosure type. It is always 'async', and will be 'throws'.
+  Type initializerType = initializer->getType();
+  bool throws = TypeChecker::canThrow(initializer);
+  auto extInfo = ASTExtInfoBuilder()
+    .withAsync()
+    .withThrows(throws)
+    .build();
+
+  // Form the autoclosure expression. The actual closure here encapsulates the
+  // child task.
+  auto closureType = FunctionType::get({ }, initializerType, extInfo);
+  ASTContext &ctx = dc->getASTContext();
+  Expr *autoclosureExpr = cs.buildAutoClosureExpr(
+      initializer, closureType, /*isDefaultWrappedValue=*/false,
+      /*isAsyncLetWrapper=*/true);
+
+  // Call the autoclosure so that the AST types line up. SILGen will ignore the
+  // actual calls and translate them into a different mechanism.
+  auto autoclosureCall = CallExpr::createImplicit(
+      ctx, autoclosureExpr, { }, { });
+  autoclosureCall->setType(initializerType);
+  autoclosureCall->setThrows(throws);
+
+  // For a throwing expression, wrap the call in a 'try'.
+  Expr *resultInit = autoclosureCall;
+  if (throws) {
+    resultInit = new (ctx) TryExpr(
+        SourceLoc(), resultInit, initializerType, /*implicit=*/true);
+  }
+
+  // Wrap the call in an 'await'.
+  resultInit = new (ctx) AwaitExpr(
+      SourceLoc(), resultInit, initializerType, /*implicit=*/true);
+
+  cs.cacheExprTypes(resultInit);
+  return resultInit;
+}
+
 /// Apply the given solution to the initialization target.
 ///
 /// \returns the resulting initialization expression.
@@ -7953,6 +8017,16 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
     resultTarget.setPattern(coercedPattern);
   } else {
     return None;
+  }
+
+  // For an async let, wrap the initializer appropriately to make it a child
+  // task.
+  if (auto patternBinding = target.getInitializationPatternBindingDecl()) {
+    if (patternBinding->isAsyncLet()) {
+      resultTarget.setExpr(
+          wrapAsyncLetInitializer(
+            cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
+    }
   }
 
   return resultTarget;

@@ -653,6 +653,18 @@ FUNCTION(GetCanonicalSpecializedMetadata, swift_getCanonicalSpecializedMetadata,
          ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// MetadataResponse
+// swift_getCanonicalPrespecializedGenericMetadata(MetadataRequest request,
+//                          const void * const *arguments,
+//                          const TypeContextDescriptor *description,
+//                          swift_once_t *cachedFlag)
+FUNCTION(GetCanonicalPrespecializedGenericMetadata, 
+         swift_getCanonicalPrespecializedGenericMetadata,
+         SwiftCC, GetCanonicalPrespecializedGenericMetadataAvailability,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, Int8PtrTy, TypeContextDescriptorPtrTy, OnceTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadOnly))
+
 // MetadataResponse swift_getOpaqueTypeMetadata(MetadataRequest request,
 //                                     const void * const *arguments,
 //                                     const OpaqueTypeDescriptor *descriptor,
@@ -1475,6 +1487,35 @@ FUNCTION(TaskDealloc,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(SwiftTaskPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// void swift_task_cancel(AsyncTask *task);
+FUNCTION(TaskCancel,
+         swift_task_cancel, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// AsyncTaskAndContext swift_task_create(
+//     size_t flags, AsyncTask *task, TaskContinuationFunction* function,
+//     size_t contextSize);
+FUNCTION(TaskCreateFunc,
+         swift_task_create_f, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, TaskContinuationFunctionPtrTy, SizeTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// AsyncTaskAndContext swift_task_create_future_f(
+//     size_t flags, AsyncTask *task, const Metadata *futureResultType,
+//     TaskContinuationFunction *function, size_t contextSize);
+FUNCTION(TaskCreateFutureFunc,
+         swift_task_create_future_f, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, TypeMetadataPtrTy,
+              TaskContinuationFunctionPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS

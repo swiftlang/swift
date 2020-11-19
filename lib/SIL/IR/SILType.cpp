@@ -433,17 +433,16 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       getSILStorageType(M, FTy, TypeExpansionContext::minimal()).isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
-    return SILModuleConventions(M).isSILIndirect(*this)
-               ? ValueOwnershipKind::None
-               : ValueOwnershipKind::Owned;
+    return SILModuleConventions(M).isSILIndirect(*this) ? OwnershipKind::None
+                                                        : OwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
-    return ValueOwnershipKind::Owned;
+    return OwnershipKind::Owned;
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
-      return ValueOwnershipKind::None;
-    return ValueOwnershipKind::Unowned;
+      return OwnershipKind::None;
+    return OwnershipKind::Unowned;
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
@@ -686,4 +685,11 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
     }
     return t;
   });
+}
+
+bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
+  EnumDecl *decl = getEnumOrBoundGenericEnum();
+  assert(decl && "Called for a non enum type");
+  return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
+                                       f->getResilienceExpansion());
 }

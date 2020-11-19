@@ -124,36 +124,67 @@ namespace irgen {
 
   /// A function pointer value.
   class FunctionPointer {
-    /// The actual function pointer.
+  public:
+    struct KindTy {
+      enum class Value {
+        Function,
+        AsyncFunctionPointer,
+      };
+      static const Value Function = Value::Function;
+      static const Value AsyncFunctionPointer = Value::AsyncFunctionPointer;
+      Value value;
+      KindTy(Value value) : value(value) {}
+      KindTy(CanSILFunctionType fnType)
+          : value(fnType->isAsync() ? Value::AsyncFunctionPointer
+                                    : Value::Function) {}
+      friend bool operator==(const KindTy &lhs, const KindTy &rhs) {
+        return lhs.value == rhs.value;
+      }
+      friend bool operator!=(const KindTy &lhs, const KindTy &rhs) {
+        return !(lhs == rhs);
+      }
+    };
+
+  private:
+    KindTy Kind;
+
+    /// The actual pointer, either to the function or to its descriptor.
     llvm::Value *Value;
 
     PointerAuthInfo AuthInfo;
 
     Signature Sig;
 
+    bool isFunctionPointerWithoutContext = false;
+
   public:
     /// Construct a FunctionPointer for an arbitrary pointer value.
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
-    explicit FunctionPointer(llvm::Value *value, PointerAuthInfo authInfo,
-                             const Signature &signature)
-        : Value(value), AuthInfo(authInfo), Sig(signature) {
+    explicit FunctionPointer(KindTy kind, llvm::Value *value,
+                             PointerAuthInfo authInfo,
+                             const Signature &signature,
+                             bool isWithoutCtxt = false)
+        : Kind(kind), Value(value), AuthInfo(authInfo), Sig(signature),
+          isFunctionPointerWithoutContext(isWithoutCtxt) {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
     }
 
     // Temporary only!
-    explicit FunctionPointer(llvm::Value *value, const Signature &signature)
-      : FunctionPointer(value, PointerAuthInfo(), signature) {}
+    explicit FunctionPointer(KindTy kind, llvm::Value *value,
+                             const Signature &signature, bool
+                             isWithoutCtxt = false)
+        : FunctionPointer(kind, value, PointerAuthInfo(), signature, isWithoutCtxt) {}
 
     static FunctionPointer forDirect(IRGenModule &IGM,
                                      llvm::Constant *value,
                                      CanSILFunctionType fnType);
 
-    static FunctionPointer forDirect(llvm::Constant *value,
+    static FunctionPointer forDirect(KindTy kind, llvm::Constant *value,
                                      const Signature &signature) {
-      return FunctionPointer(value, PointerAuthInfo(), signature);
+      return FunctionPointer(kind, value, PointerAuthInfo(), signature);
     }
 
     static FunctionPointer forExplosionValue(IRGenFunction &IGF,
@@ -166,8 +197,17 @@ namespace irgen {
       return (isa<llvm::Constant>(Value) && AuthInfo.isConstant());
     }
 
+    KindTy getKind() const { return Kind; }
+
+    /// Given that this value is known to have been constructed from a direct
+    /// function,  Return the name of that function.
+    StringRef getName(IRGenModule &IGM) const;
+
     /// Return the actual function pointer.
-    llvm::Value *getPointer() const { return Value; }
+    llvm::Value *getPointer(IRGenFunction &IGF) const;
+
+    /// Return the actual function pointer.
+    llvm::Value *getRawPointer() const { return Value; }
 
     /// Given that this value is known to have been constructed from
     /// a direct function, return the function pointer.
@@ -205,6 +245,13 @@ namespace irgen {
 
     llvm::Value *getExplosionValue(IRGenFunction &IGF,
                                    CanSILFunctionType fnType) const;
+
+    /// Form a FunctionPointer whose KindTy is ::Function.
+    FunctionPointer getAsFunction(IRGenFunction &IGF) const;
+
+    bool useStaticContextSize() const {
+      return isFunctionPointerWithoutContext;
+    }
   };
 
   class Callee {

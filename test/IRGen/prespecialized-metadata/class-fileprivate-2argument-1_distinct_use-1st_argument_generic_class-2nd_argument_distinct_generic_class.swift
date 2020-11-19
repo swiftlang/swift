@@ -238,7 +238,7 @@ doit()
 //      CHECK: entry:
 //      CHECK:   [[ERASED_ARGUMENT1:%[0-9]+]] = bitcast %swift.type* [[ARGUMENT1_METADATA]] to i8*
 //      CHECK:   [[ERASED_ARGUMENT2:%[0-9]+]] = bitcast %swift.type* [[ARGUMENT2_METADATA]] to i8*
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
 //      CHECK:     [[INT]] [[METADATA_REQUEST]], 
 //      CHECK:     i8* [[ERASED_ARGUMENT1]], 
 //      CHECK:     i8* [[ERASED_ARGUMENT2]], 

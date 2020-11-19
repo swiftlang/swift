@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/linear/* %t
 
+// REQUIRES: rdar70772320
+
 //
 // This test establishes a "linear" chain of modules that import one another
 // and ensures that a cross-module incremental build does not needlessly
@@ -25,6 +27,7 @@
 //
 
 // RUN: cd %t && %target-swiftc_driver -c -incremental -emit-dependencies -emit-module -emit-module-path %t/C.swiftmodule -enable-experimental-cross-module-incremental-build -module-name C -I %t -output-file-map %t/C.json -working-directory %t -driver-show-incremental -driver-show-job-lifecycle -DNEW C.swift 2>&1 | %FileCheck -check-prefix MODULE-C %s
+// RUN: touch %t/C.swiftmodule
 // RUN: cd %t && %target-swiftc_driver -c -incremental -emit-dependencies -emit-module -emit-module-path %t/B.swiftmodule -enable-experimental-cross-module-incremental-build -module-name B -I %t -output-file-map %t/B.json -working-directory %t -driver-show-incremental -driver-show-job-lifecycle B.swift 2>&1 | %FileCheck -check-prefix MODULE-B %s
 // RUN: cd %t && %target-swiftc_driver -c -incremental -emit-dependencies -emit-module -emit-module-path %t/A.swiftmodule -enable-experimental-cross-module-incremental-build -module-name A -I %t -output-file-map %t/A.json -working-directory %t -driver-show-incremental -driver-show-job-lifecycle A.swift 2>&1 | %FileCheck -check-prefix MODULE-A %s
 

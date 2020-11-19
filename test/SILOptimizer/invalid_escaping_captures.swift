@@ -247,3 +247,12 @@ struct S {
       // expected-note@-2 {{pass a copy of 'self'}}
   }
 }
+
+// Test that we look through the SILBoxType used for a 'var' binding
+func badNoEscapeCaptureThroughVar(_ fn: () -> ()) {
+  var myFunc = fn // expected-warning {{never mutated}} // expected-note {{captured here}}
+
+  takesEscaping { // expected-error {{escaping closure captures non-escaping value}}
+    myFunc()
+  }
+}

@@ -3,9 +3,6 @@
 
 // REQUIRES: optimized_stdlib
 
-// See https://bugs.swift.org/browse/SR-12370
-// XFAIL: OS=linux-androideabi && CPU=armv7
-
 // Test propagation of non-static let properties with compile-time constant values.
 
 // TODO: Once this optimization can remove the propagated fileprivate/internal let properties or

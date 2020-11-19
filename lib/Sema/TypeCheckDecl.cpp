@@ -1201,6 +1201,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       if (TypeChecker::typeCheckExpression(
               exprToCheck, ED,
               /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+        checkEnumElementActorIsolation(elt, exprToCheck);
         TypeChecker::checkEnumElementEffects(elt, exprToCheck);
       }
     }
@@ -2214,19 +2215,6 @@ static Type validateParameterType(ParamDecl *decl) {
       decl->diagnose(diag::enum_element_ellipsis);
       decl->setInvalid();
       return ErrorType::get(ctx);
-    }
-  }
-
-  // async autoclosures can only occur as parameters to async functions.
-  if (decl->isAutoClosure()) {
-    if (auto fnType = Ty->getAs<FunctionType>()) {
-      if (fnType->isAsync() &&
-          !(isa<AbstractFunctionDecl>(dc) &&
-            cast<AbstractFunctionDecl>(dc)->isAsyncContext())) {
-        decl->diagnose(diag::async_autoclosure_nonasync_function);
-        if (auto func = dyn_cast<FuncDecl>(dc))
-          addAsyncNotes(func);
-      }
     }
   }
 

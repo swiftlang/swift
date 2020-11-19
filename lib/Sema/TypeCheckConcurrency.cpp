@@ -87,6 +87,16 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 
       return true;
     }
+
+    if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+      if (fnType->isNoEscape()) {
+        if (diagnose) {
+          param->diagnose(diag::asynchandler_noescape_closure_parameter);
+        }
+
+        return true;
+      }
+    }
   }
 
   if (func->isMutating()) {
@@ -406,6 +416,15 @@ GlobalActorAttributeRequest::evaluate(
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
       }
+
+      // Global actors don't make sense on a stored property of a struct.
+      if (var->hasStorage() && var->getDeclContext()->getSelfStructDecl() &&
+          var->isInstanceMember()) {
+        var->diagnose(diag::global_actor_on_struct_property, var->getName())
+          .highlight(globalActorAttr->getRangeWithAt());
+        return None;
+      }
+
     }
   } else if (isa<ExtensionDecl>(decl)) {
     // Extensions are okay.
@@ -559,8 +578,10 @@ findMemberReference(Expr *expr) {
   return None;
 }
 
-void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
-  class ActorIsolationWalker : public ASTWalker {
+namespace {
+  /// Check for adherence to the actor isolation rules, emitting errors
+  /// when actor-isolated declarations are used in an unsafe manner.
+  class ActorIsolationChecker : public ASTWalker {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
 
@@ -569,20 +590,25 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
     }
 
   public:
-    ActorIsolationWalker(const DeclContext *dc) : ctx(dc->getASTContext()) {
+    ActorIsolationChecker(const DeclContext *dc) : ctx(dc->getASTContext()) {
       contextStack.push_back(dc);
-    }
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    bool walkToDeclPre(Decl *D) override {
+      // Don't walk into functions; they'll be handled separately.
+      if (isa<AbstractFunctionDecl>(D))
+        return false;
+
+      return true;
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
+        closure->setActorIsolation(determineClosureIsolation(closure));
         contextStack.push_back(closure);
         return { true, expr };
       }
@@ -690,11 +716,8 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       while (useContext != defContext) {
         // If we find an escaping closure, it can be run concurrently.
         if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-          if (auto type = closure->getType()) {
-            if (auto fnType = type->getAs<AnyFunctionType>())
-              if (!fnType->isNoEscape())
-                return true;
-          }
+          if (isEscapingClosure(closure))
+            return true;
         }
 
         // If we find a local function, it can escape and be run concurrently.
@@ -991,10 +1014,144 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       }
       llvm_unreachable("unhandled actor isolation kind!");
     }
-  };
 
-  ActorIsolationWalker walker(dc);
-  const_cast<Expr *>(expr)->walk(walker);
+    /// Determine whether this closure is escaping.
+    static bool isEscapingClosure(const AbstractClosureExpr *closure) {
+      if (auto type = closure->getType()) {
+        if (auto fnType = type->getAs<AnyFunctionType>())
+          return !fnType->isNoEscape();
+      }
+
+      return true;
+    }
+
+    /// Determine the isolation of a particular closure.
+    ///
+    /// This function assumes that enclosing closures have already had their
+    /// isolation checked.
+    ClosureActorIsolation determineClosureIsolation(
+        AbstractClosureExpr *closure) {
+      // An escaping closure is always actor-independent.
+      if (isEscapingClosure(closure))
+        return ClosureActorIsolation::forIndependent();
+
+      // A non-escaping closure gets its isolation from its context.
+      Optional<ActorIsolation> parentIsolation;
+      auto parentDC = closure->getParent();
+      switch (parentDC->getContextKind()) {
+      case DeclContextKind::AbstractClosureExpr: {
+        auto parentClosureIsolation = cast<AbstractClosureExpr>(parentDC)
+          ->getActorIsolation();
+        switch (parentClosureIsolation) {
+        case ClosureActorIsolation::Independent:
+          parentIsolation = ActorIsolation::forIndependent(
+              ActorIndependentKind::Safe);
+          break;
+
+        case ClosureActorIsolation::ActorInstance: {
+          auto selfDecl = parentClosureIsolation.getActorInstance();
+          auto actorClass = selfDecl->getType()->getRValueType()
+              ->getClassOrBoundGenericClass();
+          assert(actorClass && "Bad closure actor isolation?");
+          parentIsolation = ActorIsolation::forActorInstance(actorClass);
+          break;
+        }
+
+        case ClosureActorIsolation::GlobalActor:
+          parentIsolation = ActorIsolation::forGlobalActor(
+              parentClosureIsolation.getGlobalActor());
+          break;
+        }
+        break;
+      }
+
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::SubscriptDecl:
+        parentIsolation = getActorIsolation(
+            cast<ValueDecl>(parentDC->getAsDecl()));
+        break;
+
+      case DeclContextKind::EnumElementDecl:
+      case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::Initializer:
+      case DeclContextKind::Module:
+      case DeclContextKind::SerializedLocal:
+      case DeclContextKind::TopLevelCodeDecl:
+        return ClosureActorIsolation::forIndependent();
+      }
+
+      // We must have parent isolation determined to get here.
+      assert(parentIsolation && "Missing parent isolation?");
+      switch (*parentIsolation) {
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::Unspecified:
+        return ClosureActorIsolation::forIndependent();
+
+      case ActorIsolation::GlobalActor: {
+        Type globalActorType = closure->mapTypeIntoContext(
+            parentIsolation->getGlobalActor()->mapTypeOutOfContext());
+        return ClosureActorIsolation::forGlobalActor(globalActorType);
+      }
+
+      case ActorIsolation::ActorInstance: {
+        SmallVector<CapturedValue, 2> localCaptures;
+        closure->getCaptureInfo().getLocalCaptures(localCaptures);
+        for (const auto &localCapture : localCaptures) {
+          if (localCapture.isDynamicSelfMetadata())
+            continue;
+
+          auto var = dyn_cast_or_null<VarDecl>(localCapture.getDecl());
+          if (!var)
+            continue;
+
+          // If we have captured the 'self' parameter, the closure is isolated
+          // to that actor instance.
+          if (var->isSelfParameter()) {
+            return ClosureActorIsolation::forActorInstance(var);
+          }
+        }
+
+        // When 'self' is not captured, this closure is actor-independent.
+        return ClosureActorIsolation::forIndependent();
+      }
+    }
+    }
+  };
+}
+
+void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
+  ActorIsolationChecker checker(decl);
+  decl->getBody()->walk(checker);
+}
+
+void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
+  ActorIsolationChecker checker(decl);
+  if (auto body = decl->getBody()) {
+    body->walk(checker);
+  }
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl))
+    if (auto superInit = ctor->getSuperInitCall())
+      superInit->walk(checker);
+}
+
+void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
+  ActorIsolationChecker checker(init);
+  expr->walk(checker);
+}
+
+void swift::checkEnumElementActorIsolation(
+    EnumElementDecl *element, Expr *expr) {
+  ActorIsolationChecker checker(element);
+  expr->walk(checker);
+}
+
+void swift::checkPropertyWrapperActorIsolation(
+   PatternBindingDecl *binding, Expr *expr) {
+  ActorIsolationChecker checker(binding->getDeclContext());
+  expr->walk(checker);
 }
 
 /// Determine actor isolation solely from attributes.

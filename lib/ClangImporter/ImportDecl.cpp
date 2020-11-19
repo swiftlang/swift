@@ -3255,6 +3255,10 @@ namespace {
         return nullptr;
       }
 
+      // TODO(SR-13809): fix this once we support dependent types.
+      if (decl->getTypeForDecl()->isDependentType())
+        return nullptr;
+
       // Don't import nominal types that are over-aligned.
       if (Impl.isOverAligned(decl))
         return nullptr;
@@ -3495,7 +3499,7 @@ namespace {
 
         if (auto dtor = cxxRecordDecl->getDestructor()) {
           if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-            result->setIsCxxNonTrivial(true);
+            return nullptr;
           }
         }
       }
@@ -3728,7 +3732,8 @@ namespace {
     ParameterList *getNonSelfParamList(
         DeclContext *dc, const clang::FunctionDecl *decl,
         Optional<unsigned> selfIdx, ArrayRef<Identifier> argNames,
-        bool allowNSUIntegerAsInt, bool isAccessor) {
+        bool allowNSUIntegerAsInt, bool isAccessor,
+        ArrayRef<GenericTypeParamDecl *> genericParams) {
       if (bool(selfIdx)) {
         assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
                (*selfIdx < decl->getNumParams()) && "where's self?");
@@ -3744,7 +3749,7 @@ namespace {
       }
       return Impl.importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
-          argNames, /*genericParams=*/{});
+          argNames, genericParams);
     }
 
     Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
@@ -3882,7 +3887,7 @@ namespace {
 
         bodyParams =
             getNonSelfParamList(dc, decl, selfIdx, name.getArgumentNames(),
-                                allowNSUIntegerAsInt, !name);
+                                allowNSUIntegerAsInt, !name, templateParams);
 
         importedType =
             Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
@@ -5690,8 +5695,7 @@ namespace {
 }
 
 static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
-                                               const ProtocolDecl *proto,
-                                               ModuleDecl *foundationModule) {
+                                               const ProtocolDecl *proto) {
   auto &ctx = nominal->getASTContext();
 
   if (inheritanceListContainsProtocol(nominal, proto))
@@ -5714,7 +5718,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
   for (ExtensionDecl *extension : nominal->getExtensions()) {
     ModuleDecl *extensionModule = extension->getParentModule();
     if (extensionModule != originalModule && extensionModule != overlayModule &&
-        extensionModule != foundationModule) {
+        !extensionModule->isFoundationModule()) {
       continue;
     }
     if (inheritanceListContainsProtocol(extension, proto))
@@ -5809,8 +5813,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its overlay.
-    if (conformsToProtocolInOriginalModule(computedNominal, proto,
-                                           Impl.tryLoadFoundationModule())) {
+    if (conformsToProtocolInOriginalModule(computedNominal, proto)) {
       synthesizedProtocols.push_back(kind);
       return true;
     }
@@ -7460,9 +7463,20 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
             Impl.importMirroredDecl(objcMethod, dc, getVersion(), proto)) {
       members.push_back(imported);
 
-      for (auto alternate : Impl.getAlternateDecls(imported))
+      for (auto alternate : Impl.getAlternateDecls(imported)) {
         if (imported->getDeclContext() == alternate->getDeclContext())
           members.push_back(alternate);
+      }
+
+      if (Impl.SwiftContext.LangOpts.EnableExperimentalConcurrency &&
+          !getVersion().supportsConcurrency()) {
+        auto asyncVersion = getVersion().withConcurrency(true);
+        if (auto asyncImport = Impl.importMirroredDecl(
+                objcMethod, dc, asyncVersion, proto)) {
+          if (asyncImport != imported)
+            members.push_back(asyncImport);
+        }
+      }
     }
   }
 }

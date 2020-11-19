@@ -383,20 +383,27 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
               reqDiffAttr->getParameterIndices()))
         supersetConfig = witnessConfig;
     }
-    if (!foundExactConfig) {
-      // If no exact witness derivative configuration was found, check
-      // conditions for creating an implicit witness `@differentiable` attribute
-      // with the exact derivative configuration.
 
-      // If witness is declared in a different file or type context than the
-      // conformance, we should not create an implicit `@differentiable`
-      // attribute on the witness. Produce an error.
-      auto sameTypeContext =
-          dc->getInnermostTypeContext() ==
+    // If no exact witness derivative configuration was found, check conditions
+    // for creating an implicit witness `@differentiable` attribute with the
+    // exact derivative configuration.
+    if (!foundExactConfig) {
+      auto witnessInDifferentFile =
+          dc->getParentSourceFile() !=
+          witness->getDeclContext()->getParentSourceFile();
+      auto witnessInDifferentTypeContext =
+          dc->getInnermostTypeContext() !=
           witness->getDeclContext()->getInnermostTypeContext();
-      auto sameModule = dc->getModuleScopeContext() ==
-                        witness->getDeclContext()->getModuleScopeContext();
-      if (!sameTypeContext || !sameModule) {
+      // Produce an error instead of creating an implicit `@differentiable`
+      // attribute if any of the following conditions are met:
+      // - The witness is in a different file than the conformance
+      //   declaration.
+      // - The witness is in a different type context (i.e. extension) than
+      //   the conformance declaration, and there is no existing
+      //   `@differentiable` attribute that covers the required differentiation
+      //   parameters.
+      if (witnessInDifferentFile ||
+          (witnessInDifferentTypeContext && !supersetConfig)) {
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
@@ -1559,7 +1566,7 @@ isUnsatisfiedReq(ConformanceChecker &checker,
         if (otherReq == req)
           continue;
 
-        if (conformance->hasWitness(otherReq))
+        if (conformance->getWitness(otherReq))
           return false;
       }
     }
@@ -2492,30 +2499,14 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     llvm::raw_string_ostream os(reqDiffAttrString);
     reqAttr->print(os, req, omitWrtClause);
     os.flush();
-    // If the witness is declared in a different file or type context than the
-    // conformance, emit a specialized diagnostic.
-    auto sameModule = conformance->getDeclContext()->getModuleScopeContext() !=
-                      witness->getDeclContext()->getModuleScopeContext();
-    auto sameTypeContext =
-        conformance->getDeclContext()->getInnermostTypeContext() !=
-        witness->getDeclContext()->getInnermostTypeContext();
-    if (sameModule || sameTypeContext) {
-      diags
-          .diagnose(
-              witness,
-              diag::
-                  protocol_witness_missing_differentiable_attr_invalid_context,
-              reqDiffAttrString, req->getName(), conformance->getType(),
-              conformance->getProtocol()->getDeclaredInterfaceType())
-          .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
-    }
-    // Otherwise, emit a general "missing attribute" diagnostic.
-    else {
-      diags
-          .diagnose(witness, diag::protocol_witness_missing_differentiable_attr,
-                    reqDiffAttrString)
-          .fixItInsert(witness->getStartLoc(), reqDiffAttrString + ' ');
-    }
+    diags
+        .diagnose(
+            witness,
+            diag::
+                protocol_witness_missing_differentiable_attr_invalid_context,
+            reqDiffAttrString, req->getName(), conformance->getType(),
+            conformance->getProtocol()->getDeclaredInterfaceType())
+        .fixItInsert(match.Witness->getStartLoc(), reqDiffAttrString + ' ');
     break;
   }
   case MatchKind::EnumCaseWithAssociatedValues:
@@ -4317,56 +4308,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
-static void checkExportability(Type depTy, Type replacementTy,
-                               const ProtocolConformance *conformance,
-                               NormalProtocolConformance *conformanceBeingChecked,
-                               DeclContext *DC) {
-  SourceFile *SF = DC->getParentSourceFile();
-  if (!SF)
-    return;
-
-  SubstitutionMap subs =
-      conformance->getSubstitutions(SF->getParentModule());
-  for (auto &subConformance : subs.getConformances()) {
-    if (!subConformance.isConcrete())
-      continue;
-    checkExportability(depTy, replacementTy, subConformance.getConcrete(),
-                       conformanceBeingChecked, DC);
-  }
-
-  const RootProtocolConformance *rootConformance =
-      conformance->getRootConformance();
-  ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
-
-  auto where = ExportContext::forDeclSignature(
-      DC->getInnermostDeclarationDeclContext());
-  auto originKind = getDisallowedOriginKind(
-      rootConformance->getDeclContext()->getAsDecl(),
-      where);
-  if (originKind == DisallowedOriginKind::None)
-    return;
-
-  ASTContext &ctx = SF->getASTContext();
-
-  Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
-  if (depTy->isEqual(selfTy)) {
-    ctx.Diags.diagnose(
-        conformanceBeingChecked->getLoc(),
-        diag::conformance_from_implementation_only_module,
-        rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), 0, M->getName(),
-        static_cast<unsigned>(originKind));
-  } else {
-    ctx.Diags.diagnose(
-        conformanceBeingChecked->getLoc(),
-        diag::assoc_conformance_from_implementation_only_module,
-        rootConformance->getType(),
-        rootConformance->getProtocol()->getName(), M->getName(),
-        depTy, replacementTy->getCanonicalType(),
-        static_cast<unsigned>(originKind));
-  }
-}
-
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
@@ -4412,18 +4353,21 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   // Now check that our associated conformances are at least as visible as
   // the conformance itself.
-  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired()) {
-    for (auto req : proto->getRequirementSignature()) {
-      if (req.getKind() == RequirementKind::Conformance) {
-        auto depTy = req.getFirstType();
-        auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-        auto conformance = Conformance->getAssociatedConformance(depTy, proto);
-        if (conformance.isConcrete()) {
-          auto *concrete = conformance.getConcrete();
-          auto replacementTy = DC->mapTypeIntoContext(concrete->getType());
-          checkExportability(depTy, replacementTy, concrete,
-                             Conformance, DC);
-        }
+  auto where = ExportContext::forConformance(DC, proto);
+  if (where.isImplicit())
+    return;
+
+  for (auto req : proto->getRequirementSignature()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto depTy = req.getFirstType();
+      auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto conformance = Conformance->getAssociatedConformance(depTy, proto);
+      if (conformance.isConcrete()) {
+        auto *concrete = conformance.getConcrete();
+        auto replacementTy = DC->mapTypeIntoContext(concrete->getType());
+        diagnoseConformanceAvailability(Conformance->getLoc(),
+                                        conformance, where,
+                                        depTy, replacementTy);
       }
     }
   }

@@ -23,45 +23,32 @@ namespace fine_grained_dependencies {
 
 class FrontendSourceFileDepGraphFactory
     : public AbstractSourceFileDepGraphFactory {
-  SourceFile *const SF;
+  const SourceFile *SF;
   const DependencyTracker &depTracker;
 
 public:
-  FrontendSourceFileDepGraphFactory(SourceFile *SF, StringRef outputPath,
+  FrontendSourceFileDepGraphFactory(const SourceFile *SF, StringRef outputPath,
                                     const DependencyTracker &depTracker,
                                     bool alsoEmitDotFile);
 
   ~FrontendSourceFileDepGraphFactory() override = default;
 
 private:
-  static std::string getFingerprint(SourceFile *SF);
-  static std::string getInterfaceHash(SourceFile *SF);
-
   void addAllDefinedDecls() override;
   void addAllUsedDecls() override;
-
-  /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create node pairs for context and name
-  template <NodeKind kind, typename ContentsT>
-  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
 };
 
 class ModuleDepGraphFactory : public AbstractSourceFileDepGraphFactory {
-  ModuleDecl *const Mod;
+  const ModuleDecl *Mod;
 
 public:
-  ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot);
+  ModuleDepGraphFactory(const ModuleDecl *Mod, bool emitDot);
 
   ~ModuleDepGraphFactory() override = default;
 
 private:
   void addAllDefinedDecls() override;
   void addAllUsedDecls() override {}
-
-  /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create node pairs for context and name
-  template <NodeKind kind, typename ContentsT>
-  void addAllDefinedDeclsOfAGivenType(std::vector<ContentsT> &contentsVec);
 };
 
 } // namespace fine_grained_dependencies

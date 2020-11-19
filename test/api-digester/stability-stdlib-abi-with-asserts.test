@@ -44,5 +44,3 @@ Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
 Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
-Func _swift_isImmutableCOWBuffer(_:) is a new API without @available attribute
-Func _swift_setImmutableCOWBuffer(_:_:) is a new API without @available attribute

@@ -150,7 +150,7 @@ func makeGenericMetatypes() {
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes6OneArgVMa"
 // CHECK-SAME:    ([[INT]] %0, %swift.type* %1)
 // CHECK:   [[BITCAST_1:%.*]] = bitcast {{.*}} %1
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* undef, i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata([[INT]] %0, i8* [[BITCAST_1]], i8* undef, i8* undef, %swift.type_descriptor* {{.*}} @"$s17generic_metatypes6OneArgVMn" {{.*}})
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s17generic_metatypes7TwoArgsVMa"

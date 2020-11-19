@@ -273,7 +273,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
             } else {
               assert(isa<ClassDecl>(NTD));
               SILValue Original, Borrowed;
-              if (Ptr.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
+              if (Ptr.getOwnershipKind() != OwnershipKind::Guaranteed) {
                 Original = Ptr;
                 Borrowed = Ptr = B.createBeginBorrow(Loc, Ptr);
                 EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);

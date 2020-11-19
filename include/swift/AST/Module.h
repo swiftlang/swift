@@ -572,6 +572,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const;
+
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
   void lookupImportedSPIGroups(
@@ -693,6 +696,9 @@ public:
 
   /// \returns true if this module is the "SwiftOnoneSupport" module;
   bool isOnoneSupportModule() const;
+
+  /// \returns true if this module is the "Foundation" module;
+  bool isFoundationModule() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);

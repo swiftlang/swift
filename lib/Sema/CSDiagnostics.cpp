@@ -841,6 +841,27 @@ bool LabelingFailure::diagnoseAsNote() {
   return false;
 }
 
+bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
+  ArrayExpr *AE = getAsExpr<ArrayExpr>(getAnchor());
+  assert(AE);
+
+  if (AE->getNumElements() == 0) {
+    emitDiagnostic(diag::should_use_empty_dictionary_literal)
+      .fixItInsertAfter(getLoc(), ":");
+    return true;
+  }
+
+  auto CTP = getConstraintSystem().getContextualTypePurpose(AE);
+  emitDiagnostic(diag::should_use_dictionary_literal,
+                 getToType()->lookThroughAllOptionalTypes(),
+                 CTP == CTP_Initialization);
+
+  auto diagnostic = emitDiagnostic(diag::meant_dictionary_lit);
+  if (AE->getNumElements() == 1)
+    diagnostic.fixItInsertAfter(AE->getElement(0)->getEndLoc(), ": <#value#>");
+  return true;
+}
+
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
   if (diagnoseParameterUse())
     return true;
@@ -5129,16 +5150,27 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   auto eltType = getFromType();
   auto contextualType = getToType();
 
-  Optional<InFlightDiagnostic> diagnostic;
-  if (isExpr<ArrayExpr>(anchor)) {
-    if (diagnoseMergedLiteralElements())
-      return true;
+  auto isFixedToDictionary = [&](ArrayExpr *anchor) {
+    return llvm::any_of(getSolution().Fixes, [&](ConstraintFix *fix) {
+      auto *fixAnchor = getAsExpr<ArrayExpr>(fix->getAnchor());
+      return fixAnchor && fixAnchor == anchor &&
+        fix->getKind() == FixKind::TreatArrayLiteralAsDictionary;
+    });
+  };
 
-    diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
-                                      eltType, contextualType));
+  bool treatAsDictionary = false;
+  Optional<InFlightDiagnostic> diagnostic;
+  if (auto *AE = getAsExpr<ArrayExpr>(anchor)) {
+    if (!(treatAsDictionary = isFixedToDictionary(AE))) {
+      if (diagnoseMergedLiteralElements())
+        return true;
+
+      diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
+                                        eltType, contextualType));
+    }
   }
 
-  if (isExpr<DictionaryExpr>(anchor)) {
+  if (treatAsDictionary || isExpr<DictionaryExpr>(anchor)) {
     auto eltLoc = locator->castLastElementTo<LocatorPathElt::TupleElement>();
     switch (eltLoc.getIndex()) {
     case 0: // key
@@ -7000,5 +7032,23 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::unresolved_nil_literal);
+  return true;
+}
+
+bool ReferenceToInvalidDeclaration::diagnoseAsError() {
+  auto *decl = castToExpr<DeclRefExpr>(getAnchor())->getDecl();
+  assert(decl);
+
+  auto &DE = getASTContext().Diags;
+  // This problem should have been already diagnosed during
+  // validation of the declaration.
+  if (DE.hadAnyError())
+    return true;
+
+  // If no errors have been emitted yet, let's emit one
+  // about reference to an invalid declaration.
+
+  emitDiagnostic(diag::reference_to_invalid_decl, decl->getName());
+  emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
   return true;
 }

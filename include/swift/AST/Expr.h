@@ -3553,6 +3553,79 @@ public:
   }
 };
 
+/// Actor isolation for a closure.
+class ClosureActorIsolation {
+public:
+  enum Kind {
+    /// The closure is independent of any actor.
+    Independent,
+
+    /// The closure is tied to the actor instance described by the given
+    /// \c VarDecl*, which is the (captured) `self` of an actor.
+    ActorInstance,
+
+    /// The closure is tied to the global actor described by the given type.
+    GlobalActor,
+  };
+
+private:
+    /// The actor to which this closure is isolated.
+    ///
+    /// There are three possible states:
+    ///   - NULL: The closure is independent of any actor.
+    ///   - VarDecl*: The 'self' variable for the actor instance to which
+    ///     this closure is isolated. It will always have a type that conforms
+    ///     to the \c Actor protocol.
+    ///   - Type: The type of the global actor on which
+  llvm::PointerUnion<VarDecl *, Type> storage;
+
+  ClosureActorIsolation(VarDecl *selfDecl) : storage(selfDecl) { }
+  ClosureActorIsolation(Type globalActorType) : storage(globalActorType) { }
+
+public:
+  ClosureActorIsolation() : storage() { }
+
+  static ClosureActorIsolation forIndependent() {
+    return ClosureActorIsolation();
+  }
+
+  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl) {
+    return ClosureActorIsolation(selfDecl);
+  }
+
+  static ClosureActorIsolation forGlobalActor(Type globalActorType) {
+    return ClosureActorIsolation(globalActorType);
+  }
+
+  /// Determine the kind of isolation.
+  Kind getKind() const {
+    if (storage.isNull())
+      return Kind::Independent;
+
+    if (storage.is<VarDecl *>())
+      return Kind::ActorInstance;
+
+    return Kind::GlobalActor;
+  }
+
+  /// Whether the closure is isolated at all.
+  explicit operator bool() const {
+    return getKind() != Kind::Independent;
+  }
+
+  /// Whether the closure is isolated at all.
+  operator Kind() const {
+    return getKind();
+  }
+
+  VarDecl *getActorInstance() const {
+    return storage.dyn_cast<VarDecl *>();
+  }
+
+  Type getGlobalActor() const {
+    return storage.dyn_cast<Type>();
+  }
+};
 
 /// A base class for closure expressions.
 class AbstractClosureExpr : public DeclContext, public Expr {
@@ -3560,6 +3633,9 @@ class AbstractClosureExpr : public DeclContext, public Expr {
 
   /// The set of parameters.
   ParameterList *parameterList;
+
+  /// Actor isolation of the closure.
+  ClosureActorIsolation actorIsolation;
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
@@ -3624,6 +3700,12 @@ public:
   ///
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
+
+  ClosureActorIsolation getActorIsolation() const { return actorIsolation; }
+
+  void setActorIsolation(ClosureActorIsolation actorIsolation) {
+    this->actorIsolation = actorIsolation;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
@@ -3903,7 +3985,10 @@ public:
 
     // An autoclosure with type (Self) -> (Args...) -> Result. Formed from type
     // checking a partial application.
-    DoubleCurryThunk = 2
+    DoubleCurryThunk = 2,
+
+    // An autoclosure with type () -> Result that was formed for an async let.
+    AsyncLet = 3,
   };
 
   AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,

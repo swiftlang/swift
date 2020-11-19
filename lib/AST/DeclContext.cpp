@@ -532,12 +532,17 @@ void AccessScope::dump() const {
 
   if (auto *decl = getDeclContext()->getAsDecl()) {
     llvm::errs() << Decl::getKindName(decl->getKind()) << " ";
-    if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-      llvm::errs() << ext->getExtendedNominal()->getName();
-    else if (auto *named = dyn_cast<ValueDecl>(decl))
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+      auto *extended = ext->getExtendedNominal();
+      if (extended)
+        llvm::errs() << extended->getName();
+      else
+        llvm::errs() << "(null)";
+    } else if (auto *named = dyn_cast<ValueDecl>(decl)) {
       llvm::errs() << named->getName();
-    else
+    } else {
       llvm::errs() << (const void *)decl;
+    }
 
     SourceLoc loc = decl->getLoc();
     if (loc.isValid()) {
@@ -1011,25 +1016,12 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
-Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
-  // Only makes sense for contexts in a source file
-  if (!getAsGenericContext()->getParentSourceFile())
-    return None;
+Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   auto mutableThis = const_cast<IterableDeclContext *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            ParseMembersRequest{mutableThis},
                            FingerprintAndMembers())
       .fingerprint;
-}
-
-bool IterableDeclContext::areTokensHashedForThisBodyInsteadOfInterfaceHash()
-    const {
-  // Do not keep separate hashes for extension bodies because the dependencies
-  // can miss the addition of a member in an extension because there is nothing
-  // corresponding to the fingerprinted nominal dependency node.
-  if (isa<ExtensionDecl>(this))
-    return false;
-  return true;
 }
 
 /// Return the DeclContext to compare when checking private access in

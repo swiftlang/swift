@@ -251,6 +251,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
     llvm_unreachable("cannot find platform kind");
   case swift::PlatformKind::OpenBSD:
     llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::Windows:
+    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
     return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
@@ -718,6 +720,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
                        AFD->getGenericSignature()));
 
   visitDefaultArguments(AFD, AFD->getParameters());
+
+  if (AFD->isAsyncContext()) {
+    addSymbol(LinkEntity::forAsyncFunctionPointer(AFD));
+  }
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {

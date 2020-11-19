@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -191,6 +191,9 @@ PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 PASS(ExistentialSpecializer, "existential-specializer",
      "Existential Specializer")
+PASS(SILSkippingChecker, "check-sil-skipping",
+     "Utility pass to ensure -experimental-skip-*-function-bodies skip "
+     "SIL generation of not-to-be-serialized functions entirely")
 PASS(GlobalOpt, "global-opt",
      "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
@@ -203,6 +206,8 @@ PASS(HighLevelLICM, "high-level-licm",
      "Loop Invariant Code Motion in High-Level SIL")
 PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
+PASS(OptimizeHopToExecutor, "optimize-hop-to-executor",
+     "Optimize hop_to_executor instructions for actor isolated code")
 PASS(InstCount, "inst-count",
      "Record SIL Instruction, Block, and Function Counts as LLVM Statistics")
 PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",
@@ -345,9 +350,6 @@ PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
 PASS(CMOSerializeSILPass, "cmo-serialize-sil",
      "Utility pass. Serializes the current SILModule for cross-module-optimization")
-PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
-     "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
-     "skips everything it should")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")

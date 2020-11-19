@@ -25,6 +25,7 @@
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -145,7 +146,7 @@ public:
         getOpASTType(predEnum->getDeclaredInterfaceType()->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
         enumTy, TypeExpansionContext::minimal());
-    vjpBB->createPhiArgument(enumLoweredTy, ValueOwnershipKind::Owned);
+    vjpBB->createPhiArgument(enumLoweredTy, OwnershipKind::Owned);
     remappedBasicBlocks.insert(bb);
     return vjpBB;
   }
@@ -256,34 +257,32 @@ public:
         createTrampolineBasicBlock(cbi, pbStructVal, cbi->getFalseBB()));
   }
 
-  void visitSwitchEnumInstBase(SwitchEnumInstBase *inst) {
+  void visitSwitchEnumTermInst(SwitchEnumTermInst inst) {
     // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(inst);
+    auto *pbStructVal = buildPullbackValueStructValue(*inst);
 
     // Create trampoline successor basic blocks.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
-    for (unsigned i : range(inst->getNumCases())) {
-      auto caseBB = inst->getCase(i);
+    for (unsigned i : range(inst.getNumCases())) {
+      auto caseBB = inst.getCase(i);
       auto *trampolineBB =
           createTrampolineBasicBlock(inst, pbStructVal, caseBB.second);
       caseBBs.push_back({caseBB.first, trampolineBB});
     }
     // Create trampoline default basic block.
     SILBasicBlock *newDefaultBB = nullptr;
-    if (auto *defaultBB = inst->getDefaultBBOrNull().getPtrOrNull())
+    if (auto *defaultBB = inst.getDefaultBBOrNull().getPtrOrNull())
       newDefaultBB = createTrampolineBasicBlock(inst, pbStructVal, defaultBB);
 
     // Create a new `switch_enum` instruction.
     switch (inst->getKind()) {
     case SILInstructionKind::SwitchEnumInst:
-      getBuilder().createSwitchEnum(inst->getLoc(),
-                                    getOpValue(inst->getOperand()),
-                                    newDefaultBB, caseBBs);
+      getBuilder().createSwitchEnum(
+          inst->getLoc(), getOpValue(inst.getOperand()), newDefaultBB, caseBBs);
       break;
     case SILInstructionKind::SwitchEnumAddrInst:
-      getBuilder().createSwitchEnumAddr(inst->getLoc(),
-                                        getOpValue(inst->getOperand()),
-                                        newDefaultBB, caseBBs);
+      getBuilder().createSwitchEnumAddr(
+          inst->getLoc(), getOpValue(inst.getOperand()), newDefaultBB, caseBBs);
       break;
     default:
       llvm_unreachable("Expected `switch_enum` or `switch_enum_addr`");
@@ -291,11 +290,11 @@ public:
   }
 
   void visitSwitchEnumInst(SwitchEnumInst *sei) {
-    visitSwitchEnumInstBase(sei);
+    visitSwitchEnumTermInst(sei);
   }
 
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
-    visitSwitchEnumInstBase(seai);
+    visitSwitchEnumTermInst(seai);
   }
 
   void visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {

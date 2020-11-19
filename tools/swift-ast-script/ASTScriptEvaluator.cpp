@@ -92,8 +92,11 @@ public:
     if (auto module = dyn_cast<ModuleDecl>(dc)) {
       out << module->getName() << ".";
     } else if (auto extension = dyn_cast<ExtensionDecl>(dc)) {
-      printDecl(out, extension->getExtendedNominal());
-      out << ".";
+      auto *extended = extension->getExtendedNominal();
+      if (extended) {
+        printDecl(out, extended);
+        out << ".";
+      }
     } else if (auto decl = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
       printDecl(out, decl);
       out << ".";

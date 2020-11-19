@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/DeclObjC.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
@@ -31,9 +30,11 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
@@ -138,10 +139,47 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(
     ValueDecl *D, DeclVisibilityKind reason,
     DynamicLookupInfo dynamicLookupInfo) {
-  if (D->hasInterfaceType() && D->isInvalid())
-    return;
   if (!D->isAccessibleFrom(DC))
     return;
+
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
+}
+
+void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
+    DeclVisibilityKind reason, DynamicLookupInfo dynamicLookupInfo) {
+  // Skip when Loc is within the decl's own initializer
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    Expr *init = VD->getParentInitializer();
+    if (auto *PD = dyn_cast<ParamDecl>(D)) {
+      init = PD->getStructuralDefaultExpr();
+    }
+
+    // Only check if the VarDecl has the same (or parent) context to avoid
+    // grabbing the end location for every decl with an initializer
+    if (init != nullptr) {
+      auto *varContext = VD->getDeclContext();
+      if (DC == varContext || DC->isChildContextOf(varContext)) {
+        auto initRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, init->getSourceRange());
+        if (initRange.isValid() && initRange.contains(Loc))
+          return;
+      }
+    }
+  }
+
+  switch (reason) {
+  case DeclVisibilityKind::LocalVariable:
+    // Skip if Loc is before the found decl, unless its a TypeDecl (whose use
+    // before its declaration is still allowed)
+    if (!isa<TypeDecl>(D) && !SM.isBeforeInBuffer(D->getLoc(), Loc))
+      return;
+    break;
+  default:
+    // The rest of the file is currently skipped, so no need to check
+    // decl location for VisibleAtTopLevel. Other visibility kinds are always
+    // usable
+    break;
+  }
 
   ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
 }
@@ -467,6 +505,21 @@ static void recordShadowedDeclsAfterTypeMatch(
 
           // Otherwise, the first declaration is shadowed by the second. There is
           // no point in continuing to compare the first declaration to others.
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+
+      // Next, prefer any other module over the _Concurrency module.
+      if (auto concurModule = ctx.getLoadedModule(ctx.Id_Concurrency)) {
+        if ((firstModule == concurModule) != (secondModule == concurModule)) {
+          // If second module is _Concurrency, then it is shadowed by first.
+          if (secondModule == concurModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // Otherwise, the first declaration is shadowed by the second.
           shadowed.insert(firstDecl);
           break;
         }

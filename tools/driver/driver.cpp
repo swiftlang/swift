@@ -160,33 +160,46 @@ static int run_driver(StringRef ExecName,
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
+  std::string newDriverName;
+  if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER")) {
+    newDriverName = driverNameOp.getValue();
+  }
+  auto disallowForwarding = llvm::find_if(argv, [](const char* arg) {
+    return StringRef(arg) == "-disallow-use-new-driver";
+  }) != argv.end();
   // Forwarding calls to the swift driver if the C++ driver is invoked as `swift`
   // or `swiftc`, and an environment variable SWIFT_USE_NEW_DRIVER is defined.
-  if (llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER") &&
+  if (!newDriverName.empty() && !disallowForwarding &&
       (ExecName == "swift" || ExecName == "swiftc")) {
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
-    llvm::sys::path::append(NewDriverPath, "swift-driver");
-    SmallVector<const char *, 256> subCommandArgs;
-    // Rewrite the program argument.
-    subCommandArgs.push_back(NewDriverPath.c_str());
-    if (ExecName == "swiftc") {
-      subCommandArgs.push_back("--driver-mode=swiftc");
+    llvm::sys::path::append(NewDriverPath, newDriverName);
+    if (!llvm::sys::fs::exists(NewDriverPath)) {
+      Diags.diagnose(SourceLoc(), diag::remark_forwarding_driver_not_there,
+                     NewDriverPath);
     } else {
-      assert(ExecName == "swift");
-      subCommandArgs.push_back("--driver-mode=swift");
+      SmallVector<const char *, 256> subCommandArgs;
+      // Rewrite the program argument.
+      subCommandArgs.push_back(NewDriverPath.c_str());
+      if (ExecName == "swiftc") {
+        subCommandArgs.push_back("--driver-mode=swiftc");
+      } else {
+        assert(ExecName == "swift");
+        subCommandArgs.push_back("--driver-mode=swift");
+      }
+      subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
+
+      // Execute the subcommand.
+      subCommandArgs.push_back(nullptr);
+      Diags.diagnose(SourceLoc(), diag::remark_forwarding_to_new_driver,
+                     NewDriverPath);
+      ExecuteInPlace(NewDriverPath.c_str(), subCommandArgs.data());
+
+      // If we reach here then an error occurred (typically a missing path).
+      std::string ErrorString = llvm::sys::StrError();
+      llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
+                   << " (" << ErrorString << ")\n";
+      return 2;
     }
-    subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
-
-    // Execute the subcommand.
-    subCommandArgs.push_back(nullptr);
-    Diags.diagnose(SourceLoc(), diag::remark_forwarding_to_new_driver);
-    ExecuteInPlace(NewDriverPath.c_str(), subCommandArgs.data());
-
-    // If we reach here then an error occurred (typically a missing path).
-    std::string ErrorString = llvm::sys::StrError();
-    llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
-                 << " (" << ErrorString << ")\n";
-    return 2;
   }
 
   Driver TheDriver(Path, ExecName, argv, Diags);

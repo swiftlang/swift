@@ -255,7 +255,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPhiArgument(argTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(argTy, OwnershipKind::Owned);
   }
 
   SILBasicBlock *FalseBB = createBasicBlock();
@@ -326,6 +326,11 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           // Ignore all other implicit expressions.
           continue;
         }
+      } else if (auto D = ESD.dyn_cast<Decl*>()) {
+        // Local type declarations are not unreachable because they can appear
+        // after the declared type has already been used.
+        if (isa<TypeDecl>(D))
+          continue;
       }
       
       if (StmtType != UnknownStmtType) {
@@ -816,7 +821,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
   SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
-      exnTL.getLoweredType(), ValueOwnershipKind::Owned);
+      exnTL.getLoweredType(), OwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -1212,10 +1217,13 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
   SILValue exn = destBB->createPhiArgument(getSILType(exnResult, fnTy),
-                                           ValueOwnershipKind::Owned);
+                                           OwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
+
+  if (fnTy->isAsync())
+    emitHopToCurrentExecutor(loc);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.

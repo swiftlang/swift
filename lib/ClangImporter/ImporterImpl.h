@@ -921,6 +921,9 @@ public:
   /// into the ASTContext.
   ModuleDecl *tryLoadFoundationModule();
 
+  /// Returns whether or not the "Foundation" module can be imported, without loading it.
+  bool canImportFoundationModule();
+
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying,

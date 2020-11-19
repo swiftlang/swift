@@ -58,3 +58,42 @@ bb0(%0 : $Int64):
   end_access %33 : $*Int64
   return %35 : $Int64
 }
+
+// CHECK-LABEL: sil [ossa] @test_borrow_init_enum_addr : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK: bb0(%0 : @owned $AnyObject):
+// CHECK: [[ALLOC:%.*]] = alloc_stack $Optional<AnyObject>
+// CHECK: init_enum_data_addr [[ALLOC]] : $*Optional<AnyObject>, #Optional.some!enumelt
+// CHECK: load_borrow [[ALLOC]] : $*Optional<AnyObject>
+// CHECK-LABEL: } // end sil function 'test_borrow_init_enum_addr'
+sil [ossa] @test_borrow_init_enum_addr : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack $Optional<AnyObject>
+  %2 = init_enum_data_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+  store %0 to [init] %2 : $*AnyObject
+  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
+  %5 = load_borrow %1 : $*Optional<AnyObject>
+  end_borrow %5 : $Optional<AnyObject>
+  dealloc_stack %1 : $*Optional<AnyObject>
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// unchecked_ownership_conversion should not be considered a write to memory.
+class ObjectWrapper {
+  var object: AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed ObjectWrapper) -> @owned ObjectWrapper {
+// CHECK: bb0(%0 : @guaranteed $ObjectWrapper):
+// CHECK:   load_borrow
+// CHECK:   unchecked_ownership_conversion %0 : $ObjectWrapper, @guaranteed to @owned
+// CHECK:   end_borrow
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_conversion_test'
+sil [ossa] @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed ObjectWrapper) -> @owned ObjectWrapper {
+bb0(%0 : @guaranteed $ObjectWrapper):
+  %1 = ref_element_addr %0 : $ObjectWrapper, #ObjectWrapper.object
+  %2 = load_borrow %1 : $*AnyObject
+  %3 = unchecked_ownership_conversion %0 : $ObjectWrapper, @guaranteed to @owned
+  end_borrow %2 : $AnyObject
+  return %3 : $ObjectWrapper
+}

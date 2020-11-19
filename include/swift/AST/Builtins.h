@@ -135,6 +135,11 @@ llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O);
 /// Returns true if the builtin with ID \p ID has a defined static overload for
 /// the type \p Ty.
 bool canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty);
+
+/// Retrieve the AST-level AsyncTaskAndContext type, used for the
+/// createAsyncTask builtin.
+Type getAsyncTaskAndContextType(ASTContext &ctx);
+
 }
 
 #endif

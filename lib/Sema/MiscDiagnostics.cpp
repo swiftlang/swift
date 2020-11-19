@@ -1495,8 +1495,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                   const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
-      return !AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
-               .isKnownNoEscape();
+      if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
+               .isKnownNoEscape())
+        return false;
+
+      if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
+        if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
+          return false;
+      }
+
+      return true;
     }
 
 
@@ -4604,7 +4612,6 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
-  checkActorIsolation(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

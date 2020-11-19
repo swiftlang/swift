@@ -588,6 +588,12 @@ SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   105)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
+  DeclModifier | OnVar | OnFunc | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  106)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -58,6 +58,12 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
+                                             llvm::cl::init(false));
+
+static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
+                                             llvm::cl::init(false));
+
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
                               llvm::cl::init(true));
@@ -682,9 +688,18 @@ public:
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
 
-    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    StringRef funcName;
+    if (CurInstruction)
+      funcName = CurInstruction->getFunction()->getName();
+    else if (CurArgument)
+      funcName = CurArgument->getFunction()->getName();
+    if (ContinueOnFailure) {
+      llvm::dbgs() << "Begin Error in function " << funcName << "\n";
+    }
 
-    if (extraContext) extraContext();
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    if (extraContext)
+      extraContext();
 
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
@@ -693,10 +708,18 @@ public:
       llvm::dbgs() << "Verifying argument:\n";
       CurArgument->printInContext(llvm::dbgs());
     }
+    if (ContinueOnFailure) {
+      llvm::dbgs() << "End Error in function " << funcName << "\n";
+      return;
+    }
+
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
-    llvm::dbgs() << "In module:\n";
-    F.getModule().print(llvm::dbgs());
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      llvm::dbgs() << "In module:\n";
+      F.getModule().print(llvm::dbgs());
+    }
 
     // We abort by default because we want to always crash in
     // the debugger.
@@ -986,7 +1009,7 @@ public:
     // Check the SILLLocation attached to the instruction.
     checkInstructionsSILLocation(I);
 
-    // Check ownership.
+    // Check ownership and types.
     SILFunction *F = I->getFunction();
     assert(F && "Expected value base with parent function");
 
@@ -1005,8 +1028,11 @@ public:
     assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
-    if (!F->hasOwnership())
+    if (!F->hasOwnership()) {
+      require(SILValue(V).getOwnershipKind() == OwnershipKind::None,
+              "Once ownership is gone, all values should have none ownership");
       return;
+    }
     SILValue(V).verifyOwnership(&DEBlocks);
   }
 
@@ -1083,7 +1109,7 @@ public:
               "instruction's operand's owner isn't the instruction");
       require(isInValueUses(&operand), "operand value isn't used by operand");
 
-      if (I->isTypeDependentOperand(operand)) {
+      if (operand.isTypeDependent()) {
         require(isa<SILInstruction>(I),
                "opened archetype operand should refer to a SILInstruction");
       }
@@ -1091,6 +1117,28 @@ public:
       // Make sure that if operand is generic that its primary archetypes match
       // the function context.
       checkLegalType(I->getFunction(), operand.get(), I);
+
+      // If we are not in OSSA, our operand constraint should be invalid for a
+      // type dependent operand (that is Optional::None) and if we have a non
+      // type dependent operand then we should have a constraint of
+      // OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding.
+      if (!I->getFunction()->hasOwnership()) {
+        if (operand.isTypeDependent()) {
+          require(
+              !operand.getOwnershipConstraint(),
+              "Non Optional::None constraint for a type dependent operand?!");
+        } else {
+          auto constraint = operand.getOwnershipConstraint();
+          require(constraint.hasValue(),
+                  "All non-type dependent operands must have a "
+                  "non-Optional::None constraint?!");
+          require(constraint->getPreferredKind() == OwnershipKind::Any &&
+                      constraint->getLifetimeConstraint() ==
+                          UseLifetimeConstraint::NonLifetimeEnding,
+                  "In non-ossa all non-type dependent operands must have a "
+                  "constraint of Any, NonLifetimeEnding");
+        }
+      }
     }
 
     // TODO: There should be a use of an opened archetype inside the instruction for
@@ -1460,14 +1508,8 @@ public:
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
-
-    // Check that if the apply is of a noreturn callee, make sure that an
-    // unreachable is the next instruction.
-    if (AI->getModule().getStage() == SILStage::Raw ||
-        !AI->isCalleeNoReturn())
-      return;
-    require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
-            "No return apply without an unreachable as a next instruction.");
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
   }
 
   void checkTryApplyInst(TryApplyInst *AI) {
@@ -1477,6 +1519,9 @@ public:
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
+
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
@@ -1522,6 +1567,8 @@ public:
 
     require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
             "must call yield_once coroutine with begin_apply");
+    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+            "cannot call an async function from a non async function");
   }
 
   void checkAbortApplyInst(AbortApplyInst *AI) {
@@ -1653,7 +1700,7 @@ public:
                 "function");
       }
     }
-    
+
     // TODO: Impose additional constraints when partial_apply when the
     // -disable-sil-partial-apply flag is enabled. We want to reduce
     // partial_apply to being only a means of associating a closure invocation
@@ -1710,6 +1757,14 @@ public:
     // Check for special constraints on llvm intrinsics.
     if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic) {
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
+      return;
+    }
+
+    // Check that 'getCurrentAsyncTask' only occurs within an async function.
+    if (BI->getBuiltinKind() &&
+        *BI->getBuiltinKind() == BuiltinValueKind::GetCurrentAsyncTask) {
+      require(F.isAsync(),
+          "getCurrentAsyncTask builtin can only be used in an async function");
       return;
     }
   }
@@ -1901,6 +1956,17 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkUncheckedOwnershipConversionInst(
+    UncheckedOwnershipConversionInst *uoci) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+    require(!uoci->getType().isAddress(),
+            "cannot convert ownership of an address");
+    require(uoci->getType() == uoci->getOperand()->getType(),
+            "converting ownership does not affect the type");
+  }
+
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
     if (AccessInst->getModule().getStage() != SILStage::Raw) {
@@ -2045,7 +2111,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(*SI->getFunction()) ||
-                  Src.getOwnershipKind() == ValueOwnershipKind::None,
+                  Src.getOwnershipKind() == OwnershipKind::None,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -2883,6 +2949,41 @@ public:
     require(!sd->isResilient(F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
+    if (F.hasOwnership()) {
+      // Make sure that all of our destructure results ownership kinds are
+      // compatible with our destructure_struct's ownership kind /and/ that if
+      // our destructure ownership kind is non-trivial then all non-trivial
+      // results must have the same ownership kind as our operand.
+      auto parentKind = DSI->getOwnershipKind();
+      for (const DestructureStructResult &result : DSI->getAllResultsBuffer()) {
+        require(parentKind.isCompatibleWith(result.getOwnershipKind()),
+                "destructure result with ownership that is incompatible with "
+                "parent forwarding ownership kind");
+        require(parentKind != OwnershipKind::None ||
+                    result.getOwnershipKind() == OwnershipKind::None,
+                "destructure with none ownership kind operand and non-none "
+                "ownership kind result?!");
+      }
+    }
+  }
+
+  void checkDestructureTupleInst(DestructureTupleInst *dti) {
+    if (F.hasOwnership()) {
+      // Make sure that all of our destructure results ownership kinds are
+      // compatible with our destructure_struct's ownership kind /and/ that if
+      // our destructure ownership kind is non-trivial then all non-trivial
+      // results must have the same ownership kind as our operand.
+      auto parentKind = dti->getOwnershipKind();
+      for (const auto &result : dti->getAllResultsBuffer()) {
+        require(parentKind.isCompatibleWith(result.getOwnershipKind()),
+                "destructure result with ownership that is incompatible with "
+                "parent forwarding ownership kind");
+        require(parentKind != OwnershipKind::None ||
+                    result.getOwnershipKind() == OwnershipKind::None,
+                "destructure with none ownership kind operand and non-none "
+                "ownership kind result?!");
+      }
+    }
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
@@ -2928,7 +3029,7 @@ public:
             "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetypeOf(lookupType)) {
+    if (getOpenedArchetypeOf(lookupType) || isa<DynamicSelfType>(lookupType)) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
       verifyOpenedArchetype(AMI, lookupType);
@@ -2936,7 +3037,7 @@ public:
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
     }
-    if (!isa<ArchetypeType>(lookupType)) {
+    if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
@@ -3048,6 +3149,7 @@ public:
                                         "result of class_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
+
     SILType operandType = CMI->getOperand()->getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
@@ -3659,6 +3761,18 @@ public:
           CBI->getOperand()->getType(),
           "failure dest block argument must match type of original type in "
           "ownership qualified sil");
+      auto succOwnershipKind =
+          CBI->getSuccessBB()->args_begin()[0]->getOwnershipKind();
+      require(succOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "succ dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
+      auto failOwnershipKind =
+          CBI->getFailureBB()->args_begin()[0]->getOwnershipKind();
+      require(failOwnershipKind.isCompatibleWith(
+                  CBI->getOperand().getOwnershipKind()),
+              "failure dest block argument must have ownership compatible with "
+              "the checked_cast_br operand");
     } else {
       require(CBI->getFailureBB()->args_empty(),
               "Failure dest of checked_cast_br must not take any argument in "
@@ -4247,6 +4361,13 @@ public:
           require(dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
+          if (!dest->getArgument(0)->getType().isTrivial(*SOI->getFunction())) {
+            require(
+                dest->getArgument(0)->getOwnershipKind().isCompatibleWith(
+                    SOI->getOwnershipKind()),
+                "Switch enum non-trivial destination arg must have ownership "
+                "kind that is compatible with the switch_enum's operand");
+          }
         } else {
           require(dest->getArguments().empty() ||
                       dest->getArguments().size() == 1,
@@ -4294,6 +4415,12 @@ public:
             SOI->getOperand()->getType(),
             "Switch enum default block should have one argument that is "
             "the same as the input type");
+        auto defaultKind =
+            SOI->getDefaultBB()->getArgument(0)->getOwnershipKind();
+        require(
+            defaultKind.isCompatibleWith(SOI->getOperand().getOwnershipKind()),
+            "Switch enum default block arg must have same ownership kind "
+            "as operand");
       } else if (!F.hasOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
@@ -4808,7 +4935,7 @@ public:
               "error successor argument must have Error type");
       
       if (AACI->getFunction()->hasOwnership()) {
-        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "error successor argument must be owned");
       }
     }
@@ -4823,7 +4950,7 @@ public:
       requireSameType(arg->getType(), cont->getLoweredResumeType(),
                       "resume successor must take an argument of the continuation resume type");
       if (AACI->getFunction()->hasOwnership()) {
-        require(arg->getOwnershipKind() == ValueOwnershipKind::Owned,
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
                 "resume successor argument must be owned");
       }
     }
@@ -5029,8 +5156,11 @@ public:
           SILValue op = i.getOperand(0);
           require(!state.Stack.empty(),
                   "stack dealloc with empty stack");
-          require(op == state.Stack.back(),
-                  "stack dealloc does not match most recent stack alloc");
+          if (op != state.Stack.back()) {
+            llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
+            require(op == state.Stack.back(),
+                    "stack dealloc does not match most recent stack alloc");
+          }
           state.Stack.pop_back();
 
         } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
@@ -5152,37 +5282,30 @@ public:
 
   void verifyBranches(const SILFunction *F) {
     // Verify no critical edge.
-    auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
-      assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
-
+    auto requireNonCriticalSucc = [this](const TermInst *termInst,
+                                         const Twine &message) {
       // A critical edge has more than one outgoing edges from the source
       // block.
-      auto SrcSuccs = T->getSuccessors();
-      if (SrcSuccs.size() <= 1)
-        return false;
+      auto succBlocks = termInst->getSuccessorBlocks();
+      if (succBlocks.size() <= 1)
+        return;
 
-      // And its destination block has more than one predecessor.
-      SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
-      assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessorBlock())
-        return false;
-
-      return true;
+      for (const SILBasicBlock *destBB : succBlocks) {
+        // And its destination block has more than one predecessor.
+        _require(destBB->getSinglePredecessorBlock(), message);
+      }
     };
 
-    for (auto &BB : *F) {
-      const TermInst *TI = BB.getTerminator();
-      CurInstruction = TI;
+    for (auto &bb : *F) {
+      const TermInst *termInst = bb.getTerminator();
+      CurInstruction = termInst;
 
-      // FIXME: In OSSA, critical edges will never be allowed.
-      // In Lowered SIL, they are allowed on unconditional branches only.
-      //   if (!(isSILOwnershipEnabled() && F->hasOwnership()))
-      if (AllowCriticalEdges && isa<CondBranchInst>(TI))
-        continue;
-
-      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-        require(!isCriticalEdgePred(TI, Idx),
-                "non cond_br critical edges not allowed");
+      if (isSILOwnershipEnabled() && F->hasOwnership()) {
+        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
+      }
+      // In Lowered SIL, they are allowed on conditional branches only.
+      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
+        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
       }
     }
   }

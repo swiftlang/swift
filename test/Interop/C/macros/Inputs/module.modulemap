@@ -1,0 +1,3 @@
+module RedefinedMacro {
+  header "redefined-macro.h"
+}

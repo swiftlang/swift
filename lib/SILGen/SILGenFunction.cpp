@@ -517,7 +517,14 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitStmt(fd->getTypecheckedBody());
+  if (fd->isAsyncHandler()) {
+    // Async handlers are need to have their bodies emitted into a
+    // detached task.
+    // FIXME: Actually implement these properly.
+    B.createBuiltinTrap(fd->getTypecheckedBody());
+  } else {
+    emitStmt(fd->getTypecheckedBody());
+  }
 
   emitEpilog(fd);
 
@@ -759,8 +766,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto *exitBlock = createBasicBlock();
     B.setInsertionPoint(exitBlock);
-    SILValue exitCode = exitBlock->createPhiArgument(builtinInt32Type,
-                                                     ValueOwnershipKind::None);
+    SILValue exitCode =
+        exitBlock->createPhiArgument(builtinInt32Type, OwnershipKind::None);
     auto returnType = F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
     if (exitCode->getType() != returnType)
       exitCode = B.createStruct(moduleLoc, returnType, exitCode);
@@ -770,7 +777,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       auto *successBlock = createBasicBlock();
       B.setInsertionPoint(successBlock);
       successBlock->createPhiArgument(SGM.Types.getEmptyTupleType(),
-                                      ValueOwnershipKind::None);
+                                      OwnershipKind::None);
       SILValue zeroReturnValue =
           B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
       B.createBranch(moduleLoc, exitBlock, {zeroReturnValue});
@@ -778,8 +785,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       auto *failureBlock = createBasicBlock();
       B.setInsertionPoint(failureBlock);
       SILValue error = failureBlock->createPhiArgument(
-          SILType::getExceptionType(getASTContext()),
-          ValueOwnershipKind::Owned);
+          SILType::getExceptionType(getASTContext()), OwnershipKind::Owned);
       // Log the error.
       B.createBuiltin(moduleLoc, getASTContext().getIdentifier("errorInMain"),
                       SGM.Types.getEmptyTupleType(), {}, {error});

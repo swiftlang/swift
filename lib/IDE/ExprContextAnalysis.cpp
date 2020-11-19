@@ -750,7 +750,7 @@ class ExprContextAnalyzer {
   SmallVectorImpl<PossibleParamInfo> &PossibleParams;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
   Expr *&AnalyzedExpr;
-  bool &singleExpressionBody;
+  bool &implicitSingleExpressionReturn;
 
   void recordPossibleType(Type ty) {
     if (!ty || ty->is<ErrorType>())
@@ -795,8 +795,8 @@ class ExprContextAnalyzer {
       bool MayNeedName = !HasName && !E->isImplicit() &&
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
                           isa<UnresolvedMemberExpr>(E));
-      SmallPtrSet<TypeBase *, 4> seenTypes;
-      llvm::SmallSet<std::pair<Identifier, TypeBase *>, 4> seenArgs;
+      SmallPtrSet<CanType, 4> seenTypes;
+      llvm::SmallSet<std::pair<Identifier, CanType>, 4> seenArgs;
       for (auto &typeAndDecl : Candidates) {
         DeclContext *memberDC = nullptr;
         if (typeAndDecl.Decl)
@@ -820,7 +820,8 @@ class ExprContextAnalyzer {
                             paramList->get(Pos)->isVariadic());
 
           if (paramType.hasLabel() && MayNeedName) {
-            if (seenArgs.insert({paramType.getLabel(), ty.getPointer()}).second)
+            if (seenArgs.insert({paramType.getLabel(), ty->getCanonicalType()})
+                    .second)
               recordPossibleParam(&paramType, !canSkip);
           } else {
             auto argTy = ty;
@@ -828,7 +829,7 @@ class ExprContextAnalyzer {
               argTy = InOutType::get(argTy);
             else if (paramType.isAutoClosure() && argTy->is<AnyFunctionType>())
               argTy = argTy->castTo<AnyFunctionType>()->getResult();
-            if (seenTypes.insert(argTy.getPointer()).second)
+            if (seenTypes.insert(argTy->getCanonicalType()).second)
               recordPossibleType(argTy);
           }
           if (!canSkip)
@@ -837,7 +838,7 @@ class ExprContextAnalyzer {
         // If the argument position is out of expeceted number, indicate that
         // with optional nullptr param.
         if (Position >= Params.size()) {
-          if (seenArgs.insert({Identifier(), nullptr}).second)
+          if (seenArgs.insert({Identifier(), CanType()}).second)
             recordPossibleParam(nullptr, /*isRequired=*/false);
         }
       }
@@ -969,8 +970,8 @@ class ExprContextAnalyzer {
     }
     case ExprKind::Closure: {
       auto *CE = cast<ClosureExpr>(Parent);
-      assert(isSingleExpressionBodyForCodeCompletion(CE->getBody()));
-      singleExpressionBody = true;
+      assert(hasImplicitSingleExpressionReturn(CE->getBody()));
+      implicitSingleExpressionReturn = true;
       SmallVector<Type, 2> candidates;
       collectPossibleReturnTypesFromContext(CE, candidates);
       for (auto ty : candidates)
@@ -1051,8 +1052,8 @@ class ExprContextAnalyzer {
     }
     default:
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        assert(isSingleExpressionBodyForCodeCompletion(FD->getBody()));
-        singleExpressionBody = true;
+        assert(hasImplicitSingleExpressionReturn(FD->getBody()));
+        implicitSingleExpressionReturn = true;
         SmallVector<Type, 2> candidates;
         collectPossibleReturnTypesFromContext(DC, candidates);
         for (auto ty : candidates)
@@ -1104,15 +1105,36 @@ class ExprContextAnalyzer {
   }
 
   /// Whether the given \c BraceStmt, which must be the body of a function or
-  /// closure, should be treated as a single-expression return for the purposes
-  /// of code-completion.
+  /// closure, contains a single expression that would be implicitly returned if
+  /// the single-expression-body transform had been performed.
   ///
   /// We cannot use hasSingleExpressionBody, because we explicitly do not use
-  /// the single-expression-body when there is code-completion in the expression
-  /// in order to avoid a base expression affecting the type. However, now that
-  /// we've typechecked, we will take the context type into account.
-  static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
-    return body->getNumElements() == 1 && body->getFirstElement().is<Expr *>();
+  /// the single-expression-body transform when there is a code-completion in
+  /// the expression in order to avoid a base expression affecting the type, and
+  /// need to distinguish whether the single expression body was explicitly
+  /// returned (in which case the expression's type *must* match the expected
+  /// return type) or not (in which case it *may* match, as the user could intend
+  /// it only as the first statement of many that they haven't finished writing
+  /// yet.
+  static bool hasImplicitSingleExpressionReturn(BraceStmt *body) {
+    if (body->getNumElements() == 2) {
+      if (auto *D = body->getFirstElement().dyn_cast<Decl *>()) {
+        // Step into nested active clause.
+        while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+          auto ACE = ICD->getActiveClauseElements();
+          if (ACE.size() == 1) {
+            return body->getLastElement().is<Expr *>();
+          } else if (ACE.size() == 2) {
+            if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
+              D = ND;
+              continue;
+            }
+          }
+          break;
+        }
+      }
+    }
+    return body->getNumElements() == 1 && body->getLastElement().is<Expr *>();
   }
 
 public:
@@ -1120,12 +1142,12 @@ public:
       DeclContext *DC, Expr *ParsedExpr, SmallVectorImpl<Type> &PossibleTypes,
       SmallVectorImpl<PossibleParamInfo> &PossibleArgs,
       SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
-      Expr *&AnalyzedExpr, bool &singleExpressionBody)
+      Expr *&AnalyzedExpr, bool &implicitSingleExpressionReturn)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
         PossibleParams(PossibleArgs), PossibleCallees(PossibleCallees),
         AnalyzedExpr(AnalyzedExpr),
-        singleExpressionBody(singleExpressionBody) {}
+        implicitSingleExpressionReturn(implicitSingleExpressionReturn) {}
 
   void Analyze() {
     // We cannot analyze without target.
@@ -1166,7 +1188,7 @@ public:
                   !isa<BinaryExpr>(ParentE));
         }
         case ExprKind::Closure:
-          return isSingleExpressionBodyForCodeCompletion(
+          return hasImplicitSingleExpressionReturn(
               cast<ClosureExpr>(E)->getBody());
         default:
           return false;
@@ -1190,7 +1212,7 @@ public:
         default:
           if (auto *FD = dyn_cast<FuncDecl>(D))
             if (auto *body = FD->getBody())
-              return isSingleExpressionBodyForCodeCompletion(body);
+              return hasImplicitSingleExpressionReturn(body);
           return false;
         }
       } else if (auto P = Node.getAsPattern()) {
@@ -1234,6 +1256,6 @@ public:
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
   ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleParams,
                                PossibleCallees, AnalyzedExpr,
-                               singleExpressionBody);
+                               implicitSingleExpressionReturn);
   Analyzer.Analyze();
 }

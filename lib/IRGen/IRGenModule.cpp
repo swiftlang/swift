@@ -554,7 +554,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                                  MainInputFilenameForDebugInfo,
                                                      PrivateDiscriminator);
 
-  initClangTypeConverter();
+  if (auto loader = Context.getClangModuleLoader()) {
+    ClangASTContext =
+        &static_cast<ClangImporter *>(loader)->getClangASTContext();
+  }
 
   if (ClangASTContext) {
     auto atomicBoolTy = ClangASTContext->getAtomicType(ClangASTContext->BoolTy);
@@ -587,9 +590,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
+                                            {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = createStructType(*this, "swift.context", {});
   SwiftTaskTy = createStructType(*this, "swift.task", {});
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});
+  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
@@ -602,12 +608,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
+  AsyncTaskAndContextTy = createStructType(
+      *this, "swift.async_task_and_context",
+      { SwiftTaskPtrTy, SwiftContextPtrTy });
+
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
 
 IRGenModule::~IRGenModule() {
-  destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   destroyPointerAuthCaches();
   delete &Types;
@@ -691,6 +700,16 @@ namespace RuntimeConstants {
   GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getIntermodulePrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  GetCanonicalPrespecializedGenericMetadataAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getPrespecializedGenericMetadataAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

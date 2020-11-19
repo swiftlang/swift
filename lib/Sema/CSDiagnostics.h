@@ -690,6 +690,18 @@ protected:
   getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
 };
 
+/// Diagnose errors related to using an array literal where a
+/// dictionary is expected.
+class ArrayLiteralToDictionaryConversionFailure final : public ContextualFailure {
+public:
+  ArrayLiteralToDictionaryConversionFailure(const Solution &solution,
+                                            Type arrayTy, Type dictTy,
+                                            ConstraintLocator *locator)
+      : ContextualFailure(solution, arrayTy, dictTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose errors related to converting function type which
 /// isn't explicitly '@escaping' to some other type.
 class NoEscapeFuncToTypeConversionFailure final : public ContextualFailure {
@@ -2276,6 +2288,21 @@ class MissingContextualTypeForNil final : public FailureDiagnostic {
 public:
   MissingContextualTypeForNil(const Solution &solution,
                               ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnostic situations where AST node references an invalid declaration.
+///
+/// \code
+/// let foo = doesntExist // or something invalid
+/// foo(42)
+/// \endcode
+class ReferenceToInvalidDeclaration final : public FailureDiagnostic {
+public:
+  ReferenceToInvalidDeclaration(const Solution &solution,
+                                ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

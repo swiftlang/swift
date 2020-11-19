@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -391,7 +391,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -415,7 +415,11 @@ protected:
     Synthesized : 1,
 
     /// Whether this member's body consists of a single expression.
-    HasSingleExpressionBody : 1
+    HasSingleExpressionBody : 1,
+
+    /// Whether peeking into this function detected nested type declarations.
+    /// This is set when skipping over the decl at parsing.
+    HasNestedTypeDeclarations : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
@@ -1783,6 +1787,9 @@ public:
 
   /// Is the pattern binding entry for this variable  currently being computed?
   bool isComputingPatternBindingEntry(const VarDecl *vd) const;
+
+  /// Is this an "async let" declaration?
+  bool isAsyncLet() const;
 
   /// Gets the text of the initializer expression for the pattern entry at the
   /// given index, stripping out inactive branches of any #ifs inside the
@@ -4727,6 +4734,9 @@ public:
   /// getSpecifier() == Specifier::Default.
   bool isLet() const { return getIntroducer() == Introducer::Let; }
 
+  /// Is this an "async let" property?
+  bool isAsyncLet() const;
+
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
   }
@@ -5538,6 +5548,7 @@ protected:
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.Synthesized = false;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
+    Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -5653,13 +5664,14 @@ public:
   /// Set a new body for the function.
   void setBody(BraceStmt *S, BodyKind NewBodyKind);
 
-  /// Note that the body was skipped for this function.  Function body
+  /// Note that the body was skipped for this function. Function body
   /// cannot be attached after this call.
   void setBodySkipped(SourceRange bodyRange) {
-    // FIXME: Remove 'Parsed' from this once we can delay parsing function
-    //        bodies. Right now -experimental-skip-non-inlinable-function-bodies
-    //        requires being able to change the state from Parsed to Skipped,
-    //        because we're still eagerly parsing function bodies.
+    // FIXME: Remove 'Parsed' from this list once we can always delay
+    //        parsing bodies. The -experimental-skip-*-function-bodies options
+    //        do currently skip parsing, unless disabled through other means in
+    //        SourceFile::hasDelayedBodyParsing (eg. needing to build the full
+    //        syntax tree due to -verify-syntax-tree).
     assert(getBodyKind() == BodyKind::None ||
            getBodyKind() == BodyKind::Unparsed ||
            getBodyKind() == BodyKind::Parsed);
@@ -5681,6 +5693,16 @@ public:
   /// Provide the parsed body for the function.
   void setBodyParsed(BraceStmt *S) {
     setBody(S, BodyKind::Parsed);
+  }
+
+  /// Was there a nested type declaration detected when parsing this
+  /// function was skipped?
+  bool hasNestedTypeDeclarations() const {
+    return Bits.AbstractFunctionDecl.HasNestedTypeDeclarations;
+  }
+
+  void setHasNestedTypeDeclarations(bool value) {
+    Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = value;
   }
 
   /// Note that parsing for the body was delayed.
@@ -6501,6 +6523,13 @@ public:
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
+
+  static ConstructorDecl *
+  createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
+                 SourceLoc constructorLoc, bool failable,
+                 SourceLoc failabilityLoc, bool throws, SourceLoc throwsLoc,
+                 ParameterList *bodyParams, GenericParamList *genericParams,
+                 DeclContext *parent);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }

@@ -1958,7 +1958,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   ParserStatus Status;
   {
-    Scope S(this, ScopeKind::Brace);
     SmallVector<ASTNode, 4> Stmts;
 
     // Make the variable which will contain our temporary value.
@@ -1968,7 +1967,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setUserAccessible(false);
-    addToScope(InterpolationVar);
     setLocalDiscriminator(InterpolationVar);
     
     Stmts.push_back(InterpolationVar);
@@ -2203,54 +2201,13 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = nullptr;
-  // When doing incremental re-parsing for SwiftSyntax this check may emit bogus
-  // diagnostic. Also really the syntactic parser should not be doing name
-  // lookups, so disable this check when parsing for SwiftSyntax.
-  if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
-    D = lookupInScope(name);
-
-    if (!Context.LangOpts.DisableParserLookup) {
-      // FIXME: We want this to work: "var x = { x() }", but for now it's better
-      // to disallow it than to crash.
-      if (D) {
-        for (auto activeVar : DisabledVars) {
-          if (activeVar == D) {
-            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-            return new (Context) ErrorExpr(loc.getSourceRange());
-          }
-        }
-      } else {
-        for (auto activeVar : DisabledVars) {
-          if (activeVar->getName() == name.getFullName()) {
-            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-            return new (Context) ErrorExpr(loc.getSourceRange());
-          }
-        }
-      }
-    }
+  if (name.getBaseName().isEditorPlaceholder()) {
+    IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
+    return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
   }
-  
-  Expr *E;
-  if (D == nullptr || D->getAttrs().hasAttribute<CustomAttr>()) {
-    if (name.getBaseName().isEditorPlaceholder()) {
-      IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
-      return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
-    }
 
-    auto refKind = DeclRefKind::Ordinary;
-    E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-  } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    // When parsing default argument expressions for generic functions,
-    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
-    // to the FuncDecl yet. Other than that, we should only ever find
-    // global or local declarations here.
-    assert(!TD->getDeclContext()->isTypeContext() ||
-           isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc, TD, /*DC*/ nullptr);
-  } else {
-    E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-  }
+  auto refKind = DeclRefKind::Ordinary;
+  Expr *E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   
   if (hasGenericArgumentList) {
     E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
@@ -2773,14 +2730,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   auto *closure = new (Context) ClosureExpr(
       bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc, arrowLoc,
       inLoc, explicitResultType, discriminator, CurDeclContext);
-  // The arguments to the func are defined in their own scope.
-  Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
   if (params) {
-    // Add the parameters into scope.
-    addParametersToScope(params);
     setLocalDiscriminatorToParamList(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
@@ -2789,10 +2742,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // users who are refactoring code by adding names.
     AnonClosureVars.push_back({{}, leftBrace});
   }
-  
-  // Add capture list variables to scope.
-  for (auto c : captureList)
-    addToScope(c.Var);
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
@@ -2839,39 +2788,30 @@ ParserResult<Expr> Parser::parseExprClosure() {
     closure->setParameterList(params);
     closure->setHasAnonymousClosureVars();
   }
-
+  
   // If the body consists of a single expression, turn it into a return
   // statement.
   bool hasSingleExpressionBody = false;
-  if (!missingRBrace && bodyElements.size() == 1) {
-    // If the closure's only body element is a single return statement,
-    // use that instead of creating a new wrapping return expression.
-    Expr *returnExpr = nullptr;
+  if (!missingRBrace &&
+      Parser::shouldReturnSingleExpressionElement(bodyElements)) {
+    auto Element = bodyElements.back();
     
-    if (bodyElements[0].is<Stmt *>()) {
-      if (auto returnStmt =
-                  dyn_cast<ReturnStmt>(bodyElements[0].get<Stmt*>())) {
-        
+    if (Element.is<Stmt *>()) {
+      if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
+        hasSingleExpressionBody = true;
         if (!returnStmt->hasResult()) {
-          
-          returnExpr = TupleExpr::createEmpty(Context,
-                                              SourceLoc(),
-                                              SourceLoc(),
-                                              /*implicit*/true);
-          
+          auto returnExpr = TupleExpr::createEmpty(Context,
+                                                   SourceLoc(),
+                                                   SourceLoc(),
+                                                   /*implicit*/true);
           returnStmt->setResult(returnExpr);
         }
-        
-        hasSingleExpressionBody = true;
       }
-    }
-    
-    // Otherwise, create the wrapping return.
-    if (bodyElements[0].is<Expr *>()) {
+    } else if (Element.is<Expr *>()) {
+      // Create the wrapping return.
       hasSingleExpressionBody = true;
-      returnExpr = bodyElements[0].get<Expr*>();
-      bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
-                                                 returnExpr);
+      auto returnExpr = Element.get<Expr*>();
+      bodyElements.back() = new (Context) ReturnStmt(SourceLoc(), returnExpr);
     }
   }
 
@@ -3590,26 +3530,22 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
     return Element;
 
   // Parse the ':'.
-  if (!consumeIf(tok::colon)) {
-    if (Element.hasCodeCompletion()) {
-      // Return the completion expression itself so we can analyze the type
-      // later.
-      return Element;
+  ParserResult<Expr> Value;
+  if (consumeIf(tok::colon)) {
+    // Parse the value.
+    Value = parseExpr(diag::expected_value_in_dictionary_literal);
+    if (Value.isNull()) {
+      if (!Element.hasCodeCompletion()) {
+        Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+      } else {
+        Value = makeParserResult(Value,
+                                 new (Context) CodeCompletionExpr(PreviousLoc));
+      }
     }
+  } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-    return ParserStatus(Element) | makeParserError();
-  }
-
-  // Parse the value.
-  auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
-
-  if (Value.isNull()) {
-    if (!Element.hasCodeCompletion()) {
-      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
-    } else {
-      Value = makeParserResult(Value,
-                               new (Context) CodeCompletionExpr(PreviousLoc));
-    }
+    Value = makeParserResult(makeParserError(),
+                             new (Context) ErrorExpr(SourceRange()));
   }
 
   // Make a tuple of Key Value pair.
@@ -3653,23 +3589,6 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
     diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
         .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
   }
-}
-
-void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
-  for (Pattern *Pat : Patterns) {
-    Pat->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasName()) {
-        // Add any variable declarations to the current scope.
-        addToScope(VD);
-      }
-    });
-  }
-}
-
-void Parser::addParametersToScope(ParameterList *PL) {
-  for (auto param : *PL)
-    if (param->hasName())
-      addToScope(param);
 }
 
 
