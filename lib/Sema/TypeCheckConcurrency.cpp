@@ -720,10 +720,9 @@ namespace {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // FIXME: We'd like to insert 'async' at the appropriate place, but
-        // FuncDecl/AbstractFunctionDecl doesn't have the right source-location
-        // information to do so.
-        func->diagnose(diag::actor_isolated_method);
+        func->diagnose(diag::actor_isolated_sync_func, 
+          decl->getDescriptiveKind(),
+          decl->getName());
       } else if (isa<VarDecl>(decl)) {
         decl->diagnose(diag::actor_mutable_state);
       } else {

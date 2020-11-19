@@ -18,10 +18,10 @@ actor class BankAccount {
   }
 
   // NOTE: this func is accessed through both async and sync calls.
-  // expected-note@+1 {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  // expected-note@+1 {{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   func balance() -> Int { return curBalance }
 
-  // expected-note@+1 {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  // expected-note@+1 {{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
   func deposit(_ amount : Int) -> Int {
     guard amount >= 0 else { return 0 }
 
@@ -85,6 +85,8 @@ func someAsyncFunc() async {
   }
 
   _ = await a.deposit(b.withdraw(a.deposit(b.withdraw(b.balance()))))
+
+  a.testSelfBalance() // expected-error {{call is 'async' but is not marked with 'await'}}
 
   print("ok!")
 }
@@ -150,9 +152,9 @@ func blender(_ peeler : () -> Void) {
   peeler()
 }
 
-@BananaActor func wisk(_ something : Any) { } // expected-note 4 {{only asynchronous methods can be used outside the actor instance}}
+@BananaActor func wisk(_ something : Any) { } // expected-note 4 {{calls to global function 'wisk' from outside of its actor context are implicitly asynchronous}}
 
-@BananaActor func peelBanana() { } // expected-note 2 {{only asynchronous methods can be used outside the actor instance}}
+@BananaActor func peelBanana() { } // expected-note 2 {{calls to global function 'peelBanana()' from outside of its actor context are implicitly asynchronous}}
 
 @OrangeActor func makeSmoothie() async {
   await wisk({})
@@ -174,4 +176,12 @@ func blender(_ peeler : () -> Void) {
   // expected-warning@+2 {{no calls to 'async' functions occur within 'await' expression}}
   // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
   await (true ? wisk : {n in return})(1)
+}
+
+
+// want to make sure there is no note about implicitly async on this func.
+@BananaActor func rice() async {}
+
+@OrangeActor func quinoa() async {
+  rice() // expected-error {{call is 'async' but is not marked with 'await'}}
 }

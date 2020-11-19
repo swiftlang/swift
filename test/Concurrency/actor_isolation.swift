@@ -19,7 +19,7 @@ func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
 actor class MySuperActor {
   var superState: Int = 25 // expected-note {{mutable state is only available within the actor instance}}
 
-  func superMethod() { } // expected-note 3 {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func superMethod() { } // expected-note 3 {{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
   func superAsyncMethod() async { }
 
   subscript (index: Int) -> String { // expected-note 3{{subscript declared here}}
@@ -34,7 +34,7 @@ actor class MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -199,7 +199,7 @@ struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
 }
 
-@SomeGlobalActor func syncGlobalActorFunc() { syncGlobalActorFunc() } // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+@SomeGlobalActor func syncGlobalActorFunc() { syncGlobalActorFunc() } // expected-note{{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
 @SomeGlobalActor func asyncGlobalActorFunc() async { await asyncGlobalActorFunc() }
 
 @SomeOtherGlobalActor func syncOtherGlobalActorFunc() { }
@@ -255,7 +255,7 @@ extension MyActor {
 }
 
 struct GenericStruct<T> {
-  @GenericGlobalActor<T> func f() { } // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  @GenericGlobalActor<T> func f() { } // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> func g() {
     f() // okay

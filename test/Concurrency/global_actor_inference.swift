@@ -33,7 +33,7 @@ protocol P2 {
 }
 
 class C1: P1 {
-  func method() { } // expected-note {{only asynchronous methods can be used outside the actor instance}}
+  func method() { } // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}}
   // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}}
@@ -44,7 +44,7 @@ class C1: P1 {
 }
 
 class C2: P2 {
-  func method1() { }  // expected-note{{only asynchronous methods can be used outside the actor instance}}
+  func method1() { }  // expected-note{{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
   func method2() { }
 
   // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}}
@@ -60,19 +60,19 @@ class C2: P2 {
 // Global actor inference for classes and extensions
 // ----------------------------------------------------------------------
 @SomeGlobalActor class C3 {
-  func method1() { }  // expected-note {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func method1() { }  // expected-note {{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
 }
 
 extension C3 {
-  func method2() { }  // expected-note {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
 }
 
 class C4: C3 {
-  func method3() { }  // expected-note {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func method3() { }  // expected-note {{calls to instance method 'method3()' from outside of its actor context are implicitly asynchronous}}
 }
 
 extension C4 {
-  func method4() { }  // expected-note {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func method4() { }  // expected-note {{calls to instance method 'method4()' from outside of its actor context are implicitly asynchronous}}
 }
 
 class C5 {
@@ -80,7 +80,7 @@ class C5 {
 }
 
 @SomeGlobalActor extension C5 {
-  func method2() { }  // expected-note {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
 }
 
 // expected-note@+2 5 {{add '@asyncHandler' to function 'testGlobalActorInference(c3:c4:c5:)' to create an implicit asynchronous context}}
@@ -140,7 +140,7 @@ actor class GenericSuper<T> {
 }
 
 actor class GenericSub<T> : GenericSuper<[T]> {
-  override func method() { }  // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  override func method() { }  // expected-note{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
   @actorIndependent override func method3() { } // expected-error{{actor-independent instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
@@ -168,7 +168,7 @@ struct OtherContainer<U> {
 
   // Ensure that substitutions work properly when inheriting.
   class Subclass3<V> : Container<(U, V)>.Superclass2 {
-    func method() { } // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+    func method() { } // expected-note{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
     @OtherGlobalActor func testMethod() async {
       await method()
