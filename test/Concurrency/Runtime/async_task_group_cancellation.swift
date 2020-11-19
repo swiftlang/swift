@@ -33,24 +33,53 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 // ==== ------------------------------------------------------------------------
 // MARK: Tests
 
-func test_taskGroup_01_sum() {
-  let numbers = [1, 2]
-  let expected = numbers.reduce(0, +)
-
+func test_taskGroup_cancel_internally_afterOne() {
   let taskHandle = launch { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
-      for n in numbers {
-        await group.add { () async -> Int in n }
+
+      func submit(_ n: Int) async {
+        await group.add {
+          do {
+            await try Task.checkCancellation()
+            print("submitted: \(n)")
+            return n
+          } catch {
+            print("submit failed: \(error)")
+            throw error
+          }
+        }
       }
+
+      func pull() async -> Result<Int, Error>? {
+        do {
+          if let r = await try group.next() {
+            return .success(r)
+          } else {
+            return nil
+          }
+        } catch {
+          return .failure(error)
+        }
+      }
+
+      await submit(1)
 
       var sum = 0
-      while let r = await try! group.next() {
+      while let r = await pull() {
         print("next: \(r)")
-        sum += r
+        await submit(1)
+
+        if sum >= 2 {
+          print("task group returning: \(sum)")
+          return sum
+        }
+
+        sum += 1
+        group.cancelAll() // cancel all after we receive one element
       }
 
-      print("task group returning: \(sum)")
-      return sum
+      print("bad, task group returning: \(sum)")
+      return 0
     }
   }
 
@@ -61,15 +90,14 @@ func test_taskGroup_01_sum() {
 
   launch { () async in
     let sum = await try! taskHandle.get()
-    // CHECK: result: 3
+    // CHECK: result: 2
     print("result: \(sum)")
-    assert(expected == sum)
     exit(0)
   }
 
   print("main task")
 }
 
-test_taskGroup_01_sum()
+test_taskGroup_cancel_internally_afterOne()
 
 dispatchMain()

@@ -33,11 +33,11 @@ func test_taskGroup_add() async throws -> Int {
 
 func test_taskGroup_addHandles() async throws -> Int {
   await try Task.withGroup(resultType: Int.self) { group in
-    let one = await group.addWithHandle {
+    let one = await group.add {
       await asyncFunc()
     }
 
-    let two = await group.addWithHandle {
+    let two = await group.add {
       await asyncFunc()
     }
 
@@ -48,11 +48,11 @@ func test_taskGroup_addHandles() async throws -> Int {
 
 func test_taskGroup_cancel_handles() async throws {
   await try Task.withGroup(resultType: Int.self) { group in
-    let one = await group.addWithHandle {
+    let one = await group.add {
       await try asyncThrowsOnCancel()
     }
 
-    let two = await group.addWithHandle {
+    let two = await group.add {
       await asyncFunc()
     }
 
