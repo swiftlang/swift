@@ -506,11 +506,18 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
                                              bool emitDot)
     : AbstractSourceFileDepGraphFactory(Mod->getASTContext().hadError(),
-                                        Mod->getNameStr(),
-                                        Fingerprint("00000000000000000000000000000000"),
-                                        emitDot,
-                                        Mod->getASTContext().Diags),
-      Mod(Mod) {}
+                                        Mod->getNameStr(), Fingerprint::ZERO(),
+                                        emitDot, Mod->getASTContext().Diags),
+
+      Mod(Mod) {
+  // Since a fingerprint only summarizes the state of the module but not
+  // the state of its fingerprinted sub-declarations, and since a module
+  // contains no state other than sub-declarations, its fingerprint does not
+  // matter and can just be some arbitrary value. Should it be the case that a
+  // change in a declaration that does not have a fingerprint must cause
+  // a rebuild of a file outside of the module, this assumption will need
+  // to be revisited.
+}
 
 void ModuleDepGraphFactory::addAllDefinedDecls() {
   // TODO: express the multiple provides and depends streams with variadic

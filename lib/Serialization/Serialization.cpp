@@ -435,6 +435,8 @@ namespace {
     }
   };
 
+  // Side table information for serializing the table keyed under
+  // \c DeclFingerprintsLayout.
   class DeclFingerprintsTableInfo {
   public:
     using key_type = DeclID;

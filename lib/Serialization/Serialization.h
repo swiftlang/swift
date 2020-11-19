@@ -279,7 +279,7 @@ public:
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of the fingerprint associated with a serialized
-  // iterable decl context.
+  // iterable decl context. It is keyed by that context's decl ID.
   using DeclFingerprintsTable = llvm::MapVector<uint32_t, Fingerprint>;
 
 private:

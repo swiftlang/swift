@@ -1012,9 +1012,9 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 }
 
 Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
-  auto &ctx = getASTContext();
   auto mutableThis = const_cast<IterableDeclContext *>(this);
-  return evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ParseMembersRequest{mutableThis},
                            FingerprintAndMembers())
       .fingerprint;
 }

@@ -566,6 +566,8 @@ public:
   }
 };
 
+/// Serialization for the table mapping module-level declIDs for serialized
+/// iterable decl contexts to their corresponding \c Fingerprint values.
 class ModuleFileSharedCore::DeclFingerprintsTableInfo {
 public:
   using internal_key_type = uint32_t;

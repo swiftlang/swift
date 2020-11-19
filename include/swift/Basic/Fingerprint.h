@@ -28,7 +28,7 @@ class IO;
 
 namespace swift {
 
-/// A \c Fingerprint represents a stable point of identity for a piece of data
+/// A \c Fingerprint represents a stable summary of a given piece of data
 /// in the compiler.
 ///
 /// A \c Fingerprint value is subject to the following invariants:
@@ -107,6 +107,15 @@ public:
 
   friend llvm::hash_code hash_value(const Fingerprint &fp) {
     return llvm::hash_value(fp.Core);
+  }
+
+public:
+  /// The fingerprint value consisting of 32 bytes of zeroes.
+  ///
+  /// This fingerprint is a perfectly fine value for an MD5 hash, but it is
+  /// completely arbitrary.
+  static Fingerprint ZERO() {
+    return Fingerprint("00000000000000000000000000000000");
   }
 
 private:
