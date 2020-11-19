@@ -6,7 +6,7 @@ allNodes:
       aspect:          interface
       context:         ''
       name:            does-not-change.swiftdeps
-    fingerprint:     same
+    fingerprint:     sameasiteverwassameasiteverwassa
     sequenceNumber:  0
     defsIDependUpon: [ 8, 7, 2, 4, 6 ]
     isProvides:      true
@@ -15,7 +15,7 @@ allNodes:
       aspect:          implementation
       context:         ''
       name:            does-not-change.swiftdeps
-    fingerprint:     same
+    fingerprint:     sameasiteverwassameasiteverwassa
     sequenceNumber:  1
     defsIDependUpon: [  ]
     isProvides:      true

@@ -4280,7 +4280,7 @@ static Parser::ParseDeclOptions getMemberParseDeclOptions(
   }
 }
 
-std::pair<std::vector<Decl *>, Optional<std::string>>
+std::pair<std::vector<Decl *>, Optional<Fingerprint>>
 Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   Decl *D = const_cast<Decl*>(IDC->getDecl());
   DeclContext *DC = cast<DeclContext>(D);
@@ -4737,7 +4737,7 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
 /// \verbatim
 ///    decl* '}'
 /// \endverbatim
-std::pair<std::vector<Decl *>, Optional<std::string>>
+std::pair<std::vector<Decl *>, Optional<Fingerprint>>
 Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       ParseDeclOptions Options, IterableDeclContext *IDC,
                       bool &hadError) {
@@ -4779,9 +4779,7 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 
   llvm::MD5::MD5Result result;
   CurrentTokenHash->final(result);
-  llvm::SmallString<32> tokenHashString;
-  llvm::MD5::stringifyResult(result, tokenHashString);
-  return std::make_pair(decls, tokenHashString.str().str());
+  return std::make_pair(decls, Fingerprint{std::move(result)});
 }
 
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
