@@ -908,6 +908,10 @@ REMARK(cross_import_added,none,
        "import of %0 and %1 triggered a cross-import of %2",
        (Identifier, Identifier, Identifier))
 
+REMARK(module_loaded,none,
+       "loaded module from %0",
+       (StringRef))
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
