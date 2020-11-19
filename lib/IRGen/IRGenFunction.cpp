@@ -23,6 +23,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Callee.h"
 #include "Explosion.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -697,8 +698,13 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto resumeProjFn = getOrCreateResumePrjFn();
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+    // The dispatch function just calls the resume point.
+    auto resumeFnPtr =
+        getFunctionPointerForResumeIntrinsic(AsyncCoroutineCurrentResume);
     arguments.push_back(Builder.CreateBitOrPointerCast(
-        getOrCreateAwaitAsyncSupendFn(), IGM.Int8PtrTy));
+        createAsyncDispatchFn(resumeFnPtr,
+                              {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy}),
+        IGM.Int8PtrTy));
     arguments.push_back(AsyncCoroutineCurrentResume);
     arguments.push_back(
         Builder.CreateBitOrPointerCast(getAsyncTask(), IGM.Int8PtrTy));
@@ -706,9 +712,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
         Builder.CreateBitOrPointerCast(getAsyncExecutor(), IGM.Int8PtrTy));
     arguments.push_back(Builder.CreateBitOrPointerCast(
         AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
-    auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async, arguments);
 
-                                           arguments);
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, null, one,
         llvm::AtomicOrdering::Release /*success ordering*/,

@@ -135,7 +135,8 @@ public:
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
-  llvm::Function *getOrCreateAwaitAsyncSupendFn();
+  llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
+                                        ArrayRef<llvm::Type *> argTypes);
 
   void emitGetAsyncContinuation(SILType silTy, StackAddress optionalResultAddr,
                                 Explosion &out);
@@ -146,6 +147,9 @@ public:
                                   llvm::BasicBlock *&normalBB,
                                   llvm::PHINode *&optionalErrorPhi,
                                   llvm::BasicBlock *&optionalErrorBB);
+
+  FunctionPointer
+  getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 
 private:
   void emitPrologue();

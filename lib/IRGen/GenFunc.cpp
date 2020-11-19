@@ -2395,21 +2395,31 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
       },
       false /*isNoInline*/));
 }
-
 llvm::Function *
 IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                      ArrayRef<llvm::Value *> args) {
   SmallVector<llvm::Type*, 8> argTys;
-  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
   for (auto arg : args) {
     auto *ty = arg->getType();
+    argTys.push_back(ty);
+  }
+  return createAsyncDispatchFn(fnPtr, argTys);
+}
+
+llvm::Function *
+IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
+                                     ArrayRef<llvm::Type *> argTypes) {
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
+  for (auto ty : argTypes) {
     argTys.push_back(ty);
   }
   auto calleeFnPtrType = fnPtr.getRawPointer()->getType();
   auto *dispatchFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
   llvm::SmallString<40> name;
-  llvm::raw_svector_ostream(name) << "__swift_suspend_dispatch_" << args.size();
+  llvm::raw_svector_ostream(name)
+      << "__swift_suspend_dispatch_" << argTypes.size();
   llvm::Function *dispatch =
       llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(name), &IGM.Module);
@@ -2432,32 +2442,4 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   call->setTailCall();
   Builder.CreateRetVoid();
   return dispatch;
-}
-
-llvm::Function *IRGenFunction::getOrCreateAwaitAsyncSupendFn() {
-  auto name = "__swift_async_await_async_suspend";
-  return cast<llvm::Function>(IGM.getOrCreateHelperFunction(
-      name, IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
-      [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        auto &Builder = IGF.Builder;
-        auto *fnTy = llvm::FunctionType::get(
-            IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
-            false /*vaargs*/);
-        llvm::Value *fn = &*(it++);
-        SmallVector<llvm::Value *, 8> callArgs;
-        for (auto end = IGF.CurFn->arg_end(); it != end; ++it)
-          callArgs.push_back(&*it);
-        auto signature =
-            Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftCC);
-        auto fnPtr = FunctionPointer(
-            FunctionPointer::KindTy::Function,
-            Builder.CreateBitOrPointerCast(fn, fnTy->getPointerTo()),
-            PointerAuthInfo(), signature);
-        auto call = Builder.CreateCall(fnPtr, callArgs);
-        call->setTailCall();
-        call->setCallingConv(IGM.SwiftCC);
-        Builder.CreateRetVoid();
-      },
-      false /*isNoInline*/));
 }

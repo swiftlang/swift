@@ -4581,3 +4581,17 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   auto call = IGF.Builder.CreateCall(fnPtr, Args);
   call->setTailCall();
 }
+
+FunctionPointer
+IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
+  auto *fnTy = llvm::FunctionType::get(
+      IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
+      false /*vaargs*/);
+  auto signature =
+      Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftCC);
+  auto fnPtr = FunctionPointer(
+      FunctionPointer::KindTy::Function,
+      Builder.CreateBitOrPointerCast(resume, fnTy->getPointerTo()),
+      PointerAuthInfo(), signature);
+  return fnPtr;
+}
