@@ -61,6 +61,9 @@ static llvm::cl::opt<bool> AbortOnFailure(
 static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
                                              llvm::cl::init(false));
 
+static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
+                                             llvm::cl::init(false));
+
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
                               llvm::cl::init(true));
@@ -712,8 +715,11 @@ public:
 
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
-    llvm::dbgs() << "In module:\n";
-    F.getModule().print(llvm::dbgs());
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      llvm::dbgs() << "In module:\n";
+      F.getModule().print(llvm::dbgs());
+    }
 
     // We abort by default because we want to always crash in
     // the debugger.
