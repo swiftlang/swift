@@ -788,7 +788,8 @@ TEST(ModuleDepGraph, BaselineForPrintsAndCrossType) {
 
   {
     const auto jobs = simulateReload(
-        graph, &job0, {{NodeKind::nominal, {"A1", "A2"}}}, "changed");
+        graph, &job0, {{NodeKind::nominal, {"A1", "A2"}}},
+        Fingerprint{"chchchangesturnandfacethestrange"});
     EXPECT_EQ(3u, jobs.size());
     EXPECT_TRUE(contains(jobs, &job0));
     EXPECT_TRUE(contains(jobs, &job1));

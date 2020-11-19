@@ -3530,26 +3530,22 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
     return Element;
 
   // Parse the ':'.
-  if (!consumeIf(tok::colon)) {
-    if (Element.hasCodeCompletion()) {
-      // Return the completion expression itself so we can analyze the type
-      // later.
-      return Element;
+  ParserResult<Expr> Value;
+  if (consumeIf(tok::colon)) {
+    // Parse the value.
+    Value = parseExpr(diag::expected_value_in_dictionary_literal);
+    if (Value.isNull()) {
+      if (!Element.hasCodeCompletion()) {
+        Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+      } else {
+        Value = makeParserResult(Value,
+                                 new (Context) CodeCompletionExpr(PreviousLoc));
+      }
     }
+  } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-    return ParserStatus(Element) | makeParserError();
-  }
-
-  // Parse the value.
-  auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
-
-  if (Value.isNull()) {
-    if (!Element.hasCodeCompletion()) {
-      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
-    } else {
-      Value = makeParserResult(Value,
-                               new (Context) CodeCompletionExpr(PreviousLoc));
-    }
+    Value = makeParserResult(makeParserError(),
+                             new (Context) ErrorExpr(SourceRange()));
   }
 
   // Make a tuple of Key Value pair.

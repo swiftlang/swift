@@ -73,56 +73,45 @@ bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
 }
 
 bool swift::isOwnedForwardingValueKind(SILNodeKind kind) {
-  switch (kind) {
-  case SILNodeKind::BranchInst:
-    return true;
-  default:
-    return isOwnershipForwardingValueKind(kind);
-  }
+  return isOwnershipForwardingValueKind(kind);
 }
 
-bool swift::isOwnedForwardingInstruction(SILInstruction *inst) {
-  auto kind = inst->getKind();
-  switch (kind) {
-  case SILInstructionKind::BranchInst:
-    return true;
-  default:
-    return isOwnershipForwardingValueKind(SILNodeKind(kind));
-  }
+bool swift::isOwnedForwardingUse(Operand *op) {
+  auto kind = op->getUser()->getKind();
+  return isOwnershipForwardingValueKind(SILNodeKind(kind));
 }
 
 bool swift::isOwnedForwardingValue(SILValue value) {
-  switch (value->getKind()) {
-  // Phi arguments always forward ownership.
-  case ValueKind::SILPhiArgument:
-    return true;
-  default:
-    return isOwnedForwardingValueKind(
-        value->getKindOfRepresentativeSILNodeInObject());
-  }
+  // If we have a SILArgument and we are the successor block of a transforming
+  // terminator, we are fine.
+  if (auto *arg = dyn_cast<SILPhiArgument>(value))
+    if (auto *predTerm = arg->getSingleTerminator())
+      if (predTerm->isTransformationTerminator())
+        return true;
+  return isOwnedForwardingValueKind(
+      value->getKindOfRepresentativeSILNodeInObject());
 }
 
 bool swift::isGuaranteedForwardingValue(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
-  if (auto *arg = dyn_cast<SILArgument>(value)) {
-    if (auto *ti = arg->getSingleTerminator()) {
-      if (ti->isTransformationTerminator()) {
+  if (auto *arg = dyn_cast<SILArgument>(value))
+    if (auto *ti = arg->getSingleTerminator())
+      if (ti->isTransformationTerminator())
         return true;
-      }
-    }
-  }
 
   return isGuaranteedForwardingValueKind(
       value->getKindOfRepresentativeSILNodeInObject());
 }
 
-bool swift::isGuaranteedForwardingInst(SILInstruction *i) {
-  return isGuaranteedForwardingValueKind(SILNodeKind(i->getKind()));
+bool swift::isGuaranteedForwardingUse(Operand *use) {
+  auto kind = SILNodeKind(use->getUser()->getKind());
+  return isGuaranteedForwardingValueKind(kind);
 }
 
-bool swift::isOwnershipForwardingInst(SILInstruction *i) {
-  return isOwnershipForwardingValueKind(SILNodeKind(i->getKind()));
+bool swift::isOwnershipForwardingUse(Operand *use) {
+  auto kind = SILNodeKind(use->getUser()->getKind());
+  return isOwnershipForwardingValueKind(kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -843,32 +832,17 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
 
 Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
   auto *user = use->getUser();
-  if (isa<OwnershipForwardingTermInst>(user))
-    return ForwardingOperand(use);
-  if (isa<OwnershipForwardingSingleValueInst>(user))
-    return ForwardingOperand(use);
-  if (isa<OwnershipForwardingConversionInst>(user))
-    return ForwardingOperand(use);
-  if (isa<OwnershipForwardingSelectEnumInstBase>(user))
-    return ForwardingOperand(use);
-  if (isa<OwnershipForwardingMultipleValueInstruction>(user))
-    return ForwardingOperand(use);
+
+  if (isa<OwnershipForwardingInst>(user)) {
+    assert(isGuaranteedForwardingUse(use));
+    return {use};
+  }
+  assert(!isGuaranteedForwardingUse(use));
   return None;
 }
 
 ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
-  auto *user = use->getUser();
-  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user))
-    return ofti->getOwnershipKind();
-  if (auto *ofsvi = dyn_cast<OwnershipForwardingSingleValueInst>(user))
-    return ofsvi->getOwnershipKind();
-  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    return ofci->getOwnershipKind();
-  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    return ofseib->getOwnershipKind();
-  if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user))
-    return ofmvi->getOwnershipKind();
-  llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+  return getUser()->getOwnershipKind();
 }
 
 void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {

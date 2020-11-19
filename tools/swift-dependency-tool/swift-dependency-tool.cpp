@@ -64,6 +64,17 @@ struct SequenceTraits<
   static SourceFileDepGraphNode &element(IO &, NodeVec &vec, size_t index);
 };
 
+template <> struct ScalarTraits<swift::Fingerprint> {
+  static void output(const swift::Fingerprint &fp, void *c, raw_ostream &os) {
+    os << fp.getRawValue();
+  }
+  static StringRef input(StringRef s, void *, swift::Fingerprint &fp) {
+    fp = swift::Fingerprint{s.str()};
+    return StringRef();
+  }
+  static QuotingType mustQuote(StringRef S) { return needsQuotes(S); }
+};
+
 } // namespace yaml
 } // namespace llvm
 

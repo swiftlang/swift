@@ -34,6 +34,7 @@ class ConstructorDecl;
 class CustomAttr;
 class Decl;
 class EnumDecl;
+class Fingerprint;
 class FuncDecl;
 enum class ResultBuilderBodyPreCheck : uint8_t;
 class GenericParamList;
