@@ -109,7 +109,7 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
 
   // Optimization for whole-file users:
   if (interfaceKey.getKind() == NodeKind::sourceFileProvide &&
@@ -145,7 +145,7 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    const DependencyKey &key, const Optional<StringRef> fingerprint,
+    const DependencyKey &key, const Optional<Fingerprint> fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {

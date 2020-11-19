@@ -373,6 +373,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const override;
+
   virtual void
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,

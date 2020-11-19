@@ -434,6 +434,45 @@ namespace {
       }
     }
   };
+
+  // Side table information for serializing the table keyed under
+  // \c DeclFingerprintsLayout.
+  class DeclFingerprintsTableInfo {
+  public:
+    using key_type = DeclID;
+    using key_type_ref = const key_type &;
+    using data_type = Fingerprint;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return llvm::hash_value(static_cast<uint32_t>(key));
+    }
+
+    std::pair<unsigned, unsigned>
+    EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+      endian::Writer writer(out, little);
+      // No need to write the key or value length; they're both constant.
+      const unsigned valueLen = Fingerprint::DIGEST_LENGTH;
+      return {sizeof(uint32_t), valueLen};
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == sizeof(uint32_t));
+      endian::Writer writer(out, little);
+      writer.write<uint32_t>(key);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == Fingerprint::DIGEST_LENGTH);
+      endian::Writer writer(out, little);
+      out << data;
+    }
+  };
 } // end anonymous namespace
 
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
@@ -799,6 +838,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
   BLOCK_RECORD(index_block, DECL_MEMBER_NAMES);
+  BLOCK_RECORD(index_block, DECL_FINGERPRINTS);
   BLOCK_RECORD(index_block, ORDERED_TOP_LEVEL_DECLS);
 
   BLOCK(DECL_MEMBER_TABLES_BLOCK);
@@ -4809,6 +4849,27 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
   mems.emit(scratch, tableOffset, hashTableBlob);
 }
 
+static void
+writeDeclFingerprintsTable(const index_block::DeclFingerprintsLayout &fpl,
+                           const Serializer::DeclFingerprintsTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<DeclFingerprintsTableInfo> generator;
+    for (auto &entry : table) {
+      generator.insert(entry.first, entry.second);
+    }
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::write<uint32_t>(blobStream, 0, little);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  fpl.emit(scratch, tableOffset, hashTableBlob);
+}
+
 namespace {
   /// Used to serialize the on-disk Objective-C method hash table.
   class ObjCMethodTableInfo {
@@ -5083,6 +5144,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
   UniquedDerivativeFunctionConfigTable uniquedDerivativeConfigs;
+  DeclFingerprintsTable declFingerprints;
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
@@ -5144,6 +5206,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // derived conformance (for example, ==), force them to be
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
+        if (auto bodyFP = IDC->getBodyFingerprint()) {
+          declFingerprints.insert({addDeclRef(D), *bodyFP});
+        }
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
@@ -5174,6 +5239,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       localTypeGenerator.insert(MangledName, addDeclRef(TD));
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
+        if (auto bodyFP = IDC->getBodyFingerprint()) {
+          declFingerprints.insert({addDeclRef(TD), *bodyFP});
+        }
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
@@ -5238,6 +5306,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     if (!nestedTypeDecls.empty()) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
+    }
+
+    if (!declFingerprints.empty()) {
+      index_block::DeclFingerprintsLayout DeclsFingerprints(Out);
+      writeDeclFingerprintsTable(DeclsFingerprints, declFingerprints);
     }
 
     // Convert uniqued derivative function config table to serialization-
