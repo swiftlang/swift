@@ -9,6 +9,9 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_EXTRAARG | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNRESOLVED_AMBIGUOUS | %FileCheck %s --check-prefix=UNRESOLVED_AMBIGUOUS
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNRESOLVED_STILLAMBIGUOUS | %FileCheck %s --check-prefix=UNRESOLVED_AMBIGUOUS
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNRESOLVED_UNAMBIGUOUS | %FileCheck %s --check-prefix=UNRESOLVED_UNAMBIGUOUS
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=NOCALLBACK_FALLBACK | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FALLBACK | %FileCheck %s --check-prefix=MULTICLOSURE_FALLBACK
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNAMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=UNAMBIGUOUSCLOSURE_ARG
@@ -117,13 +120,40 @@ let x: A = overloadedReturn(1).#^RELATED_EXTRAARG^#
 // RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings()[#Void#]{{; name=.+$}}
 // RELATED: End completions
 
-func takesA(_ callback: () -> A) -> B {}
+func takesClosureGivingA(_ callback: () -> A) -> B {}
 func takesB(_ item: B) {}
 
-takesB((takesA { return overloadedReturn().#^RELATED_INERROREXPR^# }).)
+takesB((takesClosureGivingA { return overloadedReturn().#^RELATED_INERROREXPR^# }).)
+
+func overloadedArg(_ arg: A) -> A {}
+func overloadedArg(_ arg: B) -> B {}
+
+overloadedArg(.#^UNRESOLVED_AMBIGUOUS^#)
+
+// UNRESOLVED_AMBIGUOUS: Begin completions, 4 items
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal: doAThings({#(self): A#})[#() -> A#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#A#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS: End completions
+
+// Make sure we still offer A and B members as the user may intend to add a member on the end of the overloadedArg call later that has type B.
+takesB(overloadedArg(.#^UNRESOLVED_STILLAMBIGUOUS^#))
+
+func overloadedArg2(_ arg: A) -> Void {}
+func overloadedArg2(_ arg: A) -> Never {}
+func overloadedArg2(_ arg: B) -> B {}
+
+takesB(overloadedArg2(.#^UNRESOLVED_UNAMBIGUOUS^#))
+
+// UNRESOLVED_UNAMBIGUOUS: Begin completions, 2 items
+// UNRESOLVED_UNAMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
+// UNRESOLVED_UNAMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_UNAMBIGUOUS: End completions
+
 
 switch undefined {
-  case takesA { return overloadedReturn().#^NOCALLBACK_FALLBACK^# }:
+  case takesClosureGivingA { return overloadedReturn().#^NOCALLBACK_FALLBACK^# }:
     break
 }
 
