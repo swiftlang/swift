@@ -10,6 +10,12 @@
 #
 #===----------------------------------------------------------------------===#
 
+set(swift_concurrency_objc_sources
+  SwiftNativeNSObject.mm)
+
+set(LLVM_OPTIONAL_SOURCES
+  ${swift_concurrency_objc_sources})
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Actor.swift
   PartialAsyncTask.swift
