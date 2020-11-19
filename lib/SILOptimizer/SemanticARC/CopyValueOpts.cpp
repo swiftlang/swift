@@ -296,7 +296,7 @@ static bool canSafelyJoinSimpleRange(SILValue cviOperand,
   // NOTE: This use may be any type of consuming use and may not be a
   // destroy_value.
   auto *cviConsumer = cvi->getSingleConsumingUse();
-  if (!cviConsumer || isOwnedForwardingInstruction(cviConsumer->getUser())) {
+  if (!cviConsumer || isOwnedForwardingUse(cviConsumer)) {
     return false;
   }
 

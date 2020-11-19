@@ -35,12 +35,13 @@ bool isValueAddressOrTrivial(SILValue v);
 /// These operations forward both owned and guaranteed ownership.
 bool isOwnershipForwardingValueKind(SILNodeKind kind);
 
-/// Is this an instruction that can forward both owned and guaranteed ownership
+/// Is this an operand that can forward both owned and guaranteed ownership
 /// kinds.
-bool isOwnershipForwardingInst(SILInstruction *i);
+bool isOwnershipForwardingUse(Operand *op);
 
-/// Is this an instruction that can forward guaranteed ownership.
-bool isGuaranteedForwardingInst(SILInstruction *i);
+/// Is this an operand that forwards guaranteed ownership from its value to a
+/// result of the using instruction.
+bool isGuaranteedForwardingUse(Operand *op);
 
 /// These operations forward guaranteed ownership, but don't necessarily forward
 /// owned values.
@@ -54,12 +55,12 @@ bool isGuaranteedForwardingValue(SILValue value);
 /// forward guaranteed ownership.
 bool isOwnedForwardingValueKind(SILNodeKind kind);
 
-/// Does this SILInstruction 'forward' owned ownership, but may not be able to
-/// forward guaranteed ownership.
-bool isOwnedForwardingInstruction(SILInstruction *inst);
-
-/// Does this value 'forward' owned ownership, but may not be able to forward
+/// Does this operand 'forward' owned ownership, but may not be able to forward
 /// guaranteed ownership.
+bool isOwnedForwardingUse(Operand *use);
+
+/// Is this value the result of an instruction that 'forward's owned ownership,
+/// but may not be able to forward guaranteed ownership.
 ///
 /// This will be either a multiple value instruction resuilt, a single value
 /// instruction that forwards or an argument that forwards the ownership from a
@@ -78,6 +79,10 @@ public:
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
+
+  OwnershipForwardingInst *getUser() const {
+    return cast<OwnershipForwardingInst>(use->getUser());
+  }
 };
 
 /// Returns true if the instruction is a 'reborrow'.
