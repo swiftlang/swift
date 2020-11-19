@@ -665,6 +665,10 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
                 "enum metadata header unexpectedly has extra members");
   static_assert(sizeof(EnumMetadata) == sizeof(ValueMetadata),
                 "enum metadata unexpectedly has extra members");
+  assert(!pattern->hasExtraDataPattern() ||
+         (extraDataSize == (pattern->getExtraDataPattern()->OffsetInWords +
+                            pattern->getExtraDataPattern()->SizeInWords) *
+                               sizeof(void *)));
 
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
