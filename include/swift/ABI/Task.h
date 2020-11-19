@@ -382,6 +382,16 @@ public:
 
   AsyncContext(const AsyncContext &) = delete;
   AsyncContext &operator=(const AsyncContext &) = delete;
+
+  /// Perform a return from this context.
+  ///
+  /// Generally this should be tail-called.
+  SWIFT_CC(swiftasync)
+  void resumeParent(AsyncTask *task, ExecutorRef executor) {
+    // TODO: destroy context before returning?
+    // FIXME: force tail call
+    return ResumeParent(task, executor, Parent);
+  }
 };
 
 /// An async context that supports yielding.
