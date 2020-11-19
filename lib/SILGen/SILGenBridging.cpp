@@ -1662,11 +1662,19 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       getConstantInfo(getTypeExpansionContext(), foreignDeclRef);
   auto foreignFnTy = foreignCI.SILFnType;
 
-  // Find the foreign error convention and 'self' parameter index.
+  // Find the foreign error/async convention and 'self' parameter index.
+  bool hasError = false;
+  Optional<ForeignAsyncConvention> foreignAsync;
+  if (nativeFnTy->isAsync()) {
+    foreignAsync = fd->getForeignAsyncConvention();
+    assert(foreignAsync && "couldn't find foreign async convention?!");
+  }
   Optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {
+    hasError = true;
     foreignError = fd->getForeignErrorConvention();
-    assert(foreignError && "couldn't find foreign error convention!");
+    assert((foreignError || foreignAsync)
+           && "couldn't find foreign error or async convention for foreign error!");
   }
   ImportAsMemberStatus memberStatus = fd->getImportAsMemberStatus();
 
@@ -1707,7 +1715,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
   // Set up the throw destination if necessary.
   CleanupLocation cleanupLoc(fd);
-  if (foreignError) {
+  if (hasError) {
     prepareRethrowEpilog(cleanupLoc);
   }
 
@@ -1719,14 +1727,20 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     SmallVector<ManagedValue, 8> args;
     unsigned foreignArgIndex = 0;
 
-    // A helper function to add a function error argument in the
+    // A helper function to add a placeholder for a foreign argument in the
     // appropriate position.
-    auto maybeAddForeignErrorArg = [&] {
-      if (foreignError &&
-          foreignArgIndex == foreignError->getErrorParameterIndex()) {
+    auto maybeAddForeignArg = [&]() -> bool {
+      if ((foreignError
+           && foreignArgIndex == foreignError->getErrorParameterIndex())
+          || (foreignAsync
+              && foreignArgIndex == foreignAsync->completionHandlerParamIndex()))
+      {
         args.push_back(ManagedValue());
         ++foreignArgIndex;
+        return true;
       }
+      
+      return false;
     };
 
     {
@@ -1768,7 +1782,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           llvm_unreachable("unsupported convention");
         }
 
-        maybeAddForeignErrorArg();
+        while (maybeAddForeignArg());
 
         bool isSelf = (hasSelfParam && nativeParamIndex == params.size() - 1);
 
@@ -1825,7 +1839,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       }
     }
 
-    maybeAddForeignErrorArg();
+    while (maybeAddForeignArg());
     
     // Call the original.
     auto subs = getForwardingSubstitutionMap();
@@ -1846,7 +1860,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
                                    bridgedFormalResultType),
         nativeFormalResultType,
         foreignError,
-        {}, // TODO foreignAsync
+        foreignAsync,
         ImportAsMemberStatus());
 
     auto init = indirectResult
