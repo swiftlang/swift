@@ -44,7 +44,8 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
-    fatalError("\(#function) not implemented yet.")
+    let task = Builtin.getCurrentAsyncTask()
+    return getPriority(task)
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -80,6 +81,7 @@ extension Task {
   ///       similar to Darwin Dispatch's QoS; bearing in mind that priority is not as
   ///       much of a thing on other platforms (i.e. server side Linux systems).
   public enum Priority: Int, Comparable {
+    // Values must be same as defined by the internal `JobPriority`.
     case userInteractive = 0x21
     case userInitiated   = 0x19
     case `default`       = 0x15
@@ -413,6 +415,9 @@ extension Task {
 
 @_silgen_name("swift_task_run")
 public func runTask(_ task: __owned Builtin.NativeObject)
+
+@_silgen_name("swift_task_getPriority")
+public func getPriority(_ task: __owned Builtin.NativeObject) -> Task.Priority
 
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
