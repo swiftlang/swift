@@ -54,7 +54,7 @@ namespace swift {
       SmallVector<Type, 4> ExpectedTypes;
       bool ExpectsNonVoid;
       bool BaseIsStaticMetaType;
-      bool IsSingleExpressionBody;
+      bool IsImplicitSingleExpressionReturn;
     };
 
   private:
@@ -91,7 +91,7 @@ namespace swift {
   public:
     struct Result {
       Type ExpectedTy;
-      bool IsSingleExpressionBody;
+      bool IsImplicitSingleExpressionReturn;
     };
 
   private:

@@ -1171,14 +1171,14 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
     //
     //     { ... -> Int in x }        // x must be Int
     //     { ... -> ()  in return x } // x must be Void
-    if (typeContext.isSingleExpressionBody && expectedTy->isVoid())
+    if (typeContext.isImplicitSingleExpressionReturn && expectedTy->isVoid())
       continue;
 
     Result = std::max(Result, calculateTypeRelation(Ty, expectedTy, DC));
 
     // Map invalid -> unrelated when in a single-expression body, since the
     // input may be incomplete.
-    if (typeContext.isSingleExpressionBody &&
+    if (typeContext.isImplicitSingleExpressionReturn &&
         Result == CodeCompletionResult::ExpectedTypeRelation::Invalid)
       Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   }
@@ -1958,9 +1958,11 @@ public:
     IsStaticMetatype = value;
   }
 
-  void setExpectedTypes(ArrayRef<Type> Types, bool isSingleExpressionBody,
+  void setExpectedTypes(ArrayRef<Type> Types,
+                        bool isImplicitSingleExpressionReturn,
                         bool preferNonVoid = false) {
-    expectedTypeContext.isSingleExpressionBody = isSingleExpressionBody;
+    expectedTypeContext.isImplicitSingleExpressionReturn =
+        isImplicitSingleExpressionReturn;
     expectedTypeContext.preferNonVoid = preferNonVoid;
     expectedTypeContext.possibleTypes.clear();
     expectedTypeContext.possibleTypes.reserve(Types.size());
@@ -1976,7 +1978,7 @@ public:
   CodeCompletionContext::TypeContextKind typeContextKind() const {
     if (expectedTypeContext.empty() && !expectedTypeContext.preferNonVoid) {
       return CodeCompletionContext::TypeContextKind::None;
-    } else if (expectedTypeContext.isSingleExpressionBody) {
+    } else if (expectedTypeContext.isImplicitSingleExpressionReturn) {
       return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
     } else {
       return CodeCompletionContext::TypeContextKind::Required;
@@ -6105,7 +6107,7 @@ void deliverUnresolvedMemberResults(
 
   for (auto &Result: Results) {
     Lookup.setExpectedTypes({Result.ExpectedTy},
-                            Result.IsSingleExpressionBody,
+                            Result.IsImplicitSingleExpressionReturn,
                             /*expectsNonVoid*/true);
     Lookup.setIdealExpectedType(Result.ExpectedTy);
 
@@ -6154,7 +6156,7 @@ void deliverDotExprResults(
     Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
     Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
     Lookup.setExpectedTypes(Result.ExpectedTypes,
-                            Result.IsSingleExpressionBody,
+                            Result.IsImplicitSingleExpressionReturn,
                             Result.ExpectsNonVoid);
     if (isDynamicLookup(Result.BaseTy))
       Lookup.setIsDynamicLookup();
@@ -6395,7 +6397,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprBeginning: {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
+                            ContextInfo.isImplicitSingleExpressionReturn());
     DoPostfixExprBeginning();
     break;
   }
@@ -6417,8 +6419,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (ShouldCompleteCallPatternAfterParen) {
       ExprContextInfo ParentContextInfo(CurDeclContext, ParsedExpr);
-      Lookup.setExpectedTypes(ParentContextInfo.getPossibleTypes(),
-                              ParentContextInfo.isSingleExpressionBody());
+      Lookup.setExpectedTypes(
+          ParentContextInfo.getPossibleTypes(),
+          ParentContextInfo.isImplicitSingleExpressionReturn());
       if (!ContextInfo.getPossibleCallees().empty()) {
         for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
           Lookup.tryFunctionCallCompletions(typeAndDecl.Type, typeAndDecl.Decl,
@@ -6436,7 +6439,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         (Lookup.FoundFunctionCalls &&
          Lookup.FoundFunctionsWithoutFirstKeyword)) {
       Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                              ContextInfo.isSingleExpressionBody());
+                              ContextInfo.isImplicitSingleExpressionReturn());
       Lookup.setHaveLParen(false);
       DoPostfixExprBeginning();
     }
@@ -6485,7 +6488,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::CaseStmtBeginning: {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
+                            ContextInfo.isImplicitSingleExpressionReturn());
     Lookup.setIdealExpectedType(CodeCompleteTokenExpr->getType());
     Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
     DoPostfixExprBeginning();
@@ -6504,7 +6507,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isa<AccessorDecl>(ParsedDecl)) {
       ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
       Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                              ContextInfo.isSingleExpressionBody());
+                              ContextInfo.isImplicitSingleExpressionReturn());
       DoPostfixExprBeginning();
     }
     break;
@@ -6578,7 +6581,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (shouldPerformGlobalCompletion) {
       Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                              ContextInfo.isSingleExpressionBody());
+                              ContextInfo.isImplicitSingleExpressionReturn());
       DoPostfixExprBeginning();
     }
     break;
@@ -6697,7 +6700,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     SmallVector<Type, 2> possibleReturnTypes;
     collectPossibleReturnTypesFromContext(CurDeclContext, possibleReturnTypes);
     Lookup.setExpectedTypes(possibleReturnTypes,
-                            /*isSingleExpressionBody*/ false);
+                            /*isImplicitSingleExpressionReturn*/ false);
     Lookup.getValueCompletionsInDeclContext(Loc);
     break;
   }
@@ -6708,7 +6711,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (FD->isCoroutine()) {
         // TODO: handle multi-value yields.
         Lookup.setExpectedTypes(FD->getStorage()->getValueInterfaceType(),
-                                /*isSingleExpressionBody*/ false);
+                                /*isImplicitSingleExpressionReturn*/ false);
       }
     }
     Lookup.getValueCompletionsInDeclContext(Loc);
@@ -6718,7 +6721,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::AfterPoundExpr: {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
+                            ContextInfo.isImplicitSingleExpressionReturn());
 
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundLiteralCompletions(/*needPound=*/false);

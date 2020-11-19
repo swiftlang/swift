@@ -1160,12 +1160,21 @@ static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   return S.getResolvedType(E);
 };
 
-static bool isSingleExpressionBodyCompletion(ConstraintSystem &CS,
+/// Whether the given completion expression is the only expression in its
+/// containing closure or function body and its value is implicitly returned.
+///
+/// If these conditions are met, code completion needs to avoid penalizing
+/// completion results that don't match the expected return type when computing
+/// type relations, as since no return statement was explicitly written by the
+/// user, it's possible they intend the single expression not as the return
+/// value but merely the first entry in a multi-statement body they just haven't
+/// finished writing yet.
+static bool isImplicitSingleExpressionReturn(ConstraintSystem &CS,
                                              Expr *CompletionExpr) {
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (!ParentExpr) {
+  if (!ParentExpr)
     return CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr;
-  }
+
   if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
     if (ParentCE->hasSingleExpressionBody() &&
         ParentCE->getSingleExpressionBody() == CompletionExpr) {
@@ -1205,14 +1214,14 @@ sawSolution(const constraints::Solution &S) {
   auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
   if (Ret.second) {
     bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
-    bool SingleExprBody = isSingleExpressionBodyCompletion(CS, CompletionExpr);
+    bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
     bool DisallowVoid = ExpectedTy
                             ? !ExpectedTy->isVoid()
                             : !ParentExpr && CS.getContextualTypePurpose(
                                                  CompletionExpr) != CTP_Unused;
 
     Results.push_back(
-        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, SingleExprBody});
+        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ImplicitReturn});
     if (ExpectedTy)
       Results.back().ExpectedTypes.push_back(ExpectedTy);
   } else if (ExpectedTy) {
@@ -1242,6 +1251,6 @@ sawSolution(const constraints::Solution &S) {
     return;
   }
 
-  bool SingleExprBody = isSingleExpressionBodyCompletion(CS, CompletionExpr);
+  bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
   Results.push_back({ExpectedTy, SingleExprBody});
 }
