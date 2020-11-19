@@ -1,21 +1,79 @@
 import errors
 
-func foo() {
+func testInvalidGlobalCursor() {
   invalidGlobalMissingInit = ""
+}
 
-  let bar: InvalidStruct
-  bar.memberB
+func testInvalidFuncCursor() {
   invalidPartialFunc()
-  bar.
+}
 
-  let baz: ;
+func testInvalidStructCursor() {
+  let foo: InvalidStruct
+  foo.memberB
+}
 
+func testInvalidStructMemberCompletion() {
+  let foo: InvalidStruct
+  foo.#^INVALID-MEMBER^#
+  // INVALID-MEMBER: Begin completions
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberA[#Int#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberB[#<<error type>>#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberC[#<<error type>>#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberD[#<<error type>>#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberE[#<<error type>>#];
+  // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         add({#<<error type>>#})[#Void#];
+  // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         get()[#InvalidStruct.Item#];
+  // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         set({#item: InvalidStruct.Item#})[#Void#];
+  // INVALID-MEMBER: End completions
+}
+
+func testInvalidTypeCompletion() {
+  let foo: #^INVALID-TYPE^#;
+  // INVALID-TYPE: Begin completions
+  // INVALID-TYPE-DAG: Decl[Enum]/OtherModule[errors]:     InvalidEnum[#InvalidEnum#];
+  // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClass[#InvalidClass#];
+  // INVALID-TYPE-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct#];
+  // INVALID-TYPE-DAG: Decl[Struct]/OtherModule[errors]:   InvalidStruct[#InvalidStruct#];
+  // INVALID-TYPE-DAG: Decl[TypeAlias]/OtherModule[errors]: InvalidAlias[#InvalidAlias#];
+  // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub1[#InvalidClassSub1#];
+  // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
+  // INVALID-TYPE-DAG: Decl[Protocol]/OtherModule[errors]: InvalidProtocol[#InvalidProtocol#];
+  // INVALID-TYPE: End completions
+}
+
+func testInvalidTopLevelCompletion() {
+  #^INVALID-TOP^#
+  // INVALID-TOP: Begin completions
+  // INVALID-TOP-DAG: Decl[Enum]/OtherModule[errors]:     InvalidEnum[#InvalidEnum#];
+  // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClass[#InvalidClass#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncBody({#param: T#})[#T#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidPartialFunc()[#Void#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncBody()[#Void#];
+  // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureBody[#<<error type>>#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncSignature()[#Void#];
+  // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalMissingInit[#String#];
+  // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct#];
+  // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidStruct[#InvalidStruct#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: typeUsesFunc({#pe: InvalidEnum#}, {#pa: <<error type>>#}, {#pp: InvalidProtocol#}, {#ps: InvalidStruct#}, {#pg: <<error type>>#}, {#pc: InvalidClass#})[#Int#];
+  // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalKeypath[#InvalidStruct.Type#];
+  // INVALID-TOP-DAG: Decl[TypeAlias]/OtherModule[errors]: InvalidAlias[#InvalidAlias#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncType({#param: T#})[#<<error type>>#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncType()[#<<error type>>#];
+  // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureType[#() -> ()#];
+  // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub1[#InvalidClassSub1#];
+  // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
+  // INVALID-TOP-DAG: Decl[Protocol]/OtherModule[errors]: InvalidProtocol[#InvalidProtocol#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncThrows()[' throws'][#<<error type>>#];
+  // INVALID-TOP: End completions
 }
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -experimental-allow-module-with-compiler-errors -primary-file %S/Inputs/errors-a.swift %S/Inputs/errors-b.swift -module-name errors -o %t/errors.a.swiftmodule
-// RUN: %target-swift-frontend -emit-module -experimental-allow-module-with-compiler-errors %S/Inputs/errors-a.swift -primary-file %S/Inputs/errors-b.swift -module-name errors -o %t/errors.b.swiftmodule
-// RUN: %target-swift-frontend -merge-modules -emit-module -experimental-allow-module-with-compiler-errors %t/errors.a.swiftmodule %t/errors.b.swiftmodule -module-name errors -o %t/errors.swiftmodule
+
+// RUN: %target-swift-frontend -emit-module -experimental-allow-module-with-compiler-errors -primary-file %S/Inputs/errors-a.swift %S/Inputs/errors-b.swift %S/Inputs/errors-c.swift -module-name errors -o %t/errors.a.swiftmodule
+// RUN: %target-swift-frontend -emit-module -experimental-allow-module-with-compiler-errors %S/Inputs/errors-a.swift -primary-file %S/Inputs/errors-b.swift %S/Inputs/errors-c.swift -module-name errors -o %t/errors.b.swiftmodule
+// RUN: %target-swift-frontend -emit-module -experimental-allow-module-with-compiler-errors %S/Inputs/errors-a.swift %S/Inputs/errors-b.swift -primary-file %S/Inputs/errors-c.swift -module-name errors -o %t/errors.c.swiftmodule
+// RUN: %target-swift-frontend -merge-modules -emit-module -experimental-allow-module-with-compiler-errors %t/errors.a.swiftmodule %t/errors.b.swiftmodule %t/errors.c.swiftmodule -module-name errors -o %t/errors.swiftmodule
 
 // Read the module back in to make sure it can be deserialized
 // RUN: %target-swift-ide-test -print-module -source-filename dummy -module-to-print errors -I %t | %FileCheck %s
@@ -47,8 +105,8 @@ func foo() {
 // CHECK: typealias Item = <<error type>>
 // CHECK: let memberA: Int
 // CHECK: let memberB: <<error type>>
-// CHECK: var memberC: <<error type>> { get }
-// CHECK: lazy var memberD: <<error type>> { mutating get }
+// CHECK: var memberC: <<error type>>
+// CHECK: lazy var memberD: <<error type>>
 // CHECK: var memberE: <<error type>>
 // CHECK: mutating func set(item: <<error type>>)
 // CHECK: func invalidFuncBody()
@@ -64,62 +122,23 @@ func foo() {
 // CHECK: func invalidPartialFunc()
 // CHECK: func typeUsesFunc
 
+// Check completions
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t-completions -I %t
+
 // Check cursor info for the various symbols
 // RUN: %sourcekitd-test -req=cursor -pos=4:3 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // CHECK-GLOBAL: source.lang.swift.ref.var.global
 // CHECK-GLOBAL: invalidGlobalMissingInit
 
-// RUN: %sourcekitd-test -req=cursor -pos=6:12 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-STRUCT
-// CHECK-STRUCT: source.lang.swift.ref.struct
-// CHECK-STRUCT: InvalidStruct
-
-// : %sourcekitd-test -req=cursor -pos=7:7 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-MEMBER
-// CHECK-MEMBER: source.lang.swift.ref.var.instance
-// CHECK-MEMBER: memberB
-
 // RUN: %sourcekitd-test -req=cursor -pos=8:3 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-FUNC
 // CHECK-FUNC: source.lang.swift.ref.function.free
 // CHECK-FUNC: invalidPartialFunc
 
-// Check completions
-// RUN: %sourcekitd-test -req=complete -pos=9:7 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-MEMBER-COMPLETE
-// CHECK-MEMBER-COMPLETE: key.name: "add(
-// CHECK-MEMBER-COMPLETE: key.name: "get(
-// CHECK-MEMBER-COMPLETE: key.name: "memberA"
-// CHECK-MEMBER-COMPLETE: key.name: "memberB"
-// CHECK-MEMBER-COMPLETE: key.name: "memberC"
-// CHECK-MEMBER-COMPLETE: key.name: "memberD"
-// CHECK-MEMBER-COMPLETE: key.name: "memberE"
-// CHECK-MEMBER-COMPLETE: key.name: "set(
+// RUN: %sourcekitd-test -req=cursor -pos=12:12 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-STRUCT
+// CHECK-STRUCT: source.lang.swift.ref.struct
+// CHECK-STRUCT: InvalidStruct
 
-// RUN: %sourcekitd-test -req=complete -pos=11:11 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-TYPE-COMPLETE
-// CHECK-TYPE-COMPLETE: key.name: "InvalidAlias"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidClass"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidClassSub1"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidClassSub2"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidEnum"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidGenericStruct"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidProtocol"
-// CHECK-TYPE-COMPLETE: key.name: "InvalidStruct"
-
-// RUN: %sourcekitd-test -req=complete -pos=12:1 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-GLOBAL-COMPLETE
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidAlias"
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidClass"
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidClassSub1"
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidClassSub2"
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidEnum"
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidFuncBody(
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidFuncSignature(
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidFuncThrows(
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidFuncType(
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidGenericFuncBody(
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidGenericFuncType(
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidGenericStruct"
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidGlobalClosureBody"
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidGlobalClosureType
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidGlobalKeypath
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidGlobalMissingInit
-// CHECK-GLOBAL-COMPLETE: key.name: "invalidPartialFunc(
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidProtocol"
-// CHECK-GLOBAL-COMPLETE: key.name: "InvalidStruct"
-// CHECK-GLOBAL-COMPLETE: key.name: "typeUsesFunc(
+// Currently doesn't work for any members with invalid types, even within the same module: rdar://71514163
+// RUN: %sourcekitd-test -req=cursor -pos=13:7 %s -- -I %t -target %target-triple %s | not %FileCheck %s -check-prefix=CHECK-MEMBER
+// CHECK-MEMBER: source.lang.swift.ref.var.instance
+// CHECK-MEMBER: memberB

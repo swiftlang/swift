@@ -3,7 +3,12 @@
 
 #pragma clang assume_nonnull begin
 
-@interface SlowServer : NSObject
+@protocol ServiceProvider
+@property(readonly) NSArray<NSString *> *allOperations;
+-(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
+@end
+
+@interface SlowServer : NSObject <ServiceProvider>
 -(void)doSomethingSlow:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)checkAvailabilityWithCompletionHandler:(void (^)(BOOL isAvailable))completionHandler;
