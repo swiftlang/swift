@@ -4234,6 +4234,7 @@ namespace {
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
       auto init = builder.beginStruct();
+      init.setPacked(true);
 
       struct Scanner : StructMetadataScanner<Scanner> {
         GenericStructMetadataBuilder &Outer;
@@ -4602,6 +4603,7 @@ namespace {
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
       auto init = builder.beginStruct();
+      init.setPacked(true);
 
       auto &layout = IGM.getMetadataLayout(Target);
 
