@@ -776,9 +776,11 @@ static bool isForPatternMatch(SolutionApplicationTarget &target) {
   return false;
 }
 
-/// Remove any solutions from the provided vector with a score less than the best solution's.
+/// Remove any solutions from the provided vector that both require fixes and have a
+/// score worse than the best.
 static void filterSolutions(SolutionApplicationTarget &target,
-                            SmallVectorImpl<Solution> &solutions) {
+                            SmallVectorImpl<Solution> &solutions,
+                            CodeCompletionExpr *completionExpr) {
   // FIXME: this is only needed because in pattern matching position, the
   // code completion expression always becomes an expression pattern, which
   // requires the ~= operator to be defined on the type being matched against.
@@ -791,23 +793,32 @@ static void filterSolutions(SolutionApplicationTarget &target,
   // completion. That only generates the 'nil' completion, which is rarely what
   // the user intends to write in this position and shouldn't be preferred over
   // the other formed solutions (which require fixes). We should generate enum
-  // pattern completions separately.
-  if (isForPatternMatch(target))
-    return;
+  // pattern completions separately, but for now ignore the
+  // _OptionalNilComparisonType solution.
+  if (isForPatternMatch(target)) {
+    solutions.erase(llvm::remove_if(solutions, [&](const Solution &S) {
+      ASTContext &ctx = S.getConstraintSystem().getASTContext();
+      if (!S.hasType(completionExpr))
+        return false;
+      if (auto ty = S.getResolvedType(completionExpr))
+        if (auto *NTD = ty->getAnyNominal())
+          return NTD->getBaseIdentifier() == ctx.Id_OptionalNilComparisonType;
+      return false;
+    }), solutions.end());
+  }
 
   if (solutions.size() <= 1)
     return;
 
-  auto min = std::min_element(solutions.begin(), solutions.end(),
-                              [](const Solution &a, const Solution &b) {
+  Score minScore = std::min_element(solutions.begin(), solutions.end(),
+                                    [](const Solution &a, const Solution &b) {
     return a.getFixedScore() < b.getFixedScore();
-  });
-  auto fixStart = llvm::partition(solutions, [&](const Solution &S) {
-    return S.getFixedScore() == min->getFixedScore();
-  });
+  })->getFixedScore();
 
-  if (fixStart != solutions.begin() && fixStart != solutions.end())
-    solutions.erase(fixStart, solutions.end());
+  llvm::erase_if(solutions, [&](const Solution &S) {
+    return S.getFixedScore().Data[SK_Fix] != 0 &&
+        S.getFixedScore() > minScore;
+  });
 }
 
 /// When solving for code completion we still consider solutions with holes as
@@ -899,8 +910,9 @@ bool TypeChecker::typeCheckForCodeCompletion(
       return CompletionResult::Fallback;
 
     // FIXME: instead of filtering, expose the score and viability to clients.
-    // Only keep the solution(s) with the best score.
-    filterSolutions(target, solutions);
+    // Remove any solutions that both require fixes and have a score that is
+    // worse than the best.
+    filterSolutions(target, solutions, contextAnalyzer.getCompletionExpr());
 
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
@@ -1078,70 +1090,117 @@ void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
       [&](const Solution &S) { sawSolution(S); });
 }
 
+void UnresolvedMemberTypeCheckCompletionCallback::
+fallbackTypeCheck(DeclContext *DC) {
+  assert(!gotCallback());
+
+  CompletionContextFinder finder(DC);
+  if (!finder.hasCompletionExpr())
+    return;
+
+  auto fallback = finder.getFallbackCompletionExpr();
+  if (!fallback)
+    return;
+
+
+  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
+                                             CTP_Unused, Type(),
+                                             /*isDiscared=*/true);
+  TypeChecker::typeCheckForCodeCompletion(
+      completionTarget, /*needsPrecheck*/true,
+      [&](const Solution &S) { sawSolution(S); });
+}
+
+static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
+  auto &CS = S.getConstraintSystem();
+
+  // To aid code completion, we need to attempt to convert type holes
+  // back into underlying generic parameters if possible, since type
+  // of the code completion expression is used as "expected" (or contextual)
+  // type so it's helpful to know what requirements it has to filter
+  // the list of possible member candidates e.g.
+  //
+  // \code
+  // func test<T: P>(_: [T]) {}
+  //
+  // test(42.#^MEMBERS^#)
+  // \code
+  //
+  // It's impossible to resolve `T` in this case but code completion
+  // expression should still have a type of `[T]` instead of `[<<hole>>]`
+  // because it helps to produce correct contextual member list based on
+  // a conformance requirement associated with generic parameter `T`.
+  if (isa<CodeCompletionExpr>(E)) {
+    auto completionTy = S.getType(E).transform([&](Type type) -> Type {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        return S.getFixedType(typeVar);
+      return type;
+    });
+
+    return S.simplifyType(completionTy.transform([&](Type type) {
+      if (auto *hole = type->getAs<HoleType>()) {
+        if (auto *typeVar =
+                hole->getOriginator().dyn_cast<TypeVariableType *>()) {
+          if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+            // Code completion depends on generic parameter type being
+            // represented in terms of `ArchetypeType` since it's easy
+            // to extract protocol requirements from it.
+            if (auto *GPD = GP->getDecl())
+              return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+          }
+        }
+
+        return Type(CS.getASTContext().TheUnresolvedType);
+      }
+
+      return type;
+    }));
+  }
+
+  return S.getResolvedType(E);
+};
+
+/// Whether the given completion expression is the only expression in its
+/// containing closure or function body and its value is implicitly returned.
+///
+/// If these conditions are met, code completion needs to avoid penalizing
+/// completion results that don't match the expected return type when computing
+/// type relations, as since no return statement was explicitly written by the
+/// user, it's possible they intend the single expression not as the return
+/// value but merely the first entry in a multi-statement body they just haven't
+/// finished writing yet.
+static bool isImplicitSingleExpressionReturn(ConstraintSystem &CS,
+                                             Expr *CompletionExpr) {
+  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
+  if (!ParentExpr)
+    return CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr;
+
+  if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
+    if (ParentCE->hasSingleExpressionBody() &&
+        ParentCE->getSingleExpressionBody() == CompletionExpr) {
+      ASTNode Last = ParentCE->getBody()->getLastElement();
+      return !Last.isStmt(StmtKind::Return) || Last.isImplicit();
+    }
+  }
+  return false;
+}
+
 void DotExprTypeCheckCompletionCallback::
 sawSolution(const constraints::Solution &S) {
   GotCallback = true;
   auto &CS = S.getConstraintSystem();
-
-  auto GetType = [&](Expr *E) {
-    // To aid code completion, we need to attempt to convert type holes
-    // back into underlying generic parameters if possible, since type
-    // of the code completion expression is used as "expected" (or contextual)
-    // type so it's helpful to know what requirements it has to filter
-    // the list of possible member candidates e.g.
-    //
-    // \code
-    // func test<T: P>(_: [T]) {}
-    //
-    // test(42.#^MEMBERS^#)
-    // \code
-    //
-    // It's impossible to resolve `T` in this case but code completion
-    // expression should still have a type of `[T]` instead of `[<<hole>>]`
-    // because it helps to produce correct contextual member list based on
-    // a conformance requirement associated with generic parameter `T`.
-    if (isa<CodeCompletionExpr>(E)) {
-      auto completionTy = S.getType(E).transform([&](Type type) -> Type {
-        if (auto *typeVar = type->getAs<TypeVariableType>())
-          return S.getFixedType(typeVar);
-        return type;
-      });
-
-      return S.simplifyType(completionTy.transform([&](Type type) {
-        if (auto *hole = type->getAs<HoleType>()) {
-          if (auto *typeVar =
-                  hole->getOriginator().dyn_cast<TypeVariableType *>()) {
-            if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-              // Code completion depends on generic parameter type being
-              // represented in terms of `ArchetypeType` since it's easy
-              // to extract protocol requirements from it.
-              if (auto *GPD = GP->getDecl())
-                return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
-            }
-          }
-
-          return Type(CS.getASTContext().TheUnresolvedType);
-        }
-
-        return type;
-      }));
-    }
-
-    return S.getResolvedType(E);
-  };
-
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
 
-  auto BaseTy = GetType(ParsedExpr);
+  auto BaseTy = getTypeForCompletion(S, ParsedExpr);
   // If base type couldn't be determined (e.g. because base expression
   // is an invalid reference), let's not attempt to do a lookup since
   // it wouldn't produce any useful results anyway.
-  if (!BaseTy || BaseTy->is<UnresolvedType>())
+  if (!BaseTy || BaseTy->getRValueType()->is<UnresolvedType>())
     return;
 
   auto *Locator = CS.getConstraintLocator(SemanticExpr);
-  Type ExpectedTy = GetType(CompletionExpr);
+  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
   if (!ParentExpr)
     ExpectedTy = CS.getContextualType(CompletionExpr);
@@ -1153,31 +1212,45 @@ sawSolution(const constraints::Solution &S) {
 
   auto Key = std::make_pair(BaseTy, ReferencedDecl);
   auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
-  if (!Ret.second && ExpectedTy) {
-    Results[Ret.first->getSecond()].ExpectedTypes.push_back(ExpectedTy);
-  } else {
+  if (Ret.second) {
     bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
-    bool SingleExprBody = false;
+    bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
     bool DisallowVoid = ExpectedTy
                             ? !ExpectedTy->isVoid()
                             : !ParentExpr && CS.getContextualTypePurpose(
                                                  CompletionExpr) != CTP_Unused;
 
-    if (!ParentExpr) {
-      if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr)
-        SingleExprBody = true;
-    } else if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
-      if (ParentCE->hasSingleExpressionBody() &&
-          ParentCE->getSingleExpressionBody() == CompletionExpr) {
-        ASTNode Last = ParentCE->getBody()->getLastElement();
-        if (!Last.isStmt(StmtKind::Return) || Last.isImplicit())
-          SingleExprBody = true;
-      }
-    }
-
     Results.push_back(
-        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, SingleExprBody});
+        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ImplicitReturn});
     if (ExpectedTy)
       Results.back().ExpectedTypes.push_back(ExpectedTy);
+  } else if (ExpectedTy) {
+    auto &ExpectedTys = Results[Ret.first->getSecond()].ExpectedTypes;
+    auto IsEqual = [&](Type Ty) { return ExpectedTy->isEqual(Ty); };
+    if (!llvm::any_of(ExpectedTys, IsEqual))
+      ExpectedTys.push_back(ExpectedTy);
   }
+}
+
+void UnresolvedMemberTypeCheckCompletionCallback::
+sawSolution(const constraints::Solution &S) {
+  GotCallback = true;
+
+  auto &CS = S.getConstraintSystem();
+  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
+  // If the type couldn't be determined (e.g. because there isn't any context
+  // to derive it from), let's not attempt to do a lookup since it wouldn't
+  // produce any useful results anyway.
+  if (!ExpectedTy || ExpectedTy->is<UnresolvedType>())
+    return;
+
+  // If ExpectedTy is a duplicate of any other result, ignore this solution.
+  if (llvm::any_of(Results, [&](const Result &R) {
+    return R.ExpectedTy->isEqual(ExpectedTy);
+  })) {
+    return;
+  }
+
+  bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
+  Results.push_back({ExpectedTy, SingleExprBody});
 }

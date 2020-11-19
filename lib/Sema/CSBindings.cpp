@@ -1387,7 +1387,8 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // under-constrained due to e.g. lack of expressions on the
     // right-hand side of the token, which are required for a
     // regular type-check.
-    if (dstLocator->directlyAt<CodeCompletionExpr>())
+    if (dstLocator->directlyAt<CodeCompletionExpr>() ||
+        srcLocator->directlyAt<CodeCompletionExpr>())
       return None;
   }
 
