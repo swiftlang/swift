@@ -61,6 +61,9 @@ static llvm::cl::opt<bool> AbortOnFailure(
 static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
                                              llvm::cl::init(false));
 
+static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
+                                             llvm::cl::init(false));
+
 // SWIFT_ENABLE_TENSORFLOW
 // This flag is temporarily set to false because debug scope verification does
 // not handle inlined call sites. This is problematic for deabstraction, which
@@ -720,8 +723,11 @@ public:
 
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
-    llvm::dbgs() << "In module:\n";
-    F.getModule().print(llvm::dbgs());
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      llvm::dbgs() << "In module:\n";
+      F.getModule().print(llvm::dbgs());
+    }
 
     // We abort by default because we want to always crash in
     // the debugger.
@@ -1512,14 +1518,6 @@ public:
             "cannot call coroutine with normal apply");
     require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
             "cannot call an async function from a non async function");
-
-    // Check that if the apply is of a noreturn callee, make sure that an
-    // unreachable is the next instruction.
-    if (AI->getModule().getStage() == SILStage::Raw ||
-        !AI->isCalleeNoReturn())
-      return;
-    require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
-            "No return apply without an unreachable as a next instruction.");
   }
 
   void checkTryApplyInst(TryApplyInst *AI) {
