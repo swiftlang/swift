@@ -28,6 +28,7 @@
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 #include <cctype>
 #include <cinttypes>
@@ -5805,30 +5806,6 @@ bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
 
-static void checkAllocatorDebugEnvironmentVariable(void *context) {
-  _swift_debug_metadataAllocationIterationEnabled
-    = runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION();
-  if (!_swift_debug_metadataAllocationIterationEnabled) {
-    if (runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
-      swift::warning(RuntimeErrorFlagNone,
-                     "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
-                     "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
-                     "has no effect.\n");
-    return;
-  }
-
-  // Write a PoolTrailer to the end of InitialAllocationPool and shrink
-  // the pool accordingly.
-  auto poolCopy = AllocationPool.load(std::memory_order_relaxed);
-  assert(poolCopy.Begin == InitialAllocationPool.Pool);
-  size_t newPoolSize = InitialPoolSize - sizeof(PoolTrailer);
-  PoolTrailer trailer = { nullptr, newPoolSize };
-  memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer,
-         sizeof(trailer));
-  poolCopy.Remaining = newPoolSize;
-  AllocationPool.store(poolCopy, std::memory_order_relaxed);
-}
-
 static void recordBacktrace(void *allocation) {
   withCurrentBacktrace([&](void **addrs, int count) {
     MetadataAllocationBacktraceHeader<InProcess> *record =
@@ -5847,19 +5824,65 @@ static void recordBacktrace(void *allocation) {
   });
 }
 
-template <typename Pointee>
-static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
+static inline bool scribbleEnabled() {
 #ifndef NDEBUG
   // When DEBUG is defined, always scribble.
-  memset(bytes, 0xAA, totalSize);
+  return true;
 #else
   // When DEBUG is not defined, only scribble when the
   // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE environment variable is set.
-  if (SWIFT_UNLIKELY(
-          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE())) {
-    memset(bytes, 0xAA, totalSize);
-  }
+  return SWIFT_UNLIKELY(
+          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE());
 #endif
+}
+
+static constexpr char scribbleByte = 0xAA;
+
+template <typename Pointee>
+static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
+  if (scribbleEnabled())
+    memset(bytes, scribbleByte, totalSize);
+}
+
+/// When scribbling is enabled, check the specified region for the scribble
+/// values to detect overflows. When scribbling is disabled, this is a no-op.
+static inline void checkScribble(char *bytes, size_t totalSize) {
+  if (scribbleEnabled())
+    for (size_t i = 0; i < totalSize; i++)
+      if (bytes[i] != scribbleByte) {
+        const size_t maxToPrint = 16;
+        size_t remaining = totalSize - i;
+        size_t toPrint = std::min(remaining, maxToPrint);
+        std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
+        swift::fatalError(
+            0, "corrupt metadata allocation arena detected at %p: %s%s",
+            &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
+      }
+}
+
+static void checkAllocatorDebugEnvironmentVariables(void *context) {
+  memsetScribble(InitialAllocationPool.Pool, InitialPoolSize);
+
+  _swift_debug_metadataAllocationIterationEnabled =
+      runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION();
+  if (!_swift_debug_metadataAllocationIterationEnabled) {
+    if (runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
+      swift::warning(RuntimeErrorFlagNone,
+                     "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
+                     "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
+                     "has no effect.\n");
+    return;
+  }
+
+  // Write a PoolTrailer to the end of InitialAllocationPool and shrink
+  // the pool accordingly.
+  auto poolCopy = AllocationPool.load(std::memory_order_relaxed);
+  assert(poolCopy.Begin == InitialAllocationPool.Pool);
+  size_t newPoolSize = InitialPoolSize - sizeof(PoolTrailer);
+  PoolTrailer trailer = {nullptr, newPoolSize};
+  memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer, sizeof(trailer));
+  poolCopy.Remaining = newPoolSize;
+  AllocationPool.store(poolCopy, std::memory_order_relaxed);
 }
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
@@ -5868,7 +5891,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(size % alignof(void*) == 0);
 
   static OnceToken_t getenvToken;
-  SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariable, nullptr);
+  SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariables, nullptr);
 
   // If the size is larger than the maximum, just use malloc.
   if (size > PoolRange::MaxPoolAllocationSize) {
@@ -5899,6 +5922,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
         poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
       allocation = new char[PoolRange::PageSize];
+      memsetScribble(allocation, PoolRange::PageSize);
 
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
         PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
@@ -5919,7 +5943,6 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
-      memsetScribble(allocation, sizeWithHeader);
 
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
         AllocationHeader *header = (AllocationHeader *)allocation;
@@ -5932,8 +5955,10 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
                 SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
           recordBacktrace(returnedAllocation);
 
+        checkScribble(returnedAllocation, size);
         return returnedAllocation;
       } else {
+        checkScribble(allocation, size);
         return allocation;
       }
     }
@@ -5960,6 +5985,10 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size,
   if (reinterpret_cast<const char*>(allocation) + size != curState.Begin) {
     return;
   }
+
+  // If we're scribbling, re-scribble the allocation so that the next call to
+  // Allocate sees what it expects.
+  memsetScribble(const_cast<void *>(allocation), size);
 
   // Try to swap back to the pre-allocation state.  If this fails,
   // don't bother trying again; we'll just leak the allocation.
