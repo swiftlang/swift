@@ -3020,7 +3020,7 @@ function printJSONTimestamp() {
     local command=$1
     local kind=$2
 
-    echo "{ \"command\": \"${command}\", \"${kind}\":  \"$(date "+%Y-%m-%dT%H:%M:%S")\" }"
+    echo "{ \"command\": \"${command}\", \"${kind}\": \"$(date "+%Y-%m-%dT%H:%M:%S")\" }"
 }
 
 function printJSONStartTimestamp() {
@@ -3049,7 +3049,6 @@ for host in "${ALL_HOSTS[@]}"; do
     # Calculate the directory to install products in to.
     host_install_destdir=$(get_host_install_destdir ${host})
     host_install_prefix=$(get_host_install_prefix ${host})
-
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then
         echo "--- Extracting symbols ---"
