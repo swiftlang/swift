@@ -51,6 +51,7 @@ add_swift_host_library(swiftBasic STATIC
   ExponentialGrowthAppendingBinaryByteStream.cpp
   FileSystem.cpp
   FileTypes.cpp
+  Fingerprint.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   Located.cpp

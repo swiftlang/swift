@@ -34,9 +34,6 @@ public:
   ~FrontendSourceFileDepGraphFactory() override = default;
 
 private:
-  static std::string getFingerprint(const SourceFile *SF);
-  static std::string getInterfaceHash(const SourceFile *SF);
-
   void addAllDefinedDecls() override;
   void addAllUsedDecls() override;
 };
