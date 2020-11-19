@@ -4160,13 +4160,18 @@ namespace {
                                  ConstantStructBuilder &B)
       : super(IGM, theStruct, B) {}
 
+    Size getExtraDataSize(StructMetadataLayout &layout) {
+      auto extraSize = layout.getSize().getOffsetToEnd() -
+                       IGM.getOffsetOfStructTypeSpecificMetadataMembers();
+      return extraSize;
+    }
+
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                       llvm::Value *descriptor,
                                       llvm::Value *arguments,
                                       llvm::Value *templatePointer) {
       auto &layout = IGM.getMetadataLayout(Target);
-      auto extraSize = layout.getSize().getOffsetToEnd()
-                         - IGM.getOffsetOfStructTypeSpecificMetadataMembers();
+      auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
 
       // Sign the descriptor.
@@ -4234,6 +4239,7 @@ namespace {
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
       auto init = builder.beginStruct();
+      init.setPacked(true);
 
       struct Scanner : StructMetadataScanner<Scanner> {
         GenericStructMetadataBuilder &Outer;
@@ -4278,10 +4284,9 @@ namespace {
       Offset zeroingEnd = offsetUpToTrailingFlags 
                             ? layout.getTrailingFlagsOffset()
                             : layout.getFieldOffsetVectorOffset();
-      return { global,
-               zeroingEnd.getStatic()
-                 - zeroingStart,
-               structSize };
+      auto offset = zeroingEnd.getStatic() - zeroingStart;
+      assert((offset + structSize) == getExtraDataSize(layout));
+      return {global, offset, structSize};
     }
 
     bool hasCompletionFunction() {
@@ -4557,13 +4562,18 @@ namespace {
                                ConstantStructBuilder &B)
       : super(IGM, theEnum, B) {}
 
+    Size getExtraDataSize(EnumMetadataLayout &layout) {
+      auto size = layout.getSize().getOffsetToEnd() -
+                  IGM.getOffsetOfEnumTypeSpecificMetadataMembers();
+      return size;
+    }
+
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                       llvm::Value *descriptor,
                                       llvm::Value *arguments,
                                       llvm::Value *templatePointer) {
       auto &layout = IGM.getMetadataLayout(Target);
-      auto extraSize = layout.getSize().getOffsetToEnd()
-                         - IGM.getOffsetOfEnumTypeSpecificMetadataMembers();
+      auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
 
       // Sign the descriptor.
@@ -4602,6 +4612,7 @@ namespace {
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
       auto init = builder.beginStruct();
+      init.setPacked(true);
 
       auto &layout = IGM.getMetadataLayout(Target);
 
@@ -4623,10 +4634,9 @@ namespace {
       Offset zeroingEnd = offsetUpToTrailingFlags 
                             ? layout.getTrailingFlagsOffset()
                             : layout.getPayloadSizeOffset();
-      return { global,
-               zeroingEnd.getStatic()
-                 - zeroingStart,
-               structSize };
+      auto offset = zeroingEnd.getStatic() - zeroingStart;
+      assert((offset + structSize) == getExtraDataSize(layout));
+      return {global, offset, structSize};
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
