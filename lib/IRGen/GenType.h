@@ -103,6 +103,7 @@ private:
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
+  const LoadableTypeInfo *RawUnsafeContinuationTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
@@ -183,6 +184,7 @@ public:
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
+  const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();

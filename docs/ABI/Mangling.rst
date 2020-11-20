@@ -498,6 +498,7 @@ Types
   type ::= 'BO'                              // Builtin.UnknownObject (no longer a distinct type, but still used for AnyObject)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
+  type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
   type ::= 'Bt'                              // Builtin.SILToken
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word

@@ -78,6 +78,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
 
   if (Name == "RawPointer")
     return Context.TheRawPointerType;
+  if (Name == "RawUnsafeContinuation")
+    return Context.TheRawUnsafeContinuationType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
   if (Name == "BridgeObject")
@@ -2627,6 +2629,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
   switch (getBuiltinTypeKind()) {
   case BuiltinTypeKind::BuiltinRawPointer:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_RAWPOINTER);
+    break;
+  case BuiltinTypeKind::BuiltinRawUnsafeContinuation:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION);
     break;
   case BuiltinTypeKind::BuiltinNativeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);

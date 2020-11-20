@@ -595,6 +595,8 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                            BuiltinBridgeObjectType(*this)),
     TheRawPointerType(new (*this, AllocationArena::Permanent)
                         BuiltinRawPointerType(*this)),
+    TheRawUnsafeContinuationType(new (*this, AllocationArena::Permanent)
+                                 BuiltinRawUnsafeContinuationType(*this)),
     TheUnsafeValueBufferType(new (*this, AllocationArena::Permanent)
                                BuiltinUnsafeValueBufferType(*this)),
     TheSILTokenType(new (*this, AllocationArena::Permanent)
