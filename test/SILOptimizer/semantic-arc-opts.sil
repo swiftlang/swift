@@ -90,6 +90,8 @@ struct StructWithEnumWithIndirectCaseField {
   var field : EnumWithIndirectCase
 }
 
+sil @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+
 ///////////
 // Tests //
 ///////////
@@ -1747,10 +1749,8 @@ bb1:
   return %9999 : $()
 }
 
-// Forwarding case. We need LiveRanges for this.
-//
 // CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'donot_join_simple_liveranges_in_same_block_2'
 sil [ossa] @donot_join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -2831,4 +2831,40 @@ bb1:
 
 bb2:
   unreachable
+}
+
+// Make sure we leave only one copy in bb2 and no destroys
+//
+// CHECK-LABEL: sil [ossa] @join_test_with_forwarding_inst : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb2:
+// CHECK: copy_value
+// CHECK-NOT: destroy_value
+// CHECK-NOT: copy_value
+// CHECK:   br bb3(
+// CHECK: } // end sil function 'join_test_with_forwarding_inst'
+sil [ossa] @join_test_with_forwarding_inst : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+bb0:
+  %allocStack = alloc_stack $Builtin.NativeObject
+  %0 = function_ref @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+  %1 = apply %0() : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $FakeOptional<Builtin.NativeObject>
+  %2 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt
+  br bb3(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+  %4 = copy_value %3 : $Builtin.NativeObject
+  store %3 to [init] %allocStack : $*Builtin.NativeObject
+  %4c = copy_value %4 : $Builtin.NativeObject
+  destroy_value %4 : $Builtin.NativeObject
+  %5 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %4c : $Builtin.NativeObject
+  destroy_addr %allocStack : $*Builtin.NativeObject
+  br bb3(%5 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
+  dealloc_stack %allocStack : $*Builtin.NativeObject
+  return %result : $FakeOptional<Builtin.NativeObject>
 }

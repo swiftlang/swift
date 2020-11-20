@@ -289,23 +289,21 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
 static bool canSafelyJoinSimpleRange(SILValue cviOperand,
                                      DestroyValueInst *cviOperandDestroy,
                                      CopyValueInst *cvi) {
-  // We only handle cases where our copy_value has a single consuming use that
-  // is not a forwarding use. We need to use the LiveRange functionality to
-  // guarantee correctness in the presence of forwarding uses.
-  //
-  // NOTE: This use may be any type of consuming use and may not be a
-  // destroy_value.
+  // We only handle cases where our copy_value has a single lifetime ending
+  // use. We are not working with live ranges here so we do can treat forwarding
+  // insts like any other value.
   auto *cviConsumer = cvi->getSingleConsumingUse();
-  if (!cviConsumer || isOwnedForwardingUse(cviConsumer)) {
+  if (!cviConsumer) {
     return false;
   }
 
   // Ok, we may be able to eliminate this. The main thing we need to be careful
-  // of here is that if the destroy_value is /after/ the consuming use of the
-  // operand of copy_value, we may have normal uses of the copy_value's operand
-  // that would become use-after-frees since we would be shrinking the lifetime
-  // of the object potentially. Consider the following SIL:
+  // of here is that if the lifetime of %0 ends /after/ the lifetime of
+  // %1. Otherwise we would be shrinking the lifetime of the object
+  // potentially. Consider the following SIL that we would miscompile in such a
+  // case.
   //
+  //   // potential_miscompile.sil
   //   %0 = ...
   //   %1 = copy_value %0
   //   apply %cviConsumer(%1)
