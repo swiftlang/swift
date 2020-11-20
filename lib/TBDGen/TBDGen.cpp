@@ -631,7 +631,7 @@ void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
 /// the initializer given a decl.
 /// The rule is that structs and convenience init of classes emit a
 /// dynamic replacement for the allocator.
-/// Designated init of classes emit a dynamic replacement for the intializer.
+/// Designated init of classes emit a dynamic replacement for the initializer.
 /// This is because the super class init call is emitted to the initializer and
 /// needs to be dynamic.
 static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
