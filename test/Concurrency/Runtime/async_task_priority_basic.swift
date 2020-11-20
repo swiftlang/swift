@@ -25,9 +25,9 @@ extension DispatchQueue {
 func test_getPriority() {
   _ = DispatchQueue.main.async { () async in
     let p = await Task.currentPriority()
-    // CHECK: priority: userInteractive
+    // CHECK: priority: default
     print("priority: \(p)")
-    assert(p == Task.Priority.userInteractive)
+    assert(p == Task.Priority.default)
     exit(0)
   }
 }
