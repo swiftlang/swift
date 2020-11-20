@@ -45,7 +45,12 @@ extension Task {
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
     let task = Builtin.getCurrentAsyncTask()
-    return getPriority(task)
+    let p = getPriority(task)
+    if let priority = Priority(rawValue: p) {
+      return priority
+    } else {
+      fatalError("Unknown priority: \(p)")
+    }
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -417,7 +422,7 @@ extension Task {
 public func runTask(_ task: __owned Builtin.NativeObject)
 
 @_silgen_name("swift_task_getPriority")
-public func getPriority(_ task: __owned Builtin.NativeObject) -> Task.Priority
+func getPriority(_ task: __owned Builtin.NativeObject) -> Int
 
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
