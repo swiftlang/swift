@@ -352,6 +352,6 @@ void swift::swift_task_run(AsyncTask *taskToRun) {
   taskToRun->run(ExecutorRef::noPreference());
 }
 
-JobPriority swift::swift_task_getPriority(AsyncTask *task) {
-  return task->getPriority();
+JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
+  return task->Flags;
 }

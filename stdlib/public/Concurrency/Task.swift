@@ -44,13 +44,8 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
-    let task = Builtin.getCurrentAsyncTask()
-    let p = getPriority(task)
-    if let priority = Priority(rawValue: p) {
-      return priority
-    } else {
-      fatalError("Unknown priority: \(p)")
-    }
+    let flags = getJobFlags(Builtin.getCurrentAsyncTask())
+    return flags.priority
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -421,8 +416,8 @@ extension Task {
 @_silgen_name("swift_task_run")
 public func runTask(_ task: __owned Builtin.NativeObject)
 
-@_silgen_name("swift_task_getPriority")
-func getPriority(_ task: __owned Builtin.NativeObject) -> Int
+@_silgen_name("swift_task_getJobFlags")
+func getJobFlags(_ task: __owned Builtin.NativeObject) -> Task.JobFlags
 
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
