@@ -584,6 +584,7 @@ namespace {
   class ActorIsolationChecker : public ASTWalker {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
+    SmallVector<ApplyExpr*, 4> applyStack;
 
     const DeclContext *getDeclContext() const {
       return contextStack.back();
@@ -625,27 +626,45 @@ namespace {
       }
 
       if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        applyStack.push_back(apply);  // record this encounter
+
         // If this is a call to a partial apply thunk, decompose it to check it
         // like based on the original written syntax, e.g., "self.method".
         if (auto partialApply = decomposePartialApplyThunk(
                 apply, Parent.getAsExpr())) {
           if (auto memberRef = findMemberReference(partialApply->fn)) {
+            // NOTE: partially-applied thunks are never annotated as 
+            // implicitly async, regardless of whether they are escaping.
+            // So, we do not pass the ApplyExpr along to checkMemberReference.
             checkMemberReference(
                 partialApply->base, memberRef->first, memberRef->second,
                 partialApply->isEscaping);
 
             partialApply->base->walk(*this);
+
+            // manual clean-up since normal traversal is skipped
+            assert(applyStack.back() == apply);
+            applyStack.pop_back();
+
             return { false, expr };
           }
         }
       }
 
+      // NOTE: SelfApplyExpr is a subtype of ApplyExpr
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
-              call->getArg(), memberRef->first, memberRef->second);
+              call->getArg(), memberRef->first, memberRef->second, 
+              /*isEscapingPartialApply=*/false, call);
+
           call->getArg()->walk(*this);
+
+          // manual clean-up since normal traversal is skipped
+          assert(applyStack.back() == dyn_cast<ApplyExpr>(expr));
+          applyStack.pop_back();
+
           return { false, expr };
         }
       }
@@ -657,6 +676,11 @@ namespace {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         assert(contextStack.back() == closure);
         contextStack.pop_back();
+      }
+
+      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+        assert(applyStack.back() == apply);
+        applyStack.pop_back();
       }
 
       return expr;
@@ -696,10 +720,9 @@ namespace {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // FIXME: We'd like to insert 'async' at the appropriate place, but
-        // FuncDecl/AbstractFunctionDecl doesn't have the right source-location
-        // information to do so.
-        func->diagnose(diag::actor_isolated_method);
+        func->diagnose(diag::actor_isolated_sync_func, 
+          decl->getDescriptiveKind(),
+          decl->getName());
       } else if (isa<VarDecl>(decl)) {
         decl->diagnose(diag::actor_mutable_state);
       } else {
@@ -835,9 +858,39 @@ namespace {
     /// Check a reference to an entity within a global actor.
     bool checkGlobalActorReference(
         ValueDecl *value, SourceLoc loc, Type globalActor) {
+
+      /// Returns true if this global actor reference is the callee of an Apply.
+      /// NOTE: This check mutates the identified ApplyExpr if it returns true!
+      auto inspectForImplicitlyAsync = [&] () -> bool {
+
+        // Is this global actor reference outside of an ApplyExpr?
+        if (applyStack.size() == 0)
+          return false;
+
+        // Check our applyStack metadata from the traversal.
+        // Our goal is to identify whether this global actor reference appears
+        // as the called value of the enclosing ApplyExpr. We cannot simply
+        // inspect Parent here because of expressions like (callee)()
+        ApplyExpr *apply = applyStack.back();
+        Expr *fn = apply->getFn()->getValueProvidingExpr();
+        if (auto memberRef = findMemberReference(fn)) {
+          auto concDecl = memberRef->first;
+          if (value == concDecl.getDecl() && !apply->implicitlyAsync()) {
+            // then this ValueDecl appears as the called value of the ApplyExpr.
+            apply->setImplicitlyAsync(true);
+            return true;
+          }
+        }
+
+        return false;
+      };
+
       switch (auto contextIsolation =
                   getInnermostIsolatedContext(getDeclContext())) {
       case ActorIsolation::ActorInstance:
+        if (inspectForImplicitlyAsync())
+          return false;
+
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_instance_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
@@ -850,6 +903,12 @@ namespace {
         if (contextIsolation.getGlobalActor()->isEqual(globalActor))
           return false;
 
+        // Otherwise, we check if this decl reference is the callee of the
+        // enclosing Apply, making it OK as an implicitly async call.
+        if (inspectForImplicitlyAsync())
+          return false;
+
+        // Otherwise, this is a problematic global actor decl reference.
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_other_global_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
@@ -860,6 +919,9 @@ namespace {
 
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
+        if (inspectForImplicitlyAsync())
+          return false;
+
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_independent_context,
             value->getDescriptiveKind(), value->getName(), globalActor);
@@ -867,7 +929,8 @@ namespace {
         return true;
 
       case ActorIsolation::Unspecified:
-        // Okay.
+        // Okay no matter what, but still must inspect for implicitly async.
+        inspectForImplicitlyAsync();
         return false;
       }
       llvm_unreachable("unhandled actor isolation kind!");
@@ -918,9 +981,12 @@ namespace {
     }
 
     /// Check a reference with the given base expression to the given member.
+    /// Returns true iff the member reference refers to actor-isolated state
+    /// in an invalid or unsafe way such that a diagnostic was emitted.
     bool checkMemberReference(
         Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
-        bool isEscapingPartialApply = false) {
+        bool isEscapingPartialApply = false, 
+        ApplyExpr *maybeImplicitAsync = nullptr) {
       if (!base || !memberRef)
         return false;
 
@@ -934,6 +1000,11 @@ namespace {
         // Must reference actor-isolated state on 'self'.
         auto selfVar = getSelfReference(base);
         if (!selfVar) {
+          // actor-isolated non-self calls are implicitly async and thus OK.
+          if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
+            maybeImplicitAsync->setImplicitlyAsync(true);
+            return false;
+          }
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
