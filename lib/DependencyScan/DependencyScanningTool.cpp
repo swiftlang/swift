@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/DependencyScanningTool.h"
-#include "swift/DependencyScan/ModuleInfo.h"
+#include "swift/DependencyScan/FullDependencies.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -28,7 +28,7 @@ DependencyScanningTool::DependencyScanningTool()
     : SharedCache(std::make_unique<ModuleDependenciesCache>()), PDC(), Alloc(),
       Saver(Alloc) {}
 
-llvm::ErrorOr<std::string> DependencyScanningTool::getDependencies(
+llvm::ErrorOr<FullDependencies> DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const llvm::StringSet<> &PlaceholderModules) {
   // The primary instance used to scan the query Swift source-code
@@ -37,13 +37,13 @@ llvm::ErrorOr<std::string> DependencyScanningTool::getDependencies(
     return EC;
   auto Instance = std::move(*InstanceOrErr);
 
-  std::string JSONOutput;
-  llvm::raw_string_ostream OSS(JSONOutput);
-  performModuleScan(*Instance.get(), *SharedCache, OSS);
-  OSS.flush();
+  // Execute the scanning action, retreiving the in-memory result
+  auto DependenciesOrErr = performModuleScan(*Instance.get(), *SharedCache);
+  if (DependenciesOrErr.getError())
+    return std::make_error_code(std::errc::not_supported);
+  auto Dependencies = std::move(*DependenciesOrErr);
 
-  // TODO: swiftch to an in-memory representation
-  return JSONOutput;
+  return Dependencies;
 }
 
 std::error_code DependencyScanningTool::getDependencies(

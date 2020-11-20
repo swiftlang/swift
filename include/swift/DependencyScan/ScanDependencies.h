@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FRONTENDTOOL_SCANDEPENDENCIES_H
-#define SWIFT_FRONTENDTOOL_SCANDEPENDENCIES_H
+#ifndef SWIFT_DEPENDENCY_SCANDEPENDENCIES_H
+#define SWIFT_DEPENDENCY_SCANDEPENDENCIES_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 namespace llvm {
 class StringSaver;
@@ -27,6 +28,7 @@ class ModuleDependenciesCache;
 
 namespace dependencies {
 
+struct FullDependencies;
 struct BatchScanInput {
   llvm::StringRef moduleName;
   llvm::StringRef arguments;
@@ -34,40 +36,40 @@ struct BatchScanInput {
   bool isSwift;
 };
 
-// MARK: swift-frontend -scan-dependencies entry points
+// MARK: FrontendTool dependency scanner entry points
 /// Scans the dependencies of the main module of \c instance and writes out
 /// the resulting JSON according to the instance's output parameters.
-/// This method is used for swift-frontend invocations in dependency scanning mode
-/// (-scan-dependencies), where the module dependency cache is not shared.
 bool scanDependencies(CompilerInstance &instance);
+
+/// Identify all imports in the translation unit's module.
+bool prescanDependencies(CompilerInstance &instance);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
 bool batchScanDependencies(CompilerInstance &instance,
                            llvm::StringRef batchInputFile);
 
-/// Identify all imports in the translation unit's module.
-bool prescanMainModuleDependencies(CompilerInstance &instance);
+/// Batch prescan the imports of modules specified in \c batchInputFile.
+bool batchPrescanDependencies(CompilerInstance &instance,
+                              llvm::StringRef batchInputFile);
 
-
-// MARK: dependency scanning execution
+// MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
-bool performModuleScan(CompilerInstance &instance,
-                       ModuleDependenciesCache &cache,
-                       llvm::raw_ostream &out);
+llvm::ErrorOr<FullDependencies>
+performModuleScan(CompilerInstance &instance,
+                  ModuleDependenciesCache &cache);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool performBatchModuleScan(CompilerInstance &instance,
-                            ModuleDependenciesCache &cache,
-                            llvm::StringSaver &saver,
-                            const std::vector<BatchScanInput> &BatchInput);
+std::vector<llvm::ErrorOr<FullDependencies>>
+performBatchModuleScan(CompilerInstance &instance,
+                       ModuleDependenciesCache &cache, llvm::StringSaver &saver,
+                       const std::vector<BatchScanInput> &BatchInput);
 
-/// Scan for dependencies of a module with a specified name, producing the resulting output
-/// at the specified output path.
-bool scanBatchModuleEntry(CompilerInstance &instance,
+/// Batch prescan the imports of modules specified in \c batchInputFile.
+std::vector<llvm::ErrorOr<std::vector<std::string>>>
+performBatchModulePrescan(CompilerInstance &instance,
                           ModuleDependenciesCache &cache,
-                          llvm::StringRef moduleName,
-                          bool isClang,
-                          llvm::StringRef outputPath);
+                          llvm::StringSaver &saver,
+                          const std::vector<BatchScanInput> &BatchInput);
 
 } // end namespace dependencies
 } // end namespace swift

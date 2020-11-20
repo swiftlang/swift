@@ -1137,11 +1137,14 @@ static bool performScanDependencies(CompilerInstance &Instance) {
   ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
     if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
-      return dependencies::prescanMainModuleDependencies(Instance);
+      return dependencies::prescanDependencies(Instance);
     else
       return dependencies::scanDependencies(Instance);
   } else {
-    return dependencies::batchScanDependencies(Instance, batchScanInput);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::batchPrescanDependencies(Instance, batchScanInput);
+    else
+      return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 

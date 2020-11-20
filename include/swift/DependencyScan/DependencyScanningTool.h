@@ -16,8 +16,6 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/DependencyScan/ScanDependencies.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"
@@ -37,7 +35,7 @@ public:
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c FullDependencies otherwise.
-  llvm::ErrorOr<std::string>
+  llvm::ErrorOr<FullDependencies>
   getDependencies(ArrayRef<const char *> Command,
                   const llvm::StringSet<> &PlaceholderModules);
 

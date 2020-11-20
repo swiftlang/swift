@@ -12,6 +12,7 @@
 
 #include "ScanFixture.h"
 #include "swift/Basic/Platform.h"
+#include "swift/DependencyScan/FullDependencies.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
@@ -158,8 +159,7 @@ export *\n\
   std::string Command = TestPathStr + " -I " + SwiftDirPath + " -I " +
                         CHeadersDirPath + " -I " + StdLibDir.str().str() +
                         " -I " + ShimsLibDir.str().str();
-  llvm::ErrorOr<std::string> deps = ScannerTool.getDependencies(
-      Command.c_str(), {});
+  auto deps = ScannerTool.getDependencies(Command.c_str(), {});
 
   // TODO: Output/verify dependency graph correctness
   // llvm::dbgs() << "Deps: " << deps << "\n";
