@@ -1655,6 +1655,29 @@ static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
   return builder.build(id);
 }
 
+static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
+                                            Identifier id,
+                                            bool throws) {
+  BuiltinFunctionBuilder builder(ctx);
+
+  auto contTy = ctx.TheRawUnsafeContinuationType;
+  SmallVector<AnyFunctionType::Param, 1> params;
+  params.emplace_back(contTy);
+
+  auto voidTy = ctx.TheEmptyTupleType;
+  auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
+  auto *fnTy = FunctionType::get(params, voidTy, extInfo);
+
+  builder.addParameter(makeConcrete(fnTy));
+  builder.setResult(makeGenericParam());
+
+  builder.setAsync();
+  if (throws)
+    builder.setThrows();
+
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -2592,6 +2615,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     return getTriggerFallbackDiagnosticOperation(Context, Id);
+
+  case BuiltinValueKind::WithUnsafeContinuation:
+    return getWithUnsafeContinuation(Context, Id, /*throws=*/false);
+
+  case BuiltinValueKind::WithUnsafeThrowingContinuation:
+    return getWithUnsafeContinuation(Context, Id, /*throws=*/true);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContext:
     return getAutoDiffCreateLinearMapContext(Context, Id);
