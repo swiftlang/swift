@@ -1,0 +1,3 @@
+struct CxxLoadableIntWrapper {
+  int value;
+};
