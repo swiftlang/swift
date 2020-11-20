@@ -5,7 +5,7 @@ actor class MyActor {
   let immutable: Int = 17
   var text: [String] = []
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 2 {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 2 {{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String { synchronous() }
 
   func testAsyncLetIsolation() async {
@@ -26,4 +26,12 @@ actor class MyActor {
     _ = await z
     _ = await w
   }
+}
+
+func outside() async {
+  let a = MyActor()
+  async let x = a.synchronous() // expected-error {{call is 'async' in an 'async let' initializer that is not marked with 'await'}}
+  async let y = await a.synchronous()
+  _ = await x
+  _ = await y
 }
