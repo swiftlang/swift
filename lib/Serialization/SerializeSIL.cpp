@@ -260,6 +260,8 @@ namespace {
                                         unsigned attrs);
     void writeOneTypeLayout(SILInstructionKind valueKind,
                             unsigned attrs, SILType type);
+    void writeOneTypeLayout(SILInstructionKind valueKind,
+                            unsigned attrs, CanType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
                                       SILType type,
@@ -585,6 +587,14 @@ void SILSerializer::writeOneTypeLayout(SILInstructionKind valueKind,
         (unsigned) valueKind, attrs,
         S.addTypeRef(type.getASTType()),
         (unsigned)type.getCategory());
+}
+
+void SILSerializer::writeOneTypeLayout(SILInstructionKind valueKind,
+                                       unsigned attrs, CanType type) {
+  unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
+  SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned) valueKind, attrs,
+        S.addTypeRef(type), 0);
 }
 
 void SILSerializer::writeOneOperandLayout(SILInstructionKind valueKind,
@@ -1584,13 +1594,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
     auto &gaca = cast<GetAsyncContinuationAddrInst>(SI);
-    writeOneTypeOneOperandLayout(gaca.getKind(), 0, gaca.getType(),
+    writeOneTypeOneOperandLayout(gaca.getKind(), gaca.throws(),
+                                 gaca.getFormalResumeType(),
                                  gaca.getOperand());
     break;
   }
   case SILInstructionKind::GetAsyncContinuationInst: {
     auto &gaca = cast<GetAsyncContinuationInst>(SI);
-    writeOneTypeLayout(gaca.getKind(), 0, gaca.getType());
+    writeOneTypeLayout(gaca.getKind(), gaca.throws(),
+                       gaca.getFormalResumeType());
     break;
   }
   // Conversion instructions (and others of similar form).

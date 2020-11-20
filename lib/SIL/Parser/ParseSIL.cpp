@@ -5288,8 +5288,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         throws = true;
       }
       
-      SILType resumeTy;
-      if (parseSILType(resumeTy)) {
+      CanType resumeTy;
+      if (parseASTType(resumeTy)) {
         return true;
       }
       
@@ -5304,21 +5304,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILDebugLocation(InstLoc, B))
         return true;
       
-      auto &M = B.getModule();
-      NominalTypeDecl *continuationDecl = throws
-        ? M.getASTContext().getUnsafeThrowingContinuationDecl()
-        : M.getASTContext().getUnsafeContinuationDecl();
-      
-      auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
-                                                  resumeTy.getASTType());
-      auto continuationSILTy
-        = SILType::getPrimitiveObjectType(continuationTy->getCanonicalType());
-      
       if (Opcode == SILInstructionKind::GetAsyncContinuationAddrInst) {
         ResultVal = B.createGetAsyncContinuationAddr(InstLoc, resumeBuffer,
-                                                     continuationSILTy);
+                                                     resumeTy, throws);
       } else {
-        ResultVal = B.createGetAsyncContinuation(InstLoc, continuationSILTy);
+        ResultVal = B.createGetAsyncContinuation(InstLoc, resumeTy, throws);
       }
       break;
     }
