@@ -235,7 +235,7 @@ private:
           llvm::consumeError(name.takeError());
           continue;
         }
-        uint64_t offset = resolve(R, 0, 0);
+        uint64_t offset = resolve(R.getType(), R.getOffset(), 0, 0, 0);
         DynamicRelocations.insert({R.getOffset(), {*name, offset}});
       }
     }
