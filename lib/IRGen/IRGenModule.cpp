@@ -619,9 +619,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
-  AsyncContinuationContextTy =
-      createStructType(*this, "swift.async_continuation_context",
-                       {SwiftContextPtrTy, SizeTy, ErrorPtrTy, OpaquePtrTy});
+  AsyncContinuationContextTy = createStructType(
+      *this, "swift.async_continuation_context",
+      {SwiftContextPtrTy, SizeTy, ErrorPtrTy, OpaquePtrTy, SwiftExecutorPtrTy});
   AsyncContinuationContextPtrTy = AsyncContinuationContextTy->getPointerTo();
 
   DifferentiabilityWitnessTy = createStructType(

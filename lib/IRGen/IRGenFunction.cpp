@@ -567,11 +567,13 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
   //     IndirectResult *result;
   //     DirectResult *result;
   //   };
+  //   ExecutorRef *resumeExecutor;
   // } continuation_context; // local variable of current_sil_function
   //
   // continuation_context.resumeCtxt = currCtxt;
   // continuation_context.errResult = nulllptr;
   // continuation_context.result = ... // local alloca.
+  // continuation_context.resumeExecutor = .. // current executor
 
   auto currTask = getAsyncTask();
   auto unsafeContinuation =
@@ -621,6 +623,14 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
                             contResultAddr->getType()->getPointerElementType()),
                         Address(contResultAddr, pointerAlignment));
   }
+  // continuation_context.resumeExecutor = // current executor
+  auto contExecutorRefAddr =
+      Builder.CreateStructGEP(continuationContext.getAddress(), 4);
+  Builder.CreateStore(
+      Builder.CreateBitOrPointerCast(
+          getAsyncExecutor(),
+          contExecutorRefAddr->getType()->getPointerElementType()),
+      Address(contExecutorRefAddr, pointerAlignment));
 
   // Fill the current task (i.e the continuation) with the continuation
   // information.

@@ -30,6 +30,8 @@ bb0:
 // CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 3
 // CHECK: [[result_storage_as_opaque:%.*]] = bitcast i32* [[result_storage]] to %swift.opaque*
 // CHECK: store %swift.opaque* [[result_storage_as_opaque]], %swift.opaque** [[result_addr]]
+// CHECK:  [[exectuor_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 4
+// CHECK:  store %swift.executor* %1, %swift.executor** [[exectuor_addr]]
 //   Initialize the async task with the continuation function and async continuation context.
 // CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* %0, i32 0, i32 3
 // CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
@@ -73,7 +75,7 @@ bb0:
 // CHECK:   [[result_addr:%.*]] = load %swift.opaque*, %swift.opaque** [[result_addr_addr]]
 // CHECK:   [[typed_result_addr:%.*]] = bitcast %swift.opaque* [[result_addr]] to i32*
 // CHECK:   [[result_value:%.*]] = load i32, i32* [[typed_result_addr]]
-// CHECK:   br label [[result_bb:[0-9]+]]
+// CHECK:   br label %[[result_bb:[0-9]+]]
 
 // CHECK: [[result_bb]]:
 // CHECK:   phi i32 [ [[result_value]], %await.async.normal ]
