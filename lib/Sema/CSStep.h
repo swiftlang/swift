@@ -639,6 +639,8 @@ class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   Optional<Score> BestNonGenericScore;
   Optional<std::pair<Constraint *, Score>> LastSolvedChoice;
 
+  FunctionType *argFnType = nullptr;
+
 public:
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
                   SmallVectorImpl<Solution> &solutions)
@@ -647,6 +649,29 @@ public:
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
     pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
+
+    // FIXME: This is duplicate (and expensive) work from simplifyAppliedOverloads
+    auto choices = disjunction->getNestedConstraints();
+    auto *typeVar = choices.front()->getFirstType()->getAs<TypeVariableType>();
+    if (!typeVar)
+      return;
+
+    auto result = cs.findConstraintThroughOptionals(
+        typeVar, ConstraintSystem::OptionalWrappingDirection::Unwrap,
+        [&](Constraint *match, TypeVariableType *currentRep) {
+          // Check to see if we have an applicable fn with a type var RHS that
+          // matches the disjunction.
+          if (match->getKind() != ConstraintKind::ApplicableFunction)
+            return false;
+
+          auto *rhsTyVar = match->getSecondType()->getAs<TypeVariableType>();
+          return rhsTyVar && currentRep == cs.getRepresentative(rhsTyVar);
+        });
+
+    if (result) {
+      auto *applicableFn = result->first;
+      argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
+    }
   }
 
   ~DisjunctionStep() override {
@@ -732,7 +757,9 @@ private:
 
   // Figure out which of the solutions has the smallest score.
   static Optional<Score> getBestScore(SmallVectorImpl<Solution> &solutions) {
-    assert(!solutions.empty());
+    if (solutions.empty())
+      return None;
+
     Score bestScore = solutions.front().getFixedScore();
     if (solutions.size() == 1)
       return bestScore;

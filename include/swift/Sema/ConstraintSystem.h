@@ -3923,6 +3923,7 @@ private:
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
+public:
   /// Describes a direction of optional wrapping, either increasing optionality
   /// or decreasing optionality.
   enum class OptionalWrappingDirection {
@@ -3950,6 +3951,7 @@ private:
       TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
       llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate);
 
+private:
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
   ///

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSStep.h"
+#include "TypeChecker.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -554,6 +555,40 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
 
   if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
+
+  // If the solver already found a solution with a choice that did not
+  // introduce any conversions (i.e., the score is not worse than the
+  // current score), we can skip any generic operators with conformance
+  // requirements that are not satisfied by any known argument types.
+  auto bestScore = getBestScore(Solutions);
+  auto bestChoiceNeedsConversions = bestScore && (bestScore > getCurrentScore());
+  if (!bestChoiceNeedsConversions && choice.isGenericOperator() && argFnType) {
+    Constraint *constraint = choice;
+    auto *decl = constraint->getOverloadChoice().getDecl();
+    auto *useDC = constraint->getOverloadUseDC();
+    auto choiceType = CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
+                                                  /*allowMembers=*/true, useDC);
+    auto choiceFnType = choiceType->getAs<FunctionType>();
+    auto genericFnType = decl->getInterfaceType()->getAs<GenericFunctionType>();
+    auto signature = genericFnType->getGenericSignature();
+
+    for (auto argParamPair : llvm::zip(argFnType->getParams(),
+                                       choiceFnType->getParams())) {
+      auto argType = std::get<0>(argParamPair).getPlainType();
+      auto paramType = std::get<1>(argParamPair).getPlainType();
+
+      // Only check argument types with no type variables that will be matched
+      // against a plain type parameter.
+      argType = argType->getCanonicalType()->getWithoutSpecifierType();
+      if (argType->hasTypeVariable() || !paramType->isTypeParameter())
+        continue;
+
+      for (auto *protocol : signature->getRequiredProtocols(paramType)) {
+        if (!TypeChecker::conformsToProtocol(argType, protocol, useDC))
+          return skip("unsatisfied");
+      }
+    }
+  }
 
   // Don't attempt to solve for generic operators if we already have
   // a non-generic solution.
