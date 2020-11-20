@@ -2,7 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: OS=macosx
+// REQUIRES: libdispatch
 // XFAIL: CPU=arm64e
 
 import Dispatch
