@@ -173,6 +173,10 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_removeStatusRecord(AsyncTask *task,
                                    TaskStatusRecord *record);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority
+swift_task_getPriority(AsyncTask* task);
+
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {
 ///      case none

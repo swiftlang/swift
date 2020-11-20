@@ -127,6 +127,10 @@ public:
     return Flags.isAsyncTask();
   }
 
+  JobPriority getPriority() const {
+    return Flags.getPriority();
+  }
+
   /// Run this job.
   void run(ExecutorRef currentExecutor);
 };
