@@ -18,6 +18,7 @@
 
 #include "OwnershipPhiOperand.h"
 #include "SemanticARCOptVisitor.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -450,6 +451,65 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
   return false;
 }
 
+/// Given an owned value that is completely enclosed within its parent owned
+/// value and is not consumed, eliminate the copy.
+bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
+    CopyValueInst *cvi) {
+  if (ctx.onlyGuaranteedOpts)
+    return false;
+
+  auto originalValue = cvi->getOperand();
+  if (originalValue.getOwnershipKind() != OwnershipKind::Owned)
+    return false;
+
+  // TODO: Add support for forwarding insts here.
+  SmallVector<DestroyValueInst *, 8> destroyingUses;
+  SmallVector<Operand *, 32> allCopyUses;
+  for (auto *use : cvi->getUses()) {
+    // First just stash our use so we have /all uses/.
+    allCopyUses.push_back(use);
+
+    // Then if we are not a lifetime ending use, just continue.
+    if (!use->isLifetimeEnding()) {
+      continue;
+    }
+
+    // Otherwise, if we have a destroy value lifetime ending use, stash that.
+    if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
+      destroyingUses.push_back(dvi);
+      continue;
+    }
+
+    // Otherwise, just bail for now.
+    return false;
+  }
+
+  // NOTE: We do not actually care if the parent's lifetime ends with
+  // destroy_values. All we care is that it is lifetime ending and the use isn't
+  // a forwarding instruction.
+  SmallVector<Operand *, 8> parentLifetimeEndingUses;
+  for (auto *origValueUse : originalValue->getUses())
+    if (origValueUse->isLifetimeEnding() &&
+        !isa<OwnershipForwardingInst>(origValueUse->getUser()))
+      parentLifetimeEndingUses.push_back(origValueUse);
+
+  // Ok, we have an owned value. If we do not have any non-destroying consuming
+  // uses, see if all of our uses (ignoring destroying uses) are within our
+  // parent owned value's lifetime.
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+  if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
+                                allCopyUses))
+    return false;
+
+  // Ok, we can perform our transform. Eliminate all of our destroy value insts,
+  // and then RAUW our copy value with our parent value.
+  while (!destroyingUses.empty())
+    eraseInstruction(destroyingUses.pop_back_val());
+  eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
@@ -469,6 +529,10 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 
   // Then try to perform the guaranteed copy value optimization.
   if (performGuaranteedCopyValueOptimization(cvi)) {
+    return true;
+  }
+
+  if (tryPerformOwnedCopyValueOptimization(cvi)) {
     return true;
   }
 
