@@ -1420,12 +1420,12 @@ bb0:
   return %9999 : $()
 }
 
-// Make sure we do not eliminate copies where only the destroy_value is outside
-// of the lifetime of the parent value, but a begin_borrow extends the lifetime
-// of the value.
+// We can eliminate the ARC traffic here due to lifetime joining. There is a
+// test in semantic-arc-opts-redundantcopyopts.sil that shows said pass does not
+// optimize this pattern.
 //
 // CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime : $@convention(thin) () -> () {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'simple_recursive_copy_case_destroying_use_out_of_lifetime'
 sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime : $@convention(thin) () -> () {
 bb0:
@@ -1457,11 +1457,10 @@ bb3:
   return %9999 : $()
 }
 
-// Second version of the test that consumes the pair in case we make the
-// lifetime joining smart enough to handle the original case.
+// We handle this with lifetime joining.
 //
 // CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime_2 : $@convention(thin) () -> () {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'simple_recursive_copy_case_destroying_use_out_of_lifetime_2'
 sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime_2 : $@convention(thin) () -> () {
 bb0:

@@ -847,7 +847,7 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
 }
 
 ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
-  return getUser()->getOwnershipKind();
+  return (*this)->getOwnershipKind();
 }
 
 void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
@@ -972,4 +972,46 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
     return;
   }
   llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+}
+
+SILValue ForwardingOperand::getSingleForwardedValue() const {
+  assert(isGuaranteedForwardingUse(use));
+  if (auto *svi = dyn_cast<SingleValueInstruction>(use->getUser()))
+    return svi;
+  return SILValue();
+}
+
+bool ForwardingOperand::visitForwardedValues(
+    function_ref<bool(SILValue)> visitor) {
+  auto *user = use->getUser();
+
+  assert(isGuaranteedForwardingUse(use));
+
+  // See if we have a single value instruction... if we do that is always the
+  // transitive result.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+    return visitor(svi);
+  }
+
+  if (auto *mvri = dyn_cast<MultipleValueInstruction>(user)) {
+    return llvm::all_of(mvri->getResults(), [&](SILValue value) {
+      if (value.getOwnershipKind() == OwnershipKind::None)
+        return true;
+      return visitor(value);
+    });
+  }
+
+  // This is an instruction like switch_enum and checked_cast_br that are
+  // "transforming terminators"... We know that this means that we should at
+  // most have a single phi argument.
+  auto *ti = cast<TermInst>(user);
+  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+    // If we do not have any arguments, then continue.
+    if (succBlock->args_empty())
+      return true;
+
+    auto args = succBlock->getSILPhiArguments();
+    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
+    return visitor(args[0]);
+  });
 }
