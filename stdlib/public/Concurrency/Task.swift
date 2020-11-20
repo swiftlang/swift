@@ -417,7 +417,7 @@ extension Task {
 public func runTask(_ task: __owned Builtin.NativeObject)
 
 @_silgen_name("swift_task_getJobFlags")
-func getJobFlags(_ task: __owned Builtin.NativeObject) -> Task.JobFlags
+func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
