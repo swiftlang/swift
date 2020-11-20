@@ -9,6 +9,6 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -Rmodule-loading 2>&1 | %FileCheck %s
 
 import TestModule
-// CHECK: remark: loaded module from {{.*}}SwiftShims-{{.*}}.pcm
-// CHECK: remark: loaded module from {{.*}}Swift.swiftmodule{{.*}}.swiftmodule
-// CHECK: remark: loaded module from {{.*}}TestModule.swiftinterface
+// CHECK: remark: loaded module at {{.*}}SwiftShims-{{.*}}.pcm
+// CHECK: remark: loaded module at {{.*}}Swift.swiftmodule{{.*}}.swiftmodule
+// CHECK: remark: loaded module at {{.*}}TestModule.swiftinterface

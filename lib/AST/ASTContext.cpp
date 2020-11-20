@@ -1922,7 +1922,7 @@ ASTContext::getModule(ImportPath::Module ModulePath) {
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath)) {
       if (LangOpts.EnableModuleLoadingRemarks) {
-        Diags.diagnose(nullptr,
+        Diags.diagnose(ModulePath.getSourceRange().Start,
                        diag::module_loaded,
                        M->getModuleFilename());
       }

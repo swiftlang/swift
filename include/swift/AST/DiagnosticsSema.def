@@ -909,7 +909,7 @@ REMARK(cross_import_added,none,
        (Identifier, Identifier, Identifier))
 
 REMARK(module_loaded,none,
-       "loaded module from %0",
+       "loaded module at %0",
        (StringRef))
 
 // Operator decls
