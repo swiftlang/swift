@@ -178,6 +178,16 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   return FD;
 }
 
+namespace {
+
+enum class BuiltinThrowsKind : uint8_t {
+  None,
+  Throws,
+  Rethrows
+};
+
+}
+
 /// Build a builtin function declaration.
 static FuncDecl *
 getBuiltinGenericFunction(Identifier Id,
@@ -185,7 +195,7 @@ getBuiltinGenericFunction(Identifier Id,
                           Type ResType,
                           GenericParamList *GenericParams,
                           GenericSignature Sig,
-                          bool Rethrows = false) {
+                          bool Async, BuiltinThrowsKind Throws) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -211,13 +221,15 @@ getBuiltinGenericFunction(Identifier Id,
 
   DeclName Name(Context, Id, paramList);
   auto *const func = FuncDecl::createImplicit(
-      Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
-      /*Async=*/false,
-      /*Throws=*/Rethrows, GenericParams, paramList, ResType, DC);
+      Context, StaticSpellingKind::None, Name,
+      /*NameLoc=*/SourceLoc(),
+      Async,
+      Throws != BuiltinThrowsKind::None,
+      GenericParams, paramList, ResType, DC);
 
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
-  if (Rethrows)
+  if (Throws == BuiltinThrowsKind::Rethrows)
     func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
 
   return func;
@@ -445,7 +457,8 @@ namespace {
     GenericParamList *TheGenericParamList;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
-    bool Rethrows = false;
+    bool Async = false;
+    BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
 
     // Accumulate params and requirements here, so that we can make the
     // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
@@ -490,8 +503,16 @@ namespace {
       addedRequirements.push_back(req);
     }
 
-    void setRethrows(bool rethrows = true) {
-      Rethrows = rethrows;
+    void setAsync() {
+      Async = true;
+    }
+
+    void setThrows() {
+      Throws = BuiltinThrowsKind::Throws;
+    }
+
+    void setRethrows() {
+      Throws = BuiltinThrowsKind::Rethrows;
     }
 
     FuncDecl *build(Identifier name) {
@@ -502,7 +523,8 @@ namespace {
         nullptr);
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
-                                       TheGenericParamList, GenericSig);
+                                       TheGenericParamList, GenericSig,
+                                       Async, Throws);
     }
 
     // Don't use these generator classes directly; call the make{...}
