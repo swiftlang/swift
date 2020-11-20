@@ -124,7 +124,7 @@ private:
   ///
   /// Very well, LLVM. A default value you shall have.
   friend class llvm::yaml::IO;
-  Fingerprint() : Core{DIGEST_LENGTH, '0'} {}
+  Fingerprint() : Core(DIGEST_LENGTH, '0') {}
 };
 
 void simple_display(llvm::raw_ostream &out, const Fingerprint &fp);
