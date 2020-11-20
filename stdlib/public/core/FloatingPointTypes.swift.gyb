@@ -1352,7 +1352,13 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 
 ${SelfDocComment}
 @frozen
+%  if bits == 16:
+@available(iOS 14, tvOS 14, watchOS 7, *)
+@available(OSX, unavailable)
+@available(macCatalyst, unavailable)
+%  else:
 @available(*, unavailable, message: "${Self} is not available on target platform.")
+%  end
 public struct ${Self} {
   /// Creates a value initialized to zero.
   @_transparent
