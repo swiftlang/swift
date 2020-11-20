@@ -530,22 +530,27 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  bool attemptFixes = CS.shouldAttemptFixes();
-  // Enable all disabled choices in "diagnostic" mode.
-  if (!attemptFixes && choice.isDisabled()) {
+  // Never skip disjunction choices in diagnostic mode.
+  if (CS.shouldAttemptFixes())
+    return false;
+
+  auto skip = [&](std::string reason) -> bool {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
-      log << "(skipping ";
+      log << "(skipping " + reason + " ";
       choice.print(log, &ctx.SourceMgr);
       log << '\n';
     }
 
     return true;
-  }
+  };
 
-  // Skip unavailable overloads unless solver is in the "diagnostic" mode.
-  if (!attemptFixes && choice.isUnavailable())
-    return true;
+  if (choice.isDisabled())
+    return skip("disabled");
+
+  // Skip unavailable overloads.
+  if (choice.isUnavailable())
+    return skip("unavailable");
 
   if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
@@ -567,7 +572,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     // and there are no non-trivial function conversions.
     if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
         score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
-      return true;
+      return skip("generic");
   }
 
   return false;
