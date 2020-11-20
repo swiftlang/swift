@@ -22,14 +22,14 @@ public struct PartialAsyncTask {
 
 @frozen
 public struct UnsafeContinuation<T> {
-  private var context: UnsafeRawPointer
+  private var context: Builtin.RawUnsafeContinuation
 
   public func resume(returning: __owned T) { }
 }
 
 @frozen
 public struct UnsafeThrowingContinuation<T> {
-  private var context: UnsafeRawPointer
+  private var context: Builtin.RawUnsafeContinuation
 
   public func resume(returning: __owned T) { }
   public func resume(throwing: __owned Error) { }
