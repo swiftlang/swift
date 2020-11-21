@@ -42,6 +42,10 @@ enum {
 
   /// The number of words in a yield-many coroutine buffer.
   NumWords_YieldManyBuffer = 8,
+
+  /// The number of words (in addition to the heap-object header)
+  /// in a default actor.
+  NumWords_DefaultActor = 10,
 };
 
 struct InProcess;
