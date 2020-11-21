@@ -355,3 +355,7 @@ void swift::swift_task_run(AsyncTask *taskToRun) {
 JobPriority swift::swift_task_getPriority(AsyncTask *task) {
   return task->getPriority();
 }
+
+bool swift::swift_task_isCancelled(AsyncTask *task) {
+  return task->isCancelled();
+}

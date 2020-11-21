@@ -419,6 +419,9 @@ public func runTask(_ task: __owned Builtin.NativeObject)
 @_silgen_name("swift_task_getPriority")
 public func getPriority(_ task: __owned Builtin.NativeObject) -> Task.Priority
 
+@_silgen_name("swift_task_isCancelled")
+public func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
+
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
   runTask(childTask.0)
