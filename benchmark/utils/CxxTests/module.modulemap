@@ -1,0 +1,3 @@
+module CxxCreateObjects {
+  header "CreateObjects.h"
+}

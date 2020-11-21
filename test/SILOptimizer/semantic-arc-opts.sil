@@ -21,11 +21,14 @@ sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
 sil @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
 sil @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
+sil @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
 }
+
+sil @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
 
 struct FakeOptionalNativeObjectPairPair {
   var pair1 : FakeOptional<NativeObjectPair>
@@ -34,6 +37,7 @@ struct FakeOptionalNativeObjectPairPair {
 sil @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
 
 sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+sil @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
 
 protocol MyFakeAnyObject : Klass {
   func myFakeMethod()
@@ -89,6 +93,8 @@ struct StructWithEnumWithIndirectCaseField {
   var i: Builtin.Int23
   var field : EnumWithIndirectCase
 }
+
+sil @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
 
 ///////////
 // Tests //
@@ -1747,10 +1753,8 @@ bb1:
   return %9999 : $()
 }
 
-// Forwarding case. We need LiveRanges for this.
-//
 // CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'donot_join_simple_liveranges_in_same_block_2'
 sil [ossa] @donot_join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -2832,3 +2836,244 @@ bb1:
 bb2:
   unreachable
 }
+
+// Make sure we leave only one copy in bb2 and no destroys
+//
+// CHECK-LABEL: sil [ossa] @join_test_with_forwarding_inst : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb2:
+// CHECK: copy_value
+// CHECK-NOT: destroy_value
+// CHECK-NOT: copy_value
+// CHECK:   br bb3(
+// CHECK: } // end sil function 'join_test_with_forwarding_inst'
+sil [ossa] @join_test_with_forwarding_inst : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+bb0:
+  %allocStack = alloc_stack $Builtin.NativeObject
+  %0 = function_ref @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+  %1 = apply %0() : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $FakeOptional<Builtin.NativeObject>
+  %2 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt
+  br bb3(%2 : $FakeOptional<Builtin.NativeObject>)
+
+bb2:
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+  %4 = copy_value %3 : $Builtin.NativeObject
+  store %3 to [init] %allocStack : $*Builtin.NativeObject
+  %4c = copy_value %4 : $Builtin.NativeObject
+  destroy_value %4 : $Builtin.NativeObject
+  %5 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %4c : $Builtin.NativeObject
+  destroy_addr %allocStack : $*Builtin.NativeObject
+  br bb3(%5 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
+  dealloc_stack %allocStack : $*Builtin.NativeObject
+  return %result : $FakeOptional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case'
+sil [ossa] @simple_recursive_copy_case : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  destroy_value %pair : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_2 : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_2'
+sil [ossa] @simple_recursive_copy_case_2 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  destroy_value %pair : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We fail in this case since the lifetime of %pair ends too early and our
+// joined lifetime analysis is too simplistic to handle this case.
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_3 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_3'
+sil [ossa] @simple_recursive_copy_case_3 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  %consumeFunc = function_ref @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  apply %consumeFunc(%pair) : $@convention(thin) (@owned NativeObjectPair) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  (%1a, %1b) = destructure_struct %1 : $NativeObjectPair
+  %ownedUser = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %ownedUser(%1a) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %ownedUser(%1b) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  destroy_value %1 : $NativeObjectPair
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This case fails due to the destructure of our parent object even though the
+// lifetimes line up. We don't support destructures here yet.
+//
+// TODO: Handle this!
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_4 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_4'
+sil [ossa] @simple_recursive_copy_case_4 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  %consumeFunc = function_ref @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  destroy_value %1 : $NativeObjectPair
+  (%pair1, %pair2) = destructure_struct %pair : $NativeObjectPair
+  %ownedUser = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %ownedUser(%pair1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %ownedUser(%pair2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This case fails due to the destructure of our parent object even though the
+// lifetimes line up. We don't support destructures here yet.
+//
+// TODO: Handle this!
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_5 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_5'
+sil [ossa] @simple_recursive_copy_case_5 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  %consumeFunc = function_ref @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  (%pair1, %pair2) = destructure_struct %pair : $NativeObjectPair
+  %ownedUser = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %1 : $NativeObjectPair
+  apply %ownedUser(%pair1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %ownedUser(%pair2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we do not eliminate copies where only the destroy_value is outside
+// of the lifetime of the parent value, but a begin_borrow extends the lifetime
+// of the value.
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_destroying_use_out_of_lifetime'
+sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %pairBorrow = begin_borrow %pair : $NativeObjectPair
+  %3 = struct_extract %pairBorrow : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %pairBorrow : $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  destroy_value %pair : $NativeObjectPair
+  %3a = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  apply %gUserFun(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  br bb3
+
+bb2:
+  destroy_value %pair : $NativeObjectPair
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Second version of the test that consumes the pair in case we make the
+// lifetime joining smart enough to handle the original case.
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime_2 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_destroying_use_out_of_lifetime_2'
+sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime_2 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %pairBorrow = begin_borrow %pair : $NativeObjectPair
+  %3 = struct_extract %pairBorrow : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %pairBorrow : $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  destroy_value %pair : $NativeObjectPair
+  %3a = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  apply %gUserFun(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  br bb3
+
+bb2:
+  %consumePair = function_ref @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  apply %consumePair(%pair) : $@convention(thin) (@owned NativeObjectPair) -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

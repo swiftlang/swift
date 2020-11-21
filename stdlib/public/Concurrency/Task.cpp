@@ -351,3 +351,7 @@ void swift::swift_task_future_wait(
 void swift::swift_task_run(AsyncTask *taskToRun) {
   taskToRun->run(ExecutorRef::noPreference());
 }
+
+JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
+  return task->Flags;
+}

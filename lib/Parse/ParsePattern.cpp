@@ -70,7 +70,7 @@ static ParserStatus parseDefaultArgument(
   SourceLoc equalLoc = P.consumeToken();
 
   if (P.SF.Kind == SourceFileKind::Interface) {
-    // Swift module interfaces don't synthesize inherited intializers and
+    // Swift module interfaces don't synthesize inherited initializers and
     // instead include them explicitly in subclasses. Since the
     // \c DefaultArgumentKind of these initializers is \c Inherited, this is
     // represented textually as `= super` in the interface.

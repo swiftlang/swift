@@ -9,7 +9,7 @@ import Builtin
 
 // -- Generic structs with fixed layout should have no completion function
 //    and emit the field offset vector as part of the pattern.
-// CHECK:       [[PATTERN:@.*]] = internal constant { i32, i32, i32, [4 x i8], i64 } { i32 0, i32 1, i32 8, [4 x i8] zeroinitializer, i64 0 }, align 8
+// CHECK:       [[PATTERN:@.*]] = internal constant <{ i32, i32, i32, [4 x i8], i64 }> <{ i32 0, i32 1, i32 8, [4 x i8] zeroinitializer, i64 0 }>, align 8
 // CHECK-LABEL: @"$s22generic_structs_future18FixedLayoutGenericVMP" = internal constant <{ {{.*}} }> <{
 // -- instantiation function
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$s22generic_structs_future18FixedLayoutGenericVMi"
@@ -20,7 +20,7 @@ import Builtin
 // -- vwtable pointer
 // CHECK-SAME:   @"$s22generic_structs_future18FixedLayoutGenericVWV"
 // -- extra data pattern
-// CHECK-SAME: { i32, i32, i32, [4 x i8], i64 }* [[PATTERN]]
+// CHECK-SAME: <{ i32, i32, i32, [4 x i8], i64 }>* [[PATTERN]]
 // CHECK-SAME: i16 1,
 // CHECK-SAME: i16 3 }>
 
