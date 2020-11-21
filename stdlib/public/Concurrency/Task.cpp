@@ -57,7 +57,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
       return queueHead.getStatus();
 
     case Status::Executing:
-      // Task is now complete. We'll need to add ourselves to the queue.
+      // Task is not complete. We'll need to add ourselves to the queue.
       break;
     }
 
@@ -76,54 +76,54 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
 }
 
 
-namespace {
+//namespace {
+//
+///// An asynchronous context within a task that describes a general "Future".
+///// task.
+/////
+///// This type matches the ABI of a function `<T> () async throws -> T`, which
+///// is the type used by `Task.runDetached` and `Task.group.add` to create
+///// futures.
+//class TaskFutureWaitAsyncContext : public AsyncContext {
+//public:
+//  // Error result is always present.
+//  SwiftError *errorResult = nullptr;
+//
+//  // No indirect results.
+//
+//  TaskFutureWaitResult result;
+//
+//  // FIXME: Currently, this is always here, but it isn't technically
+//  // necessary.
+//  void* Self;
+//
+//  // Arguments.
+//  AsyncTask *task;
+//
+//  using AsyncContext::AsyncContext;
+//};
+//
+//}
 
-/// An asynchronous context within a task that describes a general "Future".
-/// task.
-///
-/// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
-/// futures.
-class TaskFutureWaitAsyncContext : public AsyncContext {
-public:
-  // Error result is always present.
-  SwiftError *errorResult = nullptr;
-
-  // No indirect results.
-
-  TaskFutureWaitResult result;
-
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
-  void* Self;
-
-  // Arguments.
-  AsyncTask *task;
-
-  using AsyncContext::AsyncContext;
-};
-
-}
-
-/// Run the given task, privoding it with the result of the future.
-static void runTaskWithFutureResult(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    FutureFragment *futureFragment, bool hadErrorResult) {
-  auto waitingTaskContext =
-      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
-
-  waitingTaskContext->result.hadErrorResult = hadErrorResult;
-  if (hadErrorResult) {
-    waitingTaskContext->result.storage =
-        reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-  } else {
-    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
-  }
-
-  // TODO: schedule this task on the executor rather than running it
-  // directly.
-  waitingTask->run(executor);
-}
+///// Run the given task, providing it with the result of the future.
+//static void runTaskWithFutureResult(
+//    AsyncTask *waitingTask, ExecutorRef executor,
+//    FutureFragment *futureFragment, bool hadErrorResult) {
+//  auto waitingTaskContext =
+//      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
+//
+//  waitingTaskContext->result.hadErrorResult = hadErrorResult;
+//  if (hadErrorResult) {
+//    waitingTaskContext->result.storage =
+//        reinterpret_cast<OpaqueValue *>(futureFragment->getError());
+//  } else {
+//    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
+//  }
+//
+//  // TODO: schedule this task on the executor rather than running it
+//  // directly.
+//  waitingTask->run(executor);
+//}
 
 void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   using Status = FutureFragment::Status;
@@ -172,6 +172,11 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
     task->futureFragment()->destroy();
   }
 
+  // For a channel, destroy the results.
+  if (task->isChannel()) {
+    task->channelFragment()->destroy();
+  }
+
   // The task execution itself should always hold a reference to it, so
   // if we get here, we know the task has finished running, which means
   // swift_task_complete should have been run, which will have torn down
@@ -208,6 +213,14 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   // Complete the future.
   if (task->isFuture()) {
     task->completeFuture(context, executor);
+  }
+
+  // Offer the future to the parent task group's channel.
+  if (task->isGroupChild()) {
+    // then we must offer into the parent group's channel that we completed,
+    // so it may `next()` poll completed child tasks in completion order.
+    auto parent = task->childFragment()->getParent();
+    parent->channelOffer(task, context, executor);
   }
 
   // TODO: set something in the status?
@@ -249,6 +262,12 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
   assert((parent != nullptr) == flags.task_isChildTask());
+
+  // TODO: cleanup
+  if (flags.task_isGroupChild()) {
+    assert(flags.task_isGroupChild() && flags.task_isChildTask());
+    assert(flags.task_isGroupChild() && parent->Flags.task_isChannel());
+  }
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -295,6 +314,18 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
     futureContext->errorResult = nullptr;
     futureContext->indirectResult = futureFragment->getStoragePtr();
+
+    if (flags.task_isChannel()) {
+      auto parentChannelFragment = parent->channelFragment();
+      // new(channelFragment) ChannelFragment(futureResultType); // TODO make sure parent does init
+      assert(parentChannelFragment && "group child task could not find parent channel fragment!");
+
+//
+//      // Set up the context for the future such that results ar *offered*
+//      // into the channel fragment's message queue.
+//      futureContext->indirectResult = parentChannelFragment;
+    }
+
   }
 
   // Configure the initial context.
@@ -537,4 +568,8 @@ void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *erro
   context->ErrorResult = error;
   
   resumeTaskAfterContinuation(task, context);
+}
+
+bool swift::swift_task_isCancelled(AsyncTask *task) {
+  return task->isCancelled();
 }

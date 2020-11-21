@@ -31,10 +31,10 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 
     buyVegetables(
       shoppingList: shoppingList,
-      onGotAllVegetables: { veggies in continuation.resume(returning: veggies) },
+      onGotAllVegetables: { veggies in cc.resume(returning: veggies) },
       onGotVegetable: { v in veggies.append(v) },
-      onNoMoreVegetables: { continuation.resume(returning: veggies) },
-      onNoVegetablesInStore: { error in continuation.resume(throwing: error) }
+      onNoMoreVegetables: { cc.resume(returning: veggies) },
+      onNoVegetablesInStore: { error in cc.resume(throwing: error) }
       )
   }
 }
@@ -45,7 +45,7 @@ func test_unsafeContinuations() async {
   // after all: if you have async code, just call it directly, without the unsafe continuation
   let _: String = withUnsafeContinuation { continuation in // expected-error{{invalid conversion from 'async' function of type '(UnsafeContinuation<String>) async -> Void' to synchronous function type '(UnsafeContinuation<String>) -> Void'}}
     let s = await someAsyncFunc() // rdar://70610141 for getting a better error message here
-    continuation.resume(returning: s)
+    cc.resume(returning: s)
   }
 
   let _: String = await withUnsafeContinuation { continuation in

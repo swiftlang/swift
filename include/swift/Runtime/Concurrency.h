@@ -133,6 +133,26 @@ struct TaskFutureWaitResult {
   OpaqueValue *storage;
 };
 
+/// The result of waiting on a Channel (TaskGroup).
+struct TaskChannelPollResult {
+  /// Whether the storage represents an existing value, or "known no value,"
+  /// instructing the `group.next()` call to return `nil` immediately.
+  bool hadAnyResult;
+
+  /// Whether the storage represents the error result vs. the successful
+  /// result.
+  bool hadErrorResult;
+
+  /// Storage for the result of the future.
+  ///
+  /// When the future completed normally, this is a pointer to the storage
+  /// of the result value, which lives inside the future task itself.
+  ///
+  /// When the future completed by throwing an error, this is the error
+  /// object itself.
+  OpaqueValue *storage;
+};
+
 using TaskFutureWaitSignature =
   AsyncSignature<TaskFutureWaitResult(AsyncTask *), /*throws*/ false>;
 
@@ -147,6 +167,18 @@ using TaskFutureWaitSignature =
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitSignature::FunctionType
 swift_task_future_wait;
+
+/// Wait for a readyQueue of a Channel to become non empty.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_channel_poll(on channelTask: Builtin.NativeObject) async
+///     -> RawTaskChannelPollResult?
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncFunctionType<TaskChannelPollResult(AsyncTask *task)>
+swift_task_channel_poll;
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
@@ -187,6 +219,9 @@ bool swift_task_removeStatusRecord(AsyncTask *task,
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCancelled(AsyncTask* task);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {

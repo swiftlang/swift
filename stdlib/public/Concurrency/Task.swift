@@ -44,8 +44,7 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
-    let flags = getJobFlags(Builtin.getCurrentAsyncTask())
-    return flags.priority
+    getJobFlags(Builtin.getCurrentAsyncTask()).priority
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -209,6 +208,36 @@ extension Task {
         }
       }
     }
+
+    /// Whether this is a channel.
+    var isChannel: Bool {
+      get {
+        (bits & (1 << 26)) != 0
+      }
+
+      set {
+        if newValue {
+          bits = bits | 1 << 26
+        } else {
+          bits = (bits & ~(1 << 26))
+        }
+      }
+    }
+
+    /// Whether this is a groupChild.
+    var isGroupChild: Bool {
+      get {
+        (bits & (1 << 27)) != 0
+      }
+
+      set {
+        if newValue {
+          bits = bits | 1 << 27
+        } else {
+          bits = (bits & ~(1 << 27))
+        }
+      }
+    }
   }
 }
 
@@ -301,6 +330,9 @@ func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
+
+@_silgen_name("swift_task_isCancelled")
+func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
