@@ -44,8 +44,7 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
-    let flags = getJobFlags(Builtin.getCurrentAsyncTask())
-    return flags.priority
+    getJobFlags(Builtin.getCurrentAsyncTask()).priority
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -327,6 +326,10 @@ public func runTask(_ task: __owned Builtin.NativeObject)
 
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
+
+
+@_silgen_name("swift_task_isCancelled")
+func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)

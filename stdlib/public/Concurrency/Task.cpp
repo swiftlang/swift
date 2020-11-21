@@ -355,3 +355,7 @@ void swift::swift_task_run(AsyncTask *taskToRun) {
 JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags;
 }
+
+bool swift::swift_task_isCancelled(AsyncTask *task) {
+  return task->isCancelled();
+}

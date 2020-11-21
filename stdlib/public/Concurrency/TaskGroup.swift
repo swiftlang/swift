@@ -72,13 +72,12 @@ extension Task {
 
     // Set up the job flags for a new task.
     var groupFlags = JobFlags()
-    groupFlags.kind = .task // TODO: .taskGroup?
-    groupFlags.priority = await Task.currentPriority()
+    groupFlags.kind = .task
+    groupFlags.priority = getJobFlags(parent).priority
     groupFlags.isFuture = true
     groupFlags.isChildTask = true
 
     // 1. Prepare the Group task
-    // FIXME: do we have to rather prepare it inside the task we spawn; and yield it back along with the result instead?
     var group = Task.Group<TaskResult>(parentTask: parent)
 
     let (groupTask, context) =
@@ -88,7 +87,7 @@ extension Task {
     let groupHandle = Handle<BodyResult>(task: groupTask)
 
     // 2.0) Run the task!
-    DispatchQueue.global(priority: .default).async { // TODO: use executors when they land
+    DispatchQueue.global(priority: .default).async { // FIXME: use executors when they land
       groupHandle.run()
     }
 
@@ -127,6 +126,9 @@ extension Task {
     /// it should be resumed by *any* of the in-flight tasks completing.
     private var nextHandle: Task.Handle<TaskResult>? = nil
 
+    // private let childTasks: ConcurrentMap<String, String> = .init()
+    private let completions: [Int] = []
+
     /// No public initializers
     init(parentTask: Builtin.NativeObject) {
       self.parentTask = parentTask
@@ -154,23 +156,20 @@ extension Task {
       operation: @escaping () async throws -> TaskResult
     ) async -> Task.Handle<TaskResult> {
       var flags = JobFlags()
-      flags.kind = .task // TODO: childTask?
-      flags.priority = .default // TODO: priority getting from parent not implemented yet
-//      if let overridingPriority = overridingPriority { // TODO: cannot use ?? with async defaultValue
-//        flags.priority = overridingPriority
-//      } else {
-//        flags.priority = await Task.currentPriority() // TODO: self.parent.priority ?
-//      }
+      flags.kind = .task
+      flags.priority = overridingPriority ?? getJobFlags(parentTask).priority
       flags.isFuture = true
+      flags.isChildTask = true
 
       let (childTask, context) =
         // TODO: passing the parentTask (instead of nil) here makes the program hang here
-        Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+        Builtin.createAsyncTaskFuture(flags.bits, parentTask, operation)
 
       let handle = Handle<TaskResult>(task: childTask)
 
       // runTask(childTask)
         DispatchQueue.global(priority: .default).async {
+          print(">>> run")
           handle.run()
         }
 

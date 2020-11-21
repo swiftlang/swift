@@ -22,7 +22,7 @@ extension DispatchQueue {
 // ==== ------------------------------------------------------------------------
 // MARK: Tests
 
-func test_getPriority() {
+func test_currentPriority() {
   _ = DispatchQueue.main.async { () async in
     let p = await Task.currentPriority()
     // CHECK: priority: default
@@ -32,6 +32,6 @@ func test_getPriority() {
   }
 }
 
-test_getPriority()
+test_currentPriority()
 
 dispatchMain()

@@ -33,53 +33,36 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 // ==== ------------------------------------------------------------------------
 // MARK: Tests
 
-func test_taskGroup_cancel_internally_afterOne() {
+func test_taskGroup_01_sum() {
+  let numbers = [2, 1, 3]
+  let expected = numbers.reduce(0, +)
+
   let taskHandle = launch { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
-
-      func submit(_ n: Int) async {
-        await group.add {
-          do {
-            await try Task.checkCancellation()
-            print("submitted: \(n)")
-            return n
-          } catch {
-            print("submit failed: \(error)")
-            throw error
-          }
-        }
+      let one = group.add {
+        await launch { () async -> Int in
+          sleep(3) // TODO: reimplement with completing them in order
+        }.get()
       }
-
-      func pull() async -> Result<Int, Error>? {
-        do {
-          if let r = await try group.next() {
-            return .success(r)
-          } else {
-            return nil
-          }
-        } catch {
-          return .failure(error)
-        }
+      let two = group.add {
+        await launch { () async -> Int in
+          sleep(2) // TODO: reimplement with completing them in order
+        }.get()
       }
-
-      await submit(1)
+      let three = group.add {
+        await launch { () async -> Int in
+          sleep(2) // TODO: reimplement with completing them in order
+        }.get()
+      }
 
       var sum = 0
-      while let r = await pull() {
+      while let r = await try! group.next() {
         print("next: \(r)")
-        await submit(1)
-
-        if sum >= 2 {
-          print("task group returning: \(sum)")
-          return sum
-        }
-
-        sum += 1
-        group.cancelAll() // cancel all after we receive one element
+        sum += r
       }
 
-      print("bad, task group returning: \(sum)")
-      return 0
+      print("task group returning: \(sum)")
+      return sum
     }
   }
 
@@ -90,14 +73,15 @@ func test_taskGroup_cancel_internally_afterOne() {
 
   launch { () async in
     let sum = await try! taskHandle.get()
-    // CHECK: result: 2
+    // CHECK: result: 3
     print("result: \(sum)")
+    assert(expected == sum)
     exit(0)
   }
 
   print("main task")
 }
 
-test_taskGroup_cancel_internally_afterOne()
+test_taskGroup_01_sum()
 
 dispatchMain()

@@ -215,8 +215,8 @@ public:
     ResumeTask(this, currentExecutor, ResumeContext);
   }
 
-  /// Check whether this task has been cancelled.  Checking this is,
-  /// of course, inherently race-prone on its own.
+  /// Check whether this task has been cancelled.
+  /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const {
     return Status.load(std::memory_order_relaxed).isCancelled();
   }
