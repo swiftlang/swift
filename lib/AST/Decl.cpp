@@ -7726,6 +7726,13 @@ void EnumElementDecl::setParameterList(ParameterList *params) {
     params->setDeclContextOfParamDecls(this);
 }
 
+bool EnumElementDecl::hasAnyUnnamedParameters() const {
+  auto *params = getParameterList();
+  return params &&
+         std::any_of(params->begin(), params->end(),
+                     [](auto *paramDecl) { return !paramDecl->hasName(); });
+}
+
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
   for (EnumCaseDecl *EC : getParentEnum()->getAllCases()) {
     ArrayRef<EnumElementDecl *> CaseElements = EC->getElements();

@@ -88,4 +88,6 @@ FUNC_DECL(Swap, "swap")
 FUNC_DECL(UnimplementedInitializer, "_unimplementedInitializer")
 FUNC_DECL(Undefined, "_undefined")
 
+FUNC_DECL(FatalError, "fatalError")
+
 #undef FUNC_DECL

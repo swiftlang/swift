@@ -142,6 +142,18 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
+      case KnownDerivableProtocolKind::Encodable:
+      case KnownDerivableProtocolKind::Decodable:
+        // FIXME: This is not actually correct. We cannot promise to always
+        // provide a witness here for all structs and classes. Unfortunately,
+        // figuring out whether this is actually possible requires much more
+        // context -- a TypeChecker and the parent decl context at least -- and
+        // is tightly coupled to the logic within DerivedConformance. This
+        // unfortunately means that we expect a witness even if one will not be
+        // produced, which requires DerivedConformance::deriveCodable to output
+        // its own diagnostics.
+        return true;
+
       default:
         return false;
     }
@@ -726,10 +738,11 @@ bool DerivedConformance::allAssociatedValuesConformToProtocol(DeclContext *DC,
 /// \p varPrefix The prefix character for variable names (e.g., a0, a1, ...).
 /// \p varContext The context into which payload variables should be declared.
 /// \p boundVars The array to which the pattern's variables will be appended.
-Pattern*
-DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
-                             char varPrefix, DeclContext *varContext,
-                             SmallVectorImpl<VarDecl*> &boundVars) {
+/// \p useLabels If the argument has a label, use it instead of the generated
+/// name.
+Pattern *DerivedConformance::enumElementPayloadSubpattern(
+    EnumElementDecl *enumElementDecl, char varPrefix, DeclContext *varContext,
+    SmallVectorImpl<VarDecl *> &boundVars, bool useLabels) {
   auto parentDC = enumElementDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -747,8 +760,16 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
     SmallVector<TuplePatternElt, 4> elementPatterns;
     int index = 0;
     for (auto tupleElement : tupleType->getElements()) {
-      auto payloadVar = indexedVarDecl(varPrefix, index++,
-                                       tupleElement.getType(), varContext);
+      VarDecl *payloadVar;
+      if (useLabels && tupleElement.hasName()) {
+        payloadVar =
+            new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                            SourceLoc(), tupleElement.getName(), varContext);
+        payloadVar->setInterfaceType(tupleElement.getType());
+      } else {
+        payloadVar = indexedVarDecl(varPrefix, index++, tupleElement.getType(),
+                                    varContext);
+      }
       boundVars.push_back(payloadVar);
 
       auto namedPattern = new (C) NamedPattern(payloadVar);
@@ -777,7 +798,6 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
       new (C) BindingPattern(SourceLoc(), /*isLet*/ true, namedPattern);
   return ParenPattern::createImplicit(C, letPattern);
 }
-
 
 /// Creates a named variable based on a prefix character and a numeric index.
 /// \p prefixChar The prefix character for the variable's name.
