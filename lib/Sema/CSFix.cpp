@@ -1673,3 +1673,18 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
   return new (cs.getAllocator())
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
 }
+
+bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
+    const Solution &solution, bool asNote) const {
+  MemberMissingExplicitBaseTypeFailure failure(solution, MemberName,
+                                               getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyBaseTypeForOptionalUnresolvedMember *
+SpecifyBaseTypeForOptionalUnresolvedMember::create(ConstraintSystem &cs,
+                                                   DeclNameRef memberName,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyBaseTypeForOptionalUnresolvedMember(cs, memberName, locator);
+}

@@ -289,6 +289,10 @@ enum class FixKind : uint8_t {
   /// Treat empty and single-element array literals as if they were incomplete
   /// dictionary literals when used as such.
   TreatArrayLiteralAsDictionary,
+
+  /// Explicitly specify the type to disambiguate between possible member base
+  /// types.
+  SpecifyBaseTypeForOptionalUnresolvedMember,
 };
 
 class ConstraintFix {
@@ -2141,6 +2145,29 @@ public:
 
   static AllowRefToInvalidDecl *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
+};
+
+class SpecifyBaseTypeForOptionalUnresolvedMember final : public ConstraintFix {
+  SpecifyBaseTypeForOptionalUnresolvedMember(ConstraintSystem &cs,
+                                             DeclNameRef memberName,
+                                             ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyBaseTypeForOptionalUnresolvedMember,
+                      locator, /*isWarning=*/true),
+        MemberName(memberName) {}
+  DeclNameRef MemberName;
+
+public:
+  std::string getName() const override {
+    const auto name = MemberName.getBaseName();
+    return "specify unresolved member optional base type explicitly '" +
+           name.userFacingName().str() + "'";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static SpecifyBaseTypeForOptionalUnresolvedMember *
+  create(ConstraintSystem &cs, DeclNameRef memberName,
+         ConstraintLocator *locator);
 };
 
 } // end namespace constraints
