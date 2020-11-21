@@ -4738,9 +4738,8 @@ private:
     /// The set of constraints which would be used to infer default types.
     llvm::TinyPtrVector<Constraint *> Defaults;
 
-    /// Whether these bindings should be delayed until the rest of the
-    /// constraint system is considered "fully bound".
-    bool FullyBound = false;
+    /// The set of constraints which delay attempting this type variable.
+    llvm::TinyPtrVector<Constraint *> DelayedBy;
 
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
@@ -4762,6 +4761,10 @@ private:
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
+
+    /// Whether these bindings should be delayed until the rest of the
+    /// constraint system is considered "fully bound".
+    bool isFullyBound() const;
 
     /// Whether the bindings represent (potentially) incomplete set,
     /// there is no way to say with absolute certainty if that's the
@@ -4805,7 +4808,7 @@ private:
 
       return std::make_tuple(b.isHole(),
                              !hasNoDefaultableBindings,
-                             b.FullyBound,
+                             b.isFullyBound(),
                              b.isSubtypeOfExistentialType(),
                              b.InvolvesTypeVariables,
                              static_cast<unsigned char>(b.LiteralBinding),
@@ -4952,7 +4955,7 @@ public:
       out.indent(indent);
       if (isPotentiallyIncomplete())
         out << "potentially_incomplete ";
-      if (FullyBound)
+      if (isFullyBound())
         out << "fully_bound ";
       if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
