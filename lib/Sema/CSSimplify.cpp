@@ -7183,9 +7183,9 @@ static bool attemptUnresolvedMemberFix(ConstraintSystem &cs,
     return false;
 
   // Right now, name lookup only unwraps a single layer of optionality, which
-  // for cases where base type is a multi-optional type e.g. Foo?? so, it only
-  // finds optional base candidates. To produce the correct warning perform an
-  // extra lookup on unwrapped type is required.
+  // for cases where base type is a multi-optional type e.g. Foo?? it only
+  // finds optional base candidates. To produce the correct warning we perform
+  // an extra lookup on unwrapped type.
   if (!allOptionalBaseCandidates)
     return true;
 
