@@ -1172,23 +1172,17 @@ bool ConstraintSystem::PotentialBindings::infer(
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload: {
-    // If this variable is in the left-hand side, it is fully bound.
-    SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(cs.simplifyType(constraint->getFirstType()),
-                          typeVars);
-    if (typeVars.count(TypeVar))
-      DelayedBy.push_back(constraint);
+    // It's possible that type of member couldn't be determined,
+    // and if so it would be beneficial to bind member to a hole
+    // early to propagate that information down to arguments,
+    // result type of a call that references such a member.
+    if (cs.shouldAttemptFixes() && TypeVar->getImpl().canBindToHole()) {
+      if (ConstraintSystem::typeVarOccursInType(
+              TypeVar, cs.simplifyType(constraint->getSecondType())))
+        break;
+    }
 
-    if (InvolvesTypeVariables)
-      return false;
-
-    // If this and another type variable occur, this result involves
-    // type variables.
-    findInferableTypeVars(cs.simplifyType(constraint->getSecondType()),
-                          typeVars);
-    if (typeVars.size() > 1 && typeVars.count(TypeVar))
-      InvolvesTypeVariables = true;
-
+    DelayedBy.push_back(constraint);
     break;
   }
 
