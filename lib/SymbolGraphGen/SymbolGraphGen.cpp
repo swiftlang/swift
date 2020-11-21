@@ -99,3 +99,27 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
 
   return Success;
 }
+
+bool symbolgraphgen::
+printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
+                        bool InSynthesizedExtension,
+                        const SymbolGraphOptions &Options,
+                        llvm::raw_ostream &OS) {
+  if (!Symbol::supportsKind(D->getKind()))
+    return true;
+
+  llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
+  ModuleDecl *MD = D->getModuleContext();
+  SymbolGraphASTWalker Walker(*MD, Options);
+  markup::MarkupContext MarkupCtx;
+  SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
+                    /*IsForSingleNode=*/true);
+  NominalTypeDecl *NTD = InSynthesizedExtension
+      ? BaseTy->getAnyNominal()
+      : nullptr;
+
+  Symbol MySym(&Graph, D, NTD, BaseTy);
+  Graph.recordNode(MySym);
+  Graph.serialize(JOS);
+  return false;
+}
