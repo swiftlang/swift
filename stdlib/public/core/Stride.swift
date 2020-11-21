@@ -237,7 +237,14 @@ extension StrideToIterator: IteratorProtocol {
     if _stride > 0 ? result >= _end : result <= _end {
       return nil
     }
-    _current = Element._step(after: _current, from: _start, by: _stride)
+    // This check is needed because we might otherwise advance `_current` past
+    // the representable bounds of the type unnecessarily.
+    if (_current.index == nil || _current.index == 0)
+        && result.distance(to: _end).magnitude < _stride.magnitude {
+      _current = (index: nil, value: _end)
+    } else {
+      _current = Element._step(after: _current, from: _start, by: _stride)
+    }
     return result
   }
 }
@@ -439,16 +446,26 @@ extension StrideThroughIterator: IteratorProtocol {
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
-      // This check is needed because if we just changed the above operators
-      // to > and <, respectively, we might advance current past the end
-      // and throw it out of bounds (e.g. above Int.max) unnecessarily.
+      // This check is needed because, to prevent advancing `_current` past the
+      // representable bounds of the type, we represent steps past the end as
+      // `(index: nil, value: _end)`.
+      //
+      // (Note how we use the `>=` and `<=` operators above.)
       if result == _end && !_didReturnEnd {
         _didReturnEnd = true
         return result
       }
       return nil
     }
-    _current = Element._step(after: _current, from: _start, by: _stride)
+    // This check is needed because we might otherwise advance `_current` past
+    // the representable bounds of the type unnecessarily.
+    if (_current.index == nil || _current.index == 0)
+        && result.distance(to: _end).magnitude < _stride.magnitude {
+      _didReturnEnd = true
+      _current = (index: nil, value: _end)
+    } else {
+      _current = Element._step(after: _current, from: _start, by: _stride)
+    }
     return result
   }
 }
