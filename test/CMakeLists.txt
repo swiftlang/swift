@@ -1,3 +1,7 @@
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+include(SwiftTestUtils)
+
 function(swift_configure_lit_site_cfg source_path destination_path installed_name)
   if (CMAKE_CFG_INTDIR STREQUAL ".")
     set(SWIFT_BUILD_MODE ".")
@@ -197,24 +201,14 @@ foreach(SDK ${SWIFT_SDKS})
     # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
     # have have only the "default" flavor for all SDKs and architectures except
     # OSX when macCatalyst support is enabled.
-    set(build_flavors "default")
-    if(SWIFT_ENABLE_MACCATALYST AND "${SDK}" STREQUAL "OSX")
-      list(APPEND build_flavors "ios-like" )
-    endif()
+    get_swift_test_build_flavors(build_flavors "${SDK}")
 
     foreach(BUILD_FLAVOR ${build_flavors})
     # Configure variables for this subdirectory.
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    get_versioned_target_triple(VARIANT_TRIPLE ${SDK} ${ARCH} "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
-    set(DEFAULT_OSX_VARIANT_SUFFIX "")
-
-    if(BUILD_FLAVOR STREQUAL "ios-like")
-      set(DEFAULT_OSX_VARIANT_SUFFIX "${VARIANT_SUFFIX}")
-      # Use the macCatalyst target triple and compiler resources for the iOS-like build flavor.
-      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-maccatalyst-${ARCH}")
-      set(VARIANT_TRIPLE "${ARCH}-apple-ios13.0-macabi")
-    endif()
+    get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
+    get_swift_test_versioned_target_triple(VARIANT_TRIPLE "${SDK}" "${ARCH}" "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}" "${BUILD_FLAVOR}")
+    get_swift_test_default_osx_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${VARIANT_SUFFIX}" "${BUILD_FLAVOR}")
 
     # A directory where to put the xUnit-style XML test results.
     set(SWIFT_TEST_RESULTS_DIR
