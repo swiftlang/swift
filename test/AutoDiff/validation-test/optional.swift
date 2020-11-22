@@ -29,7 +29,7 @@ OptionalTests.test("Let") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_let), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_let), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_let), .init(nil))
 
   @differentiable
   func optional_let_tracked(_ maybeX: Tracked<Float>?) -> Tracked<Float> {
@@ -39,7 +39,7 @@ OptionalTests.test("Let") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_let_tracked), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_let_tracked), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_let_tracked), .init(nil))
 
   @differentiable
   func optional_let_nonresilient_tracked(_ maybeX: NonresilientTracked<Float>?)
@@ -53,7 +53,7 @@ OptionalTests.test("Let") {
   expectEqual(
     gradient(at: 10, in: optional_let_nonresilient_tracked), .init(20.0))
   expectEqual(
-    gradient(at: nil, in: optional_let_nonresilient_tracked), .init(0.0))
+    gradient(at: nil, in: optional_let_nonresilient_tracked), .init(nil))
 
   @differentiable
   func optional_let_nested(_ nestedMaybeX: Float??) -> Float {
@@ -66,7 +66,7 @@ OptionalTests.test("Let") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_let_nested), .init(.init(20.0)))
-  expectEqual(gradient(at: nil, in: optional_let_nested), .init(.init(0.0)))
+  expectEqual(gradient(at: nil, in: optional_let_nested), .init(nil))
 
   @differentiable
   func optional_let_nested_tracked(_ nestedMaybeX: Tracked<Float>??) -> Tracked<
@@ -83,7 +83,7 @@ OptionalTests.test("Let") {
   expectEqual(
     gradient(at: 10, in: optional_let_nested_tracked), .init(.init(20.0)))
   expectEqual(
-    gradient(at: nil, in: optional_let_nested_tracked), .init(.init(0.0)))
+    gradient(at: nil, in: optional_let_nested_tracked), .init(nil))
 
   @differentiable
   func optional_let_nested_nonresilient_tracked(
@@ -102,7 +102,7 @@ OptionalTests.test("Let") {
     .init(.init(20.0)))
   expectEqual(
     gradient(at: nil, in: optional_let_nested_nonresilient_tracked),
-    .init(.init(0.0)))
+    .init(nil))
 
   @differentiable
   func optional_let_generic<T: Differentiable>(_ maybeX: T?, _ defaultValue: T)
@@ -115,7 +115,7 @@ OptionalTests.test("Let") {
   }
   expectEqual(gradient(at: 10, 20, in: optional_let_generic), (.init(1.0), 0.0))
   expectEqual(
-    gradient(at: nil, 20, in: optional_let_generic), (.init(0.0), 1.0))
+    gradient(at: nil, 20, in: optional_let_generic), (.init(nil), 1.0))
 
   expectEqual(
     gradient(
@@ -123,7 +123,7 @@ OptionalTests.test("Let") {
       in: optional_let_generic), (.init(1.0), 0.0))
   expectEqual(
     gradient(at: nil, Tracked<Float>.init(20), in: optional_let_generic),
-    (.init(0.0), 1.0))
+    (.init(nil), 1.0))
 
   @differentiable
   func optional_let_nested_generic<T: Differentiable>(
@@ -143,7 +143,7 @@ OptionalTests.test("Let") {
     (.init(.init(1.0)), 0.0))
   expectEqual(
     gradient(at: nil, 20, in: optional_let_nested_generic),
-    (.init(.init(0.0)), 1.0))
+    (.init(nil), 1.0))
 }
 
 OptionalTests.test("Switch") {
@@ -155,7 +155,7 @@ OptionalTests.test("Switch") {
     }
   }
   expectEqual(gradient(at: 10, in: optional_switch), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_switch), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_switch), .init(nil))
 
   @differentiable
   func optional_switch_tracked(_ maybeX: Tracked<Float>?) -> Tracked<Float> {
@@ -165,7 +165,7 @@ OptionalTests.test("Switch") {
     }
   }
   expectEqual(gradient(at: 10, in: optional_switch_tracked), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_switch_tracked), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_switch_tracked), .init(nil))
 
   @differentiable
   func optional_switch_nonresilient_tracked(
@@ -179,7 +179,7 @@ OptionalTests.test("Switch") {
   expectEqual(
     gradient(at: 10, in: optional_switch_nonresilient_tracked), .init(20.0))
   expectEqual(
-    gradient(at: nil, in: optional_switch_nonresilient_tracked), .init(0.0))
+    gradient(at: nil, in: optional_switch_nonresilient_tracked), .init(nil))
 
   @differentiable
   func optional_switch_nested(_ nestedMaybeX: Float??) -> Float {
@@ -193,7 +193,7 @@ OptionalTests.test("Switch") {
     }
   }
   expectEqual(gradient(at: 10, in: optional_switch_nested), .init(.init(20.0)))
-  expectEqual(gradient(at: nil, in: optional_switch_nested), .init(.init(0.0)))
+  expectEqual(gradient(at: nil, in: optional_switch_nested), .init(nil))
 
   @differentiable
   func optional_switch_nested_tracked(_ nestedMaybeX: Tracked<Float>??)
@@ -211,7 +211,7 @@ OptionalTests.test("Switch") {
   expectEqual(
     gradient(at: 10, in: optional_switch_nested_tracked), .init(.init(20.0)))
   expectEqual(
-    gradient(at: nil, in: optional_switch_nested_tracked), .init(.init(0.0)))
+    gradient(at: nil, in: optional_switch_nested_tracked), .init(nil))
 
   @differentiable
   func optional_switch_nested_nonresilient_tracked(
@@ -231,7 +231,7 @@ OptionalTests.test("Switch") {
     .init(.init(20.0)))
   expectEqual(
     gradient(at: nil, in: optional_switch_nested_nonresilient_tracked),
-    .init(.init(0.0)))
+    .init(nil))
 
   @differentiable
   func optional_switch_generic<T: Differentiable>(
@@ -245,7 +245,7 @@ OptionalTests.test("Switch") {
   expectEqual(
     gradient(at: 10, 20, in: optional_switch_generic), (.init(1.0), 0.0))
   expectEqual(
-    gradient(at: nil, 20, in: optional_switch_generic), (.init(0.0), 1.0))
+    gradient(at: nil, 20, in: optional_switch_generic), (.init(nil), 1.0))
 
   @differentiable
   func optional_switch_nested_generic<T: Differentiable>(
@@ -265,7 +265,7 @@ OptionalTests.test("Switch") {
     (.init(.init(1.0)), 0.0))
   expectEqual(
     gradient(at: nil, 20, in: optional_switch_nested_generic),
-    (.init(.init(0.0)), 1.0))
+    (.init(nil), 1.0))
 }
 
 OptionalTests.test("Optional binding: if let") {
@@ -278,7 +278,7 @@ OptionalTests.test("Optional binding: if let") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_var1), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_var1), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_var1), .init(nil))
 
   @differentiable
   func optional_var1_tracked(_ maybeX: Tracked<Float>?) -> Tracked<Float> {
@@ -289,7 +289,7 @@ OptionalTests.test("Optional binding: if let") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_var1_tracked), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_var1_tracked), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_var1_tracked), .init(nil))
 
   @differentiable
   func optional_var1_nonresilient_tracked(_ maybeX: NonresilientTracked<Float>?)
@@ -304,7 +304,7 @@ OptionalTests.test("Optional binding: if let") {
   expectEqual(
     gradient(at: 10, in: optional_var1_nonresilient_tracked), .init(20.0))
   expectEqual(
-    gradient(at: nil, in: optional_var1_nonresilient_tracked), .init(0.0))
+    gradient(at: nil, in: optional_var1_nonresilient_tracked), .init(nil))
 
   @differentiable
   func optional_var1_nested(_ nestedMaybeX: Float??) -> Float {
@@ -318,7 +318,7 @@ OptionalTests.test("Optional binding: if let") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_var1_nested), .init(.init(20.0)))
-  expectEqual(gradient(at: nil, in: optional_var1_nested), .init(.init(0.0)))
+  expectEqual(gradient(at: nil, in: optional_var1_nested), .init(nil))
 
   @differentiable
   func optional_var1_nested_tracked(_ nestedMaybeX: Tracked<Float>??)
@@ -336,7 +336,7 @@ OptionalTests.test("Optional binding: if let") {
   expectEqual(
     gradient(at: 10, in: optional_var1_nested_tracked), .init(.init(20.0)))
   expectEqual(
-    gradient(at: nil, in: optional_var1_nested_tracked), .init(.init(0.0)))
+    gradient(at: nil, in: optional_var1_nested_tracked), .init(nil))
 
   @differentiable
   func optional_var1_nested_nonresilient_tracked(
@@ -356,7 +356,7 @@ OptionalTests.test("Optional binding: if let") {
     .init(.init(20.0)))
   expectEqual(
     gradient(at: nil, in: optional_var1_nested_nonresilient_tracked),
-    .init(.init(0.0)))
+    .init(nil))
 
   @differentiable
   func optional_var1_generic<T: Differentiable>(_ maybeX: T?, _ defaultValue: T)
@@ -371,7 +371,7 @@ OptionalTests.test("Optional binding: if let") {
   expectEqual(
     gradient(at: 10, 20, in: optional_var1_generic), (.init(1.0), 0.0))
   expectEqual(
-    gradient(at: nil, 20, in: optional_var1_generic), (.init(0.0), 1.0))
+    gradient(at: nil, 20, in: optional_var1_generic), (.init(nil), 1.0))
 
   @differentiable
   func optional_var1_nested_generic<T: Differentiable>(
@@ -391,7 +391,7 @@ OptionalTests.test("Optional binding: if let") {
     (.init(.init(1.0)), 0.0))
   expectEqual(
     gradient(at: nil, 20, in: optional_var1_nested_generic),
-    (.init(.init(0.0)), 1.0))
+    (.init(nil), 1.0))
 }
 
 OptionalTests.test("Optional binding: if var") {
@@ -403,7 +403,7 @@ OptionalTests.test("Optional binding: if var") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_var2), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_var2), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_var2), .init(nil))
 
   @differentiable
   func optional_var2_tracked(_ maybeX: Tracked<Float>?) -> Tracked<Float> {
@@ -413,7 +413,7 @@ OptionalTests.test("Optional binding: if var") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_var2_tracked), .init(20.0))
-  expectEqual(gradient(at: nil, in: optional_var2_tracked), .init(0.0))
+  expectEqual(gradient(at: nil, in: optional_var2_tracked), .init(nil))
 
   @differentiable
   func optional_var2_nonresilient_tracked(_ maybeX: NonresilientTracked<Float>?)
@@ -427,7 +427,7 @@ OptionalTests.test("Optional binding: if var") {
   expectEqual(
     gradient(at: 10, in: optional_var2_nonresilient_tracked), .init(20.0))
   expectEqual(
-    gradient(at: nil, in: optional_var2_nonresilient_tracked), .init(0.0))
+    gradient(at: nil, in: optional_var2_nonresilient_tracked), .init(nil))
 
   @differentiable
   func optional_var2_nested(_ nestedMaybeX: Float??) -> Float {
@@ -440,7 +440,7 @@ OptionalTests.test("Optional binding: if var") {
     return 10
   }
   expectEqual(gradient(at: 10, in: optional_var2_nested), .init(.init(20.0)))
-  expectEqual(gradient(at: nil, in: optional_var2_nested), .init(.init(0.0)))
+  expectEqual(gradient(at: nil, in: optional_var2_nested), .init(nil))
 
   @differentiable
   func optional_var2_nested_tracked(_ nestedMaybeX: Tracked<Float>??)
@@ -457,7 +457,7 @@ OptionalTests.test("Optional binding: if var") {
   expectEqual(
     gradient(at: 10, in: optional_var2_nested_tracked), .init(.init(20.0)))
   expectEqual(
-    gradient(at: nil, in: optional_var2_nested_tracked), .init(.init(0.0)))
+    gradient(at: nil, in: optional_var2_nested_tracked), .init(nil))
 
   @differentiable
   func optional_var2_nested_nonresilient_tracked(
@@ -476,7 +476,7 @@ OptionalTests.test("Optional binding: if var") {
     .init(.init(20.0)))
   expectEqual(
     gradient(at: nil, in: optional_var2_nested_nonresilient_tracked),
-    .init(.init(0.0)))
+    .init(nil))
 
   @differentiable
   func optional_var2_generic<T: Differentiable>(_ maybeX: T?, _ defaultValue: T)
@@ -490,7 +490,7 @@ OptionalTests.test("Optional binding: if var") {
   expectEqual(
     gradient(at: 10, 20, in: optional_var2_generic), (.init(1.0), 0.0))
   expectEqual(
-    gradient(at: nil, 20, in: optional_var2_generic), (.init(0.0), 1.0))
+    gradient(at: nil, 20, in: optional_var2_generic), (.init(nil), 1.0))
 
   @differentiable
   func optional_var2_nested_generic<T: Differentiable>(
@@ -509,7 +509,7 @@ OptionalTests.test("Optional binding: if var") {
     (.init(.init(1.0)), 0.0))
   expectEqual(
     gradient(at: nil, 20, in: optional_var2_nested_generic),
-    (.init(.init(0.0)), 1.0))
+    (.init(nil), 1.0))
 }
 
 runAllTests()
