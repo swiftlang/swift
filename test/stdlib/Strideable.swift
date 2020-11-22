@@ -213,10 +213,9 @@ StrideTestSuite.test("FloatingPointStride/rounding error") {
     // possible will produce better results more often than not (see SR-6377).
     //
     // If checking of end bounds has been inadvertently modified such that we're
-    // computing the sum of the penultimate element and the stride (in this
-    // case, `5.5 + 0.9`), then the last element will be omitted here. This
-    // is not the desired behavior, as the result reflects error accumulation
-    // (in this case, `(1 as Float).addingProduct(0.9, 5) + 0.9`).
+    // computing the distance from the penultimate element to the end (in this
+    // case, `6.3999996 - (1 as Float).addingProduct(0.9, 5)`), then the last
+    // element will be omitted here.
     //
     // Therefore, if the test has failed, there may have been a regression in
     // the bounds-checking logic of `Stride*Iterator`. Restore the expected
