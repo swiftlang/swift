@@ -1165,7 +1165,8 @@ def main_preset():
                 "build-presets.ini")
         ]
 
-        user_presets_file = os.path.join(os.getenv("HOME", "/"), '.swift-build-presets')
+        user_presets_file = os.path.join(os.getenv("HOME", "/"),
+                                         '.swift-build-presets')
         if os.path.isfile(user_presets_file):
             args.preset_file_names.append(user_presets_file)
 
