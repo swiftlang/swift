@@ -202,6 +202,28 @@ StrideTestSuite.test("FloatingPointStride/rounding error") {
     expectEqual(7, c.count)
     expectEqual(1 as Double, c.last)
   }
+  
+  if (1 as Float).addingProduct(0.9, 6) == 6.3999996 {
+    let d = Array(stride(from: 1 as Float, through: 6.3999996, by: 0.9))
+    expectEqual(7, d.count)
+    // The reason that `d` has seven elements and not six is that the fused
+    // multiply-add operation `(1 as Float).addingProduct(0.9, 6)` gives the
+    // result `6.3999996`. This is nonetheless the desired behavior because
+    // avoiding error accumulation and intermediate rounding error wherever
+    // possible will produce better results more often than not (see SR-6377).
+    //
+    // If checking of end bounds has been inadvertently modified such that we're
+    // computing the sum of the penultimate element and the stride (in this
+    // case, `5.5 + 0.9`), then the last element will be omitted here. This
+    // is not the desired behavior, as the result reflects error accumulation
+    // (in this case, `(1 as Float).addingProduct(0.9, 5) + 0.9`).
+    //
+    // Therefore, if the test has failed, there may have been a regression in
+    // the bounds-checking logic of `Stride*Iterator`. Restore the expected
+    // behavior here by ensuring that floating-point strides are opted out of
+    // any bounds checking that performs arithmetic with values other than the
+    // bounds themselves and the stride.
+  }
 }
 
 func strideIteratorTest<
