@@ -1354,7 +1354,7 @@ ${SelfDocComment}
 @frozen
 %  if bits == 16:
 @available(iOS 14, tvOS 14, watchOS 7, *)
-@available(OSX, unavailable)
+@available(macOS, unavailable)
 @available(macCatalyst, unavailable)
 %  else:
 @available(*, unavailable, message: "${Self} is not available on target platform.")
