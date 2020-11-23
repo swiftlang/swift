@@ -4129,11 +4129,7 @@ ClangImporter::instantiateCXXClassTemplate(
   assert(isa<clang::RecordType>(CanonType) &&
           "type of non-dependent specialization is not a RecordType");
 
-  auto *swiftDecl = Impl.importDecl(ctsd, Impl.CurrentVersion);
-  if (swiftDecl) {
-    return dyn_cast<NominalTypeDecl>(swiftDecl);
-  }
-  return nullptr;
+  return dyn_cast_or_null<NominalTypeDecl>(Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
 
 Identifier
