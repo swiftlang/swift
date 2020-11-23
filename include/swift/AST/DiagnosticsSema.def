@@ -2769,7 +2769,7 @@ ERROR(unexportable_clang_function_type,none,
       (Type))
 
 ERROR(cxx_class_instantiation_failed,none,
-      "clang couldn't instantiate class template",
+      "couldn't instantiate a C++ class template",
       ())
 
 WARNING(warn_implementation_only_conflict,none,
