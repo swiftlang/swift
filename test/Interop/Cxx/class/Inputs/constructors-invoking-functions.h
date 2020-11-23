@@ -7,11 +7,24 @@ inline int increment(int t) {
 
 struct Incrementor {
   int incrementee;
+  Incrementor() {
+    incrementee = 41;
+  }
   Incrementor(int value) : incrementee(increment(value)) {}
+  void memberIncrement() {
+    incrementee = increment(incrementee);
+  }
 };
 
 inline int badIncrement() {
   return Incrementor(41).incrementee;
+}
+
+inline int badMemberIncrement() {
+  Incrementor myIncrementor;
+  myIncrementor.memberIncrement();
+  return myIncrementor.incrementee;
+
 }
 
 inline int goodIncrement() {

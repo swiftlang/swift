@@ -8,12 +8,12 @@ import StdlibUnittest
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 TemplatesTestSuite.test("transitive-function-constructor") {
- // expectEqual(2, increment(1))
-  expectEqual(42, badIncrement())
+ // expectEqual(42, badIncrement())
+ // expectEqual(42, badMemberIncrement())
 }
 
 TemplatesTestSuite.test("inline-experiment") {
-  //expectEqual(42, goodIncrement())
+ // expectEqual(42, goodIncrement())
 }
 
 runAllTests()
