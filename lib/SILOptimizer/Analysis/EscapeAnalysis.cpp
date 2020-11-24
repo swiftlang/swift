@@ -450,6 +450,9 @@ EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
   if (Node) {
     CGNode *targetNode = Node->getMergeTarget();
     targetNode->mergeFlags(false /*isInterior*/, hasReferenceOnly);
+    // Update the node in Values2Nodes, so that next time we don't need to find
+    // the final merge target.
+    Node = targetNode;
     return targetNode;
   }
   if (isa<SILFunctionArgument>(ptrBase)) {
