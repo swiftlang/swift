@@ -26,15 +26,15 @@ func buyVegetables(
 
 // returns 1 or more vegetables or throws an error
 func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
-  await try Task.withUnsafeThrowingContinuation { continuation in
+  await try Task.withUnsafeThrowingContinuation { cc in
     var veggies: [Vegetable] = []
 
     buyVegetables(
       shoppingList: shoppingList,
-      onGotAllVegetables: { veggies in continuation.resume(returning: veggies) },
+      onGotAllVegetables: { veggies in cc.resume(returning: veggies) },
       onGotVegetable: { v in veggies.append(v) },
-      onNoMoreVegetables: { continuation.resume(returning: veggies) },
-      onNoVegetablesInStore: { error in continuation.resume(throwing: error) }
+      onNoMoreVegetables: { cc.resume(returning: veggies) },
+      onNoVegetablesInStore: { error in cc.resume(throwing: error) }
       )
   }
 }
@@ -45,21 +45,21 @@ func test_unsafeContinuations() async {
   // after all: if you have async code, just call it directly, without the unsafe continuation
   let _: String = Task.withUnsafeContinuation { continuation in // expected-error{{cannot convert value of type '(_) async -> ()' to expected argument type '(UnsafeContinuation<String>) -> Void'}}
     let s = await someAsyncFunc() // rdar://70610141 for getting a better error message here
-    continuation.resume(returning: s)
+    cc.resume(returning: s)
   }
 
-  let _: String = await Task.withUnsafeContinuation { continuation in
-    continuation.resume(returning: "")
+  let _: String = await Task.withUnsafeContinuation { cc in
+    cc.resume(returning: "")
   }
 }
 
 func test_unsafeThrowingContinuations() async {
-  let _: String = try await Task.withUnsafeThrowingContinuation { continuation in
-    continuation.resume(returning: "")
+  let _: String = try await Task.withUnsafeThrowingContinuation { cc in
+    cc.resume(returning: "")
   }
 
-  let _: String = try await Task.withUnsafeThrowingContinuation { continuation in
-    continuation.resume(throwing: MyError())
+  let _: String = await try Task.withUnsafeThrowingContinuation { cc in
+    cc.resume(throwing: MyError())
   }
 
   // TODO: Potentially could offer some warnings if we know that a continuation was resumed or escaped at all in a closure?

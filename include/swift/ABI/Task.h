@@ -244,11 +244,15 @@ public:
     }
   };
 
+  // TODO: rename? all other functions are is... rather than has...Fragment
   bool hasChildFragment() const { return Flags.task_isChildTask(); }
+
   ChildFragment *childFragment() {
     assert(hasChildFragment());
     return reinterpret_cast<ChildFragment*>(this + 1);
   }
+
+  // ==== Future ---------------------------------------------------------------
 
   class FutureFragment {
   public:
@@ -302,7 +306,7 @@ public:
     const Metadata *resultType;
 
     // Trailing storage for the result itself. The storage will be uninitialized,
-    // contain an instance of \c resultType, or contaon an an \c Error.
+    // contain an instance of \c resultType, or contain an an \c Error.
 
     friend class AsyncTask;
 
@@ -368,6 +372,197 @@ public:
   /// Upon completion, any waiting tasks will be scheduled on the given
   /// executor.
   void completeFuture(AsyncContext *context, ExecutorRef executor);
+
+  // ==== Channel --------------------------------------------------------------
+
+  class ChannelFragment {
+  public:
+      /// Describes the status of the channel.
+      enum class ReadyQueueStatus : uintptr_t {
+          /// The channel is empty, no tasks are pending.
+          /// Return immediately, there is no point in suspending.
+          ///
+          /// The storage is not accessible.
+          Empty = 0,
+
+          /// The channel has pending tasks
+          ///
+          /// The storage is not accessible.
+          Pending = 1,
+
+          /// The future has completed with result (of type \c resultType).
+          Success = 2,
+
+          /// The future has completed by throwing an error (an \c Error
+          /// existential).
+          Error = 3,
+
+//          /// No tasks are ready, yet there exist pending tasks (they were
+//          /// `add()`-ed and not completed yet). Suspend and await a wake-up
+//          /// when any task completes.
+//          Pending = 1,
+//
+//          /// At least one task is completed and waiting in the queue.
+//          /// Pull immediately without suspending to obtain it.
+//          Ready = 2,
+      };
+
+      /// Describes the status of the future.
+      ///
+      /// Futures always begin in the "Executing" state, and will always
+      /// make a single state change to either Success or Error.
+      enum class Status : uintptr_t {
+          /// No-one is waiting.
+          /// The storage is not accessible.
+          Pending = 0,
+
+          /// The future has completed with result (of type \c resultType).
+          Success = 1,
+
+          /// The future has completed by throwing an error (an \c Error
+          /// existential).
+          Error = 2,
+      };
+
+      /// An item within the message queue of a channel.
+      struct ReadyQueueItem {
+          /// Mask used for the low status bits in a message queue item.
+          static const uintptr_t statusMask = 0x03;
+
+          uintptr_t storage;
+
+          ReadyQueueStatus getStatus() const {
+            return static_cast<ReadyQueueStatus>(storage & statusMask);
+          }
+
+          AsyncTask *getTask() const {
+            return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+          }
+
+          static ReadyQueueItem get(ReadyQueueStatus status, AsyncTask *task) {
+            return ReadyQueueItem{
+                reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+          }
+      };
+
+      /// An item within the wait queue, which includes the status and the
+      /// head of the list of tasks.
+      struct WaitQueueItem {
+          /// Mask used for the low status bits in a wait queue item.
+          static const uintptr_t statusMask = 0x03;
+
+          uintptr_t storage;
+
+          Status getStatus() const {
+            return static_cast<Status>(storage & statusMask);
+          }
+
+          AsyncTask *getTask() const {
+            return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+          }
+
+          static WaitQueueItem get(Status status, AsyncTask *task) {
+            return WaitQueueItem{
+                reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+          }
+      };
+
+  private:
+      // TODO we likely can collapse these into one queue if we try hard enough
+
+      /// Queue containing completed tasks offered into this channel.
+      ///
+      /// The low bits contain the status, the rest of the pointer is the
+      /// AsyncTask.
+      std::atomic<ReadyQueueItem> readyQueue;
+
+      /// Queue containing all of the tasks that are waiting in `get()`.
+      ///
+      /// The low bits contain the status, the rest of the pointer is the
+      /// AsyncTask.
+      std::atomic<WaitQueueItem> waitQueue;
+
+      /// The type of the result that will be produced by the channel.
+      const Metadata *resultType;
+
+      // FIXME: seems shady...?
+      // Trailing storage for the result itself. The storage will be uninitialized.
+      // Use the `readyQueue` to poll for values from the channel instead.
+      friend class AsyncTask; // TODO: remove this?
+
+  public:
+      explicit ChannelFragment(const Metadata *resultType)
+          : readyQueue(ReadyQueueItem::get(ReadyQueueStatus::Empty, nullptr)),
+            waitQueue(WaitQueueItem::get(Status::Pending, nullptr)),
+            resultType(resultType) { }
+
+      /// Destroy the storage associated with the channel.
+      void destroy();
+
+//      /// Offer a completed task to the channel to enable polling for it.
+//      void offer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+//
+//      /// Poll the channel for any
+//      ChannelFragment::ReadyQueueStatus channelPoll(AsyncTask *waitingTask);
+
+//      /// Retrieve a pointer to the storage of result.
+//      OpaqueValue *getStoragePtr() {
+//        return reinterpret_cast<OpaqueValue *>(
+//            reinterpret_cast<char *>(this) + storageOffset(resultType));
+//      }
+//
+//      /// Retrieve the error.
+//      SwiftError *&getError() {
+//        return *reinterpret_cast<SwiftError **>(
+//            reinterpret_cast<char *>(this) + storageOffset(resultType));
+//      }
+
+//      /// Compute the offset of the storage from the base of the channel
+//      /// fragment.
+//      static size_t storageOffset(const Metadata *resultType)  {
+//        size_t offset = sizeof(ChannelFragment);
+//        size_t alignment =
+//            std::max(resultType->vw_alignment(), alignof(SwiftError *));
+//        return (offset + alignment - 1) & ~(alignment - 1);
+//      }
+//
+//      /// Determine the size of the channel fragment given a particular channel
+//      /// result type.
+//      static size_t fragmentSize(const Metadata *resultType) {
+//        return storageOffset(resultType) +
+//               std::max(resultType->vw_size(), sizeof(SwiftError *));
+//      }
+  };
+
+  bool isChannel() const { return Flags.task_isChannel(); }
+
+  ChannelFragment *channelFragment() {
+    assert(isChannel());
+    // FIXME: isn't it also a future at the same time?
+    if (hasChildFragment()) { // TODO: make sure those all are correct; we can have many fragments
+      return reinterpret_cast<ChannelFragment *>(
+          reinterpret_cast<ChildFragment*>(this + 1) + 1);
+    }
+
+    return reinterpret_cast<ChannelFragment *>(this + 1);
+  }
+
+  /// Offer result of a task into this channel.
+  /// The value is enqueued at the end of the channel.
+  ///
+  /// Upon enqueue, any waiting tasks will be scheduled on the given executor. // TODO: not precisely right
+  void channelOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+
+  /// Wait for for channel to become non-empty.
+  ///
+  /// \returns the status of the queue.  TODO more docs
+  ChannelFragment::ReadyQueueStatus channelPoll(AsyncTask *waitingTask);
+
+  // ==== ----------------------------------------------------------------------
+
+  bool isGroupChild() const { return Flags.task_isGroupChild(); }
+
+  // ==== ----------------------------------------------------------------------
 
   static bool classof(const Job *job) {
     return job->isAsyncTask();
@@ -474,6 +669,10 @@ class FutureAsyncContext : public AsyncContext {
 public:
   SwiftError *errorResult = nullptr;
   OpaqueValue *indirectResult;
+
+
+  // TODO: this is to support "offer into queue on complete"
+  AsyncContext *parentChannel = nullptr; // TODO: no idea if we need this or not
 
   using AsyncContext::AsyncContext;
 };

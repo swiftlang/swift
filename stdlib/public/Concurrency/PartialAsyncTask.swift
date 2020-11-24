@@ -24,6 +24,13 @@ public struct PartialAsyncTask {
 public struct UnsafeContinuation<T> {
   private var context: UnsafeRawPointer
 
+  /// Return a value into the continuation and make the task schedulable.
+  ///
+  /// The task will never run synchronously, even if the task does not
+  /// need to be resumed on a specific executor.
+  ///
+  /// This is appropriate when the caller is something "busy", like an event
+  /// loop, and doesn't want to be potentially delayed by arbitrary work.
   public func resume(returning: __owned T) { }
 }
 
@@ -31,14 +38,28 @@ public struct UnsafeContinuation<T> {
 public struct UnsafeThrowingContinuation<T> {
   private var context: UnsafeRawPointer
 
+  /// Return a value into the continuation and make the task schedulable.
+  ///
+  /// The task will never run synchronously, even if the task does not
+  /// need to be resumed on a specific executor.
+  ///
+  /// This is appropriate when the caller is something "busy", like an event
+  /// loop, and doesn't want to be potentially delayed by arbitrary work.
   public func resume(returning: __owned T) { }
+
+  /// Resume the continuation with an error and make the task schedulable.
+  ///
+  /// The task will never run synchronously, even if the task does not
+  /// need to be resumed on a specific executor.
+  ///
+  /// This is appropriate when the caller is something "busy", like an event
+  /// loop, and doesn't want to be potentially delayed by arbitrary work.
   public func resume(throwing: __owned Error) { }
 }
 
 #if _runtime(_ObjC)
 
-// Intrinsics used by SILGen to resume or fail continuations
-// for
+// Intrinsics used by SILGen to resume continuations
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _resumeUnsafeContinuation<T>(

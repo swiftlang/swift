@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 import Dispatch
 
@@ -25,7 +26,7 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
   let handle = Task.runDetached(operation: operation)
 
   // Run the task
-  _ = DispatchQueue.global(priority: .default).async { handle.run() }
+  DispatchQueue.global(priority: .default).async { handle.run() }
 
   return handle
 }
@@ -39,19 +40,22 @@ func test_taskGroup_01_sum() {
 
   let taskHandle = launch { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
-      let one = group.add {
-        await launch { () async -> Int in
+      let one = await group.add {
+        await try launch { () async -> Int in
           sleep(3) // TODO: reimplement with completing them in order
+          return 1
         }.get()
       }
-      let two = group.add {
-        await launch { () async -> Int in
+      let two = await group.add {
+        await try launch { () async -> Int in
           sleep(2) // TODO: reimplement with completing them in order
+          return 2
         }.get()
       }
-      let three = group.add {
-        await launch { () async -> Int in
+      let three = await group.add {
+        await try launch { () async -> Int in
           sleep(2) // TODO: reimplement with completing them in order
+          return 3
         }.get()
       }
 
