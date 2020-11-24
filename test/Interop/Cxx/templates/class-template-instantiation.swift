@@ -2,7 +2,7 @@
 //
 // REQUIRES: executable_test
 
-import MagicWrapper
+import ClassTemplateInstantiation
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
@@ -23,6 +23,12 @@ TemplatesTestSuite.test("with-c++-type-calling-method-on-arg") {
   let i2 = IntWrapper(value: 12)
   var wrappedMagicNumber = MagicWrapper<IntWrapper>(t: i1)
   expectEqual(wrappedMagicNumber.getValuePlusArg(i2), 54)
+}
+
+TemplatesTestSuite.test("existing-specialization") {
+  let myInt = IntWrapper(value: 18)
+  var magicInt = MagicWrapper<IntWrapper>(t: myInt)
+  expectEqual(magicInt.getValuePlusArg(12), 30)
 }
 
 runAllTests()

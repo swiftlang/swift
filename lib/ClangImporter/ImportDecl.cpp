@@ -3982,7 +3982,7 @@ namespace {
         markAsVariant(result, *correctSwiftName);
 
       if (decl->isInvalidDecl()) {
-        Impl.markUnavailable(result, "function marked as invalid by clang");
+        return nullptr;
       }
 
       return result;

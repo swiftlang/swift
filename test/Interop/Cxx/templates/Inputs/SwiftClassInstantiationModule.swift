@@ -1,4 +1,4 @@
-import MagicWrapper
+import ClassTemplateForSwiftModule
 
 public func makeWrappedMagicNumber() -> MagicWrapper<IntWrapper> {
   let t = IntWrapper(value: 42)

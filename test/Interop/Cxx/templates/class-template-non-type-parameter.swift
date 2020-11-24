@@ -3,7 +3,6 @@
 // REQUIRES: executable_test
 
 import ClassTemplateNonTypeParameter
-import MagicWrapper
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
@@ -22,10 +21,13 @@ TemplatesTestSuite.test("typedeffed-non-type-parameter") {
 
 // TODO(SR-13261): This test doesn't work because Swift only expects types as generic arguments.
 // TemplatesTestSuite.test("non-type-parameter") {
-//   var intWrapper = IntWrapper(value: 5)
-//   var pair = MagicArray<Element, intWrapper>(data: (Element(id: 1), Element(id: 2), Element(id: 3), Element(id: 4), Element(id: 5)))
-//   expectEqual(pair.data.count, 5)
-//   expectEqual(pair.data.3.id, 3)
+//   var pair = MagicArray<IntWrapper, 5>(
+//     data: (
+//       IntWrapper(value: 0), IntWrapper(value: 1), IntWrapper(value: 2), IntWrapper(value: 3),
+//       IntWrapper(value: 4)
+//     ))
+//   expectEqual(pair.count, 5)
+//   expectEqual(pair.3.value, 3)
 // }
 
 runAllTests()

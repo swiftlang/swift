@@ -22,6 +22,10 @@ module ExplicitClassSpecialization {
   header "explicit-class-specialization.h"
 }
 
+module ClassTemplateInstantionExistingSpecialization {
+  header "class-template-instantiation-existing-specialization.h"
+}
+
 module FunctionTemplates {
   header "function-templates.h"
 }
@@ -34,8 +38,12 @@ module ClassTemplateEagerInstantiationProblems {
   header "class-template-eager-instantiation-problems.h"
 }
 
-module MagicWrapper {
-  header "magic-wrapper.h"
+module ClassTemplateInstantiation {
+  header "class-template-instantiation.h"
+}
+
+module ClassTemplateForSwiftModule {
+  header "class-template-for-swift-module.h"
 }
 
 module Mangling {

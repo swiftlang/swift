@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface %S/Inputs/SwiftClassInstantiationModule.swift -I %S/Inputs -enable-cxx-interop
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: import MagicWrapper
+// CHECK: import ClassTemplateForSwiftModule
 
 // CHECK: func makeWrappedMagicNumber() -> __ObjC.__CxxTemplateInst12MagicWrapperI10IntWrapperE
 
