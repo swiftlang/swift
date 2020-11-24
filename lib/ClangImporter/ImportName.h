@@ -353,8 +353,6 @@ class NameImporter {
   EnumInfoCache enumInfos;
   StringScratchSpace scratch;
 
-  const bool inferImportAsMember;
-
   // TODO: remove when we drop the options (i.e. import all names)
   using CacheKeyType =
       std::pair<const clang::NamedDecl *, ImportNameVersion>;
@@ -369,10 +367,9 @@ class NameImporter {
 
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema, bool inferIAM)
+               clang::Sema &cSema)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()),
-        inferImportAsMember(inferIAM) {}
+        enumInfos(clangSema.getPreprocessor()) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -414,8 +411,6 @@ public:
   }
 
   StringScratchSpace &getScratch() { return scratch; }
-
-  bool isInferImportAsMember() const { return inferImportAsMember; }
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return enumInfos.getEnumInfo(decl);

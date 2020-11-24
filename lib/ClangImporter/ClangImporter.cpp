@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
 #include "ClangDiagnosticConsumer.h"
-#include "IAMInference.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -1055,8 +1054,7 @@ ClangImporter::create(ASTContext &ctx,
           importer->Impl.BridgingHeaderLookupTable,
           importer->Impl.LookupTables, importer->Impl.SwiftContext,
           importer->Impl.getBufferImporterForDiagnostics(),
-          importer->Impl.platformAvailability,
-          importer->Impl.InferImportAsMember));
+          importer->Impl.platformAvailability));
 
   // Create a compiler instance.
   {
@@ -1172,7 +1170,7 @@ ClangImporter::create(ASTContext &ctx,
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
-      importer->Impl.getClangSema(), importer->Impl.InferImportAsMember));
+      importer->Impl.getClangSema()));
 
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
@@ -2089,7 +2087,6 @@ ClangImporter::Implementation::Implementation(
     DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx),
       ImportForwardDeclarations(ctx.ClangImporterOpts.ImportForwardDeclarations),
-      InferImportAsMember(ctx.ClangImporterOpts.InferImportAsMember),
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(!ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
