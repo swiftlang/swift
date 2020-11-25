@@ -1439,7 +1439,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
   // Form the metatype of the result type.
   CanType futureResultType =
       Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext())))
+        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
           .subst(subs)->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
