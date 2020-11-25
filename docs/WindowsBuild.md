@@ -4,6 +4,8 @@ Visual Studio 2017 or newer is needed to build Swift on Windows. The free Commun
 
 The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
+All the commands below are written in Command Prompt. While using PowerShell, You need to replace `^` with <code>`</code> (backtick) at the end of each line.
+
 ## Install dependencies
 
 ### Visual Studio
