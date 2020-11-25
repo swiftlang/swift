@@ -143,7 +143,7 @@ private:
   }
   DifferentiationInvoker getInvoker() const { return vjpCloner.getInvoker(); }
   LinearMapInfo &getPullbackInfo() const { return vjpCloner.getPullbackInfo(); }
-  const SILAutoDiffIndices getIndices() const { return vjpCloner.getIndices(); }
+  AutoDiffConfig getConfig() const { return vjpCloner.getConfig(); }
   const DifferentiableActivityInfo &getActivityInfo() const {
     return vjpCloner.getActivityInfo();
   }
@@ -862,7 +862,7 @@ public:
     // differentiated.
     if (applyInfoLookup == nestedApplyInfo.end()) {
       // Must not be active.
-      assert(!getActivityInfo().isActive(ai, getIndices()));
+      assert(!getActivityInfo().isActive(ai, getConfig()));
       return;
     }
     auto applyInfo = applyInfoLookup->getSecond();
@@ -880,7 +880,7 @@ public:
     SmallVector<SILValue, 8> origAllResults;
     collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
     // Append `inout` arguments after original results.
-    for (auto paramIdx : applyInfo.indices.parameters->getIndices()) {
+    for (auto paramIdx : applyInfo.config.parameterIndices->getIndices()) {
       auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
           ai->getNumIndirectResults() + paramIdx);
       if (!paramInfo.isIndirectMutating())
@@ -909,7 +909,7 @@ public:
     }
 
     // Collect callee pullback formal arguments.
-    for (auto resultIndex : applyInfo.indices.results->getIndices()) {
+    for (auto resultIndex : applyInfo.config.resultIndices->getIndices()) {
       assert(resultIndex < origAllResults.size());
       auto origResult = origAllResults[resultIndex];
       // Get the seed (i.e. adjoint value of the original result).
@@ -955,7 +955,7 @@ public:
 
     // Accumulate adjoints for original differentiation parameters.
     auto allResultsIt = allResults.begin();
-    for (unsigned i : applyInfo.indices.parameters->getIndices()) {
+    for (unsigned i : applyInfo.config.parameterIndices->getIndices()) {
       auto origArg = ai->getArgument(ai->getNumIndirectResults() + i);
       // Skip adjoint accumulation for `inout` arguments.
       auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
@@ -1767,7 +1767,7 @@ bool PullbackCloner::Implementation::run() {
   // Collect original formal results.
   SmallVector<SILValue, 8> origFormalResults;
   collectAllFormalResultsInTypeOrder(original, origFormalResults);
-  for (auto resultIndex : getIndices().results->getIndices()) {
+  for (auto resultIndex : getConfig().resultIndices->getIndices()) {
     auto origResult = origFormalResults[resultIndex];
     // If original result is non-varied, it will always have a zero derivative.
     // Skip full pullback generation and simply emit zero derivatives for wrt
@@ -1777,7 +1777,7 @@ bool PullbackCloner::Implementation::run() {
     // returning non-varied result with >1 basic block where some basic blocks
     // have no dominated active values; control flow differentiation does not
     // handle this case. See TF-876 for context.
-    if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
+    if (!getActivityInfo().isVaried(origResult, getConfig().parameterIndices)) {
       emitZeroDerivativesForNonvariedResult(origResult);
       return false;
     }
@@ -1803,7 +1803,7 @@ bool PullbackCloner::Implementation::run() {
     // returns true. Otherwise, returns false.
     auto recordValueIfActive = [&](SILValue v) -> bool {
       // If value is not active, skip.
-      if (!getActivityInfo().isActive(v, getIndices()))
+      if (!getActivityInfo().isActive(v, getConfig()))
         return false;
       // If active value has already been visited, skip.
       if (visited.count(v))
@@ -1999,13 +1999,13 @@ bool PullbackCloner::Implementation::run() {
   // The pullback function has type:
   // `(seed0, seed1, ..., exit_pb_struct|context_obj) -> (d_arg0, ..., d_argn)`.
   auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
-  assert(getIndices().results->getNumIndices() == pbParamArgs.size() - 1 &&
+  assert(getConfig().resultIndices->getNumIndices() == pbParamArgs.size() - 1 &&
          pbParamArgs.size() >= 2);
   // Assign adjoints for original result.
   builder.setInsertionPoint(pullbackEntry,
                             getNextFunctionLocalAllocationInsertionPoint());
   unsigned seedIndex = 0;
-  for (auto resultIndex : getIndices().results->getIndices()) {
+  for (auto resultIndex : getConfig().resultIndices->getIndices()) {
     auto origResult = origFormalResults[resultIndex];
     auto *seed = pbParamArgs[seedIndex];
     if (seed->getType().isAddress()) {
@@ -2089,7 +2089,7 @@ bool PullbackCloner::Implementation::run() {
     }
   };
   // Collect differentiation parameter adjoints.
-  for (auto i : getIndices().parameters->getIndices()) {
+  for (auto i : getConfig().parameterIndices->getIndices()) {
     // Skip `inout` parameters.
     if (conv.getParameters()[i].isIndirectMutating())
       continue;
@@ -2426,7 +2426,7 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // Propagate adjoint values from active basic block arguments to
   // incoming values (predecessor terminator operands).
   for (auto *bbArg : bb->getArguments()) {
-    if (!getActivityInfo().isActive(bbArg, getIndices()))
+    if (!getActivityInfo().isActive(bbArg, getConfig()))
       continue;
     // Get predecessor terminator operands.
     SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
@@ -2576,9 +2576,9 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
 
   SmallVector<SILValue, 8> origFormalResults;
   collectAllFormalResultsInTypeOrder(original, origFormalResults);
-  assert(getIndices().results->getNumIndices() == 1 &&
+  assert(getConfig().resultIndices->getNumIndices() == 1 &&
          "Getter should have one semantic result");
-  auto origResult = origFormalResults[*getIndices().results->begin()];
+  auto origResult = origFormalResults[*getConfig().resultIndices->begin()];
 
   auto tangentVectorSILTy = pullback.getConventions().getResults().front()
       .getSILStorageType(getModule(),
