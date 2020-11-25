@@ -2278,8 +2278,13 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
   llvm::Value *value;
+//  auto isSpecialAsyncWithoutCtxtSize =
+//      fn->isAsync() && fn->getName().equals("swift_task_future_wait");
   auto isSpecialAsyncWithoutCtxtSize =
-      fn->isAsync() && fn->getName().equals("swift_task_future_wait");
+      fn->isAsync() && (
+          fn->getName().equals("swift_task_future_wait") ||
+          fn->getName().equals("swift_task_channel_poll") // TODO: do we need this?
+      );
   if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = Builder.CreateBitCast(value, fnPtr->getType());

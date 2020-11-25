@@ -24,7 +24,14 @@ using namespace swift;
 using ChannelFragment = AsyncTask::ChannelFragment;
 using FutureFragment = AsyncTask::FutureFragment;
 
-// ==== Destroy ----------------------------------------------------------------
+using ReadyQueueItem = ChannelFragment::ReadyQueueItem;
+using ReadyQueueStatus = ChannelFragment::ReadyQueueStatus;
+using ChannelPollResult = ChannelFragment::ChannelPollResult;
+
+using WaitQueueItem = ChannelFragment::WaitQueueItem;
+using WaitStatus = ChannelFragment::WaitStatus;
+
+// ==== destroy ----------------------------------------------------------------
 
 void
 ChannelFragment::destroy() {
@@ -47,20 +54,16 @@ ChannelFragment::destroy() {
 // ==== channelOffer -----------------------------------------------------------
 
 void
-AsyncTask::channelOffer(AsyncTask *completed, AsyncContext *context,
+AsyncTask::channelOffer(AsyncTask *completedTask, AsyncContext *context,
                        ExecutorRef executor) {
-  assert(completed->hasChildFragment() &&
+  assert(completedTask);
+  assert(completedTask->hasChildFragment() &&
       "Attempted to offer non-child task! "
       "Only child tasks may offer their results to their parent.");
-  assert(completed->isFuture());
+  assert(completedTask->isFuture());
 
   assert(isChannel());
   auto fragment = channelFragment();
-
-  using Status = ChannelFragment::Status;
-  using ReadyQueueStatus = ChannelFragment::ReadyQueueStatus;
-  using ReadyQueueItem = ChannelFragment::ReadyQueueItem;
-  using WaitQueueItem = ChannelFragment::WaitQueueItem;
 
   // TODO: is this right? we should rather reuse the child I guess?
   // If an error was thrown, save it in the future fragment.
@@ -72,41 +75,17 @@ AsyncTask::channelOffer(AsyncTask *completed, AsyncContext *context,
     hadErrorResult = true;
   }
 
-  // Update the wait queue, signaling that if there were any waiters,
-  // we'll have processed them by the end of this function.
-  auto newWaitQueueHead = WaitQueueItem::get(
-      Status::Pending,
-      nullptr
-  );
-  auto waitQueueHead = fragment->waitQueue.exchange(
-      newWaitQueueHead, std::memory_order_acquire);
+//  // Update the wait queue, signaling that if there were any waiters,
+//  // we'll have processed them by the end of this function.
+//  auto newWaitHead = WaitQueueItem::get(
+//      WaitStatus::Pending,
+//      nullptr
+//  );
+//  auto waitHead = fragment->waitQueue.exchange(
+//      newWaitHead, std::memory_order_acquire);
 
-  auto waitingTask = waitQueueHead.getTask();
-  if (waitingTask == nullptr) {
-    // ==== enqueue message ----------------------------------------------------
-    //
-    // no-one was waiting (yet), so we have to instead enqueue to the message queue
-    // when a task polls during next() it will notice that we have a value ready
-    // for it, and will process it immediately without suspending.
-    auto newReadyQueueHead = ReadyQueueItem::get(
-        ReadyQueueStatus::Empty,
-        completed
-    );
-    auto readyQueueHead = fragment->readyQueue.exchange(
-        newReadyQueueHead, std::memory_order_acquire);
-    while (true) {
-      // Put the completed task at the beginning of the message queue.
-      waitingTask->getNextWaitingTask() = readyQueueHead.getTask();
-      if (fragment->readyQueue.compare_exchange_weak(
-          readyQueueHead, newReadyQueueHead, std::memory_order_release,
-          std::memory_order_acquire)) {
-        // Escalate the priority of this task based on the priority
-        // of the waiting task.
-        swift_task_escalate(this, waitingTask->Flags.getPriority());
-        return;
-      }
-    }
-  } else {
+  auto waitHead = fragment->waitQueue.load(std::memory_order_acquire);
+  if (auto waitingTask = waitHead.getTask()) {
     // ==== run waiters --------------------------------------------------------
     //
     // Some tasks were waiting, schedule them all on the executor.
@@ -115,33 +94,103 @@ AsyncTask::channelOffer(AsyncTask *completed, AsyncContext *context,
       auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
       // Run the task.
-      auto completedFragment = completed->futureFragment();
+      auto completedFragment = completedTask->futureFragment();
       swift::runTaskWithFutureResult(waitingTask, executor, completedFragment, hadErrorResult);
 
       // Move to the next task.
       waitingTask = nextWaitingTask;
     }
+    // FIXME: have we cleared the queue?
     return;
+  } else {
+    // ==== enqueue message ----------------------------------------------------
+    //
+    // no-one was waiting (yet), so we have to instead enqueue to the message queue
+    // when a task polls during next() it will notice that we have a value ready
+    // for it, and will process it immediately without suspending.
+
+    // load the ready queue's head; it could be empty or be some other value,
+    // we don't really care right now, as we simply make it our new tail,
+    // and become the new head. // FIXME: this means we end up in reverse order (wrt completion)...
+    auto readyHead = fragment->readyQueue.load(std::memory_order_acquire);
+
+    // TODO: replace with a "real" fifo queue, since we get the events in reverse
+    //       order and just peeling off one event is quite a pain now.
+
+    while (true) {
+      completedTask->getNextChannelCompletedTask() = readyHead.getTask();
+      auto newReadyHead = ReadyQueueItem::get(
+          hadErrorResult ? ReadyQueueStatus::Error : ReadyQueueStatus::Success,
+          completedTask
+      );
+
+      if (fragment->readyQueue.compare_exchange_weak(
+          readyHead, newReadyHead,
+          /*success*/ std::memory_order_release,
+          /*failure*/ std::memory_order_acquire)) {
+        return;
+      } // else, try again
+    }
+
+    //    auto newReadyHead = ReadyQueueItem::get(
+      //        hadErrorResult ? ReadyQueueStatus::Error : ReadyQueueStatus::Success,
+      //        completedTask
+      //    );
+      //    auto readyHead = fragment->readyQueue.exchange(
+      //        newReadyHead, std::memory_order_acquire);
+      //    while (true) {
+      //      // Put the completed task at the beginning of the message queue.
+      //      waitingTask->getNextWaitingTask() = readyHead.getTask();
+      //      if (fragment->readyQueue.compare_exchange_weak(
+      //          readyHead, newReadyHead, std::memory_order_release,
+      //          std::memory_order_acquire)) {
+      //        // Escalate the priority of this task based on the priority
+      //        // of the waiting task.
+      //        swift_task_escalate(this, waitingTask->Flags.getPriority());
+      //        return;
+      //      }
+      //    }
   }
 }
 
-
-//void swift::swift_task_channel_offer(
-//    AsyncTask *channelTask,
-//    AsyncTask *completedTask) {
-//  assert(channelTask->isChannel());
-//  assert(completedTask->isFuture());
+//void AsyncTask::channelOffer(AsyncContext *context, ExecutorRef executor) {
+//  assert(isChannel());
+//  auto fragment = ChannelFragment();
+//
+//  // If an error was thrown, save it in the future fragment.
+//  auto futureContext = static_cast<FutureAsyncContext *>(context);
+//  bool hadErrorResult = false;
+//  if (auto errorObject = futureContext->errorResult) {
+//    fragment->getError() = errorObject;
+//    hadErrorResult = true;
+//  }
+//
+//  // Update the status to signal completion.
+//  auto newWaitHead = WaitQueueItem::get(
+//    hadErrorResult ? WaitStatus::Error : Status::Success,
+//    nullptr
+//  );
+//  auto messageHead = fragment->waitQueue.exchange(newWaitHead, std::memory_order_acquire);
+//  assert(messageHead.getStatus() == WaitStatus::Executing);
+//
+//  // Schedule every waiting task on the executor.
+//  auto waitingTask = messageHead.getTask();
+//  while (waitingTask) {
+//    // Find the next waiting task.
+//    auto nextWaitingTask = waitingTask->getNextWaitingTask();
+//
+//    // Run the task.
+//    runTaskWithFutureResult(waitingTask, executor, fragment, hadErrorResult);
+//
+//    // Move to the next task.
+//    waitingTask = nextWaitingTask;
+//  }
 //}
 
 // ==== pollChannel ------------------------------------------------------------
 
-AsyncTask::ChannelFragment::ReadyQueueStatus
+ChannelPollResult
 AsyncTask::channelPoll(AsyncTask *waitingTask) {
-  using Status = ChannelFragment::Status;
-  using WaitQueueItem = ChannelFragment::WaitQueueItem;
-  using ReadyQueueItem = ChannelFragment::ReadyQueueItem;
-  using ReadyQueueStatus = ChannelFragment::ReadyQueueStatus;
-
   assert(isChannel());
   auto fragment = channelFragment();
 
@@ -151,12 +200,16 @@ AsyncTask::channelPoll(AsyncTask *waitingTask) {
   switch (readyQueueHeadStatus) {
     case ReadyQueueStatus::Empty:
       // empty and no tasks in flight, bail out!
-      return readyQueueHeadStatus;
+      ChannelPollResult result;
+      result.hadAnyResult = false;
+      return result;
     case ReadyQueueStatus::Pending:
+      // we will have to wait/suspend until pending tasks complete
       shouldWait = true;
       break;
     case ReadyQueueStatus::Success:
     case ReadyQueueStatus::Error:
+      // great, we can immediately return the polled value
       break;
   }
 
@@ -167,7 +220,6 @@ AsyncTask::channelPoll(AsyncTask *waitingTask) {
   }
 
   // ==== Ready tasks in queue, poll one ----------------------------------------
-  assert(false && "IMPLEMENT getting task AsyncTask::channelPoll");
 
 //  while (true) {
 //    switch (channelStatus) {
@@ -187,10 +239,10 @@ AsyncTask::channelPoll(AsyncTask *waitingTask) {
 //    }
 //
 //    // 3) Put the waiting task at the beginning of the wait queue.
-//    auto waitQueueHead = fragment->waitQueue.load(std::memory_order_acquire);
-//    waitingTask->getNextWaitingTask() = waitQueueHead.getTask();
-//    auto newWaitHead = WaitQueueItem::get(Status::Pending, waitingTask);
-//    if (fragment->waitQueue.compare_exchange_weak(waitQueueHead, newWaitHead,
+//    auto waitHead = fragment->waitQueue.load(std::memory_order_acquire);
+//    waitingTask->getNextWaitingTask() = waitHead.getTask();
+//    auto newWaitHead = WaitQueueItem::get(WaitStatus::Pending, waitingTask);
+//    if (fragment->waitQueue.compare_exchange_weak(waitHead, newWaitHead,
 //            /*success*/ std::memory_order_release,
 //            /*failure*/ std::memory_order_acquire)) {
 //      // Escalate the priority of this task based on the priority
@@ -201,84 +253,51 @@ AsyncTask::channelPoll(AsyncTask *waitingTask) {
 //  }
 }
 
-//void AsyncTask::channelOffer(AsyncContext *context, ExecutorRef executor) {
-//  using Status = ChannelFragment::Status;
-//  using ReadyQueueItem = ChannelFragment::ReadyQueueItem;
-//  using WaitQueueItem = ChannelFragment::WaitQueueItem;
-//
-//  assert(isChannel());
-//  auto fragment = ChannelFragment();
-//
-//  // If an error was thrown, save it in the future fragment.
-//  auto futureContext = static_cast<FutureAsyncContext *>(context);
-//  bool hadErrorResult = false;
-//  if (auto errorObject = futureContext->errorResult) {
-//    fragment->getError() = errorObject;
-//    hadErrorResult = true;
-//  }
-//
-//  // Update the status to signal completion.
-//  auto newWaitHead = WaitQueueItem::get(
-//    hadErrorResult ? Status::Error : Status::Success,
-//    nullptr
-//  );
-//  auto messageHead = fragment->waitQueue.exchange(newWaitHead, std::memory_order_acquire);
-//  assert(messageHead.getStatus() == Status::Executing);
-//
-//  // Schedule every waiting task on the executor.
-//  auto waitingTask = messageHead.getTask();
-//  while (waitingTask) {
-//    // Find the next waiting task.
-//    auto nextWaitingTask = waitingTask->getNextWaitingTask();
-//
-//    // Run the task.
-//    runTaskWithFutureResult(waitingTask, executor, fragment, hadErrorResult);
-//
-//    // Move to the next task.
-//    waitingTask = nextWaitingTask;
-//  }
-//}
-
-//AsyncTaskAndContext swift::swift_task_create_future(
-//    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-//    const AsyncFunctionPointer<void()> *function) {
-//  return swift_task_create_future_f(
-//      flags, parent, futureResultType, function->Function.get(),
-//      function->ExpectedContextSize);
-//}
-
 void swift::swift_task_channel_poll(
     AsyncTask *waitingTask, ExecutorRef executor,
     AsyncContext *rawContext) {
-  assert(false && "IMPLEMENT swift_task_channel_poll");
-//  // Suspend the waiting task.
-//  waitingTask->ResumeTask = rawContext->ResumeParent;
-//  waitingTask->ResumeContext = rawContext;
-//
-//  // Wait on the future.
-//  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
-//  auto task = context->task;
-//  assert(task->isFuture());
-//  assert(task->isChannel());
-//  switch (task->pollChannel(waitingTask)) {
-//  case ChannelFragment::ReadyQueueStatus::Empty:
+  // Suspend the waiting task.
+  waitingTask->ResumeTask = rawContext->ResumeParent;
+  waitingTask->ResumeContext = rawContext;
+
+  // Wait on the future.
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  auto task = context->task;
+  // assert(task->isFuture()); // TODO: shall it also be a future?
+  assert(task->isChannel());
+
+  auto polled = task->channelPoll(waitingTask);
+//  if (!polled.hadAnyResult) {
+//    return;
+//  }
+
+  runTaskWithChannelPollResult(waitingTask, executor, polled);
+//  switch (polled.status) {
+//  case ReadyQueueStatus::Empty:
 //    // The waiting task has been queued on the future.
 //    return;
 //
-//  case ChannelFragment::Status::Success:
+//  case ReadyQueueStatus::Success:
 //    // Run the task with a successful result.
 //    // FIXME: Want to guarantee a tail call here
 //    runTaskWithFutureResult(
-//        waitingTask, executor, task->ChannelFragment(),
+//        waitingTask, executor, task->channelFragment(),
 //        /*hadErrorResult=*/false);
 //    return;
 //
-// case ChannelFragment::Status::Error:
+// case ReadyQueueStatus::Error:
 //    // Run the task with an error result.
 //    // FIXME: Want to guarantee a tail call here
 //    runTaskWithFutureResult(
-//        waitingTask, executor, task->ChannelFragment(),
+//        waitingTask, executor, task->channelFragment(),
 //        /*hadErrorResult=*/true);
 //    return;
 //  }
+}
+
+// ==== isEmpty ----------------------------------------------------------------
+
+bool swift::swift_task_channel_is_empty(AsyncTask *task) {
+  assert(task->isChannel());
+  return task->channelFragment()->isEmpty();
 }
