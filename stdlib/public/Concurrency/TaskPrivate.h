@@ -84,6 +84,28 @@ static void runTaskWithFutureResult(
   waitingTask->run(executor);
 }
 
+/// Run the given task, providing it with the result of the future.
+static void runTaskWithChannelPollResult(
+    AsyncTask *waitingTask, ExecutorRef executor,
+    AsyncTask::ChannelFragment::ChannelPollResult result) {
+  auto waitingTaskContext =
+      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
+
+  waitingTaskContext->result.hadErrorResult = result.hadErrorResult;
+  if (result.hadErrorResult) {
+//    waitingTaskContext->result.storage =
+//        reinterpret_cast<OpaqueValue *>(result->getError());
+    waitingTaskContext->result.storage = result.storage;
+  } else if (result.hadAnyResult){
+//    waitingTaskContext->result.storage = result->getStoragePtr();
+    waitingTaskContext->result.storage = result.storage;
+  }
+
+  // TODO: schedule this task on the executor rather than running it
+  // directly.
+  waitingTask->run(executor);
+}
+
 } // end namespace swift
 
 #endif

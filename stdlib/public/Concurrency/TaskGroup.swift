@@ -192,12 +192,17 @@ extension Task {
     /// rather the order of `next()` calls completing is by completion order of
     /// the tasks. This differentiates task groups from streams (
     public mutating func next() async throws -> TaskResult? {
-      func x () -> RawTaskChannelPollResult {
-        fatalError("TODO: implement next()")
-      }
+//      func x () -> RawChannelPollResult {
+//        fatalError("TODO: implement next()")
+//      }
+
+//      return nil
+
+      let rawResult = await taskFutureWait(on: self.groupChannelTask)
+      print("xxx == \(rawResult)")
       return nil
-//      let rawResult: RawTaskChannelPollResult = await taskChannelPoll(on: self.groupChannelTask)
-//
+
+//      let rawResult: RawChannelPollResult = await taskChannelPoll(on: self.groupChannelTask)
 //      guard rawResult.hadAnyResult else {
 //        // Polling returned "no result", it means there is nothing to await on anymore
 //        // i.e. there are no more pending tasks / "we drained all tasks"
@@ -223,8 +228,7 @@ extension Task {
     ///
     /// - Returns: `true` if the group has no pending tasks, `false` otherwise.
     public var isEmpty: Bool {
-      fatalError("\(#function) not implemented yet")
-      // taskChannelIsEmpty(self.groupChannelTask) // TODO: implement via a Status property
+      taskChannelIsEmpty(self.groupChannelTask)
     }
 
     /// Cancel all the remaining tasks in the group.
@@ -255,8 +259,8 @@ extension Task {
 //  completedTask: Builtin.NativeObject
 //)
 
-/// See: TaskChannelPollResult
-struct RawTaskChannelPollResult {
+/// See: ChannelPollResult
+struct RawChannelPollResult {
   /// If false, return `nil` from `next()`.
   let hadAnyResult: Bool
 
@@ -269,9 +273,9 @@ struct RawTaskChannelPollResult {
 @_silgen_name("swift_task_channel_poll")
 func taskChannelPoll(
   on channelTask: Builtin.NativeObject
-) async -> RawTaskChannelPollResult
+) async -> RawChannelPollResult
 
-//@_silgen_name("swift_task_channel_is_empty")
-//func taskChannelIsEmpty(
-//  on channelTask: Builtin.NativeObject
-//) -> Bool
+@_silgen_name("swift_task_channel_is_empty")
+func taskChannelIsEmpty(
+  _ channelTask: Builtin.NativeObject
+) -> Bool

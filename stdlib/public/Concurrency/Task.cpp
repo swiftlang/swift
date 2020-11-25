@@ -22,6 +22,7 @@
 
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
+using ChannelFragment = AsyncTask::ChannelFragment;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -39,9 +40,14 @@ void FutureFragment::destroy() {
   }
 }
 
-FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
+FutureFragment::Status
+AsyncTask::waitFuture(AsyncTask *waitingTask) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
+
+//  if (isChannel()) {
+//    assert(false && "waiting on channel!");
+//  }
 
   assert(isFuture());
   auto fragment = futureFragment();
@@ -261,15 +267,20 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
          initialContextSize >= sizeof(FutureAsyncContext));
   assert((parent != nullptr) == flags.task_isChildTask());
 
-  // TODO: cleanup
-  if (flags.task_isGroupChild()) {
-    assert(flags.task_isGroupChild() && flags.task_isChildTask());
-    assert(flags.task_isGroupChild() && parent->Flags.task_isChannel());
+  if (flags.task_isGroupChild()) { // TODO: express without the `if`?
+    assert(flags.task_isChildTask());
+    assert(parent->Flags.task_isChannel());
   }
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
-  if (parent) headerSize += sizeof(AsyncTask::ChildFragment);
+  if (parent) {
+    headerSize += sizeof(AsyncTask::ChildFragment);
+  }
+
+  if (flags.task_isChannel()) {
+    headerSize += ChannelFragment::fragmentSize();
+  }
 
   if (futureResultType) {
     headerSize += FutureFragment::fragmentSize(futureResultType);
@@ -302,6 +313,12 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
+  // Initialize the channel fragment if applicable.
+  if (flags.task_isChannel()) {
+    auto channelFragment = task->channelFragment();
+    new (channelFragment) ChannelFragment(futureResultType);
+  }
+
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     auto futureFragment = task->futureFragment();
@@ -312,18 +329,6 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
     futureContext->errorResult = nullptr;
     futureContext->indirectResult = futureFragment->getStoragePtr();
-
-    if (flags.task_isChannel()) {
-      auto parentChannelFragment = parent->channelFragment();
-      // new(channelFragment) ChannelFragment(futureResultType); // TODO make sure parent does init
-      assert(parentChannelFragment && "group child task could not find parent channel fragment!");
-
-//
-//      // Set up the context for the future such that results ar *offered*
-//      // into the channel fragment's message queue.
-//      futureContext->indirectResult = parentChannelFragment;
-    }
-
   }
 
   // Configure the initial context.
@@ -351,9 +356,16 @@ void swift::swift_task_future_wait(
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
-  // Wait on the future.
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
+
+  if (task->isChannel()) {
+    // assert(false && "WAITING ON GROUP CHILD TASK");
+    swift::swift_task_channel_poll(waitingTask, executor, rawContext);
+    return;
+  }
+
+  // Wait on the future.
   assert(task->isFuture());
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:

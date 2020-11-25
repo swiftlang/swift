@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
@@ -34,8 +34,10 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 // ==== ------------------------------------------------------------------------
 // MARK: Tests
 
+/// Tasks complete before they are next() polled.
 func test_taskGroup_01_sum() {
-  let numbers = [1, 2, 3, 4, 5]
+  let numbers = [1]
+//  let numbers = [1, 2, 3, 4, 5]
   let expected = numbers.reduce(0, +)
 
   let taskHandle = launch { () async -> Int in
@@ -43,10 +45,12 @@ func test_taskGroup_01_sum() {
       for n in numbers {
         print("before group.add: \(n)")
         await group.add { () async -> Int in
-          print("-- inside group.add { \(n) }")
+          print("  inside group.add { \(n) }")
           return n
         }
       }
+
+      sleep(1)
 
       var sum = 0
       print("before group.next(), sum: \(sum)")
@@ -62,10 +66,18 @@ func test_taskGroup_01_sum() {
   }
 
   // CHECK: main task
-  // CHECK: next: 1
-  // CHECK: next: 2
-  // CHECK: next: 3
-  // CHECK: task group returning: 3
+  // CHECK: before group.add: 1
+  // CHECK: before group.add: 2
+  // CHECK: before group.add: 3
+  // CHECK: before group.add: 4
+  // CHECK: before group.add: 5
+  // CHECK: inside group.add { 1 }
+  // CHECK: inside group.add { 2 }
+  // CHECK: inside group.add { 3 }
+  // COM: next: 1
+  // COM: next: 2
+  // COM: next: 3
+  // COM: task group returning: 3
 
   launch { () async in
     let sum = await try! taskHandle.get()
@@ -76,6 +88,7 @@ func test_taskGroup_01_sum() {
   }
 
   print("main task")
+  sleep(5)
 }
 
 test_taskGroup_01_sum()
