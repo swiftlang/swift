@@ -15,6 +15,8 @@
 
 #include "Context.h"
 #include "OwnershipLiveRange.h"
+#include "SemanticARCOpts.h"
+
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/MultiMapCache.h"
@@ -55,6 +57,12 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
                 [this](SingleValueInstruction *i, SILValue value) {
                   eraseAndRAUWSingleValueInstruction(i, value);
                 })) {}
+
+  void reset() {
+    ctx.reset();
+    worklist.clear();
+    visitedSinceLastMutation.clear();
+  }
 
   DeadEndBlocks &getDeadEndBlocks() { return ctx.getDeadEndBlocks(); }
 
@@ -192,6 +200,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   bool processWorklist();
   bool optimize();
+  bool optimizeWithoutFixedPoint();
 
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);

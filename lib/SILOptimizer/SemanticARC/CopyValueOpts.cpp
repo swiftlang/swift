@@ -517,22 +517,26 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
 bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
-  if (eliminateDeadLiveRangeCopyValue(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
+      eliminateDeadLiveRangeCopyValue(cvi)) {
     return true;
   }
 
   // Then see if copy_value operand's lifetime ends after our copy_value via a
   // destroy_value. If so, we can join their lifetimes.
-  if (tryJoiningCopyValueLiveRangeWithOperand(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::LifetimeJoiningPeephole) &&
+      tryJoiningCopyValueLiveRangeWithOperand(cvi)) {
     return true;
   }
 
   // Then try to perform the guaranteed copy value optimization.
-  if (performGuaranteedCopyValueOptimization(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
+      performGuaranteedCopyValueOptimization(cvi)) {
     return true;
   }
 
-  if (tryPerformOwnedCopyValueOptimization(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
+      tryPerformOwnedCopyValueOptimization(cvi)) {
     return true;
   }
 
