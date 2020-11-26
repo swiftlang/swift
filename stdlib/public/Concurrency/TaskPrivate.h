@@ -17,6 +17,13 @@
 #ifndef SWIFT_CONCURRENCY_TASKPRIVATE_H
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
+#include "swift/Runtime/Concurrency.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/Metadata.h"
+#include "swift/Runtime/HeapObject.h"
+#include <pthread.h>
+#include <stdio.h>
+
 namespace swift {
 
 class AsyncTask;
@@ -92,31 +99,50 @@ static void runTaskWithFutureResult(
     waitingTaskContext->result.storage = futureFragment->getStoragePtr();
   }
 
-  // TODO: schedule this task on the executor rather than running it
-  // directly.
+  // TODO: schedule this task on the executor rather than running it directly.
   waitingTask->run(executor);
 }
 
 /// Run the given task, providing it with the result of the future.
-static void runTaskWithChannelPollResult(
+static void runTaskWithGroupPollResult(
     AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::ChannelFragment::ChannelPollResult result) {
+    AsyncTask::GroupFragment::GroupPollResult result) {
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  waitingTaskContext->result.hadErrorResult = result.hadErrorResult;
-  if (result.hadErrorResult) {
-//    waitingTaskContext->result.storage =
-//        reinterpret_cast<OpaqueValue *>(result->getError());
-    waitingTaskContext->result.storage = result.storage;
-  } else if (result.hadAnyResult){
-//    waitingTaskContext->result.storage = result->getStoragePtr();
-    waitingTaskContext->result.storage = result.storage;
+  fprintf(stderr, "error: runTaskWithGroupPollResult[%d %s:%d]: runTaskWithGroupPollResult polled, storage: %d, retainedTask: %d, STATUS: %d\n",
+          pthread_self(), __FILE__, __LINE__, result.storage, result.retainedTask, result.status);
+
+  // Was it an error or successful return?
+  waitingTaskContext->result.hadErrorResult =
+      result.status == AsyncTask::GroupFragment::ChannelPollStatus::Error;
+
+  // Extract the stored value into the waiting task's result storage:
+  switch (result.status) {
+    case AsyncTask::GroupFragment::ChannelPollStatus::Success:
+      waitingTaskContext->result.storage = result.storage;
+      break;
+    case AsyncTask::GroupFragment::ChannelPollStatus::Error:
+      waitingTaskContext->result.storage =
+        reinterpret_cast<OpaqueValue *>(result.storage);
+      break;
+    case AsyncTask::GroupFragment::ChannelPollStatus::Empty:
+      // return a `nil` here (as result of the `group.next()`)
+      waitingTaskContext->result.storage = nullptr;
+      break;
+    case AsyncTask::GroupFragment::ChannelPollStatus::Waiting:
+      assert(false && "Must not attempt to run with a Waiting result.");
   }
 
-  // TODO: schedule this task on the executor rather than running it
-  // directly.
+  // TODO: schedule this task on the executor rather than running it directly.
   waitingTask->run(executor);
+
+  // if we need to, release the now completed task so it can be destroyed
+  if (result.retainedTask) {
+    swift_release(result.retainedTask);
+//    fprintf(stderr, "error: %s[%d %s:%d]: group swift_released retained task: %d, REF_COUNT: %d\n",
+//            __FUNCTION__, pthread_self(), __FILE__, __LINE__, result.retainedTask, swift::swift_retainCount(result.retainedTask));
+  }
 }
 
 } // end namespace swift

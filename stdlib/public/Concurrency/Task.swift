@@ -210,7 +210,7 @@ extension Task {
     }
 
     /// Whether this is a channel.
-    var isChannel: Bool {
+    var isTaskGroup: Bool {
       get {
         (bits & (1 << 26)) != 0
       }
@@ -224,20 +224,6 @@ extension Task {
       }
     }
 
-    /// Whether this is a groupChild.
-    var isGroupChild: Bool {
-      get {
-        (bits & (1 << 27)) != 0
-      }
-
-      set {
-        if newValue {
-          bits = bits | 1 << 27
-        } else {
-          bits = (bits & ~(1 << 27))
-        }
-      }
-    }
   }
 }
 
@@ -337,6 +323,12 @@ func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
+// TODO: _taskFUturePoll -- need to return the Task, which we need to
+// builting native object is treated as owned and releases
+// TODO: if noone holds the the handle to a task, after next we should destroy it
+// -- check this by printing in destroyFuture
+// (error, storage, child NativeObject?) // TODO check if the child is automatically released
+
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
   on task: Builtin.NativeObject
@@ -347,8 +339,7 @@ public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
   assert(!rawResult.hadErrorResult)
 
   // Take the value.
-  let storagePtr =
-    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  let storagePtr = rawResult.storage.bindMemory(to: T.self, capacity: 1)
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
@@ -389,18 +380,16 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
   return task
 }
 
-//@_silgen_name("swift_task_get_priority") // TODO: not quite this way?
-//public func getTaskPriority(_ task: __owned Builtin.NativeObject) -> JobPriority
-
 struct RawTaskFutureWaitResult {
   let hadErrorResult: Bool
-  let storage: UnsafeRawPointer
+  let storage: UnsafeRawPointer?
 }
 
-@_silgen_name("swift_task_future_wait")
-func taskFutureWait(
-  on task: Builtin.NativeObject
-) async -> RawTaskFutureWaitResult
+@_silgen_name("swift_task_cancel")
+func _taskCancel(_ task: Builtin.NativeObject)
+
+@_silgen_name("swift_task_isCancelled")
+func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 #if _runtime(_ObjC)
 

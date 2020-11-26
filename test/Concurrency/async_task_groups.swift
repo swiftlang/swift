@@ -174,9 +174,7 @@ func test_taskGroup_quorum_thenCancel() async {
 
 extension Collection {
 
-  // DEMO-05-03: structured spawning of much work
-  // func map                <T>(                                        _ transform: (Element) throws -> T)             rethrows -> [T] {
-  // func mapAsync           <T>(parallelism: Int = 0/*system default*/, _ transform: (Element) async throws -> T) async rethrows -> [T] {
+  /// Just another example of how one might use task groups.
   func map<T>(
     parallelism requestedParallelism: Int? = nil/*system default*/,
     // ordered: Bool = true, /

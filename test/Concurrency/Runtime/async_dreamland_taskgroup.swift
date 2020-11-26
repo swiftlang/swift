@@ -25,11 +25,18 @@
 //// MARK: Select (exactly 1, cancel the rest)
 //// Effectively like Go's select {}
 //
+//// step 1) with existing APIs
 //let first: Int = await Task.Group<Int>.select { group in
 //    await group.add { await work() }
 //    await group.add { await sleep(.seconds(3)) }
 //}
 //
+//// step 2) combining task groups with function builders
+//
+//let first: Int = await Task.Group<Int>.select { group in
+//    async let _ = await work()
+//    async let _ = await sleep(.seconds(3))
+//}
 //// ==== ----------------------------------------------------------------------------------------------------------------
 //// MARK: Collect (collect all elements, any failure cancels everything else and rethrows)
 //// Collect works in submission order, the results are returned in the order they are submitted,
@@ -41,7 +48,7 @@
 //  await group.add { await randomlySlowWork() }
 //}
 //
-//// CH_____ECK: [1, 2, 3]
+//// COM: [1, 2, 3]
 //// Order is guaranteed, regardless of timing
 //print("\(collected)")
 //
@@ -53,9 +60,10 @@
 //  await group.add { await randomlySlowWork() }
 //  await group.add { await randomlySlowWork() }
 //  await group.add { await randomlySlowWork() }
+//  await group.add { await randomlySlowWork() }
 //}
 //
-//// CH_____ECK: [1, 2, 3]
+//// COM: [1, 2, 3]
 //// Order is NOT guaranteed, the values are collected as they complete
 //print("\(Set(gathered))")
 ////

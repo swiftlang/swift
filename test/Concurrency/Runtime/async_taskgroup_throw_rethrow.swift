@@ -20,66 +20,64 @@ extension DispatchQueue {
   }
 }
 
+@available(*, deprecated, message: "This is a temporary hack")
+@discardableResult
+func launch<R>(operation: @escaping () async throws -> R) -> Task.Handle<R> {
+  let handle = Task.runDetached(operation: operation)
+
+  // Run the task
+  DispatchQueue.global(priority: .default).async { handle.run() }
+
+  return handle
+}
+
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
 
-func one() async -> Int { 1 }
+func echo(_ i: Int) async -> Int { i }
+func boom() async throws -> Int { throw Boom() }
 
 // ==== ------------------------------------------------------------------------
 // MARK: Tests
 
-func test_taskGroup_01_throw() {
-  let taskHandle = DispatchQueue.main.async { () async throws -> Int in
+func test_taskGroup_throws_rethrows() {
+  let taskHandle = launch {
     return await try Task.withGroup(resultType: Int.self) { (group) async throws -> Int in
-      await group.add { await one() }
-      await group.add { () async throws -> Int in throw Boom() }
+      await group.add { await echo(1) }
+      await group.add { await echo(2) }
+      await group.add { await try boom() }
 
       do {
         while let r = await try group.next() {
           print("next: \(r)")
         }
       } catch {
-        print("error: \(error)")
-
-        await group.add { () async throws -> Int in
-            print("task 3 checking isCancelled")
-          if await Task.isCancelled() {
-            print("task 3 cancelled")
-            throw IgnoredBoom() // shall be ignored, we're already throwing the initial error
-          } else {
-            print("task 3 completed normally")
-            return 3
-          }
-        }
-
+        print("error caught and rethrown in group: \(error)")
         throw error
       }
 
-      print("task group returning normally")
-      return 1
+      fatalError("should have thrown")
     }
   }
 
-  // CHECK: main task
-  // CHECK: next: 1
-  // CHECK: error: Boom()
-  // CHECK: task 3 cancelled
-
-  DispatchQueue.main.async { () async in
+  launch { () async in
     do {
-      _ = await try taskHandle.get()
+      let got = await try taskHandle.get()
+      print("got: \(got)")
+      exit(1)
     } catch {
-      // CHECK: rethrown: Boom()
       print("rethrown: \(error)")
       exit(0)
     }
-    assert(false, "should have thrown")
-    exit(1)
   }
 
   print("main task")
 }
 
-test_taskGroup_01_throw()
+
+// CHECK: main task
+// CHECK: error caught and rethrown in group: Boom()
+// CHECK: rethrown: Boom()
+test_taskGroup_throws_rethrows()
 
 dispatchMain()
