@@ -73,6 +73,56 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
   }
 }
 
+
+namespace {
+
+/// An asynchronous context within a task that describes a general "Future".
+/// task.
+///
+/// This type matches the ABI of a function `<T> () async throws -> T`, which
+/// is the type used by `Task.runDetached` and `Task.group.add` to create
+/// futures.
+class TaskFutureWaitAsyncContext : public AsyncContext {
+public:
+  // Error result is always present.
+  SwiftError *errorResult = nullptr;
+
+  // No indirect results.
+
+  TaskFutureWaitResult result;
+
+  // FIXME: Currently, this is always here, but it isn't technically
+  // necessary.
+  void* Self;
+
+  // Arguments.
+  AsyncTask *task;
+
+  using AsyncContext::AsyncContext;
+};
+
+}
+
+/// Run the given task, privoding it with the result of the future.
+static void runTaskWithFutureResult(
+    AsyncTask *waitingTask, ExecutorRef executor,
+    FutureFragment *futureFragment, bool hadErrorResult) {
+  auto waitingTaskContext =
+      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
+
+  waitingTaskContext->result.hadErrorResult = hadErrorResult;
+  if (hadErrorResult) {
+    waitingTaskContext->result.storage =
+        reinterpret_cast<OpaqueValue *>(futureFragment->getError());
+  } else {
+    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
+  }
+
+  // TODO: schedule this task on the executor rather than running it
+  // directly.
+  waitingTask->run(executor);
+}
+
 void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
@@ -103,9 +153,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     // Find the next waiting task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
-    // TODO: schedule this task on the executor rather than running it
-    // directly.
-    waitingTask->run(executor);
+    // Run the task.
+    runTaskWithFutureResult(waitingTask, executor, fragment, hadErrorResult);
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
@@ -264,25 +313,45 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   return {task, initialContext};
 }
 
-TaskFutureWaitResult
-swift::swift_task_future_wait(AsyncTask *task, AsyncTask *waitingTask) {
+void swift::swift_task_future_wait(
+    AsyncTask *waitingTask, ExecutorRef executor,
+    AsyncContext *rawContext) {
+  // Suspend the waiting task.
+  waitingTask->ResumeTask = rawContext->ResumeParent;
+  waitingTask->ResumeContext = rawContext;
+
+  // Wait on the future.
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  auto task = context->task;
   assert(task->isFuture());
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
-    return TaskFutureWaitResult{TaskFutureWaitResult::Waiting, nullptr};
+    // The waiting task has been queued on the future.
+    return;
 
   case FutureFragment::Status::Success:
-    return TaskFutureWaitResult{
-        TaskFutureWaitResult::Success, task->futureFragment()->getStoragePtr()};
+    // Run the task with a successful result.
+    // FIXME: Want to guarantee a tail call here
+    runTaskWithFutureResult(
+        waitingTask, executor, task->futureFragment(),
+        /*hadErrorResult=*/false);
+    return;
 
-   case FutureFragment::Status::Error:
-      return TaskFutureWaitResult{
-          TaskFutureWaitResult::Error,
-          reinterpret_cast<OpaqueValue *>(task->futureFragment()->getError())};
+ case FutureFragment::Status::Error:
+    // Run the task with an error result.
+    // FIXME: Want to guarantee a tail call here
+    runTaskWithFutureResult(
+        waitingTask, executor, task->futureFragment(),
+        /*hadErrorResult=*/true);
+    return;
   }
 }
 
 // TODO: Remove this hack.
 void swift::swift_task_run(AsyncTask *taskToRun) {
   taskToRun->run(ExecutorRef::noPreference());
+}
+
+JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
+  return task->Flags;
 }

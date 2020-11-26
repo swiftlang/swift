@@ -495,8 +495,6 @@ Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
   auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {getAsyncTask(), size});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
   auto address = Address(call, alignment);
   return address;
 }

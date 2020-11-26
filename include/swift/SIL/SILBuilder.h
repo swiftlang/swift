@@ -268,8 +268,9 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hasValidInsertionPoint() const { return BB != nullptr; }
-  SILBasicBlock *getInsertionBB() { return BB; }
-  SILBasicBlock::iterator getInsertionPoint() { return InsertPt; }
+  SILBasicBlock *getInsertionBB() const { return BB; }
+  SILBasicBlock::iterator getInsertionPoint() const { return InsertPt; }
+  SILLocation getInsertionPointLoc() const { return InsertPt->getLoc(); }
 
   /// insertingAtEndOfBlock - Return true if the insertion point is at the end
   /// of the current basic block.  False if we're inserting before an existing
@@ -319,8 +320,6 @@ public:
   void setInsertionPoint(SILFunction::iterator BBIter) {
     setInsertionPoint(&*BBIter);
   }
-
-  SILBasicBlock *getInsertionPoint() const { return BB; }
 
   //===--------------------------------------------------------------------===//
   // Instruction Tracking
@@ -2527,6 +2526,21 @@ public:
   /// predecessor block: the parent of \p inst.
   static void insertAfter(SILInstruction *inst,
                           function_ref<void(SILBuilder &)> func);
+
+  /// If \p is an inst, then this is equivalent to insertAfter(inst). If a
+  /// SILArgument is passed in, we use the first instruction in its parent
+  /// block. We assert on undef.
+  static void insertAfter(SILValue value,
+                          function_ref<void(SILBuilder &)> func) {
+    if (auto *i = dyn_cast<SingleValueInstruction>(value))
+      return insertAfter(i, func);
+    if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(value))
+      return insertAfter(mvir->getParent(), func);
+    if (auto *arg = dyn_cast<SILArgument>(value))
+      return insertAfter(&*arg->getParent()->begin(), func);
+    assert(!isa<SILUndef>(value) && "This API can not use undef");
+    llvm_unreachable("Unhandled case?!");
+  }
 };
 
 class SavedInsertionPointRAII {

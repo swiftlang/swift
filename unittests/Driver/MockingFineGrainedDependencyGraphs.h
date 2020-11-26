@@ -66,7 +66,7 @@ namespace mocking_fine_grained_dependency_graphs {
 
 void simulateLoad(ModuleDepGraph &g, const driver::Job *cmd,
                   const DependencyDescriptions &dependencyDescriptions,
-                  StringRef interfaceHashIfNonEmpty = StringRef(),
+                  Optional<Fingerprint> interfaceHashIfNonEmpty = None,
                   const bool hadCompilationError = false);
 
 /// Same as \ref simulateLoad, but returns the specifically changed nodes or
@@ -75,7 +75,7 @@ void simulateLoad(ModuleDepGraph &g, const driver::Job *cmd,
 ModuleDepGraph::Changes
 getChangesForSimulatedLoad(ModuleDepGraph &g, const driver::Job *cmd,
                            const DependencyDescriptions &dependencyDescriptions,
-                           StringRef interfaceHashIfNonEmpty = StringRef(),
+                           Optional<Fingerprint> interfaceHashIfNonEmpty = None,
                            const bool hadCompilationError = false);
 
 /// Simulates the driver reloading a swiftdeps file after a job has run.
@@ -87,7 +87,7 @@ getChangesForSimulatedLoad(ModuleDepGraph &g, const driver::Job *cmd,
 std::vector<const driver::Job *>
 simulateReload(ModuleDepGraph &g, const driver::Job *cmd,
                const DependencyDescriptions &dependencyDescriptions,
-               StringRef interfaceHashIfNonEmpty = StringRef(),
+               Optional<Fingerprint> interfaceHashIfNonEmpty = None,
                const bool hadCompilationError = false);
 
 std::vector<const driver::Job *>

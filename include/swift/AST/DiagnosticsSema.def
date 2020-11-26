@@ -4269,9 +4269,10 @@ ERROR(actor_isolated_concurrent_access,none,
         "actor-isolated %0 %1 is unsafe to reference in code "
         "that may execute concurrently",
         (DescriptiveDeclKind, DeclName))
-NOTE(actor_isolated_method,none,
-     "only asynchronous methods can be used outside the actor instance; "
-     "do you want to add 'async'?", ())
+NOTE(actor_isolated_sync_func,none,
+     "calls to %0 %1 from outside of its actor context are "
+     "implicitly asynchronous",
+     (DescriptiveDeclKind, DeclName))
 NOTE(actor_mutable_state,none,
      "mutable state is only available within the actor instance", ())
 WARNING(shared_mutable_state_access,none,

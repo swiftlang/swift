@@ -110,31 +110,31 @@ swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 
 /// The result of waiting for a task future.
 struct TaskFutureWaitResult {
-  enum Kind : uintptr_t {
-    /// The waiting task has been added to the future's wait queue, and will
-    /// be scheduled once the future has completed.
-    Waiting,
+  /// Whether the storage represents the error result vs. the successful
+  /// result.
+  bool hadErrorResult;
 
-    /// The future succeeded and produced a result value. \c storage points
-    /// at that value.
-    Success,
-
-    /// The future finished by throwing an error. \c storage is that error
-    /// existential.
-    Error,
-  };
-
-  Kind kind;
+  /// Storage for the result of the future.
+  ///
+  /// When the future completed normally, this is a pointer to the storage
+  /// of the result value, which lives inside the future task itself.
+  ///
+  /// When the future completed by throwing an error, this is the error
+  /// object itself.
   OpaqueValue *storage;
 };
 
 /// Wait for a future task to complete.
 ///
-/// This can be called from any thread.
+/// This can be called from any thread. Its Swift signature is
 ///
+/// \code
+/// func swift_task_future_wait(on task: Builtin.NativeObject) async
+///     -> TaskFutureWaitResult
+/// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskFutureWaitResult
-swift_task_future_wait(AsyncTask *task, AsyncTask *waitingTask);
+AsyncFunctionType<TaskFutureWaitResult(AsyncTask *task)>
+swift_task_future_wait;
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
@@ -172,6 +172,10 @@ bool swift_task_tryAddStatusRecord(AsyncTask *task,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_removeStatusRecord(AsyncTask *task,
                                    TaskStatusRecord *record);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobFlags
+swift_task_getJobFlags(AsyncTask* task);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {

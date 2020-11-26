@@ -277,6 +277,11 @@ public:
       Identifier,
       llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
 
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of the fingerprint associated with a serialized
+  // iterable decl context. It is keyed by that context's decl ID.
+  using DeclFingerprintsTable = llvm::MapVector<uint32_t, Fingerprint>;
+
 private:
   /// A map from identifiers to methods and properties with the given name.
   ///

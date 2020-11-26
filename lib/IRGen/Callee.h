@@ -155,14 +155,18 @@ namespace irgen {
 
     Signature Sig;
 
+    bool isFunctionPointerWithoutContext = false;
+
   public:
     /// Construct a FunctionPointer for an arbitrary pointer value.
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
     explicit FunctionPointer(KindTy kind, llvm::Value *value,
                              PointerAuthInfo authInfo,
-                             const Signature &signature)
-        : Kind(kind), Value(value), AuthInfo(authInfo), Sig(signature) {
+                             const Signature &signature,
+                             bool isWithoutCtxt = false)
+        : Kind(kind), Value(value), AuthInfo(authInfo), Sig(signature),
+          isFunctionPointerWithoutContext(isWithoutCtxt) {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
@@ -170,8 +174,9 @@ namespace irgen {
 
     // Temporary only!
     explicit FunctionPointer(KindTy kind, llvm::Value *value,
-                             const Signature &signature)
-        : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
+                             const Signature &signature, bool
+                             isWithoutCtxt = false)
+        : FunctionPointer(kind, value, PointerAuthInfo(), signature, isWithoutCtxt) {}
 
     static FunctionPointer forDirect(IRGenModule &IGM,
                                      llvm::Constant *value,
@@ -243,6 +248,10 @@ namespace irgen {
 
     /// Form a FunctionPointer whose KindTy is ::Function.
     FunctionPointer getAsFunction(IRGenFunction &IGF) const;
+
+    bool useStaticContextSize() const {
+      return isFunctionPointerWithoutContext;
+    }
   };
 
   class Callee {

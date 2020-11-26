@@ -941,7 +941,7 @@ public:
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
-  std::pair<std::vector<Decl *>, Optional<std::string>>
+  std::pair<std::vector<Decl *>, Optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
@@ -1085,7 +1085,7 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  std::pair<std::vector<Decl *>, Optional<std::string>>
+  std::pair<std::vector<Decl *>, Optional<Fingerprint>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                 ParseDeclOptions Options, IterableDeclContext *IDC,
                 bool &hadError);

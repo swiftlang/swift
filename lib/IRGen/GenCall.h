@@ -313,7 +313,8 @@ namespace irgen {
   std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
       IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
       FunctionPointer functionPointer, llvm::Value *thickContext,
-      std::pair<bool, bool> values = {true, true});
+      std::pair<bool, bool> values = {true, true},
+      Size initialContextSize = Size(0));
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
 

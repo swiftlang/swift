@@ -5,8 +5,6 @@
 
 // REQUIRES: objc_interop
 
-// REQUIRES: rdar71476765
-
 import Foundation
 
 public class GenericNSObjectSubclass<T> : NSObject {}
@@ -16,6 +14,6 @@ public class ConcreteNSObjectSubclass : GenericNSObjectSubclass<Int> {}
 // Note the stub here is internal; it's only purpose is to appear in the stub list
 // so that it can be realized by objc_copyClassList():
 
-// CHECK-LABEL: @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMt" = internal global %objc_full_class_stub { i64 0, i64 1, %objc_class* (%objc_class*, i8*)* @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMU" }
+// CHECK-LABEL: @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMt" = internal global %objc_full_class_stub {{.*}} @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMU{{(\.ptrauth)?}}"
 
 // CHECK-LABEL: @objc_class_stubs = internal global {{.*}} @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMt" {{.*}}, section "__DATA,__objc_stublist,regular,no_dead_strip"

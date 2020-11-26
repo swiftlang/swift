@@ -19,6 +19,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {
@@ -30,7 +31,7 @@ void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
 struct FingerprintAndMembers {
-  Optional<std::string> fingerprint = None;
+  Optional<Fingerprint> fingerprint = None;
   ArrayRef<Decl *> members = {};
   bool operator==(const FingerprintAndMembers &x) const {
     return fingerprint == x.fingerprint && members == x.members;

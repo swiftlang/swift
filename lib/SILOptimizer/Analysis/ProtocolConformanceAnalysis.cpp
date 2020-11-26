@@ -47,7 +47,7 @@ public:
     /// (2) Walk over all ExtensionDecls to determine conformances.
     if (auto *e = dyn_cast<ExtensionDecl>(D)) {
       auto *ntd = e->getExtendedNominal();
-      if (!isa<ProtocolDecl>(ntd)) {
+      if (ntd && !isa<ProtocolDecl>(ntd)) {
         for (auto *conformance : e->getLocalConformances()) {
           if (isa<NormalProtocolConformance>(conformance)) {
             auto *proto = conformance->getProtocol();

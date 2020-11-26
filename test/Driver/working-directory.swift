@@ -11,6 +11,11 @@
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory=%S/Inputs -c %/S/Inputs/main.swift | %FileCheck %s -check-prefix=INPUT
 
 // SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
+// In another driver mode.
+// cd %t && %swift_driver -driver-print-jobs -working-directory %/S/Inputs -F. | %FileCheck %s -check-prefix=REPL
+// cd %t && %swift_driver -driver-print-jobs -deprecated-integrated-repl -working-directory %/S/Inputs -F. | %FileCheck %s -check-prefix=REPL
+// REPL: -F {{\\?"?}}SOURCE_DIR/test/Driver/Inputs
+// SWIFT_ENABLE_TENSORFLOW END
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory=%/S/Inputs -c -module-name m main.swift lib.swift | %FileCheck %s -check-prefix=MULTI_INPUT
 // MULTI_INPUT: SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}main.swift
@@ -22,12 +27,12 @@
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -F . | %FileCheck %s -check-prefix=SEARCH_PATH
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -F. | %FileCheck %s -check-prefix=SEARCH_PATH
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -F=. | %FileCheck %s -check-prefix=SEARCH_PATH
-// SEARCH_PATH: -F {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}.
+// SEARCH_PATH: -F {{"?}}SOURCE_DIR/test/Driver/Inputs
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -emit-executable %/s -L . | %FileCheck %s -check-prefix=L_PATH
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -emit-executable %/s -L. | %FileCheck %s -check-prefix=L_PATH
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -emit-executable %/s -L=. | %FileCheck %s -check-prefix=L_PATH
-// L_PATH: -L {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}.
+// L_PATH: -L {{"?}}SOURCE_DIR/test/Driver/Inputs
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -disable-bridging-pch -import-objc-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER1
 // OBJC_HEADER1: -import-objc-header {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h
