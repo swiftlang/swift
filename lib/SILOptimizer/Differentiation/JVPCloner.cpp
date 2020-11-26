@@ -26,7 +26,9 @@
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
+#include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
@@ -56,6 +58,9 @@ private:
 
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
+
+  /// The loop info.
+  SILLoopInfo *loopInfo;
 
   /// The differential info.
   LinearMapInfo differentialInfo;
@@ -1403,8 +1408,11 @@ JVPCloner::Implementation::Implementation(ADContext &context,
       invoker(invoker),
       activityInfo(getActivityInfo(context, original,
                                    witness->getSILAutoDiffIndices(), jvp)),
+      loopInfo(context.getPassManager().getAnalysis<SILLoopAnalysis>()
+                   ->get(original)),
       differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
-                       jvp, witness->getSILAutoDiffIndices(), activityInfo),
+                       jvp, witness->getSILAutoDiffIndices(), activityInfo,
+                       loopInfo),
       differentialBuilder(SILBuilder(
           *createEmptyDifferential(context, witness, &differentialInfo))),
       diffLocalAllocBuilder(getDifferential()) {

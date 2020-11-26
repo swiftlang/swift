@@ -4595,3 +4595,32 @@ IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
       PointerAuthInfo(), signature);
   return fnPtr;
 }
+
+Address irgen::emitAutoDiffCreateLinearMapContext(
+    IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffCreateLinearMapContextFn(), {topLevelSubcontextSize});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}
+
+Address irgen::emitAutoDiffProjectTopLevelSubcontext(
+    IRGenFunction &IGF, Address context) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffProjectTopLevelSubcontextFn(),
+      {context.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}
+
+Address irgen::emitAutoDiffAllocateSubcontext(
+    IRGenFunction &IGF, Address context, llvm::Value *size) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffAllocateSubcontextFn(),
+      {context.getAddress(), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}

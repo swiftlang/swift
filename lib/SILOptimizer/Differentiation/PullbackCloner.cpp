@@ -86,9 +86,6 @@ private:
   /// adjoint buffers.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
 
-  /// Mapping from pullback basic blocks to pullback struct arguments.
-  llvm::DenseMap<SILBasicBlock *, SILArgument *> pullbackStructArguments;
-
   /// Mapping from pullback struct field declarations to pullback struct
   /// elements destructured from the linear map basic block argument. In the
   /// beginning of each pullback basic block, the block's pullback struct is
@@ -129,6 +126,9 @@ private:
 
   /// The seed arguments of the pullback function.
   SmallVector<SILArgument *, 4> seeds;
+
+  /// The `AutoDiffLinearMapContext` object, if any.
+  SILValue contextValue = nullptr;
 
   llvm::BumpPtrAllocator allocator;
 
@@ -1895,11 +1895,28 @@ bool PullbackCloner::Implementation::run() {
     if (origBB == origExit) {
       assert(pullbackBB->isEntry());
       createEntryArguments(&pullback);
-      auto *mainPullbackStruct = pullbackBB->getArguments().back();
-      assert(mainPullbackStruct->getType() == pbStructLoweredType);
-      pullbackStructArguments[origBB] = mainPullbackStruct;
-      // Destructure the pullback struct to get the elements.
       builder.setInsertionPoint(pullbackBB);
+      // Obtain the context object, if any, and the top-level subcontext, i.e.
+      // the main pullback struct.
+      SILValue mainPullbackStruct;
+      if (getPullbackInfo().hasLoops()) {
+        // The last argument is the context object (`Builtin.NativeObject`).
+        contextValue = pullbackBB->getArguments().back();
+        assert(contextValue->getType() ==
+               SILType::getNativeObjectType(getASTContext()));
+        // Load the pullback struct.
+        auto subcontextAddr = emitProjectTopLevelSubcontext(
+            builder, pbLoc, contextValue, pbStructLoweredType);
+        mainPullbackStruct = builder.createLoad(
+            pbLoc, subcontextAddr,
+            pbStructLoweredType.isTrivial(getPullback()) ?
+                LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
+      } else {
+        // Obtain and destructure pullback struct elements.
+        mainPullbackStruct = pullbackBB->getArguments().back();
+        assert(mainPullbackStruct->getType() == pbStructLoweredType);
+      }
+
       auto *dsi = builder.createDestructureStruct(pbLoc, mainPullbackStruct);
       initializePullbackStructElements(origBB, dsi->getResults());
       continue;
@@ -1938,7 +1955,6 @@ bool PullbackCloner::Implementation::run() {
     // Add a pullback struct argument.
     auto *pbStructArg = pullbackBB->createPhiArgument(pbStructLoweredType,
                                                       OwnershipKind::Owned);
-    pullbackStructArguments[origBB] = pbStructArg;
     // Destructure the pullback struct to get the elements.
     builder.setInsertionPoint(pullbackBB);
     auto *dsi = builder.createDestructureStruct(pbLoc, pbStructArg);
@@ -1969,7 +1985,7 @@ bool PullbackCloner::Implementation::run() {
 
   auto *pullbackEntry = pullback.getEntryBlock();
   // The pullback function has type:
-  // `(seed0, seed1, ..., exit_pb_struct) -> (d_arg0, ..., d_argn)`.
+  // `(seed0, seed1, ..., exit_pb_struct|context_obj) -> (d_arg0, ..., d_argn)`.
   auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
   assert(getIndices().results->getNumIndices() == pbParamArgs.size() - 1 &&
          pbParamArgs.size() >= 2);
@@ -2328,17 +2344,22 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   }
   // Propagate pullback struct argument.
   SILBuilder pullbackTrampolineBBBuilder(pullbackTrampolineBB);
-  auto *predPBStructVal = pullbackTrampolineBB->getArguments().front();
-  auto boxType = dyn_cast<SILBoxType>(predPBStructVal->getType().getASTType());
-  if (!boxType) {
-    trampolineArguments.push_back(predPBStructVal);
+  auto *pullbackTrampolineBBArg = pullbackTrampolineBB->getArguments().front();
+  if (vjpCloner.getLoopInfo()->getLoopFor(origPredBB)) {
+    assert(pullbackTrampolineBBArg->getType() ==
+               SILType::getRawPointerType(getASTContext()));
+    auto pbStructType =
+        remapType(getPullbackInfo().getLinearMapStructLoweredType(origPredBB));
+    auto predPbStructAddr = pullbackTrampolineBBBuilder.createPointerToAddress(
+        loc, pullbackTrampolineBBArg, pbStructType.getAddressType(),
+        /*isStrict*/ true);
+    auto predPbStructVal = pullbackTrampolineBBBuilder.createLoad(
+        loc, predPbStructAddr,
+        pbStructType.isTrivial(getPullback()) ?
+            LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
+    trampolineArguments.push_back(predPbStructVal);
   } else {
-    auto *projectBox = pullbackTrampolineBBBuilder.createProjectBox(
-        loc, predPBStructVal, /*index*/ 0);
-    auto loaded = pullbackTrampolineBBBuilder.emitLoadValueOperation(
-        loc, projectBox, LoadOwnershipQualifier::Copy);
-    pullbackTrampolineBBBuilder.emitDestroyValueOperation(loc, predPBStructVal);
-    trampolineArguments.push_back(loaded);
+    trampolineArguments.push_back(pullbackTrampolineBBArg);
   }
   // Branch from pullback trampoline block to pullback block.
   pullbackTrampolineBBBuilder.createBranch(loc, pullbackBB,
@@ -2535,7 +2556,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
 
   // Get getter argument and result values.
   //   Getter type: $(Self) -> Result
-  // Pullback type: $(Result', PB_Struct) -> Self'
+  // Pullback type: $(Result', PB_Struct|Context) -> Self'
   assert(original.getLoweredFunctionType()->getNumParameters() == 1);
   assert(pullback.getLoweredFunctionType()->getNumParameters() == 2);
   assert(pullback.getLoweredFunctionType()->getNumResults() == 1);
@@ -2547,8 +2568,10 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
          "Getter should have one semantic result");
   auto origResult = origFormalResults[*getIndices().results->begin()];
 
-  auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType(
-      TypeExpansionContext::minimal());
+  auto tangentVectorSILTy = pullback.getConventions().getResults().front()
+      .getSILStorageType(getModule(),
+                         pullback.getLoweredFunctionType(),
+                         TypeExpansionContext::minimal());
   auto tangentVectorTy = tangentVectorSILTy.getASTType();
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
 

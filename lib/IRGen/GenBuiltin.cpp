@@ -1115,5 +1115,27 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::AutoDiffCreateLinearMapContext) {
+    auto topLevelSubcontextSize = args.claimNext();
+    out.add(emitAutoDiffCreateLinearMapContext(IGF, topLevelSubcontextSize)
+                .getAddress());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::AutoDiffProjectTopLevelSubcontext) {
+    Address allocatorAddr(args.claimNext(), IGF.IGM.getPointerAlignment());
+    out.add(
+        emitAutoDiffProjectTopLevelSubcontext(IGF, allocatorAddr).getAddress());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::AutoDiffAllocateSubcontext) {
+    Address allocatorAddr(args.claimNext(), IGF.IGM.getPointerAlignment());
+    auto size = args.claimNext();
+    out.add(
+        emitAutoDiffAllocateSubcontext(IGF, allocatorAddr, size).getAddress());
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

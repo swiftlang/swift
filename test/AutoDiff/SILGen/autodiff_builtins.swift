@@ -152,3 +152,26 @@ func linearFunction_f_direct_arity1() -> @differentiable(linear) (Float) -> Floa
 // CHECK:   [[THICK_ORIG2:%.*]] = thin_to_thick_function [[ORIG2]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
 // CHECK:   [[LINEAR:%.*]] = linear_function [parameters 0] [[THICK_ORIG1]] : $@callee_guaranteed (Float) -> Float with_transpose [[THICK_ORIG2]] : $@callee_guaranteed (Float) -> Float
 // CHECK:   return [[LINEAR]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float
+
+struct ExamplePullbackStruct<T: Differentiable> {
+  var pb0: (T.TangentVector) -> T.TangentVector
+}
+
+@_silgen_name("test_context_builtins")
+func test_context_builtins() {
+  let pbStruct = ExamplePullbackStruct<Float>(pb0: { $0 })
+  let context = Builtin.autoDiffCreateLinearMapContext(Builtin.sizeof(type(of: pbStruct)))
+  let topLevelSubctxAddr = Builtin.autoDiffProjectTopLevelSubcontext(context)
+  UnsafeMutableRawPointer(topLevelSubctxAddr).storeBytes(of: pbStruct, as: type(of: pbStruct))
+  let newBuffer = Builtin.autoDiffAllocateSubcontext(context, Builtin.sizeof(type(of: pbStruct)))
+  UnsafeMutableRawPointer(newBuffer).storeBytes(of: pbStruct, as: type(of: pbStruct))
+}
+
+// CHECK-LABEL: sil{{.*}}@test_context_builtins
+// CHECK: bb0:
+// CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContext"({{%.*}} : $Builtin.Word) : $Builtin.NativeObject
+// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX]] : $Builtin.NativeObject
+// CHECK:   [[BUF:%.*]] = builtin "autoDiffProjectTopLevelSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject) : $Builtin.RawPointer
+// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX]] : $Builtin.NativeObject
+// CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $Builtin.Word) : $Builtin.RawPointer
+// CHECK:   destroy_value [[CTX]]

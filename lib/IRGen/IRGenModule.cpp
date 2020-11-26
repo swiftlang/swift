@@ -735,6 +735,14 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
+    auto featureAvailability = context.getDifferentiationAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
