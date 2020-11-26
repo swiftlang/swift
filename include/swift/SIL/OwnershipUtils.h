@@ -179,7 +179,10 @@ struct BorrowingOperand {
   /// Example: An apply performs an instantaneous recursive borrow of a
   /// guaranteed value but a begin_apply borrows the value over the entire
   /// region of code corresponding to the coroutine.
-  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  ///
+  /// NOTE: Return false from func to stop iterating. Returns false if the
+  /// closure requested to stop early.
+  bool visitLocalEndScopeUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.

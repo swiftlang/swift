@@ -161,31 +161,33 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-void BorrowingOperand::visitLocalEndScopeInstructions(
-    function_ref<void(Operand *)> func) const {
+bool BorrowingOperand::visitLocalEndScopeUses(
+    function_ref<bool(Operand *)> func) const {
   switch (kind) {
   case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
-        func(use);
+        if (!func(use))
+          return false;
       }
     }
-    return;
+    return true;
   case BorrowingOperandKind::BeginApply: {
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
-      func(use);
+      if (!func(use))
+        return false;
     }
-    return;
+    return true;
   }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
   case BorrowingOperandKind::Apply:
   case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::Yield:
-    return;
+    return true;
   case BorrowingOperandKind::Branch:
-    return;
+    return true;
   }
 }
 
@@ -267,7 +269,10 @@ void BorrowingOperand::visitUserResultConsumingUses(
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitLocalEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
+  visitLocalEndScopeUses([&](Operand *op) {
+    foundUses.push_back(op);
+    return true;
+  });
 }
 
 //===----------------------------------------------------------------------===//
