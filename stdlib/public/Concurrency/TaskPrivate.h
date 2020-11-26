@@ -79,8 +79,7 @@ static void runTaskWithFutureResult(
     waitingTaskContext->result.storage = futureFragment->getStoragePtr();
   }
 
-  // TODO: schedule this task on the executor rather than running it
-  // directly.
+  // TODO: schedule this task on the executor rather than running it directly.
   waitingTask->run(executor);
 }
 
@@ -91,18 +90,24 @@ static void runTaskWithChannelPollResult(
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  waitingTaskContext->result.hadErrorResult = result.hadErrorResult;
-  if (result.hadErrorResult) {
-//    waitingTaskContext->result.storage =
-//        reinterpret_cast<OpaqueValue *>(result->getError());
-    waitingTaskContext->result.storage = result.storage;
-  } else if (result.hadAnyResult){
-//    waitingTaskContext->result.storage = result->getStoragePtr();
-    waitingTaskContext->result.storage = result.storage;
+  switch (result.status) {
+    case AsyncTask::ChannelFragment::ChannelPollStatus::Success:
+      waitingTaskContext->result.storage = result.storage;
+      break;
+    case AsyncTask::ChannelFragment::ChannelPollStatus::Error:
+      waitingTaskContext->result.hadErrorResult = true;
+      waitingTaskContext->result.storage =
+        reinterpret_cast<OpaqueValue *>(result.storage);
+      break;
+    case AsyncTask::ChannelFragment::ChannelPollStatus::Empty:
+      // return a `nil` here (as result of the `group.next()`)
+      waitingTaskContext->result.storage = nullptr;
+      break;
+    case AsyncTask::ChannelFragment::ChannelPollStatus::Waiting:
+      assert(false && "Must not attempt to run with a Waiting result.");
   }
 
-  // TODO: schedule this task on the executor rather than running it
-  // directly.
+  // TODO: schedule this task on the executor rather than running it directly.
   waitingTask->run(executor);
 }
 

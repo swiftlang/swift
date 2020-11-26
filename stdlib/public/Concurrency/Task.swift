@@ -357,9 +357,6 @@ public func runTask(_ task: __owned Builtin.NativeObject)
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
-@_silgen_name("swift_task_isCancelled")
-func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
-
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
   runTask(childTask.0)
@@ -425,3 +422,9 @@ struct RawTaskFutureWaitResult {
 func taskFutureWait(
   on task: Builtin.NativeObject
 ) async -> RawTaskFutureWaitResult
+
+@_silgen_name("swift_task_cancel")
+func taskCancel(_ task: Builtin.NativeObject)
+
+@_silgen_name("swift_task_isCancelled")
+func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool

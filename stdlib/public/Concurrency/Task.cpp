@@ -45,14 +45,10 @@ AsyncTask::waitFuture(AsyncTask *waitingTask) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
-//  if (isChannel()) {
-//    assert(false && "waiting on channel!");
-//  }
-
   assert(isFuture());
   auto fragment = futureFragment();
 
-  auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+  WaitQueueItem queueHead = fragment->waitQueue.load(std::memory_order_acquire);
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
@@ -69,8 +65,9 @@ AsyncTask::waitFuture(AsyncTask *waitingTask) {
     waitingTask->getNextWaitingTask() = queueHead.getTask();
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
     if (fragment->waitQueue.compare_exchange_weak(
-            queueHead, newQueueHead, std::memory_order_release,
-            std::memory_order_acquire)) {
+            queueHead, newQueueHead,
+            /*success*/ std::memory_order_release,
+            /*failure*/ std::memory_order_acquire)) {
       // Escalate the priority of this task based on the priority
       // of the waiting task.
       swift_task_escalate(this, waitingTask->Flags.getPriority());
@@ -171,14 +168,14 @@ SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
 
-  // For a future, destroy the result.
-  if (task->isFuture()) {
-    task->futureFragment()->destroy();
-  }
-
   // For a channel, destroy the results.
   if (task->isChannel()) {
     task->channelFragment()->destroy();
+  }
+
+  // For a future, destroy the result.
+  if (task->isFuture()) {
+    task->futureFragment()->destroy();
   }
 
   // The task execution itself should always hold a reference to it, so
@@ -321,6 +318,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
 
   // Initialize the future fragment if applicable.
   if (futureResultType) {
+    assert(task->isFuture());
     auto futureFragment = task->futureFragment();
     new (futureFragment) FutureFragment(futureResultType);
 
@@ -359,8 +357,9 @@ void swift::swift_task_future_wait(
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
 
+  // TODO: Would be nicer perhaps to make a new function swift_task_channel_poll
+  //       to not mix it into the future_wait which is somewhat different but very similar...
   if (task->isChannel()) {
-    // assert(false && "WAITING ON GROUP CHILD TASK");
     swift::swift_task_channel_poll(waitingTask, executor, rawContext);
     return;
   }

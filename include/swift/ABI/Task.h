@@ -23,6 +23,9 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
+#include "TaskGroup.h"
+#include "bitset"
+#include "string"
 
 namespace swift {
 
@@ -194,7 +197,6 @@ public:
 /// An AsyncTask may have the following fragments:
 ///
 ///    +------------------+
-///    |                  |
 ///    | childFragment?   |
 ///    | channelFragment? |
 ///    | futureFragment?  |*
@@ -275,11 +277,12 @@ public:
     return reinterpret_cast<ChildFragment*>(this + 1);
   }
 
-  // ==== Channel --------------------------------------------------------------
+  // ==== TaskGroup Channel ----------------------------------------------------
 
   class ChannelFragment {
   public:
     /// Describes the status of the channel.
+    // FIXME: the enum needs to be designed better or not be an enum anymo
     enum class ReadyQueueStatus : uintptr_t {
         /// The channel is empty, no tasks are pending.
         /// Return immediately, there is no point in suspending.
@@ -287,10 +290,10 @@ public:
         /// The storage is not accessible.
         Empty = 0b00,
 
-        /// The channel has pending tasks
-        ///
-        /// The storage is not accessible.
-        Pending = 0b01, // FIXME: we need a pending counter in the fragment.
+//        /// The channel has pending tasks
+//        ///
+//        /// The storage is not accessible.
+//        Pending = 0b01, // FIXME: we need a pending counter in the fragment.
 
         /// The future has completed with result (of type \c resultType).
         Success = 0b10,
@@ -305,9 +308,8 @@ public:
     /// Futures always begin in the "Executing" state, and will always
     /// make a single state change to either Success or Error.
     enum class WaitStatus : uintptr_t {
-        /// No-one is waiting.
         /// The storage is not accessible.
-        Pending = 0,
+        Executing = 0,
 
         /// The future has completed with result (of type \c resultType).
         Success = 1,
@@ -317,15 +319,24 @@ public:
         Error = 2,
     };
 
+    enum class ChannelPollStatus : uintptr_t {
+        /// The channel is known to be empty and we can immediately return nil.
+        Empty = 0,
+
+        /// The task has been enqueued to the channels wait queue.
+        Waiting = 1,
+
+        /// The task has completed with result (of type \c resultType).
+        Success = 2,
+
+        /// The task has completed by throwing an error (an \c Error
+        /// existential).
+        Error = 3,
+    };
+
     /// The result of waiting on a Channel (TaskGroup).
     struct ChannelPollResult {
-        /// Whether the storage represents an existing value, or "known no value,"
-        /// instructing the `group.next()` call to return `nil` immediately.
-        bool hadAnyResult;
-
-        /// Whether the storage represents the error result vs. the successful
-        /// result.
-        bool hadErrorResult;
+        ChannelPollStatus status; // TODO: pack it into storage pointer or not worth it?
 
         /// Storage for the result of the future.
         ///
@@ -335,6 +346,12 @@ public:
         /// When the future completed by throwing an error, this is the error
         /// object itself.
         OpaqueValue *storage;
+
+        bool isStorageAccessible() {
+          return status == ChannelPollStatus::Success ||
+              status == ChannelPollStatus::Error ||
+              status == ChannelPollStatus::Empty;
+        }
 
 //          /// Retrieve a pointer to the storage of result.
 //          OpaqueValue *getStoragePtr() { // FIXME: ???
@@ -365,6 +382,7 @@ public:
         }
 
         static ReadyQueueItem get(ReadyQueueStatus status, AsyncTask *task) {
+          assert(task == nullptr || task->isFuture());
           return ReadyQueueItem{
               reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
         }
@@ -372,7 +390,7 @@ public:
 
     /// An item within the wait queue, which includes the status and the
     /// head of the list of tasks.
-    struct WaitQueueItem {
+    struct WaitQueueItem { // TODO: reuse the future's wait queue instead?
         /// Mask used for the low status bits in a wait queue item.
         static const uintptr_t statusMask = 0x03;
 
@@ -392,61 +410,124 @@ public:
         }
     };
 
-  private:
-    // TODO we likely can collapse these into one queue if we try hard enough
+    struct ChannelStatus {
+        /// 32 bits for the ready waiting queue
+        static const unsigned long maskPending    = 0xFFFFFFFF00000000l;
+        static const unsigned long onePendingTask = 0x0000000100000000l;
+        /// 32 bits for the ready waiting queue
+        static const unsigned long maskWaiting    = 0x00000000FFFFFFFFl;
+        static const unsigned long oneWaitingTask = 0x0000000000000001l;
 
-    std::atomic<uintptr_t> status;
+        unsigned long status;
+
+        unsigned int pendingTasks() {
+          return status >> 32; // consider only `maskPending` bits
+        }
+
+        unsigned int waitingTasks() {
+          return status & maskWaiting; // consider only `maskWaiting` bits
+        }
+
+        /// Pretty prints the status, as follows:
+        /// ChannelStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
+        std::string to_string() {
+          std::string str;
+          str.append("ChannelStatus{ ");
+          str.append("P:");
+          str.append(std::to_string(pendingTasks()));
+          str.append(" W:");
+          str.append(std::to_string(waitingTasks()));
+          str.append(" " + std::bitset<64>(status).to_string());
+          str.append(" }");
+          return str;
+        }
+
+        /// Initially there are no waiting and no pending tasks.
+        static const ChannelStatus initial() {
+          return ChannelStatus { 0 };
+        };
+    };
+
+  private:
+
+    /// Used for queue management, counting number of waiting and ready tasks
+    // TODO: we likely can collapse these into the wait queue if we try hard enough?
+    //       but we'd lose the ability to get counts I think.
+    std::atomic<unsigned long> status;
 
     /// Queue containing completed tasks offered into this channel.
     ///
     /// The low bits contain the status, the rest of the pointer is the
     /// AsyncTask.
-    std::atomic<ReadyQueueItem> readyQueue;
+    mpsc_queue_t<ReadyQueueItem> readyQueue;
 
     /// Queue containing all of the tasks that are waiting in `get()`.
     ///
     /// The low bits contain the status, the rest of the pointer is the
     /// AsyncTask.
-    std::atomic<WaitQueueItem> waitQueue;
+    // TODO: these are like Future, had tough time making it be BOTH future and channel
+    std::atomic<WaitQueueItem> waitQueue; // TODO: reuse the future's wait queue instead?
 
     /// The type of the result that will be produced by the channel.
-    const Metadata *resultType;
+    const Metadata *resultType; // TODO not sure if we need it.
 
     // FIXME: seems shady...?
     // Trailing storage for the result itself. The storage will be uninitialized.
     // Use the `readyQueue` to poll for values from the channel instead.
-    friend class AsyncTask; // TODO: remove this?
+    friend class AsyncTask;
 
   public:
     explicit ChannelFragment(const Metadata *resultType)
-        : readyQueue(ReadyQueueItem::get(ReadyQueueStatus::Empty, nullptr)),
-          waitQueue(WaitQueueItem::get(WaitStatus::Pending, nullptr)),
-          resultType(resultType) { }
+        : //readyQueue(ReadyQueueItem::get(ReadyQueueStatus::Empty, nullptr)),
+          status(ChannelStatus::initial().status),
+          readyQueue(),
+          waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)), // TODO: reuse FutureFragment's waitQ
+          resultType(resultType) { // TODO: reuse FutureFragment's resultType
+      assert(sizeof(long) == 8);
+    }
 
     /// Destroy the storage associated with the channel.
     void destroy();
 
     bool isEmpty() {
-      auto readyHead = readyQueue.load(std::memory_order_relaxed);
-      return readyHead.getStatus() == ReadyQueueStatus::Empty;
+      auto oldStatus = ChannelStatus { status.load(std::memory_order_relaxed) };
+      return oldStatus.pendingTasks() == 0;
     }
 
-//    /// Compute the offset of the storage from the base of the channel
-//    /// fragment.
-//    static size_t storageOffset()  {
-//      // FIXME: not entirely sure how to properly calculate these...
-//      size_t offset = sizeof(ChannelFragment);
-//      size_t alignment =
-//          std::max(resultType->vw_alignment(), alignof(SwiftError *));
-//      return (offset + alignment - 1) & ~(alignment - 1);
-//    }
+    /// Returns "old" status.
+    ChannelStatus statusAddPendingTask() {
+      return ChannelStatus {
+          status.fetch_add(ChannelStatus::onePendingTask, std::memory_order_relaxed)
+      };
+    }
+
+    /// Returns "old" status.
+    ChannelStatus statusAddWaitingTask() {
+      return ChannelStatus {
+          status.fetch_add(ChannelStatus::oneWaitingTask, std::memory_order_relaxed)
+      };
+    }
+
+    /// Returns "old" status.
+    ChannelStatus statusRemoveWaitingTask() {
+      return ChannelStatus {
+          status.fetch_sub(ChannelStatus::oneWaitingTask, std::memory_order_relaxed)
+      };
+    }
+
+    /// Returns "old" status.
+    ChannelStatus statusCompletePendingTask() {
+      return ChannelStatus{
+          status.fetch_sub(ChannelStatus::onePendingTask, std::memory_order_relaxed)
+      };
+    }
 
     /// Determine the size of the channel fragment given a particular channel
     /// result type.
     static size_t fragmentSize() {
 //        return storageOffset() +
 //               std::max(resultType->vw_size(), sizeof(SwiftError *));
-      size_t offset = sizeof(ChannelFragment);
+      return sizeof(ChannelFragment);
     }
   };
 
@@ -474,11 +555,13 @@ public:
   /// \returns the status of the queue.  TODO more docs
   ChannelFragment::ChannelPollResult channelPoll(AsyncTask *waitingTask);
 
-  // ==== ----------------------------------------------------------------------
+  // ==== TaskGroup Child ------------------------------------------------------
 
-  // Just a flag, no additional fragments.
+  // Flag indicating this task is a child of a group; no additional fragments.
+  //
+  // A child task that is a group child knows that it's parent is a group
+  // and therefore may `channelOffer` to it upon completion.
   bool isGroupChild() const { return Flags.task_isGroupChild(); }
-
 
   // ==== Future ---------------------------------------------------------------
 
@@ -736,6 +819,82 @@ public:
 
   using AsyncContext::AsyncContext;
 };
+
+
+///// SeeAlso: Based on http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue
+//template <typename T>
+//class MPSCLinkedQueue {
+//private:
+//
+//  struct Node {
+//  //    Node* volatile  next;
+//    std::atomic<Node> next;
+//  };
+//
+//  struct MPSCLinkedQueue {
+//  //    Node* volatile  head;
+//    std::atomic<Node> head;
+//    Node*           tail;
+//    Node            stub;
+//  };
+//
+//  // #define MPSCQ_STATIC_INIT(self) {&self.stub, &self.stub, {0}}
+//
+//public:
+//  explicit MPSCLinkedQueue() {
+//    self->head = &self->stub;
+//    self->tail = &self->stub;
+//    self->stub.next = 0;
+//  }
+//
+//  ~MPSCLinkedQueue() noexcept {
+////    for (size_t i = 0; i < capacity_; ++i) {
+////      slots_[i].~Slot();
+////    }
+////    allocator_.deallocate(slots_, capacity_ + 1);
+////  }
+//
+////    void mpscq_create(MPSCLinkedQueue *self) {
+////      self->head = &self->stub;
+////      self->tail = &self->stub;
+////      self->stub.next = 0;
+////    }
+//
+//  void push(Node *node) {
+//    node->next = 0;
+//    // Node *prev = XCHG(&self->head, n); //(*)
+//    Node *prev = head.exchange(node, std::memory_order_acquire);
+//    prev->next = node;
+//  }
+//
+//  /// Returns `nullptr` if the queue was empty.
+//  Node *pop() {
+//    auto *tail = this.tail;
+//    auto *next = this.next;
+//    if (tail == &self->stub) {
+//      if (0 == next)
+//        return 0;
+//      self->tail = next;
+//      tail = next;
+//      next = next->next;
+//    }
+//    if (next) {
+//      self->tail = next;
+//      return tail;
+//    }
+//    Node *head = self->head;
+//    if (tail != head)
+//      return 0;
+//    push(self, &self->stub);
+//    next = tail->next;
+//    if (next) {
+//      self->tail = next;
+//      return tail;
+//    }
+//    return 0;
+//  }
+//
+//};
 
 } // end namespace swift
 

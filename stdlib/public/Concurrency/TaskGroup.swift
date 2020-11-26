@@ -152,33 +152,24 @@ extension Task {
     @discardableResult
     public mutating func add(
       overridingPriority: Priority? = nil,
-      operation: @escaping () async throws -> TaskResult
+      operation: @escaping () async throws -> TaskResult,
+      file: String = #file, line: UInt = #line
     ) async -> Task.Handle<TaskResult> {
       var flags = JobFlags()
       flags.kind = .task
-      flags.priority = overridingPriority ?? getJobFlags(self.groupChannelTask).priority
+      flags.priority = overridingPriority ?? getJobFlags(groupChannelTask).priority
       flags.isFuture = true
       flags.isChildTask = true
       flags.isGroupChild = true
 
-//      let storageOperation = { () async throws -> TaskResult in
-//        let result = await try operation()
-//        print("<<< task [\(taskID)] completed: \(result)")
-//
-//        // FIXME: instead make the task offer itself it completes
-//        swift_task_channel_offer(completed: nil, on: groupChannelTask)
-//        return result
-//      }
-
       let (childTask, _) =
-        Builtin.createAsyncTaskFuture(flags.bits, self.groupChannelTask, operation)
+        Builtin.createAsyncTaskFuture(flags.bits, groupChannelTask, operation)
+      taskChannelAddPending(groupChannelTask, childTask)
       let handle = Handle<TaskResult>(task: childTask)
-
-      // we must store the handle before starting its task
 
       // FIXME: use executors or something else to launch the task
       DispatchQueue.global(priority: .default).async {
-        print(">>> run")
+        // print(">>> run (task added at \(file):\(line))")
         handle.run()
       }
 
@@ -192,32 +183,30 @@ extension Task {
     /// rather the order of `next()` calls completing is by completion order of
     /// the tasks. This differentiates task groups from streams (
     public mutating func next() async throws -> TaskResult? {
-//      func x () -> RawChannelPollResult {
-//        fatalError("TODO: implement next()")
-//      }
-
-//      return nil
-
+      // We reuse the taskFutureWait -> swift_task_future_wait since it seems to have special sauce,
+      // but actually we
+      print("error: next[\(#line)]: invoked\n")
       let rawResult = await taskFutureWait(on: self.groupChannelTask)
-      print("xxx == \(rawResult)")
-      return nil
+//      let rawResult = await taskChannelPoll(on: self.groupChannelTask) // TODO: consider if we can implement this way
 
-//      let rawResult: RawChannelPollResult = await taskChannelPoll(on: self.groupChannelTask)
-//      guard rawResult.hadAnyResult else {
+//      guard rawResult.storage == nil else {
 //        // Polling returned "no result", it means there is nothing to await on anymore
 //        // i.e. there are no more pending tasks / "we drained all tasks"
+//        print("\(#function): return nil")
 //        return nil
 //      }
-//
-//      if rawResult.hadErrorResult {
-//        // Throw the result on error.
-//        throw unsafeBitCast(rawResult.storage, to: Error.self)
-//      }
-//
-//      // Take the value on success
-//      let storagePtr =
-//        rawResult.storage.bindMemory(to: TaskResult.self, capacity: 1)
-//      return UnsafeMutablePointer<TaskResult>(mutating: storagePtr).pointee
+
+      if rawResult.hadErrorResult {
+        // Throw the result on error.
+        print("error: next[\(#line)]: after await, error: \(rawResult)");
+        throw unsafeBitCast(rawResult.storage, to: Error.self)
+      }
+
+      // Take the value on success
+      print("error: next[\(#line)]: after await, result: \(rawResult)");
+      let storagePtr =
+        rawResult.storage.bindMemory(to: Optional<TaskResult>.self, capacity: 1)
+      return UnsafeMutablePointer<Optional<TaskResult>>(mutating: storagePtr).pointee
     }
 
     /// Query whether the group has any remaining tasks.
@@ -239,14 +228,8 @@ extension Task {
     /// cancellation, are silently discarded.
     ///
     /// - SeeAlso: `Task.addCancellationHandler`
-    public mutating func cancelAll(file: String = #file, line: UInt = #line) {
-//      // TODO: implement this
-//      fatalError("\(#function) not implemented yet")
-
-//      for (id, handle) in self.pendingTasks {
-//        handle.cancel()
-//      }
-//      self.pendingTasks = [:]
+    public mutating func cancelAll() {
+      taskCancel(groupChannelTask) // TODO: do we also have to go over all child tasks and cancel there?
     }
   }
 }
@@ -259,23 +242,36 @@ extension Task {
 //  completedTask: Builtin.NativeObject
 //)
 
-/// See: ChannelPollResult
+/// SeeAlso: ChannelPollResult
 struct RawChannelPollResult {
-  /// If false, return `nil` from `next()`.
-  let hadAnyResult: Bool
-
-  /// If `true` the `storage` contains an `Error`.
-  let hadErrorResult: Bool
-
+  let status: ChannelPollStatus
   let storage: UnsafeRawPointer
+
+  var hadAnyResult: Bool {
+    status != .waiting
+  }
+}
+
+enum ChannelPollStatus: Int {
+  case empty   = 0
+  case waiting = 1
+  case success = 2
+  case error   = 3
 }
 
 @_silgen_name("swift_task_channel_poll")
 func taskChannelPoll(
   on channelTask: Builtin.NativeObject
-) async -> RawChannelPollResult
+) async -> RawTaskFutureWaitResult
+// ) async -> RawChannelPollResult
 
 @_silgen_name("swift_task_channel_is_empty")
 func taskChannelIsEmpty(
   _ channelTask: Builtin.NativeObject
 ) -> Bool
+
+@_silgen_name("swift_task_channel_add_pending")
+func taskChannelAddPending(
+  _ channelTask: Builtin.NativeObject,
+  _ childTask: Builtin.NativeObject
+)

@@ -145,8 +145,20 @@ swift_task_future_wait;
 ///     -> RawChannelPollResult?
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncFunctionType<AsyncTask::ChannelFragment::ChannelPollResult(AsyncTask *task)>
+AsyncFunctionType<TaskFutureWaitResult(AsyncTask *task)>
 swift_task_channel_poll;
+
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_channel_add_pending(
+///     _ channelTask: Builtin.NativeObject),
+///     _ childTask: Builtin.NativeObject
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void
+swift_task_channel_add_pending(AsyncTask *channelTask, AsyncTask *childTask);
 
 /// Check the readyQueue of a Channel, return true if it has no pending tasks.
 ///
