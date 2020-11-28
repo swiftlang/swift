@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -237,8 +237,20 @@ extension StrideToIterator: IteratorProtocol {
     if _stride > 0 ? result >= _end : result <= _end {
       return nil
     }
-    // This check is needed because we might otherwise advance `_current` past
-    // the representable bounds of the type unnecessarily.
+    // The following check is needed because we might otherwise advance
+    // `_current` past the representable bounds of the `Strideable` type
+    // unnecessarily.
+    //
+    // Note that `_current.index` always starts at `0`, but it is set to `nil`
+    // at each subsequent step when striding over values of most `Strideable`
+    // types. In the case of floating-point types, we avoid accumulating
+    // rounding error from repeated addition by actually incrementing
+    // `_current.index` at each step.
+    //
+    // In that circumstance (i.e., when `_current.index` is neither `0` nor
+    // `nil`), we can and should opt out of the following check, not only for
+    // performance reasons but also because the distance between the penultimate
+    // and last value can be less than `_stride` due to floating-point rounding.
     if (_current.index == nil || _current.index == 0)
         && result.distance(to: _end).magnitude < _stride.magnitude {
       _current = (index: nil, value: _end)
@@ -447,8 +459,8 @@ extension StrideThroughIterator: IteratorProtocol {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
       // This check is needed because, to prevent advancing `_current` past the
-      // representable bounds of the type, we represent steps past the end as
-      // `(index: nil, value: _end)`.
+      // representable bounds of the `Strideable` type, we may represent steps
+      // past the end as `(index: nil, value: _end)`.
       //
       // (Note how we use the `>=` and `<=` operators above.)
       if result == _end && !_didReturnEnd {
@@ -457,8 +469,20 @@ extension StrideThroughIterator: IteratorProtocol {
       }
       return nil
     }
-    // This check is needed because we might otherwise advance `_current` past
-    // the representable bounds of the type unnecessarily.
+    // The following check is needed because we might otherwise advance
+    // `_current` past the representable bounds of the `Strideable` type
+    // unnecessarily.
+    //
+    // Note that `_current.index` always starts at `0`, but it is set to `nil`
+    // at each subsequent step when striding over values of most `Strideable`
+    // types. In the case of floating-point types, we avoid accumulating
+    // rounding error from repeated addition by actually incrementing
+    // `_current.index` at each step.
+    //
+    // In that circumstance (i.e., when `_current.index` is neither `0` nor
+    // `nil`), we can and should opt out of the following check, not only for
+    // performance reasons but also because the distance between the penultimate
+    // and last value can be less than `_stride` due to floating-point rounding.
     if (_current.index == nil || _current.index == 0)
         && result.distance(to: _end).magnitude < _stride.magnitude {
       _didReturnEnd = true
