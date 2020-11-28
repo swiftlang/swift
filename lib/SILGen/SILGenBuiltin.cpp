@@ -1409,14 +1409,7 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
 static ManagedValue emitBuiltinCancelAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto argument = args[0].borrow(SGF, loc).forward(SGF);
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      SGF.getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { argument });
-  return ManagedValue::forUnmanaged(apply);
+  return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
