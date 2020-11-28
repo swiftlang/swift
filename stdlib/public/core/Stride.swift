@@ -171,6 +171,59 @@ extension Strideable {
   }
 }
 
+extension Strideable where Self: FixedWidthInteger & SignedInteger {
+  @_alwaysEmitIntoClient
+  public static func _step(
+    after current: (index: Int?, value: Self),
+    from start: Self, by distance: Self.Stride
+  ) -> (index: Int?, value: Self) {
+    let value = current.value
+    // When we're striding over values of fixed-width integer type, we can avoid
+    // trapping overflow that can occur when calling `advanced(by:)` by using
+    // `*ReportingOverflow` APIs instead.
+    let (partialValue, overflow) =
+      Self.bitWidth >= Self.Stride.bitWidth ||
+        (value < (0 as Self)) == (distance < (0 as Self.Stride))
+          ? value.addingReportingOverflow(Self(distance))
+          : (Self(Self.Stride(value) + distance), false)
+    // To opt out of checks for overflow in `Stride*Iterator.next()`, we'll
+    // return one of two sentinel values for `index` to indicate that we're
+    // keeping track of things here instead.
+    //
+    // In case of overflow, we'll set `index` to `Int.min` to indicate that
+    // `value` doesn't actually represent the value of the next step; otherwise,
+    // we'll set `index` to `Int.max`.
+    return overflow
+      ? (.min, distance < (0 as Self.Stride) ? .min : .max)
+      : (.max, partialValue)
+  }
+}
+
+extension Strideable where Self: FixedWidthInteger & UnsignedInteger {
+  @_alwaysEmitIntoClient
+  public static func _step(
+    after current: (index: Int?, value: Self),
+    from start: Self, by distance: Self.Stride
+  ) -> (index: Int?, value: Self) {
+    // When we're striding over values of fixed-width integer type, we can avoid
+    // trapping overflow that can occur when calling `advanced(by:)` by using
+    // `*ReportingOverflow` APIs instead.
+    let (partialValue, overflow) = distance < (0 as Self.Stride)
+      ? current.value.subtractingReportingOverflow(Self(-distance))
+      : current.value.addingReportingOverflow(Self(distance))
+    // To opt out of checks for overflow in `Stride*Iterator.next()`, we'll
+    // return one of two sentinel values for `index` to indicate that we're
+    // keeping track of things here instead.
+    //
+    // In case of overflow, we'll set `index` to `Int.min` to indicate that
+    // `value` doesn't actually represent the value of the next step; otherwise,
+    // we'll set `index` to `Int.max`.
+    return overflow
+      ? (.min, distance < (0 as Self.Stride) ? .min : .max)
+      : (.max, partialValue)
+  }
+}
+
 extension Strideable where Stride: FloatingPoint {
   @inlinable // protocol-only
   public static func _step(
@@ -241,16 +294,29 @@ extension StrideToIterator: IteratorProtocol {
     // `_current` past the representable bounds of the `Strideable` type
     // unnecessarily.
     //
-    // Note that `_current.index` always starts at `0`, but it is set to `nil`
-    // at each subsequent step when striding over values of most `Strideable`
-    // types. In the case of floating-point types, we avoid accumulating
-    // rounding error from repeated addition by actually incrementing
-    // `_current.index` at each step.
+    // Note that `_current.index` always starts at `0`, and we always check to
+    // ensure that `_stride` never exceeds the distance from `_start` to `_end`
+    // before invoking `Element._step`. (We rely on this invariant in
+    // implementations of `Element._step`.) For most types, we advance from one
+    // value to the next by serial addition and have no need to keep track of
+    // the number of steps, so `_current.index` is set to `nil` at each
+    // subsequent step.
     //
-    // In that circumstance (i.e., when `_current.index` is neither `0` nor
-    // `nil`), we can and should opt out of the following check, not only for
-    // performance reasons but also because the distance between the penultimate
-    // and last value can be less than `_stride` due to floating-point rounding.
+    // In the case of floating-point types, to avoid the accumulation of
+    // rounding error with serial addition, we do keep track of the number of
+    // steps by incrementing `_current.index`, and we multiply that index by
+    // `_stride` when computing `_current.value`. In that circumstance (i.e.,
+    // when `_current.index` is neither `0` nor `nil`), we can and should opt
+    // out of the following check, not only for performance reasons, but also
+    // because the distance between the penultimate and last value can be less
+    // than `_stride` due to floating-point rounding.
+    //
+    // In the case of fixed-width integer types, we can make use of the
+    // `*ReportingOverflow` APIs and opt out of the following check as well. To
+    // opt out, `_current.index` is set to `Int.min` if overflow has occurred or
+    // `Int.max` otherwise. If an overflow has occurred, then `_current.value`
+    // is set to `Element.min` if `_stride` is negative or `Element.max`
+    // otherwise.
     if (_current.index == nil || _current.index == 0)
         && result.distance(to: _end).magnitude < _stride.magnitude {
       _current = (index: nil, value: _end)
@@ -458,12 +524,16 @@ extension StrideThroughIterator: IteratorProtocol {
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
+      // (Note how we use the `>=` and `<=` operators above.)
+      //
       // This check is needed because, to prevent advancing `_current` past the
       // representable bounds of the `Strideable` type, we may represent steps
       // past the end as `(index: nil, value: _end)`.
       //
-      // (Note how we use the `>=` and `<=` operators above.)
-      if result == _end && !_didReturnEnd {
+      // If the `Strideable` type is a fixed-width integer, overflowed results
+      // are represented using a sentinel value for `_current`; namely,
+      // `(index: .min, value: _stride < 0 ? .min : .max)`.
+      if result == _end && !_didReturnEnd && _current.index != .min {
         _didReturnEnd = true
         return result
       }
@@ -473,16 +543,29 @@ extension StrideThroughIterator: IteratorProtocol {
     // `_current` past the representable bounds of the `Strideable` type
     // unnecessarily.
     //
-    // Note that `_current.index` always starts at `0`, but it is set to `nil`
-    // at each subsequent step when striding over values of most `Strideable`
-    // types. In the case of floating-point types, we avoid accumulating
-    // rounding error from repeated addition by actually incrementing
-    // `_current.index` at each step.
+    // Note that `_current.index` always starts at `0`, and we always check to
+    // ensure that `_stride` never exceeds the distance from `_start` to `_end`
+    // before invoking `Element._step`. (We rely on this invariant in
+    // implementations of `Element._step`.) For most types, we advance from one
+    // value to the next by serial addition and have no need to keep track of
+    // the number of steps, so `_current.index` is set to `nil` at each
+    // subsequent step.
     //
-    // In that circumstance (i.e., when `_current.index` is neither `0` nor
-    // `nil`), we can and should opt out of the following check, not only for
-    // performance reasons but also because the distance between the penultimate
-    // and last value can be less than `_stride` due to floating-point rounding.
+    // In the case of floating-point types, to avoid the accumulation of
+    // rounding error with serial addition, we do keep track of the number of
+    // steps by incrementing `_current.index`, and we multiply that index by
+    // `_stride` when computing `_current.value`. In that circumstance (i.e.,
+    // when `_current.index` is neither `0` nor `nil`), we can and should opt
+    // out of the following check, not only for performance reasons, but also
+    // because the distance between the penultimate and last value can be less
+    // than `_stride` due to floating-point rounding.
+    //
+    // In the case of fixed-width integer types, we can make use of the
+    // `*ReportingOverflow` APIs and opt out of the following check as well. To
+    // opt out, `_current.index` is set to `Int.min` if overflow has occurred or
+    // `Int.max` otherwise. If an overflow has occurred, then `_current.value`
+    // is set to `Element.min` if `_stride` is negative or `Element.max`
+    // otherwise.
     if (_current.index == nil || _current.index == 0)
         && result.distance(to: _end).magnitude < _stride.magnitude {
       _didReturnEnd = true
