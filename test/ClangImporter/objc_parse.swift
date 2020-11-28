@@ -540,10 +540,12 @@ func testStrangeSelectors(obj: StrangeSelectors) {
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'}} 
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
