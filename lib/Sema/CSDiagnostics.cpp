@@ -975,9 +975,26 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
   auto fromType = getFromType();
   auto toType = getToType();
 
-  emitDiagnostic(diag::missing_forced_downcast, fromType, toType)
-      .highlight(getSourceRange())
-      .fixItReplace(getLoc(), "as!");
+  emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
+
+  auto &solution = getSolution();
+  auto restriction = solution.ConstraintRestrictions.find(
+      {toType->getCanonicalType(),
+       OptionalType::get(toType)->getCanonicalType()});
+  // If the type has an value to optional conversion we can instead suggest
+  // the conditional downcast as it is safer in situations like conditional
+  // binding.
+  if (restriction != solution.ConstraintRestrictions.end() &&
+      restriction->getSecond() == ConversionRestrictionKind::ValueToOptional) {
+    emitDiagnostic(diag::missing_optional_downcast)
+        .highlight(getSourceRange())
+        .fixItReplace(getLoc(), "as?");
+  } else {
+    emitDiagnostic(diag::missing_forced_downcast)
+        .highlight(getSourceRange())
+        .fixItReplace(getLoc(), "as!");
+  }
+
   return true;
 }
 
@@ -1051,10 +1068,19 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (needsParensOutside)
     insertAfter += ")";
 
-  auto diagID =
-      useAs ? diag::missing_explicit_conversion : diag::missing_forced_downcast;
-  auto diag = emitDiagnostic(diagID, fromType, toType);
+  auto diagnose = [&]() {
+    if (useAs) {
+      return emitDiagnostic(diag::missing_explicit_conversion, fromType,
+                            toType);
+    } else {
+      // Emit error diagnostic.
+      emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
+      // Emit and return note suggesting as! where the fixit will be placed.
+      return emitDiagnostic(diag::missing_forced_downcast);
+    }
+  };
 
+  auto diag = diagnose();
   if (!insertBefore.empty()) {
     diag.fixItInsert(getSourceRange().Start, insertBefore);
   }
