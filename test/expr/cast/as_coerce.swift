@@ -141,3 +141,16 @@ _ = sr6022 as! AnyObject // expected-warning {{forced cast from '() -> Any' to '
 _ = sr6022 as? AnyObject // expected-warning {{conditional cast from '() -> Any' to 'AnyObject' always succeeds}}
 _ = sr6022_1 as! Any // expected-warning {{forced cast from '() -> ()' to 'Any' always succeeds; did you mean to use 'as'?}}
 _ = sr6022_1 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}
+
+// SR-13899
+let any: Any = 1
+if let int = any as Int { // expected-error {{'Any' is not convertible to 'Int'}}
+// expected-note@-1 {{did you mean to use 'as?' to conditionally downcast?}} {{18-20=as?}}
+}
+
+let _ = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
+// expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{13-15=as!}}
+let _: Int = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
+// expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{18-20=as!}}
+let _: Int? = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
+// expected-note@-1 {{did you mean to use 'as?' to conditionally downcast?}} {{19-21=as?}}

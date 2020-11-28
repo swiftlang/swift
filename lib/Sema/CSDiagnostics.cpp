@@ -1075,7 +1075,7 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     } else {
       // Emit error diagnostic.
       emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
-      // Emit and return note suggesting as! where the fixit will be placed.
+      // Emit and return note suggesting as! where the fix-it will be placed.
       return emitDiagnostic(diag::missing_forced_downcast);
     }
   };
