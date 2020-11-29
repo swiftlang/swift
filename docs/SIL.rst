@@ -1713,9 +1713,97 @@ normal uses always before consuming uses. Any such violations of ownership
 semantics would trigger a static SILVerifier error allowing us to know that we
 do not have any leaks or use-after-frees in the above code.
 
+Ownership Kind
+~~~~~~~~~~~~~~
+
 The semantics in the previous example is of just one form of ownership semantics
-supported: "owned" semantics. In SIL, we allow for values to have one of four
-different ownership kinds:
+supported: "owned" semantics. In SIL, we map these "ownership semantics" into a
+form that a compiler can reason about by mapping semantics onto a lattice with
+the following elements: `None`_, `Owned`_, `Guaranteed`_, `Unowned`_, `Any`_. We
+call this the lattice of "Ownership Kinds" and each individual value an
+"Ownership Kind". This lattice is defined as a 3-level lattice with::
+
+1. None being Top.
+2. Any being Bottom.
+3. All non-Any, non-None OwnershipKinds being defined as a mid-level elements of the lattice
+
+We can graphically represent the lattice via a diagram like the following::
+
+                +----+
+      +-------- |None| -----------+
+      |         +----+            |
+      |            |              |
+      v            v              v         ^
+  +-------+  +-----+------+  +---------+    |
+  | Owned |  | Guaranteed |  | Unowned |    +--- Value Ownership Kinds and
+  +-------+  +-----+------+  +---------+         Ownership Constraints
+      |            |              |
+      |            v              |         +--- Only Ownership Constraints
+      |          +---+            |         |
+      +--------->|Any|<-----------+         v
+                 +---+
+
+One moves down the lattice by performing a "meet" operation::
+
+  None meet OtherOwnershipKind -> OtherOwnershipKind
+  Unowned meet Owned -> Any
+  Owned meet Guaranteed -> Any
+
+and one moves up the lattice by performing a "join" operation, e.x.::
+
+  Any join OtherOwnershipKind -> OtherOwnershipKind
+  Owned join Any -> Owned
+  Owned join Guaranteed -> None
+
+This lattice is applied to SIL by requiring well formed SIL to:
+
+1. Define a static map of each SIL value to an OwnershipKind that classify the
+   semantics that the SIL value obeys. We call this subset of OwnershipKind to
+   be the set of `Value Ownership Kind`_: `None`_, `Unowned`_, `Guaranteed`_,
+   `Owned`_ (note conspiciously missing `Any`_). This is because in our model
+   `Any`_ represents an unknown ownership semantics and since our model is
+   statically strict, we do not allow for values to have unknown ownership.
+
+2. Define a static map from each operand of a SILInstruction, `i`, to an
+   (Ownership Kind, Boolean) called the operand's `Ownership Constraint`_. The
+   Ownership Kind element of the `Ownership Constraint`_ acts as a a static
+   "constraint" on the Value Ownership Kind that the operand's value can be mapped
+   to. The second boolean value is used to know if an operand will end the
+   lifetime of the incoming value when checking dataflow rules. The dataflow
+   rules that each `Value Ownership Kind`_ obeys is documented for each
+   `Value Ownership Kind`_ in its detailed description below.
+
+Then we take these static definitions and require that valid SIL has the
+property that given a value ``v``, an instruction ``i`` and said instruction's
+operand ``operand(i)``, that ``v`` can be used as a value in ``operand(i)`` only
+if the join of the ownership constraint of ``operand(i)`` with ``v`` is the
+ownership kind of ``v``! In symbols, we must have the following join is
+defined::
+
+  join : (OwnershipConstraint, ValueOwnershipKind) -> ValueOwnershipKind
+  OwnershipConstraint(operand(i)) join ValueOwnershipKind(v) = ValueOwnershipKind(v)
+
+In prose, a value can be passed to an operand if applying the operand's
+ownership constraint to the value's ownership does not change the value's
+ownership. Operationally this has a few interesting effects on SIL::
+
+1. We have defined away invalid value-operand (aka def-use) pairing since the
+   SILVerifier validates the aforementioned relationship on all SIL values,
+   uses at all points of the pipeline until ossa is lowered.
+
+2. Many SIL instructions do not care about the ownership kind that their value
+   will take. They can just define all of their operand's as having an
+   ownership constraint of Any.
+
+Now lets go into more depth upon `Value Ownership Kind`_ and `Ownership Constraint`_.
+
+Value Ownership Kind
+~~~~~~~~~~~~~~~~~~~~
+
+As mentioned above, each SIL value is statically mapped to an `Ownership Kind`_
+called the value's "ValueOwnershipKind" that classify the semantics of the
+value. Below, we map each ValueOwnershipKind to a short summary of the semantics
+implied upon the parent value:
 
 * **None**. This is used to represent values that do not require memory
   management and are outside of Ownership SSA invariants. Examples: trivial
@@ -1739,10 +1827,7 @@ different ownership kinds:
   bitcasting a trivial type to a non-trivial type. This value should never be
   consumed.
 
-We describe each of these semantics in more detail below.
-
-Value Ownership Kind
-~~~~~~~~~~~~~~~~~~~~
+We describe each of these semantics in below in more detail.
 
 Owned
 `````
@@ -1912,10 +1997,26 @@ This is a form of ownership that is used to model two different use cases:
   trivial pointer to a class. In that case, since we have no reason to assume
   that the object will remain alive, we need to make a copy of the value.
 
+Ownership Constraint
+~~~~~~~~~~~~~~~~~~~~
+
+NOTE: We assume that one has read the section above on `Ownership Kind`_.
+
+As mentioned above, every operand ``operand(i)`` of a SIL instruction ``i`` has
+statically mapped to it:
+
+1. An ownership kind that acts as an "Ownership Constraint" upon what "Ownership
+   Kind" a value can take.
+
+2. A boolean value that defines whether or not the execution of the operand's
+   instruction will cause the operand's value to be invalidated. This is often
+   times referred to as an operand acting as a "lifetime ending use".
+
 Forwarding Uses
 ~~~~~~~~~~~~~~~
 
-NOTE: In the following, we assumed that one read the section above, `Value Ownership Kind`_.
+NOTE: In the following, we assumed that one read the section above, `Ownership
+Kind`_, `Value Ownership Kind`_ and `Ownership Constraint`_.
 
 A subset of SIL instructions define the value ownership kind of their results in
 terms of the value ownership kind of their operands. Such an instruction is
