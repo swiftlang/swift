@@ -577,6 +577,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
 
+  Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   std::string TargetArgScratch;

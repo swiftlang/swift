@@ -129,6 +129,9 @@ namespace swift {
     /// overlay.
     bool EnableCrossImportRemarks = false;
 
+    /// Emit a remark after loading a module.
+    bool EnableModuleLoadingRemarks = false;
+
     ///
     /// Support for alternate usage modes
     ///
