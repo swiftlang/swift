@@ -2398,28 +2398,12 @@ public:
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
-    SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
-                                  IGF.getSILModule());
-    auto resultType =
-        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-    auto &nativeSchema =
-        IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
-    auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
-    if (expectedNativeResultType->isVoidTy()) {
-      // If the async return is void, there is no return to move out of the
-      // argument buffer.
-      return;
-    }
-    // Gather the values.
-    Explosion nativeExplosion;
     auto layout = getAsyncContextLayout();
     for (unsigned index = 0, count = layout.getDirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getDirectReturnLayout(index);
-      loadValue(fieldLayout, nativeExplosion);
+      loadValue(fieldLayout, out);
     }
-
-    out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
   Address getCalleeErrorSlot(SILType errorType) override {
     auto layout = getAsyncContextLayout();

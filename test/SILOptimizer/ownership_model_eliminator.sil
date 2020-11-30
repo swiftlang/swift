@@ -14,6 +14,11 @@ case some(R)
 
 class C {}
 
+struct PairOfInt {
+  var lhs : Builtin.Int32
+  var rhs : Builtin.Int32
+}
+
 // CHECK-LABEL: sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : $*Builtin.Int32):
 // CHECK: [[LOAD2:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
@@ -345,11 +350,11 @@ bb0(%0a : $Builtin.Int32, %0b : $Builtin.Int32):
 
 // Just make sure that we do not crash on this function.
 //
-// CHECK-LABEL: sil @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(thin) (PairOfInt) -> Builtin.Int64 {
 // CHECK: unchecked_bitwise_cast
 // CHECK: } // end sil function 'lower_unchecked_value_cast_to_unchecked_bitwise_cast'
-sil [ossa] @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
-bb0(%0a : $Builtin.Int32):
-  %0b = unchecked_value_cast %0a : $Builtin.Int32 to $Builtin.Int32
-  return %0b : $Builtin.Int32
+sil [ossa] @lower_unchecked_value_cast_to_unchecked_bitwise_cast : $@convention(thin) (PairOfInt) -> Builtin.Int64 {
+bb0(%0a : $PairOfInt):
+  %0b = unchecked_value_cast %0a : $PairOfInt to $Builtin.Int64
+  return %0b : $Builtin.Int64
 }
