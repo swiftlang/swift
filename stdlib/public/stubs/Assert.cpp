@@ -49,12 +49,12 @@ void _swift_stdlib_reportFatalErrorInFile(
 ) {
   char *log;
   swift_asprintf(
-      &log, "%.*s: %.*s%sfile %.*s, line %" PRIu32 "\n",
-      prefixLength, prefix,
-      messageLength, message,
-      (messageLength ? ": " : ""),
+      &log, "%.*s:%" PRIu32 ": %.*s%s%.*s\n",
       fileLength, file,
-      line);
+      line,
+      prefixLength, prefix,
+      (messageLength > 0 ? ": " : ""),
+      messageLength, message);
 
   swift_reportError(flags, log);
   free(log);
@@ -89,10 +89,10 @@ void _swift_stdlib_reportUnimplementedInitializerInFile(
   char *log;
   swift_asprintf(
       &log,
-      "%.*s: %" PRIu32 ": %" PRIu32 ": Fatal error: Use of unimplemented "
+      "%.*s:%" PRIu32 ": Fatal error: Use of unimplemented "
       "initializer '%.*s' for class '%.*s'\n",
       fileLength, file,
-      line, column,
+      line,
       initNameLength, initName,
       classNameLength, className);
 

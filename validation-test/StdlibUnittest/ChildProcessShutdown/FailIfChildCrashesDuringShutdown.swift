@@ -32,7 +32,7 @@ TestSuiteChildCrashes.test("passes") {
 // CHECK: [ RUN      ] TestSuiteChildCrashes.passes
 // CHECK: [       OK ] TestSuiteChildCrashes.passes
 // CHECK: TestSuiteChildCrashes: All tests passed
-// CHECK: stderr>>> Fatal error: Crash at exit:
+// CHECK: stderr>>> {{.*}}Fatal error: Crash at exit
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: The child process failed during shutdown, aborting.
 // CHECK: abort()
