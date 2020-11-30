@@ -44,7 +44,7 @@ extension P0 {
   }
 }
 
-protocol P1: class {
+protocol P1: AnyObject {
   func f() -> Self // okay
 
   func g(_ ds: Self) // okay

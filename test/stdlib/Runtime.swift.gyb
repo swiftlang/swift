@@ -534,7 +534,7 @@ Runtime.test("abstraction barrier on casting generic param bound to existential"
 class Malkovich: Malkovichable {
   var malkovich: String { return "malkovich" }
 }
-protocol Malkovichable: class {
+protocol Malkovichable: AnyObject {
   var malkovich: String { get }
 }
 
