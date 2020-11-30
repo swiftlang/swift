@@ -135,3 +135,24 @@ extension AutoDeriveEncodableTV2: TangentVectorMustBeEncodable {}
 
 // CHECK-AST-LABEL: extension AutoDeriveEncodableTV2 : TangentVectorMustBeEncodable {
 // CHECK-AST:   internal struct TangentVector : {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
+
+protocol TangentVectorP: Differentiable {
+  var requirement: Int { get }
+}
+
+protocol TangentVectorConstrained: Differentiable where TangentVector: TangentVectorP {}
+
+struct StructWithTangentVectorConstrained: TangentVectorConstrained {
+  var x: Float
+}
+
+// `extension StructWithTangentVectorConstrained.TangentVector: TangentVectorP` gives
+// "error: type 'StructWithTangentVectorConstrained.TangentVector' does not conform to protocol 'TangentVectorP'",
+// maybe because it typechecks the conformance before seeing the extension. But this roundabout way
+// of stating the same thing works.
+extension TangentVectorP where Self == StructWithTangentVectorConstrained.TangentVector {
+  var requirement: Int { 42 }
+}
+
+// CHECK-AST-LABEL: internal struct StructWithTangentVectorConstrained : TangentVectorConstrained {
+// CHECK-AST:   internal struct TangentVector : {{(TangentVectorP, Differentiable, AdditiveArithmetic)|(TangentVectorP, AdditiveArithmetic, Differentiable)|(Differentiable, TangentVectorP, AdditiveArithmetic)|(AdditiveArithmetic, TangentVectorP, Differentiable)|(Differentiable, AdditiveArithmetic, TangentVectorP)|(AdditiveArithmetic, Differentiable, TangentVectorP)}} {

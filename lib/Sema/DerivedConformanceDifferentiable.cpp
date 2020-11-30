@@ -725,10 +725,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
+  auto synthesizedLoc = derived.ConformanceDecl->getEndLoc();
   auto *structDecl =
-      new (C) StructDecl(SourceLoc(), C.Id_TangentVector, SourceLoc(),
+      new (C) StructDecl(synthesizedLoc, C.Id_TangentVector, synthesizedLoc,
                          /*Inherited*/ C.AllocateCopy(tvDesiredProtoTypeLocs),
                          /*GenericParams*/ {}, parentDC);
+  structDecl->setBraces({synthesizedLoc, synthesizedLoc});
   structDecl->setImplicit();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
