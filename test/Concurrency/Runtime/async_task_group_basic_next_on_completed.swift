@@ -36,8 +36,7 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 
 /// Tasks complete before they are next() polled.
 func test_sum_nextOnCompleted() {
-  let numbers = [1, 2]
-//  let numbers = [1, 2, 3, 4, 5]
+  let numbers = [1, 2, 3, 4, 5]
   let expected = numbers.reduce(0, +)
 
   let taskHandle = launch { () async -> Int in
@@ -58,16 +57,6 @@ func test_sum_nextOnCompleted() {
           sum += r
           print("sum: \(sum)")
         }
-//        if let r = await try group.next() {
-//          print("next: \(r)")
-//          sum += r
-//          print("sum: \(sum)")
-//        }
-//        if let r = await try group.next() {
-//          print("next: \(r)")
-//          sum += r
-//          print("sum: \(sum)")
-//        }
       } catch {
         print("ERROR: \(error)")
       }

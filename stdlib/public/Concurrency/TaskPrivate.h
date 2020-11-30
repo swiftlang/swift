@@ -86,30 +86,30 @@ static void runTaskWithFutureResult(
 }
 
 /// Run the given task, providing it with the result of the future.
-static void runTaskWithChannelPollResult(
+static void runTaskWithGroupPollResult(
     AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::ChannelFragment::ChannelPollResult result) {
+    AsyncTask::GroupFragment::GroupPollResult result) {
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  fprintf(stderr, "error: runTaskWithChannelPollResult[%d :%d]: polled STATUS: %d\n",
+  fprintf(stderr, "error: runTaskWithGroupPollResult[%d :%d]: polled STATUS: %d\n",
           pthread_self(), __LINE__, result.status);
 
   waitingTaskContext->result.hadErrorResult =
-      result.status == AsyncTask::ChannelFragment::ChannelPollStatus::Error;
+      result.status == AsyncTask::GroupFragment::ChannelPollStatus::Error;
   switch (result.status) {
-    case AsyncTask::ChannelFragment::ChannelPollStatus::Success:
+    case AsyncTask::GroupFragment::ChannelPollStatus::Success:
       waitingTaskContext->result.storage = result.storage;
       break;
-    case AsyncTask::ChannelFragment::ChannelPollStatus::Error:
+    case AsyncTask::GroupFragment::ChannelPollStatus::Error:
       waitingTaskContext->result.storage =
         reinterpret_cast<OpaqueValue *>(result.storage);
       break;
-    case AsyncTask::ChannelFragment::ChannelPollStatus::Empty:
+    case AsyncTask::GroupFragment::ChannelPollStatus::Empty:
       // return a `nil` here (as result of the `group.next()`)
       waitingTaskContext->result.storage = nullptr;
       break;
-    case AsyncTask::ChannelFragment::ChannelPollStatus::Waiting:
+    case AsyncTask::GroupFragment::ChannelPollStatus::Waiting:
       assert(false && "Must not attempt to run with a Waiting result.");
   }
 

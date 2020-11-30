@@ -198,7 +198,7 @@ public:
 ///
 ///    +------------------+
 ///    | childFragment?   |
-///    | channelFragment? |
+///    | groupFragment? |
 ///    | futureFragment?  |*
 ///    +------------------+
 ///
@@ -279,7 +279,7 @@ public:
 
   // ==== TaskGroup Channel ----------------------------------------------------
 
-  class ChannelFragment {
+  class GroupFragment {
   public:
     /// Describes the status of the channel.
     // FIXME: the enum needs to be designed better or not be an enum anymo
@@ -289,11 +289,6 @@ public:
         ///
         /// The storage is not accessible.
         Empty = 0b00,
-
-//        /// The channel has pending tasks
-//        ///
-//        /// The storage is not accessible.
-//        Pending = 0b01, // FIXME: we need a pending counter in the fragment.
 
         /// The future has completed with result (of type \c resultType).
         Success = 0b10,
@@ -335,7 +330,7 @@ public:
     };
 
     /// The result of waiting on a Channel (TaskGroup).
-    struct ChannelPollResult {
+    struct GroupPollResult {
         ChannelPollStatus status; // TODO: pack it into storage pointer or not worth it?
 
         /// Storage for the result of the future.
@@ -410,7 +405,7 @@ public:
         }
     };
 
-    struct ChannelStatus {
+    struct GroupStatus {
         /// 32 bits for the ready waiting queue
         static const unsigned long maskPending    = 0xFFFFFFFF00000000l;
         static const unsigned long onePendingTask = 0x0000000100000000l;
@@ -433,17 +428,17 @@ public:
         }
 
         /// Status value decrementing the Pending and Waiting counters by one.
-        ChannelStatus completingPendingWaitingTask() {
+        GroupStatus completingPendingWaitingTask() {
           assert(pendingTasks() > 0 && "can only complete pending/waiting tasks when pending tasks available");
           assert(waitingTasks() > 0 && "can only complete pending/waiting tasks when waiting tasks available");
-          return ChannelStatus { status - oneWaitingTask - onePendingTask };
+          return GroupStatus { status - oneWaitingTask - onePendingTask };
         }
 
         /// Pretty prints the status, as follows:
-        /// ChannelStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
+        /// GroupStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
         std::string to_string() {
           std::string str;
-          str.append("ChannelStatus{ ");
+          str.append("GroupStatus{ ");
           str.append("P:");
           str.append(std::to_string(pendingTasks()));
           str.append(" W:");
@@ -454,8 +449,8 @@ public:
         }
 
         /// Initially there are no waiting and no pending tasks.
-        static const ChannelStatus initial() {
-          return ChannelStatus { 0 };
+        static const GroupStatus initial() {
+          return GroupStatus { 0 };
         };
     };
 
@@ -488,46 +483,44 @@ public:
     friend class AsyncTask;
 
   public:
-    explicit ChannelFragment(const Metadata *resultType)
+    explicit GroupFragment(const Metadata *resultType)
         : //readyQueue(ReadyQueueItem::get(ReadyQueueStatus::Empty, nullptr)),
-          status(ChannelStatus::initial().status),
+          status(GroupStatus::initial().status),
           readyQueue(),
           waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)), // TODO: reuse FutureFragment's waitQ
-          resultType(resultType) { // TODO: reuse FutureFragment's resultType
-      assert(sizeof(long) == 8);
-    }
+          resultType(resultType) { } // TODO: reuse FutureFragment's resultType
 
     /// Destroy the storage associated with the channel.
     void destroy();
 
     bool isEmpty() {
-      auto oldStatus = ChannelStatus { status.load(std::memory_order_relaxed) };
+      auto oldStatus = GroupStatus { status.load(std::memory_order_relaxed) };
       return oldStatus.pendingTasks() == 0;
     }
 
-    ChannelStatus statusLoad() {
-      return ChannelStatus {
+    GroupStatus statusLoad() {
+      return GroupStatus {
           status.load(std::memory_order_relaxed)
       };
     }
 
-    ChannelStatus statusAddPendingTask() {
-      return ChannelStatus {
-          status.fetch_add(ChannelStatus::onePendingTask, std::memory_order_relaxed)
+    GroupStatus statusAddPendingTask() {
+      return GroupStatus {
+          status.fetch_add(GroupStatus::onePendingTask, std::memory_order_relaxed)
       };
     }
 
     /// Returns "old" status.
-    ChannelStatus statusAddWaitingTask() {
-      return ChannelStatus {
-          status.fetch_add(ChannelStatus::oneWaitingTask, std::memory_order_relaxed)
+    GroupStatus statusAddWaitingTask() {
+      return GroupStatus {
+          status.fetch_add(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
       };
     }
 
     /// Remove waiting task, without taking any pending task.
-    ChannelStatus statusRemoveWaitingTask() {
-      return ChannelStatus {
-          status.fetch_sub(ChannelStatus::oneWaitingTask, std::memory_order_relaxed)
+    GroupStatus statusRemoveWaitingTask() {
+      return GroupStatus {
+          status.fetch_sub(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
       };
     }
 
@@ -535,57 +528,57 @@ public:
     /// by simultaneously decrementing one Pending and one Waiting tasks.
     ///
     /// This is used to atomically perform a waiting task completion.
-    bool statusCompletePendingWaitingTasks(ChannelStatus& old) {
+    bool statusCompletePendingWaitingTasks(GroupStatus& old) {
       return status.compare_exchange_weak(
           old.status, old.completingPendingWaitingTask().status,
           /*success*/ std::memory_order_relaxed,
           /*failure*/ std::memory_order_relaxed);
     }
 
-//    /// Returns "old" status.
-//    ChannelStatus statusCompletePendingTask() {
-//      return ChannelStatus{
-//          status.fetch_sub(ChannelStatus::onePendingTask, std::memory_order_relaxed)
-//      };
-//    }
-
     /// Determine the size of the channel fragment given a particular channel
     /// result type.
     static size_t fragmentSize() {
 //        return storageOffset() +
 //               std::max(resultType->vw_size(), sizeof(SwiftError *));
-      return sizeof(ChannelFragment);
+      return sizeof(GroupFragment);
     }
   };
 
-  bool isChannel() const { return Flags.task_isChannel(); }
+  bool isTaskGroup() const { return Flags.task_isTaskGroup(); }
 
-  ChannelFragment *channelFragment() {
-    assert(isChannel());
+  GroupFragment *groupFragment() {
+    assert(isTaskGroup());
 
     if (hasChildFragment()) {
-      return reinterpret_cast<ChannelFragment *>(
+      return reinterpret_cast<GroupFragment *>(
           reinterpret_cast<ChildFragment*>(this + 1) + 1);
     }
 
-    return reinterpret_cast<ChannelFragment *>(this + 1);
+    return reinterpret_cast<GroupFragment *>(this + 1);
   }
 
   /// Offer result of a task into this channel.
   /// The value is enqueued at the end of the channel.
   ///
   /// Upon enqueue, any waiting tasks will be scheduled on the given executor. // TODO: not precisely right
-  void channelOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+  void
+  groupOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
 
-  /// Wait for for channel to become non-empty.
-  ChannelFragment::ChannelPollResult channelPoll(AsyncTask *waitingTask);
+  /// Attempt to dequeue ready tasks and complete the waitingTask.
+  ///
+  /// If unable to complete the waiting task immediately (with an readily
+  /// available completed task), either return ChannelPollStatus::Empty if it is known
+  /// that no tasks are in flight, or ChannelPollStatus::Waiting if there are
+  /// tasks in flight and we'll eventually be woken up by a completion.
+  GroupFragment::GroupPollResult
+  groupPoll(AsyncTask *waitingTask);
 
   // ==== TaskGroup Child ------------------------------------------------------
 
   // Flag indicating this task is a child of a group; no additional fragments.
   //
   // A child task that is a group child knows that it's parent is a group
-  // and therefore may `channelOffer` to it upon completion.
+  // and therefore may `groupOffer` to it upon completion.
   bool isGroupChild() const { return Flags.task_isGroupChild(); }
 
   // ==== Future ---------------------------------------------------------------
@@ -690,9 +683,9 @@ public:
 
     // TODO: can we simplify this? maybe a channel is ALWAYS
     if (hasChildFragment()) {
-      if (isChannel()) {
+      if (isTaskGroup()) {
         return reinterpret_cast<FutureFragment *>(
-            reinterpret_cast<ChannelFragment *>(
+            reinterpret_cast<GroupFragment *>(
                 reinterpret_cast<ChildFragment*>(this + 1) + 1) + 1);
       }
 
@@ -700,9 +693,9 @@ public:
           reinterpret_cast<ChildFragment*>(this + 1) + 1);
     }
 
-    if (isChannel()) {
+    if (isTaskGroup()) {
       return reinterpret_cast<FutureFragment *>(
-          reinterpret_cast<ChannelFragment *>(this + 1) + 1);
+          reinterpret_cast<GroupFragment *>(this + 1) + 1);
     }
 
     return reinterpret_cast<FutureFragment *>(this + 1);
@@ -844,82 +837,6 @@ public:
 
   using AsyncContext::AsyncContext;
 };
-
-
-///// SeeAlso: Based on http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue
-//template <typename T>
-//class MPSCLinkedQueue {
-//private:
-//
-//  struct Node {
-//  //    Node* volatile  next;
-//    std::atomic<Node> next;
-//  };
-//
-//  struct MPSCLinkedQueue {
-//  //    Node* volatile  head;
-//    std::atomic<Node> head;
-//    Node*           tail;
-//    Node            stub;
-//  };
-//
-//  // #define MPSCQ_STATIC_INIT(self) {&self.stub, &self.stub, {0}}
-//
-//public:
-//  explicit MPSCLinkedQueue() {
-//    self->head = &self->stub;
-//    self->tail = &self->stub;
-//    self->stub.next = 0;
-//  }
-//
-//  ~MPSCLinkedQueue() noexcept {
-////    for (size_t i = 0; i < capacity_; ++i) {
-////      slots_[i].~Slot();
-////    }
-////    allocator_.deallocate(slots_, capacity_ + 1);
-////  }
-//
-////    void mpscq_create(MPSCLinkedQueue *self) {
-////      self->head = &self->stub;
-////      self->tail = &self->stub;
-////      self->stub.next = 0;
-////    }
-//
-//  void push(Node *node) {
-//    node->next = 0;
-//    // Node *prev = XCHG(&self->head, n); //(*)
-//    Node *prev = head.exchange(node, std::memory_order_acquire);
-//    prev->next = node;
-//  }
-//
-//  /// Returns `nullptr` if the queue was empty.
-//  Node *pop() {
-//    auto *tail = this.tail;
-//    auto *next = this.next;
-//    if (tail == &self->stub) {
-//      if (0 == next)
-//        return 0;
-//      self->tail = next;
-//      tail = next;
-//      next = next->next;
-//    }
-//    if (next) {
-//      self->tail = next;
-//      return tail;
-//    }
-//    Node *head = self->head;
-//    if (tail != head)
-//      return 0;
-//    push(self, &self->stub);
-//    next = tail->next;
-//    if (next) {
-//      self->tail = next;
-//      return tail;
-//    }
-//    return 0;
-//  }
-//
-//};
 
 } // end namespace swift
 

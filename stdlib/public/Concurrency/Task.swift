@@ -215,7 +215,7 @@ extension Task {
     }
 
     /// Whether this is a channel.
-    var isChannel: Bool {
+    var isTaskGroup: Bool {
       get {
         (bits & (1 << 26)) != 0
       }
@@ -365,15 +365,31 @@ public func runAsync(_ asyncFun: @escaping () async -> ()) {
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
   on task: Builtin.NativeObject
-) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer)
+) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
 
 public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
   let rawResult = await _taskFutureWait(on: task)
   assert(!rawResult.hadErrorResult)
 
+  guard let storage = rawResult.storage else {
+    fatalError("\(#function): async result storage was null!")
+  }
+
   // Take the value.
-  let storagePtr =
-    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
+  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
+}
+
+public func _taskFutureGetOptional<T>(_ task: Builtin.NativeObject) async -> T? {
+  let rawResult = await _taskFutureWait(on: task)
+  assert(!rawResult.hadErrorResult)
+
+  guard let storage = rawResult.storage else {
+    return nil
+  }
+
+  // Take the value.
+  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
@@ -386,9 +402,30 @@ public func _taskFutureGetThrowing<T>(
     throw unsafeBitCast(rawResult.storage, to: Error.self)
   }
 
+  guard let storage = rawResult.storage else {
+    fatalError("\(#function): async result storage was null!")
+  }
+
   // Take the value on success
-  let storagePtr =
-    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
+  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
+}
+
+public func _taskFutureGetOptionalThrowing<T>(
+    _ task: Builtin.NativeObject
+) async throws -> T? {
+  let rawResult = await _taskFutureWait(on: task)
+  if rawResult.hadErrorResult {
+    // Throw the result on error.
+    throw unsafeBitCast(rawResult.storage, to: Error.self)
+  }
+
+  guard let storage = rawResult.storage else {
+    return nil
+  }
+
+  // Take the value on success
+  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
@@ -418,13 +455,8 @@ struct RawTaskFutureWaitResult {
   let storage: UnsafeRawPointer?
 }
 
-@_silgen_name("swift_task_future_wait")
-func taskFutureWait(
-  on task: Builtin.NativeObject
-) async -> RawTaskFutureWaitResult
-
 @_silgen_name("swift_task_cancel")
-func taskCancel(_ task: Builtin.NativeObject)
+func _taskCancel(_ task: Builtin.NativeObject)
 
 @_silgen_name("swift_task_isCancelled")
-func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
+func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool

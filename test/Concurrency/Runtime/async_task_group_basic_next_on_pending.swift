@@ -68,24 +68,24 @@ func test_sum_nextOnPending() {
   }
 
   // CHECK: before group.next(), sum: 0
-  //
-  // COM: start group.add { 1 }
-  // COM: complete group.add { 1 }
-  // COM: next: 1
-  //
-  // COM: start group.add { 2 }
-  // COM: complete group.add { 2 }
-  // COM: next: 2
-  //
-  // COM: start group.add { 3 }
-  // COM: complete group.add { 3 }
-  // COM: next: 3
-  //
+
+  // CHECK-DAG: complete group.add { [[REG1:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[REG2:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[REG3:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[REG4:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[REG5:[0-9]+]] }
+
+  // CHECK: next: [[REG1]]
+  // CHECK: next: [[REG2]]
+  // CHECK: next: [[REG3]]
+  // CHECK: next: [[REG4]]
+  // CHECK: next: [[REG5]]
+
   // CHECK: task group returning: 15
 
   launch { () async in
     let sum = await try! taskHandle.get()
-    // CHECK: result: 3
+    // CHECK: result: 15
     print("result: \(sum)")
     exit(0)
   }

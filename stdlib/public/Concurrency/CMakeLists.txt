@@ -21,7 +21,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskStatus.cpp
   TaskGroup.swift
   TaskGroup.h
-  TaskChannel.cpp
+  TaskGroup.cpp
   Mutex.cpp
 
   SWIFT_MODULE_DEPENDS_OSX Darwin

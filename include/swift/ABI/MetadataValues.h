@@ -1918,7 +1918,7 @@ public:
     Task_IsFuture         = 25,
     // A TaskGroup is a Channel Task which allows children to offer values into
     // it as they complete
-    Task_IsChannel        = 26,
+    Task_IsTaskGroup        = 26,
     // A child task started in a TaskGroup.
     // Its parent MUST be the group's channel task,
     // and the child task MUST offer its completion value into it when it completes.
@@ -1946,9 +1946,9 @@ public:
                                 task_isFuture,
                                 task_setIsFuture)
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChannel,
-                                task_isChannel,
-                                task_setIsChannel)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskGroup,
+                                task_isTaskGroup,
+                                task_setIsTaskGroup)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChild,
                                 task_isGroupChild,
                                 task_setGroupChild)
@@ -1962,7 +1962,7 @@ enum class TaskStatusRecordKind : uint8_t {
 
   /// A ChildTaskStatusRecord, which represents the potential for
   /// active child tasks.
-  ChildTask = 1,
+  ChildTask = 1, // TODO: should we do this for GroupChild?
 
   /// A CancellationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task is cancelled.

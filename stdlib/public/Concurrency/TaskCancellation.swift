@@ -25,7 +25,7 @@ extension Task {
   /// - SeeAlso: `checkCancellation()`
   /* @instantaneous */
   public static func isCancelled() async -> Bool {
-     isTaskCancelled(Builtin.getCurrentAsyncTask())
+     _taskIsCancelled(Builtin.getCurrentAsyncTask())
   }
 
   /// Check if the task is cancelled and throw an `CancellationError` if it was.

@@ -82,11 +82,11 @@ extension Task {
     // 1. Prepare the Group task
     var group = Task.Group<TaskResult>(parentTask: parent)
 
-    let (groupChannelTask, _) =
+    let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
         await try body(&group)
       }
-    let groupHandle = Handle<BodyResult>(task: groupChannelTask)
+    let groupHandle = Handle<BodyResult>(task: groupTask)
 
     // 2.0) Run the task!
     DispatchQueue.global(priority: .default).async { // FIXME: use executors when they land
@@ -116,24 +116,24 @@ extension Task {
   /// Its intended use is with the `Task.withGroup` function.
   /* @unmoveable */
   public struct Group<TaskResult> {
-    // private let parentTask: Builtin.NativeObject // TODO: maybe use the groupChannelTask as parent for all add()ed tasks instead and remove this one
+    // private let parentTask: Builtin.NativeObject // TODO: maybe use the groupTask as parent for all add()ed tasks instead and remove this one
 
     /// Channel task into which child tasks offer their results,
     /// and the `next()` function polls those results from.
-    private let groupChannelTask: Builtin.NativeObject
+    private let groupTask: Builtin.NativeObject
 
     /// No public initializers
     init(parentTask: Builtin.NativeObject) {
       var flags = JobFlags()
       flags.kind = .task // TODO: taskGroup?
       flags.priority = getJobFlags(parentTask).priority
-      flags.isChannel = true
+      flags.isTaskGroup = true
       flags.isChildTask = true
       // TODO: make sure we inherit everything from the parent
-      let (groupChannelTask, _) = Builtin.createAsyncTask(flags.bits, parentTask, { () async throws -> () in
+      let (groupTask, _) = Builtin.createAsyncTask(flags.bits, parentTask, { () async throws -> () in
         () // ...nothing...
       })
-      self.groupChannelTask = groupChannelTask
+      self.groupTask = groupTask
     }
 
     // Swift will statically prevent this type from being copied or moved.
@@ -159,14 +159,14 @@ extension Task {
     ) async -> Task.Handle<TaskResult> {
       var flags = JobFlags()
       flags.kind = .task
-      flags.priority = overridingPriority ?? getJobFlags(groupChannelTask).priority
+      flags.priority = overridingPriority ?? getJobFlags(groupTask).priority
       flags.isFuture = true
       flags.isChildTask = true
       flags.isGroupChild = true
 
       let (childTask, _) =
-        Builtin.createAsyncTaskFuture(flags.bits, groupChannelTask, operation)
-      taskChannelAddPending(groupChannelTask, childTask)
+        Builtin.createAsyncTaskFuture(flags.bits, groupTask, operation)
+      taskGroupAddPending(groupTask, childTask)
       let handle = Handle<TaskResult>(task: childTask)
 
       // FIXME: use executors or something else to launch the task
@@ -188,8 +188,8 @@ extension Task {
       // We reuse the taskFutureWait -> swift_task_future_wait since it seems to have special sauce,
       // but actually we
       fputs("error: next[\(pthread_self()) :\(#line)]: invoked\n", stderr)
-      let rawResult = await taskFutureWait(on: self.groupChannelTask)
-//      let rawResult = await taskChannelPoll(on: self.groupChannelTask) // TODO: consider if we can implement this way
+      let rawResult = await _taskFutureWait(on: self.groupTask)
+//      let rawResult = await taskGroupPoll(on: self.groupTask) // TODO: consider if we can implement this way
       fputs("error: next[\(pthread_self()) :\(#line)]: NEXT RESULT RAW: \(rawResult)\n", stderr)
 
       if rawResult.hadErrorResult {
@@ -220,7 +220,7 @@ extension Task {
     ///
     /// - Returns: `true` if the group has no pending tasks, `false` otherwise.
     public var isEmpty: Bool {
-      taskChannelIsEmpty(self.groupChannelTask)
+      taskGroupIsEmpty(self.groupTask)
     }
 
     /// Cancel all the remaining tasks in the group.
@@ -232,21 +232,21 @@ extension Task {
     ///
     /// - SeeAlso: `Task.addCancellationHandler`
     public mutating func cancelAll() {
-      taskCancel(groupChannelTask) // TODO: do we also have to go over all child tasks and cancel there?
+      _taskCancel(groupTask) // TODO: do we also have to go over all child tasks and cancel there?
     }
   }
 }
 
 /// ==== -----------------------------------------------------------------------
 
-//@_silgen_name("swift_task_channel_offer")
-//func taskChannelOffer(
-//  channel: Builtin.NativeObject,
-//  completedTask: Builtin.NativeObject
-//)
+@_silgen_name("swift_task_group_offer")
+func taskGroupOffer(
+  group: Builtin.NativeObject,
+  completedTask: Builtin.NativeObject
+)
 
-/// SeeAlso: ChannelPollResult
-struct RawChannelPollResult {
+/// SeeAlso: GroupPollResult
+struct RawGroupPollResult {
   let status: ChannelPollStatus
   let storage: UnsafeRawPointer
 }
@@ -258,19 +258,19 @@ enum ChannelPollStatus: Int {
   case error   = 3
 }
 
-@_silgen_name("swift_task_channel_poll")
-func taskChannelPoll(
+@_silgen_name("swift_task_group_poll")
+func taskGroupPoll(
   on channelTask: Builtin.NativeObject
 ) async -> RawTaskFutureWaitResult
-// ) async -> RawChannelPollResult
+// ) async -> RawGroupPollResult
 
-@_silgen_name("swift_task_channel_is_empty")
-func taskChannelIsEmpty(
+@_silgen_name("swift_task_group_is_empty")
+func taskGroupIsEmpty(
   _ channelTask: Builtin.NativeObject
 ) -> Bool
 
-@_silgen_name("swift_task_channel_add_pending")
-func taskChannelAddPending(
+@_silgen_name("swift_task_group_add_pending")
+func taskGroupAddPending(
   _ channelTask: Builtin.NativeObject,
   _ childTask: Builtin.NativeObject
 )

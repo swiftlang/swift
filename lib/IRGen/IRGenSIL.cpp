@@ -2281,7 +2281,7 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto isSpecialAsyncWithoutCtxtSize =
       fn->isAsync() && (
           fn->getName().equals("swift_task_future_wait") ||
-          fn->getName().equals("swift_task_channel_poll") // TODO: do we need this?
+          fn->getName().equals("swift_task_group_poll") // TODO: do we need this?
       );
   if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
