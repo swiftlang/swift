@@ -680,6 +680,11 @@ bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>)
   %6 = function_ref @get : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %7 = apply %6<T>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %8 = apply %3(%0, %7) : $@convention(thin) (Int, Int) -> Bool
+  %9 = copy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
+  %10 = project_box %9 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
+  copy_addr %10 to [initialization] %4 : $*S<T>
+  destroy_value %9 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
+  destroy_addr %4 : $*S<T>
   dealloc_stack %4 : $*S<T>
   destroy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
 // CHECK: return
