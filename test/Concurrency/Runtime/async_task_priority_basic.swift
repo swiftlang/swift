@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// XFAIL: CPU=arm64e
 
 import Dispatch
 
