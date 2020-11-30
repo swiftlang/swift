@@ -21,6 +21,11 @@ template <class R, class T, class U> R returns_template(T a, U b) {
 // Same here:
 template <class T> void cannot_infer_template() {}
 
+struct HasVariadicMemeber {
+  void test1(...) {}
+  void test2(int, ...) {}
+};
+
 // TODO: We should support these types. Until then, make sure we don't crash when importing.
 template<class... Ts>
 void testPackExpansion(Ts...) { }
