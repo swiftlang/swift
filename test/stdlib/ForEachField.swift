@@ -101,6 +101,27 @@ struct ContainsObject {
   var obj: TestClass
 }
 
+struct LetKeyPaths {
+  let int : Int
+  let double: Double
+}
+
+protocol TestExisential {}
+
+struct KeyPathTypes {
+  weak var weakObj: TestClass?
+  unowned var unownedObj: TestClass
+  var obj: TestClass
+  var tuple: (Int, Int, Int)
+  var structField: Int
+  var function: (Int) -> (Int)
+  var optionalFunction: (Int) -> (Int)?
+  var enumField: TestEnum
+  var existential: TestExisential
+  var existentialMetatype: Any.Type
+  var metatype: Int.Type
+}
+
 #if _runtime(_ObjC)
 import Foundation
 
@@ -135,6 +156,31 @@ func checkFields<T>(
 
     expectEqual(checkOffset, offset)
     expectEqual(checkType, type)
+    return true
+  }
+
+  expectEqual(fields.count, count)
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+func checkFieldsWithKeyPath<T>(
+  of type: T.Type,
+  options: _EachFieldOptions = [],
+  fields: [String: PartialKeyPath<T>]
+) {
+  var count = 0
+
+  _forEachFieldWithKeyPath(of: T.self, options: options) {
+    charPtr, keyPath in
+    count += 1
+
+    let fieldName = String(cString: charPtr)
+    guard let checkKeyPath = fields[fieldName] else {
+      expectTrue(false, "Unexpected field '\(fieldName)'")
+      return true
+    }
+
+    expectTrue(checkKeyPath == keyPath)
     return true
   }
 
@@ -250,6 +296,53 @@ if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
     expectFalse(_forEachField(of: TestStruct.self, options: .classType) {
       _, _, _, _ in true
     })
+  }
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    tests.test("StructKeyPath") {
+      checkFieldsWithKeyPath(
+        of: TestStruct.self,
+        fields: [
+          "int": \TestStruct.int,
+          "double": \TestStruct.double,
+          "bool": \TestStruct.bool,
+      ])
+    }
+
+    tests.test("LetKeyPaths") {
+      checkFieldsWithKeyPath(
+        of: LetKeyPaths.self,
+        fields: [
+          "int": \LetKeyPaths.int,
+          "double": \LetKeyPaths.double,
+      ])
+    }
+
+    tests.test("KeyPathTypes") {
+      checkFieldsWithKeyPath(
+        of: KeyPathTypes.self,
+        options: .ignoreUnknown,
+        fields: [
+          "obj": \KeyPathTypes.obj,
+          "tuple": \KeyPathTypes.tuple,
+          "structField": \KeyPathTypes.structField,
+          "enumField": \KeyPathTypes.enumField,
+          "existential": \KeyPathTypes.existential,
+          "existentialMetatype": \KeyPathTypes.existentialMetatype,
+      ])
+    }
+
+    tests.test("TupleKeyPath") {
+      typealias TestTuple = (Int, Int, TestClass, TestStruct)
+      checkFieldsWithKeyPath(
+        of: TestTuple.self,
+        fields: [
+          ".0": \TestTuple.0,
+          ".1": \TestTuple.1,
+          ".2": \TestTuple.2,
+          ".3": \TestTuple.3,
+      ])
+    }
   }
 
   func checkGenericStruct<T>(_: T.Type) {
