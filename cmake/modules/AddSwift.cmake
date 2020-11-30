@@ -286,9 +286,7 @@ function(_add_host_variant_c_compile_flags target)
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
     if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
-      # this is the minimum architecture that supports 16 byte CAS, which is
-      # necessary to avoid a dependency to libatomic
-      target_compile_options(${target} PRIVATE -march=core2)
+      target_compile_options(${target} PRIVATE -mcx16)
     endif()
   endif()
 

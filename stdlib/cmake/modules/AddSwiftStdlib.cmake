@@ -308,8 +308,7 @@ function(_add_target_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
-      # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
-      list(APPEND result "-march=core2")
+      list(APPEND result "-mcx16")
     endif()
   endif()
 
