@@ -434,11 +434,13 @@ public:
             loc, origCallee, SILType::getPrimitiveObjectType(origFnUnsubstType),
             /*withoutActuallyEscaping*/ false);
       }
-      auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, origCallee);
-      vjpValue = builder.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::VJP,
-          borrowedDiffFunc);
-      vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+      builder.emitScopedBorrowOperation(
+          loc, origCallee, [&](SILValue borrowedDiffFunc) {
+            vjpValue = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::VJP,
+                borrowedDiffFunc);
+            vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+          });
       auto vjpFnType = vjpValue->getType().castTo<SILFunctionType>();
       auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
       if (vjpFnType != vjpFnUnsubstType) {
@@ -540,11 +542,14 @@ public:
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
 
-      auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
-      auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::VJP, borrowedADFunc);
-      vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
-      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitScopedBorrowOperation(
+          loc, diffFuncInst, [&](SILValue borrowedADFunc) {
+            auto extractedVJP =
+                getBuilder().createDifferentiableFunctionExtract(
+                    loc, NormalDifferentiableFunctionTypeComponent::VJP,
+                    borrowedADFunc);
+            vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
+          });
       builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
