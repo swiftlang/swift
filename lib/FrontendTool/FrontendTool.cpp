@@ -79,6 +79,11 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#elif defined(_WIN32)
+#include <process.h>
+#endif
 #include <algorithm>
 #include <memory>
 #include <unordered_set>

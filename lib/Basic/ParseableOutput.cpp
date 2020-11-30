@@ -79,11 +79,6 @@ namespace {
 
 Action::Kind
 mapFrontendInvocationToActionKind(const CompilerInvocation &Invocation) {
-  auto Executable = llvm::sys::path::filename(
-      Invocation.getFrontendOptions().MainExecutablePath);
-  assert(Executable.str() == "swift-frontend" &&
-         "Expected a swift-frontend invocation.");
-
   Action::Kind ActionKind;
   FrontendOptions::ActionType ActionType =
       Invocation.getFrontendOptions().RequestedAction;
