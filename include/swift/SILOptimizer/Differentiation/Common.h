@@ -192,6 +192,16 @@ void extractAllElements(SILValue value, SILBuilder &builder,
 void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
                         SILValue bufferAccess, SILLocation loc);
 
+/// Emit a `Builtin.Word` value that represents the given type's memory layout
+/// size.
+SILValue emitMemoryLayoutSize(
+    SILBuilder &builder, SILLocation loc, CanType type);
+
+/// Emit a projection of the top-level subcontext from the context object.
+SILValue emitProjectTopLevelSubcontext(
+    SILBuilder &builder, SILLocation loc, SILValue context,
+    SILType subcontextType);
+
 //===----------------------------------------------------------------------===//
 // Utilities for looking up derivatives of functions
 //===----------------------------------------------------------------------===//

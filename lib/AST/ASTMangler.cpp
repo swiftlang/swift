@@ -785,8 +785,8 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
-  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-  auto fileUnit = cast<FileUnit>(topLevelContext);
+  auto topLevelSubcontext = decl->getDeclContext()->getModuleScopeContext();
+  auto fileUnit = cast<FileUnit>(topLevelSubcontext);
 
   Identifier discriminator =
       fileUnit->getDiscriminatorForPrivateValue(decl);
@@ -2900,9 +2900,9 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 void
 ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
   GenericSignature contextSig;
-  auto topLevelContext =
+  auto topLevelSubcontext =
       conformance->getDeclContext()->getModuleScopeContext();
-  Mod = topLevelContext->getParentModule();
+  Mod = topLevelSubcontext->getParentModule();
 
   auto conformingType = conformance->getType();
   appendType(conformingType->getCanonicalType());
@@ -2910,7 +2910,7 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
   appendProtocolName(conformance->getProtocol());
 
   bool needsModule = true;
-  if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
+  if (auto *file = dyn_cast<FileUnit>(topLevelSubcontext)) {
     if (file->getKind() == FileUnitKind::ClangModule ||
         file->getKind() == FileUnitKind::DWARFModule) {
       if (conformance->getProtocol()->hasClangNode())
