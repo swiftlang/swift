@@ -196,7 +196,6 @@ void ClangImporter::recordModuleDependencies(
     std::string PCMPath;
     std::string ModuleMapPath;
   };
-  auto ModuleCacheDir = swift::getModuleCachePathFromClang(getClangInstance());
 
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
