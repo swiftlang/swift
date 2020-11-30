@@ -24,15 +24,15 @@ public struct PartialAsyncTask {
 public struct UnsafeContinuation<T> {
   private var context: UnsafeRawPointer
 
-  public func resume(_: __owned T) { }
+  public func resume(returning: __owned T) { }
 }
 
 @frozen
 public struct UnsafeThrowingContinuation<T> {
   private var context: UnsafeRawPointer
 
-  public func resume(_: __owned T) { }
-  public func fail(_: __owned Error) { }
+  public func resume(returning: __owned T) { }
+  public func resume(throwing: __owned Error) { }
 }
 
 #if _runtime(_ObjC)
@@ -45,7 +45,7 @@ internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T>,
   _ value: __owned T
 ) {
-  continuation.resume(value)
+  continuation.resume(returning: value)
 }
 
 @_alwaysEmitIntoClient
@@ -54,7 +54,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeThrowingContinuation<T>,
   _ value: __owned T
 ) {
-  continuation.resume(value)
+  continuation.resume(returning: value)
 }
 
 @_alwaysEmitIntoClient
@@ -63,7 +63,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeThrowingContinuation<T>,
   _ error: __owned Error
 ) {
-  continuation.fail(error)
+  continuation.resume(throwing: error)
 }
 
 #endif
