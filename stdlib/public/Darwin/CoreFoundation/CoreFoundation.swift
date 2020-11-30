@@ -12,7 +12,7 @@
 
 @_exported import CoreFoundation
 
-public protocol _CFObject: class, Hashable {}
+public protocol _CFObject: AnyObject, Hashable {}
 extension _CFObject {
   public var hashValue: Int {
     return Int(bitPattern: CFHash(self))
