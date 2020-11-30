@@ -119,6 +119,10 @@ public:
 
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
+  Optional<FuncDecl*> RunChildTask;
+  Optional<FuncDecl*> TaskFutureGet;
+  Optional<FuncDecl*> TaskFutureGetThrowing;
+
   Optional<FuncDecl*> ResumeUnsafeContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
@@ -472,6 +476,15 @@ public:
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
+
+  /// Retrieve the _Concurrency._runChildTask intrinsic.
+  FuncDecl *getRunChildTask();
+
+  /// Retrieve the _Concurrency._taskFutureGet intrinsic.
+  FuncDecl *getTaskFutureGet();
+
+  /// Retrieve the _Concurrency._taskFutureGetThrowing intrinsic.
+  FuncDecl *getTaskFutureGetThrowing();
 
   /// Retrieve the _Concurrency._resumeUnsafeContinuation intrinsic.
   FuncDecl *getResumeUnsafeContinuation();
