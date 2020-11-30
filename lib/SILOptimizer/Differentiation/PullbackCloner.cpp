@@ -138,7 +138,6 @@ private:
   SILModule &getModule() const { return getContext().getModule(); }
   ASTContext &getASTContext() const { return getPullback().getASTContext(); }
   SILFunction &getOriginal() const { return vjpCloner.getOriginal(); }
-  SILFunction &getPullback() const { return vjpCloner.getPullback(); }
   SILDifferentiabilityWitness *getWitness() const {
     return vjpCloner.getWitness();
   }
@@ -781,6 +780,10 @@ public:
   /// Skip full pullback generation and simply emit zero derivatives for wrt
   /// parameters.
   void emitZeroDerivativesForNonvariedResult(SILValue origNonvariedResult);
+
+  /// Public helper so that our users can get the underlying newly created
+  /// function.
+  SILFunction &getPullback() const { return vjpCloner.getPullback(); }
 
   using TrampolineBlockSet = SmallPtrSet<SILBasicBlock *, 4>;
 
@@ -1740,7 +1743,14 @@ PullbackCloner::~PullbackCloner() { delete &impl; }
 // Entry point
 //--------------------------------------------------------------------------//
 
-bool PullbackCloner::run() { return impl.run(); }
+bool PullbackCloner::run() {
+  bool foundError = impl.run();
+#ifndef NDEBUG
+  if (!foundError)
+    impl.getPullback().verify();
+#endif
+  return foundError;
+}
 
 bool PullbackCloner::Implementation::run() {
   PrettyStackTraceSILFunction trace("generating pullback for", &getOriginal());
