@@ -18,12 +18,17 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "Context.h"
 #include "SemanticARCOptVisitor.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
 
 bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
+  // Quickly check if we are supposed to perform this transformation.
+  if (!ctx.shouldPerform(ARCTransformKind::RedundantBorrowScopeElimPeephole))
+    return false;
+
   auto kind = bbi->getOperand().getOwnershipKind();
   SmallVector<EndBorrowInst *, 16> endBorrows;
   for (auto *op : bbi->getUses()) {
