@@ -3738,7 +3738,9 @@ namespace {
         assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
                (*selfIdx < decl->getNumParams()) && "where's self?");
       } else {
-        assert(decl->getNumParams() == argNames.size() || isAccessor);
+        unsigned numParamsAdjusted =
+            decl->getNumParams() + (decl->isVariadic() ? 1 : 0);
+        assert(numParamsAdjusted == argNames.size() || isAccessor);
       }
 
       SmallVector<const clang::ParmVarDecl *, 4> nonSelfParams;
