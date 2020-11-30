@@ -424,8 +424,19 @@ public:
           return status >> 32; // consider only `maskPending` bits
         }
 
+        bool isEmpty() {
+          return pendingTasks() == 0;
+        }
+
         unsigned int waitingTasks() {
           return status & maskWaiting; // consider only `maskWaiting` bits
+        }
+
+        /// Status value decrementing the Pending and Waiting counters by one.
+        ChannelStatus completingPendingWaitingTask() {
+          assert(pendingTasks() > 0 && "can only complete pending/waiting tasks when pending tasks available");
+          assert(waitingTasks() > 0 && "can only complete pending/waiting tasks when waiting tasks available");
+          return ChannelStatus { status - oneWaitingTask - onePendingTask };
         }
 
         /// Pretty prints the status, as follows:
@@ -494,7 +505,12 @@ public:
       return oldStatus.pendingTasks() == 0;
     }
 
-    /// Returns "old" status.
+    ChannelStatus statusLoad() {
+      return ChannelStatus {
+          status.load(std::memory_order_relaxed)
+      };
+    }
+
     ChannelStatus statusAddPendingTask() {
       return ChannelStatus {
           status.fetch_add(ChannelStatus::onePendingTask, std::memory_order_relaxed)
@@ -508,19 +524,30 @@ public:
       };
     }
 
-    /// Returns "old" status.
+    /// Remove waiting task, without taking any pending task.
     ChannelStatus statusRemoveWaitingTask() {
       return ChannelStatus {
           status.fetch_sub(ChannelStatus::oneWaitingTask, std::memory_order_relaxed)
       };
     }
 
-    /// Returns "old" status.
-    ChannelStatus statusCompletePendingTask() {
-      return ChannelStatus{
-          status.fetch_sub(ChannelStatus::onePendingTask, std::memory_order_relaxed)
-      };
+    /// Compare-and-set old status to a status derived from the old one,
+    /// by simultaneously decrementing one Pending and one Waiting tasks.
+    ///
+    /// This is used to atomically perform a waiting task completion.
+    bool statusCompletePendingWaitingTasks(ChannelStatus& old) {
+      return status.compare_exchange_weak(
+          old.status, old.completingPendingWaitingTask().status,
+          /*success*/ std::memory_order_relaxed,
+          /*failure*/ std::memory_order_relaxed);
     }
+
+//    /// Returns "old" status.
+//    ChannelStatus statusCompletePendingTask() {
+//      return ChannelStatus{
+//          status.fetch_sub(ChannelStatus::onePendingTask, std::memory_order_relaxed)
+//      };
+//    }
 
     /// Determine the size of the channel fragment given a particular channel
     /// result type.
@@ -551,8 +578,6 @@ public:
   void channelOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
 
   /// Wait for for channel to become non-empty.
-  ///
-  /// \returns the status of the queue.  TODO more docs
   ChannelFragment::ChannelPollResult channelPoll(AsyncTask *waitingTask);
 
   // ==== TaskGroup Child ------------------------------------------------------

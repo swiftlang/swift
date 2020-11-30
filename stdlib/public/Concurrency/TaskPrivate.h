@@ -21,6 +21,8 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include <pthread.h>
+#include <stdio.h>
 
 namespace swift {
 
@@ -90,12 +92,16 @@ static void runTaskWithChannelPollResult(
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
+  fprintf(stderr, "error: runTaskWithChannelPollResult[%d :%d]: polled STATUS: %d\n",
+          pthread_self(), __LINE__, result.status);
+
+  waitingTaskContext->result.hadErrorResult =
+      result.status == AsyncTask::ChannelFragment::ChannelPollStatus::Error;
   switch (result.status) {
     case AsyncTask::ChannelFragment::ChannelPollStatus::Success:
       waitingTaskContext->result.storage = result.storage;
       break;
     case AsyncTask::ChannelFragment::ChannelPollStatus::Error:
-      waitingTaskContext->result.hadErrorResult = true;
       waitingTaskContext->result.storage =
         reinterpret_cast<OpaqueValue *>(result.storage);
       break;

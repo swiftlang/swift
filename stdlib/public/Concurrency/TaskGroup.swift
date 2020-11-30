@@ -13,6 +13,8 @@
 import Swift
 import Dispatch
 @_implementationOnly import _SwiftConcurrencyShims
+import Darwin
+import Foundation
 
 // ==== Task Group -------------------------------------------------------------
 
@@ -185,16 +187,10 @@ extension Task {
     public mutating func next() async throws -> TaskResult? {
       // We reuse the taskFutureWait -> swift_task_future_wait since it seems to have special sauce,
       // but actually we
-      print("error: next[\(#line)]: invoked\n")
+      fputs("error: next[\(pthread_self()) :\(#line)]: invoked\n", stderr)
       let rawResult = await taskFutureWait(on: self.groupChannelTask)
 //      let rawResult = await taskChannelPoll(on: self.groupChannelTask) // TODO: consider if we can implement this way
-
-//      guard rawResult.storage == nil else {
-//        // Polling returned "no result", it means there is nothing to await on anymore
-//        // i.e. there are no more pending tasks / "we drained all tasks"
-//        print("\(#function): return nil")
-//        return nil
-//      }
+      fputs("error: next[\(pthread_self()) :\(#line)]: NEXT RESULT RAW: \(rawResult)\n", stderr)
 
       if rawResult.hadErrorResult {
         // Throw the result on error.
@@ -202,11 +198,18 @@ extension Task {
         throw unsafeBitCast(rawResult.storage, to: Error.self)
       }
 
-      // Take the value on success
       print("error: next[\(#line)]: after await, result: \(rawResult)");
+
+      guard let storage = rawResult.storage else {
+        return nil
+      }
+
+      // Take the value on success
       let storagePtr =
-        rawResult.storage.bindMemory(to: Optional<TaskResult>.self, capacity: 1)
-      return UnsafeMutablePointer<Optional<TaskResult>>(mutating: storagePtr).pointee
+        storage.bindMemory(to: Optional<TaskResult>.self, capacity: 1)
+      let value = UnsafeMutablePointer<Optional<TaskResult>>(mutating: storagePtr).pointee
+      fputs("error: next[\(pthread_self()) :\(#line)]: NEXT RESULT: \(value)\n", stderr)
+      return value
     }
 
     /// Query whether the group has any remaining tasks.
@@ -246,10 +249,6 @@ extension Task {
 struct RawChannelPollResult {
   let status: ChannelPollStatus
   let storage: UnsafeRawPointer
-
-  var hadAnyResult: Bool {
-    status != .waiting
-  }
 }
 
 enum ChannelPollStatus: Int {

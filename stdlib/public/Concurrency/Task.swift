@@ -415,7 +415,7 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
 
 struct RawTaskFutureWaitResult {
   let hadErrorResult: Bool
-  let storage: UnsafeRawPointer
+  let storage: UnsafeRawPointer?
 }
 
 @_silgen_name("swift_task_future_wait")

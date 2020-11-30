@@ -218,6 +218,9 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 
   // Offer the future to the parent task group's channel.
   if (task->isGroupChild()) {
+    auto futureContext = static_cast<FutureAsyncContext *>(context);
+    fprintf(stderr, "error: completeTask[%d :%d]: complete group child: %d\n", pthread_self(), __LINE__,
+            task->futureFragment()->getStoragePtr());
     // then we must offer into the parent group's channel that we completed,
     // so it may `next()` poll completed child tasks in completion order.
     auto parent = task->childFragment()->getParent();

@@ -53,21 +53,21 @@ func test_sum_nextOnCompleted() {
 
       var sum = 0
       do {
-//        while let r = await try group.next() { // FIXME: unlock it working on while
+        while let r = await try group.next() { // FIXME: unlock it working on while
+          print("next: \(r)")
+          sum += r
+          print("sum: \(sum)")
+        }
+//        if let r = await try group.next() {
 //          print("next: \(r)")
 //          sum += r
 //          print("sum: \(sum)")
 //        }
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-          print("sum: \(sum)")
-        }
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-          print("sum: \(sum)")
-        }
+//        if let r = await try group.next() {
+//          print("next: \(r)")
+//          sum += r
+//          print("sum: \(sum)")
+//        }
       } catch {
         print("ERROR: \(error)")
       }

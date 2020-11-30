@@ -20,17 +20,6 @@ extension DispatchQueue {
   }
 }
 
-@available(*, deprecated, message: "This is a temporary hack")
-@discardableResult
-func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
-  let handle = Task.runDetached(operation: operation)
-
-  // Run the task
-  DispatchQueue.global(priority: .default).async { handle.run() }
-
-  return handle
-}
-
 func asyncInt() async -> Int {
   42
 }
@@ -41,30 +30,34 @@ func asyncInt() async -> Int {
 func test_taskGroup_isEmpty() {
   // CHECK: main task
 
-  let taskHandle = launch { () async -> Int in
+  let taskHandle = DispatchQueue.main.async { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
       // CHECK: before add: isEmpty=true
       print("before add: isEmpty=\(group.isEmpty)")
 
-//      await group.add {
-//        print("inside run")
-//        defer { print("completed run") }
-//        sleep(2)
-//        return await asyncInt()
-//      }
-//      // TODO: CH ECK: after add: isEmpty=false
-//      print("after add: isEmpty=\(group.isEmpty)")
+      await group.add {
+        sleep(2)
+        return await asyncInt()
+      }
+
+      // CHECK: while add running, outside: isEmpty=false
+      // CHECK: inside add: isEmpty=false
+      print("while add running, outside: isEmpty=\(group.isEmpty)")
+
+      while let value = await try! group.next() {
+        print("next: \(value)")
+        sleep(1)
+      }
+
+      // CHECK: after draining tasks: isEmpty=true
+      print("after draining tasks: isEmpty=\(group.isEmpty)")
 
       return 0
     }
   }
 
-  launch { () async in
-    _ = await try! taskHandle.get()
-    exit(0)
-  }
-
   print("main task")
+  sleep(10)
 }
 
 test_taskGroup_isEmpty()

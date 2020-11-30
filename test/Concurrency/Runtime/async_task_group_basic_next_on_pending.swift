@@ -5,6 +5,7 @@
 // REQUIRES: CPU=x86_64
 
 import Dispatch
+import Darwin
 
 // ==== ------------------------------------------------------------------------
 // MARK: "Infrastructure" for the tests
@@ -38,6 +39,7 @@ func completeSlowly(n: Int) async -> Int {
   print("start group.add { \(n) }")
   sleep(1)
   print("complete group.add { \(n) }")
+  fputs("error: complete group.add { \(n) }\n", stderr)
   return n
 }
 
@@ -53,44 +55,11 @@ func test_sum_nextOnPending() {
       }
 
       var sum = 0
-      do {
+      print("before group.next(), sum: \(sum)")
+      while let r = await try! group.next() {
+        print("next: \(r)")
+        sum += r
         print("before group.next(), sum: \(sum)")
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-        }
-
-        print("before group.next(), sum: \(sum)")
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-        }
-
-        print("before group.next(), sum: \(sum)")
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-        }
-
-        print("before group.next(), sum: \(sum)")
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-        }
-
-        print("before group.next(), sum: \(sum)")
-        if let r = await try group.next() {
-          print("next: \(r)")
-          sum += r
-        }
-
-//        print("before group.next(), sum: \(sum)")
-//        if let r = await try group.next() {
-//          print("next: \(r)")
-//          sum += r
-//        }
-      } catch {
-        print("ERROR: \(error)")
       }
 
       print("task group returning: \(sum)")
