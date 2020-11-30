@@ -327,10 +327,9 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
-static FuncDecl *
-lookUpResumeContinuationIntrinsic(ASTContext &C,
-                                  Optional<FuncDecl*> &cache,
-                                  StringRef name) {
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
+                                            Optional<FuncDecl*> &cache,
+                                            StringRef name) {
   if (cache)
     return *cache;
   
@@ -356,21 +355,42 @@ lookUpResumeContinuationIntrinsic(ASTContext &C,
 }
 
 FuncDecl *
+SILGenModule::getRunChildTask() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunChildTask,
+                                    "_runChildTask");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGet,
+                                    "_taskFutureGet");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGetThrowing,
+                                    "_taskFutureGetThrowing");
+}
+
+FuncDecl *
 SILGenModule::getResumeUnsafeContinuation() {
-  return lookUpResumeContinuationIntrinsic(getASTContext(),
-                                           ResumeUnsafeContinuation,
-                                           "_resumeUnsafeContinuation");
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeContinuation,
+                                    "_resumeUnsafeContinuation");
 }
 FuncDecl *
 SILGenModule::getResumeUnsafeThrowingContinuation() {
-  return lookUpResumeContinuationIntrinsic(getASTContext(),
-                                           ResumeUnsafeThrowingContinuation,
-                                           "_resumeUnsafeThrowingContinuation");
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuation,
+                                    "_resumeUnsafeThrowingContinuation");
 }
 FuncDecl *
 SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
-  return lookUpResumeContinuationIntrinsic(getASTContext(),
-                                 ResumeUnsafeThrowingContinuationWithError,
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuationWithError,
                                  "_resumeUnsafeThrowingContinuationWithError");
 }
 
