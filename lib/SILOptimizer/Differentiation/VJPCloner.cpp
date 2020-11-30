@@ -1019,7 +1019,14 @@ bool VJPCloner::Implementation::run() {
   return errorOccurred;
 }
 
-bool VJPCloner::run() { return impl.run(); }
+bool VJPCloner::run() {
+  bool foundError = impl.run();
+#ifndef NDEBUG
+  if (!foundError)
+    getVJP().verify();
+#endif
+  return foundError;
+}
 
 } // end namespace autodiff
 } // end namespace swift

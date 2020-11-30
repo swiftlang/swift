@@ -31,6 +31,9 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
+using namespace swift;
+using namespace autodiff;
+
 namespace swift {
 namespace autodiff {
 
@@ -379,6 +382,8 @@ public:
 
   /// Run JVP generation. Returns true on error.
   bool run();
+
+  SILFunction &getJVP() const { return *jvp; }
 
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
     if (errorOccurred)
@@ -1727,7 +1732,16 @@ bool JVPCloner::Implementation::run() {
   return errorOccurred;
 }
 
-bool JVPCloner::run() { return impl.run(); }
-
 } // end namespace autodiff
 } // end namespace swift
+
+bool JVPCloner::run() {
+  bool foundError = impl.run();
+#ifndef NDEBUG
+  if (!foundError)
+    getJVP().verify();
+#endif
+  return foundError;
+}
+
+SILFunction &JVPCloner::getJVP() const { return impl.getJVP(); }
