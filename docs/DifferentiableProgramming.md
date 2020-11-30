@@ -1271,6 +1271,12 @@ The synthesized `TangentVector` has the same effective access level as the
 original type declaration. Properties in the synthesized `TangentVector` have
 the same effective access level as their corresponding original properties.
 
+The synthesized `TangentVector` adopts protocols from all `TangentVector`
+conformance constraints implied by the declaration that triggers synthesis. For
+example, synthesized `TangentVector`s always adopt the `AdditiveArithmetic` and
+`Differentiable` protocols because the `Differentiable` protocol requires that
+`TangentVector` conforms to `AdditiveArithmetic` and `Differentiable`.
+
 The synthesized `move(along:)` method calls `move(along:)` for each pair of a
 differentiable variable and its corresponding property in `TangentVector`.
 
