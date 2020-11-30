@@ -286,6 +286,8 @@ function(_add_host_variant_c_compile_flags target)
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
     if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
+      # The -mcx16 flag gives us 16-byte cas and provides support
+      # for machines with older processors 
       target_compile_options(${target} PRIVATE -mcx16)
     endif()
   endif()

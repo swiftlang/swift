@@ -308,6 +308,8 @@ function(_add_target_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
+      # The -mcx16 flag gives us 16-byte cas and provides support
+      # for machines with older processors
       list(APPEND result "-mcx16")
     endif()
   endif()
