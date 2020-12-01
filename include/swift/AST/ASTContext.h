@@ -713,6 +713,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the runtime availability of support for differentiation.
+  AvailabilityContext getDifferentiationAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();

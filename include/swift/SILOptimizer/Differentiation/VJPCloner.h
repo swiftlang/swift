@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+#include "swift/SIL/LoopInfo.h"
 
 namespace swift {
 namespace autodiff {
@@ -52,6 +53,7 @@ public:
   const SILAutoDiffIndices getIndices() const;
   DifferentiationInvoker getInvoker() const;
   LinearMapInfo &getPullbackInfo() const;
+  SILLoopInfo *getLoopInfo() const;
   const DifferentiableActivityInfo &getActivityInfo() const;
 
   /// Performs VJP generation on the empty VJP function. Returns true if any

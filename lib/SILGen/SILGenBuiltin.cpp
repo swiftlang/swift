@@ -1462,6 +1462,48 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
+static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
+      SILType::getNativeObjectType(ctx),
+      subs,
+      /*args*/ {args[0].getValue()});
+  return SGF.emitManagedRValueWithCleanup(builtinApply);
+}
+
+static ManagedValue emitBuiltinAutoDiffProjectTopLevelSubcontext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext)),
+      SILType::getRawPointerType(ctx),
+      subs,
+      /*args*/ {args[0].borrow(SGF, loc).getValue()});
+  return ManagedValue::forUnmanaged(builtinApply);
+}
+
+static ManagedValue emitBuiltinAutoDiffAllocateSubcontext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+      SILType::getRawPointerType(ctx),
+      subs,
+      /*args*/ {args[0].borrow(SGF, loc).getValue(), args[1].getValue()});
+  return ManagedValue::forUnmanaged(builtinApply);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

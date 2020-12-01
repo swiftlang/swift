@@ -653,9 +653,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           .fixItInsert(DRE->getStartLoc(), "self.");
       }
 
-      DeclContext *topLevelContext = DC->getModuleScopeContext();
+      DeclContext *topLevelSubcontext = DC->getModuleScopeContext();
       auto descriptor = UnqualifiedLookupDescriptor(
-          DeclNameRef(VD->getBaseName()), topLevelContext, SourceLoc());
+          DeclNameRef(VD->getBaseName()), topLevelSubcontext, SourceLoc());
       auto lookup = evaluateOrDefault(Ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
 

@@ -432,6 +432,13 @@ namespace irgen {
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        CanSILFunctionType fnType);
+
+  Address emitAutoDiffCreateLinearMapContext(
+      IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);
+  Address emitAutoDiffProjectTopLevelSubcontext(
+      IRGenFunction &IGF, Address context);
+  Address emitAutoDiffAllocateSubcontext(
+      IRGenFunction &IGF, Address context, llvm::Value *size);
 } // end namespace irgen
 } // end namespace swift
 
