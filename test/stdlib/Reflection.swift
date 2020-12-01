@@ -118,7 +118,7 @@ print("Fooable double:")
 fooable = 2.5
 dump(fooable)
 
-protocol Barrable : class {}
+protocol Barrable : AnyObject {}
 extension Best: Barrable {}
 
 // CHECK-LABEL: Barrable class:

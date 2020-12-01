@@ -331,25 +331,60 @@ static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
 }
 
+void IRGenFunction::setupAsync() {
+  llvm::Value *t = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
+  asyncTaskLocation = createAlloca(t->getType(), IGM.getPointerAlignment());
+  Builder.CreateStore(t, asyncTaskLocation);
+
+  llvm::Value *e = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
+  asyncExecutorLocation = createAlloca(e->getType(), IGM.getPointerAlignment());
+  Builder.CreateStore(e, asyncExecutorLocation);
+
+  llvm::Value *c = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
+  asyncContextLocation = createAlloca(c->getType(), IGM.getPointerAlignment());
+  Builder.CreateStore(c, asyncContextLocation);
+}
+
 llvm::Value *IRGenFunction::getAsyncTask() {
   assert(isAsync());
-  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
-  assert(value->getType() == IGM.SwiftTaskPtrTy);
-  return value;
+  return Builder.CreateLoad(asyncTaskLocation);
 }
 
 llvm::Value *IRGenFunction::getAsyncExecutor() {
   assert(isAsync());
-  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
-  assert(value->getType() == IGM.SwiftExecutorPtrTy);
-  return value;
+  return Builder.CreateLoad(asyncExecutorLocation);
 }
 
 llvm::Value *IRGenFunction::getAsyncContext() {
   assert(isAsync());
-  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
-  assert(value->getType() == IGM.SwiftContextPtrTy);
-  return value;
+  return Builder.CreateLoad(asyncContextLocation);
+}
+
+llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args) {
+  auto *id =
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async, args);
+
+  // Update the current values of task, executor and context.
+
+  auto *rawTask = Builder.CreateExtractValue(id,
+      (unsigned)AsyncFunctionArgumentIndex::Task);
+  auto *task = Builder.CreateBitCast(rawTask, IGM.SwiftTaskPtrTy);
+  Builder.CreateStore(task, asyncTaskLocation);
+
+  auto *rawExecutor = Builder.CreateExtractValue(id,
+      (unsigned)AsyncFunctionArgumentIndex::Executor);
+  auto *executor = Builder.CreateBitCast(rawExecutor, IGM.SwiftExecutorPtrTy);
+  Builder.CreateStore(executor, asyncExecutorLocation);
+
+  auto *calleeContext = Builder.CreateExtractValue(id,
+      (unsigned)AsyncFunctionArgumentIndex::Context);
+  llvm::Constant *projectFn = cast<llvm::Constant>(args[1])->stripPointerCasts();
+  // Get the caller context from the calle context.
+  llvm::Value *context = Builder.CreateCall(projectFn, {calleeContext});
+  context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
+  Builder.CreateStore(context, asyncContextLocation);
+
+  return id;
 }
 
 llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
@@ -2429,9 +2464,7 @@ public:
         Builder.CreateBitOrPointerCast(fn.getRawPointer(), IGM.Int8PtrTy));
     for (auto arg: args)
       arguments.push_back(arg);
-    auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
-                                           arguments);
-    return id;
+    return IGF.emitSuspendAsyncCall(arguments);
   }
 };
 

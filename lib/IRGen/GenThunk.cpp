@@ -144,7 +144,8 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   }
 
   IRGenFunction IGF(*this, f);
-  IGF.setAsync(declRef.getAbstractFunctionDecl()->hasAsync());
+  if (declRef.getAbstractFunctionDecl()->hasAsync())
+    IGF.setupAsync();
 
   // Look up the method.
   auto fn = lookupMethod(IGF, declRef);

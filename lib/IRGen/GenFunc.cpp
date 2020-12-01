@@ -1332,7 +1332,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
-  subIGF.setAsync(origType->isAsync());
+  if (origType->isAsync())
+    subIGF.setupAsync();
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
 
