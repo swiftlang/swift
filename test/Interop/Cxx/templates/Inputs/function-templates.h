@@ -69,4 +69,19 @@ void cassini(T, U) { }
 template<class T>
 void magellan(T&) { }
 
-}
+} // namespace Orbiters
+
+// We can't import these (and may never be able to in the case of "_Atomic"),
+// but don't crash while trying.
+namespace Unimportable {
+
+template <class> struct Dependent {};
+template <class T> void takesDependent(Dependent<T> d) {}
+
+void takesAtomic(_Atomic(int) a) {}
+
+struct HasImposibleMember {
+  void memberTakesAtomic(_Atomic(int) a) {}
+};
+
+} // namespace Unimportable
