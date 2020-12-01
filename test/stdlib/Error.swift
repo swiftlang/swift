@@ -122,7 +122,7 @@ ErrorTests.test("try!/location")
   .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration()
-                        ? "main/Error.swift, line 128"
+                        ? "main/Error.swift:128"
                         : "")
   .code {
     expectCrashLater()

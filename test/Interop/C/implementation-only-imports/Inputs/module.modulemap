@@ -1,9 +1,9 @@
 module UserA {
-    header "user_a.h"
+    header "user-a.h"
     export *
 }
 
 module UserB {
-    header "user_b.h"
+    header "user-b.h"
     export *
 }

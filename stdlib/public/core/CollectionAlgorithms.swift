@@ -401,35 +401,30 @@ extension MutableCollection where Self: BidirectionalCollection {
   ) rethrows -> Index {
     var lo = startIndex
     var hi = endIndex
+    while true {
+      // Invariants at this point:
+      //
+      // * `lo <= hi`
+      // * all elements in `startIndex ..< lo` belong in the first partition
+      // * all elements in `hi ..< endIndex` belong in the second partition
 
-    // 'Loop' invariants (at start of Loop, all are true):
-    // * lo < hi
-    // * predicate(self[i]) == false, for i in startIndex ..< lo
-    // * predicate(self[i]) == true, for i in hi ..< endIndex
+      // Find next element from `lo` that may not be in the right place.
+      while true {
+        guard lo < hi else { return lo }
+        if try belongsInSecondPartition(self[lo]) { break }
+        formIndex(after: &lo)
+      }
 
-    Loop: while true {
-      FindLo: repeat {
-        while lo < hi {
-          if try belongsInSecondPartition(self[lo]) { break FindLo }
-          formIndex(after: &lo)
-        }
-        break Loop
-      } while false
-
-      FindHi: repeat {
+      // Find next element down from `hi` that we can swap `lo` with.
+      while true {
         formIndex(before: &hi)
-        while lo < hi {
-          if try !belongsInSecondPartition(self[hi]) { break FindHi }
-          formIndex(before: &hi)
-        }
-        break Loop
-      } while false
+        guard lo < hi else { return lo }
+        if try !belongsInSecondPartition(self[hi]) { break }
+      }
 
       swapAt(lo, hi)
       formIndex(after: &lo)
     }
-
-    return lo
   }
 }
 

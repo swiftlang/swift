@@ -161,31 +161,33 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-void BorrowingOperand::visitLocalEndScopeInstructions(
-    function_ref<void(Operand *)> func) const {
+bool BorrowingOperand::visitLocalEndScopeUses(
+    function_ref<bool(Operand *)> func) const {
   switch (kind) {
   case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
-        func(use);
+        if (!func(use))
+          return false;
       }
     }
-    return;
+    return true;
   case BorrowingOperandKind::BeginApply: {
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
-      func(use);
+      if (!func(use))
+        return false;
     }
-    return;
+    return true;
   }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
   case BorrowingOperandKind::Apply:
   case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::Yield:
-    return;
+    return true;
   case BorrowingOperandKind::Branch:
-    return;
+    return true;
   }
 }
 
@@ -267,7 +269,10 @@ void BorrowingOperand::visitUserResultConsumingUses(
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitLocalEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
+  visitLocalEndScopeUses([&](Operand *op) {
+    foundUses.push_back(op);
+    return true;
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -842,7 +847,7 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
 }
 
 ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
-  return getUser()->getOwnershipKind();
+  return (*this)->getOwnershipKind();
 }
 
 void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
@@ -967,4 +972,46 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
     return;
   }
   llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+}
+
+SILValue ForwardingOperand::getSingleForwardedValue() const {
+  assert(isGuaranteedForwardingUse(use));
+  if (auto *svi = dyn_cast<SingleValueInstruction>(use->getUser()))
+    return svi;
+  return SILValue();
+}
+
+bool ForwardingOperand::visitForwardedValues(
+    function_ref<bool(SILValue)> visitor) {
+  auto *user = use->getUser();
+
+  assert(isGuaranteedForwardingUse(use));
+
+  // See if we have a single value instruction... if we do that is always the
+  // transitive result.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+    return visitor(svi);
+  }
+
+  if (auto *mvri = dyn_cast<MultipleValueInstruction>(user)) {
+    return llvm::all_of(mvri->getResults(), [&](SILValue value) {
+      if (value.getOwnershipKind() == OwnershipKind::None)
+        return true;
+      return visitor(value);
+    });
+  }
+
+  // This is an instruction like switch_enum and checked_cast_br that are
+  // "transforming terminators"... We know that this means that we should at
+  // most have a single phi argument.
+  auto *ti = cast<TermInst>(user);
+  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+    // If we do not have any arguments, then continue.
+    if (succBlock->args_empty())
+      return true;
+
+    auto args = succBlock->getSILPhiArguments();
+    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
+    return visitor(args[0]);
+  });
 }

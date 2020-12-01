@@ -1805,6 +1805,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskFuture:
+    case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+    case BuiltinValueKind::AutoDiffAllocateSubcontext:
       return;
 
     // General memory access to a pointer in first operand position.
@@ -1980,6 +1982,10 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::ValueMetatypeInst:
+  // TODO: Is this correct?
+  case SILInstructionKind::GetAsyncContinuationInst:
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+  case SILInstructionKind::AwaitAsyncContinuationInst:
     return;
   }
 }

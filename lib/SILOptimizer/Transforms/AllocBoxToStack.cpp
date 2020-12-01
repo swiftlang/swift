@@ -818,28 +818,33 @@ PromotedParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
   SILCloner<PromotedParamCloner>::visitStrongRetainInst(Inst);
 }
 
-void PromotedParamCloner::visitCopyValueInst(CopyValueInst *CVI) {
+void PromotedParamCloner::visitCopyValueInst(CopyValueInst *cvi) {
   // If it's a copy of a promoted parameter, just drop the instruction.
-  auto *Tmp = CVI;
-  while (auto *CopyOp = dyn_cast<CopyValueInst>(Tmp->getOperand())) {
-    Tmp = CopyOp;
+  auto *tmp = cvi;
+  while (auto *copyOp = dyn_cast<CopyValueInst>(tmp->getOperand())) {
+    tmp = copyOp;
   }
-  if (OrigPromotedParameters.count(Tmp->getOperand()))
+  if (OrigPromotedParameters.count(tmp->getOperand()))
     return;
 
-  SILCloner<PromotedParamCloner>::visitCopyValueInst(CVI);
+  SILCloner<PromotedParamCloner>::visitCopyValueInst(cvi);
 }
 
-void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
-  // If it's a projection of a promoted parameter, drop the instruction.
-  // Its uses will be replaced by the promoted address.
-  if (OrigPromotedParameters.count(Inst->getOperand())) {
-    auto *origArg = cast<SILFunctionArgument>(Inst->getOperand());
-    recordFoldedValue(Inst, NewPromotedArgs[origArg->getIndex()]);
+void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *pbi) {
+  // If it's a projection of a promoted parameter (or a copy_value of a promoted
+  // parameter), drop the instruction.  Its uses will be replaced by the
+  // promoted address.
+  SILValue box = pbi->getOperand();
+  while (auto *copyOp = dyn_cast<CopyValueInst>(box)) {
+    box = copyOp->getOperand();
+  }
+  if (OrigPromotedParameters.count(box)) {
+    auto *origArg = cast<SILFunctionArgument>(box);
+    recordFoldedValue(pbi, NewPromotedArgs[origArg->getIndex()]);
     return;
   }
 
-  SILCloner<PromotedParamCloner>::visitProjectBoxInst(Inst);
+  SILCloner<PromotedParamCloner>::visitProjectBoxInst(pbi);
 }
 
 // While cloning during specialization, make sure apply instructions do not have

@@ -1446,7 +1446,8 @@ namespace {
         // Get the address of the storage property.
         ManagedValue proj;
         if (!BaseFormalType) {
-          proj = SGF.maybeEmitValueOfLocalVarDecl(backingVar);
+          proj = SGF.maybeEmitValueOfLocalVarDecl(
+              backingVar, AccessKind::Write);
         } else if (BaseFormalType->mayHaveSuperclass()) {
           RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
                                   typeData);
@@ -2666,6 +2667,24 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
   return lv;
 }
 
+/// Map a SILGen access kind back to an AST access kind.
+static AccessKind mapAccessKind(SGFAccessKind accessKind) {
+  switch (accessKind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+    return AccessKind::Read;
+
+  case SGFAccessKind::Write:
+    return AccessKind::Write;
+
+  case SGFAccessKind::ReadWrite:
+    return AccessKind::ReadWrite;
+  }
+}
+
 void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                       VarDecl *var,
                                       SubstitutionMap subs,
@@ -2730,7 +2749,8 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       // address.
 
       // Check for a local (possibly captured) variable.
-      auto address = SGF.maybeEmitValueOfLocalVarDecl(Storage);
+      auto astAccessKind = mapAccessKind(this->AccessKind);
+      auto address = SGF.maybeEmitValueOfLocalVarDecl(Storage, astAccessKind);
 
       // The only other case that should get here is a global variable.
       if (!address) {
@@ -2765,10 +2785,20 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 }
 
 ManagedValue
-SILGenFunction::maybeEmitValueOfLocalVarDecl(VarDecl *var) {
+SILGenFunction::maybeEmitValueOfLocalVarDecl(
+    VarDecl *var, AccessKind accessKind) {
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
   if (It != VarLocs.end()) {
+    // If the variable is part of an async let, ensure that the child task
+    // has completed first.
+    if (var->isAsyncLet() && accessKind != AccessKind::Write) {
+      auto patternBinding = var->getParentPatternBinding();
+      unsigned index = patternBinding->getPatternEntryIndexForVarDecl(var);
+      completeAsyncLetChildTask(patternBinding, index);
+    }
+
+
     // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;
     if (ptr->getType().isAddress())
@@ -2791,7 +2821,8 @@ SILGenFunction::emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
                                           SGFAccessKind accessKind) {
   assert(var->getDeclContext()->isLocalContext());
   assert(var->getImplInfo().isSimpleStored());
-  auto address = maybeEmitValueOfLocalVarDecl(var);
+  AccessKind astAccessKind = mapAccessKind(accessKind);
+  auto address = maybeEmitValueOfLocalVarDecl(var, astAccessKind);
   assert(address);
   assert(address.isLValue());
   return address;
@@ -2806,7 +2837,7 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   auto *var = cast<VarDecl>(declRef.getDecl());
-  auto localValue = maybeEmitValueOfLocalVarDecl(var);
+  auto localValue = maybeEmitValueOfLocalVarDecl(var, AccessKind::Read);
 
   // If this VarDecl is represented as an address, emit it as an lvalue, then
   // perform a load to get the rvalue.

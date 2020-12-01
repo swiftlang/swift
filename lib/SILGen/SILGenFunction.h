@@ -397,7 +397,14 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
- 
+
+  /// Mapping from each async let clause to the child task that will produce
+  /// the initializer value for that clause and a Boolean value indicating
+  /// whether the task can throw.
+  llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
+                      std::pair<SILValue, bool /*isThrowing*/> >
+      AsyncLetChildTasks;
+
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
   /// because of assumptions in framework code. This enum tracks the state of
@@ -616,6 +623,8 @@ public:
   
   /// Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
+  /// Generate code for @asyncHandler functions.
+  void emitAsyncHandler(FuncDecl *fd);
   /// Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
@@ -1257,7 +1266,8 @@ public:
                                          SGFAccessKind accessKind);
 
   // FIXME: demote this to private state.
-  ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
+  ManagedValue maybeEmitValueOfLocalVarDecl(
+      VarDecl *var, AccessKind accessKind);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
@@ -1320,6 +1330,14 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
+
+  ManagedValue emitRunChildTask(
+      SILLocation loc, Type functionType, ManagedValue taskFunction);
+
+  ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
+
+  void completeAsyncLetChildTask(
+      PatternBindingDecl *patternBinding, unsigned index);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -1466,6 +1484,12 @@ public:
                                 LValue &&src, LValue &&dest);
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
+
+  /// Emit an assignment to the variables in the destination pattern, given
+  /// an rvalue source that has the same type as the pattern.
+  void emitAssignToPatternVars(
+      SILLocation loc, Pattern *destPattern, RValue &&src);
+
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
@@ -2025,6 +2049,9 @@ public:
                                               SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
+
+  /// Enter a cleanup to cancel the given task.
+  CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,

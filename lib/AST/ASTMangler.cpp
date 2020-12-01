@@ -88,7 +88,7 @@ std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
 
 std::string ASTMangler::mangleEntity(const ValueDecl *decl, SymbolKind SKind) {
   beginMangling();
-  appendEntity(decl);
+  appendEntity(decl, SKind == SymbolKind::AsyncHandlerBody);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -657,7 +657,7 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   Ty = getTypeForDWARFMangling(Ty);
 
   if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
-    appendFunction(fnType, false);
+    appendFunction(fnType);
   } else {
     appendType(Ty);
   }
@@ -744,6 +744,7 @@ std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
+    case SymbolKind::AsyncHandlerBody: return;
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
@@ -785,8 +786,8 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
-  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-  auto fileUnit = cast<FileUnit>(topLevelContext);
+  auto topLevelSubcontext = decl->getDeclContext()->getModuleScopeContext();
+  auto fileUnit = cast<FileUnit>(topLevelSubcontext);
 
   Identifier discriminator =
       fileUnit->getDiscriminatorForPrivateValue(decl);
@@ -2249,7 +2250,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     addSubstitution(cast<TypeAliasDecl>(decl));
 }
 
-void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling,
+void ASTMangler::appendFunction(AnyFunctionType *fn,
+                                FunctionManglingKind functionMangling,
                                 const ValueDecl *forDecl) {
   // Append parameter labels right before the signature/type.
   auto parameters = fn->getParams();
@@ -2269,8 +2271,8 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling,
     appendOperator("y");
   }
 
-  if (isFunctionMangling) {
-    appendFunctionSignature(fn, forDecl);
+  if (functionMangling != NoFunctionMangling) {
+    appendFunctionSignature(fn, forDecl, functionMangling);
   } else {
     appendFunctionType(fn, /*autoclosure*/ false, forDecl);
   }
@@ -2281,7 +2283,7 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
-  appendFunctionSignature(fn, forDecl);
+  appendFunctionSignature(fn, forDecl, NoFunctionMangling);
 
   bool mangleClangType = fn->getASTContext().LangOpts.UseClangFunctionTypes &&
                          fn->hasNonDerivableClangType();
@@ -2359,10 +2361,11 @@ void ASTMangler::appendClangType(AnyFunctionType *fn) {
 }
 
 void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
-                                         const ValueDecl *forDecl) {
+                                        const ValueDecl *forDecl,
+                                        FunctionManglingKind functionMangling) {
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
-  if (fn->isAsync())
+  if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
     appendOperator("Y");
   if (fn->isThrowing())
     appendOperator("K");
@@ -2780,14 +2783,15 @@ CanType ASTMangler::getDeclTypeForMangling(
   return canTy;
 }
 
-void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) {
+void ASTMangler::appendDeclType(const ValueDecl *decl,
+                                FunctionManglingKind functionMangling) {
   Mod = decl->getModuleContext();
   GenericSignature genericSig;
   GenericSignature parentGenericSig;
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    appendFunction(FuncTy, isFunctionMangling, decl);
+    appendFunction(FuncTy, functionMangling, decl);
   } else {
     appendType(type, decl);
   }
@@ -2795,7 +2799,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   // Mangle the generic signature, if any.
   if (genericSig && appendGenericSignature(genericSig, parentGenericSig)) {
     // The 'F' function mangling doesn't need a 'u' for its generic signature.
-    if (!isFunctionMangling)
+    if (functionMangling == NoFunctionMangling)
       appendOperator("u");
   }
 }
@@ -2870,7 +2874,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl, StringRef EntityOp,
     appendOperator("Z");
 }
 
-void ASTMangler::appendEntity(const ValueDecl *decl) {
+void ASTMangler::appendEntity(const ValueDecl *decl, bool isAsyncHandlerBody) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
   
@@ -2891,7 +2895,8 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
   appendContextOf(decl);
   appendDeclName(decl);
-  appendDeclType(decl, /*isFunctionMangling*/ true);
+  appendDeclType(decl, isAsyncHandlerBody ? AsyncHandlerBodyMangling
+                                          : FunctionMangling);
   appendOperator("F");
   if (decl->isStatic())
     appendOperator("Z");
@@ -2900,9 +2905,9 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 void
 ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
   GenericSignature contextSig;
-  auto topLevelContext =
+  auto topLevelSubcontext =
       conformance->getDeclContext()->getModuleScopeContext();
-  Mod = topLevelContext->getParentModule();
+  Mod = topLevelSubcontext->getParentModule();
 
   auto conformingType = conformance->getType();
   appendType(conformingType->getCanonicalType());
@@ -2910,7 +2915,7 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
   appendProtocolName(conformance->getProtocol());
 
   bool needsModule = true;
-  if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
+  if (auto *file = dyn_cast<FileUnit>(topLevelSubcontext)) {
     if (file->getKind() == FileUnitKind::ClangModule ||
         file->getKind() == FileUnitKind::DWARFModule) {
       if (conformance->getProtocol()->hasClangNode())

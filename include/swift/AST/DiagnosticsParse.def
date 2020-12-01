@@ -1567,6 +1567,9 @@ ERROR(attr_specialize_missing_comma,none,
 ERROR(attr_specialize_unknown_parameter_name,none,
       "unknown parameter %0 in '_specialize attribute'", (StringRef))
 
+ERROR(attr_specialize_unsupported_exported_true ,none,
+      "'exported: true' has no effect in '_specialize' attribute", (StringRef))
+
 ERROR(attr_specialize_expected_bool_value,none,
       "expected a boolean true or false value in '_specialize' attribute", ())
 

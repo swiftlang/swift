@@ -36,3 +36,12 @@ if(SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(SwiftReflectionTest)
   endif()
 endif()
+
+# Keep in sync with stdlib/tools/CMakeLists.txt: swift-reflection-test is
+# only used when testing dynamic stdlib.
+if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
+  # NOTE create a stub BlocksRuntime library that can be used for the
+  # reflection tests
+  add_subdirectory(BlocksRuntimeStubs)
+endif()
+
