@@ -92,9 +92,6 @@ actor class Actor5<T> {
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   Tests.test("base generic class crash when set assoc object")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-      "actor generic class isa initialization: rdar://70589739"))
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
     expectCrashLater()
@@ -118,9 +115,6 @@ class Actor6<T> : Actor5<T> {
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   Tests.test("sub-generic class base generic class crash when set assoc object")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-      "actor generic class isa initialization: rdar://70589739"))
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
     expectCrashLater()
@@ -136,9 +130,6 @@ final class Actor6Final<T> : Actor5<T> {
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   Tests.test("final sub-generic class base generic class crash when set assoc object")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-      "actor generic class isa initialization: rdar://70589739"))
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
     expectCrashLater()
@@ -147,9 +138,6 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 
   Tests.test("final sub-generic class base generic class crash when set assoc object2")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-      "actor generic class isa initialization: rdar://70589739"))
   .code {
     let x = Actor6Final(state: 5)
     print(type(of: x))

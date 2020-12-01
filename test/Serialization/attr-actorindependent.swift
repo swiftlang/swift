@@ -18,7 +18,6 @@
 // MODULE-CHECK-NEXT:   @actorIndependent var count: Int
 // MODULE-CHECK-NEXT:   var actorCount: Int
 // MODULE-CHECK-NEXT:   @actorIndependent(unsafe) func enqueue(partialTask: PartialAsyncTask)
-// MODULE-CHECK-NEXT:   var $__actor_storage: _DefaultActorQueue
 // MODULE-CHECK-NEXT:   init()
 // MODULE-CHECK-NEXT: }
 

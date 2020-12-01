@@ -118,6 +118,9 @@ enum class NominalTypeKind : uint32_t {
 /// The maximum supported type alignment.
 const size_t MaximumAlignment = 16;
 
+/// The alignment of a DefaultActor.
+const size_t Alignment_DefaultActor = MaximumAlignment;
+
 /// Flags stored in the value-witness table.
 template <typename int_type>
 class TargetValueWitnessFlags {

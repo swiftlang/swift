@@ -22,8 +22,9 @@
 
 namespace swift {
 
-/// The default actor implementation.
-class alignas(MaximumAlignment) DefaultActor : public HeapObject {
+/// The default actor implementation.  This is the layout of both
+/// the DefaultActor and NSDefaultActor classes.
+class alignas(Alignment_DefaultActor) DefaultActor : public HeapObject {
 public:
   // These constructors do not initialize the actor instance, and the
   // destructor does not destroy the actor instance; you must call
