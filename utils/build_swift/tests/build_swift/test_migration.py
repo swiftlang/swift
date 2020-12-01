@@ -18,6 +18,8 @@ from build_swift.constants import BUILD_SCRIPT_IMPL_PATH
 
 import six
 
+from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
+
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -25,7 +27,7 @@ import six
 def _get_sdk_targets(sdk_names):
     targets = []
     for sdk_name in sdk_names:
-        targets += migration._SDK_TARGETS[sdk_name]
+        targets += StdlibDeploymentTarget.get_migrated_targets_for_sdk(sdk_name)
 
     return targets
 
@@ -43,7 +45,7 @@ class TestMigrateSwiftSDKsMeta(type):
 
     def __new__(cls, name, bases, attrs):
         # Generate tests for migrating each Swift SDK
-        for sdk_name in migration._SDK_TARGETS.keys():
+        for sdk_name in StdlibDeploymentTarget.get_all_migrated_sdks():
             test_name = 'test_migrate_swift_sdk_{}'.format(sdk_name)
             attrs[test_name] = cls.generate_migrate_swift_sdks_test(sdk_name)
 
