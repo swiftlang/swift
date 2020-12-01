@@ -4529,7 +4529,7 @@ ERROR(differentiable_function_type_invalid_parameter,none,
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(linear)}1'"
       "%select{|; did you want to add '@noDerivative' to this parameter?}2",
-      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+      (StringRef, /*isLinear*/ bool,
        /*hasValidDifferentiabilityParameter*/ bool))
 ERROR(differentiable_function_type_invalid_result,none,
       "result type '%0' does not conform to 'Differentiable'"
@@ -4539,6 +4539,12 @@ ERROR(differentiable_function_type_invalid_result,none,
 ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())
+ERROR(differentiable_function_type_no_differentiability_parameters, 
+      none,
+      "'@differentiable' function type requires at least one differentiability "
+      "parameter, i.e. a non-'@noDerivative' parameter whose type conforms to "
+      "'Differentiable'%select{| with its 'TangentVector' equal to itself}0",
+      (/*isLinear*/ bool))
 
 // SIL
 ERROR(opened_non_protocol,none,
