@@ -393,6 +393,11 @@ SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
                                     ResumeUnsafeThrowingContinuationWithError,
                                  "_resumeUnsafeThrowingContinuationWithError");
 }
+FuncDecl *
+SILGenModule::getRunAsyncHandler() {
+  return lookupConcurrencyIntrinsic(getASTContext(), RunAsyncHandler,
+                                    "_runAsyncHandler");
+}
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)

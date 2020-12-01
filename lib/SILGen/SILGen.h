@@ -126,6 +126,7 @@ public:
   Optional<FuncDecl*> ResumeUnsafeContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
+  Optional<FuncDecl*> RunAsyncHandler;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -492,6 +493,8 @@ public:
   FuncDecl *getResumeUnsafeThrowingContinuation();
   /// Retrieve the _Concurrency._resumeUnsafeThrowingContinuationWithError intrinsic.
   FuncDecl *getResumeUnsafeThrowingContinuationWithError();
+  /// Retrieve the _Concurrency._runAsyncHandler intrinsic.
+  FuncDecl *getRunAsyncHandler();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);
