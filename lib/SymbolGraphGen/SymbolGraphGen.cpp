@@ -22,10 +22,21 @@ using namespace symbolgraphgen;
 namespace {
 int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
-  SmallString<256> FileName(SG.M.getNameStr());
-  if (SG.ExtendedModule.hasValue()) {
-    FileName.push_back('@');
-    FileName.append(SG.ExtendedModule.getValue()->getNameStr());
+  SmallString<256> FileName;
+  if (SG.DeclaringModule.hasValue()) {
+    // Save a cross-import overlay symbol graph as `MainModule@BystandingModule[@BystandingModule...].symbols.json`
+    FileName.append(SG.DeclaringModule.getValue()->getNameStr());
+    for (auto BystanderModule : SG.BystanderModules) {
+      FileName.push_back('@');
+      FileName.append(BystanderModule.str());
+    }
+  } else {
+    FileName.append(SG.M.getNameStr());
+    
+    if (SG.ExtendedModule.hasValue()) {
+      FileName.push_back('@');
+      FileName.append(SG.ExtendedModule.getValue()->getNameStr());
+    }
   }
   FileName.append(".symbols.json");
 
