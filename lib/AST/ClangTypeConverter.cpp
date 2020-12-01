@@ -564,8 +564,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   case StructKind::Invalid:
     return clang::QualType();
 
-  case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
+    return convert(argCanonicalTy);
+
+  case StructKind::UnsafeMutablePointer:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
     auto clangTy = convert(argCanonicalTy);
     if (clangTy.isNull())
