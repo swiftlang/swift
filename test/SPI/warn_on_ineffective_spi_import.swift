@@ -16,4 +16,4 @@
 // RUN: rm %t/SPIHelper.private.swiftinterface
 // RUN: %target-typecheck-verify-swift -I %t
 
-@_spi(SPIHelper) import SPIHelper // expected-warning {{importation of 'SPIHelper' has an ineffective '@_spi' attribute; it was built from the public interface at}}
+@_spi(SPIHelper) import SPIHelper // expected-warning {{'@_spi' import of 'SPIHelper' will not include any SPI symbols; 'SPIHelper' was built from the public interface at}}
