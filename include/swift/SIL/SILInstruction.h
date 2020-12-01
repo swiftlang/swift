@@ -5973,19 +5973,22 @@ VarDecl *getIndexedField(NominalTypeDecl *decl, unsigned index);
 /// because it would allow constant time lookup of either the VarDecl or the
 /// index from a single pointer without referring back to a projection
 /// instruction.
-class FieldIndexCacheBase : public SingleValueInstruction {
+template <typename ParentTy>
+class FieldIndexCacheBase : public ParentTy {
   enum : unsigned { InvalidFieldIndex = ~unsigned(0) };
 
   VarDecl *field;
 
 public:
+  template <typename... ArgTys>
   FieldIndexCacheBase(SILInstructionKind kind, SILDebugLocation loc,
-                      SILType type, VarDecl *field)
-      : SingleValueInstruction(kind, loc, type), field(field) {
+                      SILType type, VarDecl *field, ArgTys &&... extraArgs)
+      : ParentTy(kind, loc, type, std::forward<ArgTys>(extraArgs)...),
+        field(field) {
     SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = InvalidFieldIndex;
     // This needs to be a concrete class to hold bitfield information. However,
     // it should only be extended by UnaryInstructions.
-    assert(getNumOperands() == 1);
+    assert(ParentTy::getNumOperands() == 1);
   }
 
   VarDecl *getField() const { return field; }
@@ -5999,7 +6002,8 @@ public:
   }
 
   NominalTypeDecl *getParentDecl() const {
-    auto s = getOperand(0)->getType().getNominalOrBoundGenericNominal();
+    auto s =
+        ParentTy::getOperand(0)->getType().getNominalOrBoundGenericNominal();
     assert(s);
     return s;
   }
@@ -6012,13 +6016,17 @@ public:
   }
 
 private:
-  unsigned cacheFieldIndex();
+  unsigned cacheFieldIndex() {
+    unsigned index = swift::getFieldIndex(getParentDecl(), getField());
+    SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = index;
+    return index;
+  }
 };
 
 /// Extract a physical, fragile field out of a value of struct type.
 class StructExtractInst
     : public UnaryInstructionBase<SILInstructionKind::StructExtractInst,
-                                  FieldIndexCacheBase> {
+                                  FieldIndexCacheBase<SingleValueInstruction>> {
   friend SILBuilder;
 
   StructExtractInst(SILDebugLocation DebugLoc, SILValue Operand, VarDecl *Field,
@@ -6043,7 +6051,7 @@ public:
 /// Derive the address of a physical field from the address of a struct.
 class StructElementAddrInst
     : public UnaryInstructionBase<SILInstructionKind::StructElementAddrInst,
-                                  FieldIndexCacheBase> {
+                                  FieldIndexCacheBase<SingleValueInstruction>> {
   friend SILBuilder;
 
   StructElementAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -6060,7 +6068,7 @@ public:
 /// type instance.
 class RefElementAddrInst
     : public UnaryInstructionBase<SILInstructionKind::RefElementAddrInst,
-                                  FieldIndexCacheBase> {
+                                  FieldIndexCacheBase<SingleValueInstruction>> {
   friend SILBuilder;
 
   RefElementAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
