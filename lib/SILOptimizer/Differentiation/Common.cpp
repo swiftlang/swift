@@ -329,14 +329,16 @@ VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
 }
 
 VarDecl *getTangentStoredProperty(ADContext &context,
-                                  FieldIndexCacheBase *projectionInst,
+                                  SingleValueInstruction *projectionInst,
                                   CanType baseType,
                                   DifferentiationInvoker invoker) {
   assert(isa<StructExtractInst>(projectionInst) ||
          isa<StructElementAddrInst>(projectionInst) ||
          isa<RefElementAddrInst>(projectionInst));
+  Projection proj(projectionInst);
   auto loc = getValidLocation(projectionInst);
-  return getTangentStoredProperty(context, projectionInst->getField(), baseType,
+  auto *field = proj.getVarDecl(projectionInst->getOperand(0)->getType());
+  return getTangentStoredProperty(context, field, baseType,
                                   loc, invoker);
 }
 

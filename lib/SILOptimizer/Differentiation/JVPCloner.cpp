@@ -1043,7 +1043,7 @@ public:
     auto structType =
         remapSILTypeInDifferential(sei->getOperand()->getType()).getASTType();
     auto *tanField =
-        getTangentStoredProperty(context, sei, structType, invoker);
+      getTangentStoredProperty(context, sei, structType, invoker);
     if (!tanField) {
       errorOccurred = true;
       return;
@@ -1074,7 +1074,7 @@ public:
     auto structType =
         remapSILTypeInDifferential(seai->getOperand()->getType()).getASTType();
     auto *tanField =
-        getTangentStoredProperty(context, seai, structType, invoker);
+      getTangentStoredProperty(context, seai, structType, invoker);
     if (!tanField) {
       errorOccurred = true;
       return;
