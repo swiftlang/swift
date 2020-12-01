@@ -9,7 +9,7 @@ foreach(SDK ${SWIFT_SDKS})
     foreach(BUILD_FLAVOR build_flavors)
       get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
 
-      set(test_bin_dir "${CMAKE_BINARY_DIR}/test${VARIANT_SUFFIX}")
+      set(test_bin_dir "${SWIFT_BINARY_DIR}/test${VARIANT_SUFFIX}")
 
       _add_swift_target_library_single(
         BlocksRuntimeStub${VARIANT_SUFFIX}
