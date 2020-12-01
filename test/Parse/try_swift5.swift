@@ -263,7 +263,7 @@ let _: Int??? = try? producer.produceDoubleOptionalInt() // good
 let _: String = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
 
 // rdar://problem/46742002
-protocol Dummy : class {}
+protocol Dummy : AnyObject {}
 
 class F<T> {
   func wait() throws -> T { fatalError() }

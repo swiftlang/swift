@@ -763,16 +763,10 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 /// \param DC The context in which to check conformance. This affects, for
 /// example, extension visibility.
 ///
-/// \param ComplainLoc If valid, then this function will emit diagnostics if
-/// T does not conform to the given protocol. The primary diagnostic will
-/// be placed at this location, with notes for each of the protocol
-/// requirements not satisfied.
-///
 /// \returns The protocol conformance, if \c T conforms to the
 /// protocol \c Proto, or \c None.
 ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          DeclContext *DC,
-                                          SourceLoc ComplainLoc = SourceLoc());
+                                          DeclContext *DC);
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
 /// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final

@@ -3896,6 +3896,10 @@ namespace {
         bodyParams =
             getNonSelfParamList(dc, decl, selfIdx, name.getArgumentNames(),
                                 allowNSUIntegerAsInt, !name, templateParams);
+        // If we can't import a param for some reason (ex. it's a dependent
+        // type), bail.
+        if (!bodyParams)
+          return nullptr;
 
         importedType =
             Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);

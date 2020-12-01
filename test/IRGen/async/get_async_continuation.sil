@@ -14,38 +14,44 @@ bb0:
 }
 
 // CHECK-LABEL: define{{.*}} @async_continuation(
+// CHECK: [[tsk_addr:%.*]] = alloca %swift.task*
+// CHECK: [[exe_addr:%.*]] = alloca %swift.executor*
+// CHECK: [[ctxt_addr:%.*]] = alloca %swift.context*
 // CHECK: [[cont_context:%.*]] = alloca %swift.async_continuation_context
 // CHECK: [[result_storage:%.*]] = alloca i32
 // CHECK: call token @llvm.coro.id.async
 // CHECK: call i8* @llvm.coro.begin(
 //   Create UnsafeContinuation<Int32>.
-// CHECK: [[tmp0:%.*]] = bitcast %swift.task* %0 to i8*
+// CHECK: [[tsk:%.*]] = load %swift.task*, %swift.task** [[tsk_addr]]
+// CHECK: [[tmp0:%.*]] = bitcast %swift.task* [[tsk]] to i8*
 // CHECK: [[tmp1:%.*]] = insertvalue %TSV undef, i8* [[tmp0]], 0
 // CHECK: [[continuation:%.*]] = insertvalue %T12_Concurrency18UnsafeContinuationV undef, %TSV [[tmp1]], 0
 //   Initialize the async  continuation context.
 // CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 0
-// CHECK: store %swift.context* %2, %swift.context** [[context_addr]]
+// CHECK: [[ctxt:%.*]] = load %swift.context*, %swift.context** [[ctxt_addr]]
+// CHECK: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
 // CHECK: [[error_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 2
 // CHECK: store %swift.error* null, %swift.error** [[error_addr]]
 // CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 3
 // CHECK: [[result_storage_as_opaque:%.*]] = bitcast i32* [[result_storage]] to %swift.opaque*
 // CHECK: store %swift.opaque* [[result_storage_as_opaque]], %swift.opaque** [[result_addr]]
 // CHECK:  [[exectuor_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 4
-// CHECK:  store %swift.executor* %1, %swift.executor** [[exectuor_addr]]
+// CHECK:  [[exe:%.*]] = load %swift.executor*, %swift.executor** [[exe_addr]]
+// CHECK:  store %swift.executor* [[exe]], %swift.executor** [[exectuor_addr]]
 //   Initialize the async task with the continuation function and async continuation context.
-// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* %0, i32 0, i32 3
+// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 3
 // CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
 // CHECK: store i8* [[continuation_fn]], i8** [[task_continuation_fn_addr]]
-// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* %0, i32 0, i32 4
+// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
 // CHECK: [[cont_context2:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
 // CHECK: store %swift.context* [[cont_context2]], %swift.context** [[task_resume_context_addr]]
 //  Initialize the synchronization variable.
-// CHECK: [[synchronization_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* %3, i32 0, i32 1
+// CHECK: [[synchronization_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 1
 // CHECK: store atomic {{(i64|i32)}} 0, {{(i64|i32)}}* [[synchronization_addr]] release
 //  Do some stuff.
 // CHECK: call swiftcc void @not_async_test()
 //  Arrive at the await_async_continuation point.
-// CHECK: [[synchronization_addr_before_await:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* %3, i32 0, i32 1
+// CHECK: [[synchronization_addr_before_await:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 1
 // CHECK: [[first_at_sync_pt:%.*]] = cmpxchg {{(i64|i32)}}* [[synchronization_addr_before_await]], {{(i64|i32)}} 0, {{(i64|i32)}} 1 release acquire
 // CHECK: [[first_at_sync_pt_bool:%.*]] = extractvalue { {{(i64|i32)}}, i1 } [[first_at_sync_pt]], 1
 // CHECK: br i1 [[first_at_sync_pt_bool]], label %await.async.abort, label %await.async.maybe.resume

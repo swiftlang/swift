@@ -132,6 +132,8 @@ public:
   llvm::Value *getAsyncExecutor();
   llvm::Value *getAsyncContext();
 
+  llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
+
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
@@ -162,7 +164,10 @@ private:
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
-  bool IsAsync = false;
+
+  Address asyncTaskLocation;
+  Address asyncExecutorLocation;
+  Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
   llvm::BasicBlock *CoroutineExitBlock = nullptr;
@@ -182,8 +187,8 @@ public:
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
 
-  bool isAsync() const { return IsAsync; }
-  void setAsync(bool async = true) { IsAsync = async; }
+  void setupAsync();
+  bool isAsync() const { return asyncTaskLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");
