@@ -768,7 +768,8 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     if (From->mappedValue) {
       // values previously mapped to 'From' but not transferred to 'To's
       // mappedValue must remain mapped to 'From'. Lookups on those values will
-      // find 'To' via the mergeTarget. Dropping a value's mapping is illegal
+      // find 'To' via the mergeTarget and will remap those values to 'To'
+      // on-the-fly for efficiency. Dropping a value's mapping is illegal
       // because it could cause a node to be recreated without the edges that
       // have already been discovered.
       if (!To->mappedValue) {
