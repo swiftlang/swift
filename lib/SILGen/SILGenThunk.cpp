@@ -33,6 +33,8 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 
+#include "clang/AST/ASTContext.h"
+
 using namespace swift;
 using namespace Lowering;
 
@@ -139,6 +141,46 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
     return B.createFunctionRefFor(loc, f);
 }
 
+static const clang::Type *prependParameterType(
+      ASTContext &ctx,
+      const clang::Type *oldBlockPtrTy,
+      const clang::Type *newParameterTy) {
+  if (!oldBlockPtrTy)
+    return nullptr;
+
+  SmallVector<clang::QualType, 4> newParamTypes;
+  newParamTypes.push_back(clang::QualType(newParameterTy, 0));
+  clang::QualType returnType;
+  clang::FunctionProtoType::ExtProtoInfo newExtProtoInfo{};
+  using ExtParameterInfo = clang::FunctionProtoType::ExtParameterInfo;
+  SmallVector<ExtParameterInfo, 4> newExtParamInfos;
+
+  auto blockPtrTy = cast<clang::BlockPointerType>(oldBlockPtrTy);
+  auto blockPointeeTy = blockPtrTy->getPointeeType().getTypePtr();
+  if (auto fnNoProtoTy = dyn_cast<clang::FunctionNoProtoType>(blockPointeeTy)) {
+    returnType = fnNoProtoTy->getReturnType();
+    newExtProtoInfo.ExtInfo = fnNoProtoTy->getExtInfo();
+  } else {
+    auto fnProtoTy = cast<clang::FunctionProtoType>(blockPointeeTy);
+    llvm::copy(fnProtoTy->getParamTypes(), std::back_inserter(newParamTypes));
+    returnType = fnProtoTy->getReturnType();
+    newExtProtoInfo = fnProtoTy->getExtProtoInfo();
+    auto extParamInfos = fnProtoTy->getExtParameterInfosOrNull();
+    if (extParamInfos) {
+      auto oldExtParamInfos =
+          ArrayRef<ExtParameterInfo>(extParamInfos, fnProtoTy->getNumParams());
+      newExtParamInfos.push_back(clang::FunctionProtoType::ExtParameterInfo());
+      llvm::copy(oldExtParamInfos, std::back_inserter(newExtParamInfos));
+      newExtProtoInfo.ExtParameterInfos = newExtParamInfos.data();
+    }
+  }
+
+  auto &clangCtx = ctx.getClangModuleLoader()->getClangASTContext();
+  auto newFnTy =
+      clangCtx.getFunctionType(returnType, newParamTypes, newExtProtoInfo);
+  return clangCtx.getPointerType(newFnTy).getTypePtr();
+}
+
 SILFunction *
 SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                          CanSILFunctionType blockType,
@@ -159,10 +201,17 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   std::copy(blockType->getParameters().begin(),
             blockType->getParameters().end(),
             std::back_inserter(implArgs));
+
+  auto newClangTy = prependParameterType(
+      getASTContext(),
+      blockType->getClangTypeInfo().getType(),
+      getASTContext().getClangTypeForIRGen(blockStorageTy));
   
   auto implTy = SILFunctionType::get(GenericSignature(),
-         blockType->getExtInfo()
-           .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer),
+         blockType->getExtInfo().intoBuilder()
+           .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer)
+           .withClangFunctionType(newClangTy)
+           .build(),
          SILCoroutineKind::None,
          ParameterConvention::Direct_Unowned,
          implArgs, {}, blockType->getResults(),
