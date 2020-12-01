@@ -964,28 +964,20 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   return true;
 }
 
-ASTNode MissingForcedDowncastFailure::getAnchor() const {
+ASTNode InvalidCoercionFailure::getAnchor() const {
   auto anchor = FailureDiagnostic::getAnchor();
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
     return assignExpr->getSrc();
   return anchor;
 }
 
-bool MissingForcedDowncastFailure::diagnoseAsError() {
+bool InvalidCoercionFailure::diagnoseAsError() {
   auto fromType = getFromType();
   auto toType = getToType();
 
   emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
 
-  auto &solution = getSolution();
-  auto restriction = solution.ConstraintRestrictions.find(
-      {toType->getCanonicalType(),
-       OptionalType::get(toType)->getCanonicalType()});
-  // If the type has an value to optional conversion we can instead suggest
-  // the conditional downcast as it is safer in situations like conditional
-  // binding.
-  if (restriction != solution.ConstraintRestrictions.end() &&
-      restriction->getSecond() == ConversionRestrictionKind::ValueToOptional) {
+  if (UseConditionalCast) {
     emitDiagnostic(diag::missing_optional_downcast)
         .highlight(getSourceRange())
         .fixItReplace(getLoc(), "as?");
