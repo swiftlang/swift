@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s --dump-input always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
