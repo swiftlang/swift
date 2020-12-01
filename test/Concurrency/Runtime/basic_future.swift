@@ -7,6 +7,12 @@
 
 import Dispatch
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 extension DispatchQueue {
   func async<R>(execute: @escaping () async throws -> R) -> Task.Handle<R> {
     let handle = Task.runDetached(operation: execute)

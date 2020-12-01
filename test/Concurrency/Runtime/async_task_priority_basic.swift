@@ -6,6 +6,12 @@
 
 import Dispatch
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 // ==== ------------------------------------------------------------------------
 // MARK: "Infrastructure" for the tests
 
