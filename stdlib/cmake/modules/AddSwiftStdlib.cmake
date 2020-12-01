@@ -308,8 +308,15 @@ function(_add_target_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
-      # The -mcx16 flag gives us 16-byte cas and provides support
-      # for machines with older processors
+      # We support all x86 architectures that support the -mcx16 flag.
+      # This flag ensures that was have a 16-byte cas.
+      # NOTE: This used to be -march=core2. The reason why we changed this was
+      # that this caused the following problems:
+      #   1. Setting core2 allows for the usage of intel-specific instructions
+      #      (e.g. SSSE3) causing binary incompatibility issues on AMD processors.
+      #   2. There are intel processors older than core2-duo that support cx16.
+      #      If we compiled for core2, we could use newer intel intrinsics than
+      #      these older processors would support.
       list(APPEND result "-mcx16")
     endif()
   endif()
