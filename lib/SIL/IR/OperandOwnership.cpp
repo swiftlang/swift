@@ -922,10 +922,17 @@ Optional<OwnershipConstraint> Operand::getOwnershipConstraint() const {
   // We do not ever call this function when an instruction isn't in a block.
   assert(getUser()->getParent() &&
          "Can not lookup ownership constraint unless inserted into block");
-  if (auto *block = getUser()->getParent())
-    if (auto *func = block->getParent())
-      if (!func->hasOwnership())
-        return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+  if (auto *block = getUser()->getParent()) {
+    auto *func = block->getParent();
+    if (!func) {
+      // If we don't have a function, then we must have a SILGlobalVariable. In
+      // that case, we act as if we aren't in ownership.
+      return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+    }
+
+    if (!func->hasOwnership())
+      return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+  }
 
   OwnershipConstraintClassifier classifier(getUser()->getModule(), *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
