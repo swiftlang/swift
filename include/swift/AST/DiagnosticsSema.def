@@ -1784,6 +1784,10 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+WARNING(spi_attribute_on_import_of_public_module,none,
+        "importation of %0 has an ineffective '@_spi' attribute; "
+        "it was built from the public interface at %1",
+        (DeclName, StringRef))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,

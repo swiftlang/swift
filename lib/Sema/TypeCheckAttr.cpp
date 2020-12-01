@@ -1030,6 +1030,21 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
       }
     }
   }
+
+  if (auto ID = dyn_cast<ImportDecl>(D)) {
+    auto importedModule = ID->getModule();
+    if (importedModule) {
+      auto path = importedModule->getModuleFilename();
+      if (llvm::sys::path::extension(path) == ".swiftinterface" &&
+          !path.endswith(".private.swiftinterface")) {
+        // If the module was built from the public swiftinterface, it can't
+        // have any SPI.
+        diagnose(attr->getLocation(),
+                 diag::spi_attribute_on_import_of_public_module,
+                 importedModule->getName(), path);
+      }
+    }
+  }
 }
 
 static bool checkObjCDeclContext(Decl *D) {
