@@ -19,6 +19,7 @@ using namespace llvm;
 
 SWIFT_CC(swift)
 static void destroyLinearMapContext(SWIFT_CONTEXT HeapObject *obj) {
+  static_cast<AutoDiffLinearMapContext *>(obj)->~AutoDiffLinearMapContext();
   free(obj);
 }
 
