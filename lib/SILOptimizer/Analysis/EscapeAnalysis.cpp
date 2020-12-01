@@ -30,7 +30,7 @@ using CGNode = EscapeAnalysis::CGNode;
 static llvm::cl::opt<bool> EnableInternalVerify(
     "escapes-internal-verify",
     llvm::cl::desc("Enable internal verification of escape analysis"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // Returns the kind of pointer that \p Ty recursively contains.
 EscapeAnalysis::PointerKind
