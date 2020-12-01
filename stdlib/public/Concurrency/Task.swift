@@ -310,6 +310,11 @@ extension Task {
 
     return Handle<T>(task: task)
   }
+
+}
+
+public func _runAsyncHandler(operation: @escaping () async -> ()) {
+  _ = Task.runDetached(operation: operation)
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
