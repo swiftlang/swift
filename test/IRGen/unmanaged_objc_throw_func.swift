@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 // REQUIRES: objc_interop
+// REQUIRES: optimized_stdlib
 
 import Foundation
 
