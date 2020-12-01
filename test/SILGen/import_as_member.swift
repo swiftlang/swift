@@ -42,12 +42,12 @@ public func returnNullableStringGlobalVar() -> String? {
 // CHECK-LABEL: sil {{.*}}useClass{{.*}}
 // CHECK: bb0([[D:%[0-9]+]] : $Double, [[OPTS:%[0-9]+]] : $SomeClass.Options):
 public func useClass(d: Double, opts: SomeClass.Options) {
-  // CHECK: [[CTOR:%[0-9]+]] = function_ref @MakeIAMSomeClass : $@convention(c) (Double) -> @autoreleased SomeClass
+  // CHECK: [[CTOR:%[0-9]+]] = function_ref @MakeIAMSomeClass : $@convention(c{{.+}}) (Double) -> @autoreleased SomeClass
   // CHECK: [[OBJ:%[0-9]+]] = apply [[CTOR]]([[D]])
   let o = SomeClass(value: d)
 
   // CHECK: [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @IAMSomeClassApplyOptions : $@convention(c) (SomeClass, SomeClass.Options) -> ()
+  // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @IAMSomeClassApplyOptions : $@convention(c{{.+}}) (SomeClass, SomeClass.Options) -> ()
   // CHECK: apply [[APPLY_FN]]([[BORROWED_OBJ]], [[OPTS]])
   // CHECK: end_borrow [[BORROWED_OBJ]]
   // CHECK: destroy_value [[OBJ]]

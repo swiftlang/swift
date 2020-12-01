@@ -34,7 +34,7 @@ struct ModuleInterfaceOptions {
 
   /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
-  bool PrintFullConvention = false;
+  bool PrintFullConvention = true;
 
   /// Copy of all the command-line flags passed at .swiftinterface
   /// generation time, re-applied to CompilerInvocation when reading

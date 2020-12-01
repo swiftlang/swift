@@ -5,7 +5,7 @@ extern const CCPowerSupplyRef kCCPowerStandard;
 
 // Attribute: managed +0 result
 __attribute__((cf_returns_not_retained))
-CCPowerSupplyRef CCPowerSupplyGetDefault();
+CCPowerSupplyRef CCPowerSupplyGetDefault(void);
 
 typedef const struct __attribute__((objc_bridge(id))) __CCRefrigerator *CCRefrigeratorRef;
 
