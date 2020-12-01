@@ -399,6 +399,35 @@ void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
   builder.emitDestroyValueOperation(loc, getter);
 }
 
+SILValue emitMemoryLayoutSize(
+    SILBuilder &builder, SILLocation loc, CanType type) {
+  auto &ctx = builder.getASTContext();
+  auto id = ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Sizeof));
+  auto *builtin = cast<FuncDecl>(getBuiltinValueDecl(ctx, id));
+  auto metatypeTy = SILType::getPrimitiveObjectType(
+      CanMetatypeType::get(type, MetatypeRepresentation::Thin));
+  auto metatypeVal = builder.createMetatype(loc, metatypeTy);
+  return builder.createBuiltin(
+      loc, id, SILType::getBuiltinWordType(ctx),
+      SubstitutionMap::get(
+          builtin->getGenericSignature(), ArrayRef<Type>{type}, {}),
+      {metatypeVal});
+}
+
+SILValue emitProjectTopLevelSubcontext(
+    SILBuilder &builder, SILLocation loc, SILValue context,
+    SILType subcontextType) {
+  assert(context.getOwnershipKind() == OwnershipKind::Guaranteed);
+  auto &ctx = builder.getASTContext();
+  auto id = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext));
+  assert(context->getType() == SILType::getNativeObjectType(ctx));
+  auto *subcontextAddr = builder.createBuiltin(
+      loc, id, SILType::getRawPointerType(ctx), SubstitutionMap(), {context});
+  return builder.createPointerToAddress(
+      loc, subcontextAddr, subcontextType.getAddressType(), /*isStrict*/ true);
+}
+
 //===----------------------------------------------------------------------===//
 // Utilities for looking up derivatives of functions
 //===----------------------------------------------------------------------===//

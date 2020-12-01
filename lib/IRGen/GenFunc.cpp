@@ -2420,21 +2420,31 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
       },
       false /*isNoInline*/));
 }
-
 llvm::Function *
 IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                      ArrayRef<llvm::Value *> args) {
   SmallVector<llvm::Type*, 8> argTys;
-  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
   for (auto arg : args) {
     auto *ty = arg->getType();
+    argTys.push_back(ty);
+  }
+  return createAsyncDispatchFn(fnPtr, argTys);
+}
+
+llvm::Function *
+IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
+                                     ArrayRef<llvm::Type *> argTypes) {
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
+  for (auto ty : argTypes) {
     argTys.push_back(ty);
   }
   auto calleeFnPtrType = fnPtr.getRawPointer()->getType();
   auto *dispatchFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
   llvm::SmallString<40> name;
-  llvm::raw_svector_ostream(name) << "__swift_suspend_dispatch_" << args.size();
+  llvm::raw_svector_ostream(name)
+      << "__swift_suspend_dispatch_" << argTypes.size();
   llvm::Function *dispatch =
       llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(name), &IGM.Module);

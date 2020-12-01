@@ -2748,8 +2748,16 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
 void NecessaryBindings::addTypeMetadata(CanType type) {
   assert(!isa<InOutType>(type));
 
+  // If the bindings are for an async function, we will always need the type
+  // metadata.  The opportunities to reconstruct it available in the context of
+  // partial apply forwarders are not available here.
+  if (forAsyncFunction()) {
+    addRequirement({type, nullptr});
+    return;
+  }
+
   // Bindings are only necessary at all if the type is dependent.
-  if (!type->hasArchetype() && !forAsyncFunction())
+  if (!type->hasArchetype())
     return;
 
   // Break down structural types so that we don't eagerly pass metadata

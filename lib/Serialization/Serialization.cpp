@@ -2612,8 +2612,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           storage->hasPrivateAccessor()));
 
     if (shouldEmitFilenameForPrivate || shouldEmitPrivateDiscriminator) {
-      auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
-      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+      auto topLevelSubcontext = value->getDeclContext()->getModuleScopeContext();
+      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelSubcontext)) {
         if (shouldEmitPrivateDiscriminator) {
           Identifier discriminator =
               enclosingFile->getDiscriminatorForPrivateValue(value);

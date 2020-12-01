@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_SEMANTICARC_CONTEXT_H
 
 #include "OwnershipLiveRange.h"
+#include "SemanticARCOpts.h"
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -30,6 +31,7 @@ namespace semanticarc {
 
 struct LLVM_LIBRARY_VISIBILITY Context {
   SILFunction &fn;
+  ARCTransformKind transformKind = ARCTransformKind::All;
   Optional<DeadEndBlocks> deadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   SmallMultiMapCache<SILValue, Operand *> addressToExhaustiveWriteListCache;
@@ -90,6 +92,25 @@ struct LLVM_LIBRARY_VISIBILITY Context {
         onlyGuaranteedOpts(onlyGuaranteedOpts), instModCallbacks(callbacks) {}
 
   void verify() const;
+
+  bool shouldPerform(ARCTransformKind testKind) const {
+    // When asserts are enabled, we allow for specific arc transforms to be
+    // turned on/off via LLVM args. So check that if we have asserts, perform
+    // all optimizations otherwise.
+#ifndef NDEBUG
+    if (transformKind == ARCTransformKind::Invalid)
+      return false;
+    return bool(testKind & transformKind);
+#else
+    return true;
+#endif
+  }
+
+  void reset() {
+    lifetimeFrontier.clear();
+    addressToExhaustiveWriteListCache.clear();
+    joinedOwnedIntroducerToConsumedOperands.reset();
+  }
 
 private:
   static bool

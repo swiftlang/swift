@@ -1677,7 +1677,7 @@ private:
 } // end anonymous namespace
 
 namespace {
-static bool isTopLevelContext(const DeclContext *DC) {
+static bool isTopLevelSubcontext(const DeclContext *DC) {
   for (; DC && DC->isLocalContext(); DC = DC->getParent()) {
     switch (DC->getContextKind()) {
     case DeclContextKind::TopLevelCodeDecl:
@@ -2139,7 +2139,7 @@ public:
       if (CurrDeclContext && D->getModuleContext() == CurrModule) {
         // Treat global variables from the same source file as local when
         // completing at top-level.
-        if (isa<VarDecl>(D) && isTopLevelContext(CurrDeclContext) &&
+        if (isa<VarDecl>(D) && isTopLevelSubcontext(CurrDeclContext) &&
             D->getDeclContext()->getParentSourceFile() ==
                 CurrDeclContext->getParentSourceFile()) {
           return SemanticContextKind::Local;

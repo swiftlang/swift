@@ -2089,6 +2089,11 @@ ASTContext::getModule(ImportPath::Module ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath)) {
+      if (LangOpts.EnableModuleLoadingRemarks) {
+        Diags.diagnose(ModulePath.getSourceRange().Start,
+                       diag::module_loaded,
+                       M->getModuleFilename());
+      }
       return M;
     }
   }

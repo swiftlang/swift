@@ -75,14 +75,34 @@ class ForwardingOperand {
 public:
   static Optional<ForwardingOperand> get(Operand *use);
 
+  Operand *getUse() const { return use; }
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
-  OwnershipForwardingInst *getUser() const {
+  const OwnershipForwardingInst *operator->() const {
     return cast<OwnershipForwardingInst>(use->getUser());
   }
+  OwnershipForwardingInst *operator->() {
+    return cast<OwnershipForwardingInst>(use->getUser());
+  }
+  const OwnershipForwardingInst &operator*() const {
+    return *cast<OwnershipForwardingInst>(use->getUser());
+  }
+  OwnershipForwardingInst &operator*() {
+    return *cast<OwnershipForwardingInst>(use->getUser());
+  }
+
+  /// Call \p visitor with each value that contains the final forwarded
+  /// ownership of. E.x.: result of a unchecked_ref_cast, phi arguments of a
+  /// switch_enum.
+  bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
+
+  /// If statically this forwarded operand has a single forwarded value that the
+  /// operand forwards ownership into, return that value. Return false
+  /// otherwise.
+  SILValue getSingleForwardedValue() const;
 };
 
 /// Returns true if the instruction is a 'reborrow'.
@@ -179,7 +199,10 @@ struct BorrowingOperand {
   /// Example: An apply performs an instantaneous recursive borrow of a
   /// guaranteed value but a begin_apply borrows the value over the entire
   /// region of code corresponding to the coroutine.
-  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  ///
+  /// NOTE: Return false from func to stop iterating. Returns false if the
+  /// closure requested to stop early.
+  bool visitLocalEndScopeUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.

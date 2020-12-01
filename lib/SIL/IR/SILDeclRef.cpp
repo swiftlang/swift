@@ -764,6 +764,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;
+    case SILDeclRef::ManglingKind::AsyncHandlerBody:
+      SKind = ASTMangler::SymbolKind::AsyncHandlerBody;
+      break;
   }
 
   switch (kind) {

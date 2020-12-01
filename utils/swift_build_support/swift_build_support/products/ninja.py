@@ -58,17 +58,19 @@ class NinjaBuilder(product.ProductBuilder):
             osx_version_min = self.args.darwin_deployment_version_osx
             assert sysroot is not None
             env = {
-                "CXX": self.toolchain.cxx,
+                "CXX": shell._quote(self.toolchain.cxx),
                 "CFLAGS": (
                     "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
-                ).format(sysroot=sysroot, osx_version=osx_version_min),
+                ).format(sysroot=shell._quote(sysroot),
+                         osx_version=osx_version_min),
                 "LDFLAGS": (
                     "-isysroot {sysroot} -mmacosx-version-min={osx_version}"
-                ).format(sysroot=sysroot, osx_version=osx_version_min),
+                ).format(sysroot=shell._quote(sysroot),
+                         osx_version=osx_version_min),
             }
         elif self.toolchain.cxx:
             env = {
-                "CXX": self.toolchain.cxx,
+                "CXX": shell._quote(self.toolchain.cxx),
             }
 
         # Ninja can only be built in-tree.  Copy the source tree to the build

@@ -646,6 +646,14 @@ bool Parser::parseSpecializeAttributeArguments(
         if (ParamLabel == "exported") {
           Exported = isTrue;
         }
+        if (Exported == true) {
+          const LangOptions &LangOpts = Context.LangOpts;
+          if (!LangOpts.EnableExperimentalPrespecialization) {
+            diagnose(Tok.getLoc(),
+                     diag::attr_specialize_unsupported_exported_true,
+                     ParamLabel);
+          }
+        }
       }
       if (ParamLabel == "kind") {
         SourceLoc paramValueLoc;

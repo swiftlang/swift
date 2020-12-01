@@ -1409,14 +1409,7 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
 static ManagedValue emitBuiltinCancelAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto argument = args[0].borrow(SGF, loc).forward(SGF);
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      SGF.getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { argument });
-  return ManagedValue::forUnmanaged(apply);
+  return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
@@ -1446,7 +1439,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
   // Form the metatype of the result type.
   CanType futureResultType =
       Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext())))
+        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
           .subst(subs)->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
@@ -1467,6 +1460,48 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
       { flags, parentTask, futureResultMetadata, function });
   return SGF.emitManagedRValueWithCleanup(apply);
+}
+
+static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
+      SILType::getNativeObjectType(ctx),
+      subs,
+      /*args*/ {args[0].getValue()});
+  return SGF.emitManagedRValueWithCleanup(builtinApply);
+}
+
+static ManagedValue emitBuiltinAutoDiffProjectTopLevelSubcontext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext)),
+      SILType::getRawPointerType(ctx),
+      subs,
+      /*args*/ {args[0].borrow(SGF, loc).getValue()});
+  return ManagedValue::forUnmanaged(builtinApply);
+}
+
+static ManagedValue emitBuiltinAutoDiffAllocateSubcontext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+      SILType::getRawPointerType(ctx),
+      subs,
+      /*args*/ {args[0].borrow(SGF, loc).getValue(), args[1].getValue()});
+  return ManagedValue::forUnmanaged(builtinApply);
 }
 
 Optional<SpecializedEmitter>

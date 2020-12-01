@@ -63,6 +63,9 @@ private:
   /// Activity info of the original function.
   const DifferentiableActivityInfo &activityInfo;
 
+  /// The original function's loop info.
+  SILLoopInfo *loopInfo;
+
   /// Differentiation indices of the function.
   const SILAutoDiffIndices indices;
 
@@ -85,6 +88,9 @@ private:
 
   /// Mapping from linear map structs to their branching trace enum fields.
   llvm::DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
+
+  /// Blocks in a loop.
+  llvm::SmallSetVector<SILBasicBlock *, 4> blocksInLoop;
 
   /// A synthesized file unit.
   SynthesizedFileUnit &synthesizedFile;
@@ -144,7 +150,8 @@ public:
   explicit LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                          SILFunction *original, SILFunction *derivative,
                          SILAutoDiffIndices indices,
-                         const DifferentiableActivityInfo &activityInfo);
+                         const DifferentiableActivityInfo &activityInfo,
+                         SILLoopInfo *loopInfo);
 
   /// Returns the linear map struct associated with the given original block.
   StructDecl *getLinearMapStruct(SILBasicBlock *origBB) const {
@@ -200,19 +207,27 @@ public:
 
   /// Returns the branching trace enum field for the linear map struct of the
   /// given original block.
-  VarDecl *lookUpLinearMapStructEnumField(SILBasicBlock *origBB) {
+  VarDecl *lookUpLinearMapStructEnumField(SILBasicBlock *origBB) const {
     auto *linearMapStruct = getLinearMapStruct(origBB);
     return linearMapStructEnumFields.lookup(linearMapStruct);
   }
 
   /// Finds the linear map declaration in the pullback struct for the given
   /// `apply` instruction in the original function.
-  VarDecl *lookUpLinearMapDecl(ApplyInst *ai) {
+  VarDecl *lookUpLinearMapDecl(ApplyInst *ai) const {
     assert(ai->getFunction() == original);
     auto lookup = linearMapFieldMap.find(ai);
     assert(lookup != linearMapFieldMap.end() &&
            "No linear map field corresponding to the given `apply`");
     return lookup->getSecond();
+  }
+
+  bool hasLoops() const {
+    return !blocksInLoop.empty();
+  }
+
+  ArrayRef<SILBasicBlock *> getBlocksInLoop() const {
+    return blocksInLoop.getArrayRef();
   }
 };
 

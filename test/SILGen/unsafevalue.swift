@@ -45,7 +45,9 @@ public struct UnsafeValue<Element: AnyObject> {
   // CANONICAL-LABEL: sil [transparent] [serialized] @$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC : $@convention(method) <Element where Element : AnyObject> (@guaranteed Element, @thin UnsafeValue<Element>.Type) -> UnsafeValue<Element> {
   // CANONICAL: bb0([[INPUT_ELEMENT:%.*]] : $Element,
   // CANONICAL-NEXT: debug_value
+  // CANONICAL-NEXT: strong_retain [[INPUT_ELEMENT]]
   // CANONICAL-NEXT: [[UNMANAGED_ELEMENT:%.*]] = ref_to_unmanaged [[INPUT_ELEMENT]]
+  // CANONICAL-NEXT: strong_release [[INPUT_ELEMENT]]
   // CANONICAL-NEXT: [[RESULT:%.*]] = struct $UnsafeValue<Element> ([[UNMANAGED_ELEMENT]] : $@sil_unmanaged Element)
   // CANONICAL-NEXT: return [[RESULT]]
   // CANONICAL: } // end sil function '$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC'

@@ -22,6 +22,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1439,7 +1440,6 @@ public:
     }
   }
 };
-
 } // end anonymous namespace
 
 /// Returns the kind of origin, implementation-only import or SPI declaration,
@@ -1459,6 +1459,40 @@ swift::getDisallowedOriginKind(const Decl *decl,
     if (where.isSPI())
       downgradeToWarning = DowngradeToWarning::Yes;
 
+    // Even if the current module is @_implementationOnly, Swift should
+    // not report an error in the cases where the decl is also exported from
+    // a non @_implementationOnly module. Thus, we check to see if there is
+    // a visible access path to the Clang decl, and only error out in case
+    // there is none.
+    auto filter = ModuleDecl::ImportFilter(
+        {ModuleDecl::ImportFilterKind::Exported,
+         ModuleDecl::ImportFilterKind::Default,
+         ModuleDecl::ImportFilterKind::SPIAccessControl,
+         ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay});
+    SmallVector<ImportedModule, 4> sfImportedModules;
+    SF->getImportedModules(sfImportedModules, filter);
+    if (auto clangDecl = decl->getClangDecl()) {
+      for (auto redecl : clangDecl->redecls()) {
+        if (auto tagReDecl = dyn_cast<clang::TagDecl>(redecl)) {
+          // This is a forward declaration. We ignore visibility of those.
+          if (tagReDecl->getBraceRange().isInvalid()) {
+            continue;
+          }
+        }
+        auto moduleWrapper =
+            decl->getASTContext().getClangModuleLoader()->getWrapperForModule(
+                redecl->getOwningModule());
+        auto visibleAccessPath =
+            find_if(sfImportedModules, [&moduleWrapper](auto importedModule) {
+              return importedModule.importedModule == moduleWrapper ||
+                     !importedModule.importedModule
+                          ->isImportedImplementationOnly(moduleWrapper);
+            });
+        if (visibleAccessPath != sfImportedModules.end()) {
+          return DisallowedOriginKind::None;
+        }
+      }
+    }
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
   } else if (decl->isSPI() && !where.isSPI()) {

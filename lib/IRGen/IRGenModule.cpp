@@ -597,7 +597,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = createStructType(*this, "swift.context", {});
-  SwiftTaskTy = createStructType(*this, "swift.task", {});
+  auto *ContextPtrTy = llvm::PointerType::getUnqual(SwiftContextTy);
+  SwiftTaskTy = createStructType(*this, "swift.task", {
+    Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
+    Int64Ty,              // Job.Flags
+    FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
+    ContextPtrTy,         // Task.ResumeContext
+    Int64Ty               // Task.Status
+  });
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
@@ -615,6 +622,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncTaskAndContextTy = createStructType(
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
+
+  AsyncContinuationContextTy = createStructType(
+      *this, "swift.async_continuation_context",
+      {SwiftContextPtrTy, SizeTy, ErrorPtrTy, OpaquePtrTy, SwiftExecutorPtrTy});
+  AsyncContinuationContextPtrTy = AsyncContinuationContextTy->getPointerTo();
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
@@ -722,6 +734,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
     auto featureAvailability = context.getConcurrencyAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
+    auto featureAvailability = context.getDifferentiationAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

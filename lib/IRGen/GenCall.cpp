@@ -2390,28 +2390,12 @@ public:
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
-    SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
-                                  IGF.getSILModule());
-    auto resultType =
-        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-    auto &nativeSchema =
-        IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
-    auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
-    if (expectedNativeResultType->isVoidTy()) {
-      // If the async return is void, there is no return to move out of the
-      // argument buffer.
-      return;
-    }
-    // Gather the values.
-    Explosion nativeExplosion;
     auto layout = getAsyncContextLayout();
     for (unsigned index = 0, count = layout.getDirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getDirectReturnLayout(index);
-      loadValue(fieldLayout, nativeExplosion);
+      loadValue(fieldLayout, out);
     }
-
-    out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
   Address getCalleeErrorSlot(SILType errorType) override {
     auto layout = getAsyncContextLayout();
@@ -4580,4 +4564,47 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   Args.push_back(IGF.getAsyncContext());
   auto call = IGF.Builder.CreateCall(fnPtr, Args);
   call->setTailCall();
+}
+
+FunctionPointer
+IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
+  auto *fnTy = llvm::FunctionType::get(
+      IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
+      false /*vaargs*/);
+  auto signature =
+      Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftCC);
+  auto fnPtr = FunctionPointer(
+      FunctionPointer::KindTy::Function,
+      Builder.CreateBitOrPointerCast(resume, fnTy->getPointerTo()),
+      PointerAuthInfo(), signature);
+  return fnPtr;
+}
+
+Address irgen::emitAutoDiffCreateLinearMapContext(
+    IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffCreateLinearMapContextFn(), {topLevelSubcontextSize});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}
+
+Address irgen::emitAutoDiffProjectTopLevelSubcontext(
+    IRGenFunction &IGF, Address context) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffProjectTopLevelSubcontextFn(),
+      {context.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}
+
+Address irgen::emitAutoDiffAllocateSubcontext(
+    IRGenFunction &IGF, Address context, llvm::Value *size) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffAllocateSubcontextFn(),
+      {context.getAddress(), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
 }

@@ -327,6 +327,10 @@ AvailabilityContext ASTContext::getConcurrencyAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext ASTContext::getDifferentiationAvailability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
