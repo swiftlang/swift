@@ -4706,6 +4706,11 @@ private:
       return {type, kind, BindingSource};
     }
 
+    /// Determine whether this binding could be a viable candidate
+    /// to be "joined" with some other binding. It has to be at least
+    /// a non-default r-value supertype binding with no type variables.
+    bool isViableForJoin() const;
+
     static PotentialBinding forHole(TypeVariableType *typeVar,
                                     ConstraintLocator *locator) {
       return {HoleType::get(typeVar->getASTContext(), typeVar),
@@ -4744,9 +4749,6 @@ private:
 
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
-
-    /// Tracks the position of the last known supertype in the group.
-    Optional<unsigned> lastSupertypeIndex;
 
     /// A set of all not-yet-resolved type variables this type variable
     /// is a subtype of, supertype of or is equivalent to. This is used
