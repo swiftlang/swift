@@ -32,32 +32,21 @@ class DeadEndBlocks;
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
 
-/// These operations forward both owned and guaranteed ownership.
-bool isOwnershipForwardingValueKind(SILNodeKind kind);
-
-/// Is this an operand that can forward both owned and guaranteed ownership
-/// kinds.
+/// Is this an operand that can forward both owned and guaranteed ownership into
+/// one of the operand's owner instruction's result.
 bool isOwnershipForwardingUse(Operand *op);
 
-/// Is this an operand that forwards guaranteed ownership from its value to a
-/// result of the using instruction.
+/// Is this an operand that can forward guaranteed ownership into one of the
+/// operand's owner instruction's result.
 bool isGuaranteedForwardingUse(Operand *op);
 
-/// These operations forward guaranteed ownership, but don't necessarily forward
-/// owned values.
-bool isGuaranteedForwardingValueKind(SILNodeKind kind);
-
-/// Is this a value that is the result of an operation that forwards owned
-/// ownership.
-bool isGuaranteedForwardingValue(SILValue value);
-
-/// Is this a node kind that can forward owned ownership, but may not be able to
-/// forward guaranteed ownership.
-bool isOwnedForwardingValueKind(SILNodeKind kind);
-
-/// Does this operand 'forward' owned ownership, but may not be able to forward
-/// guaranteed ownership.
+/// Is this an operand that can forward owned ownership into one of the
+/// operand's owner instruction's result.
 bool isOwnedForwardingUse(Operand *use);
+
+/// Is this a value that is the result of an instruction that forwards
+/// guaranteed ownership from one of its operands.
+bool isGuaranteedForwardingValue(SILValue value);
 
 /// Is this value the result of an instruction that 'forward's owned ownership,
 /// but may not be able to forward guaranteed ownership.
@@ -76,6 +65,11 @@ public:
   static Optional<ForwardingOperand> get(Operand *use);
 
   Operand *getUse() const { return use; }
+  OwnershipConstraint getOwnershipConstraint() const {
+    // We use a force unwrap since a ForwardingOperand should always have an
+    // ownership constraint.
+    return *use->getOwnershipConstraint();
+  }
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,

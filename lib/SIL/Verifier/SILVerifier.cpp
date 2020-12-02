@@ -30,6 +30,7 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/MemoryLifetime.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1149,8 +1150,29 @@ public:
       }
     }
 
-    // TODO: There should be a use of an opened archetype inside the instruction for
-    // each opened archetype operand of the instruction.
+    if (isa<OwnershipForwardingInst>(I)) {
+      checkOwnershipForwardingInst(I);
+    }
+  }
+
+  /// We are given an instruction \p fInst that forwards ownership from \p
+  /// operand to one of \p fInst's results, make sure that if we have a
+  /// forwarding instruction that can only accept owned or guaranteed ownership
+  /// that we are following that invariant.
+  void checkOwnershipForwardingInst(SILInstruction *i) {
+    if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
+      ValueOwnershipKind kind = OwnershipKind::Owned;
+      require(kind.isCompatibleWith(o->getOwnershipKind()),
+              "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
+              "compatible with owned");
+    }
+
+    if (auto *o = dyn_cast<GuaranteedFirstArgForwardingSingleValueInst>(i)) {
+      ValueOwnershipKind kind = OwnershipKind::Guaranteed;
+      require(kind.isCompatibleWith(o->getOwnershipKind()),
+              "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
+              "must be compatible with guaranteed");
+    }
   }
 
   void checkInstructionsSILLocation(SILInstruction *I) {
