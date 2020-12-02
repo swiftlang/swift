@@ -5,6 +5,6 @@ public func makeWrappedMagicNumber() -> MagicWrapper<IntWrapper> {
   return MagicWrapper<IntWrapper>(t: t)
 }
 
-public func readWrappedMagicNumber(_ i : inout MagicWrapper<IntWrapper>) -> CInt {
+public func readWrappedMagicNumber(_ i: inout MagicWrapper<IntWrapper>) -> CInt {
   return i.getValuePlusArg(13)
 }
