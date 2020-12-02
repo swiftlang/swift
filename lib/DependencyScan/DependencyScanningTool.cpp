@@ -47,6 +47,23 @@ DependencyScanningTool::getDependencies(
   return Dependencies;
 }
 
+llvm::ErrorOr<depscan_prescan_result_t *>
+DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
+  // The primary instance used to scan the query Swift source-code
+  auto InstanceOrErr = initCompilerInstanceForScan(Command);
+  if (std::error_code EC = InstanceOrErr.getError())
+    return EC;
+  auto Instance = std::move(*InstanceOrErr);
+
+  // Execute the scanning action, retreiving the in-memory result
+  auto DependenciesOrErr = performModulePrescan(*Instance.get());
+  if (DependenciesOrErr.getError())
+    return std::make_error_code(std::errc::not_supported);
+  auto Dependencies = std::move(*DependenciesOrErr);
+
+  return Dependencies;
+}
+
 std::vector<llvm::ErrorOr<depscan_dependency_result_t *>>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
@@ -135,6 +152,23 @@ depscan_scan_dependencies(depscan_scanner_t *scanner,
   return DependencyGraph;
 }
 
+depscan_prescan_result_t *
+depscan_prescan_dependencies(depscan_scanner_t *scanner,
+                          const char *working_directory, int argc,
+                          const char *const *argv) {
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(argv[i]);
+
+  // Execute the scan and bridge the result
+  auto PreScanResult = ScanningTool->getImports(Compilation);
+  if (PreScanResult.getError())
+    return nullptr;
+  auto ImportSet = std::move(*PreScanResult);
+  return ImportSet;
+}
+
 void depscan_dependency_info_details_dispose(
     depscan_module_details_t *details) {
   switch (details->kind) {
@@ -193,5 +227,10 @@ void depscan_dependency_set_dispose(depscan_dependency_set_t *set) {
 void depscan_dependency_result_dispose(depscan_dependency_result_t *result) {
   depscan_string_dispose(result->main_module_name);
   depscan_dependency_set_dispose(result->module_set);
+  delete result;
+}
+
+void depscan_prescan_result_dispose(depscan_prescan_result_t *result) {
+  depscan_string_set_dispose(result->import_set);
   delete result;
 }

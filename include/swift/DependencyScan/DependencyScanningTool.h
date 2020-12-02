@@ -35,10 +35,17 @@ public:
   /// placeholder modules.
   ///
   /// \returns a \c StringError with the diagnostic output if errors
-  /// occurred, \c FullDependencies otherwise.
+  /// occurred, \c depscan_dependency_result_t otherwise.
   llvm::ErrorOr<depscan_dependency_result_t*>
   getDependencies(ArrayRef<const char *> Command,
                   const llvm::StringSet<> &PlaceholderModules);
+
+  /// Collect the set of imports for the input module
+  ///
+  /// \returns a \c StringError with the diagnostic output if errors
+  /// occurred, \c depscan_prescan_result_t otherwise.
+  llvm::ErrorOr<depscan_prescan_result_t*>
+  getImports(ArrayRef<const char *> Command);
 
   /// Collect the full module depenedency graph for the input collection of
   /// module names (batch inputs) and output them to the

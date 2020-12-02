@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/ScanDependencies.h"
-#include "swift/DependencyScan/DSString.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -24,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/DependencyScan/DSString.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -472,14 +472,13 @@ getAsClangDependencyModule(const depscan_module_details_t *details) {
   return nullptr;
 }
 
-static void
-writePrescanJSON(llvm::raw_ostream &out,
-                 const std::vector<std::string> &moduleDependencies) {
+static void writePrescanJSON(llvm::raw_ostream &out,
+                             const depscan_prescan_result_t *importSet) {
   // Write out a JSON containing all main module imports.
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
 
-  writeJSONSingleField(out, "imports", moduleDependencies, 0, false);
+  writeJSONSingleField(out, "imports", importSet, 0, false);
 }
 
 static void writeJSON(llvm::raw_ostream &out,
@@ -984,8 +983,7 @@ forEachBatchEntry(CompilerInstance &instance, ModuleDependenciesCache &cache,
 }
 
 static ModuleDependencies
-identifyMainModuleDependencies(CompilerInstance &instance,
-                               ModuleDependenciesCache &cache) {
+identifyMainModuleDependencies(CompilerInstance &instance) {
   ModuleDecl *mainModule = instance.getMainModule();
   // Main module file name.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
@@ -1105,10 +1103,13 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   }
 
   // Execute import prescan, and write JSON output to the output stream
-  auto mainDependencies = identifyMainModuleDependencies(instance, cache);
+  auto importSetOrErr = performModulePrescan(instance);
+  if (importSetOrErr.getError())
+    return true;
+  auto importSet = std::move(*importSetOrErr);
 
   // Serialize and output main module dependencies only and exit.
-  writePrescanJSON(out, mainDependencies.getModuleDependencies());
+  writePrescanJSON(out, importSet);
   // This process succeeds regardless of whether any errors occurred.
   // FIXME: We shouldn't need this, but it's masking bugs in our scanning
   // logic where we don't create a fresh context when scanning Swift interfaces
@@ -1186,7 +1187,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   ModuleDecl *mainModule = instance.getMainModule();
 
   // First, identify the dependencies of the main module
-  auto mainDependencies = identifyMainModuleDependencies(instance, cache);
+  auto mainDependencies = identifyMainModuleDependencies(instance);
 
   // Add the main module.
   StringRef mainModuleName = mainModule->getNameStr();
@@ -1261,6 +1262,15 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   return dependencyGraph;
 }
 
+llvm::ErrorOr<depscan_prescan_result_t *>
+swift::dependencies::performModulePrescan(CompilerInstance &instance) {
+  // Execute import prescan, and write JSON output to the output stream
+  auto mainDependencies = identifyMainModuleDependencies(instance);
+  depscan_prescan_result_t *importSet = new depscan_prescan_result_t;
+  importSet->import_set = create_set(mainDependencies.getModuleDependencies());
+  return importSet;
+}
+
 std::vector<llvm::ErrorOr<depscan_dependency_result_t *>>
 swift::dependencies::performBatchModuleScan(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
@@ -1330,11 +1340,11 @@ swift::dependencies::performBatchModuleScan(
   return batchScanResult;
 }
 
-std::vector<llvm::ErrorOr<std::vector<std::string>>>
+std::vector<llvm::ErrorOr<depscan_prescan_result_t *>>
 swift::dependencies::performBatchModulePrescan(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
-  std::vector<llvm::ErrorOr<std::vector<std::string>>> batchPrescanResult;
+  std::vector<llvm::ErrorOr<depscan_prescan_result_t *>> batchPrescanResult;
 
   // Perform a full dependency scan for each batch entry module
   forEachBatchEntry(
@@ -1377,7 +1387,9 @@ swift::dependencies::performBatchModulePrescan(
           return;
         }
 
-        batchPrescanResult.push_back(rootDeps->getModuleDependencies());
+        depscan_prescan_result_t *importSet = new depscan_prescan_result_t;
+        importSet->import_set = create_set(rootDeps->getModuleDependencies());
+        batchPrescanResult.push_back(importSet);
       });
 
   return batchPrescanResult;

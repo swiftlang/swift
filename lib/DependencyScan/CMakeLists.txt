@@ -16,15 +16,4 @@ target_link_libraries(SwiftScan INTERFACE
 target_link_libraries(SwiftScan PRIVATE
     swiftClangImporter
     swiftDemangling
-    swiftFrontend
-    swiftIDE
-    swiftImmediate
-    swiftIndex
-    swiftIRGen
-    swiftOption
-    swiftPrintAsObjC
-    swiftSerialization
-    swiftSIL
-    swiftSILGen
-    swiftSILOptimizer
-    swiftTBDGen)
+    swiftFrontend)

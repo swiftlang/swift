@@ -164,6 +164,11 @@ typedef struct {
   depscan_dependency_set_t* module_set;
 } depscan_dependency_result_t;
 
+typedef struct {
+  /// The complete list of imports discovered
+  ds_string_set_t* import_set;
+} depscan_prescan_result_t;
+
 //=== Dependency Result Functions -----------------------------------------===//
 
 DEPSCAN_PUBLIC void
@@ -177,6 +182,9 @@ depscan_dependency_set_dispose(depscan_dependency_set_t *set);
 
 DEPSCAN_PUBLIC void
 depscan_dependency_result_dispose(depscan_dependency_result_t *result);
+
+DEPSCAN_PUBLIC void
+depscan_prescan_result_dispose(depscan_prescan_result_t *result);
 
 //=== Scanner Functions ---------------------------------------------------===//
 
@@ -194,6 +202,12 @@ depscan_scan_dependencies(depscan_scanner_t* scanner,
                           const char *working_directory,
                           int argc,
                           const char *const *argv);
+
+DEPSCAN_PUBLIC depscan_prescan_result_t*
+depscan_prescan_dependencies(depscan_scanner_t* scanner,
+                             const char *working_directory,
+                             int argc,
+                             const char *const *argv);
 
 DEPSCAN_END_DECLS
 
