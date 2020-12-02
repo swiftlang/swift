@@ -98,7 +98,8 @@ class OuterGenericClass<T> {
 func f5<T, U>(x: T, y: U) {
   struct Local { // expected-error {{type 'Local' cannot be nested in generic function 'f5(x:y:)'}}
     func f() {
-      _ = 17 as T // expected-error{{'Int' is not convertible to 'T'}} {{14-16=as!}}
+      _ = 17 as T // expected-error{{'Int' is not convertible to 'T'}} 
+      // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
       _ = 17 as U // okay: refers to 'U' declared within the local class
     }
     typealias U = Int

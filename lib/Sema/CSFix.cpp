@@ -131,13 +131,14 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 bool CoerceToCheckedCast::diagnose(const Solution &solution,
                                    bool asNote) const {
-  MissingForcedDowncastFailure failure(solution, getFromType(), getToType(),
-                                       getLocator());
+  InvalidCoercionFailure failure(solution, getFromType(), getToType(),
+                                 UseConditionalCast, getLocator());
   return failure.diagnose(asNote);
 }
 
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
+                                                  bool useConditionalCast,
                                                   ConstraintLocator *locator) {
   // If any of the types has a type variable, don't add the fix.
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
@@ -159,7 +160,7 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
     return nullptr;
 
   return new (cs.getAllocator())
-      CoerceToCheckedCast(cs, fromType, toType, locator);
+      CoerceToCheckedCast(cs, fromType, toType, useConditionalCast, locator);
 }
 
 bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
