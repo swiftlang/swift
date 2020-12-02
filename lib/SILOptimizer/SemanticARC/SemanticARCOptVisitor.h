@@ -129,7 +129,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   /// The default visitor.
   bool visitSILInstruction(SILInstruction *i) {
-    assert(!isGuaranteedForwardingValueKind(SILNodeKind(i->getKind())) &&
+    assert(!isa<OwnershipForwardingInst>(i) &&
            "Should have forwarding visitor for all ownership forwarding "
            "instructions");
     return false;
@@ -157,8 +157,11 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     return false;                                                              \
   }
   FORWARDING_INST(Tuple)
+  FORWARDING_INST(Object)
   FORWARDING_INST(Struct)
   FORWARDING_INST(Enum)
+  FORWARDING_INST(UncheckedValueCast)
+  FORWARDING_INST(ThinToThickFunction)
   FORWARDING_INST(OpenExistentialRef)
   FORWARDING_INST(Upcast)
   FORWARDING_INST(UncheckedRefCast)
@@ -169,6 +172,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(UncheckedEnumData)
   FORWARDING_INST(MarkUninitialized)
   FORWARDING_INST(SelectEnum)
+  FORWARDING_INST(SelectValue)
   FORWARDING_INST(DestructureStruct)
   FORWARDING_INST(DestructureTuple)
   FORWARDING_INST(TupleExtract)
@@ -192,7 +196,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     }                                                                          \
     return false;                                                              \
   }
-
   FORWARDING_TERM(SwitchEnum)
   FORWARDING_TERM(CheckedCastBranch)
   FORWARDING_TERM(Branch)
