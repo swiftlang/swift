@@ -18,6 +18,8 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   ArrayDifferentiation.swift
   OptionalDifferentiation.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   GYB_SOURCES
     FloatingPointDifferentiation.swift.gyb
     TgmathDerivatives.swift.gyb
