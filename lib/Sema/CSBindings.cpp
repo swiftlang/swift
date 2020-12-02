@@ -88,6 +88,25 @@ bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
       return true;
   }
 
+  // If there is a `bind param` constraint associated with
+  // current type variable, result should be aware of that
+  // fact. Binding set might be incomplete until
+  // this constraint is resolved, because we currently don't
+  // look-through constraints expect to `subtype` to try and
+  // find related bindings.
+  // This only affects type variable that appears one the
+  // right-hand side of the `bind param` constraint and
+  // represents result type of the closure body, because
+  // left-hand side gets types from overload choices.
+  if (llvm::any_of(
+          EquivalentTo,
+          [&](const std::pair<TypeVariableType *, Constraint *> &equivalence) {
+            auto *constraint = equivalence.second;
+            return constraint->getKind() == ConstraintKind::BindParam &&
+                   constraint->getSecondType()->isEqual(TypeVar);
+          }))
+    return true;
+
   return false;
 }
 
