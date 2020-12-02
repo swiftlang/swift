@@ -95,6 +95,11 @@ private:
     bool HadUnexpectedDiag;
   };
 
+  void verifyAllExpectedDiagnosticsAppeared(
+      StringRef BufferName, StringRef InputFile,
+      std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+      std::vector<llvm::SMDiagnostic> &Errors);
+
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
