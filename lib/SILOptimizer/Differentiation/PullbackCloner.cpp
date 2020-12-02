@@ -1832,7 +1832,9 @@ bool PullbackCloner::Implementation::run() {
         }
       }
       // Diagnose unsupported stored property projections.
-      if (auto *inst = dyn_cast<FieldIndexCacheBase>(v)) {
+      if (isa<StructExtractInst>(v) || isa<RefElementAddrInst>(v) ||
+          isa<StructElementAddrInst>(v)) {
+        auto *inst = cast<SingleValueInstruction>(v);
         assert(inst->getNumOperands() == 1);
         auto baseType = remapType(inst->getOperand(0)->getType()).getASTType();
         if (!getTangentStoredProperty(getContext(), inst, baseType,

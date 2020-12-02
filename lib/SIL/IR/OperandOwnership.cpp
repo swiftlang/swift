@@ -148,7 +148,6 @@ INTERIOR_POINTER_PROJECTION(RefTailAddr)
             UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialValue)
-CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialBoxValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, OpenExistentialBox)
 CONSTANT_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding, HopToExecutor)
 CONSTANT_OWNERSHIP_INST(Owned, LifetimeEnding, AutoreleaseValue)
@@ -289,6 +288,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ConvertEscapeToNoEscape)
 #define FORWARD_ANY_OWNERSHIP_INST(INST)                                       \
   OwnershipConstraint OwnershipConstraintClassifier::visit##INST##Inst(        \
       INST##Inst *i) {                                                         \
+    assert(isa<OwnershipForwardingInst>(i));                                   \
     auto kind = i->getOwnershipKind();                                         \
     auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();          \
     return {kind, lifetimeConstraint};                                         \
@@ -314,27 +314,22 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
-#define FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP,                     \
-                                                USE_LIFETIME_CONSTRAINT, INST) \
+#define FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)               \
   OwnershipConstraint OwnershipConstraintClassifier::visit##INST##Inst(        \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    assert(isGuaranteedForwardingValueKind(SILNodeKind(i->getKind())) &&       \
-           "Expected an ownership forwarding inst");                           \
-    return {OwnershipKind::OWNERSHIP,                                          \
-            UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
+    assert(isa<OwnershipForwardingInst>(i));                                   \
+    ValueOwnershipKind kind = OwnershipKind::OWNERSHIP;                        \
+    return {kind, kind.getForwardingLifetimeConstraint()};                     \
   }
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
-                                        TupleExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
-                                        StructExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed,
                                         DifferentiableFunctionExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, NonLifetimeEnding,
-                                        LinearFunctionExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, LifetimeEnding,
-                                        MarkUninitialized)
-#undef CONSTANT_OR_NONE_OWNERSHIP_INST
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
+#undef FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST
 
 OwnershipConstraint OwnershipConstraintClassifier::visitDeallocPartialRefInst(
     DeallocPartialRefInst *i) {
@@ -925,10 +920,17 @@ Optional<OwnershipConstraint> Operand::getOwnershipConstraint() const {
   // We do not ever call this function when an instruction isn't in a block.
   assert(getUser()->getParent() &&
          "Can not lookup ownership constraint unless inserted into block");
-  if (auto *block = getUser()->getParent())
-    if (auto *func = block->getParent())
-      if (!func->hasOwnership())
-        return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+  if (auto *block = getUser()->getParent()) {
+    auto *func = block->getParent();
+    if (!func) {
+      // If we don't have a function, then we must have a SILGlobalVariable. In
+      // that case, we act as if we aren't in ownership.
+      return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+    }
+
+    if (!func->hasOwnership())
+      return {{OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding}};
+  }
 
   OwnershipConstraintClassifier classifier(getUser()->getModule(), *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
