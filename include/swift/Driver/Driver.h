@@ -166,7 +166,8 @@ public:
     Batch,           // swiftc
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
-    SymbolGraph      // swift-symbolgraph
+    SymbolGraph,     // swift-symbolgraph
+    APIExtract       // swift-api-extract
   };
 
   class InputInfoMap;

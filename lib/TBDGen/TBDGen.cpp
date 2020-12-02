@@ -47,9 +47,11 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/Symbol.h"
 #include "llvm/TextAPI/MachO/TextAPIReader.h"
 #include "llvm/TextAPI/MachO/TextAPIWriter.h"
 
+#include "APIGen.h"
 #include "TBDGenVisitor.h"
 
 using namespace swift;
@@ -64,10 +66,9 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 }
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
-                             SymbolCallbackFn symbolCallback)
+                             APIRecorder &recorder)
     : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
-                    desc.getParentModule(), desc.getOptions(),
-                    symbolCallback) {}
+                    desc.getParentModule(), desc.getOptions(), recorder) {}
 
 void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
                                       SymbolSource source) {
@@ -82,7 +83,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     }
   }
 #endif
-  SymbolCallback(name, kind, source);
+  recorder.addSymbol(name, kind, source);
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -877,6 +878,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       SmallString<128> buffer;
       addSymbol(CD->getObjCRuntimeName(buffer), SymbolSource::forUnknown(),
                 SymbolKind::ObjectiveCClass);
+      recorder.addObjCInterface(CD);
     }
   }
 
@@ -907,10 +909,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     TBDGenVisitor &TBD;
     ClassDecl *CD;
     bool FirstTime = true;
+    APIRecorder &recorder;
 
   public:
-    VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD)
-        : TBD(TBD), CD(CD) {}
+    VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD, APIRecorder &recorder)
+        : TBD(TBD), CD(CD), recorder(recorder) {}
 
     void addMethod(SILDeclRef method) {
       assert(method.getDecl()->getDeclContext() == CD);
@@ -928,9 +931,30 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       }
 
       TBD.addMethodDescriptor(method);
+
+      if (auto methodOrCtorOrDtor = method.getDecl()) {
+        // Skip non objc compatible methods or non-public methods.
+        if (!methodOrCtorOrDtor->isObjC() ||
+            methodOrCtorOrDtor->getFormalAccess() != AccessLevel::Public)
+          return;
+
+        // only handle FuncDecl here. Initializers are handled in
+        // visitConstructorDecl.
+        if (isa<FuncDecl>(methodOrCtorOrDtor))
+          recorder.addObjCMethod(CD, method);
+      }
     }
 
-    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
+    void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {
+      if (auto methodOrCtorOrDtor = derivedRef.getDecl()) {
+        if (!methodOrCtorOrDtor->isObjC() ||
+            methodOrCtorOrDtor->getFormalAccess() != AccessLevel::Public)
+          return;
+
+        if (isa<FuncDecl>(methodOrCtorOrDtor))
+          recorder.addObjCMethod(CD, derivedRef);
+      }
+    }
 
     void addPlaceholder(MissingMemberDecl *) {}
 
@@ -939,7 +963,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     }
   };
 
-  VTableVisitor(*this, CD).doIt();
+  VTableVisitor(*this, CD, recorder).doIt();
 }
 
 void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
@@ -948,7 +972,12 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
     addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    if (auto parentClass = CD->getParent()->getSelfClassDecl()) {
+      if (parentClass->isObjC() || CD->isObjC())
+        recorder.addObjCMethod(parentClass, SILDeclRef(CD));
+    }
   }
+
   visitAbstractFunctionDecl(CD);
 }
 
@@ -1241,8 +1270,8 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
     file.addSymbol(kind, symbol, targets);
   };
-
-  TBDGenVisitor visitor(desc, addSymbol);
+  SimpleAPIRecorder recorder(addSymbol);
+  TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
   return file;
 }
@@ -1255,8 +1284,8 @@ PublicSymbolsRequest::evaluate(Evaluator &evaluator,
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
   };
-
-  TBDGenVisitor visitor(desc, addSymbol);
+  SimpleAPIRecorder recorder(addSymbol);
+  TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
   return symbols;
 }
@@ -1274,6 +1303,137 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                  "YAML writing should be error-free");
 }
 
+class APIGenRecorder final : public APIRecorder {
+public:
+  APIGenRecorder(apigen::API &api, ModuleDecl *module)
+      : api(api), module(module) {
+    const auto &MainFile = module->getMainFile(FileUnitKind::SerializedAST);
+    moduleLoc = apigen::APILoc(MainFile.getModuleDefiningPath().str(), 0, 0);
+  }
+  ~APIGenRecorder() {}
+
+  void addSymbol(StringRef symbol, SymbolKind kind,
+                 SymbolSource source) override {
+    if (kind != SymbolKind::GlobalSymbol)
+      return;
+
+    apigen::APIAvailability availability;
+    if (source.kind == SymbolSource::Kind::SIL) {
+      auto ref = source.getSILDeclRef();
+      if (auto *decl = ref.getDecl())
+        availability = getAvailability(decl);
+    }
+
+    api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,
+                  apigen::APIFlags::None, apigen::APIAccess::Public,
+                  availability);
+  }
+
+  void addObjCInterface(const ClassDecl *decl) override {
+    addOrGetObjCInterface(decl);
+  }
+
+  void addObjCMethod(const ClassDecl *cls,
+                     SILDeclRef method) override {
+    SmallString<128> buffer;
+    StringRef name = getSelectorName(method, buffer);
+    apigen::APIAvailability availability;
+    bool isInstanceMethod = true;
+    if (auto *decl = method.getDecl()) {
+      availability = getAvailability(decl);
+      if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
+        isInstanceMethod = false;
+    }
+
+    auto *clsRecord = addOrGetObjCInterface(cls);
+    api.addObjCMethod(clsRecord, name, moduleLoc, apigen::APIAccess::Public,
+                      isInstanceMethod, false, availability);
+  }
+
+private:
+  apigen::APIAvailability getAvailability(const Decl *decl) {
+    bool unavailable = false;
+    std::string introduced, obsoleted;
+    auto platform = targetPlatform(module->getASTContext().LangOpts);
+    for (auto *attr : decl->getAttrs()) {
+      if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
+        if (ava->isUnconditionallyUnavailable())
+          unavailable = true;
+        if (ava->Platform == platform) {
+          if (ava->Introduced)
+            introduced = ava->Introduced->getAsString();
+          if (ava->Obsoleted)
+            obsoleted = ava->Obsoleted->getAsString();
+        }
+      }
+    }
+    return {introduced, obsoleted, unavailable};
+  }
+
+  StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {
+    auto methodOrCtorOrDtor = method.getDecl();
+    if (methodOrCtorOrDtor) {
+      if (auto *method = dyn_cast<FuncDecl>(methodOrCtorOrDtor))
+        return method->getObjCSelector().getString(buffer);
+      else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtorOrDtor))
+        return ctor->getObjCSelector().getString(buffer);
+      else if (isa<DestructorDecl>(methodOrCtorOrDtor))
+        return "dealloc";
+    }
+    llvm_unreachable("cannot get selector name from decl");
+  }
+
+  apigen::ObjCInterfaceRecord *addOrGetObjCInterface(const ClassDecl *decl) {
+    auto entry = classMap.find(decl);
+    if (entry != classMap.end())
+      return entry->second;
+
+    SmallString<128> nameBuffer;
+    auto name = decl->getObjCRuntimeName(nameBuffer);
+    StringRef superCls;
+    SmallString<128> buffer;
+    if (auto *super = decl->getSuperclassDecl())
+      superCls = super->getObjCRuntimeName(buffer);
+    apigen::APIAvailability availability = getAvailability(decl);
+    apigen::APIAccess access = decl->getFormalAccess() == AccessLevel::Public
+                                   ? apigen::APIAccess::Public
+                                   : apigen::APIAccess::Private;
+    apigen::APILinkage linkage = decl->isObjC() ? apigen::APILinkage::Exported
+                                                : apigen::APILinkage::Internal;
+    auto cls = api.addObjCClass(name, linkage, moduleLoc, access, availability,
+                                superCls);
+    classMap.try_emplace(decl, cls);
+    return cls;
+  }
+
+  apigen::API &api;
+  ModuleDecl *module;
+  apigen::APILoc moduleLoc;
+
+  llvm::DenseMap<const ClassDecl*, apigen::ObjCInterfaceRecord*> classMap;
+};
+
+apigen::API APIGenRequest::evaluate(Evaluator &evaluator,
+                                    TBDGenDescriptor desc) const {
+  auto *M = desc.getParentModule();
+  apigen::API api(M->getASTContext().LangOpts.Target);
+  APIGenRecorder recorder(api, M);
+
+  TBDGenVisitor visitor(desc, recorder);
+  visitor.visit(desc);
+
+  return api;
+}
+
+void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
+                             bool PrettyPrint) {
+  TBDGenOptions opts;
+  auto &evaluator = M->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forModule(M, opts);
+  auto api = llvm::cantFail(evaluator(APIGenRequest{desc}));
+  api.writeAPIJSONFile(os, PrettyPrint);
+}
+
 SymbolSourceMap SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
                                                  TBDGenDescriptor desc) const {
   using Map = SymbolSourceMap::Storage;
@@ -1283,7 +1443,8 @@ SymbolSourceMap SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
     symbolSources.insert({symbol, source});
   };
 
-  TBDGenVisitor visitor(desc, addSymbol);
+  SimpleAPIRecorder recorder(addSymbol);
+  TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
 
   // FIXME: Once the evaluator supports returning a reference to a cached value

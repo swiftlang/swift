@@ -22,3 +22,5 @@ SWIFT_REQUEST(TBDGen, PublicSymbolsRequest,
 SWIFT_REQUEST(TBDGen, SymbolSourceMapRequest,
               SymbolSourceMap(TBDGenDescriptor),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TBDGen, APIGenRequest, apigen::API(TBDGenDescriptor), Uncached,
+              NoLocationInfo)
