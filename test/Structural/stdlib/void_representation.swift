@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: structural
 
 // Test dummy void-based conformance to `Structural` protocol.
 
