@@ -74,12 +74,12 @@ ds_string_set_t *create_set(const std::vector<std::string> &strings) {
 // libSwiftScan public APIs.
 //===----------------------------------------------------------------------===//
 
-const char *depscan_get_C_string(ds_string_t string) {
+const char *ds_get_C_string(ds_string_t string) {
   return static_cast<const char *>(string.data);
 }
 
 /// Free the given string.
-void depscan_string_dispose(ds_string_t string) {
+void ds_string_dispose(ds_string_t string) {
   switch ((ds_string_management)string.private_flags) {
   case ds_string_unmanaged:
     break;
@@ -91,9 +91,9 @@ void depscan_string_dispose(ds_string_t string) {
 }
 
 /// Free the given string set.
-void depscan_string_set_dispose(ds_string_set_t *set) {
+void ds_string_set_dispose(ds_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
-    depscan_string_dispose(set->strings[SI]);
+    ds_string_dispose(set->strings[SI]);
   delete[] set->strings;
   delete set;
 }

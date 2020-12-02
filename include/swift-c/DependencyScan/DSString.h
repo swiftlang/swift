@@ -20,8 +20,8 @@ DEPSCAN_BEGIN_DECLS
 /**
  * A character string used to pass around dependency scan result metadata.
  * A slightly-reduced variation of clang's CXString
- * Use \c depscan_get_C_string() to retrieve the string data and, once finished
- * with the string data, call \c depscan_dispose_string() to free the string.
+ * Use \c ds_get_C_string() to retrieve the string data and, once finished
+ * with the string data, call \c ds_dispose_string() to free the string.
  */
 typedef struct {
   const void *data;
@@ -35,15 +35,15 @@ typedef struct {
 
 //=== Public API ----------------------------------------------------------===//
 /// Retrieve the character data associated with the given string.
-DEPSCAN_PUBLIC const char *depscan_get_C_string(ds_string_t string);
+DEPSCAN_PUBLIC const char *ds_get_C_string(ds_string_t string);
 
 
 /// Free the given string.
-DEPSCAN_PUBLIC void depscan_string_dispose(ds_string_t string);
+DEPSCAN_PUBLIC void ds_string_dispose(ds_string_t string);
 
 
 /// Free the given string set.
-DEPSCAN_PUBLIC void depscan_string_set_dispose(ds_string_set_t *set);
+DEPSCAN_PUBLIC void ds_string_set_dispose(ds_string_set_t *set);
 
 DEPSCAN_END_DECLS
 

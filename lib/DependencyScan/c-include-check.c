@@ -2,4 +2,4 @@
 // from C and that no C++ code has sneaked in.
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-typedef depscan_module_details_t _check_module_details_exists;
+typedef ds_module_details_t _check_module_details_exists;

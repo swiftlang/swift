@@ -1,5 +1,6 @@
 set_swift_llvm_is_available()
 add_swift_host_library(SwiftScan STATIC
+  DependencyScanImpl.cpp
   DependencyScanningTool.cpp
   ScanDependencies.cpp
   DSString.cpp
