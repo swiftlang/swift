@@ -757,7 +757,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       B.emitBlock(contBB);
 
       SILValue existentialResult = contBB->createPhiArgument(
-          existentialTL.getLoweredType(), ValueOwnershipKind::Owned);
+          existentialTL.getLoweredType(), OwnershipKind::Owned);
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }
   }

@@ -403,10 +403,10 @@ static void destroyConsumedOperandOfDeadInst(Operand &operand) {
   assert(!isEndOfScopeMarker(deadInst) && !isa<DestroyValueInst>(deadInst) &&
          !isa<DestroyAddrInst>(deadInst) &&
          "lifetime ending instruction is deleted without its operand");
-  if (operand.isConsumingUse()) {
+  if (operand.isLifetimeEnding()) {
     // Since deadInst cannot be an end-of-scope instruction (asserted above),
     // this must be a consuming use of an owned value.
-    assert(operandValue.getOwnershipKind() == ValueOwnershipKind::Owned);
+    assert(operandValue.getOwnershipKind() == OwnershipKind::Owned);
     SILBuilderWithScope builder(deadInst);
     builder.emitDestroyValueOperation(deadInst->getLoc(), operandValue);
   }
@@ -1000,7 +1000,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     auto *curBB = builder->getInsertionPoint()->getParent();
 
     auto *contBB = curBB->split(builder->getInsertionPoint());
-    contBB->createPhiArgument(destTy, ValueOwnershipKind::Owned);
+    contBB->createPhiArgument(destTy, OwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
     caseBBs.push_back(std::make_pair(someDecl, someBB));

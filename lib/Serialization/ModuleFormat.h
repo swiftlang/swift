@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 586; // XRefClangTemplateInstantiation added
+const uint16_t SWIFTMODULE_VERSION_MINOR = 588; // XRefClangTemplateInstantiation added
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -787,7 +787,8 @@ namespace options_block {
     IS_TESTABLE,
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
-    IS_IMPLICIT_DYNAMIC_ENABLED
+    IS_IMPLICIT_DYNAMIC_ENABLED,
+    IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -820,6 +821,10 @@ namespace options_block {
   using ResilienceStrategyLayout = BCRecordLayout<
     RESILIENCE_STRATEGY,
     BCFixed<2>
+  >;
+
+  using IsAllowModuleWithCompilerErrorsEnabledLayout = BCRecordLayout<
+    IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED
   >;
 }
 
@@ -917,6 +922,12 @@ namespace decls_block {
   using ClangTypeLayout = BCRecordLayout<
     CLANG_TYPE,
     BCArray<BCVBR<6>>
+  >;
+
+  /// A placeholder for invalid types
+  using ErrorTypeLayout = BCRecordLayout<
+    ERROR_TYPE,
+    TypeIDField // original type (if any)
   >;
 
   using BuiltinAliasTypeLayout = BCRecordLayout<
@@ -2005,6 +2016,7 @@ namespace index_block {
     PRECEDENCE_GROUPS,
     NESTED_TYPE_DECLS,
     DECL_MEMBER_NAMES,
+    DECL_FINGERPRINTS,
 
     ORDERED_TOP_LEVEL_DECLS,
 
@@ -2012,7 +2024,7 @@ namespace index_block {
     CLANG_TYPE_OFFSETS,
     LastRecordKind = CLANG_TYPE_OFFSETS,
   };
-  
+
   constexpr const unsigned RecordIDFieldWidth = 5;
   static_assert(LastRecordKind < (1 << RecordIDFieldWidth),
                 "not enough bits for all record kinds");
@@ -2072,6 +2084,12 @@ namespace index_block {
   using OrderedDeclsLayout = BCGenericRecordLayout<
     RecordIDField,        // record ID
     BCArray<DeclIDField>  // list of decls by ID
+  >;
+
+  using DeclFingerprintsLayout = BCRecordLayout<
+    DECL_FINGERPRINTS, // record ID
+    BCVBR<16>,   // table offset within the blob (see below)
+    BCBlob       // map from member DeclIDs to strings
   >;
 }
 

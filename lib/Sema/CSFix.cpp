@@ -131,13 +131,14 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 bool CoerceToCheckedCast::diagnose(const Solution &solution,
                                    bool asNote) const {
-  MissingForcedDowncastFailure failure(solution, getFromType(), getToType(),
-                                       getLocator());
+  InvalidCoercionFailure failure(solution, getFromType(), getToType(),
+                                 UseConditionalCast, getLocator());
   return failure.diagnose(asNote);
 }
 
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
+                                                  bool useConditionalCast,
                                                   ConstraintLocator *locator) {
   // If any of the types has a type variable, don't add the fix.
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
@@ -159,8 +160,25 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
     return nullptr;
 
   return new (cs.getAllocator())
-      CoerceToCheckedCast(cs, fromType, toType, locator);
+      CoerceToCheckedCast(cs, fromType, toType, useConditionalCast, locator);
 }
+
+bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  ArrayLiteralToDictionaryConversionFailure failure(solution,
+                                                    getToType(), getFromType(),
+                                                    getLocator());
+  return failure.diagnose(asNote);
+};
+
+TreatArrayLiteralAsDictionary *
+TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
+                                      Type dictionaryTy, Type arrayTy,
+                                      ConstraintLocator *locator) {
+  assert(getAsExpr<ArrayExpr>(locator->getAnchor())->getNumElements() <= 1);
+  return new (cs.getAllocator())
+      TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, locator);
+};
 
 bool MarkExplicitlyEscaping::diagnose(const Solution &solution,
                                       bool asNote) const {
@@ -1614,4 +1632,16 @@ SpecifyContextualTypeForNil *
 SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
+}
+
+bool AllowRefToInvalidDecl::diagnose(const Solution &solution,
+                                     bool asNote) const {
+  ReferenceToInvalidDeclaration failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowRefToInvalidDecl *
+AllowRefToInvalidDecl::create(ConstraintSystem &cs,
+                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowRefToInvalidDecl(cs, locator);
 }

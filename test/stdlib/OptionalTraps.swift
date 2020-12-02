@@ -36,7 +36,7 @@ OptionalTraps.test("UnwrapNone/location")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration()
-                        ? "OptionalTraps.swift, line 45"
+                        ? "OptionalTraps.swift:45:"
                         : "")
   .code {
   expectCrashLater()

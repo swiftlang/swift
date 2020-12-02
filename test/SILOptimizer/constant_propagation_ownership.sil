@@ -885,8 +885,7 @@ bb0(%2 : $*Value, %0 : $Builtin.Int1, %1 : @guaranteed $AnObject):
   cond_br %0, bb1, bb2
 
 bb1:
-  %3 = tuple()
-  return %3 : $()
+  br bb3
 
 bb2:
   %31 = alloc_stack $AnObject
@@ -896,7 +895,11 @@ bb2:
   %32 = alloc_stack $AnObject
   dealloc_stack %32: $*AnObject
   dealloc_stack %31 : $*AnObject
-  br bb1
+  br bb3
+
+bb3:
+  %3 = tuple()
+  return %3 : $()
 }
 
 public protocol P {

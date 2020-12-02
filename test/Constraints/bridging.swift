@@ -124,16 +124,24 @@ func arrayToNSArray() {
 // NSArray -> Array
 func nsArrayToArray(_ nsa: NSArray) {
   var arr1: [AnyObject] = nsa // expected-error{{'NSArray' is not implicitly convertible to '[AnyObject]'; did you mean to use 'as' to explicitly convert?}} {{30-30= as [AnyObject]}}
-  var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}} {{30-30= as! [BridgedClass]}}
-  var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}} {{28-28= as! [OtherClass]}}
-  var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}} {{31-31= as! [BridgedStruct]}}
-  var _: [NotBridgedStruct] = nsa // expected-error{{use 'as!' to force downcast}}
+  var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{30-30= as! [BridgedClass]}}
+  var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{28-28= as! [OtherClass]}}
+  var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{31-31= as! [BridgedStruct]}}
+  var _: [NotBridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{34-34= as! [NotBridgedStruct]}}
 
   var _: [AnyObject] = nsa as [AnyObject]
-  var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}} {{31-33=as!}}
-  var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}} {{29-31=as!}}
-  var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}} {{32-34=as!}}
-  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{use 'as!' to force downcast}}
+  var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{31-33=as!}}
+  var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{29-31=as!}}
+  var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}} 
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{32-34=as!}}
+  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
+  // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{35-37=as!}}
 
   var arr6: Array = nsa as Array
   arr6 = arr1
@@ -180,7 +188,8 @@ func dictionaryToNSDictionary() {
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
 struct NotEquatable {}
 func notEquatableError(_ d: Dictionary<Int, NotEquatable>) -> Bool {
-  return d == d // expected-error{{referencing operator function '==' on 'Dictionary' requires that 'NotEquatable' conform to 'Equatable'}}
+  // There is a note attached to a requirement `requirement from conditional conformance of 'Dictionary<Int, NotEquatable>' to 'Equatable'`
+  return d == d // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
 }
 
 // NSString -> String
@@ -210,7 +219,8 @@ func rdar18330319(_ s: String, d: [String : AnyObject]) {
 func rdar19551164a(_ s: String, _ a: [String]) {}
 func rdar19551164b(_ s: NSString, _ a: NSArray) {
   rdar19551164a(s, a) // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{18-18= as String}}
-  // expected-error@-1{{'NSArray' is not convertible to '[String]'; did you mean to use 'as!' to force downcast?}}{{21-21= as! [String]}}
+  // expected-error@-1{{'NSArray' is not convertible to '[String]'}}
+  // expected-note@-2 {{did you mean to use 'as!' to force downcast?}}{{21-21= as! [String]}}
 }
 
 // rdar://problem/19695671

@@ -654,7 +654,9 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   // When the decl is context-free, we should get loc from source buffer.
   if (!getDeclContext())
     return getLocFromSource();
-  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  FileUnit *File = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  if (!File)
+    return getLocFromSource();
   switch(File->getKind()) {
   case FileUnitKind::Source:
     return getLocFromSource();
@@ -684,7 +686,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto braceStmt = getBody();
   assert(braceStmt != nullptr && "No body currently available.");
-  auto body = getBody()->getFirstElement();
+  auto body = getBody()->getLastElement();
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       return returnStmt->getResult();
@@ -701,7 +703,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
 
 void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getFirstElement();
+  auto body = getBody()->getLastElement();
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
@@ -717,7 +719,7 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
       return;
     }
   }
-  getBody()->setFirstElement(NewBody);
+  getBody()->setLastElement(NewBody);
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -7522,6 +7524,20 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   Bits.ConstructorDecl.Failable = Failable;
 
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
+}
+
+ConstructorDecl *ConstructorDecl::createImported(
+    ASTContext &ctx, ClangNode clangNode, DeclName name,
+    SourceLoc constructorLoc, bool failable, SourceLoc failabilityLoc,
+    bool throws, SourceLoc throwsLoc, ParameterList *bodyParams,
+    GenericParamList *genericParams, DeclContext *parent) {
+  void *declPtr = allocateMemoryForDecl<ConstructorDecl>(
+      ctx, sizeof(ConstructorDecl), true);
+  auto ctor = ::new (declPtr)
+      ConstructorDecl(name, constructorLoc, failable, failabilityLoc, throws,
+                      throwsLoc, bodyParams, genericParams, parent);
+  ctor->setClangNode(clangNode);
+  return ctor;
 }
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {

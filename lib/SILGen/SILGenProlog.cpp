@@ -454,6 +454,9 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
   if (!F.isAsync())
     return;
 
+  // Initialize 'actor' if the function is an actor-isolated function or
+  // closure.
+
   if (auto *funcDecl =
         dyn_cast_or_null<AbstractFunctionDecl>(FunctionDC->getAsDecl())) {
     auto actorIsolation = getActorIsolation(funcDecl);
@@ -465,36 +468,56 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       case ActorIsolation::ActorInstance: {
         assert(selfParam && "no self parameter for ActorInstance isolation");
         ManagedValue selfArg = ManagedValue::forUnmanaged(F.getSelfArgument());
-        ManagedValue borrowedSelf = selfArg.borrow(*this, F.getLocation());
-        actor = borrowedSelf.getValue();
+        actor = selfArg.borrow(*this, F.getLocation()).getValue();
         break;
       }
-      case ActorIsolation::GlobalActor: {
-        CanType actorType = CanType(actorIsolation.getGlobalActor());
-        NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
-        VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
-        assert(sharedInstanceDecl && "no shared actor field in global actor");
-        SubstitutionMap subs =
-          actorType->getContextSubstitutionMap(SGM.SwiftModule, nominal);
-        SILLocation loc = F.getLocation();
-        Type instanceType =
-          actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
-
-        ManagedValue actorMetaType =
-          ManagedValue::forUnmanaged(B.createMetatype(loc,
-            SILType::getPrimitiveObjectType(
-              CanMetatypeType::get(actorType, MetatypeRepresentation::Thin))));
-
-        RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaType,
-          actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
-          subs, AccessSemantics::Ordinary, instanceType, SGFContext());
+      case ActorIsolation::GlobalActor:
+        loadGlobalActor(actorIsolation.getGlobalActor());
+        break;
+    }
+  } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
+    auto actorIsolation = closureExpr->getActorIsolation();
+    switch (actorIsolation.getKind()) {
+      case ClosureActorIsolation::Independent:
+        break;
+      case ClosureActorIsolation::ActorInstance: {
+        VarDecl *actorDecl = actorIsolation.getActorInstance();
+        RValue actorInstanceRV = emitRValueForDecl(F.getLocation(),
+          actorDecl, actorDecl->getType(), AccessSemantics::Ordinary);
         ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
-        actor = actorInstance.borrow(*this, loc).getValue();
+        actor = actorInstance.borrow(*this, F.getLocation()).getValue();
         break;
       }
+      case ClosureActorIsolation::GlobalActor:
+        loadGlobalActor(actorIsolation.getGlobalActor());
+        break;
     }
   }
   emitHopToCurrentExecutor(F.getLocation());
+}
+
+void SILGenFunction::loadGlobalActor(Type globalActor) {
+  assert(F.isAsync());
+  CanType actorType = CanType(globalActor);
+  NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
+  VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
+  assert(sharedInstanceDecl && "no shared actor field in global actor");
+  SubstitutionMap subs =
+    actorType->getContextSubstitutionMap(SGM.SwiftModule, nominal);
+  SILLocation loc = F.getLocation();
+  Type instanceType =
+    actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
+
+  ManagedValue actorMetaType =
+    ManagedValue::forUnmanaged(B.createMetatype(loc,
+      SILType::getPrimitiveObjectType(
+        CanMetatypeType::get(actorType, MetatypeRepresentation::Thin))));
+
+  RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaType,
+    actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
+    subs, AccessSemantics::Ordinary, instanceType, SGFContext());
+  ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
+  actor = actorInstance.borrow(*this, loc).getValue();
 }
 
 static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,

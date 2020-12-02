@@ -15,24 +15,16 @@
 
 using namespace swift;
 
-static ValueOwnershipKind getOwnershipKindForUndef(SILType type, const SILFunction &f) {
-  if (type.isAddress() || type.isTrivial(f))
-    return ValueOwnershipKind::None;
-  return ValueOwnershipKind::Owned;
-}
+SILUndef::SILUndef(SILType type)
+    : ValueBase(ValueKind::SILUndef, type, IsRepresentative::Yes) {}
 
-SILUndef::SILUndef(SILType type, ValueOwnershipKind ownershipKind)
-    : ValueBase(ValueKind::SILUndef, type, IsRepresentative::Yes),
-      ownershipKind(ownershipKind) {}
-
-SILUndef *SILUndef::get(SILType ty, SILModule &m, ValueOwnershipKind ownershipKind) {
-  SILUndef *&entry = m.UndefValues[std::make_pair(ty, unsigned(ownershipKind))];
+SILUndef *SILUndef::get(SILType ty, SILModule &m) {
+  SILUndef *&entry = m.UndefValues[ty];
   if (entry == nullptr)
-    entry = new (m) SILUndef(ty, ownershipKind);
+    entry = new (m) SILUndef(ty);
   return entry;
 }
 
 SILUndef *SILUndef::get(SILType ty, const SILFunction &f) {
-  auto ownershipKind = getOwnershipKindForUndef(ty, f);
-  return SILUndef::get(ty, f.getModule(), ownershipKind);
+  return SILUndef::get(ty, f.getModule());
 }

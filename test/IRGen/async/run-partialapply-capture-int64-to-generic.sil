@@ -10,6 +10,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -25,8 +26,8 @@ bb0(%x : $Int32, %f : $@async @callee_owned (Int32) -> @out T):
   return %p : $@async @callee_owned () -> @out T
 }
 
-// CHECK-LL: define internal swiftcc void @"$sTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
-// CHECK-LL: define internal swiftcc void @"$s6calleeTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]*}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swiftcc void @"$sTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swiftcc void @"$s6calleeTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T {
 entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
   %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -37,8 +38,10 @@ entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
   return %result : $()
 }
 
-sil @main : $@async @convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// Defined in _Concurrency
+sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
   %callee = function_ref @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T
   %first_literal = integer_literal $Builtin.Int32, 1
   %first = struct $Int32 (%first_literal : $Builtin.Int32)
@@ -49,7 +52,7 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   %second_literal = integer_literal $Builtin.Int32, 6789
   %second = struct $Int32 (%second_literal : $Builtin.Int32)
   %callee2 = apply %partialApplier<Int32>(%second, %callee1) : $@async @convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T
-  
+
   %result_addr = alloc_stack $Int32
   %result = apply %callee2(%result_addr) : $@async @callee_owned () -> @out Int32
 
@@ -59,7 +62,19 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   dealloc_stack %result_addr : $*Int32
   dealloc_stack %first_addr : $*Int32
 
-  %out_literal = integer_literal $Builtin.Int32, 0
-  %out = struct $Int32 (%out_literal : $Builtin.Int32)
-  return %out : $Int32
+  %void = tuple()
+  return %void : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
 }

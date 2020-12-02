@@ -1030,6 +1030,21 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
       }
     }
   }
+
+  if (auto ID = dyn_cast<ImportDecl>(D)) {
+    auto importedModule = ID->getModule();
+    if (importedModule) {
+      auto path = importedModule->getModuleFilename();
+      if (llvm::sys::path::extension(path) == ".swiftinterface" &&
+          !path.endswith(".private.swiftinterface")) {
+        // If the module was built from the public swiftinterface, it can't
+        // have any SPI.
+        diagnose(attr->getLocation(),
+                 diag::spi_attribute_on_import_of_public_module,
+                 importedModule->getName(), path);
+      }
+    }
+  }
 }
 
 static bool checkObjCDeclContext(Decl *D) {
@@ -1051,25 +1066,25 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
     return;
 
   auto &ctx = SF->getASTContext();
-  if (ctx.LangOpts.EnableObjCInterop) {
-    // Don't diagnose in a SIL file.
-    if (SF->Kind == SourceFileKind::SIL)
-      return;
 
-    // Don't diagnose for -disable-objc-attr-requires-foundation-module.
-    if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
-      return;
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+      .fixItRemove(attr->getRangeWithAt());
+    return;
   }
+
+  // Don't diagnose in a SIL file.
+  if (SF->Kind == SourceFileKind::SIL)
+    return;
+
+  // Don't diagnose for -disable-objc-attr-requires-foundation-module.
+  if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+    return;
 
   // If we have the Foundation module, @objc is okay.
   auto *foundation = ctx.getLoadedModule(ctx.Id_Foundation);
   if (foundation && ctx.getImportCache().isImportedBy(foundation, SF))
     return;
-
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt());
-  }
 
   ctx.Diags.diagnose(attr->getLocation(),
                      diag::attr_used_without_required_module, attr,

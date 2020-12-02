@@ -397,7 +397,14 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
- 
+
+  /// Mapping from each async let clause to the child task that will produce
+  /// the initializer value for that clause and a Boolean value indicating
+  /// whether the task can throw.
+  llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
+                      std::pair<SILValue, bool /*isThrowing*/> >
+      AsyncLetChildTasks;
+
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
   /// because of assumptions in framework code. This enum tracks the state of
@@ -616,6 +623,8 @@ public:
   
   /// Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
+  /// Generate code for @asyncHandler functions.
+  void emitAsyncHandler(FuncDecl *fd);
   /// Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
@@ -842,6 +851,10 @@ public:
   uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
                       Type resultType, DeclContext *DC,
                       bool throws, SourceLoc throwsLoc);
+
+  /// Initializes 'actor' with the loaded shared instance of the \p globalActor
+  /// type.
+  void loadGlobalActor(Type globalActor);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1253,7 +1266,8 @@ public:
                                          SGFAccessKind accessKind);
 
   // FIXME: demote this to private state.
-  ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
+  ManagedValue maybeEmitValueOfLocalVarDecl(
+      VarDecl *var, AccessKind accessKind);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
@@ -1316,6 +1330,14 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
+
+  ManagedValue emitRunChildTask(
+      SILLocation loc, Type functionType, ManagedValue taskFunction);
+
+  ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
+
+  void completeAsyncLetChildTask(
+      PatternBindingDecl *patternBinding, unsigned index);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -1462,6 +1484,12 @@ public:
                                 LValue &&src, LValue &&dest);
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
+
+  /// Emit an assignment to the variables in the destination pattern, given
+  /// an rvalue source that has the same type as the pattern.
+  void emitAssignToPatternVars(
+      SILLocation loc, Pattern *destPattern, RValue &&src);
+
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
@@ -2000,13 +2028,30 @@ public:
   
   /// Enter a cleanup to emit a ReleaseValue/DestroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
-  
+
+  /// Return an owned managed value for \p value that is cleaned up using an end_lifetime instruction.
+  ///
+  /// The end_lifetime cleanup is not placed into the ManagedValue itself and
+  /// thus can not be forwarded. This means that the ManagedValue is treated
+  /// as a +0 value. This means that the owned value will be copied by SILGen
+  /// if it is ever needed as a +1 value (meaning any time that the value
+  /// escapes).
+  ///
+  /// DISCUSSION: end_lifetime ends the lifetime of an owned value in OSSA
+  /// without resulting in a destroy being emitted. This cleanup should only
+  /// be used for owned values that do not need to be destroyed if they do not
+  /// escape the current call frame but need to be copied if they escape.
+  ManagedValue emitManagedRValueWithEndLifetimeCleanup(SILValue value);
+
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.
   CleanupHandle enterDeinitExistentialCleanup(CleanupState state,
                                               SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
+
+  /// Enter a cleanup to cancel the given task.
+  CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,

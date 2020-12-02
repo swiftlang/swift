@@ -63,15 +63,16 @@ static inline llvm::hash_code hash_value(ValueKind K) {
 /// What constraint does the given use of an SSA value put on the lifetime of
 /// the given SSA value.
 ///
-/// There are two possible constraints: MustBeLive and
-/// MustBeInvalidated. MustBeLive means that the SSA value must be able to be
-/// used in a valid way at the given use point. MustBeInvalidated means that any
-/// use of given SSA value after this instruction on any path through this
-/// instruction.
+/// There are two possible constraints: NonLifetimeEnding and
+/// LifetimeEnding. NonLifetimeEnding means that the SSA value must be
+/// able to be used in a valid way at the given use
+/// point. LifetimeEnding means that the value has been invalidated at
+/// the given use point and any uses reachable from that point are
+/// invalid in SIL causing a SIL verifier error.
 enum class UseLifetimeConstraint {
   /// This use requires the SSA value to be live after the given instruction's
   /// execution.
-  MustBeLive,
+  NonLifetimeEnding,
 
   /// This use invalidates the given SSA value.
   ///
@@ -81,16 +82,52 @@ enum class UseLifetimeConstraint {
   /// guaranteed (i.e. shared borrow) semantics this means that the program
   /// has left the scope of the borrowed SSA value and said value can not be
   /// used.
-  MustBeInvalidated,
+  LifetimeEnding,
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               UseLifetimeConstraint constraint);
 
-/// A value representing the specific ownership semantics that a SILValue may
-/// have.
-struct ValueOwnershipKind {
+/// A lattice that we use to classify ownership at the SIL level. None is top
+/// and Any is bottom and all of the other ownership kinds are mid level nodes
+/// in the lattice. Graphically the lattice looks as follows:
+///             +----+
+///     +-------|None|---------+
+///     |       +----+         |
+///     |          |           |
+///     v          v           v
+/// +-------+   +-----+   +----------+
+/// |Unowned|   |Owned|   |Guaranteed|
+/// +-------+   +-----+   +----------+
+///     |          |           |
+///     |          v           |
+///     |        +---+         |
+///     +------->|Any|<--------+
+///              +---+
+///
+/// One moves up the lattice by performing a join operation and one moves down
+/// the lattice by performing a meet operation.
+///
+/// This type is used in two different composition types:
+///
+/// * ValueOwnershipKind: This represents the ownership kind that a value can
+///   take. Since our ownership system is strict, we require that all values
+///   have a non-Any ownership since Any represents a type of ownership unknown
+///   statically. Thus we treat Any as representing an invalid
+///   value. ValueOwnershipKinds can only perform a meet operation to determine
+///   if two ownership kinds are compatible with a merge of Any showing the
+///   merge is impossible since values can not have any ownership.
+///
+/// * OperandConstraint: This represents a constraint on the values that can be
+///   used by a specific operand. Here Any is valid.
+struct OwnershipKind {
   enum innerty : uint8_t {
+    /// An ownership kind that models an ownership that is unknown statically at
+    /// compile time. It is invalid when applied to values because we have
+    /// strict ownership rules for values. But it is an expected/normal state
+    /// when constraining ownership kinds.
+    Any = 0,
+
     /// A SILValue with `Unowned` ownership kind is an independent value that
     /// has a lifetime that is only guaranteed to last until the next program
     /// visible side-effect. To maintain the lifetime of an unowned value, it
@@ -129,40 +166,107 @@ struct ValueOwnershipKind {
     None,
 
     LastValueOwnershipKind = None,
-  } Value;
+  } value;
 
   using UnderlyingType = std::underlying_type<innerty>::type;
   static constexpr unsigned NumBits = SILNode::NumVOKindBits;
   static constexpr UnderlyingType MaxValue = (UnderlyingType(1) << NumBits);
   static constexpr uint64_t Mask = MaxValue - 1;
-  static_assert(unsigned(ValueOwnershipKind::LastValueOwnershipKind) < MaxValue,
+  static_assert(unsigned(OwnershipKind::LastValueOwnershipKind) < MaxValue,
                 "LastValueOwnershipKind is larger than max representable "
                 "ownership value?!");
 
-  ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
-  explicit ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
-  ValueOwnershipKind(const SILFunction &F, SILType Type,
-                     SILArgumentConvention Convention);
+  OwnershipKind(OwnershipKind::innerty other) : value(other) {}
+  OwnershipKind(const OwnershipKind &other) : value(other.value) {}
+
+  OwnershipKind &operator=(const OwnershipKind &other) {
+    value = other.value;
+    return *this;
+  }
+
+  OwnershipKind &operator=(OwnershipKind::innerty other) {
+    value = other;
+    return *this;
+  }
+
+  operator OwnershipKind::innerty() const { return value; }
+
+  /// Move down the lattice.
+  OwnershipKind meet(OwnershipKind other) const {
+    // None merges with anything.
+    if (*this == OwnershipKind::None)
+      return other;
+    if (other == OwnershipKind::None)
+      return *this;
+
+    // At this point, if the two ownership kinds don't line up, the merge
+    // fails. Return any to show that we have lost information and now have a
+    // value kind that is invalid on values.
+    if (*this != other)
+      return OwnershipKind::Any;
+
+    // Otherwise, we are good, return *this.
+    return *this;
+  }
+
+  /// Move up the lattice.
+  OwnershipKind join(OwnershipKind other) const {
+    if (*this == OwnershipKind::Any)
+      return other;
+    if (other == OwnershipKind::Any)
+      return *this;
+    if (*this != other)
+      return OwnershipKind::None;
+    return *this;
+  }
+
+  /// Convert this ownership kind to a StringRef.
+  StringRef asString() const;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const OwnershipKind &kind);
+
+/// A value representing the specific ownership semantics that a SILValue may
+/// have.
+struct ValueOwnershipKind {
+  using innerty = OwnershipKind::innerty;
+
+  OwnershipKind value;
+
+  ValueOwnershipKind(innerty newValue) : value(newValue) {}
+  ValueOwnershipKind(OwnershipKind newValue) : value(newValue) {}
+  explicit ValueOwnershipKind(unsigned newValue) : value(innerty(newValue)) {}
+  ValueOwnershipKind(const SILFunction &f, SILType type,
+                     SILArgumentConvention convention);
 
   /// Parse Value into a ValueOwnershipKind.
   ///
   /// *NOTE* Emits an unreachable if an invalid value is passed in.
-  explicit ValueOwnershipKind(StringRef Value);
+  explicit ValueOwnershipKind(StringRef value);
 
-  operator innerty() const { return Value; }
+  operator OwnershipKind() const { return value; }
+  explicit operator unsigned() const { return value; }
+  operator innerty() const { return value; }
 
-  bool operator==(const swift::ValueOwnershipKind::innerty& b) {
-    return Value == b;
+  explicit operator bool() const { return value != OwnershipKind::Any; }
+
+  bool operator==(ValueOwnershipKind other) const {
+    return value == other.value;
   }
 
-  Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
+  bool operator==(innerty other) const { return value == other; }
+
+  /// We merge by moving down the lattice.
+  ValueOwnershipKind merge(ValueOwnershipKind rhs) const {
+    return value.meet(rhs.value);
+  }
 
   /// Given that there is an aggregate value (like a struct or enum) with this
   /// ownership kind, and a subobject of type Proj is being projected from the
   /// aggregate, return Trivial if Proj has trivial type and the aggregate's
   /// ownership kind otherwise.
-  ValueOwnershipKind getProjectedOwnershipKind(const SILFunction &F,
-                                               SILType Proj) const;
+  ValueOwnershipKind getProjectedOwnershipKind(const SILFunction &func,
+                                               SILType projType) const;
 
   /// Return the lifetime constraint semantics for this
   /// ValueOwnershipKind when forwarding ownership.
@@ -170,13 +274,14 @@ struct ValueOwnershipKind {
   /// This is MustBeInvalidated for Owned and MustBeLive for all other ownership
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
-    switch (Value) {
-    case ValueOwnershipKind::None:
-    case ValueOwnershipKind::Guaranteed:
-    case ValueOwnershipKind::Unowned:
-      return UseLifetimeConstraint::MustBeLive;
-    case ValueOwnershipKind::Owned:
-      return UseLifetimeConstraint::MustBeInvalidated;
+    switch (value) {
+    case OwnershipKind::Any:
+    case OwnershipKind::None:
+    case OwnershipKind::Guaranteed:
+    case OwnershipKind::Unowned:
+      return UseLifetimeConstraint::NonLifetimeEnding;
+    case OwnershipKind::Owned:
+      return UseLifetimeConstraint::LifetimeEnding;
     }
     llvm_unreachable("covered switch");
   }
@@ -185,9 +290,9 @@ struct ValueOwnershipKind {
   /// that the two ownership kinds are "compatibile".
   ///
   /// The reason why we do not compare directy is to allow for
-  /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
+  /// OwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
-    return merge(other).hasValue();
+    return bool(merge(other));
   }
 
   /// Returns isCompatibleWith(other.getOwnershipKind()).
@@ -196,16 +301,14 @@ struct ValueOwnershipKind {
   /// dependencies.
   bool isCompatibleWith(SILValue other) const;
 
-  template <typename RangeTy>
-  static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
-    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
-    return accumulate(
-        std::forward<RangeTy>(r), initial,
-        [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
-          if (!acc)
-            return acc;
-          return acc.getValue().merge(x);
-        });
+  template <typename RangeTy> static ValueOwnershipKind merge(RangeTy &&r) {
+    auto initial = OwnershipKind::None;
+    return accumulate(std::forward<RangeTy>(r), initial,
+                      [](ValueOwnershipKind acc, ValueOwnershipKind x) {
+                        if (!acc)
+                          return acc;
+                        return acc.merge(x);
+                      });
   }
 
   StringRef asString() const;
@@ -468,148 +571,52 @@ inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
   return isCompatibleWith(other.getOwnershipKind());
 }
 
-/// A map from a ValueOwnershipKind that an operand can accept to a
-/// UseLifetimeConstraint that describes the effect that the operand's use has
-/// on the underlying value. If a ValueOwnershipKind is not in this map then
-/// matching an operand with the value results in an ill formed program.
-///
-/// So for instance, a map could specify that if a value is used as an owned
-/// parameter, then the use implies that the original value is destroyed at that
-/// point. In contrast, if the value is used as a guaranteed parameter, then the
-/// liveness constraint just requires that the value remains alive at the use
-/// point.
-struct OperandOwnershipKindMap {
-  // One bit for if a value exists and if the value exists, what the
-  // ownership constraint is. These are stored as pairs.
-  //
-  // NOTE: We are burning 1 bit per unset value. But this is without
-  // matter since we are always going to need less bits than 64, so we
-  // should always have a small case SmallBitVector, so there is no
-  // difference in size.
-  static constexpr unsigned NUM_DATA_BITS =
-      2 * (unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1);
+class OwnershipConstraint {
+  OwnershipKind ownershipKind;
+  UseLifetimeConstraint lifetimeConstraint;
 
-  /// A bit vector representing our "map". Given a ValueOwnershipKind k, if the
-  /// operand can accept k, the unsigned(k)*2 bit will be set to true. Assuming
-  /// that bit is set, the unsigned(k)*2+1 bit is set to the use lifetime
-  /// constraint provided by the value.
-  SmallBitVector data;
-
-  OperandOwnershipKindMap() : data(NUM_DATA_BITS) {}
-  OperandOwnershipKindMap(ValueOwnershipKind kind,
-                          UseLifetimeConstraint constraint)
-      : data(NUM_DATA_BITS) {
-    add(kind, constraint);
+public:
+  OwnershipConstraint(OwnershipKind inputOwnershipKind,
+                      UseLifetimeConstraint inputLifetimeConstraint)
+      : ownershipKind(inputOwnershipKind),
+        lifetimeConstraint(inputLifetimeConstraint) {
+    assert((ownershipKind != OwnershipKind::None ||
+            lifetimeConstraint == UseLifetimeConstraint::NonLifetimeEnding) &&
+           "ValueOwnershipKind::None can never have their lifetime ended");
   }
 
-  /// Return the OperandOwnershipKindMap that tests for compatibility with
-  /// ValueOwnershipKind kind. This means that it will accept a element whose
-  /// ownership is ValueOwnershipKind::None.
-  static OperandOwnershipKindMap
-  compatibilityMap(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
-    OperandOwnershipKindMap set;
-    set.addCompatibilityConstraint(kind, constraint);
-    return set;
+  OwnershipKind getPreferredKind() const {
+    return ownershipKind;
   }
 
-  /// Return a map that is compatible with any and all ValueOwnershipKinds
-  /// except for \p kind.
-  static OperandOwnershipKindMap
-  compatibleWithAllExcept(ValueOwnershipKind kind) {
-    OperandOwnershipKindMap map;
-    unsigned index = 0;
-    unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
-    for (; index != end; ++index) {
-      if (ValueOwnershipKind(index) == kind) {
-        continue;
-      }
-      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
-    }
-    return map;
+  bool isLifetimeEnding() const {
+    return lifetimeConstraint == UseLifetimeConstraint::LifetimeEnding;
   }
 
-  /// Create a map that has compatibility constraints for each of the
-  /// ValueOwnershipKind, UseLifetimeConstraints in \p args.
-  static OperandOwnershipKindMap
-  compatibilityMap(std::initializer_list<
-                   std::pair<ValueOwnershipKind, UseLifetimeConstraint>>
-                       args) {
-    OperandOwnershipKindMap map;
-    for (auto &p : args) {
-      map.addCompatibilityConstraint(p.first, p.second);
-    }
-    return map;
+  UseLifetimeConstraint getLifetimeConstraint() const {
+    return lifetimeConstraint;
   }
 
-  /// Return a map that states that an operand can take any ownership with each
-  /// ownership having a must be live constraint.
-  static OperandOwnershipKindMap allLive() {
-    OperandOwnershipKindMap map;
-    unsigned index = 0;
-    unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
-    while (index != end) {
-      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
-      ++index;
-    }
-    return map;
+  /// Return a constraint that is appropriate for an operand that can accept a
+  /// value with any ownership kind without ending said value's lifetime.
+  static OwnershipConstraint any() {
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
   }
 
-  /// Specify that the operand associated with this set can accept a value with
-  /// ValueOwnershipKind \p kind. The value provided by the operand will have a
-  /// new ownership enforced constraint defined by \p constraint.
-  void add(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
-    unsigned index = unsigned(kind);
-    unsigned kindOffset = index * 2;
-    unsigned constraintOffset = index * 2 + 1;
+  bool satisfiedBy(const Operand *use) const;
 
-    // If we have already put this kind into the map, we require the constraint
-    // offset to be the same, i.e. we only allow for a kind to be added twice if
-    // the constraint is idempotent. We assert otherwise.
-    assert((!data[kindOffset] || UseLifetimeConstraint(bool(
-                                     data[constraintOffset])) == constraint) &&
-           "Adding kind twice to the map with different constraints?!");
-    data[kindOffset] = true;
-    data[constraintOffset] = bool(constraint);
+  bool satisfiesConstraint(ValueOwnershipKind testKind) const {
+    return ownershipKind.join(testKind) == testKind;
   }
 
-  void addCompatibilityConstraint(ValueOwnershipKind kind,
-                                  UseLifetimeConstraint constraint) {
-    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
-    add(kind, constraint);
+  bool operator==(const OwnershipConstraint &other) const {
+    return ownershipKind == other.ownershipKind &&
+           isLifetimeEnding() == other.isLifetimeEnding();
   }
-
-  bool canAcceptKind(ValueOwnershipKind kind) const {
-    unsigned index = unsigned(kind);
-    unsigned kindOffset = index * 2;
-    return data[kindOffset];
-  }
-
-  UseLifetimeConstraint getLifetimeConstraint(ValueOwnershipKind kind) const;
-
-  void print(llvm::raw_ostream &os) const;
-  SWIFT_DEBUG_DUMP;
 };
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     OperandOwnershipKindMap map) {
-  map.print(os);
-  return os;
-}
-
-// Out of line to work around lack of forward declaration for operator <<.
-inline UseLifetimeConstraint
-OperandOwnershipKindMap::getLifetimeConstraint(ValueOwnershipKind kind) const {
-#ifndef NDEBUG
-  if (!canAcceptKind(kind)) {
-    llvm::errs() << "Can not lookup lifetime constraint: " << kind
-                 << ". Not in map!\n"
-                 << *this;
-    llvm_unreachable("standard error assertion");
-  }
-#endif
-  unsigned constraintOffset = unsigned(kind) * 2 + 1;
-  return UseLifetimeConstraint(data[constraintOffset]);
-}
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              OwnershipConstraint constraint);
 
 /// A formal SIL reference to a value, suitable for use as a stored
 /// operand.
@@ -688,28 +695,25 @@ public:
   /// Return which operand this is in the operand list of the using instruction.
   unsigned getOperandNumber() const;
 
-  /// Return the static map of ValueOwnershipKinds that this operand can
-  /// potentially have to the UseLifetimeConstraint associated with that
-  /// ownership kind
+  /// Return the ownership constraint that restricts what types of values this
+  /// Operand can contain. Returns none if the operand is a type dependent
+  /// operand.
   ///
-  /// NOTE: This is implemented in OperandOwnershipKindMapClassifier.cpp.
-  ///
-  /// NOTE: The default argument isSubValue is a temporary staging flag that
-  /// will be removed once borrow scoping is checked by the normal verifier.
-  OperandOwnershipKindMap
-  getOwnershipKindMap(bool isForwardingSubValue = false) const;
+  /// NOTE: This is implemented in OperandOwnership.cpp.
+  Optional<OwnershipConstraint> getOwnershipConstraint() const;
+
+  /// Returns true if changing the operand to use a value with the given
+  /// ownership kind would not cause the operand to violate the operand's
+  /// ownership constraints. Returns false otherwise.
+  bool canAcceptKind(ValueOwnershipKind kind) const;
+
+  /// Returns true if this operand and its value satisfy the operand's
+  /// operand constraint.
+  bool satisfiesConstraints() const;
 
   /// Returns true if this operand acts as a use that consumes its associated
   /// value.
-  bool isConsumingUse() const {
-    // Type dependent uses can never be consuming and do not have valid
-    // ownership maps since they do not participate in the ownership system.
-    if (isTypeDependent())
-      return false;
-    auto map = getOwnershipKindMap();
-    auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
-    return constraint == UseLifetimeConstraint::MustBeInvalidated;
-  }
+  bool isLifetimeEnding() const;
 
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
@@ -796,9 +800,9 @@ public:
   explicit ConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
   ConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    assert(Cur->isConsumingUse());
+    assert(Cur->isLifetimeEnding());
     while ((Cur = Cur->NextUse)) {
-      if (Cur->isConsumingUse())
+      if (Cur->isLifetimeEnding())
         break;
     }
     return *this;
@@ -814,7 +818,7 @@ public:
 inline ValueBase::consuming_use_iterator
 ValueBase::consuming_use_begin() const {
   auto cur = FirstUse;
-  while (cur && !cur->isConsumingUse()) {
+  while (cur && !cur->isLifetimeEnding()) {
     cur = cur->NextUse;
   }
   return ValueBase::consuming_use_iterator(cur);
@@ -829,9 +833,9 @@ public:
   explicit NonConsumingUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
   NonConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    assert(!Cur->isConsumingUse());
+    assert(!Cur->isLifetimeEnding());
     while ((Cur = Cur->NextUse)) {
-      if (!Cur->isConsumingUse())
+      if (!Cur->isLifetimeEnding())
         break;
     }
     return *this;
@@ -847,7 +851,7 @@ public:
 inline ValueBase::non_consuming_use_iterator
 ValueBase::non_consuming_use_begin() const {
   auto cur = FirstUse;
-  while (cur && cur->isConsumingUse()) {
+  while (cur && cur->isLifetimeEnding()) {
     cur = cur->NextUse;
   }
   return ValueBase::non_consuming_use_iterator(cur);
@@ -884,7 +888,7 @@ inline Operand *ValueBase::getSingleUse() const {
 inline Operand *ValueBase::getSingleConsumingUse() const {
   Operand *result = nullptr;
   for (auto *op : getUses()) {
-    if (op->isConsumingUse()) {
+    if (op->isLifetimeEnding()) {
       if (result) {
         return nullptr;
       }

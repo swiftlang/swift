@@ -1,0 +1,69 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: define hidden swiftcc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* %2)
+sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
+bb0:
+  // CHECK: [[TASKLOC:%.*]] = alloca %swift.task*
+  // CHECK: store %swift.task* %0, %swift.task** [[TASKLOC]]
+  // CHECK: [[TASK:%.*]] = load %swift.task*, %swift.task** [[TASKLOC]]
+  // CHECK: [[TASKRC:%.*]] = bitcast %swift.task* [[TASK]] to %swift.refcounted*
+  %0 = builtin "getCurrentAsyncTask"() : $Builtin.NativeObject
+  // CHECK-NEXT: [[TASK_COPY:%.*]] = call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TASKRC]])
+  %1 = copy_value %0 : $Builtin.NativeObject
+  end_lifetime %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: define hidden swiftcc void @cancel_task(%swift.refcounted* %0)
+// CHECK: [[TASK:%.*]] = bitcast %swift.refcounted* %0 to %swift.task*
+// CHECK-NEXT:  call swiftcc void @swift_task_cancel(%swift.task* [[TASK]])
+sil hidden [ossa] @cancel_task : $@convention(method) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %4 = builtin "cancelAsyncTask"(%0 : $Builtin.NativeObject) : $()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @launch_task
+sil hidden [ossa] @launch_task : $@convention(method) @async (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed () -> (@error Error)) -> () {
+bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed () -> (@error Error)):
+  %3 = begin_borrow %1 : $Optional<Builtin.NativeObject>
+  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%.*]])
+  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_f(
+  // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
+  // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
+  // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]]
+  // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
+  %20 = builtin "createAsyncTask"(%0 : $Int, %3 : $Optional<Builtin.NativeObject>, %2 : $@async @callee_guaranteed () -> (@error Error)) : $(Builtin.NativeObject, Builtin.RawPointer)
+  end_borrow %3 : $Optional<Builtin.NativeObject>
+  destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @launch_future
+sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, @in_guaranteed T) -> () {
+bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, %3: $*T):
+  %4 = begin_borrow %1 : $Optional<Builtin.NativeObject>
+  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%.*]])
+  %9 = metatype $@thick T.Type
+  %10 = init_existential_metatype %9 : $@thick T.Type, $@thick Any.Type
+  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_future_f(
+  // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
+  // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
+  // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]]
+  // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
+  %20 = builtin "createAsyncTaskFuture"<T>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %10 : $@thick Any.Type, %2 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  end_borrow %4 : $Optional<Builtin.NativeObject>
+  destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
+  %21 = tuple ()
+  return %21 : $()
+}

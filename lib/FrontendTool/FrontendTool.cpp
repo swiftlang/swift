@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "ImportedModules.h"
+#include "Dependencies.h"
 #include "ScanDependencies.h"
 #include "TBD.h"
 
@@ -41,14 +41,13 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
-#include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/UUID.h"
-#include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/Option/Options.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
@@ -63,13 +62,9 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
-
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -77,26 +72,15 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/Remarks/RemarkSerializer.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/Timer.h"
-#include "llvm/Support/YAMLTraits.h"
-#include "llvm/Target/TargetMachine.h"
 
 #include <algorithm>
 #include <memory>
 #include <unordered_set>
 #include <utility>
-
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
-#include <unistd.h>
-#else
-#include <io.h>
-#endif
 
 using namespace swift;
 
@@ -106,866 +90,13 @@ static std::string displayName(StringRef MainExecutablePath) {
   return Name;
 }
 
-StringRef
-swift::frontend::utils::escapeForMake(StringRef raw,
-                                      llvm::SmallVectorImpl<char> &buffer) {
-  buffer.clear();
-
-  // The escaping rules for GNU make are complicated due to the various
-  // subsitutions and use of the tab in the leading position for recipes.
-  // Various symbols have significance in different contexts.  It is not
-  // possible to correctly quote all characters in Make (as of 3.7).  Match
-  // gcc and clang's behaviour for the escaping which covers only a subset of
-  // characters.
-  for (unsigned I = 0, E = raw.size(); I != E; ++I) {
-    switch (raw[I]) {
-    case '#': // Handle '#' the broken GCC way
-      buffer.push_back('\\');
-      break;
-
-    case ' ':
-      for (unsigned J = I; J && raw[J - 1] == '\\'; --J)
-        buffer.push_back('\\');
-      buffer.push_back('\\');
-      break;
-
-    case '$': // $ is escaped by $
-      buffer.push_back('$');
-      break;
-    }
-    buffer.push_back(raw[I]);
-  }
-  buffer.push_back('\0');
-
-  return buffer.data();
-}
-
-/// This sorting function is used to stabilize the order in which dependencies
-/// are emitted into \c .d files that are consumed by external build systems.
-/// This serves to eliminate order as a source of non-determinism in these
-/// outputs.
-///
-/// The exact sorting predicate is not important. Currently, it is a
-/// lexicographic comparison that reverses the provided strings before applying
-/// the sorting predicate. This has the benefit of being somewhat
-/// invariant with respect to the installation location of various system
-/// components. e.g. on two systems, the same file identified by two different
-/// paths differing only in their relative install location such as
-///
-/// /Applications/MyXcode.app/Path/To/A/Framework/In/The/SDK/Header.h
-/// /Applications/Xcodes/AnotherXcode.app/Path/To/A/Framework/In/The/SDK/Header.h
-///
-/// should appear in roughly the same order relative to other paths. Ultimately,
-/// this makes it easier to test the contents of the emitted files with tools
-/// like FileCheck.
-static std::vector<std::string>
-reversePathSortedFilenames(const ArrayRef<std::string> elts) {
-  std::vector<std::string> tmp(elts.begin(), elts.end());
-  std::sort(tmp.begin(), tmp.end(), [](const std::string &a,
-                                       const std::string &b) -> bool {
-              return std::lexicographical_compare(a.rbegin(), a.rend(),
-                                                  b.rbegin(), b.rend());
-            });
-  return tmp;
-}
-
-/// Emits a Make-style dependencies file.
-static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker *depTracker,
-                                         const FrontendOptions &opts,
-                                         const InputFile &input) {
-  const std::string &dependenciesFilePath = input.dependenciesFilePath();
-  if (dependenciesFilePath.empty())
-    return false;
-
-  std::error_code EC;
-  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::F_None);
-
-  if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   dependenciesFilePath, EC.message());
-    out.clear_error();
-    return true;
-  }
-
-  llvm::SmallString<256> buffer;
-
-  // collect everything in memory to avoid redundant work
-  // when there are multiple targets
-  std::string dependencyString;
-  
-  // First include all other files in the module. Make-style dependencies
-  // need to be conservative!
-  auto inputPaths =
-    reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
-  for (auto const &path : inputPaths) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
-  }
-  // Then print dependencies we've picked up during compilation.
-  auto dependencyPaths =
-    reversePathSortedFilenames(depTracker->getDependencies());
-  for (auto const &path : dependencyPaths) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
-  }
-  auto incrementalDependencyPaths =
-      reversePathSortedFilenames(depTracker->getIncrementalDependencies());
-  for (auto const &path : incrementalDependencyPaths) {
-    dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
-  }
-  
-  // FIXME: Xcode can't currently handle multiple targets in a single
-  // dependency line.
-  opts.forAllOutputPaths(input, [&](const StringRef targetName) {
-    auto targetNameEscaped = frontend::utils::escapeForMake(targetName, buffer);
-    out << targetNameEscaped << " :" << dependencyString << '\n';
-  });
-
-  return false;
-}
-
 static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
                                          const FrontendOptions &opts) {
   opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &f) -> bool {
-        return emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
+        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
       });
-}
-
-// MARK: - Module Trace
-
-namespace {
-struct SwiftModuleTraceInfo {
-  Identifier Name;
-  std::string Path;
-  bool IsImportedDirectly;
-  bool SupportsLibraryEvolution;
-};
-
-struct LoadedModuleTraceFormat {
-  static const unsigned CurrentVersion = 2;
-  unsigned Version;
-  Identifier Name;
-  std::string Arch;
-  std::vector<SwiftModuleTraceInfo> SwiftModules;
-};
-}
-
-namespace swift {
-namespace json {
-template <> struct ObjectTraits<SwiftModuleTraceInfo> {
-  static void mapping(Output &out, SwiftModuleTraceInfo &contents) {
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
-    out.mapRequired("path", contents.Path);
-    out.mapRequired("isImportedDirectly", contents.IsImportedDirectly);
-    out.mapRequired("supportsLibraryEvolution",
-                    contents.SupportsLibraryEvolution);
-  }
-};
-
-// Version notes:
-// 1. Keys: name, arch, swiftmodules
-// 2. New keys: version, swiftmodulesDetailedInfo
-template <> struct ObjectTraits<LoadedModuleTraceFormat> {
-  static void mapping(Output &out, LoadedModuleTraceFormat &contents) {
-    out.mapRequired("version", contents.Version);
-
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
-
-    out.mapRequired("arch", contents.Arch);
-
-    // The 'swiftmodules' key is kept for backwards compatibility.
-    std::vector<std::string> moduleNames;
-    for (auto &m : contents.SwiftModules)
-      moduleNames.push_back(m.Path);
-    out.mapRequired("swiftmodules", moduleNames);
-
-    out.mapRequired("swiftmodulesDetailedInfo", contents.SwiftModules);
-  }
-};
-}
-}
-
-static bool isClangOverlayOf(ModuleDecl *potentialOverlay,
-                             ModuleDecl *potentialUnderlying) {
-  return !potentialOverlay->isNonSwiftModule()
-      && potentialUnderlying->isNonSwiftModule()
-      && potentialOverlay->getName() == potentialUnderlying->getName();
-}
-
-// TODO: Delete this once changes from https://reviews.llvm.org/D83449 land on
-// apple/llvm-project's swift/main branch.
-template <typename SetLike, typename Item>
-static bool contains(const SetLike &setLike, Item item) {
-  return setLike.find(item) != setLike.end();
-}
-
-/// Get a set of modules imported by \p module.
-///
-/// By default, all imports are included.
-static void getImmediateImports(
-    ModuleDecl *module,
-    SmallPtrSetImpl<ModuleDecl *> &imports,
-    ModuleDecl::ImportFilter importFilter = {
-      ModuleDecl::ImportFilterKind::Exported,
-      ModuleDecl::ImportFilterKind::Default,
-      ModuleDecl::ImportFilterKind::ImplementationOnly,
-      ModuleDecl::ImportFilterKind::SPIAccessControl,
-      ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay
-    }) {
-  SmallVector<ImportedModule, 8> importList;
-  module->getImportedModules(importList, importFilter);
-
-  for (ImportedModule &import : importList)
-    imports.insert(import.importedModule);
-}
-
-namespace {
-/// Helper type for computing (approximate) information about ABI-dependencies.
-///
-/// This misses out on details such as typealiases and more.
-/// See the "isImportedDirectly" field above for more details.
-class ABIDependencyEvaluator {
-  /// Map of ABIs exported by a particular module, excluding itself.
-  ///
-  /// For example, consider (primed letters represent Clang modules):
-  /// \code
-  /// - A is @_exported-imported by B
-  /// - B is #imported by C' (via a compiler-generated umbrella header)
-  /// - C' is @_exported-imported by C (Swift overlay)
-  /// - D' is #imported by E'
-  /// - D' is @_exported-imported by D (Swift overlay)
-  /// - E' is @_exported-imported by E (Swift overlay)
-  /// \endcode
-  ///
-  /// Then the \c abiExportMap will be
-  /// \code
-  /// { A: {}, B: {A}, C: {B}, C': {B}, D: {}, D': {}, E: {D}, E': {D'} }
-  /// \endcode
-  ///
-  /// \b WARNING: Use \c reexposeImportedABI instead of inserting directly.
-  llvm::DenseMap<ModuleDecl *, llvm::DenseSet<ModuleDecl *>> abiExportMap;
-
-  /// Stack for depth-first traversal.
-  SmallVector<ModuleDecl *, 32> searchStack;
-
-  llvm::DenseSet<ModuleDecl *> visited;
-
-  /// Helper function to handle invariant violations as crashes in debug mode.
-  void crashOnInvariantViolation(
-    llvm::function_ref<void (llvm::raw_string_ostream &)> f) const;
-
-  /// Computes the ABI exports for \p importedModule and adds them to
-  /// \p module's ABI exports.
-  ///
-  /// If \p includeImportedModule is true, also adds \p importedModule to
-  /// \p module's ABI exports.
-  ///
-  /// Correct way to add entries to \c abiExportMap.
-  void reexposeImportedABI(ModuleDecl *module, ModuleDecl *importedModule,
-                           bool includeImportedModule = true);
-
-  /// Check if a Swift module is an overlay for some Clang module.
-  ///
-  /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
-  /// right API which we can use directly.
-  bool isOverlayOfClangModule(ModuleDecl *swiftModule);
-
-  /// Check for cases where we have a fake cycle through an overlay.
-  ///
-  /// Sometimes, we have fake cycles in the import graph due to the Clang
-  /// importer injecting overlays between Clang modules. These don't represent
-  /// an actual cycle in the build, so we should ignore them.
-  ///
-  /// We check this lazily after detecting a cycle because it is difficult to
-  /// determine at the point where we see the overlay whether it was incorrectly
-  /// injected by the Clang importer or whether any of its imports will
-  /// eventually lead to a cycle.
-  ///
-  /// For more details, see [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
-  ///
-  /// \param startOfCycle A pointer to the element of \c searchStack where
-  ///        the module \em first appeared.
-  ///
-  /// \pre The module on top of \c searchStack is the same module as
-  ///      *startOfCycle.
-  ///
-  /// \pre searchStack.begin() <= startOfCycle < searchStack.end()
-  bool isFakeCycleThroughOverlay(ModuleDecl **startOfCycle);
-
-  /// Recursive step in computing ABI dependencies.
-  ///
-  /// Use this method instead of using the \c forClangModule/\c forSwiftModule
-  /// methods.
-  void computeABIDependenciesForModule(ModuleDecl *module);
-  void computeABIDependenciesForSwiftModule(ModuleDecl *module);
-  void computeABIDependenciesForClangModule(ModuleDecl *module);
-
-  static void printModule(const ModuleDecl *module, llvm::raw_ostream &os);
-
-  template<typename SetLike>
-  static void printModuleSet(const SetLike &set, llvm::raw_ostream &os);
-
-public:
-  ABIDependencyEvaluator() = default;
-  ABIDependencyEvaluator(const ABIDependencyEvaluator &) = delete;
-  ABIDependencyEvaluator(ABIDependencyEvaluator &&) = default;
-
-  void getABIDependenciesForSwiftModule(
-    ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &abiDependencies);
-
-  void printABIExportMap(llvm::raw_ostream &os) const;
-};
-} // end anonymous namespace
-
-// See [NOTE: Bailing-vs-crashing-in-trace-emission].
-// TODO: Use PrettyStackTrace instead?
-void ABIDependencyEvaluator::crashOnInvariantViolation(
-  llvm::function_ref<void (llvm::raw_string_ostream &)> f) const {
-#ifndef NDEBUG
-  std::string msg;
-  llvm::raw_string_ostream os(msg);
-  os << "error: invariant violation: ";
-  f(os);
-  llvm::report_fatal_error(os.str());
-#endif
-}
-
-// [NOTE: Trace-Clang-submodule-complexity]
-//
-// A Clang module may have zero or more submodules. In practice, when traversing
-// the imports of a module, we observe that different submodules of the same
-// top-level module (almost) freely import each other. Despite this, we still
-// need to conceptually traverse the tree formed by the submodule relationship
-// (with the top-level module being the root).
-//
-// This needs to be taken care of in two ways:
-// 1. We need to make sure we only go towards the leaves. It's okay if we "jump"
-//    branches, so long as we don't try to visit an ancestor when one of its
-//    descendants is still on the traversal stack, so that we don't end up with
-//    arbitrarily complex intra-module cycles.
-//    See also: [NOTE: Intra-module-leafwards-traversal].
-// 2. When adding entries to the ABI export map, we need to avoid marking
-//    dependencies within the same top-level module. This step is needed in
-//    addition to step 1 to avoid creating cycles like
-//    Overlay -> Underlying -> Submodule -> Overlay.
-
-void ABIDependencyEvaluator::reexposeImportedABI(
-    ModuleDecl *module, ModuleDecl *importedModule,
-    bool includeImportedModule) {
-  if (module == importedModule) {
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
-      os << "module "; printModule(module, os); os << " imports itself!\n";
-    });
-    return;
-  }
-
-  auto addToABIExportMap = [this](ModuleDecl *module, ModuleDecl *reexport) {
-    if (module == reexport) {
-      crashOnInvariantViolation([&](llvm::raw_string_ostream &os){
-        os << "expected module "; printModule(reexport, os);
-        os << "  to not re-export itself\n";
-      });
-      return;
-    }
-    if (reexport->isNonSwiftModule()
-        && module->isNonSwiftModule()
-        && module->getTopLevelModule() == reexport->getTopLevelModule()) {
-      // Dependencies within the same top-level Clang module are not useful.
-      // See also: [NOTE: Trace-Clang-submodule-complexity].
-      return;
-    }
-
-    // We only care about dependencies across top-level modules and we want to
-    // avoid exploding abiExportMap with submodules. So we only insert entries
-    // after calling getTopLevelModule().
-
-    if (::isClangOverlayOf(module, reexport)) {
-      // For overlays, we need to have a dependency on the underlying module.
-      // Otherwise, we might accidentally create a Swift -> Swift cycle.
-      abiExportMap[module].insert(
-        reexport->getTopLevelModule(/*preferOverlay*/false));
-      return;
-    }
-    abiExportMap[module].insert(
-        reexport->getTopLevelModule(/*preferOverlay*/true));
-  };
-
-  computeABIDependenciesForModule(importedModule);
-  if (includeImportedModule) {
-    addToABIExportMap(module, importedModule);
-  }
-  // Force creation of default value if missing. This prevents abiExportMap from
-  // growing (and moving) when calling addToABIExportMap. If abiExportMap gets
-  // moved, then abiExportMap[importedModule] will be moved, forcing us to
-  // create a defensive copy to avoid iterator invalidation on move.
-  (void)abiExportMap[module];
-  for (auto reexportedModule: abiExportMap[importedModule])
-    addToABIExportMap(module, reexportedModule);
-}
-
-bool ABIDependencyEvaluator::isOverlayOfClangModule(ModuleDecl *swiftModule) {
-  assert(!swiftModule->isNonSwiftModule());
-
-  llvm::SmallPtrSet<ModuleDecl *, 8> importList;
-  ::getImmediateImports(swiftModule, importList,
-                        {ModuleDecl::ImportFilterKind::Exported});
-  bool isOverlay =
-      llvm::any_of(importList, [&](ModuleDecl *importedModule) -> bool {
-        return isClangOverlayOf(swiftModule, importedModule);
-      });
-  return isOverlay;
-}
-
-// [NOTE: ABIDependencyEvaluator-fake-cycle-detection]
-//
-// First, let's consider a concrete example.
-// - In Clang-land, ToyKit #imports CoreDoll.
-// - The Swift overlay for CoreDoll imports both CoreDoll and ToyKit.
-// Importing ToyKit from CoreDoll's overlay informally violates the layering
-// of frameworks, but it doesn't actually create any cycles in the build
-// dependencies.
-//                        ┌───────────────────────────┐
-//                    ┌───│    CoreDoll.swiftmodule   │
-//                    │   └───────────────────────────┘
-//                    │                 │
-//              import ToyKit     @_exported import CoreDoll
-//                    │                 │
-//                    │                 │
-//                    ▼                 │
-//      ┌──────────────────────────┐    │
-//      │ ToyKit (ToyKit/ToyKit.h) │    │
-//      └──────────────────────────┘    │
-//                    │                 │
-//       #import <CoreDoll/CoreDoll.h>  │
-//                    │                 │
-//                    ▼                 │
-//   ┌──────────────────────────────┐   │
-//   │CoreDoll (CoreDoll/CoreDoll.h)│◀──┘
-//   └──────────────────────────────┘
-//
-// Say we are trying to build a Swift module that imports ToyKit. Due to how
-// module loading works, the Clang importer inserts the CoreDoll overlay
-// between the ToyKit and CoreDoll Clang modules, creating a cycle in the
-// import graph.
-//
-//   ┌──────────────────────────┐
-//   │ ToyKit (ToyKit/ToyKit.h) │◀──────────┐
-//   └──────────────────────────┘           │
-//                 │                        │
-//    #import <CoreDoll/CoreDoll.h>    import ToyKit
-//                 │                        │
-//                 ▼                        │
-//   ┌────────────────────────────┐         │
-//   │    CoreDoll.swiftmodule    │─────────┘
-//   └────────────────────────────┘
-//                 │
-//     @_exported import CoreDoll
-//                 │
-//                 ▼
-//   ┌──────────────────────────────┐
-//   │CoreDoll (CoreDoll/CoreDoll.h)│
-//   └──────────────────────────────┘
-//
-// This means that, at some point, searchStack will look like:
-//
-//   [others] → ToyKit → CoreDoll (overlay) → ToyKit
-//
-// In the general case, there may be arbitrarily many modules in the cycle,
-// including submodules.
-//
-//   [others] → ToyKit → [others] → CoreDoll (overlay) → [others] → ToyKit
-//
-// where "[others]" indicates 0 or more modules of any kind.
-//
-// To detect this, we check that the start of the cycle is a Clang module and
-// that there is at least one overlay between it and its recurrence at the end
-// of the searchStack. If so, we assume we have detected a benign cycle which
-// can be safely ignored.
-
-bool ABIDependencyEvaluator::isFakeCycleThroughOverlay(
-    ModuleDecl **startOfCycle) {
-  assert(startOfCycle >= searchStack.begin() &&
-         startOfCycle < searchStack.end() &&
-         "startOfCycleIter points to an element in searchStack");
-  // The startOfCycle module must be a Clang module.
-  if (!(*startOfCycle)->isNonSwiftModule())
-    return false;
-  // Next, we must have zero or more modules followed by a Swift overlay for a
-  // Clang module.
-  return std::any_of(startOfCycle + 1, searchStack.end(),
-                     [this](ModuleDecl *module) {
-                       return !module->isNonSwiftModule() &&
-                              isOverlayOfClangModule(module);
-                     });
-}
-
-void ABIDependencyEvaluator::computeABIDependenciesForModule(
-    ModuleDecl *module) {
-  auto moduleIter = llvm::find(searchStack, module);
-  if (moduleIter != searchStack.end()) {
-    if (isFakeCycleThroughOverlay(moduleIter))
-      return;
-    crashOnInvariantViolation([&](llvm::raw_string_ostream &os) {
-      os << "unexpected cycle in import graph!\n";
-      for (auto m: searchStack) {
-        printModule(m, os);
-        if (!m->isNonSwiftModule()) {
-          os << " (isOverlay = " << isOverlayOfClangModule(m) << ")";
-        }
-        os << "\ndepends on ";
-      }
-      printModule(module, os); os << '\n';
-    });
-    return;
-  }
-  if (::contains(visited, module))
-    return;
-  searchStack.push_back(module);
-  if (module->isNonSwiftModule())
-    computeABIDependenciesForClangModule(module);
-  else
-    computeABIDependenciesForSwiftModule(module);
-  searchStack.pop_back();
-  visited.insert(module);
-}
-
-void ABIDependencyEvaluator::computeABIDependenciesForSwiftModule(
-    ModuleDecl *module) {
-  SmallPtrSet<ModuleDecl *, 32> allImports;
-  ::getImmediateImports(module, allImports);
-  for (auto import: allImports) {
-    computeABIDependenciesForModule(import);
-    if (::isClangOverlayOf(module, import)) {
-      reexposeImportedABI(module, import,
-                          /*includeImportedModule=*/false);
-    }
-  }
-
-  SmallPtrSet<ModuleDecl *, 32> reexportedImports;
-  ::getImmediateImports(module, reexportedImports,
-                        {ModuleDecl::ImportFilterKind::Exported});
-  for (auto reexportedImport: reexportedImports) {
-    reexposeImportedABI(module, reexportedImport);
-  }
-}
-
-void ABIDependencyEvaluator::computeABIDependenciesForClangModule(
-    ModuleDecl *module) {
-  SmallPtrSet<ModuleDecl *, 32> imports;
-  ::getImmediateImports(module, imports);
-  for (auto import: imports) {
-    // There are three cases here which can potentially create cycles:
-    //
-    // 1. Clang modules importing the stdlib.
-    //    See [NOTE: Pure-Clang-modules-privately-import-stdlib].
-    // 2. Overlay S @_exported-imports underlying module S' and another Clang
-    //    module C'. C' (transitively) #imports S' but it gets treated as if
-    //    C' imports S. This creates a cycle: S -> C' -> ... -> S.
-    //    In practice, this case is hit for
-    //      Darwin (Swift) -> SwiftOverlayShims (Clang) -> Darwin (Swift).
-    //    We may also hit this in a slightly different direction, in case
-    //    the module directly imports SwiftOverlayShims:
-    //      SwiftOverlayShims -> Darwin (Swift) -> SwiftOverlayShims
-    //    The latter is handled later by isFakeCycleThroughOverlay.
-    // 3. [NOTE: Intra-module-leafwards-traversal]
-    //    Cycles within the same top-level module.
-    //    These don't matter for us, since we only care about the dependency
-    //    graph at the granularity of top-level modules. So we ignore these
-    //    by only considering parent -> submodule dependencies.
-    //    See also [NOTE: Trace-Clang-submodule-complexity].
-    if (import->isStdlibModule()) {
-      continue;
-    }
-    if (!import->isNonSwiftModule() && isOverlayOfClangModule(import) &&
-        llvm::find(searchStack, import) != searchStack.end()) {
-      continue;
-    }
-    if (import->isNonSwiftModule()
-        && module->getTopLevelModule() == import->getTopLevelModule()
-        && (module == import
-            || !import->findUnderlyingClangModule()
-                      ->isSubModuleOf(module->findUnderlyingClangModule()))) {
-      continue;
-    }
-    computeABIDependenciesForModule(import);
-    reexposeImportedABI(module, import);
-  }
-}
-
-void ABIDependencyEvaluator::getABIDependenciesForSwiftModule(
-    ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &abiDependencies) {
-  computeABIDependenciesForModule(module);
-  SmallPtrSet<ModuleDecl *, 32> allImports;
-  ::getImmediateImports(module, allImports);
-  for (auto directDependency: allImports) {
-    abiDependencies.insert(directDependency);
-    for (auto exposedDependency: abiExportMap[directDependency]) {
-      abiDependencies.insert(exposedDependency);
-    }
-  }
-}
-
-void ABIDependencyEvaluator::printModule(
-    const ModuleDecl *module, llvm::raw_ostream &os) {
-  module->getReverseFullModuleName().printForward(os);
-  os << (module->isNonSwiftModule() ? " (Clang)" : " (Swift)");
-  os << " @ " << llvm::format("0x%llx", reinterpret_cast<uintptr_t>(module));
-}
-
-template<typename SetLike>
-void ABIDependencyEvaluator::printModuleSet(
-    const SetLike &set, llvm::raw_ostream &os) {
-  os << "{ ";
-  for (auto module: set) {
-    printModule(module, os); os << ", ";
-  }
-  os << "}";
-}
-
-void ABIDependencyEvaluator::printABIExportMap(llvm::raw_ostream &os) const {
-  os << "ABI Export Map {{\n";
-  for (auto &entry: abiExportMap) {
-    printModule(entry.first, os); os << " : ";
-    printModuleSet(entry.second, os);
-    os << "\n";
-  }
-  os << "}}\n";
-}
-
-/// Compute the per-module information to be recorded in the trace file.
-//
-// The most interesting/tricky thing here is _which_ paths get recorded in
-// the trace file as dependencies. It depends on how the module was synthesized.
-// The key points are:
-//
-// 1. Paths to swiftmodules in the module cache or in the prebuilt cache are not
-//    recorded - Precondition: the corresponding path to the swiftinterface must
-//    already be present as a key in pathToModuleDecl.
-// 2. swiftmodules next to a swiftinterface are saved if they are up-to-date.
-//
-// FIXME: Use the VFS instead of handling paths directly. We are particularly
-// sloppy about handling relative paths in the dependency tracker.
-static void computeSwiftModuleTraceInfo(
-    const SmallPtrSetImpl<ModuleDecl *> &abiDependencies,
-    const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
-    const DependencyTracker &depTracker,
-    StringRef prebuiltCachePath,
-    std::vector<SwiftModuleTraceInfo> &traceInfo) {
-
-  SmallString<256> buffer;
-
-  std::string errMsg;
-  llvm::raw_string_ostream err(errMsg);
-
-  // FIXME: Use PrettyStackTrace instead.
-  auto errorUnexpectedPath =
-      [&pathToModuleDecl](llvm::raw_string_ostream &errStream) {
-    errStream << "The module <-> path mapping we have is:\n";
-    for (auto &m: pathToModuleDecl)
-      errStream << m.second->getName() << " <-> " << m.first << '\n';
-    llvm::report_fatal_error(errStream.str());
-  };
-
-  using namespace llvm::sys;
-
-  auto computeAdjacentInterfacePath = [](SmallVectorImpl<char> &modPath) {
-    auto swiftInterfaceExt =
-      file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile);
-    path::replace_extension(modPath, swiftInterfaceExt);
-  };
-
-  for (auto &depPath : depTracker.getDependencies()) {
-
-    // Decide if this is a swiftmodule based on the extension of the raw
-    // dependency path, as the true file may have a different one.
-    // For example, this might happen when the canonicalized path points to
-    // a Content Addressed Storage (CAS) location.
-    auto moduleFileType =
-      file_types::lookupTypeForExtension(path::extension(depPath));
-    auto isSwiftmodule =
-      moduleFileType == file_types::TY_SwiftModuleFile;
-    auto isSwiftinterface =
-      moduleFileType == file_types::TY_SwiftModuleInterfaceFile;
-
-    if (!(isSwiftmodule || isSwiftinterface))
-      continue;
-
-    auto dep = pathToModuleDecl.find(depPath);
-    if (dep != pathToModuleDecl.end()) {
-      // Great, we recognize the path! Check if the file is still around.
-
-      ModuleDecl *depMod = dep->second;
-      if(depMod->isResilient() && !isSwiftinterface) {
-        // FIXME: Ideally, we would check that the swiftmodule has a
-        // swiftinterface next to it. Tracked by rdar://problem/56351399.
-      }
-
-      // FIXME: Better error handling
-      StringRef realDepPath
-        = fs::real_path(depPath, buffer, /*expand_tile*/true)
-        ? StringRef(depPath) // Couldn't find the canonical path, assume
-                             // this is good enough.
-        : buffer.str();
-
-      bool isImportedDirectly = ::contains(abiDependencies, depMod);
-
-      traceInfo.push_back(
-          {/*Name=*/
-           depMod->getName(),
-           /*Path=*/
-           realDepPath.str(),
-           // TODO: There is an edge case which is not handled here.
-           // When we build a framework using -import-underlying-module, or an
-           // app/test using -import-objc-header, we should look at the direct
-           // imports of the bridging modules, and mark those as our direct
-           // imports.
-           // TODO: Add negative test cases for the comment above.
-           // TODO: Describe precise semantics of "isImportedDirectly".
-           /*IsImportedDirectly=*/
-           isImportedDirectly,
-           /*SupportsLibraryEvolution=*/
-           depMod->isResilient()});
-      buffer.clear();
-
-      continue;
-    }
-
-    // If the depTracker had an interface, that means that we must've
-    // built a swiftmodule from that interface, so we should have that
-    // filename available.
-    if (isSwiftinterface) {
-      err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
-      errorUnexpectedPath(err);
-    }
-
-    // Skip cached modules in the prebuilt cache. We will add the corresponding
-    // swiftinterface from the SDK directly, but this isn't checked. :-/
-    //
-    // FIXME: This is incorrect if both paths are not relative w.r.t. to the
-    // same root.
-    if (StringRef(depPath).startswith(prebuiltCachePath))
-      continue;
-
-    // If we have a swiftmodule next to an interface, that interface path will
-    // be saved (not checked), so don't save the path to this swiftmodule.
-    SmallString<256> moduleAdjacentInterfacePath(depPath);
-    computeAdjacentInterfacePath(moduleAdjacentInterfacePath);
-    if (::contains(pathToModuleDecl, moduleAdjacentInterfacePath))
-      continue;
-
-    // FIXME: The behavior of fs::exists for relative paths is undocumented.
-    // Use something else instead?
-    if (fs::exists(moduleAdjacentInterfacePath)) {
-      // This should be an error but it is not because of funkiness around
-      // compatible modules such as us having both armv7s.swiftinterface
-      // and armv7.swiftinterface in the dependency tracker.
-      continue;
-    }
-    buffer.clear();
-
-    // We might land here when we have a arm.swiftmodule in the cache path
-    // which added a dependency on a arm.swiftinterface (which was not loaded).
-  }
-
-  // Almost a re-implementation of reversePathSortedFilenames :(.
-  std::sort(
-    traceInfo.begin(), traceInfo.end(),
-    [](const SwiftModuleTraceInfo &m1, const SwiftModuleTraceInfo &m2) -> bool {
-      return std::lexicographical_compare(
-        m1.Path.rbegin(), m1.Path.rend(),
-        m2.Path.rbegin(), m2.Path.rend());
-  });
-}
-
-// [NOTE: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
-// in trace emission where an invariant that you think should hold does not hold
-// in practice. For example, sometimes we have seen modules without any
-// corresponding filename.
-//
-// Since the trace is a supplementary output for build system consumption, it
-// it better to emit it on a best-effort basis instead of crashing and failing
-// the build.
-//
-// Moreover, going forward, it would be nice if trace emission were more robust
-// so we could emit the trace on a best-effort basis even if the dependency
-// graph is ill-formed, so that the trace can be used as a debugging aid.
-static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
-                                          DependencyTracker *depTracker,
-                                          StringRef prebuiltCachePath,
-                                          StringRef loadedModuleTracePath) {
-  ASTContext &ctxt = mainModule->getASTContext();
-  assert(!ctxt.hadError()
-         && "We should've already exited earlier if there was an error.");
-
-  if (loadedModuleTracePath.empty())
-    return false;
-  std::error_code EC;
-  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
-
-  if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        loadedModuleTracePath, EC.message());
-    out.clear_error();
-    return true;
-  }
-
-  SmallPtrSet<ModuleDecl *, 32> abiDependencies;
-  {
-    ABIDependencyEvaluator evaluator{};
-    evaluator.getABIDependenciesForSwiftModule(mainModule,
-                                               abiDependencies);
-  }
-
-  llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
-  for (const auto &module : ctxt.getLoadedModules()) {
-    ModuleDecl *loadedDecl = module.second;
-    if (!loadedDecl)
-      llvm::report_fatal_error("Expected loaded modules to be non-null.");
-    if (loadedDecl == mainModule)
-      continue;
-    if (loadedDecl->getModuleFilename().empty()) {
-      // FIXME: rdar://problem/59853077
-      // Ideally, this shouldn't happen. As a temporary workaround, avoid
-      // crashing with a message while we investigate the problem.
-      llvm::errs() << "WARNING: Module '" << loadedDecl->getName().str()
-                   << "' has an empty filename. This is probably an "
-                   << "invariant violation.\n"
-                   << "Please report it as a compiler bug.\n";
-      continue;
-    }
-    pathToModuleDecl.insert(
-      std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
-  }
-
-  std::vector<SwiftModuleTraceInfo> swiftModules;
-  computeSwiftModuleTraceInfo(abiDependencies,
-                              pathToModuleDecl, *depTracker,
-                              prebuiltCachePath, swiftModules);
-
-  LoadedModuleTraceFormat trace = {
-      /*version=*/LoadedModuleTraceFormat::CurrentVersion,
-      /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName().str(), swiftModules};
-
-  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
-  // so first write to memory and then dump the buffer to the trace file.
-  std::string stringBuffer;
-  {
-    llvm::raw_string_ostream memoryBuffer(stringBuffer);
-    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
-                            /*PrettyPrint=*/false);
-    json::jsonize(jsonOutput, trace, /*Required=*/true);
-  }
-  stringBuffer += "\n";
-  out << stringBuffer;
-
-  return true;
 }
 
 static void
@@ -974,9 +105,8 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
                                              const FrontendOptions &opts) {
   opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-        return emitLoadedModuleTraceIfNeeded(
-          mainModule, depTracker, opts.PrebuiltModuleCachePath,
-          input.loadedModuleTracePath());
+        return swift::emitLoadedModuleTraceIfNeeded(mainModule, depTracker,
+                                                    opts, input);
       });
 }
 
@@ -997,7 +127,7 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile &SF, StringRef OutputFilename) {
+static bool emitSyntax(const SourceFile &SF, StringRef OutputFilename) {
   auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
   if (!os) return true;
 
@@ -1091,8 +221,8 @@ class JSONFixitWriter
 public:
   JSONFixitWriter(std::string fixitsOutputPath,
                   const DiagnosticOptions &DiagOpts)
-    : FixitsOutputPath(fixitsOutputPath),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
+      : FixitsOutputPath(std::move(fixitsOutputPath)),
+        FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
   void handleDiagnostic(SourceManager &SM,
@@ -1320,10 +450,9 @@ static bool compileLLVMIR(CompilerInstance &Instance) {
                      Module.get(), inputsAndOutputs.getSingleOutputFilename());
 }
 
-static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation,
+static void verifyGenericSignaturesIfNeeded(const FrontendOptions &opts,
                                             ASTContext &Context) {
-  auto verifyGenericSignaturesInModule =
-      Invocation.getFrontendOptions().VerifyGenericSignaturesInModule;
+  auto verifyGenericSignaturesInModule = opts.VerifyGenericSignaturesInModule;
   if (verifyGenericSignaturesInModule.empty())
     return;
   if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
@@ -1786,11 +915,13 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     assert(ctx.getLoadedModules().begin()->second == Instance.getMainModule());
   }
 
-  // Verify the AST for all the modules we've loaded.
-  ctx.verifyAllLoadedModules();
+  if (!opts.AllowModuleWithCompilerErrors) {
+    // Verify the AST for all the modules we've loaded.
+    ctx.verifyAllLoadedModules();
 
-  // Verify generic signatures if we've been asked to.
-  verifyGenericSignaturesIfNeeded(Invocation, ctx);
+    // Verify generic signatures if we've been asked to.
+    verifyGenericSignaturesIfNeeded(Invocation.getFrontendOptions(), ctx);
+  }
 
   // Emit any additional outputs that we only need for a successful compilation.
   // We don't want to unnecessarily delay getting any errors back to the user.
@@ -1842,6 +973,51 @@ static bool printSwiftVersion(const CompilerInvocation &Invocation) {
   return false;
 }
 
+static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
+                                   llvm::raw_ostream &OS) {
+  if (table.getOption(id).hasFlag(options::FrontendOption)) {
+    auto name = StringRef(table.getOptionName(id));
+    if (!name.empty()) {
+      OS << "    \"" << name << "\",\n";
+    }
+  }
+}
+
+static bool printSwiftFeature(CompilerInstance &instance) {
+  ASTContext &context = instance.getASTContext();
+  const CompilerInvocation &invocation = instance.getInvocation();
+  const FrontendOptions &opts = invocation.getFrontendOptions();
+  std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+
+  if (out.has_error() || EC) {
+    context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
+                           EC.message());
+    out.clear_error();
+    return true;
+  }
+  std::unique_ptr<llvm::opt::OptTable> table = createSwiftOptTable();
+
+  out << "{\n";
+  SWIFT_DEFER {
+    out << "}\n";
+  };
+  out << "  \"SupportedArguments\": [\n";
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  printSingleFrontendOpt(*table, swift::options::OPT_##ID, out);
+#include "swift/Option/Options.inc"
+#undef OPTION
+  out << "    \"LastOption\"\n";
+  out << "  ],\n";
+  out << "  \"SupportedFeatures\": [\n";
+  // Print supported featur names here.
+  out << "    \"LastFeature\"\n";
+  out << "  ]\n";
+  return false;
+}
+
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
                      llvm::function_ref<bool(CompilerInstance &)> cont) {
@@ -1867,7 +1043,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
-  if (Instance.getASTContext().hadError())
+  if (Instance.getASTContext().hadError() &&
+      !opts.AllowModuleWithCompilerErrors)
     return true;
 
   return cont(Instance);
@@ -1904,6 +1081,8 @@ static bool performAction(CompilerInstance &Instance,
     return Context.hadError();
   case FrontendOptions::ActionType::PrintVersion:
     return printSwiftVersion(Instance.getInvocation());
+  case FrontendOptions::ActionType::PrintFeature:
+    return printSwiftFeature(Instance);
   case FrontendOptions::ActionType::REPL:
     llvm::report_fatal_error("Compiler-internal integrated REPL has been "
                              "removed; use the LLDB-enhanced REPL instead.");
@@ -2048,7 +1227,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Instance.hasASTContext() &&
       FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
-    hadError |= Instance.getASTContext().hadError();
+    if (!opts.AllowModuleWithCompilerErrors)
+      hadError |= Instance.getASTContext().hadError();
   }
   return hadError;
 }
@@ -2334,7 +1514,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (PSPs.haveModuleOrModuleDocOutputPaths()) {
     if (Action == FrontendOptions::ActionType::MergeModules ||
         Action == FrontendOptions::ActionType::EmitModuleOnly) {
-      return Context.hadError();
+      return Context.hadError() && !opts.AllowModuleWithCompilerErrors;
     }
   }
 
@@ -2352,7 +1532,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())
-    return true;
+    return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
 
@@ -2432,10 +1612,13 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
-    (void) index::indexAndRecord(Instance.getMainModule(), opts.InputsAndOutputs.copyOutputFilenames(),
+    (void) index::indexAndRecord(Instance.getMainModule(),
+                                 opts.InputsAndOutputs.copyOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
-                                 opts.IndexSystemModules, opts.IndexIgnoreStdlib,
-                                 isDebugCompilation, Invocation.getTargetTriple(),
+                                 opts.IndexSystemModules,
+                                 opts.IndexIgnoreStdlib,
+                                 isDebugCompilation,
+                                 Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker());
   }
 }
@@ -2503,11 +1686,12 @@ createSerializedDiagnosticConsumerIfNeeded(
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
       [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string serializedDiagnosticsPath = input.serializedDiagnosticsPath();
-    if (serializedDiagnosticsPath.empty())
-      return nullptr;
-    return serialized_diagnostics::createConsumer(serializedDiagnosticsPath);
-  });
+        auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
+        if (serializedDiagnosticsPath.empty())
+          return nullptr;
+        return serialized_diagnostics::createConsumer(
+            serializedDiagnosticsPath);
+      });
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
@@ -2524,12 +1708,12 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   return createDispatchingDiagnosticConsumerIfNeeded(
       invocation.getFrontendOptions().InputsAndOutputs,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-    std::string fixItsOutputPath = input.fixItsOutputPath();
-    if (fixItsOutputPath.empty())
-      return nullptr;
-    return std::make_unique<JSONFixitWriter>(
-        fixItsOutputPath, invocation.getDiagnosticOptions());
-  });
+        auto fixItsOutputPath = input.getFixItsOutputPath();
+        if (fixItsOutputPath.empty())
+          return nullptr;
+        return std::make_unique<JSONFixitWriter>(
+            fixItsOutputPath.str(), invocation.getDiagnosticOptions());
+      });
 }
 
 /// Print information about a

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -177,6 +177,10 @@ def verify_incremental_dependencies :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the dependency verifier for each frontend job">;
 
+def disallow_forwarding_driver :
+  Flag<["-"], "disallow-use-new-driver">, Flags<[]>,
+  HelpText<"Disable using new swift-driver">;
+
 def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
@@ -297,6 +301,10 @@ def experimental_skip_non_inlinable_function_bodies:
   Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
+def experimental_skip_non_inlinable_function_bodies_without_types:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies-without-types">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip work on non-inlinable function bodies that do not declare nested types">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;
@@ -327,6 +335,10 @@ def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-p
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if a cross-import of a module is triggered.">;
+
+def remark_loading_module : Flag<["-"], "Rmodule-loading">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark and file path of each loaded module">;
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
@@ -1106,13 +1118,9 @@ def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
   HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable parser lookup & use ASTScope lookup only (experimental)">;
-
-def enable_parser_lookup : Flag<["-"], "enable-parser-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable parser lookup">;
+def emit_supported_features : Flag<["-"], "emit-supported-features">,
+  HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def enable_request_based_incremental_dependencies : Flag<["-"],
   "enable-request-based-incremental-dependencies">,

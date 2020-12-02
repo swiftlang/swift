@@ -723,15 +723,19 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
   llvm::StructType *SwiftContextTy;
   llvm::StructType *SwiftTaskTy;
   llvm::StructType *SwiftExecutorTy;
+  llvm::PointerType *AsyncFunctionPointerPtrTy;
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
   llvm::PointerType *SwiftExecutorPtrTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
-
+  llvm::StructType *AsyncTaskAndContextTy;
+  llvm::StructType *AsyncContinuationContextTy;
+  llvm::PointerType *AsyncContinuationContextPtrTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
@@ -964,9 +968,6 @@ private:
   friend TypeConverter;
 
   const clang::ASTContext *ClangASTContext;
-  ClangTypeConverter *ClangTypes;
-  void initClangTypeConverter();
-  void destroyClangTypeConverter();
 
   llvm::DenseMap<Decl*, MetadataLayout*> MetadataLayouts;
   void destroyMetadataLayoutMap();
@@ -1391,6 +1392,11 @@ public:
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
 
+  llvm::Constant *getAddrOfAsyncFunctionPointer(SILFunction *function);
+  llvm::Constant *defineAsyncFunctionPointer(SILFunction *function,
+                                             ConstantInit init);
+  SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
+
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
   void emitDispatchThunk(SILDeclRef declRef);
@@ -1632,7 +1638,7 @@ public:
   bool hasObjCResilientClassStub(ClassDecl *D);
 
   /// Emit a resilient class stub.
-  void emitObjCResilientClassStub(ClassDecl *D);
+  llvm::Constant *emitObjCResilientClassStub(ClassDecl *D, bool isPublic);
 
 private:
   llvm::Constant *

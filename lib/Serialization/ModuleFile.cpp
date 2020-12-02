@@ -650,6 +650,24 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   }
 }
 
+Optional<Fingerprint>
+ModuleFile::loadFingerprint(const IterableDeclContext *IDC) const {
+  PrettyStackTraceDecl trace("loading fingerprints for", IDC->getDecl());
+
+  assert(IDC->wasDeserialized());
+  assert(IDC->getDeclID() != 0);
+
+  if (!Core->DeclFingerprints) {
+    return None;
+  }
+
+  auto it = Core->DeclFingerprints->find(IDC->getDeclID());
+  if (it == Core->DeclFingerprints->end()) {
+    return None;
+  }
+  return *it;
+}
+
 TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {

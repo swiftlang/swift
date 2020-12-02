@@ -25,6 +25,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   await slowServer.serverRestart("localhost")
   await slowServer.server("localhost", atPriorityRestart: 0.8)
+
+  _ = await slowServer.allOperations()
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
@@ -36,4 +38,6 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
   slowServer.doSomethingSlow("mail") { i in
     _ = i
   }
+
+  _ = slowServer.allOperations
 }

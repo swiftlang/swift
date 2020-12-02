@@ -158,7 +158,7 @@ const ParamDecl *getParamDeclFromOperand(SILValue value) {
 bool isUseOfSelfInInitializer(Operand *oper) {
   if (auto *PBI = dyn_cast<ProjectBoxInst>(oper->get())) {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(PBI->getOperand())) {
-      switch (MUI->getKind()) {
+      switch (MUI->getMarkUninitializedKind()) {
       case MarkUninitializedInst::Kind::Var:
         return false;
       case MarkUninitializedInst::Kind::RootSelf:

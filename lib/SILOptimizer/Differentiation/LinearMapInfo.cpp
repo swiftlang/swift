@@ -23,7 +23,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 
 namespace swift {
 namespace autodiff {
@@ -56,9 +55,10 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
 LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                              SILFunction *original, SILFunction *derivative,
                              SILAutoDiffIndices indices,
-                             const DifferentiableActivityInfo &activityInfo)
+                             const DifferentiableActivityInfo &activityInfo,
+                             SILLoopInfo *loopInfo)
     : kind(kind), original(original), derivative(derivative),
-      activityInfo(activityInfo), indices(indices),
+      activityInfo(activityInfo), loopInfo(loopInfo), indices(indices),
       synthesizedFile(context.getOrCreateSynthesizedFile(original)),
       typeConverter(context.getTypeConverter()) {
   generateDifferentiationDataStructures(context, derivative);
@@ -138,27 +138,38 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   // Note: must mark enum as implicit to satisfy assertion in
   // `Parser::parseDeclListDelayed`.
   branchingTraceDecl->setImplicit();
+  // Branching trace enums shall not be resilient.
+  branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
   if (genericSig)
     branchingTraceDecl->setGenericSignature(genericSig);
   computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
   file.addTopLevelDecl(branchingTraceDecl);
   // Add basic block enum cases.
   for (auto *predBB : originalBB->getPredecessorBlocks()) {
-    auto bbId = "bb" + std::to_string(predBB->getDebugID());
-    auto *linearMapStruct = getLinearMapStruct(predBB);
-    assert(linearMapStruct);
-    auto linearMapStructTy =
-        linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
     // Create dummy declaration representing enum case parameter.
     auto *decl = new (astCtx)
         ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
-    if (linearMapStructTy->hasArchetype())
-      decl->setInterfaceType(linearMapStructTy->mapTypeOutOfContext());
-    else
-      decl->setInterfaceType(linearMapStructTy);
+    // If predecessor block is in a loop, its linear map struct will be
+    // indirectly referenced in memory owned by the context object. The payload
+    // is just a raw pointer.
+    if (loopInfo->getLoopFor(predBB)) {
+      blocksInLoop.insert(predBB);
+      decl->setInterfaceType(astCtx.TheRawPointerType);
+    }
+    // Otherwise the payload is the linear map struct.
+    else {
+      auto *linearMapStruct = getLinearMapStruct(predBB);
+      assert(linearMapStruct);
+      auto linearMapStructTy =
+          linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
+      decl->setInterfaceType(
+          linearMapStructTy->hasArchetype()
+              ? linearMapStructTy->mapTypeOutOfContext() : linearMapStructTy);
+    }
     // Create enum element and enum case declarations.
     auto *paramList = ParameterList::create(astCtx, {decl});
+    auto bbId = "bb" + std::to_string(predBB->getDebugID());
     auto *enumEltDecl = new (astCtx) EnumElementDecl(
         /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)), paramList,
         loc, /*RawValueExpr*/ nullptr, branchingTraceDecl);
@@ -171,10 +182,6 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
     // Record enum element declaration.
     branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
   }
-  // If original block is in a loop, mark branching trace enum as indirect.
-  if (loopInfo->getLoopFor(originalBB))
-    branchingTraceDecl->getAttrs().add(new (astCtx)
-                                           IndirectAttr(/*Implicit*/ true));
   return branchingTraceDecl;
 }
 
@@ -201,6 +208,8 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   // Note: must mark struct as implicit to satisfy assertion in
   // `Parser::parseDeclListDelayed`.
   linearMapStruct->setImplicit();
+  // Linear map structs shall not be resilient.
+  linearMapStruct->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
   if (genericSig)
     linearMapStruct->setGenericSignature(genericSig);
   computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
@@ -355,9 +364,6 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
 void LinearMapInfo::generateDifferentiationDataStructures(
     ADContext &context, SILFunction *derivativeFn) {
   auto &astCtx = original->getASTContext();
-  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
-  auto *loopInfo = loopAnalysis->get(original);
-
   // Get the derivative function generic signature.
   CanGenericSignature derivativeFnGenSig = nullptr;
   if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())

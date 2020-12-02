@@ -178,6 +178,11 @@
 #else
 #define SWIFT_IMAGE_EXPORTS_swift_Concurrency 0
 #endif
+#if defined(swift_Differentiation_EXPORTS)
+#define SWIFT_IMAGE_EXPORTS_swift_Differentiation 1
+#else
+#define SWIFT_IMAGE_EXPORTS_swift_Differentiation 0
+#endif
 
 #define SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)                          \
   SWIFT_MACRO_IF(SWIFT_IMAGE_EXPORTS_##LIBRARY,                       \

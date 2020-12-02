@@ -61,6 +61,8 @@ public:
     formalEvalScope.verify();
   }
 
+  bool isValid() const { return normalScope.isValid(); }
+
 private:
   void popImpl() {
     // We must always pop the formal eval scope before the normal scope since

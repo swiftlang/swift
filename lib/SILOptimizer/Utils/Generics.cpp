@@ -1964,7 +1964,7 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
                                            LoadOwnershipQualifier::Take);
     } else {
       Val = Builder.emitLoadBorrowOperation(Loc, InputValue);
-      if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+      if (Val.getOwnershipKind() == OwnershipKind::Guaranteed)
         ArgAtIndexNeedsEndBorrow.push_back(Arguments.size());
     }
 
@@ -2041,7 +2041,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
       fixUsedVoidType(resultBlock->getArgument(0), loc, builder);
 
       SILArgument *arg = resultBlock->replacePhiArgument(
-          0, resultOut->getType().getObjectType(), ValueOwnershipKind::Owned);
+          0, resultOut->getType().getObjectType(), OwnershipKind::Owned);
       // Store the direct result to the original result address.
       builder.emitStoreValueOperation(loc, arg, resultOut,
                                       StoreOwnershipQualifier::Init);
@@ -2249,13 +2249,13 @@ FullApplySite ReabstractionThunkGenerator::createReabstractionThunkApply(
   auto *ErrorVal = ErrorBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(
           specConv.getSILErrorType(Builder.getTypeExpansionContext())),
-      ValueOwnershipKind::Owned);
+      OwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
   NormalBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(
           specConv.getSILResultType(Builder.getTypeExpansionContext())),
-      ValueOwnershipKind::Owned);
+      OwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);
   return FullApplySite(TAI);
 }
@@ -2337,7 +2337,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
         Arguments.push_back(argVal);
       } else {
         SILValue argVal = Builder.emitLoadBorrowOperation(Loc, NewArg);
-        if (argVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+        if (argVal.getOwnershipKind() == OwnershipKind::Guaranteed)
           ArgsThatNeedEndBorrow.push_back(Arguments.size());
         Arguments.push_back(argVal);
       }

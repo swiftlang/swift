@@ -1341,6 +1341,67 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   return builder.build(id);
 }
 
+static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
+}
+
+static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
+}
+
+Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
+  TupleTypeElt resultTupleElements[2] = {
+    ctx.TheNativeObjectType, // task,
+    ctx.TheRawPointerType    // initial context
+  };
+
+  return TupleType::get(resultTupleElements, ctx);
+}
+
+static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  return getBuiltinFunction(
+      id,
+      { ctx.getIntDecl()->getDeclaredInterfaceType(),
+        OptionalType::get(ctx.TheNativeObjectType),
+        FunctionType::get({ }, ctx.TheEmptyTupleType, extInfo) },
+      getAsyncTaskAndContextType(ctx));
+}
+
+static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder);
+  builder.addParameter(
+      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheNativeObjectType)));
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+  return builder.build(id);
+}
+
+static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
+                                                    Identifier id) {
+  return getBuiltinFunction(
+      id, {BuiltinIntegerType::getWordType(ctx)}, ctx.TheNativeObjectType);
+}
+
+static ValueDecl *getAutoDiffProjectTopLevelSubcontext(ASTContext &ctx,
+                                                       Identifier id) {
+  return getBuiltinFunction(
+      id, {ctx.TheNativeObjectType}, ctx.TheRawPointerType);
+}
+
+static ValueDecl *getAutoDiffAllocateSubcontext(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(
+      id, {ctx.TheNativeObjectType, BuiltinIntegerType::getWordType(ctx)},
+      ctx.TheRawPointerType);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -2467,6 +2528,18 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ConvertUnownedUnsafeToGuaranteed:
     return getConvertUnownedUnsafeToGuaranteed(Context, Id);
 
+  case BuiltinValueKind::GetCurrentAsyncTask:
+    return getGetCurrentAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CancelAsyncTask:
+    return getCancelAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncTask:
+    return getCreateAsyncTask(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncTaskFuture:
+    return getCreateAsyncTaskFuture(Context, Id);
+
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 
@@ -2495,6 +2568,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     return getTriggerFallbackDiagnosticOperation(Context, Id);
+
+  case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+    return getAutoDiffCreateLinearMapContext(Context, Id);
+
+  case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
+    return getAutoDiffProjectTopLevelSubcontext(Context, Id);
+
+  case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    return getAutoDiffAllocateSubcontext(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

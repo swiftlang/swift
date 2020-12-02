@@ -1474,7 +1474,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     // not have a value with @owned ownership.
     assert((!src.getType().isTrivial(SGF.F) ||
             src.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess ||
-            src.getOwnershipKind() != ValueOwnershipKind::Owned) &&
+            src.getOwnershipKind() != OwnershipKind::Owned) &&
            "@owned value without cleanup + copy_on_success");
 
     // We should only see take_on_success if we have a base type that is address
@@ -2369,7 +2369,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
     SILType ty = SGF.getLoweredType(vd->getType());
     if (ty.isAddressOnly(SGF.F))
       continue;
-    block->createPhiArgument(ty, ValueOwnershipKind::Owned, vd);
+    block->createPhiArgument(ty, OwnershipKind::Owned, vd);
   }
 }
 
@@ -2492,8 +2492,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
         mv = SGF.emitManagedRValueWithCleanup(found->second);
       } else {
         SILValue arg = caseBB->getArgument(argIndex++);
-        assert(arg.getOwnershipKind() == ValueOwnershipKind::Owned ||
-               arg.getOwnershipKind() == ValueOwnershipKind::None);
+        assert(arg.getOwnershipKind() == OwnershipKind::Owned ||
+               arg.getOwnershipKind() == OwnershipKind::None);
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
 

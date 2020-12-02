@@ -48,6 +48,7 @@ import Chars
 import ClassArrayGetter
 import Codable
 import Combos
+import CreateObjects
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -86,6 +87,7 @@ import Hanoi
 import Hash
 import Histogram
 import HTTP2StateMachine
+import IndexPathTest
 import InsertCharacter
 import IntegerParsing
 import Integrate
@@ -235,6 +237,7 @@ registerBenchmark(Chars)
 registerBenchmark(Codable)
 registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
+registerBenchmark(CreateObjects)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
 registerBenchmark(DevirtualizeProtocolComposition)
@@ -274,6 +277,7 @@ registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
 registerBenchmark(HTTP2StateMachine)
+registerBenchmark(IndexPathTest)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegerParsing)
 registerBenchmark(IntegrateTest)

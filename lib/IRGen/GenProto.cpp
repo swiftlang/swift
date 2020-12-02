@@ -1336,7 +1336,11 @@ public:
       SILFunction *Func = entry.getMethodWitness().Witness;
       llvm::Constant *witness = nullptr;
       if (Func) {
-        witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+        if (Func->isAsync()) {
+          witness = IGM.getAddrOfAsyncFunctionPointer(Func);
+        } else {
+          witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+        }
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
@@ -2744,8 +2748,16 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
 void NecessaryBindings::addTypeMetadata(CanType type) {
   assert(!isa<InOutType>(type));
 
+  // If the bindings are for an async function, we will always need the type
+  // metadata.  The opportunities to reconstruct it available in the context of
+  // partial apply forwarders are not available here.
+  if (forAsyncFunction()) {
+    addRequirement({type, nullptr});
+    return;
+  }
+
   // Bindings are only necessary at all if the type is dependent.
-  if (!type->hasArchetype() && !forAsyncFunction())
+  if (!type->hasArchetype())
     return;
 
   // Break down structural types so that we don't eagerly pass metadata
@@ -3341,7 +3353,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto &schema = IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot, member);
 
-  return FunctionPointer(witnessFnPtr, authInfo, signature);
+  return FunctionPointer(fnType, witnessFnPtr, authInfo, signature);
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(

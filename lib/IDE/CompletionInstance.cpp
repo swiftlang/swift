@@ -295,17 +295,15 @@ static bool areAnyDependentFilesInvalidated(
 /// Note that we don't care about local types (i.e. type declarations inside
 /// function bodies, closures, or top level statement bodies) because they are
 /// not visible from other functions where the completion is happening.
-void getInterfaceHashIncludingTypeMembers(SourceFile *SF,
-                                          llvm::SmallString<32> &str) {
+static Fingerprint getInterfaceHashIncludingTypeMembers(const SourceFile *SF) {
   /// FIXME: Gross. Hashing multiple "hash" values.
   llvm::MD5 hash;
-  SF->getInterfaceHash(str);
-  hash.update(str);
+  hash.update(SF->getInterfaceHash().getRawValue());
 
   std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
       [&](IterableDeclContext *IDC) {
         if (auto fp = IDC->getBodyFingerprint())
-          hash.update(*fp);
+          hash.update(fp->getRawValue());
         for (auto *member : IDC->getParsedMembers())
           if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
             hashTypeBodyFingerprints(childIDC);
@@ -318,7 +316,7 @@ void getInterfaceHashIncludingTypeMembers(SourceFile *SF,
 
   llvm::MD5::MD5Result result;
   hash.final(result);
-  str = result.digest();
+  return Fingerprint{std::move(result)};
 }
 
 } // namespace
@@ -366,7 +364,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
   tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
-  langOpts.DisableParserLookup = true;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
@@ -398,10 +395,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
   switch (newInfo.Kind) {
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
-    llvm::SmallString<32> oldInterfaceHash{};
-    llvm::SmallString<32> newInterfaceHash{};
-    getInterfaceHashIncludingTypeMembers(oldSF, oldInterfaceHash);
-    getInterfaceHashIncludingTypeMembers(tmpSF, newInterfaceHash);
+    const auto oldInterfaceHash = getInterfaceHashIncludingTypeMembers(oldSF);
+    const auto newInterfaceHash = getInterfaceHashIncludingTypeMembers(tmpSF);
     if (oldInterfaceHash != newInterfaceHash)
       return false;
 
@@ -444,17 +439,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
                            1);
     SM.setCodeCompletionPoint(newBufferID, newOffset);
 
-    // Construct dummy scopes. We don't need to restore the original scope
-    // because they are probably not 'isResolvable()' anyway.
-    auto &SI = oldState->getScopeInfo();
-    assert(SI.getCurrentScope() == nullptr);
-    Scope Top(SI, ScopeKind::TopLevel);
-    Scope Body(SI, ScopeKind::FunctionBody);
-
-    assert(oldInfo.Kind == CodeCompletionDelayedDeclKind::FunctionBody &&
-           "If the interface hash is the same as old one, the previous kind "
-           "must be FunctionBody too. Otherwise, hashing is too weak");
-    oldInfo.Kind = CodeCompletionDelayedDeclKind::FunctionBody;
     oldInfo.ParentContext = DC;
     oldInfo.StartOffset = newInfo.StartOffset;
     oldInfo.EndOffset = newInfo.EndOffset;

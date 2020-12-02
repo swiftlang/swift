@@ -255,7 +255,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPhiArgument(argTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(argTy, OwnershipKind::Owned);
   }
 
   SILBasicBlock *FalseBB = createBasicBlock();
@@ -821,7 +821,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
   SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
-      exnTL.getLoweredType(), ValueOwnershipKind::Owned);
+      exnTL.getLoweredType(), OwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -1217,7 +1217,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
   SILValue exn = destBB->createPhiArgument(getSILType(exnResult, fnTy),
-                                           ValueOwnershipKind::Owned);
+                                           OwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);

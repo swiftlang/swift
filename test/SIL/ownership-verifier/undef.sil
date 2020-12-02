@@ -12,42 +12,37 @@ struct MyInt {
   var i: Builtin.Int32
 }
 
+struct MyKlassWrapper {
+  var i: Klass
+}
+
 // Make sure that we handle undef in an appropriate way. Do to special handling
 // in SIL around undef, we test this using the ownership dumper for simplicity.
 
 // CHECK-LABEL: *** Dumping Function: 'undef_addresses_have_any_ownership'
 // CHECK: Visiting: {{.*}}%0 = mark_uninitialized [var] undef : $*Klass
-// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Ownership Constraint:
 // CHECK-NEXT: Op #: 0
-// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  No.
-// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
-// CHECK-NEXT: guaranteed:  No.
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: Constraint: <Constraint Kind:owned LifetimeConstraint:LifetimeEnding>
 // CHECK: Visiting: {{.*}}%1 = mark_uninitialized [var] undef : $Klass
-// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Ownership Constraint:
 // CHECK-NEXT: Op #: 0
-// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  No.
-// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
-// CHECK-NEXT: guaranteed:  No.
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: Constraint: <Constraint Kind:owned LifetimeConstraint:LifetimeEnding>
 // CHECK: Visiting: {{.*}}%3 = mark_uninitialized [var] undef : $*Builtin.Int32
-// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Ownership Constraint:
 // CHECK-NEXT: Op #: 0
-// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  No.
-// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
-// CHECK-NEXT: guaranteed:  No.
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: Constraint: <Constraint Kind:owned LifetimeConstraint:LifetimeEnding>
 // CHECK: Visiting: {{.*}}%4 = struct $MyInt (undef : $Builtin.Int32)
-// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Ownership Constraint:
 // CHECK-NEXT: Op #: 0
-// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
-// CHECK-NEXT: unowned:  Yes. Liveness: MustBeLive
-// CHECK-NEXT: owned: Yes. Liveness: MustBeLive
-// CHECK-NEXT: guaranteed:  Yes. Liveness: MustBeLive
-// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK-NEXT: Constraint: <Constraint Kind:none LifetimeConstraint:NonLifetimeEnding>
+// CHECK-LABEL: Visiting:   {{%.*}} = struct $MyKlassWrapper (undef : $Klass)
+// CHECK-NEXT: Ownership Constraint:
+// CHECK-NEXT: Op #: 0
+// CHECK-NEXT: Constraint: <Constraint Kind:none LifetimeConstraint:NonLifetimeEnding>
+// CHECK-NEXT: Results Ownership Kinds:
+// CHECK-NEXT: Result:   {{%.*}} = struct $MyKlassWrapper (undef : $Klass)
+// CHECK-NEXT: Kind: none
 sil [ossa] @undef_addresses_have_any_ownership : $@convention(thin) () -> () {
 bb0:
   %0 = mark_uninitialized [var] undef : $*Klass
@@ -55,6 +50,7 @@ bb0:
   destroy_value %1 : $Klass
   %2 = mark_uninitialized [var] undef : $*Builtin.Int32
   %3 = struct $MyInt(undef : $Builtin.Int32)
+  %4 = struct $MyKlassWrapper(undef : $Klass)
   %9999 = tuple()
   return %9999 : $()
 }

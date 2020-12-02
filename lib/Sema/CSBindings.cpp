@@ -22,6 +22,75 @@
 using namespace swift;
 using namespace constraints;
 
+bool ConstraintSystem::PotentialBinding::isViableForJoin() const {
+  return Kind == AllowedBindingKind::Supertypes &&
+         !BindingType->hasLValueType() &&
+         !BindingType->hasUnresolvedType() &&
+         !BindingType->hasTypeVariable() &&
+         !BindingType->hasHole() &&
+         !BindingType->hasUnboundGenericType() &&
+         !hasDefaultedLiteralProtocol() &&
+         !isDefaultableBinding();
+}
+
+bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
+  // Generic parameters are always potentially incomplete.
+  if (isGenericParameter())
+    return true;
+
+  // If current type variable is associated with a code completion token
+  // it's possible that it doesn't have enough contextual information
+  // to be resolved to anything so let's delay considering it until everything
+  // else is resolved.
+  if (AssociatedCodeCompletionToken)
+    return true;
+
+  auto *locator = TypeVar->getImpl().getLocator();
+  if (!locator)
+    return false;
+
+  if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+    // If subtyping is allowed and this is a result of an implicit member chain,
+    // let's delay binding it to an optional until its object type resolved too or
+    // it has been determined that there is no possibility to resolve it. Otherwise
+    // we might end up missing solutions since it's allowed to implicitly unwrap
+    // base type of the chain but it can't be done early - type variable
+    // representing chain's result type has a different l-valueness comparing
+    // to generic parameter of the optional.
+    if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
+          if (binding.Kind != AllowedBindingKind::Subtypes)
+            return false;
+
+          auto objectType = binding.BindingType->getOptionalObjectType();
+          return objectType && objectType->isTypeVariableOrMember();
+        }))
+      return true;
+  }
+
+  if (isHole()) {
+    // If the base of the unresolved member reference like `.foo`
+    // couldn't be resolved we'd want to bind it to a hole at the
+    // very last moment possible, just like generic parameters.
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
+      return true;
+
+    // Delay resolution of the code completion expression until
+    // the very end to give it a chance to be bound to some
+    // contextual type even if it's a hole.
+    if (locator->directlyAt<CodeCompletionExpr>())
+      return true;
+
+    // Delay resolution of the `nil` literal to a hole until
+    // the very end to give it a change to be bound to some
+    // other type, just like code completion expression which
+    // relies solely on contextual information.
+    if (locator->directlyAt<NilLiteralExpr>())
+      return true;
+  }
+
+  return false;
+}
+
 void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
     const ConstraintSystem &cs,
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
@@ -462,30 +531,23 @@ void ConstraintSystem::PotentialBindings::finalize(
   // If there are no bindings, typeVar may be a hole.
   if (cs.shouldAttemptFixes() && Bindings.empty() &&
       TypeVar->getImpl().canBindToHole()) {
-    IsHole = true;
     // If the base of the unresolved member reference like `.foo`
     // couldn't be resolved we'd want to bind it to a hole at the
     // very last moment possible, just like generic parameters.
     auto *locator = TypeVar->getImpl().getLocator();
-    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
-      PotentiallyIncomplete = true;
 
     // Delay resolution of the code completion expression until
     // the very end to give it a chance to be bound to some
     // contextual type even if it's a hole.
-    if (locator->directlyAt<CodeCompletionExpr>()) {
+    if (locator->directlyAt<CodeCompletionExpr>())
       FullyBound = true;
-      PotentiallyIncomplete = true;
-    }
 
     // Delay resolution of the `nil` literal to a hole until
     // the very end to give it a change to be bound to some
     // other type, just like code completion expression which
     // relies solely on contextual information.
-    if (locator->directlyAt<NilLiteralExpr>()) {
+    if (locator->directlyAt<NilLiteralExpr>())
       FullyBound = true;
-      PotentiallyIncomplete = true;
-    }
 
     // If this type variable is associated with a code completion token
     // and it failed to infer any bindings let's adjust hole's locator
@@ -512,17 +574,6 @@ void ConstraintSystem::PotentialBindings::finalize(
     if (AnyTypePos != Bindings.end()) {
       std::rotate(AnyTypePos, AnyTypePos + 1, Bindings.end());
     }
-  }
-
-  // Determine if the bindings only constrain the type variable from above with
-  // an existential type; such a binding is not very helpful because it's
-  // impossible to enumerate the existential type's subtypes.
-  if (!Bindings.empty()) {
-    SubtypeOfExistentialType =
-        llvm::all_of(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isExistentialType() &&
-                 binding.Kind == AllowedBindingKind::Subtypes;
-        });
   }
 }
 
@@ -639,30 +690,30 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
-  if (binding.Kind == AllowedBindingKind::Supertypes &&
-      !binding.BindingType->hasUnresolvedType() &&
-      !binding.BindingType->hasTypeVariable() &&
-      !binding.BindingType->hasHole() &&
-      !binding.BindingType->hasUnboundGenericType() &&
-      !binding.hasDefaultedLiteralProtocol() &&
-      !binding.isDefaultableBinding() && allowJoinMeet) {
-    if (lastSupertypeIndex) {
-      auto &lastBinding = Bindings[*lastSupertypeIndex];
-      auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
-      auto bindingType = binding.BindingType->getWithoutSpecifierType();
+  if (binding.isViableForJoin() && allowJoinMeet) {
+    bool joined = false;
 
-      auto join = Type::join(lastType, bindingType);
-      if (join && !(*join)->isAny() &&
-          (!(*join)->getOptionalObjectType()
-           || !(*join)->getOptionalObjectType()->isAny())) {
-        // Replace the last supertype binding with the join. We're done.
-        lastBinding.BindingType = *join;
-        return;
+    auto isAcceptableJoin = [](Type type) {
+      return !type->isAny() && (!type->getOptionalObjectType() ||
+                                !type->getOptionalObjectType()->isAny());
+    };
+
+    for (auto &existingBinding : Bindings) {
+      if (!existingBinding.isViableForJoin())
+        continue;
+
+      auto join = Type::join(existingBinding.BindingType, binding.BindingType);
+
+      if (join && isAcceptableJoin(*join)) {
+        existingBinding.BindingType = *join;
+        joined = true;
       }
     }
 
-    // Record this as the most recent supertype index.
-    lastSupertypeIndex = Bindings.size();
+    // If new binding has been joined with at least one of existing
+    // bindings, there is no reason to include it into the set.
+    if (joined)
+      return;
   }
 
   if (auto *literalProtocol = binding.getDefaultedLiteralProtocol())
@@ -677,9 +728,6 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
 
   if (!isViable(binding))
     return;
-
-  if (binding.isDefaultableBinding())
-    ++NumDefaultableBindings;
 
   Bindings.push_back(std::move(binding));
 }
@@ -709,7 +757,7 @@ bool ConstraintSystem::PotentialBindings::isViable(
 
 bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     Constraint *disjunction) const {
-  if (IsHole || FullyBound)
+  if (isHole() || FullyBound)
     return false;
 
   // If this bindings are for a closure and there are no holes,
@@ -889,10 +937,8 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // bindings and use it when forming a hole if there are no other bindings
     // available.
     if (auto *locator = bindingTypeVar->getImpl().getLocator()) {
-      if (locator->directlyAt<CodeCompletionExpr>()) {
+      if (locator->directlyAt<CodeCompletionExpr>())
         result.AssociatedCodeCompletionToken = locator->getAnchor();
-        result.PotentiallyIncomplete = true;
-      }
     }
 
     switch (constraint->getKind()) {
@@ -929,24 +975,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     if (typeVar->getImpl().canBindToLValue() !=
         otherTypeVar->getImpl().canBindToLValue())
       return None;
-  }
-
-  // If subtyping is allowed and this is a result of an implicit member chain,
-  // let's delay binding it to an optional until its object type resolved too or
-  // it has been determined that there is no possibility to resolve it. Otherwise
-  // we might end up missing solutions since it's allowed to implicitly unwrap
-  // base type of the chain but it can't be done early - type variable
-  // representing chain's result type has a different l-valueness comparing
-  // to generic parameter of the optional.
-  if (kind == AllowedBindingKind::Subtypes) {
-    auto *locator = typeVar->getImpl().getLocator();
-    if (locator &&
-        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
-      auto objectType = type->getOptionalObjectType();
-      if (objectType && objectType->isTypeVariableOrMember()) {
-        result.PotentiallyIncomplete = true;
-      }
-    }
   }
 
   if (type->is<InOutType>() && !typeVar->getImpl().canBindToInOut())
@@ -987,20 +1015,6 @@ bool ConstraintSystem::PotentialBindings::infer(
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OptionalObject: {
-    // If there is a `bind param` constraint associated with
-    // current type variable, result should be aware of that
-    // fact. Binding set might be incomplete until
-    // this constraint is resolved, because we currently don't
-    // look-through constraints expect to `subtype` to try and
-    // find related bindings.
-    // This only affects type variable that appears one the
-    // right-hand side of the `bind param` constraint and
-    // represents result type of the closure body, because
-    // left-hand side gets types from overload choices.
-    if (constraint->getKind() == ConstraintKind::BindParam &&
-        constraint->getSecondType()->isEqual(TypeVar))
-      PotentiallyIncomplete = true;
-
     auto binding =
         cs.getPotentialBindingForRelationalConstraint(*this, constraint);
     if (!binding)
@@ -1384,7 +1398,8 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // under-constrained due to e.g. lack of expressions on the
     // right-hand side of the token, which are required for a
     // regular type-check.
-    if (dstLocator->directlyAt<CodeCompletionExpr>())
+    if (dstLocator->directlyAt<CodeCompletionExpr>() ||
+        srcLocator->directlyAt<CodeCompletionExpr>())
       return None;
   }
 

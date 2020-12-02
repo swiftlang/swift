@@ -717,12 +717,49 @@ BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Spe
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
+// getCurrentAsyncTask: () -> Builtin.NativeObject
+//
+// Retrieve the pointer to the task in which the current asynchronous
+// function is executing.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "n", Special)
+
+/// cancelAsyncTask(): (Builtin.NativeObject) -> Void
+///
+/// Cancel the given asynchronous task.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
+
+/// createAsyncTask(): (
+///     Int, Builtin.NativeObject?, @escaping () async throws -> Void
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task, given flags, an (optional) parent task, and
+/// a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Special)
+
+/// createAsyncTaskFuture(): (
+///     Int, Builtin.NativeObject?, @escaping () async throws -> T
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, an (optional) parent
+/// task and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
+    "createAsyncTaskFuture", "", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
 /// does not read any memory (note that even though it reads from a string, it
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
+
+// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "n", Special)
+
+// autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
+
+// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

@@ -3,7 +3,12 @@
 
 #pragma clang assume_nonnull begin
 
-@interface SlowServer : NSObject
+@protocol ServiceProvider
+@property(readonly) NSArray<NSString *> *allOperations;
+-(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
+@end
+
+@interface SlowServer : NSObject <ServiceProvider>
 -(void)doSomethingSlow:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)checkAvailabilityWithCompletionHandler:(void (^)(BOOL isAvailable))completionHandler;
@@ -13,6 +18,10 @@
 -(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
 @property(readwrite) void (^completionHandler)(NSInteger);
+
+-(void)findMultipleAnswersWithCompletionHandler:(void (^)(NSString *_Nullable, NSInteger, NSError * _Nullable))handler __attribute__((swift_name("findMultipleAnswers(completionHandler:)")));
+
+-(void)findDifferentlyFlavoredBooleansWithCompletionHandler:(void (^)(BOOL wholeMilk, _Bool onePercent, NSError *_Nullable))handler __attribute__((swift_name("findDifferentlyFlavoredBooleans(completionHandler:)")));
 
 -(void)doSomethingConflicted:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(NSInteger)doSomethingConflicted:(NSString *)operation;

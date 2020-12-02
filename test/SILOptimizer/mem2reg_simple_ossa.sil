@@ -33,7 +33,7 @@ bb0(%0 : $Int64):
 bb1:
   %12 = struct $Int64 (%7 : $Builtin.Int64)
   store %12 to [trivial] %3 : $*Int64
-  br bb5
+  br bb6
 
 bb2:
   %15 = integer_literal $Builtin.Int64, 2
@@ -43,28 +43,31 @@ bb2:
 bb3:
   %18 = struct $Int64 (%15 : $Builtin.Int64)
   store %18 to [trivial] %3 : $*Int64
-  br bb4
+  br bb5
 
 bb4:
   br bb5
 
-// CHECK: bb5([[PHI:%[0-9]+]] : $Int64):
-// CHECK-NOT: alloc_stack
 bb5:
-  %22 = alloc_stack $Int64, var, name "i"
-  store %5 to [trivial] %22 : $*Int64
   br bb6
 
-// CHECK: bb6([[PHI2:%[0-9]+]] : $Int64):
+// CHECK: bb6([[PHI:%[0-9]+]] : $Int64):
+// CHECK-NOT: alloc_stack
 bb6:
+  %22 = alloc_stack $Int64, var, name "i"
+  store %5 to [trivial] %22 : $*Int64
+  br bb7
+
+// CHECK: bb7([[PHI2:%[0-9]+]] : $Int64):
+bb7:
   // CHECK: struct_extract [[PHI2]]
   %25 = struct_element_addr %22 : $*Int64, #Int64._value
   %26 = load [trivial] %25 : $*Builtin.Int64
   %27 = integer_literal $Builtin.Int64, 10
   %29 = builtin "cmp_slt_Int64"(%26 : $Builtin.Int64, %27 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %29, bb7, bb8
+  cond_br %29, bb8, bb9
 
-bb7:
+bb8:
   // CHECK: struct_extract [[PHI2]]
   %31 = struct_element_addr %22 : $*Int64, #Int64._value
   %32 = load [trivial] %31 : $*Builtin.Int64
@@ -75,9 +78,9 @@ bb7:
   %38 = struct $Int64 (%36 : $Builtin.Int64)
   cond_fail %37 : $Builtin.Int1
   store %38 to [trivial] %22 : $*Int64
-  br bb6
+  br bb7
 
-bb8:
+bb9:
   %42 = load [trivial] %3 : $*Int64
   dealloc_stack %22 : $*Int64
   dealloc_stack %3 : $*Int64
@@ -262,57 +265,92 @@ bb17:
   %92 = integer_literal $Builtin.Int64, 7
   %93 = struct $Int64 (%92 : $Builtin.Int64)
   store %93 to [trivial] %3 : $*Int64
-  br bb18
+  br bb35
 
 bb18:
-  br bb19
+  br bb35
+bb35:
+  br bb36
 
 bb19:
-  br bb20
+  br bb36
+bb36:
+  br bb37
 
 bb20:
-  br bb21
+  br bb37
+bb37:
+  br bb38
 
 bb21:
-  br bb22
+  br bb38
+bb38:
+  br bb39
 
 bb22:
-  br bb23
+  br bb39
+bb39:
+  br bb40
 
 bb23:
-  br bb24
+  br bb40
+bb40:
+  br bb41
 
 bb24:
-  br bb25
+  br bb41
+bb41:
+  br bb42
 
 bb25:
-  br bb26
+  br bb42
+bb42:
+  br bb43
 
 bb26:
-  br bb27
+  br bb43
+bb43:
+  br bb44
 
 bb27:
-  br bb28
+  br bb44
+bb44:
+  br bb45
 
 bb28:
-  br bb29
+  br bb45
+bb45:
+  br bb46
 
 bb29:
-  br bb30
+  br bb46
+bb46:
+  br bb47
 
 bb30:
-  br bb31
+  br bb47
+bb47:
+  br bb48
 
 bb31:
-  br bb32
+  br bb48
+bb48:
+  br bb49
 
 bb32:
-  br bb33
+  br bb49
+bb49:
+  br bb50
 
 bb33:
-  br bb34
+  br bb50
+bb50:
+  br bb51
 
 bb34:
+  br bb51
+
+bb51:
   %112 = load [trivial] %3 : $*Int64
   dealloc_stack %3 : $*Int64
   dealloc_stack %1 : $*Int64
@@ -332,7 +370,6 @@ bb0(%0 : $Int64):
   store %5 to [trivial] %3 : $*Int64
   %8 = struct_extract %0 : $Int64, #Int64._value
   %9 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int1
-// CHECK: bb2([[INIT]] : $Int64)
   cond_br %9, bb1, bb2
 
 bb1:
@@ -340,10 +377,14 @@ bb1:
 // CHECK: [[INIT2:%[0-9]+]] = struct $Int64
   %12 = struct $Int64 (%11 : $Builtin.Int64)
   store %12 to [trivial] %3 : $*Int64
-// CHECK: bb2([[INIT2]] : $Int64)
-  br bb2
+// CHECK: br bb3([[INIT2]] : $Int64)
+  br bb3
 
 bb2:
+// CHECK: br bb3([[INIT]] : $Int64)
+  br bb3
+
+bb3:
   %15 = load [trivial] %3 : $*Int64
   dealloc_stack %3 : $*Int64
   dealloc_stack %1 : $*Int64

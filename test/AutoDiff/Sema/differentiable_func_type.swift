@@ -119,6 +119,18 @@ let _: (@noDerivative Float, Float) -> Float
 
 let _: @differentiable (Float, @noDerivative Float) -> Float // okay
 
+// expected-error @+1 {{'@differentiable' function type requires at least one differentiability parameter, i.e. a non-'@noDerivative' parameter whose type conforms to 'Differentiable'}}
+let _: @differentiable (@noDerivative Float) -> Float
+
+// expected-error @+1 {{'@differentiable' function type requires at least one differentiability parameter, i.e. a non-'@noDerivative' parameter whose type conforms to 'Differentiable'}}
+let _: @differentiable (@noDerivative Float, @noDerivative Int) -> Float
+
+// expected-error @+1 {{'@differentiable' function type requires at least one differentiability parameter, i.e. a non-'@noDerivative' parameter whose type conforms to 'Differentiable'}}
+let _: @differentiable (@noDerivative Float, @noDerivative Float) -> Float
+
+// expected-error @+1 {{parameter type 'Int' does not conform to 'Differentiable' and satisfy 'Int == Int.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
+let _: @differentiable(linear) (@noDerivative Float, Int) -> Float
+
 // expected-error @+1 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
 let _: (Float) -> @noDerivative Float
 

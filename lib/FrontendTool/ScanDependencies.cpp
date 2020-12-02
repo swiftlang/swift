@@ -2,13 +2,14 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 #include "ScanDependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -680,8 +681,10 @@ static bool scanModuleDependencies(CompilerInstance &instance,
 
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
                   std::set<ModuleDependencyID>> allModules;
-  // Create the module dependency cache.
-  ModuleDependenciesCache cache;
+  // Retrieve the instance's module dependency cache.
+  ModuleDependenciesCache *cache = instance.getModuleDependencyCache();
+  assert(cache &&
+         "Dependency Scanner expected a ModuleDependenciesCache on a compiler instance.");
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
                                               ctx.ClangImporterOpts,
@@ -697,11 +700,11 @@ static bool scanModuleDependencies(CompilerInstance &instance,
   if (isClang) {
     // Loading the clang module using Clang importer.
     // This action will populate the cache with the main module's dependencies.
-    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/true, cache,
+    rootDeps = ctx.getModuleDependencies(moduleName, /*IsClang*/true, *cache,
                                          ASTDelegate);
   } else {
     // Loading the swift module's dependencies.
-    rootDeps = ctx.getSwiftModuleDependencies(moduleName, cache, ASTDelegate);
+    rootDeps = ctx.getSwiftModuleDependencies(moduleName, *cache, ASTDelegate);
   }
   if (!rootDeps.hasValue()) {
     // We cannot find the clang module, abort.
@@ -723,11 +726,11 @@ static bool scanModuleDependencies(CompilerInstance &instance,
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(instance, module, cache, ASTDelegate);
+        resolveDirectDependencies(instance, module, *cache, ASTDelegate);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
   // Write out the JSON description.
-  writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
+  writeJSON(out, instance, *cache, ASTDelegate, allModules.getArrayRef());
   return false;
 }
 
@@ -889,9 +892,11 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
 
-  // Create the module dependency cache.
-  ModuleDependenciesCache cache;
-  cache.recordDependencies(mainModuleName, std::move(mainDependencies));
+  // Retrieve the instance's module dependency cache.
+  ModuleDependenciesCache *cache = instance.getModuleDependencyCache();
+  assert(cache &&
+         "Dependency Scanner expected a ModuleDependenciesCache on a compiler instance.");
+  cache->recordDependencies(mainModuleName, std::move(mainDependencies));
 
   auto &ctx = instance.getASTContext();
   auto ModuleCachePath = getModuleCachePathFromClang(ctx
@@ -914,28 +919,28 @@ bool swift::scanDependencies(CompilerInstance &instance) {
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(instance, module, cache, ASTDelegate);
+        resolveDirectDependencies(instance, module, *cache, ASTDelegate);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
 
   // We have all explicit imports now, resolve cross import overlays.
   discoverCrosssImportOverlayDependencies(instance, mainModuleName,
-      /*All transitive dependencies*/allModules.getArrayRef().slice(1), cache,
+      /*All transitive dependencies*/allModules.getArrayRef().slice(1), *cache,
       ASTDelegate, [&](ModuleDependencyID id) {
     allModules.insert(id);
   });
 
   // Dignose cycle in dependency graph.
-  if (diagnoseCycle(instance, cache, /*MainModule*/allModules.front(), ASTDelegate))
+  if (diagnoseCycle(instance, *cache, /*MainModule*/allModules.front(), ASTDelegate))
     return true;
 
   // Write out the JSON description.
-  writeJSON(out, instance, cache, ASTDelegate, allModules.getArrayRef());
+  writeJSON(out, instance, *cache, ASTDelegate, allModules.getArrayRef());
 
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
-      auto deps = cache.findDependencies(module.first, module.second);
+      auto deps = cache->findDependencies(module.first, module.second);
       if (!deps)
         continue;
 

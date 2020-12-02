@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// Tests here are patterns we should not consider as broken
+
+import Builtin
+
+class SuperKlass {}
+class Klass : SuperKlass {}
+
+struct WrapperStruct {
+  var cls : Klass
+}
+
+sil [ossa] @foo1 : $@convention(thin) (@guaranteed WrapperStruct, @in_guaranteed WrapperStruct) -> () 
+sil [ossa] @foo2 : $@convention(thin) (@owned WrapperStruct, @in_guaranteed WrapperStruct) -> () 
+
+sil [ossa] @test1 : $@convention(thin) (@in_guaranteed WrapperStruct) -> () {
+bb0(%0 :  $*WrapperStruct):
+  %1 = load_borrow %0 : $*WrapperStruct
+  %func = function_ref @foo1 : $@convention(thin) (@guaranteed WrapperStruct, @in_guaranteed WrapperStruct) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%1, %0) : $@convention(thin) (@guaranteed WrapperStruct, @in_guaranteed WrapperStruct) -> ()
+  end_borrow %1 : $WrapperStruct
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test2 : $@convention(thin) (@in_guaranteed WrapperStruct) -> () {
+bb0(%0 :  $*WrapperStruct):
+  %1 = load_borrow %0 : $*WrapperStruct
+  %copy = copy_value %1 : $WrapperStruct
+  %func = function_ref @foo2 : $@convention(thin) (@owned WrapperStruct, @in_guaranteed WrapperStruct) -> ()
+  %pa = partial_apply %func(%copy, %0) : $@convention(thin) (@owned WrapperStruct, @in_guaranteed WrapperStruct) -> ()
+  end_borrow %1 : $WrapperStruct
+  destroy_value %pa : $@callee_owned () -> () 
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-NOT: Function: 'caller1'
+sil [ossa] @caller1 : $@convention(thin) (@owned WrapperStruct) -> () {
+bb0(%0 :  @owned $WrapperStruct):
+  %stk = alloc_stack $WrapperStruct
+  store %0 to [init] %stk : $*WrapperStruct
+  %func = function_ref @test1 : $@convention(thin) (@in_guaranteed WrapperStruct) -> ()
+  %a = apply %func(%stk) : $@convention(thin) (@in_guaranteed WrapperStruct) -> ()
+  destroy_addr %stk : $*WrapperStruct
+  dealloc_stack %stk : $*WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: Begin Error in function caller2
+// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK-LABEL: End Error in function caller2
+sil [ossa] @caller2 : $@convention(thin) (@owned WrapperStruct) -> () {
+bb0(%0 :  @owned $WrapperStruct):
+  %stk = alloc_stack $WrapperStruct
+  store %0 to [init] %stk : $*WrapperStruct
+  %func = function_ref @test2 : $@convention(thin) (@in_guaranteed WrapperStruct) -> ()
+  %a = apply %func(%stk) : $@convention(thin) (@in_guaranteed WrapperStruct) -> ()
+  destroy_addr %stk : $*WrapperStruct
+  dealloc_stack %stk : $*WrapperStruct
+  %res = tuple ()
+  return %res : $()
+}
+

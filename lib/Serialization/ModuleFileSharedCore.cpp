@@ -145,6 +145,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
       extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
       break;
+    case options_block::IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED:
+      extendedInfo.setAllowModuleWithCompilerErrorsEnabled(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -528,6 +531,18 @@ ModuleFileSharedCore::readDeclMembersTable(ArrayRef<uint64_t> fields,
       base + sizeof(uint32_t), base));
 }
 
+std::unique_ptr<ModuleFileSharedCore::SerializedDeclFingerprintsTable>
+ModuleFileSharedCore::readDeclFingerprintsTable(ArrayRef<uint64_t> fields,
+                                                StringRef blobData) const {
+  uint32_t tableOffset;
+  index_block::DeclFingerprintsLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedDeclFingerprintsTable>;
+  return OwnedTable(SerializedDeclFingerprintsTable::Create(
+      base + tableOffset, base + sizeof(uint32_t), base));
+}
+
 std::unique_ptr<ModuleFileSharedCore::SerializedObjCMethodTable>
 ModuleFileSharedCore::readObjCMethodTable(ArrayRef<uint64_t> fields,
                                     StringRef blobData) const {
@@ -681,6 +696,9 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::DECL_MEMBER_NAMES:
         DeclMemberNames = readDeclMemberNamesTable(scratch, blobData);
+        break;
+      case index_block::DECL_FINGERPRINTS:
+        DeclFingerprints = readDeclFingerprintsTable(scratch, blobData);
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
@@ -1150,6 +1168,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
+      Bits.IsAllowModuleWithCompilerErrorsEnabled =
+          extInfo.isAllowModuleWithCompilerErrorsEnabled();
       MiscVersion = info.miscVersion;
 
       hasValidControlBlock = true;

@@ -213,11 +213,6 @@ protected:
     CS.CG.addConstraint(constraint);
   }
 
-  const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
-  getResolvedOverloads() const {
-    return CS.ResolvedOverloads;
-  }
-
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) const {
     CS.recordDisjunctionChoice(disjunctionLocator, index);
@@ -318,7 +313,7 @@ public:
     : SolverStep(cs, allPartialSolutions[index]), Constraints(constraints),
       Index(index), Component(std::move(component)),
       AllPartialSolutions(allPartialSolutions) {
-    assert(!Component.dependsOn.empty() && "Should use ComponentStep");
+    assert(!Component.getDependencies().empty() && "Should use ComponentStep");
     injectConstraints();
   }
 
@@ -426,7 +421,7 @@ public:
       Constraints->push_back(constraint);
     }
 
-    assert(component.dependsOn.empty());
+    assert(component.getDependencies().empty());
   }
 
   /// Create a component step that composes existing partial solutions before
@@ -442,7 +437,8 @@ public:
           Constraints(constraints),
           DependsOnPartialSolutions(std::move(dependsOnPartialSolutions)) {
     TypeVars = component.typeVars;
-    assert(DependsOnPartialSolutions.size() == component.dependsOn.size());
+    assert(DependsOnPartialSolutions.size() ==
+           component.getDependencies().size());
 
     for (auto constraint : component.getConstraints()) {
       constraints->erase(constraint);
@@ -716,8 +712,8 @@ private:
     if (!repr || repr == typeVar)
       return;
 
-    for (auto elt : getResolvedOverloads()) {
-      auto resolved = elt.second;
+    for (auto overload : CS.getResolvedOverloads()) {
+      auto resolved = overload.second;
       if (!resolved.boundType->isEqual(repr))
         continue;
 

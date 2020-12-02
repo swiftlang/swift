@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/transitive/* %t
 
+// REQUIRES: rdar70772320
+
 //
 // This test establishes a "transitive" chain of modules that import one another
 // and ensures that a cross-module incremental build rebuilds all modules

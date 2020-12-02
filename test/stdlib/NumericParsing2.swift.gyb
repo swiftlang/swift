@@ -1,0 +1,57 @@
+//===--- NumericParsing.swift.gyb -----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// -*- swift -*-
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
+// RUN: %line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/NumericParsing.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+//
+// Behaviors below are different in old Swift runtime libraries
+// UNSUPPORTED: use_os_stdlib
+
+// ================================================================
+//
+// This is basically the same as NumericParsing, but exercises a
+// handful of behaviors that have changed since that test was written.
+// These tests are separated so they can be omitted when the test suite
+// is run against older runtime libraries.
+//
+// ================================================================
+
+import StdlibUnittest
+
+var tests = TestSuite("NumericParsing2")
+
+% for Self in 'Float', 'Double', 'Float80':
+
+% if Self == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+% end
+
+tests.test("${Self}/Overflow/Underflow") {
+  // Overflow to infinity, underflow to zero.
+  // Note: These all returned `nil` in Swift 5.3 and earlier
+  expectEqual(.infinity, ${Self}("2e99999999999999"))
+  expectEqual(0.0, ${Self}("2e-99999999999999"))
+  expectEqual(-.infinity, ${Self}("-2e99999999999999"))
+  expectEqual(0.0, ${Self}("-2e-99999999999999"))
+}
+
+% if Self == 'Float80':
+#endif
+% end
+
+% end
+
+runAllTests()

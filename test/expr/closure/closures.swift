@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -119,7 +119,6 @@ assert(f0(1) == 1)
 var selfRef = { selfRef() }
 // expected-note@-1 2{{through reference here}}
 // expected-error@-2 {{circular reference}}
-// expected-error@-3 {{unable to infer closure type in the current context}}
 
 var nestedSelfRef = {
   var recursive = { nestedSelfRef() }

@@ -510,6 +510,21 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
+      // Next, prefer any other module over the _Concurrency module.
+      if (auto concurModule = ctx.getLoadedModule(ctx.Id_Concurrency)) {
+        if ((firstModule == concurModule) != (secondModule == concurModule)) {
+          // If second module is _Concurrency, then it is shadowed by first.
+          if (secondModule == concurModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // Otherwise, the first declaration is shadowed by the second.
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+
       // The Foundation overlay introduced Data.withUnsafeBytes, which is
       // treated as being ambiguous with SwiftNIO's Data.withUnsafeBytes
       // extension. Apply a special-case name shadowing rule to use the

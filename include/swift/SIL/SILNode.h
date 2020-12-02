@@ -317,9 +317,11 @@ protected:
     KeepUnique : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(FieldIndexCacheBase, SingleValueInstruction, 32,
-                             : NumPadBits,
-                             FieldIndex : 32);
+  SWIFT_INLINE_BITFIELD_FULL_TEMPLATE(FieldIndexCacheBase,
+                                      SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldIndex : 32
+  );
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   // Ensure that WitnessMethodInst bitfield does not overflow.
@@ -362,11 +364,24 @@ protected:
   IBWTO_BITFIELD(SwitchValueInst, TermInst, 1,
     HasDefault : 1
   );
-  SWIFT_INLINE_BITFIELD_FULL(SwitchEnumInstBase, TermInst, 1+32,
+
+  // Special handling for SwitchEnumInstBase.
+  //
+  // We assume all subsequent SwitchEnumBit uses do not use any further bits.
+  SWIFT_INLINE_BITFIELD(SEIBase, TermInst, 32-NumTermInstBits,
+    // Does this switch enum inst have a default block.
     HasDefault : 1,
-    : NumPadBits,
-    NumCases : 32
+    // Number of cases 
+    NumCases : 31 - NumTermInstBits;
+    template <typename BaseTy>
+    friend class SwitchEnumInstBase
   );
+
+#define SEIB_BITFIELD_EMPTY(T, U) \
+  IBWTO_BITFIELD_EMPTY(T, U)
+
+  SEIB_BITFIELD_EMPTY(SwitchEnumInst, SEIBase);
+  SEIB_BITFIELD_EMPTY(SwitchEnumAddrInst, SEIBase);
 
   SWIFT_INLINE_BITFIELD_EMPTY(MultipleValueInstruction, SILInstruction);
 

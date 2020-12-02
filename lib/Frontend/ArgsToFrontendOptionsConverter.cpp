@@ -193,8 +193,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
-  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)
-      && Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
+  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction) &&
+      (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
+       Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
+       Args.hasArg(
+         OPT_experimental_skip_non_inlinable_function_bodies_without_types))) {
     Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
     return true;
   }
@@ -213,6 +216,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.AllowModuleWithCompilerErrors = Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -413,7 +417,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::CompileModuleFromInterface;
   if (Opt.matches(OPT_typecheck_module_from_interface))
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
-
+  if (Opt.matches(OPT_emit_supported_features))
+    return FrontendOptions::ActionType::PrintFeature;
   llvm_unreachable("Unhandled mode option");
 }
 

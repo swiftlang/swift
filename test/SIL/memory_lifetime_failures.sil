@@ -48,8 +48,10 @@ bb0(%0 : $*T):
   end_access %2 : $*T
   br bb1
 bb1:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 bb2:
+  br bb1
+bb3:
   return %3 : $T
 }
 

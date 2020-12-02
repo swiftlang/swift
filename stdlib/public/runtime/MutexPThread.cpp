@@ -114,6 +114,29 @@ bool MutexPlatformHelper::try_lock(pthread_mutex_t &mutex) {
                           /* returnFalseOnEBUSY = */ true);
 }
 
+#if HAS_OS_UNFAIR_LOCK
+
+void MutexPlatformHelper::init(os_unfair_lock &lock, bool checked) {
+  (void)checked; // Unfair locks are always checked.
+  lock = OS_UNFAIR_LOCK_INIT;
+}
+
+void MutexPlatformHelper::destroy(os_unfair_lock &lock) {}
+
+void MutexPlatformHelper::lock(os_unfair_lock &lock) {
+  os_unfair_lock_lock(&lock);
+}
+
+void MutexPlatformHelper::unlock(os_unfair_lock &lock) {
+  os_unfair_lock_unlock(&lock);
+}
+
+bool MutexPlatformHelper::try_lock(os_unfair_lock &lock) {
+  return os_unfair_lock_trylock(&lock);
+}
+
+#endif
+
 void ReadWriteLockPlatformHelper::init(pthread_rwlock_t &rwlock) {
   reportError(pthread_rwlock_init(&rwlock, nullptr));
 }

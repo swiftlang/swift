@@ -1739,6 +1739,40 @@ internal struct KeyPathBuffer {
     return UnsafeMutableRawBufferPointer(mutating: data)
   }
 
+  internal struct Builder {
+    internal var buffer: UnsafeMutableRawBufferPointer
+    internal init(_ buffer: UnsafeMutableRawBufferPointer) {
+      self.buffer = buffer
+    }
+    internal mutating func pushRaw(size: Int, alignment: Int)
+        -> UnsafeMutableRawBufferPointer {
+      var baseAddress = buffer.baseAddress.unsafelyUnwrapped
+      var misalign = Int(bitPattern: baseAddress) % alignment
+      if misalign != 0 {
+        misalign = alignment - misalign
+        baseAddress = baseAddress.advanced(by: misalign)
+      }
+      let result = UnsafeMutableRawBufferPointer(
+        start: baseAddress,
+        count: size)
+      buffer = UnsafeMutableRawBufferPointer(
+        start: baseAddress + size,
+        count: buffer.count - size - misalign)
+      return result
+    }
+    internal mutating func push<T>(_ value: T) {
+      let buf = pushRaw(size: MemoryLayout<T>.size,
+                        alignment: MemoryLayout<T>.alignment)
+      buf.storeBytes(of: value, as: T.self)
+    }
+    internal mutating func pushHeader(_ header: Header) {
+      push(header)
+      // Start the components at pointer alignment
+      _ = pushRaw(size: RawKeyPathComponent.Header.pointerAlignmentSkew,
+             alignment: 4)
+    }
+  }
+
   internal struct Header {
     internal var _value: UInt32
     
@@ -1920,6 +1954,12 @@ func _setAtWritableKeyPath<Root, Value>(
   keyPath: WritableKeyPath<Root, Value>,
   value: __owned Value
 ) {
+  if type(of: keyPath).kind == .reference {
+    return _setAtReferenceWritableKeyPath(root: root,
+      keyPath: _unsafeUncheckedDowncast(keyPath,
+        to: ReferenceWritableKeyPath<Root, Value>.self),
+      value: value)
+  }
   // TODO: we should be able to do this more efficiently than projecting.
   let (addr, owner) = keyPath._projectMutableAddress(from: &root)
   addr.pointee = value
@@ -2280,40 +2320,16 @@ internal func _appendingKeyPaths<
                              count: resultSize)
         }
         
-        func pushRaw(size: Int, alignment: Int)
-            -> UnsafeMutableRawBufferPointer {
-          var baseAddress = destBuffer.baseAddress.unsafelyUnwrapped
-          var misalign = Int(bitPattern: baseAddress) % alignment
-          if misalign != 0 {
-            misalign = alignment - misalign
-            baseAddress = baseAddress.advanced(by: misalign)
-          }
-          let result = UnsafeMutableRawBufferPointer(
-            start: baseAddress,
-            count: size)
-          destBuffer = UnsafeMutableRawBufferPointer(
-            start: baseAddress + size,
-            count: destBuffer.count - size - misalign)
-          return result
-        }
-        func push<T>(_ value: T) {
-          let buf = pushRaw(size: MemoryLayout<T>.size,
-                            alignment: MemoryLayout<T>.alignment)
-          buf.storeBytes(of: value, as: T.self)
-        }
+        var destBuilder = KeyPathBuffer.Builder(destBuffer)
         
         // Save space for the header.
         let leafIsReferenceWritable = type(of: leaf).kind == .reference
-        let header = KeyPathBuffer.Header(
+        destBuilder.pushHeader(KeyPathBuffer.Header(
           size: resultSize - MemoryLayout<Int>.size,
           trivial: rootBuffer.trivial && leafBuffer.trivial,
           hasReferencePrefix: rootBuffer.hasReferencePrefix
                               || leafIsReferenceWritable
-        )
-        push(header)
-        // Start the components at pointer alignment
-        _ = pushRaw(size: RawKeyPathComponent.Header.pointerAlignmentSkew,
-                alignment: 4)
+        ))
         
         let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
         
@@ -2334,13 +2350,13 @@ internal func _appendingKeyPaths<
           }
           
           component.clone(
-            into: &destBuffer,
+            into: &destBuilder.buffer,
             endOfReferencePrefix: endOfReferencePrefix)
+          // Insert our endpoint type between the root and leaf components.
           if let type = type {
-            push(type)
+            destBuilder.push(type)
           } else {
-            // Insert our endpoint type between the root and leaf components.
-            push(Value.self as Any.Type)
+            destBuilder.push(Value.self as Any.Type)
             break
           }
         }
@@ -2350,17 +2366,17 @@ internal func _appendingKeyPaths<
           let (component, type) = leafBuffer.next()
 
           component.clone(
-            into: &destBuffer,
+            into: &destBuilder.buffer,
             endOfReferencePrefix: component.header.endOfReferencePrefix)
 
           if let type = type {
-            push(type)
+            destBuilder.push(type)
           } else {
             break
           }
         }
         
-        _internalInvariant(destBuffer.isEmpty,
+        _internalInvariant(destBuilder.buffer.isEmpty,
                      "did not fill entire result buffer")
       }
 
@@ -3351,7 +3367,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
 
     case .pointer:
       // Resolve the sign-extended relative reference.
-      var absoluteID: UnsafeRawPointer? = idValueBase + Int(idValue)
+      var absoluteID: UnsafeRawPointer? = _resolveRelativeAddress(idValueBase, idValue)
 
       // If the pointer ID is unresolved, then it needs work to get to
       // the final value.
@@ -3456,7 +3472,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       for i in externalArgs.indices {
         let base = externalArgs.baseAddress.unsafelyUnwrapped + i
         let offset = base.pointee
-        let metadataRef = UnsafeRawPointer(base) + Int(offset)
+        let metadataRef = _resolveRelativeAddress(UnsafeRawPointer(base), offset)
         let result = _resolveKeyPathGenericArgReference(
                        metadataRef,
                        genericEnvironment: genericEnvironment,

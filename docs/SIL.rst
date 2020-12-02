@@ -2043,6 +2043,177 @@ parts::
        return %1 : $Klass
      }
 
+Borrowed Object based Safe Interior Pointers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+What is an "Unsafe Interior Pointer"
+````````````````````````````````````
+
+An unsafe interior pointer is a bare pointer into the innards of an object. A
+simple example of this in C++ would be using the method std::vector::data() to
+get to the innards of a std::vector. In general interior pointers are unsafe to
+use since languages do not provide any guarantees that the interior pointer will
+not be used after the underlying object has been deallocated. To see this,
+consider the following C++ example::
+
+    int unfortunateFunction() {
+      int *unsafeInteriorPointer = nullptr;
+      {
+        std::vector<int> vector;
+        vector.push_back(5);
+        unsafeInteriorPointer = vector.data();
+        printf("%d\n", *unsafeInteriorPointer); // Prints "5".
+      } // vector deallocated here
+      return *unsafeInteriorPointer; // Kaboom
+    }
+
+In words, C++ allows for us to get the interior pointer into the vector, but
+then lets us do whatever we want with the pointer, including use it after the
+underlying memory has been invalidated.
+
+From a user's perspective, interior pointers are really useful since one can use
+it to pass data to other APIs that are only expecting a pointer and also since
+one can use it to sometimes get better performance. But from a language designer
+perspective, this sort of API verboten and leads to bugs, crashes, and security
+vulnerabilities. That being said, clearly users have a need for such
+functionality, so we, as language designers, should figure out manners to
+express these sorts of patterns in our various languages in a safe way that
+prevents user’s from foot-gunning themselves. In SIL, we have solved this
+problem via the direct modeling of interior pointer instructions as a high level
+concept in our IR.
+
+Safe Interior Pointers in SIL
+`````````````````````````````
+
+In contrast to LLVM-IR, SIL provides mechanisms that language designers can use
+to express concepts like the above in a manner that allows the language to
+define away compiler generated unsafe interior pointer usage using "Safe
+Interior Pointers". This is implemented in SIL by:
+
+1. Classifying a set of instructions as being "interior pointer" instructions.
+2. Enforcing in the SILVerifier that all "interior pointer" instructions can
+   only have operands with `Guaranteed`_ ownership.
+3. Enforcing in the SILVerifier that any transitive address use of the interior
+   pointer to be a liveness requirement of the "interior pointer"'s
+   operand.
+
+Note that the transitive address use verifier from (3) does not attempt to
+classify uses directly. Instead the verifier:
+
+1. Has an explicit list of instructions that it understands as requiring
+   liveness of the base object.
+
+2. Has a second list of instructions that require liveness and produce a address
+   whose transitive uses need to be recursively processed.
+
+3. Asserts on any instructions that are not known to the verifier. This ensures
+   that the verifier is kept up to date with new instructions.
+
+Note that typically instructions in category (1) are instructions whose uses do
+not propagate the pointer value, so they are safe. In contrast, some other
+instructions in category (1) are escaping uses of the address such as
+`pointer_to_address`_. Those uses are unsafe--the user is reponsible for
+managing unsafe pointer lifetimes and the compiler must not extend those pointer
+lifetimes.
+
+These rules ensure statically that any uses of the address that are not escaped
+explicitly by an instruction like `pointer_to_address`_ are within the
+guaranteed pointers scope where the guaranteed value is statically known to be
+live. As a result, in SIL it is impossible to express such a bug in compiler
+generated code. As an example, consider the following unsafe interior pointer
+SIL::
+
+    class Klass { var k: KlassField }
+    struct KlassWrapper { var k: Klass }
+
+    // ...
+
+    // Today SIL restricts interior pointer instructions to only have operands
+    // with guaranteed ownership.
+    %1 = begin_borrow %0 : $Klass
+
+    // %2 is an interior pointer into %1. Since %2 is an address, it's uses are
+    // not treated as uses of underlying borrowed object %1 in the ownership
+    // system. This is because at the ownership level objects with None
+    // ownership are not verified and do not have any constraints on how they
+    // are used from the ownership system.
+    //
+    // Instead the ownership verifier gathers up all such uses and treats them
+    // as uses of the object from which the interior pointer was projected from
+    // transitively. This means that this is a constraint on the guaranteed
+    // objects use, not on the trivial values.
+    %2 = ref_element_addr %1 : $Klass, #Klass.k // %2 is a $*KlassWrapper
+    %3 = struct_element_addr %2 : $*KlassWrapper, #KlassWrapper.k // %3 is a $*Klass
+
+    // So if we end the borrow %1 at this point, invalidating the addresses
+    // ``%2`` and ``%3``.
+    end_borrow %1 : $Klass
+
+    // We would here be loading from an invalidated address. This would cause a
+    // verifier error since %3's use here is a regular use that is inferred up
+    // on %1.
+    %4 = load [copy] %3 : $*KlassWrapper
+
+    // ...
+
+Notice how due to a possible bug in the compiler, we are loading from
+potentially uninitialized memory ``%4``. This would have caused a verifier error
+stating that ``%4`` was an interior pointer based use-after-free of ``%1``
+implying this is mal-formed SIL.
+
+NOTE: This is a constraint on the base object, not on the addresses themselves
+which are viewed as outside of the ownership system since they have `None`_
+ownership.
+
+In contrast to the previous example, the following example follows ownership
+invariants and is valid SIL::
+
+    class Klass { var k: KlassField }
+    struct KlassWrapper { var k: Klass }
+
+    // ...
+
+    %1 = begin_borrow %0 : $Klass
+    // %2 is an interior pointer into the Klass k. Since %2 is an address and
+    // addresses have None ownership, it's uses are not treated as uses of the
+    // underlying object %1.
+    %2 = ref_element_addr %1 : $Klass, #Klass.k // %2 is a $*KlassWrapper
+
+    // Destroying %1 at this location would result in a verifier error since
+    // %2's uses are considered to be uses of %1.
+    //
+    // end_lifetime %1 : $Klass
+
+    // We are statically not loading from an invalidated address here since we
+    // are within the lifetime of ``%1``.
+    %3 = struct_element_addr %2 : $*KlassWrapper, #KlassWrapper.k
+    %4 = load [copy] %3 : $*Klass // %1 must be live here transitively
+
+    // ``%1``'s lifetime ends. Importantly we know that within the lifetime of
+    // ``%1``, ``%0``'s lifetime can not shrink past this point, implying
+    // transitive static safety.
+    end_borrow %1 : $Klass
+
+In the second example, we show a well-formed SIL program showing off SIL's Safe
+Interior Pointers. All of the uses of ``%2``, the interior pointer, are
+transitively uses of the base underlying object, ``%0``.
+
+The current list of interior pointer SIL instructions are:
+
+* `project_box`_ - projects a pointer out of a reference counted box. (*)
+* `ref_element_addr`_ - projects a field out of a reference counted class.
+* `ref_tail_addr`_ - projects out a pointer to a class’s tail allocated array
+  memory (assuming the class was initialized to have such an array).
+* `open_existential_box`_ - projects the address of the value out of a boxed
+  existential container using the current function context/protocol conformance
+  to create an "opened archetype".
+* `project_existential_box`_ - projects a pointer to the value inside a boxed
+  existential container. Must be the type for which the box was initially
+  allocated for and not for an "opened" archetype.
+
+(*) We still need to finish adding support for project_box, but all other
+interior pointers are guarded already.
+
 Runtime Failure
 ---------------
 
@@ -5722,6 +5893,25 @@ type ``B`` of the same size.
 This instruction is assumed to forward a fixed ownership (set upon its
 construction) and lowers to 'unchecked_bitwise_cast' in non-ossa code. This
 causes the cast to lose its guarantee of layout-compatibility.
+
+unchecked_ownership_conversion
+``````````````````````````````
+::
+
+   sil-instruction ::= 'unchecked_ownership_conversion' sil-operand ',' sil-value-ownership-kind 'to' sil-value-ownership-kind
+
+   %1 = unchecked_ownership_conversion %0 : $A, @guaranteed to @owned
+
+Converts its operand to an identical value of the same type but with
+different ownership without performing any semantic operations
+normally required by for ownership conversion.
+
+This is used in Objective-C compatible destructors to convert a
+guaranteed parameter to an owned parameter without performing a
+semantic copy.
+
+The resulting value must meet the usual ownership requirements; for
+example, a trivial type must have '.none' ownership.
 
 ref_to_raw_pointer
 ``````````````````

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 @_silgen_name("swift_isClassType")
 internal func _isClassType(_: Any.Type) -> Bool
 
@@ -29,8 +31,7 @@ internal func _getRecursiveChildCount(_: Any.Type) -> Int
 internal func _getChildMetadata(
   _: Any.Type,
   index: Int,
-  outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
-  outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
+  fieldMetadata: UnsafeMutablePointer<_FieldReflectionMetadata>
 ) -> Any.Type
 
 @_silgen_name("swift_reflectionMirror_recursiveChildOffset")
@@ -281,14 +282,91 @@ public func _forEachField(
   for i in 0..<childCount {
     let offset = _getChildOffset(type, index: i)
 
-    var nameC: UnsafePointer<CChar>? = nil
-    var freeFunc: NameFreeFunc? = nil
-    let childType = _getChildMetadata(
-      type, index: i, outName: &nameC, outFreeFunc: &freeFunc)
-    defer { freeFunc?(nameC) }
+    var field = _FieldReflectionMetadata()
+    let childType = _getChildMetadata(type, index: i, fieldMetadata: &field)
+    defer { field.freeFunc?(field.name) }
     let kind = _MetadataKind(childType)
 
-    if !body(nameC!, offset, childType, kind) {
+    if !body(field.name!, offset, childType, kind) {
+      return false
+    }
+  }
+
+  return true
+}
+
+/// Calls the given closure on every field of the specified type.
+///
+/// If `body` returns `false` for any field, no additional fields are visited.
+///
+/// - Parameters:
+///   - type: The type to inspect.
+///   - options: Options to use when reflecting over `type`.
+///   - body: A closure to call with information about each field in `type`.
+///     The parameters to `body` are a pointer to a C string holding the name
+///     of the field, the offset of the field in bytes, the type of the field,
+///     and the `_MetadataKind` of the field's type.
+/// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
+///   `false`.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@discardableResult
+@_spi(Reflection)
+public func _forEachFieldWithKeyPath<Root>(
+  of type: Root.Type,
+  options: _EachFieldOptions = [],
+  body: (UnsafePointer<CChar>, PartialKeyPath<Root>) -> Bool
+) -> Bool {
+  // Class types not supported because the metadata does not have
+  // enough information to construct computed properties.
+  if _isClassType(type) || options.contains(.classType) {
+    return false
+  }
+  let ignoreUnknown = options.contains(.ignoreUnknown)
+
+  let childCount = _getRecursiveChildCount(type)
+  for i in 0..<childCount {
+    let offset = _getChildOffset(type, index: i)
+
+    var field = _FieldReflectionMetadata()
+    let childType = _getChildMetadata(type, index: i, fieldMetadata: &field)
+    defer { field.freeFunc?(field.name) }
+    let kind = _MetadataKind(childType)
+    let supportedType: Bool
+    switch kind {
+      case .struct, .class, .optional, .existential,
+          .existentialMetatype, .tuple, .enum:
+        supportedType = true
+      default:
+        supportedType = false
+    }
+    if !supportedType || !field.isStrong {
+      if !ignoreUnknown { return false }
+      continue;
+    }
+    func keyPathType<Leaf>(for: Leaf.Type) -> PartialKeyPath<Root>.Type {
+      if field.isVar { return WritableKeyPath<Root, Leaf>.self }
+      return KeyPath<Root, Leaf>.self
+    }
+    let resultSize = MemoryLayout<Int32>.size + MemoryLayout<Int>.size
+    let partialKeyPath = _openExistential(childType, do: keyPathType)
+       ._create(capacityInBytes: resultSize) {
+      var destBuilder = KeyPathBuffer.Builder($0)
+      destBuilder.pushHeader(KeyPathBuffer.Header(
+        size: resultSize - MemoryLayout<Int>.size,
+        trivial: true,
+        hasReferencePrefix: false
+      ))
+      let component = RawKeyPathComponent(
+           header: RawKeyPathComponent.Header(stored: .struct,
+                                              mutable: field.isVar,
+                                              inlineOffset: UInt32(offset)),
+           body: UnsafeRawBufferPointer(start: nil, count: 0))
+      component.clone(
+        into: &destBuilder.buffer,
+        endOfReferencePrefix: false)
+    }
+
+    if !body(field.name!, partialKeyPath) {
       return false
     }
   }

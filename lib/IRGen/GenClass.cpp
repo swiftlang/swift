@@ -25,6 +25,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1443,6 +1444,32 @@ namespace {
     }
 
   private:
+    /// If we should set the forbids associated objects on instances metadata
+    /// flag.
+    ///
+    /// We currently do this on:
+    ///
+    /// * Actor classes.
+    /// * classes marked with @_semantics("objc.forbidAssociatedObjects")
+    ///   (for testing purposes)
+    ///
+    /// TODO: Expand this as appropriate over time.
+    bool doesClassForbidAssociatedObjectsOnInstances() const {
+      auto *clsDecl = getClass();
+
+      // We ban this on actors without objc ancestry.
+      if (clsDecl->isActor() && !clsDecl->checkAncestry(AncestryFlags::ObjC))
+        return true;
+
+      // Otherwise, we only do it if our special semantics attribute is on the
+      // relevant class. This is for testing purposes.
+      if (clsDecl->hasSemanticsAttr(semantics::OBJC_FORBID_ASSOCIATED_OBJECTS))
+        return true;
+
+      // TODO: Add new cases here as appropriate over time.
+      return false;
+    }
+
     ObjCClassFlags buildFlags(ForMetaClass_t forMeta,
                               HasUpdateCallback_t hasUpdater) {
       ObjCClassFlags flags = ObjCClassFlags::CompiledByARC;
@@ -1462,6 +1489,11 @@ namespace {
 
       if (hasUpdater)
         flags |= ObjCClassFlags::HasMetadataUpdateCallback;
+
+      // If we know that our class does not support having associated objects
+      // placed upon instances, set the forbid associated object flag.
+      if (doesClassForbidAssociatedObjectsOnInstances())
+        flags |= ObjCClassFlags::ForbidsAssociatedObjects;
 
       // FIXME: set ObjCClassFlags::Hidden when appropriate
       return flags;
@@ -2144,13 +2176,17 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// ancestry. This lets us attach categories to the class even though it
 /// does not have statically-emitted metadata.
 bool IRGenModule::hasObjCResilientClassStub(ClassDecl *D) {
-  assert(getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
+#ifndef NDEBUG
+  auto strategy = getClassMetadataStrategy(D);
+  assert(strategy == ClassMetadataStrategy::Resilient ||
+         strategy == ClassMetadataStrategy::Singleton);
+#endif
+
   return ObjCInterop && !D->isGenericContext();
 }
 
-void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
-  assert(hasObjCResilientClassStub(D));
-
+llvm::Constant *IRGenModule::emitObjCResilientClassStub(
+    ClassDecl *D, bool isPublic) {
   ConstantInitBuilder builder(*this);
   auto fields = builder.beginStruct(ObjCFullResilientClassStubTy);
   fields.addInt(SizeTy, 0); // reserved
@@ -2178,9 +2214,13 @@ void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
   objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
       ObjCResilientClassStubTy->getPointerTo());
 
-  entity = LinkEntity::forObjCResilientClassStub(
-      D, TypeMetadataAddress::AddressPoint);
-  defineAlias(entity, objcStub);
+  if (isPublic) {
+    entity = LinkEntity::forObjCResilientClassStub(
+        D, TypeMetadataAddress::AddressPoint);
+    defineAlias(entity, objcStub);
+  }
+
+  return objcStub;
 }
 
 static llvm::Constant *doEmitClassPrivateData(
@@ -2522,7 +2562,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     IGF.IGM.getClassMetadataLayout(classDecl).getMethodInfo(IGF, method);
   switch (methodInfo.getKind()) {
   case ClassMetadataLayout::MethodInfo::Kind::Offset: {
-    auto offset = methodInfo.getOffsett();
+    auto offset = methodInfo.getOffset();
 
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
@@ -2531,12 +2571,12 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(fnPtr, authInfo, signature);
+    return FunctionPointer(methodType, fnPtr, authInfo, signature);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
-    return FunctionPointer::forDirect(fnPtr, signature);
+    return FunctionPointer::forDirect(methodType, fnPtr, signature);
   }
   }
   

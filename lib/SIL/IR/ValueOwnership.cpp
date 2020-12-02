@@ -46,7 +46,7 @@ public:
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, INST)                               \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *Arg) {                                                       \
-    return ValueOwnershipKind::OWNERSHIP;                                      \
+    return OwnershipKind::OWNERSHIP;                                           \
   }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -158,9 +158,9 @@ CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
       INST##Inst *I) {                                                         \
     if (I->getType().isTrivial(*I->getFunction()) ||                           \
         I->getType().isAddress()) {                                            \
-      return ValueOwnershipKind::None;                                         \
+      return OwnershipKind::None;                                              \
     }                                                                          \
-    return ValueOwnershipKind::OWNERSHIP;                                      \
+    return OwnershipKind::OWNERSHIP;                                           \
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
@@ -216,7 +216,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
                                                   ArrayRef<Operand> ops) {
   // A forwarding inst without operands must be trivial.
   if (ops.empty())
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
 
   auto mergedValue = ValueOwnershipKind::merge(makeOptionalTransformRange(
       ops, [&i](const Operand &op) -> Optional<ValueOwnershipKind> {
@@ -225,17 +225,17 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
         return op.get().getOwnershipKind();
       }));
 
-  if (!mergedValue.hasValue()) {
+  if (!mergedValue) {
     // If we have mismatched SILOwnership and sil ownership is not enabled,
     // just return None for staging purposes. If SILOwnership is enabled, then
     // we must assert!
     if (!i->getModule().getOptions().VerifySILOwnership) {
-      return ValueOwnershipKind::None;
+      return OwnershipKind::None;
     }
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return mergedValue.getValue();
+  return mergedValue;
 }
 
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
@@ -323,13 +323,13 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   bool isTrivial = ai->getType().isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
 
   SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
 
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
@@ -341,17 +341,17 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
   }
 
-  return *mergedOwnershipKind;
+  return mergedOwnershipKind;
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   switch (LI->getOwnershipQualifier()) {
   case LoadOwnershipQualifier::Take:
   case LoadOwnershipQualifier::Copy:
-    return ValueOwnershipKind::Owned;
+    return OwnershipKind::Owned;
   case LoadOwnershipQualifier::Unqualified:
   case LoadOwnershipQualifier::Trivial:
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
   }
 
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
@@ -360,8 +360,8 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *PA) {
   if (PA->isOnStack())
-    return ValueOwnershipKind::None;
-  return ValueOwnershipKind::Owned;
+    return OwnershipKind::None;
+  return OwnershipKind::Owned;
 }
 
 //===----------------------------------------------------------------------===//
@@ -377,7 +377,7 @@ struct ValueOwnershipKindBuiltinVisitor
                                         llvm::Intrinsic::ID ID) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be any.
-    return ValueOwnershipKind::None;
+    return OwnershipKind::None;
   }
 
 #define BUILTIN(ID, NAME, ATTRS)                                               \
@@ -390,7 +390,7 @@ struct ValueOwnershipKindBuiltinVisitor
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, ID)                              \
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
-    return ValueOwnershipKind::OWNERSHIP;                                      \
+    return OwnershipKind::OWNERSHIP;                                           \
   }
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
@@ -541,6 +541,13 @@ CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskFuture)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -549,9 +556,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
     if (BI->getType().isTrivial(*BI->getFunction())) {                         \
-      return ValueOwnershipKind::None;                                         \
+      return OwnershipKind::None;                                              \
     }                                                                          \
-    return ValueOwnershipKind::Unowned;                                        \
+    return OwnershipKind::Unowned;                                             \
   }
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(CmpXChg)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
@@ -580,6 +587,29 @@ ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
 //===----------------------------------------------------------------------===//
 
 ValueOwnershipKind SILValue::getOwnershipKind() const {
+  // If we do not have an undef, we should always be able to get to our function
+  // here. If we do not have ownership enabled, just return none for everything
+  // to short circuit ownership optimizations. Since SILUndef in either case
+  // will be ValueOwnershipKind::None, we will not get any wonky behavior here.
+  //
+  // We assume that any time we are in SILBuilder and call this without having a
+  // value in a block yet, ossa is enabled.
+  if (auto *block = Value->getParentBlock()) {
+    auto *f = block->getParent();
+    // If our block isn't in a function, then it must be in a global
+    // variable. We don't verify ownership there so just return
+    // OwnershipKind::None.
+    if (!f)
+      return OwnershipKind::None;
+
+    // Now that we know that we do have a block/function, check if we have
+    // ownership.
+    if (!f->hasOwnership())
+      return OwnershipKind::None;
+  }
+
   ValueOwnershipKindClassifier Classifier;
-  return Classifier.visit(const_cast<ValueBase *>(Value));
+  auto result = Classifier.visit(const_cast<ValueBase *>(Value));
+  assert(result && "Returned ownership kind invalid on values");
+  return result;
 }

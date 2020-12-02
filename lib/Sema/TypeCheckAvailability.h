@@ -30,6 +30,7 @@ namespace swift {
   class InFlightDiagnostic;
   class Decl;
   class ProtocolConformanceRef;
+  class RootProtocolConformance;
   class Stmt;
   class SubstitutionMap;
   class Type;
@@ -128,6 +129,11 @@ public:
   /// it can reference anything.
   static ExportContext forFunctionBody(DeclContext *DC, SourceLoc loc);
 
+  /// Create an instance describing associated conformances that can be
+  /// referenced from the the conformance defined by the given DeclContext,
+  /// which must be a NominalTypeDecl or ExtensionDecl.
+  static ExportContext forConformance(DeclContext *DC, ProtocolDecl *proto);
+
   /// Produce a new context with the same properties as this one, except
   /// changing the ExportabilityReason. This only affects diagnostics.
   ExportContext withReason(ExportabilityReason reason) const;
@@ -211,12 +217,16 @@ void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 bool
 diagnoseConformanceAvailability(SourceLoc loc,
                                 ProtocolConformanceRef conformance,
-                                const ExportContext &context);
+                                const ExportContext &context,
+                                Type depTy=Type(),
+                                Type replacementTy=Type());
 
 bool
 diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                     SubstitutionMap subs,
-                                    const ExportContext &context);
+                                    const ExportContext &context,
+                                    Type depTy=Type(),
+                                    Type replacementTy=Type());
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -246,6 +256,14 @@ bool diagnoseExplicitUnavailability(
     const ExportContext &Where,
     DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+bool diagnoseExplicitUnavailability(
+    SourceLoc loc,
+    const RootProtocolConformance *rootConf,
+    const ExtensionDecl *ext,
+    const ExportContext &where);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);

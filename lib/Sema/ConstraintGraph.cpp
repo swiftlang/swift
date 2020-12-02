@@ -674,7 +674,7 @@ namespace {
             if (validComponents.count(inAdj) == 0)
               continue;
 
-            component.dependsOn.push_back(getComponent(inAdj).solutionIndex);
+            component.recordDependency(getComponent(inAdj));
           }
         }
       }
@@ -1054,6 +1054,10 @@ void ConstraintGraph::Component::addConstraint(Constraint *constraint) {
   constraints.push_back(constraint);
 }
 
+void ConstraintGraph::Component::recordDependency(const Component &component) {
+  dependencies.push_back(component.solutionIndex);
+}
+
 SmallVector<ConstraintGraph::Component, 1>
 ConstraintGraph::computeConnectedComponents(
            ArrayRef<TypeVariableType *> typeVars) {
@@ -1113,7 +1117,7 @@ bool ConstraintGraph::contractEdges() {
       bool isNotContractable = true;
       if (auto bindings = CS.inferBindingsFor(tyvar1)) {
         // Holes can't be contracted.
-        if (bindings.IsHole)
+        if (bindings.isHole())
           continue;
 
         for (auto &binding : bindings.Bindings) {
@@ -1277,13 +1281,13 @@ void ConstraintGraph::printConnectedComponents(
                  out << ' ';
                });
 
-    if (component.dependsOn.empty())
+    if (component.getDependencies().empty())
       continue;
 
     // Print all of the one-way components.
     out << " depends on ";
     llvm::interleave(
-        component.dependsOn,
+        component.getDependencies(),
         [&](unsigned index) { out << index; },
         [&] { out << ", "; }
       );

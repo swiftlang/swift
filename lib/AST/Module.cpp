@@ -680,6 +680,15 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+Optional<Fingerprint>
+ModuleDecl::loadFingerprint(const IterableDeclContext *IDC) const {
+  for (auto file : getFiles()) {
+    if (auto FP = file->loadFingerprint(IDC))
+      return FP;
+  }
+  return None;
+}
+
 void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
@@ -1074,7 +1083,7 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
-void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
+Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
@@ -1082,7 +1091,7 @@ void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
                   .InterfaceHash;
   llvm::MD5::MD5Result result;
   md5.final(result);
-  llvm::MD5::stringifyResult(result, str);
+  return Fingerprint{std::move(result)};
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {

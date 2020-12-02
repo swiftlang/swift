@@ -802,7 +802,8 @@ NOTE(invalid_redecl_implicit_wrapper,none,
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
 ERROR(invalid_member_type,none,
-      "%0 is not a member type of %1", (DeclNameRef, Type))
+      "%0 is not a member type of %1 %2",
+      (DeclNameRef, DescriptiveDeclKind, FullyQualified<Type>))
 ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
@@ -906,6 +907,10 @@ WARNING(module_not_compiled_with_library_evolution,none,
 REMARK(cross_import_added,none,
        "import of %0 and %1 triggered a cross-import of %2",
        (Identifier, Identifier, Identifier))
+
+REMARK(module_loaded,none,
+       "loaded module at %0",
+       (StringRef))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -1107,9 +1112,13 @@ ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
      (Type))
-ERROR(missing_forced_downcast,none,
-      "%0 is not convertible to %1; "
-      "did you mean to use 'as!' to force downcast?", (Type, Type))
+ERROR(cannot_coerce_to_type, none,
+      "%0 is not convertible to %1", (Type, Type))
+NOTE(missing_forced_downcast, none,
+     "did you mean to use 'as!' to force downcast?", ())
+NOTE(missing_optional_downcast, none,
+     "did you mean to use 'as?' to conditionally downcast?", ())
+     
 WARNING(coercion_may_fail_warning,none,
         "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
         (Type, Type))
@@ -1553,10 +1562,13 @@ ERROR(observingprop_requires_initializer,none,
       "non-member observing properties require an initializer", ())
 ERROR(global_requires_initializer,none,
       "global '%select{var|let}0' declaration requires an initializer expression"
-      "%select{ or getter/setter specifier|}0", (bool))
+      "%select{ or an explicitly stated getter|}0", (bool))
 ERROR(static_requires_initializer,none,
-      "%select{ERROR|'static var'|'class var'|}0 declaration requires an initializer "
-      "expression or getter/setter specifier", (StaticSpellingKind))
+      "'%select{ERROR|static|class|}0 %select{var|let}1' declaration requires "
+      "an initializer expression or an explicitly stated getter",
+      (StaticSpellingKind, bool))
+NOTE(static_requires_initializer_add_init,none,
+      "add an initializer to silence this error", ())
 ERROR(pattern_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"
@@ -1780,6 +1792,10 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+WARNING(spi_attribute_on_import_of_public_module,none,
+        "'@_spi' import of %0 will not include any SPI symbols; "
+        "%0 was built from the public interface at %1",
+        (DeclName, StringRef))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2607,6 +2623,9 @@ WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
+WARNING(anyobject_class_inheritance_deprecated,none,
+  "using 'class' keyword for protocol inheritance is deprecated; "
+  "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
@@ -2757,12 +2776,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
-ERROR(assoc_conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %select{%2 has been imported as implementation-only|"
-      "the conformance is declared as SPI in %2|"
-      "the conformance is declared as SPI}5",
-      (Type, Identifier, Identifier, Type, Type, unsigned))
+NOTE(assoc_conformance_from_implementation_only_module,none,
+     "in associated type %0 (inferred as %1)", (Type, Type))
 ERROR(unexportable_clang_function_type,none,
       "cannot export the underlying C type of the function type %0; "
       "it may use anonymous types or types defined outside of a module",
@@ -3730,6 +3745,9 @@ ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
 
+ERROR(reference_to_invalid_decl,none,
+      "cannot reference invalid declaration %0", (DeclName))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------
@@ -4214,9 +4232,10 @@ ERROR(actor_isolated_concurrent_access,none,
         "actor-isolated %0 %1 is unsafe to reference in code "
         "that may execute concurrently",
         (DescriptiveDeclKind, DeclName))
-NOTE(actor_isolated_method,none,
-     "only asynchronous methods can be used outside the actor instance; "
-     "do you want to add 'async'?", ())
+NOTE(actor_isolated_sync_func,none,
+     "calls to %0 %1 from outside of its actor context are "
+     "implicitly asynchronous",
+     (DescriptiveDeclKind, DeclName))
 NOTE(actor_mutable_state,none,
      "mutable state is only available within the actor instance", ())
 WARNING(shared_mutable_state_access,none,
@@ -4473,13 +4492,19 @@ ERROR(differentiable_function_type_invalid_parameter,none,
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(linear)}1'"
       "%select{|; did you want to add '@noDerivative' to this parameter?}2",
-      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+      (StringRef, /*isLinear*/ bool,
        /*hasValidDifferentiabilityParameter*/ bool))
 ERROR(differentiable_function_type_invalid_result,none,
       "result type '%0' does not conform to 'Differentiable'"
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(linear)}1'",
       (StringRef, bool))
+ERROR(differentiable_function_type_no_differentiability_parameters, 
+      none,
+      "'@differentiable' function type requires at least one differentiability "
+      "parameter, i.e. a non-'@noDerivative' parameter whose type conforms to "
+      "'Differentiable'%select{| with its 'TangentVector' equal to itself}0",
+      (/*isLinear*/ bool))
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -4532,6 +4557,9 @@ ERROR(invalid_objc_decl,none,
       "properties, and subscript declarations can be declared @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
+NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
+     "inherit from 'NSObject' to silence this error", ())
+
 ERROR(invalid_nonobjc_decl,none,
       "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
@@ -5040,6 +5068,39 @@ ERROR(availability_macro_in_inlinable, none,
 ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
+
+// Conformance availability checking diagnostics
+
+ERROR(conformance_availability_unavailable, none,
+      "conformance of %0 to %1 is unavailable"
+      "%select{ in %3|}2%select{|: %4}4",
+      (Type, Type, bool, StringRef, StringRef))
+
+NOTE(conformance_availability_marked_unavailable, none,
+     "conformance of %0 to %1 has been explicitly marked "
+     "unavailable here", (Type, Type))
+
+NOTE(conformance_availability_introduced_in_version, none,
+     "conformance of %0 to %1 was introduced in %2 %3",
+     (Type, Type, StringRef, llvm::VersionTuple))
+
+NOTE(conformance_availability_obsoleted, none,
+     "conformance of %0 to %1 was obsoleted in %2 %3",
+     (Type, Type, StringRef, llvm::VersionTuple))
+
+WARNING(conformance_availability_deprecated, none,
+        "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
+        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
+        (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+         StringRef))
+
+ERROR(conformance_availability_only_version_newer, none,
+      "conformance of %0 to %1 is only available in %2 %3 or newer",
+      (Type, Type, StringRef, llvm::VersionTuple))
+
+WARNING(conformance_availability_only_version_newer_warn, none,
+        "conformance of %0 to %1 is only available in %2 %3 or newer",
+        (Type, Type, StringRef, llvm::VersionTuple))
 
 //------------------------------------------------------------------------------
 // MARK: @discardableResult

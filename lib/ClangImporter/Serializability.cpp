@@ -53,8 +53,10 @@ public:
           Impl.SwiftContext.getSwiftDeclForExportedClangDecl(decl))
       return swiftDecl;
 
-    // Otherwise we have no way to find it.
-    return StableSerializationPath();
+    // Allow serialization for non-modular headers as well, with the hope that
+    // we find the same header when doing unqualified lookup during
+    // deserialization.
+    return findImportedPath(named);
   }
 
 private:

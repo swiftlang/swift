@@ -32,7 +32,7 @@ using namespace sourcekitd;
 
 static xpc_connection_t MainConnection = nullptr;
 
-void sourcekitd::postNotification(sourcekitd_response_t Notification) {
+static void postNotification(sourcekitd_response_t Notification) {
   xpc_connection_t peer = MainConnection;
   if (!peer)
     goto done;
@@ -71,7 +71,7 @@ public:
 
 static SKUIDToUIDMap UIDMap;
 
-sourcekitd_uid_t sourcekitd::SKDUIDFromUIdent(UIdent UID) {
+static sourcekitd_uid_t xpcSKDUIDFromUIdent(UIdent UID) {
   if (void *Tag = UID.getTag())
     return reinterpret_cast<sourcekitd_uid_t>(Tag);
 
@@ -108,7 +108,7 @@ sourcekitd_uid_t sourcekitd::SKDUIDFromUIdent(UIdent UID) {
   return skduid;
 }
 
-UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t SKDUID) {
+static UIdent xpcUIdentFromSKDUID(sourcekitd_uid_t SKDUID) {
   // This should be used only for debugging/logging purposes.
 
   UIdent UID = UIDMap.get(SKDUID);
@@ -208,14 +208,14 @@ static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
     llvm::sys::path::remove_filename(Path);
 }
 
-std::string sourcekitd::getRuntimeLibPath() {
+static std::string getRuntimeLibPath() {
   llvm::SmallString<128> path;
   getToolchainPrefixPath(path);
   llvm::sys::path::append(path, "lib");
   return path.str().str();
 }
 
-std::string sourcekitd::getDiagnosticDocumentationPath() {
+static std::string getDiagnosticDocumentationPath() {
   llvm::SmallString<128> path;
   getToolchainPrefixPath(path);
   llvm::sys::path::append(path, "share", "doc", "swift", "diagnostics");
@@ -341,7 +341,15 @@ static void fatal_error_handler(void *user_data, const std::string& reason,
 int main(int argc, const char *argv[]) {
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
-  sourcekitd::initialize();
+  sourcekitd_set_uid_handlers(
+      ^sourcekitd_uid_t(const char *uidStr) {
+        return xpcSKDUIDFromUIdent(UIdent(uidStr));
+      },
+      ^const char *(sourcekitd_uid_t uid) {
+        return xpcUIdentFromSKDUID(uid).c_str();
+      });
+  sourcekitd::initializeService(
+      getRuntimeLibPath(), getDiagnosticDocumentationPath(), postNotification);
 
   // Increase the file descriptor limit.
   // FIXME: Portability ?

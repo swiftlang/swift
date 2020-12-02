@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}

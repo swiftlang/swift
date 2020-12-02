@@ -8,15 +8,15 @@
 
 // CHECK-1-NOT: warning
 // CHECK-1: {{^{$}}
-// CHECK-1: "kind": "began"
-// CHECK-1: "name": "compile"
-// CHECK-1: ".\/main.swift"
+// CHECK-1-DAG: "kind"{{ ?}}: "began"
+// CHECK-1-DAG: "name"{{ ?}}: "compile"
+// CHECK-1-DAG: "{{(\.\\\/)?}}main.swift"
 // CHECK-1: {{^}$}}
 
 // CHECK-1: {{^{$}}
-// CHECK-1: "kind": "began"
-// CHECK-1: "name": "compile"
-// CHECK-1: ".\/helper.swift"
+// CHECK-1-DAG: "kind"{{ ?}}: "began"
+// CHECK-1-DAG: "name"{{ ?}}: "compile"
+// CHECK-1-DAG: "{{(\.\\\/)?}}helper.swift"
 // CHECK-1: {{^}$}}
 
 // RUN: ls %t/ | %FileCheck -check-prefix=CHECK-LS %s
@@ -28,15 +28,15 @@
 
 // CHECK-1-SKIPPED-NOT: warning
 // CHECK-1-SKIPPED: {{^{$}}
-// CHECK-1-SKIPPED: "kind": "skipped"
-// CHECK-1-SKIPPED: "name": "compile"
-// CHECK-1-SKIPPED: ".\/main.swift"
+// CHECK-1-SKIPPED-DAG: "kind"{{ ?}}: "skipped"
+// CHECK-1-SKIPPED-DAG: "name"{{ ?}}: "compile"
+// CHECK-1-SKIPPED-DAG: "{{(\.\\\/)?}}main.swift"
 // CHECK-1-SKIPPED: {{^}$}}
 
 // CHECK-1-SKIPPED: {{^{$}}
-// CHECK-1-SKIPPED: "kind": "skipped"
-// CHECK-1-SKIPPED: "name": "compile"
-// CHECK-1-SKIPPED: ".\/helper.swift"
+// CHECK-1-SKIPPED-DAG: "kind"{{ ?}}: "skipped"
+// CHECK-1-SKIPPED-DAG: "name"{{ ?}}: "compile"
+// CHECK-1-SKIPPED-DAG: "{{(\.\\\/)?}}helper.swift"
 // CHECK-1-SKIPPED: {{^}$}}
 
 // RUN: cp %S/Inputs/rdar23148987/helper-2.swift %t/helper.swift
@@ -45,15 +45,15 @@
 
 // CHECK-2-NOT: warning
 // CHECK-2: {{^{$}}
-// CHECK-2: "kind": "began"
-// CHECK-2: "name": "compile"
-// CHECK-2: ".\/helper.swift"
+// CHECK-2-DAG: "kind"{{ ?}}: "began"
+// CHECK-2-DAG: "name"{{ ?}}: "compile"
+// CHECK-2-DAG: "{{(\.\\\/)?}}helper.swift"
 // CHECK-2: {{^}$}}
 
 // CHECK-2: {{^{$}}
-// CHECK-2: "kind": "began"
-// CHECK-2: "name": "compile"
-// CHECK-2: ".\/main.swift"
+// CHECK-2-DAG: "kind"{{ ?}}: "began"
+// CHECK-2-DAG: "name"{{ ?}}: "compile"
+// CHECK-2-DAG: "{{(\.\\\/)?}}main.swift"
 // CHECK-2: {{^}$}}
 
 func test(obj: Test) {

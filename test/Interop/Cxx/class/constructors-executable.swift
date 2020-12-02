@@ -31,4 +31,11 @@ CxxConstructorTestSuite.test("ConstructorWithParam") {
   expectEqual(44, instance.x)
 }
 
+CxxConstructorTestSuite.test("TemplatedConstructor") {
+  let arg = ArgType(i: 2)
+  let instance = TemplatedConstructor(arg)
+
+  expectEqual(2, instance.value.i)
+}
+
 runAllTests()

@@ -53,7 +53,12 @@ enum class ObjCClassFlags : uint32_t {
   /// This class provides a non-trivial .cxx_destruct method, but
   /// its .cxx_construct is trivial.  For backwards compatibility,
   /// when setting this flag, HasCXXStructors must be set as well.
-  HasCXXDestructorOnly = 0x00100
+  HasCXXDestructorOnly = 0x00100,
+
+  /// This class does not allow associated objects on instances.
+  ///
+  /// Will cause the objc runtime to trap in objc_setAssociatedObject.
+  ForbidsAssociatedObjects = 0x00400,
 };
 inline ObjCClassFlags &operator|=(ObjCClassFlags &lhs, ObjCClassFlags rhs) {
   lhs = ObjCClassFlags(uint32_t(lhs) | uint32_t(rhs));

@@ -47,6 +47,8 @@ public:
   /// Performs JVP generation on the empty JVP function. Returns true if any
   /// error occurs.
   bool run();
+
+  SILFunction &getJVP() const;
 };
 
 } // end namespace autodiff

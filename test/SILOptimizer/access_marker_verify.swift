@@ -333,8 +333,9 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   copy_addr %1 to [initialization] [[ADR1]] : $*T
 // CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
 // CHECK:   [[ENUMDATAADDR:%.*]] = init_enum_data_addr [[STK]]
-// CHECK-NOT: begin_access
-// CHECK:   copy_addr [take] [[ADR1]] to [initialization] [[ENUMDATAADDR]] : $*T
+// CHECK:   [[ACCESSENUM:%.*]] = begin_access [modify] [unsafe] [[ENUMDATAADDR]] : $*T
+// CHECK:   copy_addr [take] [[ADR1]] to [initialization] [[ACCESSENUM]] : $*T
+// CHECK:   end_access [[ACCESSENUM]] : $*T
 // CHECK:   inject_enum_addr
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   copy_addr [take] %{{.*}} to [[ACCESS]] : $*GenericEnum<T>

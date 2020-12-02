@@ -640,6 +640,14 @@ public:
   /// if applicable.
   const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
 
+  /// General conversion method from Swift types -> Clang types.
+  ///
+  /// HACK: This method is only intended to be called from a specific place in
+  /// IRGen. For converting function types, strongly prefer using one of the
+  /// other methods instead, instead of manually iterating over parameters
+  /// and results.
+  const clang::Type *getClangTypeForIRGen(Type ty);
+
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
   ForeignRepresentationInfo
@@ -704,6 +712,9 @@ public:
 
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
+
+  /// Get the runtime availability of support for differentiation.
+  AvailabilityContext getDifferentiationAvailability();
 
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
@@ -900,6 +911,13 @@ public:
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
   ModuleDecl *getModule(ImportPath::Module ModulePath);
+
+  /// Attempts to load the matching overlay module for the given clang
+  /// module into this ASTContext.
+  ///
+  /// \returns The Swift overlay module corresponding to the given Clang module,
+  /// or NULL if the overlay module cannot be found.
+  ModuleDecl *getOverlayModule(const FileUnit *ClangModule);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
 

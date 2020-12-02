@@ -26,10 +26,15 @@
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
+#include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
+
+using namespace swift;
+using namespace autodiff;
 
 namespace swift {
 namespace autodiff {
@@ -56,6 +61,9 @@ private:
 
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
+
+  /// The loop info.
+  SILLoopInfo *loopInfo;
 
   /// The differential info.
   LinearMapInfo differentialInfo;
@@ -380,6 +388,8 @@ public:
   /// Run JVP generation. Returns true on error.
   bool run();
 
+  SILFunction &getJVP() const { return *jvp; }
+
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
     if (errorOccurred)
       return;
@@ -509,11 +519,13 @@ public:
           return;
         }
       }
-      auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, origCallee);
-      jvpValue = builder.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::JVP,
-          borrowedDiffFunc);
-      jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
+      builder.emitScopedBorrowOperation(
+          loc, origCallee, [&](SILValue borrowedDiffFunc) {
+            jvpValue = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::JVP,
+                borrowedDiffFunc);
+            jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
+          });
     }
 
     // If JVP has not yet been found, emit an `differentiable_function`
@@ -604,11 +616,13 @@ public:
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
 
-      auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
-      auto extractedJVP = builder.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::JVP, borrowedADFunc);
-      jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
-      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitScopedBorrowOperation(
+          loc, diffFuncInst, [&](SILValue borrowedADFunc) {
+            auto extractedJVP = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::JVP,
+                borrowedADFunc);
+            jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
+          });
       builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
@@ -1038,7 +1052,7 @@ public:
     auto structType =
         remapSILTypeInDifferential(sei->getOperand()->getType()).getASTType();
     auto *tanField =
-        getTangentStoredProperty(context, sei, structType, invoker);
+      getTangentStoredProperty(context, sei, structType, invoker);
     if (!tanField) {
       errorOccurred = true;
       return;
@@ -1069,7 +1083,7 @@ public:
     auto structType =
         remapSILTypeInDifferential(seai->getOperand()->getType()).getASTType();
     auto *tanField =
-        getTangentStoredProperty(context, seai, structType, invoker);
+      getTangentStoredProperty(context, seai, structType, invoker);
     if (!tanField) {
       errorOccurred = true;
       return;
@@ -1403,8 +1417,11 @@ JVPCloner::Implementation::Implementation(ADContext &context,
       invoker(invoker),
       activityInfo(getActivityInfo(context, original,
                                    witness->getSILAutoDiffIndices(), jvp)),
+      loopInfo(context.getPassManager().getAnalysis<SILLoopAnalysis>()
+                   ->get(original)),
       differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
-                       jvp, witness->getSILAutoDiffIndices(), activityInfo),
+                       jvp, witness->getSILAutoDiffIndices(), activityInfo,
+                       loopInfo),
       differentialBuilder(SILBuilder(
           *createEmptyDifferential(context, witness, &differentialInfo))),
       diffLocalAllocBuilder(getDifferential()) {
@@ -1430,8 +1447,7 @@ void JVPCloner::Implementation::initializeDifferentialStructElements(
          "The number of differential struct fields must equal the number of "
          "differential struct element values");
   for (auto pair : llvm::zip(diffStructDecl->getStoredProperties(), values)) {
-    assert(std::get<1>(pair).getOwnershipKind() !=
-               ValueOwnershipKind::Guaranteed &&
+    assert(std::get<1>(pair).getOwnershipKind() != OwnershipKind::Guaranteed &&
            "Differential struct elements must be @owned");
     auto insertion = differentialStructElements.insert(
         {std::get<0>(pair), std::get<1>(pair)});
@@ -1728,7 +1744,16 @@ bool JVPCloner::Implementation::run() {
   return errorOccurred;
 }
 
-bool JVPCloner::run() { return impl.run(); }
-
 } // end namespace autodiff
 } // end namespace swift
+
+bool JVPCloner::run() {
+  bool foundError = impl.run();
+#ifndef NDEBUG
+  if (!foundError)
+    getJVP().verify();
+#endif
+  return foundError;
+}
+
+SILFunction &JVPCloner::getJVP() const { return impl.getJVP(); }

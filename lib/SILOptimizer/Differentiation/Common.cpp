@@ -329,14 +329,16 @@ VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
 }
 
 VarDecl *getTangentStoredProperty(ADContext &context,
-                                  FieldIndexCacheBase *projectionInst,
+                                  SingleValueInstruction *projectionInst,
                                   CanType baseType,
                                   DifferentiationInvoker invoker) {
   assert(isa<StructExtractInst>(projectionInst) ||
          isa<StructElementAddrInst>(projectionInst) ||
          isa<RefElementAddrInst>(projectionInst));
+  Projection proj(projectionInst);
   auto loc = getValidLocation(projectionInst);
-  return getTangentStoredProperty(context, projectionInst->getField(), baseType,
+  auto *field = proj.getVarDecl(projectionInst->getOperand(0)->getType());
+  return getTangentStoredProperty(context, field, baseType,
                                   loc, invoker);
 }
 
@@ -397,6 +399,35 @@ void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
   builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
                       /*isNonThrowing*/ false);
   builder.emitDestroyValueOperation(loc, getter);
+}
+
+SILValue emitMemoryLayoutSize(
+    SILBuilder &builder, SILLocation loc, CanType type) {
+  auto &ctx = builder.getASTContext();
+  auto id = ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Sizeof));
+  auto *builtin = cast<FuncDecl>(getBuiltinValueDecl(ctx, id));
+  auto metatypeTy = SILType::getPrimitiveObjectType(
+      CanMetatypeType::get(type, MetatypeRepresentation::Thin));
+  auto metatypeVal = builder.createMetatype(loc, metatypeTy);
+  return builder.createBuiltin(
+      loc, id, SILType::getBuiltinWordType(ctx),
+      SubstitutionMap::get(
+          builtin->getGenericSignature(), ArrayRef<Type>{type}, {}),
+      {metatypeVal});
+}
+
+SILValue emitProjectTopLevelSubcontext(
+    SILBuilder &builder, SILLocation loc, SILValue context,
+    SILType subcontextType) {
+  assert(context.getOwnershipKind() == OwnershipKind::Guaranteed);
+  auto &ctx = builder.getASTContext();
+  auto id = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext));
+  assert(context->getType() == SILType::getNativeObjectType(ctx));
+  auto *subcontextAddr = builder.createBuiltin(
+      loc, id, SILType::getRawPointerType(ctx), SubstitutionMap(), {context});
+  return builder.createPointerToAddress(
+      loc, subcontextAddr, subcontextType.getAddressType(), /*isStrict*/ true);
 }
 
 //===----------------------------------------------------------------------===//

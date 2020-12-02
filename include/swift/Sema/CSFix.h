@@ -281,6 +281,14 @@ enum class FixKind : uint8_t {
 
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
+
+  /// Allow expressions to reference invalid declarations by turning
+  /// them into holes.
+  AllowRefToInvalidDecl,
+
+  /// Treat empty and single-element array literals as if they were incomplete
+  /// dictionary literals when used as such.
+  TreatArrayLiteralAsDictionary,
 };
 
 class ConstraintFix {
@@ -545,6 +553,25 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+class TreatArrayLiteralAsDictionary final : public ContextualMismatch {
+  TreatArrayLiteralAsDictionary(ConstraintSystem &cs, Type dictionaryTy,
+                                Type arrayTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::TreatArrayLiteralAsDictionary,
+                           dictionaryTy, arrayTy, locator) {
+      }
+
+public:
+  std::string getName() const override {
+    return "treat array literal as dictionary";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static TreatArrayLiteralAsDictionary *create(ConstraintSystem &cs,
+                                               Type dictionaryTy, Type arrayTy,
+                                               ConstraintLocator *loc);
 };
 
 /// Mark function type as explicitly '@escaping'.
@@ -1701,20 +1728,25 @@ public:
                              Type expectedType, ConstraintLocator *locator);
 };
 
-/// Replace a coercion ('as') with a forced checked cast ('as!').
+/// Replace a coercion ('as') with runtime checked cast ('as!' or 'as?').
 class CoerceToCheckedCast final : public ContextualMismatch {
   CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
-                      ConstraintLocator *locator)
+                      bool useConditionalCast, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
-                           locator) {}
+                           locator),
+        UseConditionalCast(useConditionalCast) {}
+  bool UseConditionalCast = false;
 
 public:
-  std::string getName() const override { return "as to as!"; }
+  std::string getName() const override {
+    return UseConditionalCast ? "as to as?" : "as to as!";
+  }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
-                                      Type toType, ConstraintLocator *locator);
+                                      Type toType, bool useConditionalCast,
+                                      ConstraintLocator *locator);
 };
 
 class RemoveInvalidCall final : public ConstraintFix {
@@ -2053,6 +2085,25 @@ public:
 
   static SpecifyContextualTypeForNil *create(ConstraintSystem & cs,
                                              ConstraintLocator * locator);
+};
+
+class AllowRefToInvalidDecl final : public ConstraintFix {
+  AllowRefToInvalidDecl(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowRefToInvalidDecl, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid declaration reference";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowRefToInvalidDecl *create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator);
 };
 
 } // end namespace constraints

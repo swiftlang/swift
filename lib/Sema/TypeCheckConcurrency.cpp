@@ -578,30 +578,38 @@ findMemberReference(Expr *expr) {
   return None;
 }
 
-void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
-  class ActorIsolationWalker : public ASTWalker {
+namespace {
+  /// Check for adherence to the actor isolation rules, emitting errors
+  /// when actor-isolated declarations are used in an unsafe manner.
+  class ActorIsolationChecker : public ASTWalker {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
+    SmallVector<ApplyExpr*, 4> applyStack;
 
     const DeclContext *getDeclContext() const {
       return contextStack.back();
     }
 
   public:
-    ActorIsolationWalker(const DeclContext *dc) : ctx(dc->getASTContext()) {
+    ActorIsolationChecker(const DeclContext *dc) : ctx(dc->getASTContext()) {
       contextStack.push_back(dc);
-    }
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    bool walkToDeclPre(Decl *D) override {
+      // Don't walk into functions; they'll be handled separately.
+      if (isa<AbstractFunctionDecl>(D))
+        return false;
+
+      return true;
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
+        closure->setActorIsolation(determineClosureIsolation(closure));
         contextStack.push_back(closure);
         return { true, expr };
       }
@@ -618,27 +626,45 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       }
 
       if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        applyStack.push_back(apply);  // record this encounter
+
         // If this is a call to a partial apply thunk, decompose it to check it
         // like based on the original written syntax, e.g., "self.method".
         if (auto partialApply = decomposePartialApplyThunk(
                 apply, Parent.getAsExpr())) {
           if (auto memberRef = findMemberReference(partialApply->fn)) {
+            // NOTE: partially-applied thunks are never annotated as 
+            // implicitly async, regardless of whether they are escaping.
+            // So, we do not pass the ApplyExpr along to checkMemberReference.
             checkMemberReference(
                 partialApply->base, memberRef->first, memberRef->second,
                 partialApply->isEscaping);
 
             partialApply->base->walk(*this);
+
+            // manual clean-up since normal traversal is skipped
+            assert(applyStack.back() == apply);
+            applyStack.pop_back();
+
             return { false, expr };
           }
         }
       }
 
+      // NOTE: SelfApplyExpr is a subtype of ApplyExpr
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
-              call->getArg(), memberRef->first, memberRef->second);
+              call->getArg(), memberRef->first, memberRef->second, 
+              /*isEscapingPartialApply=*/false, call);
+
           call->getArg()->walk(*this);
+
+          // manual clean-up since normal traversal is skipped
+          assert(applyStack.back() == dyn_cast<ApplyExpr>(expr));
+          applyStack.pop_back();
+
           return { false, expr };
         }
       }
@@ -650,6 +676,11 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         assert(contextStack.back() == closure);
         contextStack.pop_back();
+      }
+
+      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+        assert(applyStack.back() == apply);
+        applyStack.pop_back();
       }
 
       return expr;
@@ -689,10 +720,9 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // FIXME: We'd like to insert 'async' at the appropriate place, but
-        // FuncDecl/AbstractFunctionDecl doesn't have the right source-location
-        // information to do so.
-        func->diagnose(diag::actor_isolated_method);
+        func->diagnose(diag::actor_isolated_sync_func, 
+          decl->getDescriptiveKind(),
+          decl->getName());
       } else if (isa<VarDecl>(decl)) {
         decl->diagnose(diag::actor_mutable_state);
       } else {
@@ -709,11 +739,8 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       while (useContext != defContext) {
         // If we find an escaping closure, it can be run concurrently.
         if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-          if (auto type = closure->getType()) {
-            if (auto fnType = type->getAs<AnyFunctionType>())
-              if (!fnType->isNoEscape())
-                return true;
-          }
+          if (isEscapingClosure(closure))
+            return true;
         }
 
         // If we find a local function, it can escape and be run concurrently.
@@ -831,9 +858,39 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
     /// Check a reference to an entity within a global actor.
     bool checkGlobalActorReference(
         ValueDecl *value, SourceLoc loc, Type globalActor) {
+
+      /// Returns true if this global actor reference is the callee of an Apply.
+      /// NOTE: This check mutates the identified ApplyExpr if it returns true!
+      auto inspectForImplicitlyAsync = [&] () -> bool {
+
+        // Is this global actor reference outside of an ApplyExpr?
+        if (applyStack.size() == 0)
+          return false;
+
+        // Check our applyStack metadata from the traversal.
+        // Our goal is to identify whether this global actor reference appears
+        // as the called value of the enclosing ApplyExpr. We cannot simply
+        // inspect Parent here because of expressions like (callee)()
+        ApplyExpr *apply = applyStack.back();
+        Expr *fn = apply->getFn()->getValueProvidingExpr();
+        if (auto memberRef = findMemberReference(fn)) {
+          auto concDecl = memberRef->first;
+          if (value == concDecl.getDecl() && !apply->implicitlyAsync()) {
+            // then this ValueDecl appears as the called value of the ApplyExpr.
+            apply->setImplicitlyAsync(true);
+            return true;
+          }
+        }
+
+        return false;
+      };
+
       switch (auto contextIsolation =
                   getInnermostIsolatedContext(getDeclContext())) {
       case ActorIsolation::ActorInstance:
+        if (inspectForImplicitlyAsync())
+          return false;
+
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_instance_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
@@ -846,6 +903,12 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         if (contextIsolation.getGlobalActor()->isEqual(globalActor))
           return false;
 
+        // Otherwise, we check if this decl reference is the callee of the
+        // enclosing Apply, making it OK as an implicitly async call.
+        if (inspectForImplicitlyAsync())
+          return false;
+
+        // Otherwise, this is a problematic global actor decl reference.
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_other_global_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
@@ -856,6 +919,9 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
 
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
+        if (inspectForImplicitlyAsync())
+          return false;
+
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_independent_context,
             value->getDescriptiveKind(), value->getName(), globalActor);
@@ -863,7 +929,8 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         return true;
 
       case ActorIsolation::Unspecified:
-        // Okay.
+        // Okay no matter what, but still must inspect for implicitly async.
+        inspectForImplicitlyAsync();
         return false;
       }
       llvm_unreachable("unhandled actor isolation kind!");
@@ -914,9 +981,12 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
     }
 
     /// Check a reference with the given base expression to the given member.
+    /// Returns true iff the member reference refers to actor-isolated state
+    /// in an invalid or unsafe way such that a diagnostic was emitted.
     bool checkMemberReference(
         Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
-        bool isEscapingPartialApply = false) {
+        bool isEscapingPartialApply = false, 
+        ApplyExpr *maybeImplicitAsync = nullptr) {
       if (!base || !memberRef)
         return false;
 
@@ -930,6 +1000,11 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
         // Must reference actor-isolated state on 'self'.
         auto selfVar = getSelfReference(base);
         if (!selfVar) {
+          // actor-isolated non-self calls are implicitly async and thus OK.
+          if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
+            maybeImplicitAsync->setImplicitlyAsync(true);
+            return false;
+          }
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
@@ -1010,10 +1085,144 @@ void swift::checkActorIsolation(const Expr *expr, const DeclContext *dc) {
       }
       llvm_unreachable("unhandled actor isolation kind!");
     }
-  };
 
-  ActorIsolationWalker walker(dc);
-  const_cast<Expr *>(expr)->walk(walker);
+    /// Determine whether this closure is escaping.
+    static bool isEscapingClosure(const AbstractClosureExpr *closure) {
+      if (auto type = closure->getType()) {
+        if (auto fnType = type->getAs<AnyFunctionType>())
+          return !fnType->isNoEscape();
+      }
+
+      return true;
+    }
+
+    /// Determine the isolation of a particular closure.
+    ///
+    /// This function assumes that enclosing closures have already had their
+    /// isolation checked.
+    ClosureActorIsolation determineClosureIsolation(
+        AbstractClosureExpr *closure) {
+      // An escaping closure is always actor-independent.
+      if (isEscapingClosure(closure))
+        return ClosureActorIsolation::forIndependent();
+
+      // A non-escaping closure gets its isolation from its context.
+      Optional<ActorIsolation> parentIsolation;
+      auto parentDC = closure->getParent();
+      switch (parentDC->getContextKind()) {
+      case DeclContextKind::AbstractClosureExpr: {
+        auto parentClosureIsolation = cast<AbstractClosureExpr>(parentDC)
+          ->getActorIsolation();
+        switch (parentClosureIsolation) {
+        case ClosureActorIsolation::Independent:
+          parentIsolation = ActorIsolation::forIndependent(
+              ActorIndependentKind::Safe);
+          break;
+
+        case ClosureActorIsolation::ActorInstance: {
+          auto selfDecl = parentClosureIsolation.getActorInstance();
+          auto actorClass = selfDecl->getType()->getRValueType()
+              ->getClassOrBoundGenericClass();
+          assert(actorClass && "Bad closure actor isolation?");
+          parentIsolation = ActorIsolation::forActorInstance(actorClass);
+          break;
+        }
+
+        case ClosureActorIsolation::GlobalActor:
+          parentIsolation = ActorIsolation::forGlobalActor(
+              parentClosureIsolation.getGlobalActor());
+          break;
+        }
+        break;
+      }
+
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::SubscriptDecl:
+        parentIsolation = getActorIsolation(
+            cast<ValueDecl>(parentDC->getAsDecl()));
+        break;
+
+      case DeclContextKind::EnumElementDecl:
+      case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::Initializer:
+      case DeclContextKind::Module:
+      case DeclContextKind::SerializedLocal:
+      case DeclContextKind::TopLevelCodeDecl:
+        return ClosureActorIsolation::forIndependent();
+      }
+
+      // We must have parent isolation determined to get here.
+      assert(parentIsolation && "Missing parent isolation?");
+      switch (*parentIsolation) {
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::Unspecified:
+        return ClosureActorIsolation::forIndependent();
+
+      case ActorIsolation::GlobalActor: {
+        Type globalActorType = closure->mapTypeIntoContext(
+            parentIsolation->getGlobalActor()->mapTypeOutOfContext());
+        return ClosureActorIsolation::forGlobalActor(globalActorType);
+      }
+
+      case ActorIsolation::ActorInstance: {
+        SmallVector<CapturedValue, 2> localCaptures;
+        closure->getCaptureInfo().getLocalCaptures(localCaptures);
+        for (const auto &localCapture : localCaptures) {
+          if (localCapture.isDynamicSelfMetadata())
+            continue;
+
+          auto var = dyn_cast_or_null<VarDecl>(localCapture.getDecl());
+          if (!var)
+            continue;
+
+          // If we have captured the 'self' parameter, the closure is isolated
+          // to that actor instance.
+          if (var->isSelfParameter()) {
+            return ClosureActorIsolation::forActorInstance(var);
+          }
+        }
+
+        // When 'self' is not captured, this closure is actor-independent.
+        return ClosureActorIsolation::forIndependent();
+      }
+    }
+    }
+  };
+}
+
+void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
+  ActorIsolationChecker checker(decl);
+  decl->getBody()->walk(checker);
+}
+
+void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
+  ActorIsolationChecker checker(decl);
+  if (auto body = decl->getBody()) {
+    body->walk(checker);
+  }
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl))
+    if (auto superInit = ctor->getSuperInitCall())
+      superInit->walk(checker);
+}
+
+void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
+  ActorIsolationChecker checker(init);
+  expr->walk(checker);
+}
+
+void swift::checkEnumElementActorIsolation(
+    EnumElementDecl *element, Expr *expr) {
+  ActorIsolationChecker checker(element);
+  expr->walk(checker);
+}
+
+void swift::checkPropertyWrapperActorIsolation(
+   PatternBindingDecl *binding, Expr *expr) {
+  ActorIsolationChecker checker(binding->getDeclContext());
+  expr->walk(checker);
 }
 
 /// Determine actor isolation solely from attributes.

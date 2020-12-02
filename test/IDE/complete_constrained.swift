@@ -118,9 +118,9 @@ struct Vegetarian: EatsFruit, EatsVegetables { }
 func testVegetarian(chef: Chef<Vegetarian>) {
   chef.cook(.#^CONDITIONAL_OVERLOAD_ARG^#)
 // CONDITIONAL_OVERLOAD_ARG: Begin completions, 4 items
-// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]:     apple[#Fruit#]; name=apple
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:    apple[#Fruit#]; name=apple
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Fruit#})[#(into: inout Hasher) -> Void#]; name=hash(self: Fruit)
-// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]:     broccoli[#Vegetable#]; name=broccoli
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:    broccoli[#Vegetable#]; name=broccoli
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Vegetable#})[#(into: inout Hasher) -> Void#]; name=hash(self: Vegetable)
 // CONDITIONAL_OVERLOAD_ARG: End completions
 
@@ -128,7 +128,12 @@ func testVegetarian(chef: Chef<Vegetarian>) {
   let _ = chefMeta.init(.#^CONDITIONAL_OVERLOAD_INIT_ARG^#)
 
   chef.eat(.#^CONDITIONAL_INAPPLICABLE_ARG^#)
-// CONDITIONAL_INAPPLICABLE_ARG-NOT: Begin completion
+// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to addess that later
+//       (e.g. by adding the missing 'Meat' conformance to 'Vegetarian' - clearly not the intention here - but replace 'Meat' with 'Equatable').
+// CONDITIONAL_INAPPLICABLE_ARG: Begin completions, 2 items
+// CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: chicken[#Meat#]; name=chicken
+// CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Meat#})[#(into: inout Hasher) -> Void#]; name=hash(self: Meat)
+// CONDITIONAL_INAPPLICABLE_ARG: End completions
 }
 
 // rdar://problem/53401609

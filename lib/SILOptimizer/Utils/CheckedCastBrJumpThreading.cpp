@@ -251,13 +251,12 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
   assert(!Cloner.wasCloned());
   Cloner.cloneBlock();
   SILBasicBlock *TargetFailureBB = Cloner.getNewBB();
-  auto *TI = TargetFailureBB->getTerminator();
-  SILBuilderWithScope Builder(TI);
-  // This BB copy branches to a FailureBB.
-  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
-  Builder.createBranch(TI->getLoc(), CCBI->getFailureBB());
-  TI->eraseFromParent();
-  splitIfCriticalEdge(CCBBlock, CCBI->getFailureBB());
+  auto *clonedCCBI =
+      cast<CheckedCastBranchInst>(TargetFailureBB->getTerminator());
+  SILBuilderWithScope Builder(clonedCCBI);
+  // This BB copy branches to the FailureBB.
+  Builder.createBranch(clonedCCBI->getLoc(), clonedCCBI->getFailureBB());
+  clonedCCBI->eraseFromParent();
 
   // Redirect all FailurePreds to the copy of BB.
   for (auto *Pred : FailurePreds) {
@@ -272,9 +271,9 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForFailurePreds(
 /// a landing basic block for all FailurePreds.
 void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
     BasicBlockCloner &Cloner) {
-  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
 
   if (InvertSuccess) {
+    auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
     SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
                                            CCBI->getFailureBB());
     CCBI->eraseFromParent();
@@ -287,13 +286,14 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
       assert(!Cloner.wasCloned());
       Cloner.cloneBlock();
       SILBasicBlock *TargetSuccessBB = Cloner.getNewBB();
-      auto *TI = TargetSuccessBB->getTerminator();
-      SILBuilderWithScope Builder(TI);
+      auto *clonedCCBI =
+          cast<CheckedCastBranchInst>(TargetSuccessBB->getTerminator());
+      SILBuilderWithScope Builder(clonedCCBI);
       // This BB copy branches to SuccessBB.
       // Take argument value from the dominating BB.
-      Builder.createBranch(TI->getLoc(), CCBI->getSuccessBB(), {SuccessArg});
-      TI->eraseFromParent();
-      splitIfCriticalEdge(CCBBlock, CCBI->getSuccessBB());
+      Builder.createBranch(clonedCCBI->getLoc(), clonedCCBI->getSuccessBB(),
+                           {SuccessArg});
+      clonedCCBI->eraseFromParent();
 
       // Redirect all SuccessPreds to the copy of BB.
       for (auto *Pred : SuccessPreds) {
@@ -312,6 +312,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForSuccessPreds(
 
   // Add an unconditional jump at the end of the block.
   // Take argument value from the dominating BB
+  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
   SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
                                          {SuccessArg});
   CCBI->eraseFromParent();

@@ -179,6 +179,11 @@ class AbstractionPattern {
     /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
     /// error index.
     ObjCMethodType,
+    /// The type of an ObjC block used as a completion handler for
+    /// an API that has been imported into Swift as async,
+    /// representing the tuple of results of the async projection of the
+    /// API.
+    ObjCCompletionHandlerArgumentsType,
     /// The uncurried imported type of a C++ non-operator non-static member
     /// function. OrigType is valid and is a function type. CXXMethod is valid.
     CXXMethodType,
@@ -410,6 +415,7 @@ class AbstractionPattern {
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
 
     default:
@@ -445,7 +451,16 @@ class AbstractionPattern {
   }
 
   bool hasStoredForeignInfo() const {
-    return hasStoredObjCMethod();
+    switch (getKind()) {
+    case Kind::CurriedObjCMethodType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::ObjCMethodType:
+    case Kind::ObjCCompletionHandlerArgumentsType:
+      return true;
+
+    default:
+      return false;
+    }
   }
 
   bool hasImportAsMemberStatus() const {
@@ -552,6 +567,7 @@ public:
     case Kind::CXXOperatorMethodType:
     case Kind::CurriedCXXOperatorMethodType:
     case Kind::PartialCurriedCXXOperatorMethodType:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
     case Kind::Invalid:
     case Kind::Opaque:
@@ -584,6 +600,22 @@ public:
     return pattern;
   }
 
+  /// Return an abstraction pattern for a result tuple
+  /// corresponding to the parameters of a completion handler
+  /// block of an API that was imported as async.
+  static AbstractionPattern
+  getObjCCompletionHandlerArgumentsType(CanGenericSignature sig,
+                                        CanType origTupleType,
+                                        const clang::Type *clangBlockType,
+                                        EncodedForeignInfo foreignInfo) {
+    AbstractionPattern pattern(Kind::ObjCCompletionHandlerArgumentsType);
+    pattern.initClangType(sig, origTupleType, clangBlockType,
+                          Kind::ObjCCompletionHandlerArgumentsType);
+    pattern.OtherData = foreignInfo.getOpaqueValue();
+    
+    return pattern;
+  }
+
 public:
   /// Return an abstraction pattern for the curried type of an
   /// Objective-C method.
@@ -592,6 +624,7 @@ public:
                        const Optional<ForeignErrorConvention> &foreignError,
                        const Optional<ForeignAsyncConvention> &foreignAsync);
 
+  
   /// Return an abstraction pattern for the uncurried type of a C function
   /// imported as a method.
   ///
@@ -927,6 +960,7 @@ public:
     case Kind::OpaqueDerivativeFunction:
       llvm_unreachable("opaque derivative function pattern has no type");
     case Kind::ClangType:
+    case Kind::ObjCCompletionHandlerArgumentsType:
     case Kind::CurriedObjCMethodType:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::ObjCMethodType:
@@ -980,6 +1014,7 @@ public:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       assert(signature || !type->hasTypeParameter());
       assert(hasSameBasicTypeStructure(OrigType, type));
       GenericSig = (type->hasTypeParameter() ? signature : nullptr);
@@ -1018,6 +1053,7 @@ public:
     case Kind::CXXOperatorMethodType:
     case Kind::CurriedCXXOperatorMethodType:
     case Kind::PartialCurriedCXXOperatorMethodType:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
     }
     llvm_unreachable("bad kind");
@@ -1097,6 +1133,7 @@ public:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       return false;
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
@@ -1136,6 +1173,7 @@ public:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::Type:
     case Kind::Discard:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       return dyn_cast<TYPE>(getType());
     }
     llvm_unreachable("bad kind");
@@ -1167,6 +1205,7 @@ public:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    case Kind::ObjCCompletionHandlerArgumentsType:
       // We assume that the Clang type might provide additional structure.
       return false;
     case Kind::Type:
@@ -1200,6 +1239,7 @@ public:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return false;
+    case Kind::ObjCCompletionHandlerArgumentsType:
     case Kind::Tuple:
       return true;
     case Kind::Type:
@@ -1232,6 +1272,7 @@ public:
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();
+    case Kind::ObjCCompletionHandlerArgumentsType:
     case Kind::Type:
     case Kind::Discard:
     case Kind::ClangType:

@@ -9,11 +9,26 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_EXTRAARG | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=RELATED_INERROREXPR | %FileCheck %s --check-prefix=RELATED
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNRESOLVED_AMBIGUOUS | %FileCheck %s --check-prefix=UNRESOLVED_AMBIGUOUS
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNRESOLVED_STILLAMBIGUOUS | %FileCheck %s --check-prefix=UNRESOLVED_AMBIGUOUS
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNRESOLVED_UNAMBIGUOUS | %FileCheck %s --check-prefix=UNRESOLVED_UNAMBIGUOUS
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=NOCALLBACK_FALLBACK | %FileCheck %s --check-prefix=RELATED
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FALLBACK | %FileCheck %s --check-prefix=MULTICLOSURE_FALLBACK
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=UNAMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=UNAMBIGUOUSCLOSURE_ARG
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=AMBIGUOUSCLOSURE_ARG | %FileCheck %s --check-prefix=AMBIGUOUSCLOSURE_ARG
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=AMBIGUOUSCLOSURE_ARG_RETURN | %FileCheck %s --check-prefix=AMBIGUOUSCLOSURE_ARG_RETURN
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_OPTIONAL | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_NESTED | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_ASSIGN | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_NESTED | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_CALL | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_CALL_OPT | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_INDIRECT_RETURN | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_GENERIC | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_KEY
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_TUPLE | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_TUPLE
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=PARSED_AS_ARRAY_ARRAY | %FileCheck %s --check-prefix=PARSED_AS_ARRAY_TUPLE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_FOO | %FileCheck %s --check-prefix=OVERLOADEDFUNC_FOO
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_BAR | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BAR
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=OVERLOADEDFUNC_MISSINGLABEL | %FileCheck %s --check-prefix=OVERLOADEDFUNC_BOTH
@@ -105,13 +120,40 @@ let x: A = overloadedReturn(1).#^RELATED_EXTRAARG^#
 // RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings()[#Void#]{{; name=.+$}}
 // RELATED: End completions
 
-func takesA(_ callback: () -> A) -> B {}
+func takesClosureGivingA(_ callback: () -> A) -> B {}
 func takesB(_ item: B) {}
 
-takesB((takesA { return overloadedReturn().#^RELATED_INERROREXPR^# }).)
+takesB((takesClosureGivingA { return overloadedReturn().#^RELATED_INERROREXPR^# }).)
+
+func overloadedArg(_ arg: A) -> A {}
+func overloadedArg(_ arg: B) -> B {}
+
+overloadedArg(.#^UNRESOLVED_AMBIGUOUS^#)
+
+// UNRESOLVED_AMBIGUOUS: Begin completions, 4 items
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal: doAThings({#(self): A#})[#() -> A#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#A#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS: End completions
+
+// Make sure we still offer A and B members as the user may intend to add a member on the end of the overloadedArg call later that has type B.
+takesB(overloadedArg(.#^UNRESOLVED_STILLAMBIGUOUS^#))
+
+func overloadedArg2(_ arg: A) -> Void {}
+func overloadedArg2(_ arg: A) -> Never {}
+func overloadedArg2(_ arg: B) -> B {}
+
+takesB(overloadedArg2(.#^UNRESOLVED_UNAMBIGUOUS^#))
+
+// UNRESOLVED_UNAMBIGUOUS: Begin completions, 2 items
+// UNRESOLVED_UNAMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
+// UNRESOLVED_UNAMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_UNAMBIGUOUS: End completions
+
 
 switch undefined {
-  case takesA { return overloadedReturn().#^NOCALLBACK_FALLBACK^# }:
+  case takesClosureGivingA { return overloadedReturn().#^NOCALLBACK_FALLBACK^# }:
     break
 }
 
@@ -164,6 +206,45 @@ takesAnonClosure { TestRelations.#^AMBIGUOUSCLOSURE_ARG_RETURN^# }
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG_RETURN: End completions
+
+func takesDictAB(_ x: [A: B]) {}
+func takesOptDictAB(_ x: [A: B]?) {}
+func overloadedGivesAorB(_ x: A) -> A {}
+func overloadedGivesAorB(_ x: B) -> B {}
+var assignDict: [A : B] = [:]
+
+let _: [A : B] = [TestRelations.#^PARSED_AS_ARRAY^#]
+let _: [A : B]? = [TestRelations.#^PARSED_AS_ARRAY_OPTIONAL^#]
+let _: [[A : B]] = [[TestRelations.#^PARSED_AS_ARRAY_NESTED^#]]
+assignDict = [TestRelations.#^PARSED_AS_ARRAY_ASSIGN^#]
+let _: [A: B] = [overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT^#)]
+let _: [[A: B]] = [[overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_NESTED^#)]]
+takesDictAB([overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_CALL^#)]);
+takesOptDictAB([overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_CALL_OPT^#)]);
+func testReturnLiteralMismatch() -> [A: B] { return [overloadedGivesAorB(TestRelations.#^PARSED_AS_ARRAY_INDIRECT_RETURN^#)] }
+func arrayLiteralDictionaryMismatch<T>(a: inout T) where T: ExpressibleByDictionaryLiteral, T.Key == A, T.Value == B {
+  a = [TestRelations.#^PARSED_AS_ARRAY_GENERIC^#]
+}
+
+// PARSED_AS_ARRAY_KEY: Begin completions, 6 items
+// PARSED_AS_ARRAY_KEY-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: a[#A#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: b[#B#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: ab[#(A, B)#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
+// PARSED_AS_ARRAY_KEY: End completions
+
+let _: [(A, B) : B] = [TestRelations.#^PARSED_AS_ARRAY_TUPLE^#]
+let _: [(A, B)] = [TestRelations.#^PARSED_AS_ARRAY_ARRAY^#]
+// PARSED_AS_ARRAY_TUPLE: Begin completions, 6 items
+// PARSED_AS_ARRAY_TUPLE-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Keyword/CurrNominal: Type[#TestRelations.Type#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal: a[#A#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal: b[#B#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: ab[#(A, B)#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
+// PARSED_AS_ARRAY_TUPLE: End completions
 
 
 func testMissingArgs() {
@@ -344,4 +425,3 @@ CreateThings {
     }
     Thing. // ErrorExpr
 }
-

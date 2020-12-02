@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -325,6 +325,78 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
 
   // Find the conformance to _BridgedStoredNSError.
   return SwiftModule->lookupConformance(type, proto);
+}
+
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
+                                            Optional<FuncDecl*> &cache,
+                                            StringRef name) {
+  if (cache)
+    return *cache;
+  
+  auto *module = C.getLoadedModule(C.Id_Concurrency);
+  if (!module) {
+    cache = nullptr;
+    return nullptr;
+  }
+  
+  SmallVector<ValueDecl *, 1> decls;
+  module->lookupQualified(module,
+                     DeclNameRef(C.getIdentifier(name)),
+                     NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                     decls);
+
+  if (decls.size() != 1) {
+    cache = nullptr;
+    return nullptr;
+  }
+  auto func = dyn_cast<FuncDecl>(decls[0]);
+  cache = func;
+  return func;
+}
+
+FuncDecl *
+SILGenModule::getRunChildTask() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunChildTask,
+                                    "_runChildTask");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGet,
+                                    "_taskFutureGet");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGetThrowing,
+                                    "_taskFutureGetThrowing");
+}
+
+FuncDecl *
+SILGenModule::getResumeUnsafeContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeContinuation,
+                                    "_resumeUnsafeContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeUnsafeThrowingContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuation,
+                                    "_resumeUnsafeThrowingContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuationWithError,
+                                 "_resumeUnsafeThrowingContinuationWithError");
+}
+FuncDecl *
+SILGenModule::getRunAsyncHandler() {
+  return lookupConcurrencyIntrinsic(getASTContext(), RunAsyncHandler,
+                                    "_runAsyncHandler");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -1808,7 +1880,7 @@ public:
         if (SGF.B.hasValidInsertionPoint())
           SGF.B.createBranch(returnLoc, returnBB, returnValue);
         returnValue =
-            returnBB->createPhiArgument(returnType, ValueOwnershipKind::Owned);
+            returnBB->createPhiArgument(returnType, OwnershipKind::Owned);
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1946,6 +2018,17 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
+
+  // If all function bodies are being skipped there's no reason to do any
+  // SIL generation.
+  if (desc.opts.SkipFunctionBodies == FunctionBodySkipping::All)
+    return silMod;
+
+  // Skip emitting SIL if there's been any compilation errors
+  if (silMod->getASTContext().hadError() &&
+      silMod->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+    return silMod;
+
   SILGenModuleRAII scope(*silMod);
 
   // Emit a specific set of SILDeclRefs if needed.
@@ -2027,6 +2110,20 @@ static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
 }
 
 void SILGenModule::visitImportDecl(ImportDecl *import) {
+  // Importing `@_specializet(targetFunction: otherFunc)` only supported in
+  // experimental pre-specialization mode.
+  if (!getASTContext().LangOpts.EnableExperimentalPrespecialization)
+    return;
+
+  // TODO: this horrible full AST deserializing walk should be replaced by a
+  // 'single place' to lookup those declarations in the module
+  // E.g
+  // prespecializations {
+  //    extension Array {
+  //       @_specialize(exported: true, targetFunction: other(_:), T == Int)
+  //       func prespecialzie_other() {}
+  //    }
+  // }
   auto *module = import->getModule();
   if (module->isNonSwiftModule())
     return;

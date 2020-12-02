@@ -16,26 +16,27 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/Strings.h"
-#include "swift/Demangling/Demangle.h"
-#include "swift/Basic/QuotedString.h"
-#include "swift/SIL/SILPrintContext.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/CFG.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILCoverageMap.h"
-#include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILVTable.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/SILCoverageMap.h"
+#include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TerminatorUtils.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/APFloat.h"
@@ -47,10 +48,9 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormattedStream.h"
 #include <set>
-
 
 using namespace swift;
 using ID = SILPrintContext::ID;
@@ -548,7 +548,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::None) {
+    if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -1451,7 +1451,7 @@ public:
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
-    switch (MU->getKind()) {
+    switch (MU->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  *this << "[rootself] "; break;
     case MarkUninitializedInst::CrossModuleRootSelf:
@@ -1466,7 +1466,7 @@ public:
       *this << "[delegatingselfallocated] ";
       break;
     }
-    
+
     *this << getIDAndType(MU->getOperand());
   }
 
@@ -2111,27 +2111,27 @@ public:
     if (SII->hasDefault())
       *this << ", default " << Ctx.getID(SII->getDefaultBB());
   }
-  
-  void printSwitchEnumInst(SwitchEnumInstBase *SOI) {
-    *this << getIDAndType(SOI->getOperand());
-    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+
+  void printSwitchEnumInst(SwitchEnumTermInst SOI) {
+    *this << getIDAndType(SOI.getOperand());
+    for (unsigned i = 0, e = SOI.getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILBasicBlock *dest;
-      std::tie(elt, dest) = SOI->getCase(i);
+      std::tie(elt, dest) = SOI.getCase(i);
       *this << ", case " << SILDeclRef(elt, SILDeclRef::Kind::EnumElement)
             << ": " << Ctx.getID(dest);
-      if (SOI->getCaseCount(i)) {
-        *this << " !case_count(" << SOI->getCaseCount(i).getValue() << ")";
+      if (SOI.getCaseCount(i)) {
+        *this << " !case_count(" << SOI.getCaseCount(i).getValue() << ")";
       }
     }
-    if (SOI->hasDefault()) {
-      *this << ", default " << Ctx.getID(SOI->getDefaultBB());
-      if (SOI->getDefaultCount()) {
-        *this << " !default_count(" << SOI->getDefaultCount().getValue() << ")";
+    if (SOI.hasDefault()) {
+      *this << ", default " << Ctx.getID(SOI.getDefaultBB());
+      if (SOI.getDefaultCount()) {
+        *this << " !default_count(" << SOI.getDefaultCount().getValue() << ")";
       }
     }
   }
-  
+
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
     printSwitchEnumInst(SOI);
   }

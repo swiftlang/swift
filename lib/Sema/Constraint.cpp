@@ -317,15 +317,17 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Locator->dump(sm, Out);
       Out << "]]";
     }
-    Out << ":";
+    Out << ":\n";
 
     interleave(getNestedConstraints(),
                [&](Constraint *constraint) {
                  if (constraint->isDisabled())
-                   Out << "[disabled] ";
+                   Out << ">  [disabled] ";
+                 else
+                   Out << ">             ";
                  constraint->print(Out, sm);
                },
-               [&] { Out << " or "; });
+               [&] { Out << "\n"; });
     return;
   }
 

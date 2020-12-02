@@ -428,8 +428,8 @@ public:
     auto &lowering = SGF.getTypeLowering(vd->getType());
     
     // Decide whether we need a temporary stack buffer to evaluate this 'let'.
-    // There are three cases we need to handle here: parameters, initialized (or
-    // bound) decls, and uninitialized ones.
+    // There are four cases we need to handle here: parameters, initialized (or
+    // bound) decls, uninitialized ones, and async let declarations.
     bool needsTemporaryBuffer;
     bool isUninitialized = false;
 
@@ -438,6 +438,13 @@ public:
     if (vd->getParentPatternBinding() && !vd->getParentInitializer()) {
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
+      needsTemporaryBuffer = true;
+      isUninitialized = true;
+    } else if (vd->isAsyncLet()) {
+      // If this is an async let, treat it like a let-value without an
+      // initializer. The initializer runs concurrently in a child task,
+      // and value will be initialized at the point the variable in the
+      // async let is used.
       needsTemporaryBuffer = true;
       isUninitialized = true;
     } else {
@@ -1130,12 +1137,53 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 
 void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
                                         unsigned idx) {
+
+
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
-  // If an initial value expression was specified by the decl, emit it into
-  // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = PBD->getExecutableInit(idx)) {
+  // If this is an async let, create a child task to compute the initializer
+  // value.
+  if (PBD->isAsyncLet()) {
+    // Look through the implicit await (if present), try (if present), and
+    // call to reach the autoclosure that computes the value.
+    auto *init = PBD->getExecutableInit(idx);
+    if (auto awaitExpr = dyn_cast<AwaitExpr>(init))
+      init = awaitExpr->getSubExpr();
+    if (auto tryExpr = dyn_cast<TryExpr>(init))
+      init = tryExpr->getSubExpr();
+    init = cast<CallExpr>(init)->getFn();
+    assert(isa<AutoClosureExpr>(init) &&
+           "Could not find async let autoclosure");
+    bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
+
+    // Emit the closure for the child task.
+    SILValue childTask;
+    {
+      FullExpr Scope(Cleanups, CleanupLocation(init));
+      SILLocation loc(PBD);
+      childTask = emitRunChildTask(
+          loc,
+          init->getType(),
+          emitRValue(init).getScalarValue()
+        ).forward(*this);
+    }
+
+    // Destroy the task at the end of the scope.
+    enterDestroyCleanup(childTask);
+
+    // Push a cleanup that will cancel the child task at the end of the scope.
+    enterCancelAsyncTaskCleanup(childTask);
+
+    // Save the child task so we can await it as needed.
+    AsyncLetChildTasks[{PBD, idx}] = { childTask, isThrowing };
+
+    // Mark as uninitialized; actual initialization will occur when the
+    // variables are referenced.
+    initialization->finishUninitialized(*this);
+  } else if (auto *Init = PBD->getExecutableInit(idx)) {
+    // If an initial value expression was specified by the decl, emit it into
+    // the initialization.
     FullExpr Scope(Cleanups, CleanupLocation(Init));
 
     auto *var = PBD->getSingleVar();
@@ -1155,6 +1203,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
+    // Otherwise, mark it uninitialized for DI to resolve.
     initialization->finishUninitialized(*this);
   }
 }
@@ -1327,6 +1376,33 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
 }
 
 namespace {
+class EndLifetimeCleanup : public Cleanup {
+  SILValue v;
+public:
+  EndLifetimeCleanup(SILValue v) : v(v) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createEndLifetime(l, v);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndLifetimeCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+ManagedValue SILGenFunction::emitManagedRValueWithEndLifetimeCleanup(
+    SILValue value) {
+  Cleanups.pushCleanup<EndLifetimeCleanup>(value);
+  return ManagedValue::forUnmanaged(value);
+}
+
+namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.
   class DeinitExistentialCleanup: public Cleanup {
@@ -1383,6 +1459,35 @@ CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
   assert(addr->getType().isAddress());
   Cleanups.pushCleanupInState<DeinitExistentialCleanup>(state, addr,
                                                       concreteFormalType, repr);
+  return Cleanups.getTopCleanup();
+}
+
+namespace {
+  /// A cleanup that cancels an asynchronous task.
+  class CancelAsyncTaskCleanup: public Cleanup {
+    SILValue task;
+  public:
+    CancelAsyncTaskCleanup(SILValue task) : task(task) { }
+
+    void emit(SILGenFunction &SGF, CleanupLocation l,
+              ForUnwind_t forUnwind) override {
+      SILValue borrowedTask = SGF.B.createBeginBorrow(l, task);
+      SGF.emitCancelAsyncTask(l, borrowedTask);
+      SGF.B.createEndBorrow(l, borrowedTask);
+    }
+
+    void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+      llvm::errs() << "CancelAsyncTaskCleanup\n"
+                   << "Task:" << task << "\n";
+#endif
+    }
+  };
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterCancelAsyncTaskCleanup(SILValue task) {
+  Cleanups.pushCleanupInState<CancelAsyncTaskCleanup>(
+      CleanupState::Active, task);
   return Cleanups.getTopCleanup();
 }
 

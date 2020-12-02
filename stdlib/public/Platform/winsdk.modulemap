@@ -335,9 +335,24 @@ module WinSDK [system] {
     export *
   }
 
+  module Sensors {
+    header "sensors.h"
+    header "SensorsApi.h"
+    export *
+
+    link "sensorsapi.lib"
+  }
+
   module User {
     header "WinUser.h"
     export *
+  }
+
+  module WIC {
+    header "wincodec.h"
+    export *
+
+    link "windowscodecs.lib"
   }
 
   module WinBase {

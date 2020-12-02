@@ -77,6 +77,7 @@ protected:
 public:
   enum class SymbolKind {
     Default,
+    AsyncHandlerBody,
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
@@ -155,6 +156,15 @@ public:
                                              Type SelfType,
                                              ModuleDecl *Module);
 
+  /// Mangle a completion handler block implementation function, used for importing ObjC
+  /// APIs as async.
+  ///
+  /// - If `predefined` is true, this mangles the symbol name of the completion handler
+  /// predefined in the Swift runtime for the given type signature.
+  std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
+                                                   CanType ResultType,
+                                                   bool predefined);
+  
   /// Mangle the derivative function (JVP/VJP) for the given:
   /// - Mangled original function name.
   /// - Derivative function kind.
@@ -314,8 +324,15 @@ protected:
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false,
-                      const ValueDecl *forDecl = nullptr);
+  enum FunctionManglingKind {
+    NoFunctionMangling,
+    FunctionMangling,
+    AsyncHandlerBodyMangling
+  };
+
+  void appendFunction(AnyFunctionType *fn,
+                    FunctionManglingKind functionMangling = NoFunctionMangling,
+                    const ValueDecl *forDecl = nullptr);
   void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false,
                           const ValueDecl *forDecl = nullptr);
   void appendClangType(AnyFunctionType *fn);
@@ -323,7 +340,8 @@ protected:
   void appendClangType(FnType *fn, llvm::raw_svector_ostream &os);
 
   void appendFunctionSignature(AnyFunctionType *fn,
-                               const ValueDecl *forDecl = nullptr);
+                               const ValueDecl *forDecl,
+                               FunctionManglingKind functionMangling);
 
   void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
                                const ValueDecl *forDecl = nullptr);
@@ -374,7 +392,10 @@ protected:
                                  GenericSignature &genericSig,
                                  GenericSignature &parentGenericSig);
 
-  void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
+  
+
+  void appendDeclType(const ValueDecl *decl,
+                    FunctionManglingKind functionMangling = NoFunctionMangling);
 
   bool tryAppendStandardSubstitution(const GenericTypeDecl *type);
 
@@ -391,7 +412,7 @@ protected:
 
   void appendEntity(const ValueDecl *decl, StringRef EntityOp, bool isStatic);
 
-  void appendEntity(const ValueDecl *decl);
+  void appendEntity(const ValueDecl *decl, bool isAsyncHandlerBody = false);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);

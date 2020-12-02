@@ -81,8 +81,8 @@ namespace irgen {
   //     };
   //     ResultTypes directResults...;
   //   };
+  //   SelfType self;
   //   ArgTypes formalArguments...;
-  //   SelfType self?;
   // };
   struct AsyncContextLayout : StructLayout {
     struct ArgumentInfo {
@@ -177,7 +177,14 @@ namespace irgen {
         return getIndexAfterDirectReturns();
       }
     }
-    unsigned getFirstArgumentIndex() { return getIndexAfterUnion(); }
+    unsigned getLocalContextIndex() {
+      assert(hasLocalContext());
+      return getIndexAfterUnion();
+    }
+    unsigned getIndexAfterLocalContext() {
+      return getIndexAfterUnion() + (hasLocalContext() ? 1 : 0);
+    }
+    unsigned getFirstArgumentIndex() { return getIndexAfterLocalContext(); }
     unsigned getIndexAfterArguments() {
       return getFirstArgumentIndex() + getArgumentCount();
     }
@@ -188,24 +195,16 @@ namespace irgen {
     unsigned getIndexAfterBindings() {
       return getIndexAfterArguments() + (hasBindings() ? 1 : 0);
     }
-    unsigned getLocalContextIndex() {
-      assert(hasLocalContext());
-      return getIndexAfterBindings();
-    }
-    unsigned getIndexAfterLocalContext() {
-      return getIndexAfterBindings() +
-             (hasLocalContext() ? 1 : 0);
-    }
     unsigned getSelfMetadataIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterLocalContext();
+      return getIndexAfterBindings();
     }
     unsigned getSelfWitnessTableIndex() {
       assert(hasTrailingWitnesses());
-      return getIndexAfterLocalContext() + 1;
+      return getIndexAfterBindings() + 1;
     }
     unsigned getIndexAfterTrailingWitnesses() {
-      return getIndexAfterLocalContext() + (hasTrailingWitnesses() ? 2 : 0);
+      return getIndexAfterBindings() + (hasTrailingWitnesses() ? 2 : 0);
     }
 
   public:
@@ -255,8 +254,8 @@ namespace irgen {
     // AsyncContextLayout.
     SILType getParameterType(unsigned index) {
       SILFunctionConventions origConv(substitutedType, IGM.getSILModule());
-      return origConv.getSILArgumentType(
-          index, IGM.getMaximalTypeExpansionContext());
+      return origConv.getSILArgumentType(index,
+                                         IGM.getMaximalTypeExpansionContext());
     }
     unsigned getArgumentCount() { return argumentInfos.size(); }
     bool hasTrailingWitnesses() { return (bool)trailingWitnessInfo; }
@@ -302,12 +301,25 @@ namespace irgen {
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap);
 
-  llvm::Value *getDynamicAsyncContextSize(IRGenFunction &IGF,
-                                          AsyncContextLayout layout,
-                                          CanSILFunctionType functionType,
-                                          llvm::Value *thickContext);
+  /// Given an async function, get the pointer to the function to be called and
+  /// the size of the context to be allocated.
+  ///
+  /// \param values Whether any code should be emitted to retrieve the function
+  ///               pointer and the size, respectively.  If false is passed, no
+  ///               code will be emitted to generate that value and null will
+  ///               be returned for it.
+  ///
+  /// \return {function, size}
+  std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
+      IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
+      FunctionPointer functionPointer, llvm::Value *thickContext,
+      std::pair<bool, bool> values = {true, true},
+      Size initialContextSize = Size(0));
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention);
+
+  Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
+                                      CanSILFunctionType fnType);
 
   /// Does the given function have a self parameter that should be given
   /// the special treatment for self parameters?
@@ -385,22 +397,24 @@ namespace irgen {
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
 
-  Address emitTaskAlloc(IRGenFunction &IGF, llvm::Value *size,
-                        Alignment alignment);
-  void emitTaskDealloc(IRGenFunction &IGF, Address address, llvm::Value *size);
-  /// Allocate task local storage for the specified layout but using the
-  /// provided dynamic size.  Allowing the size to be specified dynamically is
-  /// necessary for applies of thick functions the sizes of whose async contexts
-  /// are dependent on the underlying, already partially applied, called
-  /// function.  The provided sizeLowerBound will be used to track the lifetime
-  /// of the allocation that is known statically.
-  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
-                                                 AsyncContextLayout layout,
-                                                 llvm::Value *sizeValue,
-                                                 Size sizeLowerBound);
-  std::pair<Address, Size> emitAllocAsyncContext(IRGenFunction &IGF,
-                                                 AsyncContextLayout layout);
-  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context, Size size);
+  void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
+
+  /// Emit a class to swift_task_create[_f] or swift_task_create_future[__f]
+  /// with the given flags, parent task, and task function.
+  ///
+  /// When \c futureResultType is non-null, calls the future variant to create
+  /// a future.
+  llvm::Value *emitTaskCreate(
+    IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
+    llvm::Value *futureResultType,
+    llvm::Value *taskFunction, llvm::Value *localContextInfo,
+    SubstitutionMap subs);
+
+  /// Allocate task local storage for the provided dynamic size.
+  Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
+  void emitDeallocAsyncContext(IRGenFunction &IGF, Address context);
+
+  void emitAsyncFunctionEntry(IRGenFunction &IGF, SILFunction *asyncFunc);
 
   /// Yield the given values from the current continuation.
   ///
@@ -415,6 +429,16 @@ namespace irgen {
     Executor = 1,
     Context = 2,
   };
+
+  void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
+                       CanSILFunctionType fnType);
+
+  Address emitAutoDiffCreateLinearMapContext(
+      IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);
+  Address emitAutoDiffProjectTopLevelSubcontext(
+      IRGenFunction &IGF, Address context);
+  Address emitAutoDiffAllocateSubcontext(
+      IRGenFunction &IGF, Address context, llvm::Value *size);
 } // end namespace irgen
 } // end namespace swift
 

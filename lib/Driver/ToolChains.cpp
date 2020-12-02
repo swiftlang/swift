@@ -268,8 +268,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(
@@ -599,6 +597,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-imported-modules";
   case file_types::TY_JSONDependencies:
     return "-scan-dependencies";
+  case file_types::TY_JSONFeatures:
+    return "-emit-supported-features";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -870,6 +870,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
+    case file_types::TY_JSONFeatures:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

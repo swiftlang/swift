@@ -517,11 +517,70 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
 
-  emitStmt(fd->getTypecheckedBody());
+  if (fd->isAsyncHandler() &&
+      // If F.isAsync() we are emitting the asyncHandler body and not the
+      // original asyncHandler.
+      !F.isAsync()) {
+    emitAsyncHandler(fd);
+  } else {
+    emitStmt(fd->getTypecheckedBody());
+  }
 
   emitEpilog(fd);
 
   mergeCleanupBlocks();
+}
+
+/// An asyncHandler function is split into two functions:
+/// 1. The asyncHandler body function: it contains the body of the function, but
+///    is emitted as an async function.
+/// 2. The original function: it just contains
+///      _runAsyncHandler(operation: asyncHandlerBodyFunction)
+void SILGenFunction::emitAsyncHandler(FuncDecl *fd) {
+
+  // 1. step: create the asyncHandler body function
+  //
+  auto origFnTy = F.getLoweredFunctionType();
+  assert(!F.isAsync() && "an asyncHandler function cannot be async");
+  
+  // The body function type is the same as the original type, just with "async".
+  auto bodyFnTy = origFnTy->getWithExtInfo(origFnTy->getExtInfo().withAsync());
+
+  SILDeclRef constant(fd, SILDeclRef::Kind::Func);
+  std::string name = constant.mangle(SILDeclRef::ManglingKind::AsyncHandlerBody);
+  SILLocation loc = F.getLocation();
+  SILGenFunctionBuilder builder(*this);
+
+  SILFunction  *bodyFn = builder.createFunction(
+    SILLinkage::Hidden, name, bodyFnTy, F.getGenericEnvironment(),
+    loc, F.isBare(), F.isTransparent(),
+    F.isSerialized(), IsNotDynamic, ProfileCounter(), IsNotThunk,
+    F.getClassSubclassScope(), F.getInlineStrategy(), F.getEffectsKind());
+  bodyFn->setDebugScope(new (getModule()) SILDebugScope(loc, bodyFn));
+
+  SILGenFunction(SGM, *bodyFn, fd).emitFunction(fd);
+  
+  // 2. step: emit the original asyncHandler function
+  //
+  Scope scope(*this, loc);
+
+  // %bodyFnRef = partial_apply %bodyFn(%originalArg0, %originalArg1, ...)
+  //
+  SmallVector<ManagedValue, 4> managedArgs;
+  for (SILValue arg : F.getArguments()) {
+    ManagedValue argVal = ManagedValue(arg, CleanupHandle::invalid());
+    managedArgs.push_back(argVal.copy(*this, loc));
+  }
+  auto *bodyFnRef = B.createFunctionRef(loc, bodyFn);
+  ManagedValue bodyFnValue =
+    B.createPartialApply(loc, bodyFnRef, F.getForwardingSubstitutionMap(),
+                         managedArgs, ParameterConvention::Direct_Guaranteed);
+  
+  // apply %_runAsyncHandler(%bodyFnValue)
+  //
+  FuncDecl *asyncHandlerDecl = SGM.getRunAsyncHandler();
+  emitApplyOfLibraryIntrinsic(loc, asyncHandlerDecl, SubstitutionMap(),
+    { bodyFnValue }, SGFContext());
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
@@ -759,8 +818,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto *exitBlock = createBasicBlock();
     B.setInsertionPoint(exitBlock);
-    SILValue exitCode = exitBlock->createPhiArgument(builtinInt32Type,
-                                                     ValueOwnershipKind::None);
+    SILValue exitCode =
+        exitBlock->createPhiArgument(builtinInt32Type, OwnershipKind::None);
     auto returnType = F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
     if (exitCode->getType() != returnType)
       exitCode = B.createStruct(moduleLoc, returnType, exitCode);
@@ -770,7 +829,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       auto *successBlock = createBasicBlock();
       B.setInsertionPoint(successBlock);
       successBlock->createPhiArgument(SGM.Types.getEmptyTupleType(),
-                                      ValueOwnershipKind::None);
+                                      OwnershipKind::None);
       SILValue zeroReturnValue =
           B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
       B.createBranch(moduleLoc, exitBlock, {zeroReturnValue});
@@ -778,8 +837,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       auto *failureBlock = createBasicBlock();
       B.setInsertionPoint(failureBlock);
       SILValue error = failureBlock->createPhiArgument(
-          SILType::getExceptionType(getASTContext()),
-          ValueOwnershipKind::Owned);
+          SILType::getExceptionType(getASTContext()), OwnershipKind::Owned);
       // Log the error.
       B.createBuiltin(moduleLoc, getASTContext().getIdentifier("errorInMain"),
                       SGM.Types.getEmptyTupleType(), {}, {error});
@@ -860,8 +918,9 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
       auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
       auto param = params->get(0);
       auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
-      opaqueValue.emplace(*this, placeholder->getOpaqueValuePlaceholder(),
-                          maybeEmitValueOfLocalVarDecl(param));
+      opaqueValue.emplace(
+          *this, placeholder->getOpaqueValuePlaceholder(),
+          maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
       assert(value == wrappedInfo.initializeFromOriginal);
     }

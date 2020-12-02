@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/TerminatorUtils.h"
 
 using namespace swift;
 
@@ -97,6 +98,12 @@ static SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned edgeIdx) {
   return S->getCase(edgeIdx).second;
 }
 
+static SILBasicBlock *getNthEdgeBlock(SwitchEnumTermInst S, unsigned edgeIdx) {
+  if (S.getNumCases() == edgeIdx)
+    return S.getDefaultBB();
+  return S.getCase(edgeIdx).second;
+}
+
 void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
                         llvm::SmallVectorImpl<SILValue> &args) {
   switch (T->getKind()) {
@@ -125,9 +132,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
       // GetAsyncContinuation, or no argument if the operand is
       // GetAsyncContinuationAddr
       if (auto contOperand = dyn_cast<GetAsyncContinuationInst>(AACI->getOperand())) {
-        args.push_back(
-         newEdgeBB->createPhiArgument(contOperand->getLoweredResumeType(),
-                                      ValueOwnershipKind::Owned));
+        args.push_back(newEdgeBB->createPhiArgument(
+            contOperand->getLoweredResumeType(), OwnershipKind::Owned));
       }
       return;
         
@@ -137,8 +143,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
       auto errorTy = C.getErrorDecl()->getDeclaredType();
       auto errorSILTy = SILType::getPrimitiveObjectType(errorTy->getCanonicalType());
       // error BB. this takes the error value argument
-      args.push_back(newEdgeBB->createPhiArgument(errorSILTy,
-                                                  ValueOwnershipKind::Owned));
+      args.push_back(
+          newEdgeBB->createPhiArgument(errorSILTy, OwnershipKind::Owned));
       return;
     }
         
@@ -159,13 +165,13 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
   // destination block to figure this out.
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchEnumAddrInst: {
-    auto SEI = cast<SwitchEnumInstBase>(T);
-    auto *succBB = getNthEdgeBlock(SEI, edgeIdx);
+    SwitchEnumTermInst branch(T);
+    auto *succBB = getNthEdgeBlock(branch, edgeIdx);
     assert(succBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
     return;
   }
 
@@ -177,7 +183,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
     return;
   }
 
@@ -188,7 +194,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
     return;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -197,7 +203,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
     return;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
@@ -206,7 +212,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
     return;
   }
 
@@ -216,7 +222,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
+        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
     return;
   }
 

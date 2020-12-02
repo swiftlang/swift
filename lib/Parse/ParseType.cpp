@@ -252,8 +252,7 @@ ParserResult<TypeRepr> Parser::parseType() {
 }
 
 ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
-                                               const TypeAttributes &attrs,
-                                               Optional<Scope> &GenericsScope) {
+                                               const TypeAttributes &attrs) {
   auto LBraceLoc = consumeToken(tok::l_brace);
   
   SmallVector<SILBoxTypeRepr::Field, 4> Fields;
@@ -275,10 +274,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
         return makeParserError();
       Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
       
-      if (consumeIf(tok::comma))
-        continue;
-      
-      break;
+      if (!consumeIf(tok::comma))
+        break;
     }
   }
   
@@ -288,11 +285,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   }
   
   auto RBraceLoc = consumeToken(tok::r_brace);
-  
-  // The generic arguments are taken from the enclosing scope. Pop the
-  // box layout's scope now.
-  GenericsScope.reset();
-  
+
   SourceLoc LAngleLoc, RAngleLoc;
   SmallVector<TypeRepr*, 4> Args;
   if (startsWithLess(Tok)) {
@@ -302,9 +295,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
       if (!argTy.getPtrOrNull())
         return makeParserError();
       Args.push_back(argTy.get());
-      if (consumeIf(tok::comma))
-        continue;
-      break;
+      if (!consumeIf(tok::comma))
+        break;
     }
     if (!startsWithGreater(Tok)) {
       diagnose(Tok, diag::sil_box_expected_r_angle);
@@ -342,28 +334,19 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   TypeAttributes attrs;
   parseTypeAttributeList(specifier, specifierLoc, attrs);
 
-  Optional<Scope> GenericsScope;
-  Optional<Scope> patternGenericsScope;
-
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
   SourceLoc substitutedLoc;
   GenericParamList *patternGenerics = nullptr;
   if (isInSILMode()) {
-    // If this is part of a sil function decl, generic parameters are visible in
-    // the function body; otherwise, they are visible when parsing the type.
-    if (!IsSILFuncDecl)
-      GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
     
     if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
       consumeToken(tok::at_sign);
       substitutedLoc = consumeToken(tok::identifier);
-      patternGenericsScope.emplace(this, ScopeKind::Generics);
       patternGenerics = maybeParseGenericParams().getPtrOrNull();
       if (!patternGenerics) {
         diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
-        patternGenericsScope.reset();
       }
     }
   }
@@ -372,9 +355,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   if (isInSILMode() && Tok.is(tok::l_brace)) {
     if (patternGenerics) {
       diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
-      patternGenericsScope.reset();
     }
-    return parseSILBoxType(generics, attrs, GenericsScope);
+    return parseSILBoxType(generics, attrs);
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
@@ -506,9 +488,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
           if (!argTy.getPtrOrNull())
             return false;
           SubsTypesVec.push_back(argTy.get());
-          if (consumeIf(tok::comma))
-            continue;
-          break;
+          if (!consumeIf(tok::comma))
+            break;
         }
         if (!startsWithGreater(Tok)) {
           diagnose(Tok, diag::sil_function_subst_expected_r_angle);
@@ -523,10 +504,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       // Parse pattern substitutions.  These must exist if we had pattern
       // generics above.
       if (patternGenerics) {
-        // These substitutions are outside of the scope of the
-        // pattern generics.
-        patternGenericsScope.reset();
-
         auto result = parseSubstitutions(patternSubsTypes);
         if (!result || patternSubsTypes.empty()) {
           diagnose(Tok, diag::sil_function_subst_expected_subs);
@@ -537,10 +514,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
 
       if (generics) {
-        // These substitutions are outside of the scope of the
-        // invocation generics.
-        GenericsScope.reset();
-
         if (auto result = parseSubstitutions(invocationSubsTypes))
           if (!*result) return makeParserError();
       }
@@ -559,8 +532,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
-    GenericsScope.reset();
-    patternGenericsScope.reset();
 
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {
@@ -597,27 +568,31 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
 
   auto result = parseType(MessageID);
 
-  if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::r_square)) {
-    auto diag = diagnose(Tok, diag::extra_rbracket);
-    diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    consumeToken();
-    return makeParserErrorResult(new (Context)
-                                     ErrorTypeRepr(getTypeErrorLoc()));
-  } else if (!result.isParseErrorOrHasCompletion() && Tok.is(tok::colon)) {
-    auto colonTok = consumeToken();
-    auto secondType = parseType(diag::expected_dictionary_value_type);
-
-    auto diag = diagnose(colonTok, diag::extra_colon);
-    diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    if (!secondType.isParseErrorOrHasCompletion()) {
-      if (Tok.is(tok::r_square)) {
-        consumeToken();
-      } else {
-        diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
-      }
+  if (!result.isParseErrorOrHasCompletion()) {
+    if (Tok.is(tok::r_square)) {
+      auto diag = diagnose(Tok, diag::extra_rbracket);
+      diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
+      consumeToken();
+      return makeParserErrorResult(new (Context)
+                                       ErrorTypeRepr(getTypeErrorLoc()));
     }
-    return makeParserErrorResult(new (Context)
-                                     ErrorTypeRepr(getTypeErrorLoc()));
+
+    if (Tok.is(tok::colon)) {
+      auto colonTok = consumeToken();
+      auto secondType = parseType(diag::expected_dictionary_value_type);
+
+      auto diag = diagnose(colonTok, diag::extra_colon);
+      diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
+      if (!secondType.isParseErrorOrHasCompletion()) {
+        if (Tok.is(tok::r_square)) {
+          consumeToken();
+        } else {
+          diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
+        }
+      }
+      return makeParserErrorResult(new (Context)
+                                       ErrorTypeRepr(getTypeErrorLoc()));
+    }
   }
   return result;
 }
@@ -747,39 +722,31 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
         Status.setHasCodeCompletionAndIsError();
         break;
       }
-      if (!peekToken().isContextualKeyword("Type")
-          && !peekToken().isContextualKeyword("Protocol")) {
-        // If parsing a qualified declaration name, break before parsing the
-        // period before the final declaration name component.
-        if (isParsingQualifiedDeclBaseType) {
-          // If qualified name base type cannot be parsed from the current
-          // point (i.e. the next type identifier is not followed by a '.'),
-          // then the next identifier is the final declaration name component.
-          BacktrackingScope backtrack(*this);
-          consumeStartingCharacterOfCurrentToken(tok::period);
-          if (!canParseBaseTypeForQualifiedDeclName())
-            break;
-        }
-        // Consume the period.
-        consumeToken();
-        continue;
+      if (peekToken().isContextualKeyword("Type") ||
+          peekToken().isContextualKeyword("Protocol"))
+        break;
+      // If parsing a qualified declaration name, break before parsing the
+      // period before the final declaration name component.
+      if (isParsingQualifiedDeclBaseType) {
+        // If qualified name base type cannot be parsed from the current
+        // point (i.e. the next type identifier is not followed by a '.'),
+        // then the next identifier is the final declaration name component.
+        BacktrackingScope backtrack(*this);
+        consumeStartingCharacterOfCurrentToken(tok::period);
+        if (!canParseBaseTypeForQualifiedDeclName())
+          break;
       }
-    } else if (Tok.is(tok::code_complete)) {
-      if (!Tok.isAtStartOfLine())
-        Status.setHasCodeCompletionAndIsError();
-      break;
+      // Consume the period.
+      consumeToken();
+      continue;
     }
+    if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine())
+      Status.setHasCodeCompletionAndIsError();
     break;
   }
 
   IdentTypeRepr *ITR = nullptr;
   if (!ComponentsR.empty()) {
-    // Lookup element #0 through our current scope chains in case it is some
-    // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
-      if (auto *TD = dyn_cast<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(TD, nullptr);
-
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
 
@@ -1322,13 +1289,14 @@ bool Parser::isOptionalToken(const Token &T) const {
   // A postfix '?' by itself is obviously optional.
   if (T.is(tok::question_postfix))
     return true;
-  
   // A postfix or bound infix operator token that begins with '?' can be
-  // optional too. We'll munch off the '?', so long as it is left-bound with
-  // the type (i.e., parsed as a postfix or unspaced binary operator).
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) &&
-      T.getText().startswith("?"))
-    return true;
+  // optional too.
+  if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
+    // We'll munch off the '?', so long as it is left-bound with
+    // the type (i.e., parsed as a postfix or unspaced binary operator).
+    return T.getText().startswith("?");
+  }
+
   return false;
 }
 
@@ -1338,12 +1306,13 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
   if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
     return true;
   // A postfix or bound infix operator token that begins with '!' can be
-  // implicitly unwrapped optional too. We'll munch off the '!', so long as it
-  // is left-bound with the type (i.e., parsed as a postfix or unspaced binary
-  // operator).
-  if ((T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) &&
-      T.getText().startswith("!"))
-    return true;
+  // implicitly unwrapped optional too.
+  if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
+    // We'll munch off the '!', so long as it is left-bound with
+    // the type (i.e., parsed as a postfix or unspaced binary operator).
+    return T.getText().startswith("!");
+  }
+
   return false;
 }
 
@@ -1548,9 +1517,7 @@ bool Parser::canParseType() {
   }
   
   if (consumeIf(tok::arrow)) {
-    if (!canParseType())
-      return false;
-    return true;
+    return canParseType();
   }
 
   return true;
@@ -1580,9 +1547,8 @@ bool Parser::canParseSimpleTypeIdentifier() {
   consumeToken();
 
   // Parse an optional generic argument list.
-  if (startsWithLess(Tok))
-    if (!canParseGenericArguments())
-      return false;
+  if (startsWithLess(Tok) && !canParseGenericArguments())
+    return false;
 
   return true;
 }

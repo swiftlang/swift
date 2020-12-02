@@ -22,11 +22,11 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc)
-    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), branchDest() {}
+    : SGF(SGF), scope(SGF, loc), loc(loc), branchDest() {}
 
 SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
                                        SwitchCaseBranchDest branchDest)
-    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), branchDest(branchDest) {}
+    : SGF(SGF), scope(SGF, loc), loc(loc), branchDest(branchDest) {}
 
 void SwitchCaseFullExpr::exitAndBranch(SILLocation loc,
                                        ArrayRef<SILValue> branchArgs) {

@@ -132,9 +132,9 @@ struct ArgumentDescriptor {
     if (IsEntirelyDead)
       return None;
     if (SubTy.isTrivial(*Arg->getFunction()))
-      return Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
+      return Optional<ValueOwnershipKind>(OwnershipKind::None);
     if (OwnedToGuaranteed)
-      return Optional<ValueOwnershipKind>(ValueOwnershipKind::Guaranteed);
+      return Optional<ValueOwnershipKind>(OwnershipKind::Guaranteed);
     return Arg->getOwnershipKind();
   }
 };

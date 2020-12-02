@@ -24,6 +24,7 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -871,9 +872,7 @@ public:
 
   /// Return a hash of all tokens in the body for dependency analysis, if
   /// available.
-  Optional<std::string> getBodyFingerprint() const;
-
-  bool areTokensHashedForThisBodyInsteadOfInterfaceHash() const;
+  Optional<Fingerprint> getBodyFingerprint() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

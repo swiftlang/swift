@@ -9,7 +9,7 @@
 
 enum Err : Error { case or }
 
-// CHECK: Fatal error: Error raised at top level: main.Err.or:
+// CHECK: Fatal error: Error raised at top level: main.Err.or
 @main
 struct S {
     static func main() throws {

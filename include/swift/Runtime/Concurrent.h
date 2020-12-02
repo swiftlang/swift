@@ -508,8 +508,8 @@ public:
   }
   
   void push_back(const ElemTy &elem) {
-    ScopedLock guard(WriterLock);
-    
+    Mutex::ScopedLock guard(WriterLock);
+
     auto *storage = Elements.load(std::memory_order_relaxed);
     auto count = storage ? storage->Count.load(std::memory_order_relaxed) : 0;
     if (count >= Capacity) {
@@ -594,9 +594,6 @@ struct ConcurrentReadableHashMap {
                 "Elements must not have destructors (they won't be called).");
 
 private:
-  // A scoped lock type to use on MutexTy.
-  using ScopedLockTy = ScopedLockT<MutexTy, false>;
-
   /// The reciprocal of the load factor at which we expand the table. A value of
   /// 4 means that we resize at 1/4 = 75% load factor.
   static const size_t ResizeProportion = 4;
@@ -624,6 +621,69 @@ private:
   /// is stored inline. We work around this contradiction by considering the
   /// first index to always be occupied with a value that never matches any key.
   struct IndexStorage {
+    using RawType = uintptr_t;
+
+    RawType Value;
+
+    static constexpr uintptr_t log2(uintptr_t x) {
+      return x <= 1 ? 0 : log2(x >> 1) + 1;
+    }
+
+    static constexpr uintptr_t InlineIndexBits = 4;
+    static constexpr uintptr_t InlineIndexMask = 0xF;
+    static constexpr uintptr_t InlineCapacity =
+        sizeof(RawType) * CHAR_BIT / InlineIndexBits;
+    static constexpr uintptr_t InlineCapacityLog2 = log2(InlineCapacity);
+
+    // Indices can be stored in different ways, depending on how big they need
+    // to be. The index mode is stored in the bottom two bits of Value. The
+    // meaning of the rest of Value depends on the mode.
+    enum class IndexMode {
+      // Value is treated as an array of four-bit integers, storing the indices.
+      // The first element overlaps with the mode, and is never used.
+      Inline,
+
+      // The rest of Value holds a pointer to storage. The first byte of this
+      // storage holds the log2 of the storage capacity. The storage is treated
+      // as an array of 8, 16, or 32-bit integers. The first element overlaps
+      // with the capacity, and is never used.
+      Array8,
+      Array16,
+      Array32,
+    };
+
+    IndexStorage() : Value(0) {}
+    IndexStorage(RawType value) : Value(value) {}
+    IndexStorage(void *ptr, unsigned indexSize, uint8_t capacityLog2) {
+      assert(capacityLog2 > InlineCapacityLog2);
+      IndexMode mode;
+      switch (indexSize) {
+      case sizeof(uint8_t):
+        mode = IndexMode::Array8;
+        break;
+      case sizeof(uint16_t):
+        mode = IndexMode::Array16;
+        break;
+      case sizeof(uint32_t):
+        mode = IndexMode::Array32;
+        break;
+      default:
+        swift_unreachable("unknown index size");
+      }
+      Value = reinterpret_cast<uintptr_t>(ptr) | static_cast<uintptr_t>(mode);
+      *reinterpret_cast<uint8_t *>(ptr) = capacityLog2;
+    }
+
+    bool valueIsPointer() { return Value & 3; }
+
+    void *pointer() {
+      if (valueIsPointer())
+        return (void *)(Value & (RawType)~3);
+      return nullptr;
+    }
+
+    IndexMode indexMode() { return IndexMode(Value & 3); }
+
     // Index size is variable based on capacity, either 8, 16, or 32 bits.
     //
     // This is somewhat conservative. We could have, for example, a capacity of
@@ -631,18 +691,6 @@ private:
     // indices. However, taking advantage of this would require reallocating
     // the index storage when the element count crossed a threshold, which is
     // more complex, and the advantages are minimal. This keeps it simple.
-    //
-    // The first byte of the storage is the log 2 of the capacity. The remaining
-    // storage is then an array of 8, 16, or 32 bit integers, depending on the
-    // capacity number. This union allows us to access the capacity, and then
-    // access the rest of the storage by taking the address of one of the
-    // IndexZero members and indexing into it (always avoiding index 0).
-    union {
-      uint8_t CapacityLog2;
-      std::atomic<uint8_t> IndexZero8;
-      std::atomic<uint16_t> IndexZero16;
-      std::atomic<uint32_t> IndexZero32;
-    };
 
     // Get the size, in bytes, of the index needed for the given capacity.
     static unsigned indexSize(uint8_t capacityLog2) {
@@ -653,46 +701,66 @@ private:
       return sizeof(uint32_t);
     }
 
-    unsigned indexSize() { return indexSize(CapacityLog2); }
+    uint8_t getCapacityLog2() {
+      if (auto *ptr = pointer())
+        return *reinterpret_cast<uint8_t *>(ptr);
+      return InlineCapacityLog2;
+    }
 
-    static IndexStorage *allocate(size_t capacityLog2) {
+    static IndexStorage allocate(size_t capacityLog2) {
       assert(capacityLog2 > 0);
       size_t capacity = 1UL << capacityLog2;
-      auto *ptr = reinterpret_cast<IndexStorage *>(
-          calloc(capacity, indexSize(capacityLog2)));
+      unsigned size = indexSize(capacityLog2);
+      auto *ptr = calloc(capacity, size);
       if (!ptr)
         swift::crash("Could not allocate memory.");
-      ptr->CapacityLog2 = capacityLog2;
-      return ptr;
+      return IndexStorage(ptr, size, capacityLog2);
     }
 
     unsigned loadIndexAt(size_t i, std::memory_order order) {
       assert(i > 0 && "index zero is off-limits, used to store capacity");
+      assert(i < (1 << getCapacityLog2()) &&
+             "index is off the end of the indices");
 
-      switch (indexSize()) {
-      case sizeof(uint8_t):
-        return (&IndexZero8)[i].load(order);
-      case sizeof(uint16_t):
-        return (&IndexZero16)[i].load(order);
-      case sizeof(uint32_t):
-        return (&IndexZero32)[i].load(order);
-      default:
-        swift_unreachable("unknown index size");
+      switch (indexMode()) {
+      case IndexMode::Inline:
+        return (Value >> (i * InlineIndexBits)) & InlineIndexMask;
+      case IndexMode::Array8:
+        return ((std::atomic<uint8_t> *)pointer())[i].load(order);
+      case IndexMode::Array16:
+        return ((std::atomic<uint16_t> *)pointer())[i].load(order);
+      case IndexMode::Array32:
+        return ((std::atomic<uint32_t> *)pointer())[i].load(order);
       }
     }
 
-    void storeIndexAt(unsigned value, size_t i, std::memory_order order) {
+    void storeIndexAt(std::atomic<RawType> *inlineStorage, unsigned value,
+                      size_t i, std::memory_order order) {
       assert(i > 0 && "index zero is off-limits, used to store capacity");
+      assert(i < (1 << getCapacityLog2()) &&
+             "index is off the end of the indices");
 
-      switch (indexSize()) {
-      case sizeof(uint8_t):
-        return (&IndexZero8)[i].store(value, order);
-      case sizeof(uint16_t):
-        return (&IndexZero16)[i].store(value, order);
-      case sizeof(uint32_t):
-        return (&IndexZero32)[i].store(value, order);
-      default:
-        swift_unreachable("unknown index size");
+      switch (indexMode()) {
+      case IndexMode::Inline: {
+        assert(value == (value & InlineIndexMask) && "value is too big to fit");
+        auto shift = i * InlineIndexBits;
+        assert((Value & (InlineIndexMask << shift)) == 0 &&
+               "can't overwrite an existing index");
+        assert(Value == inlineStorage->load(std::memory_order_relaxed) &&
+               "writing with a stale IndexStorage");
+        auto newStorage = Value | ((RawType)value << shift);
+        inlineStorage->store(newStorage, order);
+        break;
+      }
+      case IndexMode::Array8:
+        ((std::atomic<uint8_t> *)pointer())[i].store(value, order);
+        break;
+      case IndexMode::Array16:
+        ((std::atomic<uint16_t> *)pointer())[i].store(value, order);
+        break;
+      case IndexMode::Array32:
+        ((std::atomic<uint32_t> *)pointer())[i].store(value, order);
+        break;
       }
     }
   };
@@ -753,7 +821,11 @@ private:
   std::atomic<ElementStorage *> Elements{nullptr};
 
   /// The array of indices.
-  std::atomic<IndexStorage *> Indices{nullptr};
+  ///
+  /// This has to be stored as a IndexStorage::RawType instead of a IndexStorage
+  /// because some of our targets don't support interesting structs as atomic
+  /// types. See also MetadataCache::TrackingInfo which uses the same technique.
+  std::atomic<typename IndexStorage::RawType> Indices{0};
 
   /// The writer lock, which must be taken before any mutation of the table.
   MutexTy WriterLock;
@@ -798,18 +870,17 @@ private:
   /// returning the new array with all existing indices copied into it. This
   /// operation performs a rehash, so that the indices are in the correct
   /// location in the new array.
-  IndexStorage *resize(IndexStorage *indices, uint8_t indicesCapacityLog2,
-                       ElemTy *elements) {
-    // Double the size. Start with 16 (fits into 16-byte malloc
-    // bucket), which is 2^4.
-    size_t newCapacityLog2 = indices ? indicesCapacityLog2 + 1 : 4;
+  IndexStorage resize(IndexStorage indices, uint8_t indicesCapacityLog2,
+                      ElemTy *elements) {
+    // Double the size.
+    size_t newCapacityLog2 = indicesCapacityLog2 + 1;
     size_t newMask = (1UL << newCapacityLog2) - 1;
 
-    IndexStorage *newIndices = IndexStorage::allocate(newCapacityLog2);
+    IndexStorage newIndices = IndexStorage::allocate(newCapacityLog2);
 
     size_t indicesCount = 1UL << indicesCapacityLog2;
     for (size_t i = 1; i < indicesCount; i++) {
-      unsigned index = indices->loadIndexAt(i, std::memory_order_relaxed);
+      unsigned index = indices.loadIndexAt(i, std::memory_order_relaxed);
       if (index == 0)
         continue;
 
@@ -819,15 +890,16 @@ private:
       size_t newI = hash & newMask;
       // Index 0 is unusable (occupied by the capacity), so always skip it.
       while (newI == 0 ||
-             newIndices->loadIndexAt(newI, std::memory_order_relaxed) != 0) {
+             newIndices.loadIndexAt(newI, std::memory_order_relaxed) != 0) {
         newI = (newI + 1) & newMask;
       }
-      newIndices->storeIndexAt(index, newI, std::memory_order_relaxed);
+      newIndices.storeIndexAt(nullptr, index, newI, std::memory_order_relaxed);
     }
 
-    Indices.store(newIndices, std::memory_order_release);
+    Indices.store(newIndices.Value, std::memory_order_release);
 
-    FreeListNode::add(&FreeList, indices);
+    if (auto *ptr = indices.pointer())
+      FreeListNode::add(&FreeList, ptr);
 
     return newIndices;
   }
@@ -838,12 +910,10 @@ private:
   /// of the new element would be stored.
   template <class KeyTy>
   static std::pair<ElemTy *, unsigned>
-  find(const KeyTy &key, IndexStorage *indices, size_t elementCount,
+  find(const KeyTy &key, IndexStorage indices, size_t elementCount,
        ElemTy *elements) {
-    if (!indices)
-      return {nullptr, 0};
     auto hash = hash_value(key);
-    auto indicesMask = (1UL << indices->CapacityLog2) - 1;
+    auto indicesMask = (1UL << indices.getCapacityLog2()) - 1;
 
     auto i = hash & indicesMask;
     while (true) {
@@ -851,7 +921,7 @@ private:
       if (i == 0)
         i++;
 
-      auto index = indices->loadIndexAt(i, std::memory_order_acquire);
+      auto index = indices.loadIndexAt(i, std::memory_order_acquire);
       // Element indices are 1-based, 0 means no entry.
       if (index == 0)
         return {nullptr, i};
@@ -884,12 +954,12 @@ public:
   /// Readers take a snapshot of the hash map, then work with the snapshot.
   class Snapshot {
     ConcurrentReadableHashMap *Map;
-    IndexStorage *Indices;
+    IndexStorage Indices;
     ElemTy *Elements;
     size_t ElementCount;
 
   public:
-    Snapshot(ConcurrentReadableHashMap *map, IndexStorage *indices,
+    Snapshot(ConcurrentReadableHashMap *map, IndexStorage indices,
              ElemTy *elements, size_t elementCount)
         : Map(map), Indices(indices), Elements(elements),
           ElementCount(elementCount) {}
@@ -905,7 +975,7 @@ public:
     /// Search for an element matching the given key. Returns a pointer to the
     /// found element, or nullptr if no matching element exists.
     template <class KeyTy> const ElemTy *find(const KeyTy &key) {
-      if (!Indices || !ElementCount || !Elements)
+      if (!Indices.Value || !ElementCount || !Elements)
         return nullptr;
       return ConcurrentReadableHashMap::find(key, Indices, ElementCount,
                                              Elements)
@@ -937,7 +1007,7 @@ public:
     // pointer can just mean a concurrent insert that triggered a resize of the
     // elements array. This is harmless aside from a small performance hit, and
     // should not happen often.
-    IndexStorage *indices;
+    IndexStorage indices;
     size_t elementCount;
     ElementStorage *elements;
     ElementStorage *elements2;
@@ -970,13 +1040,10 @@ public:
   /// The return value is ignored when `created` is `false`.
   template <class KeyTy, typename Call>
   void getOrInsert(KeyTy key, const Call &call) {
-    ScopedLockTy guard(WriterLock);
+    typename MutexTy::ScopedLock guard(WriterLock);
 
-    auto *indices = Indices.load(std::memory_order_relaxed);
-    if (!indices)
-      indices = resize(indices, 0, nullptr);
-
-    auto indicesCapacityLog2 = indices->CapacityLog2;
+    auto indices = IndexStorage{Indices.load(std::memory_order_relaxed)};
+    auto indicesCapacityLog2 = indices.getCapacityLog2();
     auto elementCount = ElementCount.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
     auto *elementsPtr = elements ? elements->data() : nullptr;
@@ -1012,8 +1079,8 @@ public:
       assert(hash_value(key) == hash_value(*element) &&
              "Element must have the same hash code as its key.");
       ElementCount.store(elementCount + 1, std::memory_order_release);
-      indices->storeIndexAt(elementCount + 1, found.second,
-                            std::memory_order_release);
+      indices.storeIndexAt(&Indices, elementCount + 1, found.second,
+                           std::memory_order_release);
     }
 
     deallocateFreeListIfSafe();
@@ -1022,18 +1089,19 @@ public:
   /// Clear the hash table, freeing (when safe) all memory currently used for
   /// indices and elements.
   void clear() {
-    ScopedLockTy guard(WriterLock);
+    typename MutexTy::ScopedLock guard(WriterLock);
 
-    auto *indices = Indices.load(std::memory_order_relaxed);
+    IndexStorage indices = Indices.load(std::memory_order_relaxed);
     auto *elements = Elements.load(std::memory_order_relaxed);
 
     // Order doesn't matter here, snapshots will gracefully handle any field
     // being NULL/0 while the others are not.
-    Indices.store(nullptr, std::memory_order_relaxed);
+    Indices.store(0, std::memory_order_relaxed);
     ElementCount.store(0, std::memory_order_relaxed);
     Elements.store(nullptr, std::memory_order_relaxed);
 
-    FreeListNode::add(&FreeList, indices);
+    if (auto *ptr = indices.pointer())
+      FreeListNode::add(&FreeList, ptr);
     FreeListNode::add(&FreeList, elements);
 
     deallocateFreeListIfSafe();

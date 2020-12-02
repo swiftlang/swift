@@ -486,6 +486,13 @@ def create_argument_parser():
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
+    option('--dsymutil-jobs', store_int,
+           default=defaults.DSYMUTIL_JOBS,
+           metavar='COUNT',
+           help='the maximum number of parallel dsymutil jobs to use when '
+                'extracting symbols. Tweak with caution, since dsymutil'
+                'is memory intensive.')
+
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
 
@@ -1087,10 +1094,10 @@ def create_argument_parser():
                     android.adb.commands.DEVICE_TEMP_DIR))
 
     option('--android-arch', store,
-           choices=['armv7', 'aarch64'],
+           choices=['armv7', 'aarch64', 'x86_64'],
            default='armv7',
-           help='The Android target architecture when building for Android. '
-                'Currently only armv7 and aarch64 are supported. '
+           help='The target architecture when building for Android. '
+                'Currently, only armv7, aarch64, and x86_64 are supported. '
                 '%(default)s is the default.')
 
     # -------------------------------------------------------------------------

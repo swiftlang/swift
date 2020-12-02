@@ -516,7 +516,7 @@ extension Struct where T: Differentiable, T == T.TangentVector {
     fatalError()
   }
 
-  // Test instance transpose for static original intializer.
+  // Test instance transpose for static original initializer.
   // TODO(TF-1015): Add improved instance/static member mismatch error.
   // expected-error @+1 {{referenced declaration 'init' could not be resolved}}
   @transpose(of: init, wrt: 0)

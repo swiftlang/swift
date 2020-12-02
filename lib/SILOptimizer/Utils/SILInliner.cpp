@@ -467,7 +467,7 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 
     // Create an argument on the return-to BB representing the returned value.
     auto *retArg =
-        ReturnToBB->createPhiArgument(AI->getType(), ValueOwnershipKind::Owned);
+        ReturnToBB->createPhiArgument(AI->getType(), OwnershipKind::Owned);
     // Replace all uses of the ApplyInst with the new argument.
     AI->replaceAllUsesWith(retArg);
     break;
@@ -598,8 +598,8 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  if (!AI.getFunction()->hasOwnership()
-      || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
+  if (!AI.getFunction()->hasOwnership() ||
+      callArg.getOwnershipKind() != OwnershipKind::Owned) {
     return SILValue();
   }
 

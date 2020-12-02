@@ -29,6 +29,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -312,7 +313,8 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
                        }) == userBlock->end()) {
         continue;
       }
-    } else if (isReborrowInstruction(consumingUse->getUser())) {
+    } else if (auto borrowingOperand = BorrowingOperand::get(consumingUse)) {
+      assert(borrowingOperand->isReborrow());
       continue;
     }
 
@@ -549,8 +551,17 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
     Optional<function_ref<void(Operand *)>>
         nonConsumingUseOutsideLifetimeCallback) {
-  assert((!consumingUses.empty() || !deadEndBlocks.empty()) &&
-         "Must have at least one consuming user?!");
+  // FIXME: rdar://71240363. This assert does not make sense because
+  // consumingUses in some cases only contains the destroying uses. Owned values
+  // may not be destroyed because they may be converted to
+  // ValueOwnershipKind::None on all paths reaching a return. Instead, this
+  // utility needs to find liveness first considering all uses (or at least all
+  // uses that may be on a lifetime boundary). We probably then won't need this
+  // assert, but I'm leaving the FIXME as a placeholder for that work.
+  //
+  // assert((!consumingUses.empty()
+  //        || deadEndBlocks.isDeadEnd(value->getParentBlock())) &&
+  //       "Must have at least one consuming user?!");
 
   State state(value, visitedBlocks, errorBuilder, leakingBlockCallback,
               nonConsumingUseOutsideLifetimeCallback, consumingUses,

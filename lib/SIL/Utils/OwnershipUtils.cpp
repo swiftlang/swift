@@ -22,11 +22,11 @@ using namespace swift;
 
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
-         v.getOwnershipKind() == ValueOwnershipKind::None;
+         v.getOwnershipKind() == OwnershipKind::None;
 }
 
 // These operations forward both owned and guaranteed ownership.
-bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
+static bool isOwnershipForwardingValueKind(SILNodeKind kind) {
   switch (kind) {
   case SILNodeKind::TupleInst:
   case SILNodeKind::StructInst:
@@ -42,7 +42,6 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::BridgeObjectToRefInst:
   case SILNodeKind::UnconditionalCheckedCastInst:
   case SILNodeKind::UncheckedEnumDataInst:
-  case SILNodeKind::MarkUninitializedInst:
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
@@ -58,7 +57,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
 
 // These operations forward guaranteed ownership, but don't necessarily forward
 // owned values.
-bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
+static bool isGuaranteedForwardingValueKind(SILNodeKind kind) {
   switch (kind) {
   case SILNodeKind::TupleExtractInst:
   case SILNodeKind::StructExtractInst:
@@ -72,66 +71,82 @@ bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
   }
 }
 
-bool swift::isOwnedForwardingValueKind(SILNodeKind kind) {
+static bool isOwnedForwardingValueKind(SILNodeKind kind) {
   switch (kind) {
-  case SILNodeKind::BranchInst:
+  case SILNodeKind::MarkUninitializedInst:
     return true;
   default:
     return isOwnershipForwardingValueKind(kind);
   }
 }
 
-bool swift::isOwnedForwardingInstruction(SILInstruction *inst) {
-  auto kind = inst->getKind();
-  switch (kind) {
-  case SILInstructionKind::BranchInst:
-    return true;
-  default:
-    return isOwnershipForwardingValueKind(SILNodeKind(kind));
+bool swift::isOwnedForwardingUse(Operand *op) {
+  auto *user = op->getUser();
+  auto kind = user->getKind();
+  bool result = isOwnershipForwardingValueKind(SILNodeKind(kind));
+  if (result) {
+    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(user));
+    assert(isa<OwnershipForwardingInst>(user));
   }
+  return result;
 }
 
 bool swift::isOwnedForwardingValue(SILValue value) {
-  switch (value->getKind()) {
-  // Phi arguments always forward ownership.
-  case ValueKind::SILPhiArgument:
-    return true;
-  default:
-    return isOwnedForwardingValueKind(
-        value->getKindOfRepresentativeSILNodeInObject());
+  // If we have a SILArgument and we are the successor block of a transforming
+  // terminator, we are fine.
+  if (auto *arg = dyn_cast<SILPhiArgument>(value))
+    if (auto *predTerm = arg->getSingleTerminator())
+      if (predTerm->isTransformationTerminator()) {
+        assert(isa<OwnershipForwardingInst>(predTerm));
+        return true;
+      }
+  auto *node = value->getRepresentativeSILNodeInObject();
+  bool result = isOwnedForwardingValueKind(node->getKind());
+  if (result) {
+    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(node));
+    assert(isa<OwnershipForwardingInst>(node));
   }
+  return result;
 }
 
 bool swift::isGuaranteedForwardingValue(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
-  if (auto *arg = dyn_cast<SILArgument>(value)) {
-    if (auto *ti = arg->getSingleTerminator()) {
+  if (auto *arg = dyn_cast<SILArgument>(value))
+    if (auto *ti = arg->getSingleTerminator())
       if (ti->isTransformationTerminator()) {
+        assert(isa<OwnershipForwardingInst>(ti));
         return true;
       }
-    }
+
+  auto *node = value->getRepresentativeSILNodeInObject();
+  bool result = isGuaranteedForwardingValueKind(node->getKind());
+  if (result) {
+    assert(!isa<OwnedFirstArgForwardingSingleValueInst>(node));
+    assert(isa<OwnershipForwardingInst>(node));
   }
-
-  return isGuaranteedForwardingValueKind(
-      value->getKindOfRepresentativeSILNodeInObject());
+  return result;
 }
 
-bool swift::isGuaranteedForwardingInst(SILInstruction *i) {
-  return isGuaranteedForwardingValueKind(SILNodeKind(i->getKind()));
-}
-
-bool swift::isOwnershipForwardingInst(SILInstruction *i) {
-  return isOwnershipForwardingValueKind(SILNodeKind(i->getKind()));
-}
-
-bool swift::isReborrowInstruction(const SILInstruction *i) {
-  switch (i->getKind()) {
-  case SILInstructionKind::BranchInst:
-    return true;
-  default:
-    return false;
+bool swift::isGuaranteedForwardingUse(Operand *use) {
+  auto *user = use->getUser();
+  auto kind = SILNodeKind(user->getKind());
+  bool result = isGuaranteedForwardingValueKind(kind);
+  if (result) {
+    assert(!isa<OwnedFirstArgForwardingSingleValueInst>(user));
+    assert(isa<OwnershipForwardingInst>(user));
   }
+  return result;
+}
+
+bool swift::isOwnershipForwardingUse(Operand *use) {
+  auto *user = use->getUser();
+  auto kind = SILNodeKind(user->getKind());
+  bool result = isOwnershipForwardingValueKind(kind);
+  if (result) {
+    assert(isa<OwnershipForwardingInst>(user));
+  }
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -148,6 +163,15 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
     return;
   case Kind::Branch:
     os << "Branch";
+    return;
+  case Kind::Apply:
+    os << "Apply";
+    return;
+  case Kind::TryApply:
+    os << "TryApply";
+    return;
+  case Kind::Yield:
+    os << "Yield";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
@@ -172,32 +196,43 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-void BorrowingOperand::visitLocalEndScopeInstructions(
-    function_ref<void(Operand *)> func) const {
+bool BorrowingOperand::visitLocalEndScopeUses(
+    function_ref<bool(Operand *)> func) const {
   switch (kind) {
   case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
-      if (use->isConsumingUse()) {
-        func(use);
+      if (use->isLifetimeEnding()) {
+        if (!func(use))
+          return false;
       }
     }
-    return;
+    return true;
   case BorrowingOperandKind::BeginApply: {
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
-      func(use);
+      if (!func(use))
+        return false;
     }
-    return;
+    return true;
   }
+  // These are instantaneous borrow scopes so there aren't any special end
+  // scope instructions.
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
+  case BorrowingOperandKind::Yield:
+    return true;
   case BorrowingOperandKind::Branch:
-    return;
+    return true;
   }
 }
 
 void BorrowingOperand::visitBorrowIntroducingUserResults(
     function_ref<void(BorrowedValue)> visitor) const {
   switch (kind) {
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::BeginApply:
+  case BorrowingOperandKind::Yield:
     llvm_unreachable("Never has borrow introducer results!");
   case BorrowingOperandKind::BeginBorrow: {
     auto value = *BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
@@ -229,7 +264,7 @@ void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     // single guaranteed scope.
     value.visitLocalScopeEndingUses([&](Operand *valueUser) {
       if (auto subBorrowScopeOp = BorrowingOperand::get(valueUser)) {
-        if (subBorrowScopeOp->consumesGuaranteedValues()) {
+        if (subBorrowScopeOp->isReborrow()) {
           subBorrowScopeOp->visitUserResultConsumingUses(func);
           return;
         }
@@ -248,7 +283,7 @@ void BorrowingOperand::visitUserResultConsumingUses(
   if (!ti) {
     for (SILValue result : op->getUser()->getResults()) {
       for (auto *use : result->getUses()) {
-        if (use->isConsumingUse()) {
+        if (use->isLifetimeEnding()) {
           visitor(use);
         }
       }
@@ -259,7 +294,7 @@ void BorrowingOperand::visitUserResultConsumingUses(
   for (auto *succBlock : ti->getSuccessorBlocks()) {
     auto *arg = succBlock->getArgument(op->getOperandNumber());
     for (auto *use : arg->getUses()) {
-      if (use->isConsumingUse()) {
+      if (use->isLifetimeEnding()) {
         visitor(use);
       }
     }
@@ -269,7 +304,10 @@ void BorrowingOperand::visitUserResultConsumingUses(
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitLocalEndScopeInstructions([&](Operand *op) { foundUses.push_back(op); });
+  visitLocalEndScopeUses([&](Operand *op) {
+    foundUses.push_back(op);
+    return true;
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -311,8 +349,8 @@ void BorrowedValue::getLocalScopeEndingInstructions(
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
-      if (use->isConsumingUse()) {
-	scopeEndingInsts.push_back(use->getUser());
+      if (use->isLifetimeEnding()) {
+        scopeEndingInsts.push_back(use->getUser());
       }
     }
     return;
@@ -330,7 +368,7 @@ void BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::BeginBorrow:
   case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
-      if (use->isConsumingUse()) {
+      if (use->isLifetimeEnding()) {
         visitor(use);
       }
     }
@@ -385,7 +423,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
   SmallVector<Operand *, 32> worklist;
   SmallPtrSet<Operand *, 16> beenInWorklist;
   for (auto *use : value->getUses()) {
-    if (!use->isConsumingUse())
+    if (!use->isLifetimeEnding())
       continue;
     worklist.push_back(use);
     beenInWorklist.insert(use);
@@ -394,7 +432,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
   bool foundError = false;
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
-    assert(op->isConsumingUse() && "Expected only consuming uses");
+    assert(op->isLifetimeEnding() && "Expected only consuming uses");
 
     // See if we have a borrow scope operand. If we do not, then we know we are
     // a final consumer of our borrow scope introducer. Visit it and continue.
@@ -406,7 +444,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
 
     scopeOperand->visitConsumingUsesOfBorrowIntroducingUserResults(
         [&](Operand *op) {
-          assert(op->isConsumingUse() && "Expected only consuming uses");
+          assert(op->isLifetimeEnding() && "Expected only consuming uses");
           // Make sure we haven't visited this consuming operand yet. If we
           // have, signal an error and bail without re-visiting the operand.
           if (!beenInWorklist.insert(op).second) {
@@ -629,7 +667,7 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
 
 bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
                                           SmallVectorImpl<BorrowedValue> &out) {
-  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+  if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
   SmallVector<SILValue, 32> worklist;
@@ -648,7 +686,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // that we put this before checking for guaranteed forwarding instructions,
     // since we want to ignore guaranteed forwarding instructions that in this
     // specific case produce a .none value.
-    if (value.getOwnershipKind() == ValueOwnershipKind::None)
+    if (value.getOwnershipKind() == OwnershipKind::None)
       continue;
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -681,7 +719,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
 
 Optional<BorrowedValue>
 swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
-  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+  if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
     return None;
 
   SILValue currentValue = inputValue;
@@ -729,7 +767,7 @@ swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
 
 bool swift::getAllOwnedValueIntroducers(
     SILValue inputValue, SmallVectorImpl<OwnedValueIntroducer> &out) {
-  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Owned)
+  if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
   SmallVector<SILValue, 32> worklist;
@@ -748,7 +786,7 @@ bool swift::getAllOwnedValueIntroducers(
     // that we put this before checking for guaranteed forwarding instructions,
     // since we want to ignore guaranteed forwarding instructions that in this
     // specific case produce a .none value.
-    if (value.getOwnershipKind() == ValueOwnershipKind::None)
+    if (value.getOwnershipKind() == OwnershipKind::None)
       continue;
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -781,7 +819,7 @@ bool swift::getAllOwnedValueIntroducers(
 
 Optional<OwnedValueIntroducer>
 swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
-  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Owned)
+  if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
     return None;
 
   SILValue currentValue = inputValue;
@@ -826,4 +864,199 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
   }
 
   llvm_unreachable("Should never hit this");
+}
+
+//===----------------------------------------------------------------------===//
+//                             Forwarding Operand
+//===----------------------------------------------------------------------===//
+
+Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
+  if (use->isTypeDependent())
+    return None;
+
+  if (isa<OwnershipForwardingInst>(use->getUser())) {
+    return {use};
+  }
+
+  return None;
+}
+
+ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
+  return (*this)->getOwnershipKind();
+}
+
+void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
+  auto *user = use->getUser();
+  // NOTE: This if chain is meant to be a covered switch, so make sure to return
+  // in each if itself since we have an unreachable at the bottom to ensure if a
+  // new subclass of OwnershipForwardingInst is added
+  if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
+    if (!ofsvi->getType().isTrivial(*ofsvi->getFunction()))
+      return ofsvi->setOwnershipKind(newKind);
+  if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
+    if (!ofsvi->getType().isTrivial(*ofsvi->getFunction()))
+      return ofsvi->setOwnershipKind(newKind);
+  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
+    if (!ofci->getType().isTrivial(*ofci->getFunction()))
+      return ofci->setOwnershipKind(newKind);
+  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
+    if (!ofseib->getType().isTrivial(*ofseib->getFunction()))
+      return ofseib->setOwnershipKind(newKind);
+  if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
+    assert(ofmvi->getNumOperands() == 1);
+    if (!ofmvi->getOperand(0)->getType().isTrivial(*ofmvi->getFunction())) {
+      ofmvi->setOwnershipKind(newKind);
+      // TODO: Refactor this better.
+      if (auto *dsi = dyn_cast<DestructureStructInst>(ofmvi)) {
+        for (auto &result : dsi->getAllResultsBuffer()) {
+          if (result.getType().isTrivial(*dsi->getFunction()))
+            continue;
+          result.setOwnershipKind(newKind);
+        }
+      } else {
+        auto *dti = cast<DestructureTupleInst>(ofmvi);
+        for (auto &result : dti->getAllResultsBuffer()) {
+          if (result.getType().isTrivial(*dti->getFunction()))
+            continue;
+          result.setOwnershipKind(newKind);
+        }
+      }
+    }
+    return;
+  }
+
+  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
+    assert(ofti->getNumOperands() == 1);
+    if (!ofti->getOperand(0)->getType().isTrivial(*ofti->getFunction())) {
+      ofti->setOwnershipKind(newKind);
+
+      // Then convert all of its incoming values that are owned to be guaranteed.
+      for (auto &succ : ofti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (!succArg->getType().isTrivial(*ofti->getFunction()))
+            continue;
+          succArg->setOwnershipKind(newKind);
+        }
+      }
+    }
+    return;
+  }
+
+  llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+}
+
+void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
+                                             ValueOwnershipKind newKind) const {
+  auto *user = use->getUser();
+
+  if (auto *fInst = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
+    if (fInst->getOwnershipKind() == oldKind)
+      return fInst->setOwnershipKind(newKind);
+
+  if (auto *fInst = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
+    if (fInst->getOwnershipKind() == oldKind)
+      return fInst->setOwnershipKind(newKind);
+
+  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
+    if (ofci->getOwnershipKind() == oldKind)
+      return ofci->setOwnershipKind(newKind);
+
+  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
+    if (ofseib->getOwnershipKind() == oldKind)
+      return ofseib->setOwnershipKind(newKind);
+
+  if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
+    if (ofmvi->getOwnershipKind() == oldKind) {
+      ofmvi->setOwnershipKind(newKind);
+    }
+    // TODO: Refactor this better.
+    if (auto *dsi = dyn_cast<DestructureStructInst>(ofmvi)) {
+      for (auto &result : dsi->getAllResultsBuffer()) {
+        if (result.getOwnershipKind() != oldKind)
+          continue;
+        result.setOwnershipKind(newKind);
+      }
+    } else {
+      auto *dti = cast<DestructureTupleInst>(ofmvi);
+      for (auto &result : dti->getAllResultsBuffer()) {
+        if (result.getOwnershipKind() != oldKind)
+          continue;
+        result.setOwnershipKind(newKind);
+      }
+    }
+    return;
+  }
+
+  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
+    if (ofti->getOwnershipKind() == oldKind) {
+      ofti->setOwnershipKind(newKind);
+      // Then convert all of its incoming values that are owned to be guaranteed.
+      for (auto &succ : ofti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (succArg->getOwnershipKind() == oldKind) {
+            succArg->setOwnershipKind(newKind);
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  llvm_unreachable("Missing Case! Out of sync with ForwardingOperand::get?!");
+}
+
+SILValue ForwardingOperand::getSingleForwardedValue() const {
+  assert(isGuaranteedForwardingUse(use));
+  if (auto *svi = dyn_cast<SingleValueInstruction>(use->getUser()))
+    return svi;
+  return SILValue();
+}
+
+bool ForwardingOperand::visitForwardedValues(
+    function_ref<bool(SILValue)> visitor) {
+  auto *user = use->getUser();
+
+  assert(isGuaranteedForwardingUse(use));
+
+  // See if we have a single value instruction... if we do that is always the
+  // transitive result.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+    return visitor(svi);
+  }
+
+  if (auto *mvri = dyn_cast<MultipleValueInstruction>(user)) {
+    return llvm::all_of(mvri->getResults(), [&](SILValue value) {
+      if (value.getOwnershipKind() == OwnershipKind::None)
+        return true;
+      return visitor(value);
+    });
+  }
+
+  // This is an instruction like switch_enum and checked_cast_br that are
+  // "transforming terminators"... We know that this means that we should at
+  // most have a single phi argument.
+  auto *ti = cast<TermInst>(user);
+  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+    // If we do not have any arguments, then continue.
+    if (succBlock->args_empty())
+      return true;
+
+    auto args = succBlock->getSILPhiArguments();
+    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
+    return visitor(args[0]);
+  });
 }

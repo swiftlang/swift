@@ -1287,9 +1287,9 @@ void
 SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createMarkUninitialized(getOpLocation(Inst->getLoc()),
-                                                 OpValue, Inst->getKind()));
+  recordClonedInstruction(Inst, getBuilder().createMarkUninitialized(
+                                    getOpLocation(Inst->getLoc()), OpValue,
+                                    Inst->getMarkUninitializedKind()));
 }
 
 template<typename ImplClass>
@@ -2389,8 +2389,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
 
   ValueOwnershipKind Kind = SILValue(Inst).getOwnershipKind();
   if (getOpValue(Inst->getOperand()).getOwnershipKind() ==
-      ValueOwnershipKind::None) {
-    Kind = ValueOwnershipKind::None;
+      OwnershipKind::None) {
+    Kind = OwnershipKind::None;
   }
   recordClonedInstruction(Inst, getBuilder().createUncheckedOwnershipConversion(
                                     getOpLocation(Inst->getLoc()),

@@ -156,6 +156,17 @@ Type TypeResolution::mapTypeIntoContext(Type type) const {
   llvm_unreachable("unhandled stage");
 }
 
+// FIXME: It would be nice to have a 'DescriptiveTypeKind' abstraction instead.
+static DescriptiveDeclKind describeDeclOfType(Type t) {
+  if (!t) {
+    return DescriptiveDeclKind::Type;
+  }
+  if (auto *NTD = t->getAnyNominal()) {
+    return NTD->getDescriptiveKind();
+  }
+  return DescriptiveDeclKind::Type;
+}
+
 Type TypeResolution::resolveDependentMemberType(
                                           Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
@@ -214,8 +225,9 @@ Type TypeResolution::resolveDependentMemberType(
     if (!singleType) {
       auto name = ref->getNameRef();
       auto nameLoc = ref->getNameLoc();
-      ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
-        .highlight(baseRange);
+      const auto kind = describeDeclOfType(baseTy);
+      ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, kind, baseTy)
+          .highlight(baseRange);
       corrections.noteAllCandidates();
 
       return ErrorType::get(ctx);
@@ -1202,8 +1214,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Qualified lookup case.
   if (!parentType->mayHaveMembers()) {
-    diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
-                   comp->getNameRef(), parentType)
+    const auto kind = describeDeclOfType(parentType);
+    diags
+        .diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                  comp->getNameRef(), kind, parentType)
         .highlight(parentRange);
     return ErrorType::get(ctx);
   }
@@ -1256,9 +1270,11 @@ static Type diagnoseUnknownType(TypeResolution resolution,
                      parentType)
           .highlight(parentRange);
     } else {
-      diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
-                     comp->getNameRef(), parentType)
-        .highlight(parentRange);
+      const auto kind = describeDeclOfType(parentType);
+      diags
+          .diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                    comp->getNameRef(), kind, parentType)
+          .highlight(parentRange);
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
       if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
@@ -1732,10 +1748,13 @@ namespace {
   public:
     /// Construct a never-null Type. If \p Ty is null, a fatal error is thrown.
     NeverNullType(Type Ty) : WrappedTy(Ty) {
-      if (Ty.isNull()) {
+      if (WrappedTy.isNull()) {
         llvm::report_fatal_error("Resolved to null type!");
       }
     }
+
+    /// Construct a never-null Type. If \p TyB is null, a fatal error is thrown.
+    NeverNullType(TypeBase *TyB) : NeverNullType(Type(TyB)) {}
 
     operator Type() const { return WrappedTy; }
     Type get() const { return WrappedTy; }
@@ -1781,24 +1800,24 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
-    Type resolveAttributedType(AttributedTypeRepr *repr,
-                               TypeResolutionOptions options);
-    Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
-                               TypeResolutionOptions options);
-    Type resolveASTFunctionType(FunctionTypeRepr *repr,
-                                TypeResolutionOptions options,
-                                AnyFunctionType::Representation representation
-                                  = AnyFunctionType::Representation::Swift,
-                                bool noescape = false,
-                                const clang::Type *parsedClangFunctionType
-                                  = nullptr,
-                                DifferentiabilityKind diffKind
-                                  = DifferentiabilityKind::NonDifferentiable);
+    NeverNullType resolveAttributedType(AttributedTypeRepr *repr,
+                                        TypeResolutionOptions options);
+    NeverNullType resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
+                                        TypeResolutionOptions options);
+    NeverNullType
+    resolveASTFunctionType(FunctionTypeRepr *repr,
+                           TypeResolutionOptions options,
+                           AnyFunctionType::Representation representation =
+                               AnyFunctionType::Representation::Swift,
+                           bool noescape = false,
+                           const clang::Type *parsedClangFunctionType = nullptr,
+                           DifferentiabilityKind diffKind =
+                               DifferentiabilityKind::NonDifferentiable);
     SmallVector<AnyFunctionType::Param, 8> resolveASTFunctionTypeParams(
         TupleTypeRepr *inputRepr, TypeResolutionOptions options,
         bool requiresMappingOut, DifferentiabilityKind diffKind);
 
-    Type resolveSILFunctionType(
+    NeverNullType resolveSILFunctionType(
         FunctionTypeRepr *repr, TypeResolutionOptions options,
         SILCoroutineKind coroutineKind = SILCoroutineKind::None,
         SILFunctionType::ExtInfoBuilder extInfoBuilder =
@@ -1817,40 +1836,40 @@ namespace {
                                 SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 Optional<SILResultInfo> &errorResult);
-    Type resolveIdentifierType(IdentTypeRepr *IdType,
-                               TypeResolutionOptions options);
-    Type resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
-                                  TypeResolutionOptions options);
-    Type resolveArrayType(ArrayTypeRepr *repr,
-                          TypeResolutionOptions options);
-    Type resolveDictionaryType(DictionaryTypeRepr *repr,
-                               TypeResolutionOptions options);
-    Type resolveOptionalType(OptionalTypeRepr *repr,
-                             TypeResolutionOptions options);
-    Type resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
-                                                TypeResolutionOptions options,
-                                                bool isDirect);
-    Type resolveTupleType(TupleTypeRepr *repr,
-                          TypeResolutionOptions options);
-    Type resolveCompositionType(CompositionTypeRepr *repr,
-                                TypeResolutionOptions options);
-    Type resolveMetatypeType(MetatypeTypeRepr *repr,
-                             TypeResolutionOptions options);
-    Type resolveProtocolType(ProtocolTypeRepr *repr,
-                             TypeResolutionOptions options);
-    Type resolveSILBoxType(SILBoxTypeRepr *repr,
-                           TypeResolutionOptions options);
+    NeverNullType resolveIdentifierType(IdentTypeRepr *IdType,
+                                        TypeResolutionOptions options);
+    NeverNullType resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
+                                           TypeResolutionOptions options);
+    NeverNullType resolveArrayType(ArrayTypeRepr *repr,
+                                   TypeResolutionOptions options);
+    NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
+                                        TypeResolutionOptions options);
+    NeverNullType resolveOptionalType(OptionalTypeRepr *repr,
+                                      TypeResolutionOptions options);
+    NeverNullType resolveImplicitlyUnwrappedOptionalType(
+        ImplicitlyUnwrappedOptionalTypeRepr *repr,
+        TypeResolutionOptions options, bool isDirect);
+    NeverNullType resolveTupleType(TupleTypeRepr *repr,
+                                   TypeResolutionOptions options);
+    NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
+                                         TypeResolutionOptions options);
+    NeverNullType resolveMetatypeType(MetatypeTypeRepr *repr,
+                                      TypeResolutionOptions options);
+    NeverNullType resolveProtocolType(ProtocolTypeRepr *repr,
+                                      TypeResolutionOptions options);
+    NeverNullType resolveSILBoxType(SILBoxTypeRepr *repr,
+                                    TypeResolutionOptions options);
 
-    Type buildMetatypeType(MetatypeTypeRepr *repr,
-                           Type instanceType,
-                           Optional<MetatypeRepresentation> storedRepr);
-    Type buildProtocolType(ProtocolTypeRepr *repr,
-                           Type instanceType,
-                           Optional<MetatypeRepresentation> storedRepr);
-    
-    Type resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
-                                 unsigned ordinal,
-                                 TypeResolutionOptions options);
+    NeverNullType
+    buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
+                      Optional<MetatypeRepresentation> storedRepr);
+    NeverNullType
+    buildProtocolType(ProtocolTypeRepr *repr, Type instanceType,
+                      Optional<MetatypeRepresentation> storedRepr);
+
+    NeverNullType resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
+                                          unsigned ordinal,
+                                          TypeResolutionOptions options);
 
     /// Returns true if the given type conforms to `Differentiable` in the
     /// module of `DC`. If `tangentVectorEqualsSelf` is true, returns true iff
@@ -1946,7 +1965,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       // Default non-escaping for closure parameters
       auto result =
           resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
-      if (result && result->is<FunctionType>())
+      if (result->is<FunctionType>())
         return applyNonEscapingIfNecessary(result, options);
       return result;
     }
@@ -2018,8 +2037,9 @@ static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
   }
 }
 
-Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
-                                         TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
+                                    TypeResolutionOptions options) {
   // Copy the attributes, since we're about to start hacking on them.
   TypeAttributes attrs = repr->getAttrs();
   assert(!attrs.empty());
@@ -2027,9 +2047,9 @@ Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
   return resolveAttributedType(attrs, repr->getTypeRepr(), options);
 }
 
-Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
-                                         TypeRepr *repr,
-                                         TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
+                                    TypeResolutionOptions options) {
   // Convenience to grab the source range of a type attribute.
   auto getTypeAttrRangeWithAt = [](ASTContext &ctx, SourceLoc attrLoc) {
     return SourceRange(attrLoc, attrLoc.getAdvancedLoc(1));
@@ -2632,31 +2652,42 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           return isDifferentiable(param.getPlainType(),
                                   /*tangentVectorEqualsSelf*/ isLinear);
         }) != elements.end();
+    bool alreadyDiagnosedOneParam = false;
     for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
       auto *eltTypeRepr = inputRepr->getElementType(i);
       auto param = elements[i];
       if (param.isNoDerivative())
         continue;
       auto paramType = param.getPlainType();
-      if (isDifferentiable(paramType, /*tangentVectorEqualsSelf*/ isLinear))
+      if (isDifferentiable(paramType, isLinear))
         continue;
       auto paramTypeString = paramType->getString();
       auto diagnostic =
           diagnose(eltTypeRepr->getLoc(),
                    diag::differentiable_function_type_invalid_parameter,
                    paramTypeString, isLinear, hasValidDifferentiabilityParam);
+      alreadyDiagnosedOneParam = true;
       if (hasValidDifferentiabilityParam)
         diagnostic.fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
+    }
+    // Reject the case where all parameters have '@noDerivative'.
+    if (!alreadyDiagnosedOneParam && !hasValidDifferentiabilityParam) {
+      diagnose(
+          inputRepr->getLoc(),
+          diag::
+              differentiable_function_type_no_differentiability_parameters,
+          isLinear)
+          .highlight(inputRepr->getSourceRange());
     }
   }
 
   return elements;
 }
 
-Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
-                                           StringRef mangledName,
-                                           unsigned ordinal,
-                                           TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
+                                      unsigned ordinal,
+                                      TypeResolutionOptions options) {
   // The type repr should be a generic identifier type. We don't really use
   // the identifier for anything, but we do resolve the generic arguments
   // to instantiate the possibly-generic opaque type.
@@ -2695,7 +2726,7 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   return ty;
 }
 
-Type TypeResolver::resolveASTFunctionType(
+NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     AnyFunctionType::Representation representation, bool noescape,
     const clang::Type *parsedClangFunctionType,
@@ -2830,8 +2861,8 @@ bool TypeResolver::isDifferentiable(Type type, bool tangentVectorEqualsSelf) {
   return type->getCanonicalType() == tanSpace->getCanonicalType();
 }
 
-Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
-                                     TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
+                                              TypeResolutionOptions options) {
   // Resolve the field types.
   SmallVector<SILField, 4> fields;
   {
@@ -2895,7 +2926,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   return SILBoxType::get(getASTContext(), layout, subMap);
 }
 
-Type TypeResolver::resolveSILFunctionType(
+NeverNullType TypeResolver::resolveSILFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions options,
     SILCoroutineKind coroutineKind,
     SILFunctionType::ExtInfoBuilder extInfoBuilder, ParameterConvention callee,
@@ -3310,8 +3341,9 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                 yields, ordinaryResults, errorResult);
 }
 
-Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
-                                         TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
+                                    TypeResolutionOptions options) {
   auto ComponentRange = IdType->getComponentRange();
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
@@ -3345,8 +3377,9 @@ Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
   return result;
 }
 
-Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
-                                            TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
+                                       TypeResolutionOptions options) {
   // inout is only valid for (non-Subscript and non-EnumCaseDecl)
   // function parameters.
   if (!options.is(TypeResolverContext::FunctionInput) ||
@@ -3387,9 +3420,8 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
   return resolveType(repr->getBase(), options);
 }
 
-
-Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
-                                    TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
+                                             TypeResolutionOptions options) {
   auto baseTy = resolveType(repr->getBase(), options.withoutContext());
   if (baseTy->hasError()) {
     return ErrorType::get(getASTContext());
@@ -3403,8 +3435,9 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   return sliceTy;
 }
 
-Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
-                                         TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
+                                    TypeResolutionOptions options) {
   options = adjustOptionsForGenericArgs(options);
 
   auto keyTy = resolveType(repr->getKey(), options.withoutContext());
@@ -3433,8 +3466,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
   return DictionaryType::get(keyTy, valueTy);
 }
 
-Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
-                                       TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
+                                                TypeResolutionOptions options) {
   TypeResolutionOptions elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::ImmediateOptionalTypeArgument);
 
@@ -3452,10 +3485,9 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   return optionalTy;
 }
 
-Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
-      ImplicitlyUnwrappedOptionalTypeRepr *repr,
-      TypeResolutionOptions options,
-      bool isDirect) {
+NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
+    ImplicitlyUnwrappedOptionalTypeRepr *repr, TypeResolutionOptions options,
+    bool isDirect) {
   TypeResolutionFlags allowIUO = TypeResolutionFlags::SILType;
 
   bool doDiag = false;
@@ -3523,8 +3555,8 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   return uncheckedOptionalTy;
 }
 
-Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
-                                    TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
+                                             TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
 
@@ -3591,8 +3623,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, getASTContext());
 }
 
-Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
-                                          TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
+                                     TypeResolutionOptions options) {
 
   // Note that the superclass type will appear as part of one of the
   // types in 'Members', so it's not used when constructing the
@@ -3659,8 +3692,8 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                       /*HasExplicitAnyObject=*/false);
 }
 
-Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
-                                       TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
+                                                TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   auto ty = resolveType(repr->getBase(), options.withoutContext());
   if (ty->hasError()) {
@@ -3680,10 +3713,9 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   return buildMetatypeType(repr, ty, storedRepr);
 }
 
-Type TypeResolver::buildMetatypeType(
-       MetatypeTypeRepr *repr,
-       Type instanceType,
-       Optional<MetatypeRepresentation> storedRepr) {
+NeverNullType
+TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
+                                Optional<MetatypeRepresentation> storedRepr) {
   if (instanceType->isAnyExistentialType()) {
     // TODO: diagnose invalid representations?
     return ExistentialMetatypeType::get(instanceType, storedRepr);
@@ -3692,8 +3724,8 @@ Type TypeResolver::buildMetatypeType(
   }
 }
 
-Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
-                                       TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
+                                                TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   auto ty = resolveType(repr->getBase(), options.withoutContext());
   if (ty->hasError()) {
@@ -3713,10 +3745,9 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   return buildProtocolType(repr, ty, storedRepr);
 }
 
-Type TypeResolver::buildProtocolType(
-       ProtocolTypeRepr *repr,
-       Type instanceType,
-       Optional<MetatypeRepresentation> storedRepr) {
+NeverNullType
+TypeResolver::buildProtocolType(ProtocolTypeRepr *repr, Type instanceType,
+                                Optional<MetatypeRepresentation> storedRepr) {
   if (!instanceType->isAnyExistentialType()) {
     diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential,
              instanceType);

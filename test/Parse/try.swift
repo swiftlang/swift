@@ -182,7 +182,8 @@ let _: Int = try? foo() // expected-error {{value of optional type 'Int?' not un
 class X {}
 func test(_: X) {}
 func producesObject() throws -> AnyObject { return X() }
-test(try producesObject()) // expected-error {{'AnyObject' is not convertible to 'X'; did you mean to use 'as!' to force downcast?}} {{26-26= as! X}}
+test(try producesObject()) // expected-error {{'AnyObject' is not convertible to 'X'}} 
+// expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{26-26= as! X}}
 
 _ = "a\(try maybeThrow())b"
 _ = try "a\(maybeThrow())b"

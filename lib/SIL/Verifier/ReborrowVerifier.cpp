@@ -42,8 +42,9 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
                                        SILValue value) {
   SmallVector<std::tuple<Operand *, SILValue>, 4> worklist;
   // Initialize the worklist with borrow lifetime ending uses
-  initialScopedOperand.visitLocalEndScopeInstructions([&](Operand *op) {
+  initialScopedOperand.visitLocalEndScopeUses([&](Operand *op) {
     worklist.emplace_back(op, value);
+    return true;
   });
 
   while (!worklist.empty()) {
@@ -52,11 +53,9 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
     std::tie(borrowLifetimeEndOp, baseVal) = worklist.pop_back_val();
     auto *borrowLifetimeEndUser = borrowLifetimeEndOp->getUser();
 
-    // TODO: Add a ReborrowOperand ADT if we need to treat more instructions as
-    // a reborrow
-    if (!isReborrowInstruction(borrowLifetimeEndUser)) {
+    auto borrowingOperand = BorrowingOperand::get(borrowLifetimeEndOp);
+    if (!borrowingOperand || !borrowingOperand->isReborrow())
       continue;
-    }
 
     if (isVisitedOp(borrowLifetimeEndOp, baseVal))
       continue;
@@ -66,7 +65,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
     for (auto *succBlock : branchInst->getSuccessorBlocks()) {
       auto *phiArg = cast<SILPhiArgument>(
           succBlock->getArgument(borrowLifetimeEndOp->getOperandNumber()));
-      assert(phiArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+      assert(phiArg->getOwnershipKind() == OwnershipKind::Guaranteed);
 
       SILValue newBaseVal = baseVal;
       // If the previous base value was also passed as a phi arg, that will be

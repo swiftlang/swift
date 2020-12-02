@@ -223,7 +223,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
     SILGenFunction &SGF, SILParameterInfo param, ManagedValue value,
     SILLocation loc, bool isForCoroutine) {
   if (param.isConsumed() &&
-      value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+      value.getOwnershipKind() == OwnershipKind::Guaranteed) {
     return value.copyUnmanaged(SGF, loc);
   }
 
@@ -231,7 +231,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
   // values to ensure that they are live over the entire closure invocation. If
   // we do not have a coroutine, then we have an immediate non-consuming use so
   // no borrow is necessary.
-  if (isForCoroutine && value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+  if (isForCoroutine && value.getOwnershipKind() == OwnershipKind::Owned) {
     if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
                                        param.isIndirectInGuaranteed())) {
       return value.formalAccessBorrow(SGF, loc);
@@ -1785,8 +1785,7 @@ static void emitRawApply(SILGenFunction &SGF,
   // Otherwise, we need to create a try_apply.
   } else {
     SILBasicBlock *normalBB = SGF.createBasicBlock();
-    auto result =
-      normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
+    auto result = normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
@@ -3276,14 +3275,15 @@ private:
     if (Foreign.async
         && Foreign.async->completionHandlerParamIndex() == Args.size()) {
       SILParameterInfo param = claimNextParameters(1).front();
+      (void)param;
 
-      // TODO: Get or create the completion handler block implementation
-      // function for the given argument type, then create a block containing
-      // the current continuation. (This probably needs to be deferred to right
-      // before the actual call, since evaluating other arguments to the call
-      // may suspend the task)
-      auto argTy = SILType::getPrimitiveObjectType(param.getInterfaceType());
-      Args.push_back(ManagedValue::forUnmanaged(SILUndef::get(argTy, SGF.F)));
+      // Leave a placeholder in the position. We'll fill this in with a block
+      // capturing the current continuation right before we invoke the
+      // function.
+      // (We can't do this immediately, because evaluating other arguments
+      // may require suspending the async task, which is not allowed while its
+      // continuation is active.)
+      Args.push_back(ManagedValue::forInContext());
     } else if (Foreign.error
                && Foreign.error->getErrorParameterIndex() == Args.size()) {
       SILParameterInfo param = claimNextParameters(1).front();
@@ -4327,14 +4327,21 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // If there's a foreign error or async parameter, fill it in.
   ManagedValue errorTemp;
-  if (calleeTypeInfo.foreign.async) {
-    // TODO: prepare the callback continuation and block here.
-    
-  } else if (calleeTypeInfo.foreign.error) {
-    unsigned errorParamIndex =
-        calleeTypeInfo.foreign.error->getErrorParameterIndex();
+  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
 
-    // This is pretty evil.
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
+
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(*this, loc);
+
+  } else if (auto foreignError = calleeTypeInfo.foreign.error) {
+    unsigned errorParamIndex =
+        foreignError->getErrorParameterIndex();
+
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
     auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
 
     std::tie(errorTemp, errorArgSlot) =
@@ -4445,9 +4452,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                           *foreignError);
   }
   
-  // TODO(async): If there's a foreign async convention, await the continuation
-  // to get the result from the completion callback.
-
   auto directResultsArray = makeArrayRef(directResults);
   RValue result =
     resultPlan->finish(*this, loc, substResultType, directResultsArray);
@@ -4504,7 +4508,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     B.emitBlock(errorBB);
     SILValue error = errorBB->createPhiArgument(
         fnConv.getSILErrorType(getTypeExpansionContext()),
-        ValueOwnershipKind::Owned);
+        OwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), IsForUnwind);
     B.createThrow(loc, error);
@@ -4512,7 +4516,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
+  return normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
 }
 
 std::pair<SILValue, CleanupHandle>
@@ -5667,6 +5671,72 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   return endApplyHandle;
 }
 
+ManagedValue SILGenFunction::emitRunChildTask(
+    SILLocation loc, Type functionType, ManagedValue taskFunction) {
+  auto runChildTaskFn = SGM.getRunChildTask();
+
+  Type resultType = functionType->castTo<FunctionType>()->getResult();
+  Type replacementTypes[] = {resultType};
+  auto subs = SubstitutionMap::get(runChildTaskFn->getGenericSignature(),
+                                   replacementTypes,
+                                   ArrayRef<ProtocolConformanceRef>{});
+
+  CanType origParamType = runChildTaskFn->getParameters()->get(0)
+      ->getInterfaceType()->getCanonicalType();
+  CanType substParamType = origParamType.subst(subs)->getCanonicalType();
+
+  // Ensure that the closure has the appropriate type.
+  AbstractionPattern origParam(
+      runChildTaskFn->getGenericSignature().getCanonicalSignature(),
+      origParamType);
+  taskFunction = emitSubstToOrigValue(
+      loc, taskFunction, origParam, substParamType);
+
+  return emitApplyOfLibraryIntrinsic(
+      loc, runChildTaskFn, subs, {taskFunction}, SGFContext()
+    ).getScalarValue();
+}
+
+ManagedValue SILGenFunction::emitCancelAsyncTask(
+    SILLocation loc, SILValue task) {
+  ASTContext &ctx = getASTContext();
+  auto apply = B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
+      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
+      { task });
+  return ManagedValue::forUnmanaged(apply);
+}
+
+void SILGenFunction::completeAsyncLetChildTask(
+    PatternBindingDecl *patternBinding, unsigned index) {
+  SILValue childTask;
+  bool isThrowing;
+  std::tie(childTask, isThrowing)= AsyncLetChildTasks[{patternBinding, index}];
+
+  Type childResultType = patternBinding->getPattern(index)->getType();
+
+  auto taskFutureGetFn = isThrowing
+      ? SGM.getTaskFutureGetThrowing()
+      : SGM.getTaskFutureGet();
+
+  // Get the result from the future.
+  Type replacementTypes[] = {childResultType};
+  auto subs = SubstitutionMap::get(taskFutureGetFn->getGenericSignature(),
+                                   replacementTypes,
+                                   ArrayRef<ProtocolConformanceRef>{});
+  RValue childResult = emitApplyOfLibraryIntrinsic(
+      SILLocation(patternBinding), taskFutureGetFn, subs,
+      { ManagedValue::forBorrowedObjectRValue(childTask) },
+      SGFContext());
+
+  // Write the child result into the pattern variables.
+  emitAssignToPatternVars(
+      SILLocation(patternBinding), patternBinding->getPattern(index),
+      std::move(childResult));
+}
+
+
 // Create a partial application of a dynamic method, applying bridging thunks
 // if necessary.
 static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
@@ -5770,8 +5840,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
-    SILValue memberArg = hasMemberBB->createPhiArgument(
-        loweredMethodTy, ValueOwnershipKind::Owned);
+    SILValue memberArg =
+        hasMemberBB->createPhiArgument(loweredMethodTy, OwnershipKind::Owned);
 
     // Create the result value.
     Scope applyScope(Cleanups, CleanupLocation(e));
@@ -5867,8 +5937,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto functionTy = CanFunctionType::get({baseArg}, methodTy);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
-    SILValue memberArg = hasMemberBB->createPhiArgument(
-        loweredMethodTy, ValueOwnershipKind::Owned);
+    SILValue memberArg =
+        hasMemberBB->createPhiArgument(loweredMethodTy, OwnershipKind::Owned);
     // Emit the application of 'self'.
     Scope applyScope(Cleanups, CleanupLocation(e));
     ManagedValue result = emitDynamicPartialApply(*this, e, memberArg, base,

@@ -1155,13 +1155,28 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     // (Leave a hole for test cases.)
     if (ancestry.contains(AncestryFlags::ObjC) &&
         !ancestry.contains(AncestryFlags::ClangImported)) {
-      if (ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+      if (ctx.LangOpts.EnableObjCAttrRequiresFoundation) {
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::invalid_objc_swift_rooted_class)
           .fixItRemove(attr->getRangeWithAt());
-      if (!ctx.LangOpts.EnableObjCInterop)
+        // If the user has not spelled out a superclass, offer to insert
+        // 'NSObject'. We could also offer to replace the existing superclass,
+        // but that's a touch aggressive.
+         if (CD->getInherited().empty()) {
+           auto nameEndLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                                        CD->getNameLoc());
+           CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
+             .fixItInsert(nameEndLoc, ": NSObject");
+         } else if (CD->getSuperclass().isNull()) {
+           CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
+             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ");
+         }
+      }
+
+      if (!ctx.LangOpts.EnableObjCInterop) {
         ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
           .fixItRemove(attr->getRangeWithAt());
+      }
     }
 
     return ObjCReason(ObjCReason::ExplicitlyObjC);
@@ -2387,6 +2402,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
         break;
       }
     }
+    assert(req != bestConflict && "requirement conflicts with itself?");
 
     // Diagnose the conflict.
     auto reqDiagInfo = getObjCMethodDiagInfo(unsatisfied.second);

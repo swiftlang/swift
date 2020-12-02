@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
+
 #include "swift/AST/Module.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -19,6 +20,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
@@ -2743,34 +2745,34 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
   bool Changed = false;
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
-  
-    auto *SWI = dyn_cast<SwitchEnumInstBase>(TI);
+
+    SwitchEnumTermInst SWI(TI);
     if (!SWI)
       continue;
-    
-    if (!SWI->hasDefault())
+
+    if (!SWI.hasDefault())
       continue;
 
-    NullablePtr<EnumElementDecl> elementDecl = SWI->getUniqueCaseForDefault();
+    NullablePtr<EnumElementDecl> elementDecl = SWI.getUniqueCaseForDefault();
     if (!elementDecl)
       continue;
     
     // Construct a new instruction by copying all the case entries.
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
-    for (int idx = 0, numIdcs = SWI->getNumCases(); idx < numIdcs; ++idx) {
-      CaseBBs.push_back(SWI->getCase(idx));
+    for (int idx = 0, numIdcs = SWI.getNumCases(); idx < numIdcs; ++idx) {
+      CaseBBs.push_back(SWI.getCase(idx));
     }
     // Add the default-entry of the original instruction as case-entry.
-    CaseBBs.push_back(std::make_pair(elementDecl.get(), SWI->getDefaultBB()));
+    CaseBBs.push_back(std::make_pair(elementDecl.get(), SWI.getDefaultBB()));
 
-    if (isa<SwitchEnumInst>(SWI)) {
-      SILBuilderWithScope(SWI)
-          .createSwitchEnum(SWI->getLoc(), SWI->getOperand(), nullptr, CaseBBs);
+    if (isa<SwitchEnumInst>(*SWI)) {
+      SILBuilderWithScope(SWI).createSwitchEnum(SWI->getLoc(), SWI.getOperand(),
+                                                nullptr, CaseBBs);
     } else {
-      assert(isa<SwitchEnumAddrInst>(SWI) &&
+      assert(isa<SwitchEnumAddrInst>(*SWI) &&
              "unknown switch_enum instruction");
       SILBuilderWithScope(SWI).createSwitchEnumAddr(
-          SWI->getLoc(), SWI->getOperand(), nullptr, CaseBBs);
+          SWI->getLoc(), SWI.getOperand(), nullptr, CaseBBs);
     }
     SWI->eraseFromParent();
     Changed = true;
@@ -2992,8 +2994,7 @@ bool ArgumentSplitter::createNewArguments() {
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
     auto *NewArg = ParentBB->createPhiArgument(
-        P.getType(Ty, Mod, TypeExpansionContext(*F)),
-        ValueOwnershipKind::Owned);
+        P.getType(Ty, Mod, TypeExpansionContext(*F)), OwnershipKind::Owned);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
     //
@@ -3777,7 +3778,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
   A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
   auto *NewArg =
-      BB->replacePhiArgument(i, proj->getType(), ValueOwnershipKind::Owned);
+      BB->replacePhiArgument(i, proj->getType(), OwnershipKind::Owned);
   proj->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.

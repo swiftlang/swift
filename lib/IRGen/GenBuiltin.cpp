@@ -211,7 +211,50 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // getCurrentAsyncTask has no arguments.
+  if (Builtin.ID == BuiltinValueKind::GetCurrentAsyncTask) {
+    auto task = IGF.getAsyncTask();
+    out.add(IGF.Builder.CreateBitCast(task, IGF.IGM.RefCountedPtrTy));
+    return;
+  }
+
   // Everything else cares about the (rvalue) argument.
+
+  if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
+    emitTaskCancel(IGF, args.claimNext());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) {
+    auto flags = args.claimNext();
+    auto parentTask = args.claimNext();
+    auto futureResultType =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture)
+          ? args.claimNext()
+          : nullptr;
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+
+    // FIXME: SIL treats the function/context parameter as "guaranteed", but
+    // the runtime entry point assumes it is owned. Introduce an extra retain
+    // of the context to balance things out.
+    IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
+
+    auto newTaskAndContext = emitTaskCreate(
+        IGF, flags, parentTask, futureResultType, taskFunction, taskContext,
+        substitutions);
+
+    // Cast back to NativeObject/RawPointer.
+    auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
+    newTask = IGF.Builder.CreateBitCast(newTask, IGF.IGM.RefCountedPtrTy);
+    auto newContext = IGF.Builder.CreateExtractValue(newTaskAndContext, { 1 });
+    newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
+    out.add(newTask);
+    out.add(newContext);
+    return;
+  }
+
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
@@ -1069,6 +1112,28 @@ if (Builtin.ID == BuiltinValueKind::id) { \
         IGF.Builder.CreateBitCast(metatypeRHS, IGF.IGM.Int8PtrTy);
 
     out.add(IGF.Builder.CreateICmpEQ(metatypeLHSCasted, metatypeRHSCasted));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::AutoDiffCreateLinearMapContext) {
+    auto topLevelSubcontextSize = args.claimNext();
+    out.add(emitAutoDiffCreateLinearMapContext(IGF, topLevelSubcontextSize)
+                .getAddress());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::AutoDiffProjectTopLevelSubcontext) {
+    Address allocatorAddr(args.claimNext(), IGF.IGM.getPointerAlignment());
+    out.add(
+        emitAutoDiffProjectTopLevelSubcontext(IGF, allocatorAddr).getAddress());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::AutoDiffAllocateSubcontext) {
+    Address allocatorAddr(args.claimNext(), IGF.IGM.getPointerAlignment());
+    auto size = args.claimNext();
+    out.add(
+        emitAutoDiffAllocateSubcontext(IGF, allocatorAddr, size).getAddress());
     return;
   }
 

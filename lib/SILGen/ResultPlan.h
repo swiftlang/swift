@@ -49,6 +49,11 @@ public:
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
     return None;
   }
+  
+  virtual ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc) {
+    return {};
+  }
 };
 
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
