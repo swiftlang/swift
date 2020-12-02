@@ -77,7 +77,8 @@ func forgotOptionalBang(_ a: A, obj: AnyObject) {
 
 func forgotAnyObjectBang(_ obj: AnyObject) {
   var a = A()
-  a = obj // expected-error{{'AnyObject' is not convertible to 'A'; did you mean to use 'as!' to force downcast?}}{{10-10= as! A}}
+  a = obj // expected-error{{'AnyObject' is not convertible to 'A'}}
+  //expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{10-10= as! A}}
   _ = a
 }
 
