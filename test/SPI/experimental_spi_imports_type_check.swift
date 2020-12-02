@@ -16,11 +16,6 @@
 // RUN: %target-typecheck-verify-swift -DCLIENT -I %t
 // RUN: %target-swift-frontend -typecheck %s -DCLIENT -DCLIENT_LOAD_CORE -I %t
 
-/// Test with the public swiftinterface file, the SPI is unknown.
-// RUN: rm %t/LibPublic.private.swiftinterface
-// RUN: %target-typecheck-verify-swift -DCLIENT -I %t
-// RUN: %target-typecheck-verify-swift -DCLIENT -DCLIENT_LOAD_CORE -I %t
-
 #if LIB_CORE
 
 public struct CoreStruct {
