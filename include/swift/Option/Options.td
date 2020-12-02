@@ -55,6 +55,9 @@ def ModuleInterfaceOption : OptionFlag;
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
 
+// The option should be accepted by swift-api-extract.
+def SwiftAPIExtractOption : OptionFlag;
+
 /////////
 // Options
 
@@ -169,7 +172,8 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftIndentOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
+         SwiftIndentOption, SwiftAPIExtractOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -191,16 +195,17 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath]>,
+         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
+         SwiftAPIExtractOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
-def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath]>,
+def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ModuleInterfaceOption]>,
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
@@ -217,16 +222,16 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
-def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption, ArgumentIsPath]>,
+def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<F>;
 
 def Fsystem : Separate<["-"], "Fsystem">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Add directory to system framework search path">;
 
-def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption, ArgumentIsPath]>,
+def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Add directory to the import search path">;
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
@@ -372,7 +377,7 @@ def localization_path : Separate<["-"], "localization-path">,
   MetaVarName<"<path>">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Specifies the Clang module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
@@ -393,7 +398,7 @@ def define_availability : Separate<["-"], "define-availability">,
   MetaVarName<"<macro>">;
 
 def module_name : Separate<["-"], "module-name">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
@@ -663,7 +668,7 @@ def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
   HelpText<"Specifies a framework which should be linked against">;
 
 def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Add directory to library link search path">;
 def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -1027,7 +1032,7 @@ def resource_dir : Separate<["-"], "resource-dir">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption, SwiftAPIExtractOption]>,
   HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
@@ -1146,7 +1151,7 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
 // VFS
 
 def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Add directory to VFS overlay file">;
 def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
   Alias<vfsoverlay>;
@@ -1176,5 +1181,9 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          ArgumentIsPath, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+// Swift API Extraction only options
+def pretty_print: Flag<["-"], "pretty-print">, Flags<[SwiftAPIExtractOption]>,
+  HelpText<"Pretty-print the output JSON">;
 
 include "FrontendOptions.td"
