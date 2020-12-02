@@ -37,7 +37,8 @@ var ns4 = compo as NSError
 ns4 = compo // expected-error{{cannot assign value of type 'HairyError & Runcible' to type 'NSError'}}
 
 let e1 = ns1 as? FooError
-let e1fix = ns1 as FooError // expected-error{{did you mean to use 'as!'}} {{17-19=as!}}
+let e1fix = ns1 as FooError // expected-error {{'NSError' is not convertible to 'FooError'}}
+// expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
 
 let esub = ns1 as Error
 let esub2 = ns1 as? Error // expected-warning{{conditional cast from 'NSError' to 'Error' always succeeds}}

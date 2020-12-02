@@ -218,11 +218,16 @@ func testExplicitConversion(objc: APPManufacturerInfo<NSString>,
                             swift: ManufacturerInfo<NSString>) {
   // Bridging to Swift
   let _ = objc as ManufacturerInfo<NSString>
-  let _ = objc as ManufacturerInfo<NSNumber> // expected-error{{'APPManufacturerInfo<NSString>' is not convertible to 'ManufacturerInfo<NSNumber>'; did you mean to use 'as!' to force downcast?}}
-  let _ = objc as ManufacturerInfo<NSObject> // expected-error{{'APPManufacturerInfo<NSString>' is not convertible to 'ManufacturerInfo<NSObject>'; did you mean to use 'as!' to force downcast?}}
+  let _ = objc as ManufacturerInfo<NSNumber> // expected-error{{'APPManufacturerInfo<NSString>' is not convertible to 'ManufacturerInfo<NSNumber>'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
+  let _ = objc as ManufacturerInfo<NSObject> // expected-error{{'APPManufacturerInfo<NSString>' is not convertible to 'ManufacturerInfo<NSObject>'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
 
   // Bridging to Objective-C
   let _ = swift as APPManufacturerInfo<NSString>
-  let _ = swift as APPManufacturerInfo<NSNumber> // expected-error{{'ManufacturerInfo<NSString>' is not convertible to 'APPManufacturerInfo<NSNumber>'; did you mean to use 'as!' to force downcast?}}
-  let _ = swift as APPManufacturerInfo<NSObject> // expected-error{{'ManufacturerInfo<NSString>' is not convertible to 'APPManufacturerInfo<NSObject>'; did you mean to use 'as!' to force downcast?}}
+  let _ = swift as APPManufacturerInfo<NSNumber> // expected-error{{'ManufacturerInfo<NSString>' is not convertible to 'APPManufacturerInfo<NSNumber>'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
+  let _ = swift as APPManufacturerInfo<NSObject> // expected-error{{'ManufacturerInfo<NSString>' is not convertible to 'APPManufacturerInfo<NSObject>'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
+
 }

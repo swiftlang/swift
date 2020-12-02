@@ -1728,20 +1728,25 @@ public:
                              Type expectedType, ConstraintLocator *locator);
 };
 
-/// Replace a coercion ('as') with a forced checked cast ('as!').
+/// Replace a coercion ('as') with runtime checked cast ('as!' or 'as?').
 class CoerceToCheckedCast final : public ContextualMismatch {
   CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
-                      ConstraintLocator *locator)
+                      bool useConditionalCast, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
-                           locator) {}
+                           locator),
+        UseConditionalCast(useConditionalCast) {}
+  bool UseConditionalCast = false;
 
 public:
-  std::string getName() const override { return "as to as!"; }
+  std::string getName() const override {
+    return UseConditionalCast ? "as to as?" : "as to as!";
+  }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
-                                      Type toType, ConstraintLocator *locator);
+                                      Type toType, bool useConditionalCast,
+                                      ConstraintLocator *locator);
 };
 
 class RemoveInvalidCall final : public ConstraintFix {

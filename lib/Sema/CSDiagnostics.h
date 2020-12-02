@@ -1939,12 +1939,15 @@ protected:
   bool diagnoseMisplacedMissingArgument() const;
 };
 
-/// Replace a coercion ('as') with a forced checked cast ('as!').
-class MissingForcedDowncastFailure final : public ContextualFailure {
+/// Replace a coercion ('as') with a runtime checked cast ('as!' or 'as?').
+class InvalidCoercionFailure final : public ContextualFailure {
+  bool UseConditionalCast;
+
 public:
-  MissingForcedDowncastFailure(const Solution &solution, Type fromType,
-                               Type toType, ConstraintLocator *locator)
-      : ContextualFailure(solution, fromType, toType, locator) {}
+  InvalidCoercionFailure(const Solution &solution, Type fromType, Type toType,
+                         bool useConditionalCast, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator),
+        UseConditionalCast(useConditionalCast) {}
 
   ASTNode getAnchor() const override;
 

@@ -1112,9 +1112,13 @@ ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
      (Type))
-ERROR(missing_forced_downcast,none,
-      "%0 is not convertible to %1; "
-      "did you mean to use 'as!' to force downcast?", (Type, Type))
+ERROR(cannot_coerce_to_type, none,
+      "%0 is not convertible to %1", (Type, Type))
+NOTE(missing_forced_downcast, none,
+     "did you mean to use 'as!' to force downcast?", ())
+NOTE(missing_optional_downcast, none,
+     "did you mean to use 'as?' to conditionally downcast?", ())
+     
 WARNING(coercion_may_fail_warning,none,
         "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
         (Type, Type))
