@@ -1,8 +1,7 @@
 %{
 headers = [
-  # TODO: Do we really need these?
-  # 'stdc-predef.h',
-  # 'features.h',
+  'stdc-predef.h',
+  'features.h',
 
   # C standard library
   'complex.h',
