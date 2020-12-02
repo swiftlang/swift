@@ -66,7 +66,8 @@ public:
   }
 };
 
-#if defined(_WIN64)
+// FIXME: get this to build reliably
+#if 0 && defined(_WIN64)
 #include <intrin.h>
 
 /// MSVC's std::atomic uses an inline spin lock for 16-byte atomics,
