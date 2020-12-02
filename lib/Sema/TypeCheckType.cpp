@@ -848,21 +848,21 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
       SmallVector<clang::TemplateArgument, 2> templateArguments;
       std::unique_ptr<TemplateInstantiationError> error =
-        ctx.getClangTemplateArguments(
-          classTemplateDecl->getTemplateParameters(),
-          typesOfgenericArgs, templateArguments);
+          ctx.getClangTemplateArguments(
+              classTemplateDecl->getTemplateParameters(), typesOfgenericArgs,
+              templateArguments);
 
-        if (error) {
-            std::string failedTypesStr;
-            llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
-            llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
-            // TODO: This error message should not reference implementation details.
-            // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
-            ctx.Diags.diagnose(loc,
-                              diag::unable_to_convert_generic_swift_types.ID,
-                              {classTemplateDecl->getName(), StringRef(failedTypesStr)});
-            return ErrorType::get(ctx);
-          }
+      if (error) {
+        std::string failedTypesStr;
+        llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
+        llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
+        // TODO: This error message should not reference implementation details.
+        // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
+        ctx.Diags.diagnose(
+            loc, diag::unable_to_convert_generic_swift_types.ID,
+            {classTemplateDecl->getName(), StringRef(failedTypesStr)});
+        return ErrorType::get(ctx);
+      }
 
       auto *clangModuleLoader = decl->getASTContext().getClangModuleLoader();
       auto instantiatedDecl = clangModuleLoader->instantiateCXXClassTemplate(

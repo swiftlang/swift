@@ -25,10 +25,4 @@ TemplatesTestSuite.test("with-c++-type-calling-method-on-arg") {
   expectEqual(wrappedMagicNumber.getValuePlusArg(i2), 54)
 }
 
-TemplatesTestSuite.test("existing-specialization") {
-  let myInt = IntWrapper(value: 18)
-  var magicInt = MagicWrapper<IntWrapper>(t: myInt)
-  expectEqual(magicInt.getValuePlusArg(12), 30)
-}
-
 runAllTests()

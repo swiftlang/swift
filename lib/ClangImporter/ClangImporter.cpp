@@ -4145,7 +4145,8 @@ ClangImporter::instantiateCXXClassTemplate(
   assert(isa<clang::RecordType>(CanonType) &&
           "type of non-dependent specialization is not a RecordType");
 
-  return dyn_cast_or_null<NominalTypeDecl>(Impl.importDecl(ctsd, Impl.CurrentVersion));
+  return dyn_cast_or_null<NominalTypeDecl>(
+      Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
 
 Identifier

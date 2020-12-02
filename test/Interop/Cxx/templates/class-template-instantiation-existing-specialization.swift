@@ -2,6 +2,7 @@
 //
 // REQUIRES: executable_test
 
+// Please don't add tests into this test case - its setup is quite delicate.
 import ClassTemplateInstantionExistingSpecialization
 import StdlibUnittest
 
