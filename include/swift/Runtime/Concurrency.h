@@ -160,6 +160,10 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void
 swift_task_group_add_pending(AsyncTask *groupTask, AsyncTask *childTask);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void
+swift_task_print_ID(const void* name, const void* file, int line, AsyncTask *task);
+
 /// Check the readyQueue of a Channel, return true if it has no pending tasks.
 ///
 /// This can be called from any thread. Its Swift signature is

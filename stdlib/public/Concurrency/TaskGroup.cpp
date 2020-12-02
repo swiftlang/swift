@@ -143,26 +143,6 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
       }
     } // else, status-cas failed and we need to try again
   }
-
-//    // load the ready queue's head; it could be empty or be some other value,
-//    // we don't really care right now, as we simply make it our new tail,
-//    // and become the new head. // FIXME: this means we end up in reverse order (wrt completion)...
-//    auto readyHead = fragment->readyQueue.load(std::memory_order_acquire);
-//
-//    while (true) {
-//      completedTask->getNextChannelCompletedTask() = readyHead.getTask();
-//      auto newReadyHead = ReadyQueueItem::get(
-//          hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success,
-//          completedTask
-//      );
-//
-//      if (fragment->readyQueue.compare_exchange_weak(
-//          readyHead, newReadyHead,
-//          /*success*/ std::memory_order_release,
-//          /*failure*/ std::memory_order_acquire)) {
-//        return;
-//      } // else, try again
-//    }
 }
 
 // ==== pollChannel ------------------------------------------------------------
@@ -311,7 +291,12 @@ bool swift::swift_task_group_is_empty(AsyncTask *task) {
 
 void swift::swift_task_group_add_pending(AsyncTask *groupTask, AsyncTask *childTask) {
   assert(groupTask->isTaskGroup());
-  fprintf(stderr, "error: %s[%d %s:%d]: groupTask: %d, childTask\n",
+  fprintf(stderr, "error: %s[%d %s:%d]: groupTask: %d, childTask: %d\n",
           __FUNCTION__, pthread_self(), __FILE__, __LINE__, groupTask, childTask);
   groupTask->groupFragment()->statusAddPendingTask();
+}
+
+void swift::swift_task_print_ID(const void* name, const void* file, int line, AsyncTask *task) {
+  fprintf(stderr, "error: swift_task_print_ID(%s)[%d %s:%d]: task: %d\n",
+          name, pthread_self(), file, line, task);
 }

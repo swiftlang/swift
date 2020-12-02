@@ -133,6 +133,8 @@ extension Task {
       let (groupTask, _) = Builtin.createAsyncTask(flags.bits, parentTask, { () async throws -> () in
         () // ...nothing...
       })
+      _taskPrintID(("parentTask" as NSString).utf8String, (#file as NSString).utf8String, #line, parentTask)
+      _taskPrintID(("groupTask" as NSString).utf8String, (#file as NSString).utf8String, #line, groupTask)
       self.groupTask = groupTask
     }
 
@@ -164,8 +166,9 @@ extension Task {
       flags.isChildTask = true
       flags.isGroupChild = true
 
-      let (childTask, ) =
+      let (childTask, _) =
         Builtin.createAsyncTaskFuture(flags.bits, groupTask, operation)
+      _taskPrintID(("childTask(add)" as NSString).utf8String, (#file as NSString).utf8String, #line, childTask)
       _taskGroupAddPending(groupTask, childTask)
       let handle = Handle<TaskResult>(task: childTask)
 
@@ -273,3 +276,21 @@ func _taskGroupAddPending(
   _ groupTask: Builtin.NativeObject,
   _ childTask: Builtin.NativeObject
 )
+
+// TODO: remove this
+@_silgen_name("swift_task_print_ID")
+public func _taskPrintID(
+  _ name: Optional<UnsafePointer<Int8>>,
+  _ file: Optional<UnsafePointer<Int8>>,
+  _ line: Int,
+  _ task: Builtin.NativeObject
+)
+
+/// Prints the task ID (just pointer) of the currently executing task.
+public func _taskPrintIDCurrent(
+  _ name: Optional<UnsafePointer<Int8>>,
+  file: String = #file,
+  line: Int = #line
+) async {
+  _taskPrintID(name, (file as NSString).utf8String, line, Builtin.getCurrentAsyncTask())
+}

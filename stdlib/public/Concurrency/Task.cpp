@@ -308,11 +308,14 @@ void swift::swift_task_future_wait(
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
-  fprintf(stderr, "error: swift_task_future_wait[%d %s:%d]: waitingTask: %d rawContext: %d\n",
-          pthread_self(), __FILE__, __LINE__, waitingTask, rawContext);
-
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
+
+  fprintf(stderr, "error: swift_task_future_wait[%d %s:%d]: waitingTask: %d rawContext: %d task: %s\n",
+          pthread_self(), __FILE__, __LINE__, waitingTask, rawContext, task);
+
+  // Wait on the future.
+  assert(task->isFuture());
 
   // TODO: Would be nicer perhaps to make a new function swift_task_group_poll
   //       to not mix it into the future_wait which is somewhat different but very similar...
@@ -321,8 +324,6 @@ void swift::swift_task_future_wait(
     return;
   }
 
-  // Wait on the future.
-  assert(task->isFuture());
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
