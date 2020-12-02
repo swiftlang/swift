@@ -50,9 +50,6 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 # -----------------------------------------------------------------------------
 # Constants
 
-# TODO: Remove this constant, it's really not helpful.
-HOME = os.environ.get("HOME", "/")
-
 # These versions are community sourced. At any given time only the Xcode
 # version used by Swift CI is officially supported. See ci.swift.org
 _SUPPORTED_XCODE_BUILDS = [
@@ -1169,7 +1166,8 @@ def main_preset():
                 "build-presets.ini")
         ]
 
-        user_presets_file = os.path.join(HOME, '.swift-build-presets')
+        user_presets_file = os.path.join(os.getenv("HOME", "/"),
+                                         '.swift-build-presets')
         if os.path.isfile(user_presets_file):
             args.preset_file_names.append(user_presets_file)
 
