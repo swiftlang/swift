@@ -20,6 +20,7 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/FunctionExtras.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -27,6 +28,50 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool> AbortOnDiagnosticNotBeingProduced(
+    "swift-diagnostic-verifier-abort-on-not-produced-diagnostic",
+    llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc(
+        "Option for compiler developers to cause the diagnostic verifier to "
+        "abort when it detects that it did not find a diagnostic"));
+
+static llvm::cl::opt<bool> AbortOnMalformedDiagnostic(
+    "swift-diagnostic-verifier-abort-on-malformed-diagnostic", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc(
+        "Option for compiler developers that causes the diagnostic verifier to "
+        "abort when it detects a diagnostic that is malformed structurally"));
+
+static llvm::cl::opt<bool> AbortOnIncorrectDiagnostic(
+    "swift-diagnostic-verifier-abort-on-incorrect-diagnostic", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("Option for compiler developers to cause the diagnostic "
+                   "verifier to abort if it detects a diagnostic in the "
+                   "correct location, but with the wrong text."));
+
+static llvm::cl::opt<bool> AbortOnUnexpectedDiagnostic(
+    "swift-diagnostic-verifier-abort-on-unexpected-diagnostic",
+    llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc(
+        "Option for compiler developers to cause the diagnostic verifier to "
+        "abort when it detects a diagnostic that was not specified as "
+        "expected"));
+
+static llvm::cl::opt<bool> AbortOnUnexpectedDiagnosticFixit(
+    "swift-diagnostic-verifier-abort-on-unexpected-diagnostic-fixit",
+    llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc(
+        "Option for compiler developers to cause the diagnostic verifier to "
+        "abort when it detects a diagnostic fixit that was not specified as "
+        "expected"));
+
+static llvm::cl::opt<bool> AbortOnMissingDiagnostic(
+    "swift-diagnostic-verifier-abort-on-missing-diagnostic", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc(
+        "Option for compiler developers to cause the diagnostic verifier to "
+        "abort when it detects an expected diagnostic that was missing."));
 
 namespace swift {
 
@@ -322,8 +367,11 @@ static void parseExpectedDiagnosticsFromBuffer(
     auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
     auto diag =
         SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    if (AbortOnDiagnosticNotBeingProduced)
+      llvm_unreachable("Aborting due to failure to parse a diagnostic.");
     Errors.push_back(diag);
   };
+
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
     // Process this potential match.  If we fail to process it, just move on to
@@ -616,6 +664,8 @@ void DiagnosticVerifier::verifyAllExpectedDiagnosticsAppeared(
     auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag =
         SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    if (AbortOnMalformedDiagnostic)
+      llvm_unreachable("Found malformed diagnostic?!");
     Errors.push_back(diag);
   };
 
@@ -672,6 +722,8 @@ void DiagnosticVerifier::verifyAllExpectedDiagnosticsAppeared(
       llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
                                       SMLoc::getFromPointer(replEndLoc)),
                         replStr);
+      if (AbortOnUnexpectedDiagnosticFixit)
+        llvm_unreachable("Found unexpected fixit!");
       addError(location, message, fix);
     };
 
@@ -802,6 +854,8 @@ void DiagnosticVerifier::diagnoseIncorrectDiagnostics(
     auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag =
         SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    if (AbortOnIncorrectDiagnostic)
+      llvm_unreachable("Found incorrect diagnostic?!");
     Errors.push_back(diag);
   };
 
@@ -857,6 +911,8 @@ void DiagnosticVerifier::diagnoseExpectedDiagnosticsThatDidntAppear(
     auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag =
         SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    if (AbortOnMissingDiagnostic)
+      llvm_unreachable("Found missing diagnostic?!");
     Errors.push_back(diag);
   };
 
@@ -940,21 +996,21 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   // such.
   diagnoseIncorrectDiagnostics(BufferName, Errors, ExpectedDiagnostics);
 
-  std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
-
   // Diagnose expected diagnostics that didn't appear.
+  std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
   diagnoseExpectedDiagnosticsThatDidntAppear(InputFile, ExpectedDiagnostics,
                                              Errors);
 
+  // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   auto addError = [&](const char *Loc, const Twine &message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
     auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
     auto diag =
         SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    if (AbortOnUnexpectedDiagnostic)
+      llvm_unreachable("Found unexpected diagnostic?!");
     Errors.push_back(diag);
   };
-
-  // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   bool HadUnexpectedDiag = false;
   auto CapturedDiagIter = CapturedDiagnostics.begin();
   while (CapturedDiagIter != CapturedDiagnostics.end()) {
@@ -972,16 +1028,19 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
-  // Sort the diagnostics by their address in the memory buffer as the primary
-  // key.  This ensures that an "unexpected diagnostic" and
-  // "expected diagnostic" in the same place are emitted next to each other.
+  // Ok. Now we have finished processiing and found all of the errors that we
+  // are going to emit.
+  //
+  // With that in mind, sort the diagnostics by their address in the memory
+  // buffer as the primary key.  This ensures that an "unexpected diagnostic"
+  // and "expected diagnostic" in the same place are emitted next to each other.
   std::sort(Errors.begin(), Errors.end(),
             [&](const llvm::SMDiagnostic &lhs,
                 const llvm::SMDiagnostic &rhs) -> bool {
               return lhs.getLoc().getPointer() < rhs.getLoc().getPointer();
             });
 
-  // Emit all of the queue'd up errors.
+  // Then emit all of the queue'd up errors.
   for (auto Err : Errors)
     SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
 
