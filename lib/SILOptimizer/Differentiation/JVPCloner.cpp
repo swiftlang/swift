@@ -519,11 +519,13 @@ public:
           return;
         }
       }
-      auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, origCallee);
-      jvpValue = builder.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::JVP,
-          borrowedDiffFunc);
-      jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
+      builder.emitScopedBorrowOperation(
+          loc, origCallee, [&](SILValue borrowedDiffFunc) {
+            jvpValue = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::JVP,
+                borrowedDiffFunc);
+            jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
+          });
     }
 
     // If JVP has not yet been found, emit an `differentiable_function`
@@ -614,11 +616,13 @@ public:
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
 
-      auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
-      auto extractedJVP = builder.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent::JVP, borrowedADFunc);
-      jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
-      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitScopedBorrowOperation(
+          loc, diffFuncInst, [&](SILValue borrowedADFunc) {
+            auto extractedJVP = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::JVP,
+                borrowedADFunc);
+            jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
+          });
       builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
@@ -1048,7 +1052,7 @@ public:
     auto structType =
         remapSILTypeInDifferential(sei->getOperand()->getType()).getASTType();
     auto *tanField =
-        getTangentStoredProperty(context, sei, structType, invoker);
+      getTangentStoredProperty(context, sei, structType, invoker);
     if (!tanField) {
       errorOccurred = true;
       return;
@@ -1079,7 +1083,7 @@ public:
     auto structType =
         remapSILTypeInDifferential(seai->getOperand()->getType()).getASTType();
     auto *tanField =
-        getTangentStoredProperty(context, seai, structType, invoker);
+      getTangentStoredProperty(context, seai, structType, invoker);
     if (!tanField) {
       errorOccurred = true;
       return;

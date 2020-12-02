@@ -637,15 +637,18 @@ DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
                                            function_ref<void(SILValue)> &&fun) {
-  if (original->getType().isAddress()) {
-    original = createLoadBorrow(loc, original);
+  SILValue value = original;
+  if (value->getType().isAddress()) {
+    value = createLoadBorrow(loc, value);
   } else {
-    original = createBeginBorrow(loc, original);
+    value = emitBeginBorrowOperation(loc, value);
   }
 
-  fun(original);
+  fun(value);
 
-  createEndBorrow(loc, original);
+  // If we actually inserted a borrowing operation... insert the end_borrow.
+  if (value != original)
+    createEndBorrow(loc, value);
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(

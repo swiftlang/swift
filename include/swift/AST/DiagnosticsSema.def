@@ -1112,9 +1112,13 @@ ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
      (Type))
-ERROR(missing_forced_downcast,none,
-      "%0 is not convertible to %1; "
-      "did you mean to use 'as!' to force downcast?", (Type, Type))
+ERROR(cannot_coerce_to_type, none,
+      "%0 is not convertible to %1", (Type, Type))
+NOTE(missing_forced_downcast, none,
+     "did you mean to use 'as!' to force downcast?", ())
+NOTE(missing_optional_downcast, none,
+     "did you mean to use 'as?' to conditionally downcast?", ())
+     
 WARNING(coercion_may_fail_warning,none,
         "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
         (Type, Type))
@@ -1788,6 +1792,10 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+WARNING(spi_attribute_on_import_of_public_module,none,
+        "'@_spi' import of %0 will not include any SPI symbols; "
+        "%0 was built from the public interface at %1",
+        (DeclName, StringRef))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2615,6 +2623,9 @@ WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
+WARNING(anyobject_class_inheritance_deprecated,none,
+  "using 'class' keyword for protocol inheritance is deprecated; "
+  "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,

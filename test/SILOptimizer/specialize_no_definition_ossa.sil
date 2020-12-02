@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -save-optimization-record-path=%t.yaml -o /dev/null %/s
+// RUN: %FileCheck %s < %t.yaml
+
+import Builtin
+import Swift
+
+sil_stage canonical
+
+// CHECK:      --- !Missed
+// CHECK-NEXT: Pass:            sil-generic-specializer
+// CHECK-NEXT: Name:            sil.NoDef
+// CHECK-NEXT: DebugLoc:
+// CHECK:         File:            {{.*}}/specialize_no_definition_ossa.sil
+// CHECK:         Line:            33
+// CHECK:         Column:          8
+// CHECK-NEXT: Function:        foo
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'Unable to specialize generic function '
+// CHECK-NEXT:   - Callee:          '"bar"'
+// CHECK-NEXT:     DebugLoc:
+// CHECK:             File:            {{.*}}/specialize_no_definition_ossa.sil
+// CHECK:             Line:            32
+// CHECK:             Column:          21
+// CHECK-NEXT:   - String:          ' since definition is not visible'
+// CHECK-NEXT: ...
+sil hidden [ossa] @foo : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2          
+  %1 = struct $Int64 (%0 : $Builtin.Int64)          
+  %2 = alloc_stack $Int64                           
+  store %1 to [trivial] %2 : $*Int64                          
+  %4 = function_ref @bar : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () 
+  %5 = apply %4<Int64>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %2 : $*Int64                        
+  %7 = tuple ()                                   
+  return %7 : $()                                 
+}
+
+sil hidden_external @bar : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()

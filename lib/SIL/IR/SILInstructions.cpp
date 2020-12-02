@@ -724,7 +724,8 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     : UnaryInstructionBase(debugLoc, function,
                            extracteeType
                                ? *extracteeType
-                               : getExtracteeType(function, extractee, module)),
+                               : getExtracteeType(function, extractee, module),
+                           function.getOwnershipKind()),
       Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
 #ifndef NDEBUG
   if (extracteeType.hasValue()) {
@@ -763,7 +764,8 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
     LinearDifferentiableFunctionTypeComponent extractee, SILValue function)
     : UnaryInstructionBase(debugLoc, function,
-                           getExtracteeType(function, extractee, module)),
+                           getExtracteeType(function, extractee, module),
+                           function.getOwnershipKind()),
       extractee(extractee) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
@@ -1361,12 +1363,6 @@ VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
     index -= superDecl->getStoredProperties().size();
   }
   return nullptr;
-}
-
-unsigned FieldIndexCacheBase::cacheFieldIndex() {
-  unsigned index = ::getFieldIndex(getParentDecl(), getField());
-  SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = index;
-  return index;
 }
 
 // FIXME: this should be cached during cacheFieldIndex().
@@ -2108,13 +2104,13 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
 
 OpenExistentialBoxValueInst::OpenExistentialBoxValueInst(
     SILDebugLocation DebugLoc, SILValue operand, SILType ty)
-    : UnaryInstructionBase(DebugLoc, operand, ty) {
-}
+    : UnaryInstructionBase(DebugLoc, operand, ty, operand.getOwnershipKind()) {}
 
-OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
-                                                     SILValue Operand,
-                                                     SILType SelfTy)
-    : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
+OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation debugLoc,
+                                                   SILValue operand,
+                                                   SILType selfTy)
+    : UnaryInstructionBase(debugLoc, operand, selfTy,
+                           operand.getOwnershipKind()) {}
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
                                SILValue operand,

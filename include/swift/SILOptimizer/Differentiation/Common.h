@@ -22,6 +22,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -166,8 +167,11 @@ VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
 /// Returns the tangent stored property of the original stored property
 /// referenced by the given projection instruction with the given base type.
 /// On error, emits diagnostic and returns nullptr.
+///
+/// NOTE: Asserts if \p projectionInst is not one of: struct_extract,
+/// struct_element_addr, or ref_element_addr.
 VarDecl *getTangentStoredProperty(ADContext &context,
-                                  FieldIndexCacheBase *projectionInst,
+                                  SingleValueInstruction *projectionInst,
                                   CanType baseType,
                                   DifferentiationInvoker invoker);
 

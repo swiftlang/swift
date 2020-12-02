@@ -22,6 +22,17 @@
 using namespace swift;
 using namespace constraints;
 
+bool ConstraintSystem::PotentialBinding::isViableForJoin() const {
+  return Kind == AllowedBindingKind::Supertypes &&
+         !BindingType->hasLValueType() &&
+         !BindingType->hasUnresolvedType() &&
+         !BindingType->hasTypeVariable() &&
+         !BindingType->hasHole() &&
+         !BindingType->hasUnboundGenericType() &&
+         !hasDefaultedLiteralProtocol() &&
+         !isDefaultableBinding();
+}
+
 bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
   if (isGenericParameter())
@@ -679,30 +690,30 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
-  if (binding.Kind == AllowedBindingKind::Supertypes &&
-      !binding.BindingType->hasUnresolvedType() &&
-      !binding.BindingType->hasTypeVariable() &&
-      !binding.BindingType->hasHole() &&
-      !binding.BindingType->hasUnboundGenericType() &&
-      !binding.hasDefaultedLiteralProtocol() &&
-      !binding.isDefaultableBinding() && allowJoinMeet) {
-    if (lastSupertypeIndex) {
-      auto &lastBinding = Bindings[*lastSupertypeIndex];
-      auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
-      auto bindingType = binding.BindingType->getWithoutSpecifierType();
+  if (binding.isViableForJoin() && allowJoinMeet) {
+    bool joined = false;
 
-      auto join = Type::join(lastType, bindingType);
-      if (join && !(*join)->isAny() &&
-          (!(*join)->getOptionalObjectType()
-           || !(*join)->getOptionalObjectType()->isAny())) {
-        // Replace the last supertype binding with the join. We're done.
-        lastBinding.BindingType = *join;
-        return;
+    auto isAcceptableJoin = [](Type type) {
+      return !type->isAny() && (!type->getOptionalObjectType() ||
+                                !type->getOptionalObjectType()->isAny());
+    };
+
+    for (auto &existingBinding : Bindings) {
+      if (!existingBinding.isViableForJoin())
+        continue;
+
+      auto join = Type::join(existingBinding.BindingType, binding.BindingType);
+
+      if (join && isAcceptableJoin(*join)) {
+        existingBinding.BindingType = *join;
+        joined = true;
       }
     }
 
-    // Record this as the most recent supertype index.
-    lastSupertypeIndex = Bindings.size();
+    // If new binding has been joined with at least one of existing
+    // bindings, there is no reason to include it into the set.
+    if (joined)
+      return;
   }
 
   if (auto *literalProtocol = binding.getDefaultedLiteralProtocol())

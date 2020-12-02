@@ -39,8 +39,12 @@ function(manpage)
       ALL)
 
   add_dependencies(${MP_INSTALL_IN_COMPONENT} ${manpage_target})
+  set(MANPAGE_DEST "share/")
+  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
+    set(MANPAGE_DEST "")
+  endif()
   swift_install_in_component(FILES "${output_file_name}"
-                             DESTINATION "share/man/man${MP_MAN_SECTION}"
+                             DESTINATION "${MANPAGE_DEST}man/man${MP_MAN_SECTION}"
                              COMPONENT "${MP_INSTALL_IN_COMPONENT}")
 endfunction()
 

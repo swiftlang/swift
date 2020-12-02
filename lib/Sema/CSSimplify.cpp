@@ -3551,9 +3551,26 @@ bool ConstraintSystem::repairFailures(
                                   getConstraintLocator(coercion->getSubExpr())))
         return true;
 
-      // Repair a coercion ('as') with a forced checked cast ('as!').
-      if (auto *coerceToCheckCastFix = CoerceToCheckedCast::attempt(
-              *this, lhs, rhs, getConstraintLocator(locator))) {
+      // If the result type of the coercion has an value to optional conversion
+      // we can instead suggest the conditional downcast as it is safer in
+      // situations like conditional binding.
+      auto useConditionalCast = llvm::any_of(
+          ConstraintRestrictions,
+          [&](std::tuple<Type, Type, ConversionRestrictionKind> restriction) {
+            ConversionRestrictionKind restrictionKind;
+            Type type1, type2;
+            std::tie(type1, type2, restrictionKind) = restriction;
+
+            if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
+              return false;
+
+            return rhs->isEqual(type1);
+          });
+
+      // Repair a coercion ('as') with a runtime checked cast ('as!' or 'as?').
+      if (auto *coerceToCheckCastFix =
+              CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
+                                           getConstraintLocator(locator))) {
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
@@ -9560,8 +9577,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
-        if (auto *fix =
-                CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
+        if (auto *fix = CoerceToCheckedCast::attempt(
+                *this, fromType, toType, /*useConditionalCast*/ false, loc))
           return !recordFix(fix, impact);
       }
       
