@@ -29,12 +29,14 @@
 using namespace swift;
 
 namespace swift {
+
 struct ExpectedFixIt {
   const char *StartLoc, *EndLoc; // The loc of the {{ and }}'s.
   unsigned StartCol;
   unsigned EndCol;
   std::string Text;
 };
+
 } // end namespace swift
 
 namespace {
@@ -42,7 +44,9 @@ namespace {
 static constexpr StringLiteral fixitExpectationNoneString("none");
 static constexpr StringLiteral educationalNotesSpecifier("educational-notes=");
 
-struct ExpectedDiagnosticInfo {
+} // anonymous namespace
+
+struct DiagnosticVerifier::ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
   const char *ExpectedStart, *ExpectedEnd = nullptr;
 
@@ -85,6 +89,9 @@ struct ExpectedDiagnosticInfo {
                          DiagnosticKind Classification)
       : ExpectedStart(ExpectedStart), Classification(Classification) {}
 };
+namespace {
+using ExpectedDiagnosticInfo = DiagnosticVerifier::ExpectedDiagnosticInfo;
+} // anonymous namespace
 
 static std::string getDiagKindString(DiagnosticKind Kind) {
   switch (Kind) {
@@ -237,7 +244,6 @@ verifyUnknown(SourceManager &SM,
   }
   return HadError;
 }
-} // end anonymous namespace
 
 static unsigned getColumnNumber(StringRef buffer, llvm::SMLoc loc) {
   assert(loc.getPointer() >= buffer.data());

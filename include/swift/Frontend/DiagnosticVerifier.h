@@ -79,6 +79,11 @@ public:
 
   virtual bool finishProcessing() override;
 
+  /// Forward declaration of struct only used in internal impl so it can be used
+  /// in internal helper methods on this class. It is only declared, not defined
+  /// in any header.
+  struct ExpectedDiagnosticInfo;
+
 private:
   /// Result of verifying a file.
   struct Result {
