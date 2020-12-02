@@ -1,0 +1,4 @@
+module _InternalDependencyScan {
+  header "DependencyScan.h"
+  link "_InternalDependencyScan"
+}

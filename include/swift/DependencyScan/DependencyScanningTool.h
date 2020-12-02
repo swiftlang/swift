@@ -13,6 +13,7 @@
 #ifndef SWIFT_DEPENDENCY_SCANNING_TOOL_H
 #define SWIFT_DEPENDENCY_SCANNING_TOOL_H
 
+#include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/DependencyScan/ScanDependencies.h"
@@ -35,7 +36,7 @@ public:
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c FullDependencies otherwise.
-  llvm::ErrorOr<FullDependencies>
+  llvm::ErrorOr<depscan_dependency_result_t*>
   getDependencies(ArrayRef<const char *> Command,
                   const llvm::StringSet<> &PlaceholderModules);
 
@@ -44,9 +45,10 @@ public:
   /// BatchScanInput-specified output locations.
   ///
   /// \returns a \c std::error_code if errors occured during scan.
-  std::error_code getDependencies(ArrayRef<const char *> Command,
-                                  const std::vector<BatchScanInput> &BatchInput,
-                                  const llvm::StringSet<> &PlaceholderModules);
+  std::vector<llvm::ErrorOr<depscan_dependency_result_t*>>
+  getDependencies(ArrayRef<const char *> Command,
+                  const std::vector<BatchScanInput> &BatchInput,
+                  const llvm::StringSet<> &PlaceholderModules);
 
 private:
   /// Using the specified invocation command, instantiate a CompilerInstance

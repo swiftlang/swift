@@ -13,6 +13,7 @@
 #ifndef SWIFT_DEPENDENCY_SCANDEPENDENCIES_H
 #define SWIFT_DEPENDENCY_SCANDEPENDENCIES_H
 
+#include "swift-c/DependencyScan/DependencyScan.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
@@ -28,7 +29,6 @@ class ModuleDependenciesCache;
 
 namespace dependencies {
 
-struct FullDependencies;
 struct BatchScanInput {
   llvm::StringRef moduleName;
   llvm::StringRef arguments;
@@ -54,12 +54,12 @@ bool batchPrescanDependencies(CompilerInstance &instance,
 
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
-llvm::ErrorOr<FullDependencies>
+llvm::ErrorOr<depscan_dependency_result_t*>
 performModuleScan(CompilerInstance &instance,
                   ModuleDependenciesCache &cache);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<FullDependencies>>
+std::vector<llvm::ErrorOr<depscan_dependency_result_t*>>
 performBatchModuleScan(CompilerInstance &instance,
                        ModuleDependenciesCache &cache, llvm::StringSaver &saver,
                        const std::vector<BatchScanInput> &BatchInput);

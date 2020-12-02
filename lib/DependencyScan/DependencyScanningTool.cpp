@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/DependencyScanningTool.h"
-#include "swift/DependencyScan/FullDependencies.h"
+#include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -28,7 +28,8 @@ DependencyScanningTool::DependencyScanningTool()
     : SharedCache(std::make_unique<ModuleDependenciesCache>()), PDC(), Alloc(),
       Saver(Alloc) {}
 
-llvm::ErrorOr<FullDependencies> DependencyScanningTool::getDependencies(
+llvm::ErrorOr<depscan_dependency_result_t *>
+DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const llvm::StringSet<> &PlaceholderModules) {
   // The primary instance used to scan the query Swift source-code
@@ -46,18 +47,22 @@ llvm::ErrorOr<FullDependencies> DependencyScanningTool::getDependencies(
   return Dependencies;
 }
 
-std::error_code DependencyScanningTool::getDependencies(
+std::vector<llvm::ErrorOr<depscan_dependency_result_t *>>
+DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const std::vector<BatchScanInput> &BatchInput,
     const llvm::StringSet<> &PlaceholderModules) {
   // The primary instance used to scan Swift modules
   auto InstanceOrErr = initCompilerInstanceForScan(Command);
   if (std::error_code EC = InstanceOrErr.getError())
-    return EC;
+    return std::vector<llvm::ErrorOr<depscan_dependency_result_t *>>(
+        BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
   auto Instance = std::move(*InstanceOrErr);
 
-  performBatchModuleScan(*Instance.get(), *SharedCache, Saver, BatchInput);
-  return std::error_code();
+  auto batchScanResults =
+      performBatchModuleScan(*Instance.get(), *SharedCache, Saver, BatchInput);
+
+  return batchScanResults;
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
@@ -98,3 +103,95 @@ DependencyScanningTool::initCompilerInstanceForScan(
 
 } // namespace dependencies
 } // namespace swift
+
+//===--- C API ------------------------------------------------------------===//
+
+using namespace swift::dependencies;
+
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, depscan_scanner_t)
+
+depscan_scanner_t depscan_scanner_create(void) {
+  return wrap(new DependencyScanningTool());
+}
+
+void depscan_scanner_dispose(depscan_scanner_t c_scanner) {
+  delete unwrap(c_scanner);
+}
+
+depscan_dependency_result_t *
+depscan_scan_dependencies(depscan_scanner_t *scanner,
+                          const char *working_directory, int argc,
+                          const char *const *argv) {
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(argv[i]);
+
+  // Execute the scan and bridge the result
+  auto ScanResult = ScanningTool->getDependencies(Compilation, {});
+  if (ScanResult.getError())
+    return nullptr;
+  auto DependencyGraph = std::move(*ScanResult);
+  return DependencyGraph;
+}
+
+void depscan_dependency_info_details_dispose(
+    depscan_module_details_t *details) {
+  switch (details->kind) {
+  case DEPSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL:
+    depscan_string_dispose(
+        details->swift_textual_details.module_interface_path);
+    depscan_string_set_dispose(
+        details->swift_textual_details.compiled_module_candidates);
+    depscan_string_dispose(details->swift_textual_details.bridging_header_path);
+    depscan_string_set_dispose(
+        details->swift_textual_details.bridging_source_files);
+    depscan_string_set_dispose(
+        details->swift_textual_details.bridging_module_dependencies);
+    depscan_string_set_dispose(details->swift_textual_details.command_line);
+    depscan_string_set_dispose(details->swift_textual_details.extra_pcm_args);
+    depscan_string_dispose(details->swift_textual_details.context_hash);
+    break;
+  case DEPSCAN_DEPENDENCY_INFO_SWIFT_BINARY:
+    depscan_string_dispose(details->swift_binary_details.compiled_module_path);
+    depscan_string_dispose(details->swift_binary_details.module_doc_path);
+    depscan_string_dispose(
+        details->swift_binary_details.module_source_info_path);
+    break;
+  case DEPSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER:
+    depscan_string_dispose(
+        details->swift_placeholder_details.compiled_module_path);
+    depscan_string_dispose(details->swift_placeholder_details.module_doc_path);
+    depscan_string_dispose(
+        details->swift_placeholder_details.module_source_info_path);
+    break;
+  case DEPSCAN_DEPENDENCY_INFO_CLANG:
+    depscan_string_dispose(details->clang_details.module_map_path);
+    depscan_string_dispose(details->clang_details.context_hash);
+    depscan_string_set_dispose(details->clang_details.command_line);
+    break;
+  }
+  delete details;
+}
+
+void depscan_dependency_info_dispose(depscan_dependency_info_t *info) {
+  depscan_string_dispose(info->module_name);
+  depscan_string_dispose(info->module_path);
+  depscan_string_set_dispose(info->source_files);
+  depscan_string_set_dispose(info->direct_dependencies);
+  depscan_dependency_info_details_dispose(info->details);
+}
+
+void depscan_dependency_set_dispose(depscan_dependency_set_t *set) {
+  for (int i = 0; i < set->count; ++i) {
+    depscan_dependency_info_dispose(&set->modules[i]);
+  }
+  delete[] set->modules;
+  delete set;
+}
+
+void depscan_dependency_result_dispose(depscan_dependency_result_t *result) {
+  depscan_string_dispose(result->main_module_name);
+  depscan_dependency_set_dispose(result->module_set);
+  delete result;
+}
