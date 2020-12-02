@@ -92,8 +92,8 @@ static void runTaskWithGroupPollResult(
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  fprintf(stderr, "error: runTaskWithGroupPollResult[%d :%d]: polled STATUS: %d\n",
-          pthread_self(), __LINE__, result.status);
+  fprintf(stderr, "error: runTaskWithGroupPollResult[%d %s:%d]: polled STATUS: %d\n",
+          pthread_self(), __FILE__, __LINE__, result.status);
 
   waitingTaskContext->result.hadErrorResult =
       result.status == AsyncTask::GroupFragment::ChannelPollStatus::Error;

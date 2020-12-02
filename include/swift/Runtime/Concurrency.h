@@ -141,7 +141,7 @@ swift_task_future_wait;
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_poll(on channelTask: Builtin.NativeObject) async
+/// func swift_task_group_poll(on groupTask: Builtin.NativeObject) async
 ///     -> RawGroupPollResult?
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -152,20 +152,20 @@ swift_task_group_poll;
 ///
 /// \code
 /// func swift_task_group_add_pending(
-///     _ channelTask: Builtin.NativeObject),
+///     _ groupTask: Builtin.NativeObject),
 ///     _ childTask: Builtin.NativeObject
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void
-swift_task_group_add_pending(AsyncTask *channelTask, AsyncTask *childTask);
+swift_task_group_add_pending(AsyncTask *groupTask, AsyncTask *childTask);
 
 /// Check the readyQueue of a Channel, return true if it has no pending tasks.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_is_empty(on channelTask: Builtin.NativeObject) -> Bool
+/// func swift_task_group_is_empty(on groupTask: Builtin.NativeObject) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool

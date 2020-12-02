@@ -474,9 +474,6 @@ public:
     // TODO: these are like Future, had tough time making it be BOTH future and channel
     std::atomic<WaitQueueItem> waitQueue; // TODO: reuse the future's wait queue instead?
 
-    /// The type of the result that will be produced by the channel.
-    const Metadata *resultType; // TODO not sure if we need it.
-
     // FIXME: seems shady...?
     // Trailing storage for the result itself. The storage will be uninitialized.
     // Use the `readyQueue` to poll for values from the channel instead.
@@ -487,8 +484,7 @@ public:
         : //readyQueue(ReadyQueueItem::get(ReadyQueueStatus::Empty, nullptr)),
           status(GroupStatus::initial().status),
           readyQueue(),
-          waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)), // TODO: reuse FutureFragment's waitQ
-          resultType(resultType) { } // TODO: reuse FutureFragment's resultType
+          waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)) {}  // TODO: reuse FutureFragment's waitQ
 
     /// Destroy the storage associated with the channel.
     void destroy();
@@ -538,8 +534,6 @@ public:
     /// Determine the size of the channel fragment given a particular channel
     /// result type.
     static size_t fragmentSize() {
-//        return storageOffset() +
-//               std::max(resultType->vw_size(), sizeof(SwiftError *));
       return sizeof(GroupFragment);
     }
   };

@@ -57,8 +57,11 @@ func test_sum_nextOnPending() {
       var sum = 0
       print("before group.next(), sum: \(sum)")
       while let r = await try! group.next() {
+        assert(numbers.contains(r), "Unexpected value: \(r)! Expected any of \(numbers)")
         print("next: \(r)")
-        sum += r
+        DispatchQueue.main.sync { // FIXME: remove once executors/actors are a thing; they should provide us a way to guarantee the safety here
+          sum += r
+        }
         print("before group.next(), sum: \(sum)")
       }
 
@@ -67,19 +70,17 @@ func test_sum_nextOnPending() {
     }
   }
 
-  // CHECK: before group.next(), sum: 0
+  // CHECK: complete group.add { [[REG1:[0-9]+]] }
+  // CHECK: complete group.add { [[REG2:[0-9]+]] }
+  // CHECK: complete group.add { [[REG3:[0-9]+]] }
+  // CHECK: complete group.add { [[REG4:[0-9]+]] }
+  // CHECK: complete group.add { [[REG5:[0-9]+]] }
 
-  // CHECK-DAG: complete group.add { [[REG1:[0-9]+]] }
-  // CHECK-DAG: complete group.add { [[REG2:[0-9]+]] }
-  // CHECK-DAG: complete group.add { [[REG3:[0-9]+]] }
-  // CHECK-DAG: complete group.add { [[REG4:[0-9]+]] }
-  // CHECK-DAG: complete group.add { [[REG5:[0-9]+]] }
-
-  // CHECK: next: [[REG1]]
-  // CHECK: next: [[REG2]]
-  // CHECK: next: [[REG3]]
-  // CHECK: next: [[REG4]]
-  // CHECK: next: [[REG5]]
+  // CON: next: [[REG1]]
+  // CON: next: [[REG2]]
+  // CON: next: [[REG3]]
+  // CON: next: [[REG4]]
+  // CON: next: [[REG5]]
 
   // CHECK: task group returning: 15
 
@@ -87,12 +88,11 @@ func test_sum_nextOnPending() {
     let sum = await try! taskHandle.get()
     // CHECK: result: 15
     print("result: \(sum)")
+    assert(sum == expected)
     exit(0)
   }
 
   print("main task")
-  sleep(20)
-  exit(-1)
 }
 
 test_sum_nextOnPending()

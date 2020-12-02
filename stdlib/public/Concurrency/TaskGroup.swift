@@ -164,9 +164,9 @@ extension Task {
       flags.isChildTask = true
       flags.isGroupChild = true
 
-      let (childTask, _) =
+      let (childTask, ) =
         Builtin.createAsyncTaskFuture(flags.bits, groupTask, operation)
-      taskGroupAddPending(groupTask, childTask)
+      _taskGroupAddPending(groupTask, childTask)
       let handle = Handle<TaskResult>(task: childTask)
 
       // FIXME: use executors or something else to launch the task
@@ -187,18 +187,18 @@ extension Task {
     public mutating func next() async throws -> TaskResult? {
       // We reuse the taskFutureWait -> swift_task_future_wait since it seems to have special sauce,
       // but actually we
-      fputs("error: next[\(pthread_self()) :\(#line)]: invoked\n", stderr)
+      fputs("error: next[\(#file):\(#line)]: invoked: \(self.groupTask)\n", stderr)
       let rawResult = await _taskFutureWait(on: self.groupTask)
-//      let rawResult = await taskGroupPoll(on: self.groupTask) // TODO: consider if we can implement this way
-      fputs("error: next[\(pthread_self()) :\(#line)]: NEXT RESULT RAW: \(rawResult)\n", stderr)
+//      let rawResult = await _taskGroupPoll(on: self.groupTask) // TODO: consider if we can implement this way
+      fputs("error: next[\(#file):\(#line)]: NEXT RESULT RAW: \(rawResult)\n", stderr)
 
       if rawResult.hadErrorResult {
         // Throw the result on error.
-        print("error: next[\(#line)]: after await, error: \(rawResult)");
+        print("error: next[\(#file):\(#line)]: after await, error: \(rawResult)");
         throw unsafeBitCast(rawResult.storage, to: Error.self)
       }
 
-      print("error: next[\(#line)]: after await, result: \(rawResult)");
+      print("error: next[\(#file):\(#line)]: after await, result: \(rawResult)");
 
       guard let storage = rawResult.storage else {
         return nil
@@ -208,7 +208,7 @@ extension Task {
       let storagePtr =
         storage.bindMemory(to: Optional<TaskResult>.self, capacity: 1)
       let value = UnsafeMutablePointer<Optional<TaskResult>>(mutating: storagePtr).pointee
-      fputs("error: next[\(pthread_self()) :\(#line)]: NEXT RESULT: \(value)\n", stderr)
+      fputs("error: next[\(pthread_self()) \(#file):\(#line)]: NEXT RESULT: \(value)\n", stderr)
       return value
     }
 
@@ -220,7 +220,7 @@ extension Task {
     ///
     /// - Returns: `true` if the group has no pending tasks, `false` otherwise.
     public var isEmpty: Bool {
-      taskGroupIsEmpty(self.groupTask)
+      _taskGroupIsEmpty(self.groupTask)
     }
 
     /// Cancel all the remaining tasks in the group.
@@ -259,18 +259,17 @@ enum ChannelPollStatus: Int {
 }
 
 @_silgen_name("swift_task_group_poll")
-func taskGroupPoll(
-  on channelTask: Builtin.NativeObject
+func _taskGroupPoll(
+  on groupTask: Builtin.NativeObject
 ) async -> RawTaskFutureWaitResult
-// ) async -> RawGroupPollResult
 
 @_silgen_name("swift_task_group_is_empty")
-func taskGroupIsEmpty(
-  _ channelTask: Builtin.NativeObject
+func _taskGroupIsEmpty(
+  _ groupTask: Builtin.NativeObject
 ) -> Bool
 
 @_silgen_name("swift_task_group_add_pending")
-func taskGroupAddPending(
-  _ channelTask: Builtin.NativeObject,
+func _taskGroupAddPending(
+  _ groupTask: Builtin.NativeObject,
   _ childTask: Builtin.NativeObject
 )

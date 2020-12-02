@@ -168,9 +168,10 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 
   // Offer the future to the parent task group's channel.
   if (task->isGroupChild()) {
+    assert(task->isFuture());
     auto futureContext = static_cast<FutureAsyncContext *>(context);
-    fprintf(stderr, "error: completeTask[%d :%d]: complete group child: %d\n", pthread_self(), __LINE__,
-            task->futureFragment()->getStoragePtr());
+    fprintf(stderr, "error: completeTask[%d %s:%d]: complete group child: %d\n",
+            pthread_self(), __FILE__, __LINE__, task->futureFragment()->getStoragePtr());
     // then we must offer into the parent group's channel that we completed,
     // so it may `next()` poll completed child tasks in completion order.
     auto parent = task->childFragment()->getParent();
@@ -306,6 +307,9 @@ void swift::swift_task_future_wait(
   // Suspend the waiting task.
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
+
+  fprintf(stderr, "error: swift_task_future_wait[%d %s:%d]: waitingTask: %d rawContext: %d\n",
+          pthread_self(), __FILE__, __LINE__, waitingTask, rawContext);
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;

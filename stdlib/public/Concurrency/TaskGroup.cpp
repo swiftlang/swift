@@ -67,7 +67,8 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
   auto fragment = groupFragment();
 
   auto status = fragment->statusLoad();
-  fprintf(stderr, "error: groupOffer[%d :%d]: old status %s \n", pthread_self(), __LINE__, status.to_string().c_str());
+  fprintf(stderr, "error: %s[%d %s:%d]: old status %s \n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
 
   // TODO: is this right? we should rather reuse the child I guess?
   // If an error was thrown, save it in the future fragment.
@@ -81,10 +82,11 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
 
   while (true) {
     assert(status.pendingTasks());
-    fprintf(stderr, "error: groupOffer[%d :%d]: spin, taking P/W tasks %s \n", pthread_self(), __LINE__, status.to_string().c_str());
+    fprintf(stderr, "error: %s[%d %s:%d]: spin, taking P/W tasks %s \n",
+            __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
     if (status.waitingTasks() == 0) {
-      fprintf(stderr, "error: groupOffer[%d :%d]: spin complete, zero waiting tasks; enqueue future; old status: %s\n",
-              pthread_self(), __LINE__, status.to_string().c_str());
+      fprintf(stderr, "error: %s[%d %s:%d]: spin complete, zero waiting tasks; enqueue future; old status: %s\n",
+              __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
       // ==== enqueue message ----------------------------------------------------
       //
       // no-one was waiting (yet), so we have to instead enqueue to the message queue
@@ -100,10 +102,11 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
       fragment->readyQueue.enqueue(readyItem);
       return;
     } else if (fragment->statusCompletePendingWaitingTasks(status)) {
-      fprintf(stderr, "error: groupOffer[%d :%d]: spin complete, complete waiting task; old status: %s \n", pthread_self(), __LINE__,
-              status.to_string().c_str());
+      fprintf(stderr, "error: %s[%d %s:%d]: spin complete, complete waiting task; old status: %s \n",
+              __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
       if (status.waitingTasks()) { // TODO: ordering
-        fprintf(stderr, "error: groupOffer[%d :%d]: waiting tasks: %d\n", pthread_self(), __LINE__, status.waitingTasks());
+        fprintf(stderr, "error: %s[%d %s:%d]: waiting tasks: %d\n",
+                __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.waitingTasks());
         // ==== run waiter ---------------------------------------------------------
         // We are the "first" completed task to arrive, since old status had zero
         //
@@ -171,16 +174,16 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
 
   // immediately update the status counter
   auto status = fragment->statusAddWaitingTask();
-  fprintf(stderr, "error: groupPoll[%d :%d]: old status: %s\n",
-          pthread_self(), __LINE__, status.to_string().c_str());
+  fprintf(stderr, "error: %s[%d %s:%d]: old status: %s\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
 
   GroupPollResult result;
   // FIXME: read status to know if tasks in flight or not.
 
   // ==== 1) bail out early if empty -------------------------------------------
   if (status.isEmpty()) {
-    fprintf(stderr, "error: groupPoll[%d :%d]: polled, isEmpty\n",
-            pthread_self(), __LINE__);
+    fprintf(stderr, "error: %s[%d %s:%d]: polled, isEmpty\n",
+            __FUNCTION__, pthread_self(), __FILE__, __LINE__);
     // 1) No tasks in flight, we know no tasks were submitted before this poll
     //    was issued, and if we parked here we'd potentially never be woken up.
     //    Bail out and return `nil` from `group.next()`.
@@ -200,8 +203,8 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
     // 2) No ready tasks in the ready queue yet; we will have to wait/suspend
     //    until pending tasks complete.
     while (true) {
-      fprintf(stderr, "error: groupPoll[%d :%d]: add waiting, spin...\n",
-              pthread_self(), __LINE__);
+      fprintf(stderr, "error: %s[%d %s:%d]: add waiting, spin...\n",
+              __FUNCTION__, pthread_self(), __FILE__, __LINE__);
       // Put the waiting task at the beginning of the wait queue.
       auto waitHead = fragment->waitQueue.load(std::memory_order_acquire);
       waitingTask->getNextWaitingTask() = waitHead.getTask();
@@ -217,8 +220,8 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
         // TODO: we could speculatively pick some task and escalate it though that may have its own issues with fairness.
         swift_task_escalate(this, waitingTask->Flags.getPriority());
 
-        fprintf(stderr, "error: groupPoll[%d :%d]: added waiting task. Waiting tasks: %d\n",
-                pthread_self(), __LINE__, (status.waitingTasks() + 1));
+        fprintf(stderr, "error: %s[%d %s:%d]: added waiting task. Waiting tasks: %d\n",
+                __FUNCTION__, pthread_self(), __FILE__, __LINE__, (status.waitingTasks() + 1));
         result.status = GroupFragment::ChannelPollStatus::Waiting;
         return result;
       }
@@ -231,34 +234,37 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
   auto futureFragment = item.getTask()->futureFragment();
 
   status = GroupFragment::GroupStatus { status.status + 1 };
-  fprintf(stderr, "error: groupPoll[%d :%d]: dequed task, asume status to be: %s\n",
-          pthread_self(), __LINE__, status.to_string().c_str());
+  fprintf(stderr, "error: %s[%d %s:%d]: dequeued task, assume status to be: %s\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
   while (status.pendingTasks()) {
     if (fragment->statusCompletePendingWaitingTasks(status)) {
       switch (item.getStatus()) {
         case ReadyStatus::Success:
-          fprintf(stderr, "error: groupPoll[%d :%d]: eagerly return success task\n", pthread_self(), __LINE__);
-          fprintf(stderr, "error: groupPoll[%d :%d]: status now: \n", pthread_self(), __LINE__,
-                  fragment->statusLoad().to_string().c_str());
+          fprintf(stderr, "error: %s[%d %s:%d]: eagerly return success task\n",
+                  __FUNCTION__, pthread_self(), __FILE__, __LINE__);
+          fprintf(stderr, "error: %s[%d %s:%d]: status now DEFINITELY is: %s\n",
+                  __FUNCTION__, pthread_self(), __FILE__, __LINE__, fragment->statusLoad().to_string().c_str());
           // great, we can immediately return the polled value
           result.status = GroupFragment::ChannelPollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
           return result;
         case ReadyStatus::Error:
-          fprintf(stderr, "error: groupPoll[%d :%d]: eagerly return error task\n", pthread_self(), __LINE__);
-          fprintf(stderr, "error: groupPoll[%d :%d]: status now: \n", pthread_self(), __LINE__,
-                  fragment->statusLoad().to_string().c_str());
+          fprintf(stderr, "error: %s[%d %s:%d]: eagerly return error task\n",
+                  __FUNCTION__, pthread_self(), __FILE__, __LINE__);
+          fprintf(stderr, "error: %s[%d %s:%d]: status now: \n",
+                  __FUNCTION__, pthread_self(), __FILE__, __LINE__, fragment->statusLoad().to_string().c_str());
           // great, we can immediately return the polled value
           result.status = GroupFragment::ChannelPollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
           return result;
         case ReadyStatus::Empty:
-          fprintf(stderr, "error: groupPoll[%d :%d]: EMPTY! status now: \n", pthread_self(), __LINE__,
-                  fragment->statusLoad().to_string().c_str());
+          fprintf(stderr, "error: %s[%d %s:%d]: EMPTY! status now: \n",
+                  __FUNCTION__, pthread_self(), __FILE__, __LINE__, fragment->statusLoad().to_string().c_str());
           result.status = GroupFragment::ChannelPollStatus::Empty;
           result.storage = nullptr;
-          return result;      }
+          return result;
+      }
     } // else, we failed status-cas (some other waiter claimed a ready pending task, try again)
   }
 
@@ -284,8 +290,8 @@ void swift::swift_task_group_poll(
   assert(task->isTaskGroup());
 
   GroupPollResult polled = task->groupPoll(waitingTask);
-  fprintf(stderr, "error: swift_task_group_poll[%d :%d]: polled storage: %d\n",
-          pthread_self(), __LINE__, polled);
+  fprintf(stderr, "error: %s[%d %s:%d]: polled storage: %d\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, polled);
 
   if (polled.status == GroupFragment::ChannelPollStatus::Waiting) {
     // The waiting task has been queued on the channel,
@@ -303,7 +309,9 @@ bool swift::swift_task_group_is_empty(AsyncTask *task) {
   return task->groupFragment()->isEmpty();
 }
 
-void swift::swift_task_group_add_pending(AsyncTask *channelTask, AsyncTask *childTask) {
-  assert(channelTask->isTaskGroup());
-  channelTask->groupFragment()->statusAddPendingTask();
+void swift::swift_task_group_add_pending(AsyncTask *groupTask, AsyncTask *childTask) {
+  assert(groupTask->isTaskGroup());
+  fprintf(stderr, "error: %s[%d %s:%d]: groupTask: %d, childTask\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, groupTask, childTask);
+  groupTask->groupFragment()->statusAddPendingTask();
 }
