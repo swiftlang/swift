@@ -2311,6 +2311,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose use of `return` statements in a body of a result builder.
+///
+/// \code
+/// struct S : Builder {
+///   var foo: some Builder {
+///     return EmptyBuilder()
+///   }
+/// }
+/// \endcode
+class InvalidReturnInResultBuilderBody final : public FailureDiagnostic {
+  Type BuilderType;
+
+public:
+  InvalidReturnInResultBuilderBody(const Solution &solution, Type builderTy,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BuilderType(builderTy) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
