@@ -20,6 +20,18 @@ func returnNil() -> AnyObject? {
 
 var OptionalTraps = TestSuite("OptionalTraps")
 
+func shouldCheckErrorLocation() -> Bool {
+  // Location information for runtime traps is only emitted in debug builds.
+  guard _isDebugAssertConfiguration() else { return false }
+  // The runtime error location format changed after the 5.3 release.
+  // (https://github.com/apple/swift/pull/34665)
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    return true
+  } else {
+    return false
+  }
+}
+
 OptionalTraps.test("UnwrapNone")
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -35,8 +47,8 @@ OptionalTraps.test("UnwrapNone/location")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches(_isDebugAssertConfiguration()
-                        ? "OptionalTraps.swift:45:"
+  .crashOutputMatches(shouldCheckErrorLocation()
+                        ? "OptionalTraps.swift:57:"
                         : "")
   .code {
   expectCrashLater()
