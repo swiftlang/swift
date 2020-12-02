@@ -1153,7 +1153,6 @@ ClangImporter::create(ASTContext &ctx,
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
-
       if (auto named = dyn_cast<clang::NamedDecl>(D)) {
         addEntryToLookupTable(*importer->Impl.BridgingHeaderLookupTable, named,
                               *importer->Impl.nameImporter);

@@ -11,8 +11,8 @@ struct Incrementor {
     incrementee = 41;
   }
   Incrementor(int value) : incrementee(increment(value)) {}
-  void memberIncrement() {
-    incrementee = increment(incrementee);
+  int memberIncrement() {
+    return increment(41);
   }
 };
 
@@ -21,10 +21,8 @@ inline int badIncrement() {
 }
 
 inline int badMemberIncrement() {
-  Incrementor myIncrementor;
-  myIncrementor.memberIncrement();
-  return myIncrementor.incrementee;
-
+  Incrementor myIncrementor; // 
+  return myIncrementor.memberIncrement();
 }
 
 inline int goodIncrement() {

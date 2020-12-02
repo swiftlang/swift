@@ -12,25 +12,75 @@
 
 #include "IRGenModule.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclGroup.h"
+#include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
 
 namespace {
-class ClangDeclRefFinder
-    : public clang::RecursiveASTVisitor<ClangDeclRefFinder> {
-  std::function<void(const clang::DeclRefExpr *)> callback;
+class ClangDeclFinder
+    : public clang::RecursiveASTVisitor<ClangDeclFinder> {
+  std::function<void(const clang::Decl *)> callback;
 public:
   template <typename Fn>
-  explicit ClangDeclRefFinder(Fn fn) : callback(fn) {}
+  explicit ClangDeclFinder(Fn fn) : callback(fn) {}
 
   bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
-    callback(DRE);
+    llvm::errs() << "DeclRefExpr TRORORORO\n";
+    llvm::errs() << DRE->getDecl()->getQualifiedNameAsString() << "\n";
+    DRE->getDecl()->dump();
+    llvm::errs() << "End DeclRefExpr TRORORORO\n";
+    callback(DRE->getReferencedDeclOfCallee());
+    return false;
+  }
+
+  bool VisitMemberExpr(clang::MemberExpr *DRE) {
+    llvm::errs() << "DeclRefExpr TRORORORO\n";
+    llvm::errs() << DRE->getMemberDecl()->getQualifiedNameAsString() << "\n";
+    DRE->getMemberDecl()->dump();
+    llvm::errs() << "End DeclRefExpr TRORORORO\n";
+    callback(DRE->getMemberDecl());
+    return false;
+  }
+  bool VisitCallExpr(clang::CallExpr *DRE) {
+    if(DRE->getCalleeDecl()) {
+      llvm::errs() << "CallExpr CalleeDecl\n";
+      DRE->getCalleeDecl()->dump();  
+      llvm::errs() << "END CallExpr TRORORORO\n";
+      callback(DRE->getCalleeDecl());
+    } else {
+      llvm::errs() << "CallExpr NULLPTR\n";
+    }
+    return false;
+  }
+  bool VisitCXXMemberCallExpr(clang::CXXMemberCallExpr *DRE) {
+    if(DRE->getMethodDecl()) {
+      llvm::errs() << "CXXMemberCallExpr gMethodDecl\n";
+      DRE->getMethodDecl()->dump();  
+      llvm::errs() << "END CXXMemberCallExpr TRORORORO\n";
+      callback(DRE->getMethodDecl());
+    } else {
+      llvm::errs() << "CXXMemberCallExpr NULLPTR\n";
+    }
+    return false;
+  }
+  bool VisitImplicitCastExpr(clang::ImplicitCastExpr *DRE) {
+    if(DRE->getReferencedDeclOfCallee()) {
+      llvm::errs() << "ImplicitCastExpr TRORORORO\n";
+      DRE->getReferencedDeclOfCallee()->dump();
+      llvm::errs() << "End ImplicitCastExpr TRORORORO\n";
+      callback(DRE->getReferencedDeclOfCallee());
+    } else {
+      llvm::errs() << "ImplicitCastExpr NULLPTR\n";
+    }
     return true;
   }
 };
@@ -74,15 +124,15 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
 
-  ClangDeclRefFinder refFinder([&](const clang::DeclRefExpr *DRE) {
-    const clang::Decl *D = DRE->getDecl();
+  ClangDeclFinder refFinder([&](const clang::Decl *D) {
     // Check that this is a file-level declaration and not inside a function.
     // If it's a member of a file-level decl, like a C++ static member variable,
     // we want to add the entire file-level declaration because Clang doesn't
     // expect to see members directly here.
     for (auto *DC = D->getDeclContext();; DC = DC->getParent()) {
-      if (DC->isFunctionOrMethod())
+      if (DC->isFunctionOrMethod()) {
         return;
+      }
       if (DC->isFileContext())
         break;
       D = cast<const clang::Decl>(DC);
@@ -90,6 +140,9 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second)
       return;
     stack.push_back(D);
+    llvm::errs() << "Pushing to stack: \n";
+    D->dump();
+    llvm::errs() << "Pushed to stack.\n";
   });
 
   while (!stack.empty()) {
