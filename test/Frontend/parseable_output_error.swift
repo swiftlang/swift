@@ -1,6 +1,5 @@
 // RUN: not %target-swift-frontend -primary-file %s -o %t.out -emit-module -emit-module-path %t.swiftmodule -frontend-parseable-output 2>&1 | %FileCheck %s
 
-// XFAIL: freebsd, openbsd, linux
 func foo() {
     return 11;
 }
@@ -43,7 +42,7 @@ func foo() {
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "output": "{{.*[\\/]}}parseable_output_error.swift:5:12: error: unexpected non-void return value in void function{{.*}}return 11;{{.*[\\/]}}parseable_output_error.swift:5:12: note: did you mean to add a return type?{{.*}}return 11;
+// CHECK-NEXT:   "output": "{{.*[\\/]}}parseable_output_error.swift:4:12: error: unexpected non-void return value in void function{{.*}}return 11;{{.*[\\/]}}parseable_output_error.swift:4:12: note: did you mean to add a return type?{{.*}}return 11;
 // CHECK-NEXT:   "process": {
 // CHECK-NEXT:     "real_pid": [[PID]]
 // CHECK-NEXT:   },

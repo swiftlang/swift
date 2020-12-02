@@ -3,7 +3,6 @@
 // RUN: echo 'func foo() {}' > %t/test.swift
 // RUN: %target-swift-frontend -primary-file %s -primary-file %t/test.swift -o %t.out -o test.tmp.out -module-name parseable_output_batch -emit-module -emit-module-path %t.swiftmodule -module-name test -emit-module -emit-module-path test.tmp.swiftmodule -frontend-parseable-output 2>&1 | %FileCheck %s
 
-// XFAIL: freebsd, openbsd, linux
 // Despite only one frontend invocation, two compile jobs are "begin" and "finish", using quasi-PIDs, on per-primary and its outputs.
 
 // CHECK: {{[1-9][0-9]*}}

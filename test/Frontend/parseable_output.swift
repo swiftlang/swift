@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -o %t.out -emit-module -emit-module-path %t.swiftmodule -frontend-parseable-output 2>&1 | %FileCheck %s
 
-// XFAIL: freebsd, openbsd, linux
-
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
