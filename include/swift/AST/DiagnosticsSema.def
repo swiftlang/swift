@@ -5541,7 +5541,10 @@ NOTE(previous_result_builder_here, none,
      "previous result builder specified here", ())
 ERROR(result_builder_arguments, none,
       "result builder attributes cannot have arguments", ())
-WARNING(result_builder_disabled_by_return, none,
+ERROR(result_builder_disabled_by_return, none,
+      "cannot use explicit 'return' statement in the body of result builder %0",
+      (Type))
+WARNING(result_builder_disabled_by_return_warn, none,
         "application of result builder %0 disabled by explicit 'return' "
         "statement", (Type))
 NOTE(result_builder_remove_attr, none,
