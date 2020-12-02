@@ -15,8 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/FunctionExtras.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -302,34 +304,20 @@ DiagnosticVerifier::renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
   return OS.str();
 }
 
-/// After the file has been processed, check to see if we got all of
-/// the expected diagnostics and check to see if there were any unexpected
-/// ones.
-DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
-  using llvm::SMLoc;
-  
-  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
-  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
-  StringRef InputFile = SM.extractText(EntireRange);
-  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
-
-  // Queue up all of the diagnostics, allowing us to sort them and emit them in
-  // file order.
-  std::vector<llvm::SMDiagnostic> Errors;
-
+static void parseExpectedDiagnosticsFromBuffer(
+    unsigned int BufferID, SourceLoc BufferStartLoc,
+    std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+    StringRef InputFile, SourceManager &SM,
+    std::vector<llvm::SMDiagnostic> &Errors) {
   unsigned PrevExpectedContinuationLine = 0;
-
-  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
 
   auto addError = [&](const char *Loc, const Twine &message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
-    auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
-    auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message,
-                              {}, FixIts);
+    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    auto diag =
+        SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
     Errors.push_back(diag);
   };
-
-  // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
     // Process this potential match.  If we fail to process it, just move on to
@@ -359,7 +347,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     size_t TextStartIdx = MatchStart.find("{{");
     if (TextStartIdx == StringRef::npos) {
       addError(MatchStart.data(),
-               "expected {{ in expected-warning/note/error line");
+               "expected {{ in expected-warning/note/error line", {});
       continue;
     }
 
@@ -370,7 +358,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       if (MatchStart[1] != '+' && MatchStart[1] != '-' &&
           MatchStart[1] != ':') {
         addError(MatchStart.data(),
-                 "expected '+'/'-' for line offset, or ':' for column");
+                 "expected '+'/'-' for line offset, or ':' for column", {});
         continue;
       }
       StringRef Offs;
@@ -395,7 +383,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       if (ColonIndex != 0) {
         StringRef LineOffs = Offs.slice(0, ColonIndex);
         if (LineOffs.getAsInteger(10, LineOffset)) {
-          addError(MatchStart.data(), "expected line offset before '{{'");
+          addError(MatchStart.data(), "expected line offset before '{{'", {});
           continue;
         }
       }
@@ -405,7 +393,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         Offs = Offs.slice(ColonIndex + 1, Offs.size());
         int Column = 0;
         if (Offs.getAsInteger(10, Column)) {
-          addError(MatchStart.data(), "expected column before '{{'");
+          addError(MatchStart.data(), "expected column before '{{'", {});
           continue;
         }
         Expected.ColumnNo = Column;
@@ -419,12 +407,12 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         Expected.mayAppear = true;
       } else {
         if (CountStr.getAsInteger(10, Count)) {
-          addError(MatchStart.data(), "expected match count before '{{'");
+          addError(MatchStart.data(), "expected match count before '{{'", {});
           continue;
         }
         if (Count == 0) {
           addError(MatchStart.data(),
-                   "expected positive match count before '{{'");
+                   "expected positive match count before '{{'", {});
           continue;
         }
       }
@@ -435,8 +423,10 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     size_t End = MatchStart.find("}}");
     if (End == StringRef::npos) {
-      addError(MatchStart.data(),
-          "didn't find '}}' to match '{{' in expected-warning/note/error line");
+      addError(
+          MatchStart.data(),
+          "didn't find '}}' to match '{{' in expected-warning/note/error line",
+          {});
       continue;
     }
 
@@ -462,7 +452,6 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     else
       PrevExpectedContinuationLine = 0;
 
-    
     // Scan for fix-its: {{10-14=replacement text}}
     StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
     while (ExtraChecks.startswith("{{")) {
@@ -470,7 +459,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       size_t EndIndex = ExtraChecks.find("}}");
       if (EndIndex == StringRef::npos) {
         addError(ExtraChecks.data(),
-                 "didn't find '}}' to match '{{' in diagnostic verification");
+                 "didn't find '}}' to match '{{' in diagnostic verification",
+                 {});
         break;
       }
 
@@ -486,8 +476,10 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       StringRef CheckStr = ExtraChecks.slice(2, EndIndex);
       // Check for matching a later "}}" on a different line.
       if (CheckStr.find_first_of("\r\n") != StringRef::npos) {
-        addError(ExtraChecks.data(), "didn't find '}}' to match '{{' in "
-                                     "diagnostic verification");
+        addError(ExtraChecks.data(),
+                 "didn't find '}}' to match '{{' in "
+                 "diagnostic verification",
+                 {});
         break;
       }
 
@@ -500,7 +492,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         if (Expected.EducationalNotes.hasValue()) {
           addError(CheckStr.data(),
                    "each verified diagnostic may only have one "
-                   "{{educational-notes=<#notes#>}} declaration");
+                   "{{educational-notes=<#notes#>}} declaration",
+                   {});
           continue;
         }
         StringRef NotesStr = CheckStr.substr(
@@ -521,9 +514,11 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // Special case for specifying no fixits should appear.
       if (CheckStr == fixitExpectationNoneString) {
         if (Expected.noneMarkerStartLoc) {
-          addError(CheckStr.data() - 2,
-                   Twine("A second {{") + fixitExpectationNoneString +
-                       "}} was found. It may only appear once in an expectation.");
+          addError(
+              CheckStr.data() - 2,
+              Twine("A second {{") + fixitExpectationNoneString +
+                  "}} was found. It may only appear once in an expectation.",
+              {});
           break;
         }
 
@@ -532,16 +527,17 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
 
       if (Expected.noneMarkerStartLoc) {
-        addError(Expected.noneMarkerStartLoc, Twine("{{") +
-                                                  fixitExpectationNoneString +
-                                                  "}} must be at the end.");
+        addError(Expected.noneMarkerStartLoc,
+                 Twine("{{") + fixitExpectationNoneString +
+                     "}} must be at the end.",
+                 {});
         break;
       }
 
       // Parse the pieces of the fix-it.
       size_t MinusLoc = CheckStr.find('-');
       if (MinusLoc == StringRef::npos) {
-        addError(CheckStr.data(), "expected '-' in fix-it verification");
+        addError(CheckStr.data(), "expected '-' in fix-it verification", {});
         continue;
       }
       StringRef StartColStr = CheckStr.slice(0, MinusLoc);
@@ -550,26 +546,26 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       size_t EqualLoc = AfterMinus.find('=');
       if (EqualLoc == StringRef::npos) {
         addError(AfterMinus.data(),
-                 "expected '=' after '-' in fix-it verification");
+                 "expected '=' after '-' in fix-it verification", {});
         continue;
       }
       StringRef EndColStr = AfterMinus.slice(0, EqualLoc);
       StringRef AfterEqual = AfterMinus.substr(EqualLoc+1);
-      
+
       ExpectedFixIt FixIt;
       FixIt.StartLoc = OpenLoc;
       FixIt.EndLoc = CloseLoc;
       if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
         addError(StartColStr.data(),
-                 "invalid column number in fix-it verification");
+                 "invalid column number in fix-it verification", {});
         continue;
       }
       if (EndColStr.getAsInteger(10, FixIt.EndCol)) {
         addError(EndColStr.data(),
-                 "invalid column number in fix-it verification");
+                 "invalid column number in fix-it verification", {});
         continue;
       }
-      
+
       // Translate literal "\\n" into '\n', inefficiently.
       StringRef fixItText = AfterEqual.slice(0, EndIndex);
       for (const char *current = fixItText.begin(), *end = fixItText.end();
@@ -587,12 +583,12 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
           FixIt.Text += *current++;
         }
       }
-      
+
       Expected.Fixits.push_back(FixIt);
     }
 
     Expected.ExpectedEnd = ExtraChecks.data();
-    
+
     // Don't include trailing whitespace in the expected-foo{{}} range.
     while (isspace(Expected.ExpectedEnd[-1]))
       --Expected.ExpectedEnd;
@@ -601,8 +597,36 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     for (; Count; --Count)
       ExpectedDiagnostics.push_back(Expected);
   }
+}
 
-  
+/// After the file has been processed, check to see if we got all of
+/// the expected diagnostics and check to see if there were any unexpected
+/// ones.
+DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
+  using llvm::SMLoc;
+
+  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
+  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
+  StringRef InputFile = SM.extractText(EntireRange);
+  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
+
+  // Queue up all of the diagnostics, allowing us to sort them and emit them in
+  // file order.
+  std::vector<llvm::SMDiagnostic> Errors;
+  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
+
+  // Scan the memory buffer looking for expected-note/warning/error.
+  parseExpectedDiagnosticsFromBuffer(
+      BufferID, BufferStartLoc, ExpectedDiagnostics, InputFile, SM, Errors);
+
+  auto addError = [&](const char *Loc, const Twine &message,
+                      ArrayRef<llvm::SMFixIt> FixIts = {}) {
+    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    auto diag =
+        SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    Errors.push_back(diag);
+  };
+
   // Make sure all the expected diagnostics appeared.
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
 
@@ -777,7 +801,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     else
       ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
-  
+
   // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
   // such.
   auto expectedDiagIter = ExpectedDiagnostics.begin();
