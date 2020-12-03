@@ -8,10 +8,11 @@ import ObjCConcurrency
 func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Int
   // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) (Int) -> (), SlowServer) -> ()
-  // CHECK: [[CONT:%.*]] = get_async_continuation_addr $Int, [[RESUME_BUF]]
+  // CHECK: [[CONT:%.*]] = get_async_continuation_addr Int, [[RESUME_BUF]]
+  // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Int> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<Int>
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK: store [[CONT]] to [trivial] [[CONT_SLOT]]
+  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<Int>, Int) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]({{.*}}, [[BLOCK]], %0)
@@ -23,10 +24,11 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $String
   // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), SlowServer) -> ()
-  // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] $String, [[RESUME_BUF]]
+  // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] String, [[RESUME_BUF]]
+  // CHECK: [[WRAPPED:%.*]] = struct $UnsafeThrowingContinuation<String> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeThrowingContinuation<String>
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK: store [[CONT]] to [trivial] [[CONT_SLOT]]
+  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[STRING_COMPLETION_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeThrowingContinuation<String>, Optional<NSString>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)

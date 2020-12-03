@@ -113,6 +113,7 @@ public:
   }
   SINGLETON_TYPE(BuiltinIntegerLiteralType)
   SINGLETON_TYPE(BuiltinRawPointerType)
+  SINGLETON_TYPE(BuiltinRawUnsafeContinuationType)
   SINGLETON_TYPE(BuiltinNativeObjectType)
   SINGLETON_TYPE(BuiltinBridgeObjectType)
   SINGLETON_TYPE(BuiltinUnsafeValueBufferType)

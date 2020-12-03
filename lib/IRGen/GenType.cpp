@@ -1009,11 +1009,10 @@ namespace {
   class RawPointerTypeInfo final :
     public PODSingleScalarTypeInfo<RawPointerTypeInfo, LoadableTypeInfo> {
   public:
-    RawPointerTypeInfo(llvm::Type *storage, Size size, Alignment align)
-      : PODSingleScalarTypeInfo(
-          storage, size,
-          SpareBitVector::getConstant(size.getValueInBits(), false),
-          align) {}
+    RawPointerTypeInfo(llvm::Type *storage,
+                       Size size, SpareBitVector spareBits,
+                       Alignment align)
+      : PODSingleScalarTypeInfo(storage, size, spareBits, align) {}
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1555,12 +1554,30 @@ const LoadableTypeInfo &IRGenModule::getRawPointerTypeInfo() {
 
 const LoadableTypeInfo &TypeConverter::getRawPointerTypeInfo() {
   if (RawPointerTI) return *RawPointerTI;
-  RawPointerTI = new RawPointerTypeInfo(IGM.Int8PtrTy,
-                                        IGM.getPointerSize(),
+  auto size = IGM.getPointerSize();
+  auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
+  RawPointerTI = new RawPointerTypeInfo(IGM.Int8PtrTy, size,
+                                        std::move(spareBits),
                                         IGM.getPointerAlignment());
   RawPointerTI->NextConverted = FirstType;
   FirstType = RawPointerTI;
   return *RawPointerTI;
+}
+
+const LoadableTypeInfo &IRGenModule::getRawUnsafeContinuationTypeInfo() {
+  return Types.getRawUnsafeContinuationTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getRawUnsafeContinuationTypeInfo() {
+  if (RawUnsafeContinuationTI) return *RawUnsafeContinuationTI;
+  auto spareBits = IGM.getHeapObjectSpareBits();
+  RawUnsafeContinuationTI = new RawPointerTypeInfo(IGM.Int8PtrTy,
+                                                   IGM.getPointerSize(),
+                                                   std::move(spareBits),
+                                                   IGM.getPointerAlignment());
+  RawUnsafeContinuationTI->NextConverted = FirstType;
+  FirstType = RawUnsafeContinuationTI;
+  return *RawUnsafeContinuationTI;
 }
 
 const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
@@ -1969,6 +1986,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
                            getFixedBufferAlignment(IGM));
   case TypeKind::BuiltinRawPointer:
     return &getRawPointerTypeInfo();
+  case TypeKind::BuiltinRawUnsafeContinuation:
+    return &getRawUnsafeContinuationTypeInfo();
   case TypeKind::BuiltinIntegerLiteral:
     return &getIntegerLiteralTypeInfo();
   case TypeKind::BuiltinFloat:

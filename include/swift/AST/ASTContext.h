@@ -751,6 +751,7 @@ public:
   const CanType TheNativeObjectType;      /// Builtin.NativeObject
   const CanType TheBridgeObjectType;      /// Builtin.BridgeObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
+  const CanType TheRawUnsafeContinuationType; /// Builtin.RawUnsafeContinuation
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
   const CanType TheSILTokenType;          /// Builtin.SILToken
   const CanType TheIntegerLiteralType;    /// Builtin.IntegerLiteralType

@@ -1179,6 +1179,10 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_RAWPOINTER);
       break;
+    case 'c':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION);
+      break;
     case 't':
       Ty = createNode(Node::Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN);
       break;

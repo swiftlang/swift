@@ -208,6 +208,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinRawUnsafeContinuation:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
@@ -5003,6 +5004,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinRawUnsafeContinuation:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
