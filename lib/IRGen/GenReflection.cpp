@@ -779,7 +779,8 @@ private:
     auto *CD = dyn_cast<ClassDecl>(NTD);
     auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
-      addTypeRef(CD->getSuperclass(), CD->getGenericSignature());
+      addTypeRef(CD->getSuperclass(),
+                 CD->getGenericSignature());
     } else if (PD && PD->getDeclaredInterfaceType()->getSuperclass()) {
       addTypeRef(PD->getDeclaredInterfaceType()->getSuperclass(),
                  PD->getGenericSignature());

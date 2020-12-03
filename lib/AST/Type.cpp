@@ -4928,7 +4928,7 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
 }
 
 static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
-  return (theClass->checkAncestry(AncestryFlags::ClangImported)
+  return (theClass->usesObjCObjectModel()
           ? ReferenceCounting::ObjC
           : ReferenceCounting::Native);
 }

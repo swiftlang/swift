@@ -562,7 +562,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   // If the root class was implemented in Objective-C, use Objective-C's
   // allocation methods because they may have been overridden.
-  return theClass->checkAncestry(AncestryFlags::ClangImported);
+  return theClass->usesObjCObjectModel();
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
