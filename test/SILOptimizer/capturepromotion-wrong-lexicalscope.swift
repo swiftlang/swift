@@ -19,12 +19,12 @@
 // CHECK:   destroy_value %7 : ${ var Int }, loc {{.*}}:33:11, scope 3
 // CHECK:   %13 = partial_apply [callee_guaranteed] %10(%11) : $@convention(thin) (Int) -> Int, loc {{.*}}:33:11, scope 3
 // CHECK:   debug_value %13 : $@callee_guaranteed () -> Int, let, name "f", loc {{.*}}:33:7, scope 3
-// CHECK:   %15 = begin_borrow %13 : $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 3
-// CHECK:   %16 = copy_value %15 : $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 3
-// CHECK:   end_borrow %15 : $@callee_guaranteed () -> Int
+// There used to be a begin_borrow here. We leave an emptyline here to preserve line numbers.
+// CHECK:   %15 = copy_value %13 : $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 3
+// There used to be an end_borrow here. We leave an emptyline here to preserve line numbers.
 // CHECK:   destroy_value %13 : $@callee_guaranteed () -> Int, loc {{.*}}:35:1, scope 3
 // CHECK:   destroy_value %0 : ${ var Int }, loc {{.*}}:35:1, scope 3
-// CHECK:   return %16 : $@callee_guaranteed () -> Int, loc {{.*}}:34:3, scope 3
+// CHECK:   return %15 : $@callee_guaranteed () -> Int, loc {{.*}}:34:3, scope 3
 // CHECK: }
 
 
