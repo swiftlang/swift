@@ -561,10 +561,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
   //   AsyncContext *resumeCtxt;
   //   void *awaitSynchronization;
   //   SwiftError *errResult;
-  //   union {
-  //     IndirectResult *result;
-  //     DirectResult *result;
-  //   };
+  //   Result *result;
   //   ExecutorRef *resumeExecutor;
   // } continuation_context; // local variable of current_sil_function
   //
