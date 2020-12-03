@@ -6,7 +6,7 @@ foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     get_swift_test_build_flavors(build_flavors "${SDK}")
 
-    foreach(BUILD_FLAVOR build_flavors)
+    foreach(BUILD_FLAVOR ${build_flavors})
       get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
 
       set(test_bin_dir "${SWIFT_BINARY_DIR}/test${VARIANT_SUFFIX}")
