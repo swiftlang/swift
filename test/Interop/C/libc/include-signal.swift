@@ -28,4 +28,6 @@
 // See https://forums.swift.org/t/problems-with-swiftglibc-and-proposed-fix/37594
 // for further details.
 
+// REQUIRES: OS=linux-gnu
+
 import IncludeSignal
