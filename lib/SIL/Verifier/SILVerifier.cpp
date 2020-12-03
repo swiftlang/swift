@@ -5450,6 +5450,16 @@ public:
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
 
+    // Don't verify functions that were skipped. We are likely to see them in
+    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+    auto Ctx = F->getDeclContext();
+    if (Ctx) {
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+        if (AFD->isBodySkipped())
+          return;
+      }
+    }
+
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())
         return;
