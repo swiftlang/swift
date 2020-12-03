@@ -12,7 +12,7 @@ func testNonConversions() async {
 
 // Overloading
 @available(swift, deprecated: 4.0, message: "synchronous is no fun")
-func overloadedSame() -> String { "synchronous" }
+func overloadedSame(_: Int = 0) -> String { "synchronous" }
 
 func overloadedSame() async -> String { "asynchronous" }
 
