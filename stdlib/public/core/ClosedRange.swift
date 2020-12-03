@@ -78,6 +78,8 @@ public struct ClosedRange<Bound: Comparable> {
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @inlinable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    _debugPrecondition(bounds.lower <= bounds.upper,
+      "ClosedRange requires lowerBound <= upperBound")
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
