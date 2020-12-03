@@ -1091,9 +1091,7 @@ public:
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i);
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
 
-  void visitHopToExecutorInst(HopToExecutorInst *i) {
-    //TODO(async)
-  }
+  void visitHopToExecutorInst(HopToExecutorInst *i);
 
   void visitKeyPathInst(KeyPathInst *I);
 
@@ -5712,6 +5710,13 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
+}
+
+void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
+  llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
+          llvm::Intrinsic::coro_async_resume, {});
+          
+  emitSuspensionPoint(getLoweredSingletonExplosion(i->getOperand()), resumeFn);
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {

@@ -153,6 +153,10 @@ public:
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 
+  void emitSuspensionPoint(llvm::Value *toExecutor, llvm::Value *asyncResume);
+  llvm::Function *getOrCreateResumeFromSuspensionFn();
+  llvm::Function *createAsyncSuspendFn();
+
 private:
   void emitPrologue();
   void emitEpilogue();
