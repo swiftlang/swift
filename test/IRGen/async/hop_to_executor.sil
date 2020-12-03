@@ -2,6 +2,9 @@
 
 // REQUIRES: concurrency
 
+// This test fails on 32bit archs.
+// UNSUPPORTED: PTRSIZE=32
+
 sil_stage canonical
 
 import Builtin
