@@ -2151,8 +2151,12 @@ void PatternMatchEmission::emitEnumElementDispatch(
         llvm_unreachable("not allowed");
       case CastConsumptionKind::CopyOnSuccess: {
         auto copy = SGF.emitTemporaryAllocation(loc, srcValue->getType());
+        // If the element is trivial it won't be destroyed so we need to make
+        // sure we destroy the enum here.
+        if (eltTL->isTrivial())
+          copy = SGF.emitManagedBufferWithCleanup(copy).getValue();
         SGF.B.createCopyAddr(loc, srcValue, copy, IsNotTake, IsInitialization);
-        // We can always take from the copy.
+        // We can always take from the managedCopy.
         eltConsumption = CastConsumptionKind::TakeAlways;
         eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy, elt, eltTy);
         break;
@@ -2797,8 +2801,17 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Emit the subject value. If at +1, dispatching will consume it. If it is at
   // +0, we just forward down borrows.
-  ManagedValue subjectMV = emitRValueAsSingleValue(
-      S->getSubjectExpr(), SGFContext::AllowGuaranteedPlusZero);
+  // If this is an address type, use an initializer.
+  ManagedValue subjectMV;
+  if (getTypeLowering(S->getSubjectExpr()->getType()).isAddress()) {
+    auto init = emitTemporary(S->getSubjectExpr(), getTypeLowering(S->getSubjectExpr()->getType()));
+    emitExprInto(S->getSubjectExpr(), init.get());
+    subjectMV = emitManagedRValueWithCleanup(init->getAddressForInPlaceInitialization(*this, S->getSubjectExpr()));
+    subjectMV = ManagedValue::forUnmanaged(subjectMV.forward(*this));
+  } else {
+    subjectMV = emitRValueAsSingleValue(S->getSubjectExpr(),
+                                        SGFContext::AllowGuaranteedPlusZero);
+  }
 
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
@@ -2826,7 +2839,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // If we have an address only type returned without a cleanup, we
     // need to do a copy just to be safe. So for efficiency we pass it
     // down take_always.
-    return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
+    return {subjectMV, CastConsumptionKind::CopyOnSuccess};
   }());
 
   // If we need to diagnose an unexpected enum case or unexpected enum case

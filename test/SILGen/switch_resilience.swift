@@ -9,7 +9,8 @@ import resilient_struct
 // CHECK:   [[STACK_SLOT:%.*]] = alloc_stack $Enum
 //
 // CHECK: bb1:
-// CHECK:   [[VALUE:%.*]] = unchecked_take_enum_data_addr [[STACK_SLOT]] : $*Enum
+// CHECK:   [[TMP:%.*]] = alloc_stack $Enum
+// CHECK:   [[VALUE:%.*]] = unchecked_take_enum_data_addr [[TMP]] : $*Enum
 // CHECK:   [[STACK_SLOT_COPY:%.*]] = alloc_stack $(url: ResilientRef, void: ()), let, name "value"
 // CHECK:   copy_addr [[VALUE]] to [initialization] [[STACK_SLOT_COPY]]
 // CHECK:   cond_br {{%.*}}, bb2, bb3
@@ -18,6 +19,8 @@ import resilient_struct
 // CHECK: destroy_addr [[STACK_SLOT_COPY]]
 // CHECK-NEXT: dealloc_stack [[STACK_SLOT_COPY]]
 // CHECK-NEXT: destroy_addr [[VALUE]]
+// CHECK-NEXT: dealloc_stack [[TMP]]
+// CHECK-NEXT: destroy_addr [[STACK_SLOT]]
 // CHECK-NEXT: dealloc_stack [[STACK_SLOT]]
 // CHECK-NEXT: br bb4
 //
@@ -26,6 +29,8 @@ import resilient_struct
 // CHECK-NEXT: dealloc_stack [[STACK_SLOT_COPY]]
 // CHECK-NEXT: [[REPROJECT:%.*]] = tuple_element_addr [[VALUE]]
 // CHECK: destroy_addr [[REPROJECT]]
+// CHECK-NEXT: dealloc_stack [[TMP]]
+// CHECK-NEXT: destroy_addr [[STACK_SLOT]]
 // CHECK-NEXT: dealloc_stack [[STACK_SLOT]]
 // CHECK: br bb4
 //

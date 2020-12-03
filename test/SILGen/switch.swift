@@ -336,8 +336,8 @@ struct Z : P { func p() {} }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_11pyAA1P_p_tF
 func test_isa_1(p: P) {
-  // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
+  // CHECK: [[PTMPBUF1:%[0-9]+]] = alloc_stack $P
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF1]] : $*P
   switch p {
     // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
@@ -349,8 +349,8 @@ func test_isa_1(p: P) {
   // CHECK-NEXT: [[FUNC:%.*]] = function_ref @$s6switch1ayyF
   // CHECK-NEXT: apply [[FUNC]]()
   // CHECK-NEXT: dealloc_stack [[TMPBUF]]
-  // CHECK-NEXT: destroy_addr [[PTMPBUF]]
-  // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
+  // CHECK-NEXT: destroy_addr [[PTMPBUF1]]
+  // CHECK-NEXT: dealloc_stack [[PTMPBUF1]]
     a()
     // CHECK:   br [[CONT:bb[0-9]+]]
 
@@ -828,7 +828,8 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     a()
 
   // CHECK: [[IS_LEFT]]:
-  // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  // CHECK:   [[TMP:%.*]] = alloc_stack
+  // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[TMP]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
   case .Left(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1byyF
   // CHECK-NEXT: apply [[FUNC]](
@@ -837,7 +838,8 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     b()
 
   // CHECK: [[IS_RIGHT]]:
-  // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt
+  // CHECK:   [[TMP:%.*]] = alloc_stack
+  // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[TMP]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt
   // CHECK:   [[STR:%.*]] = load [take] [[STR_ADDR]]
   case .Right(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1cyyF
@@ -847,7 +849,8 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
     c()
 
   // CHECK: [[IS_BOTH]]:
-  // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt
+  // CHECK:   [[TMP:%.*]] = alloc_stack
+  // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[TMP]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt
   case .Both(_):
   // CHECK:   [[FUNC:%.*]] = function_ref @$s6switch1dyyF
   // CHECK-NEXT: apply [[FUNC]](
@@ -1124,7 +1127,7 @@ func testUninhabitedSwitchScrutinee() {
 // CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
 // CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
 // CHECK: store {{%.*}} to [trivial] [[INIT_TUP_0]]
-// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: copy_addr {{%.*}} to [initialization] [[INIT_TUP_1]]
 // CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
 // CHECK: [[TUP_0_VAL:%.*]] = load [trivial] [[TUP_0]]
 // CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
@@ -1145,16 +1148,15 @@ func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any)
 // CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
 // CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
 // CHECK: store {{%.*}} to [init] [[INIT_TUP_0]]
-// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: copy_addr {{%.*}} to [initialization] [[INIT_TUP_1]]
 // CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
 // CHECK: [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
 // CHECK: switch_enum [[TUP_0_VAL]]
 //
 // CHECK: bb1([[CASE_VAL:%.*]] :
-// CHECK-NEXT:   destroy_addr [[TUP_1]]
 // CHECK-NEXT:   end_borrow [[TUP_0_VAL]]
-// CHECK-NEXT:   destroy_addr [[TUP_0]]
+// CHECK-NEXT:   destroy_addr [[MEM]]
 // CHECK-NEXT:   dealloc_stack [[MEM]]
 //
 // CHECK: bb2:
@@ -1175,20 +1177,17 @@ func address_only_with_nontrivial_subtype(_ a: NonTrivialSingleCaseEnum, _ value
 // load_borrow, we do not lose the +1 from the original tuple formation.
 // CHECK-LABEL: sil hidden [ossa] @$s6switch35partial_address_only_tuple_dispatchyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : $*Optional<Any>):
-// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
-// CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[ARG1_COPY]]
 // CHECK:   [[TUP:%.*]] = alloc_stack $(Klass, Optional<Any>)
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   store [[ARG0_COPY]] to [init] [[TUP_0]]
-// CHECK:   copy_addr [take] [[ARG1_COPY]] to [initialization] [[TUP_1]]
+// CHECK:   copy_addr [[ARG1]] to [initialization] [[TUP_1]]
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
-// CHECK:   destroy_addr [[TUP_1]]
 // CHECK:   end_borrow [[TUP_0_VAL]]
-// CHECK:   destroy_addr [[TUP_0]]
+// CHECK:   destroy_addr [[TUP]]
 // CHECK:   dealloc_stack [[TUP]]
 // CHECK:   br bb2
 //
@@ -1207,14 +1206,12 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch50partial_address_only_tuple_dispatch_with_fail_caseyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : $*Optional<Any>):
-// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
-// CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[ARG1_COPY]]
 // CHECK:   [[TUP:%.*]] = alloc_stack $(Klass, Optional<Any>)
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   store [[ARG0_COPY]] to [init] [[TUP_0]]
-// CHECK:   copy_addr [take] [[ARG1_COPY]] to [initialization] [[TUP_1]]
+// CHECK:   copy_addr [[ARG1]] to [initialization] [[TUP_1]]
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
@@ -1223,9 +1220,8 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK: [[IS_ANYOBJECT_BB]]([[ANYOBJECT:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[ANYOBJECT_COPY:%.*]] = copy_value [[ANYOBJECT]]
 //          ... CASE BODY ...
-// CHECK:   destroy_addr [[TUP_1]]
 // CHECK:   end_borrow [[TUP_0_VAL]]
-// CHECK:   destroy_addr [[TUP_0]]
+// CHECK:   destroy_addr [[TUP]]
 // CHECK:   dealloc_stack [[TUP]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
@@ -1248,11 +1244,9 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK-NEXT:   dealloc_stack [[ANYOBJECT_ADDR]]
 // CHECK-NEXT:   destroy_addr [[SOME_ANY_ADDR]]
 // CHECK-NEXT:   dealloc_stack [[OPT_ANY_ADDR]]
-// CHECK-NEXT:   destroy_addr [[TUP_1]]
 // CHECK-NEXT:   end_borrow [[TUP_0_VAL]]
-// CHECK-NEXT:   destroy_addr [[TUP_0]]
+// CHECK-NEXT:   destroy_addr [[TUP]]
 // CHECK-NEXT:   dealloc_stack [[TUP]]
-// CHECK-NEXT:   dealloc_stack
 // CHECK-NEXT:   br [[EXIT_BB]]
 //
 // CHECK: [[ISNOT_ANY_BB]]:
@@ -1335,7 +1329,9 @@ func testVoidType() {
 // CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
 //
 // CHECK: [[BB_A]]:
-// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[TMP_SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
+// CHECK:   copy_addr [[SWITCH_ENUM_ARG]] to [initialization] [[TMP_SWITCH_ENUM_ARG]]
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[TMP_SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_A]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [initialization] [[AB_PHI]]
@@ -1343,7 +1339,9 @@ func testVoidType() {
 // CHECK:   br [[BB_AB:bb[0-9]+]]
 //
 // CHECK: [[BB_B]]:
-// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[TMP_SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
+// CHECK:   copy_addr [[SWITCH_ENUM_ARG]] to [initialization] [[TMP_SWITCH_ENUM_ARG]]
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[TMP_SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack $T, let, name "x"
 // CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_B]]
 // CHECK:   [[FUNC_CMP:%.*]] = function_ref @$sSzsE2eeoiySbx_qd__tSzRd__lFZ :
@@ -1375,7 +1373,9 @@ func testVoidType() {
 // CHECK:   br [[BB_AB_CONT]]
 //
 // CHECK: [[BB_C]]:
-// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
+// CHECK:   [[TMP_SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
+// CHECK:   copy_addr [[SWITCH_ENUM_ARG]] to [initialization] [[TMP_SWITCH_ENUM_ARG]]
+// CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[TMP_SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_C]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [initialization] [[ABBC_PHI]]
@@ -1605,3 +1605,26 @@ struct rdar49990484Struct {
     }
   }
 }
+
+enum ProtocolAndTrivial {
+    case a(P)
+    case b(Int)
+}
+
+// Make sure "e" is destroyed in both cases.
+// CHECK-LABEL: sil hidden [ossa] @$s6switch30testEnumWithProtocolAndTrivialySbAA0efG0OF
+// CHECK: bb0(
+// CHECK: [[TMP:%[0-9]+]] = alloc_stack
+// CHECK: bb1:
+// CHECK: [[P:%[0-9]+]] = unchecked_take_enum_data_addr
+// CHECK: destroy_addr [[P]]
+// CHECK: bb2:
+// CHECK: destroy_addr [[TMP]]
+// CHECK-LABEL: end sil function '$s6switch30testEnumWithProtocolAndTrivialySbAA0efG0OF'
+func testEnumWithProtocolAndTrivial(_ e: ProtocolAndTrivial) -> Bool {
+    switch (e) {
+    case .a(_): return true
+    case .b(_): return true
+    }
+}
+
