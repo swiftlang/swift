@@ -634,7 +634,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
   // information.
   // currTask->ResumeTask = @llvm.coro.async.resume();
   assert(currTask->getType() == IGM.SwiftTaskPtrTy);
-  auto currTaskResumeTaskAddr = Builder.CreateStructGEP(currTask,3);
+  auto currTaskResumeTaskAddr = Builder.CreateStructGEP(currTask, 4);
   auto coroResume =
       Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
 
@@ -645,7 +645,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
       Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy),
       Address(currTaskResumeTaskAddr, pointerAlignment));
   // currTask->ResumeContext = &continuation_context;
-  auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 4);
+  auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 5);
   Builder.CreateStore(
       Builder.CreateBitOrPointerCast(continuationContext.getAddress(),
                                      IGM.SwiftContextPtrTy),

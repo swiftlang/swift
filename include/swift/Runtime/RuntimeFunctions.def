@@ -1518,6 +1518,16 @@ FUNCTION(TaskCreateFutureFunc,
               TaskContinuationFunctionPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// void swift_task_switch(AsyncTask *task,
+//                        ExecutorRef currentExecutor,
+//                        ExecutorRef newExecutor);
+FUNCTION(TaskSwitchFunc,
+         swift_task_switch, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftExecutorPtrTy),
+         ATTRS(NoUnwind))
+
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,
          swift_autoDiffCreateLinearMapContext, SwiftCC,
