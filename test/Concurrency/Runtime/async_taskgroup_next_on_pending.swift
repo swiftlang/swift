@@ -37,7 +37,7 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 
 func completeSlowly(n: Int) async -> Int {
   print("start group.add { \(n) }")
-  sleep(1)
+  sleep(5)
   print("complete group.add { \(n) }")
   fputs("error: complete group.add { \(n) }\n", stderr)
   return n
@@ -50,8 +50,8 @@ func test_sum_nextOnPending() {
 
   let taskHandle = launch { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
+      await _taskPrintIDCurrent("TASK_ID: ADDING")
       for n in numbers {
-        await _taskPrintIDCurrent("TASK_ID: ADDING")
         await group.add {
           await _taskPrintIDCurrent("TASK_ID: ADDING-\(n) INSIDE")
           let res = await completeSlowly(n: n)
@@ -67,7 +67,7 @@ func test_sum_nextOnPending() {
         await _taskPrintIDCurrent("TASK_ID: AFTER NEXT-\(n)")
         assert(numbers.contains(n), "Unexpected value: \(n)! Expected any of \(numbers)")
         print("next: \(n)")
-        DispatchQueue.main.sync { // FIXME: remove once executors/actors are a thing; they should provide us a way to guarantee the safety here
+        DispatchQueue.main.sync {
           sum += n
         }
         print("before group.next(), sum: \(sum)")

@@ -51,13 +51,16 @@ func test_taskGroup_isEmpty() {
 
       // CHECK: after draining tasks: isEmpty=true
       print("after draining tasks: isEmpty=\(group.isEmpty)")
-
       return 0
     }
   }
 
+  DispatchQueue.main.async { () async in
+    _ = await try taskHandle.get()
+    exit(0)
+  }
+
   print("main task")
-  sleep(10)
 }
 
 test_taskGroup_isEmpty()

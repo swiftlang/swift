@@ -198,7 +198,7 @@ public:
 ///
 ///    +------------------+
 ///    | childFragment?   |
-///    | groupFragment? |
+///    | groupFragment?   |
 ///    | futureFragment?  |*
 ///    +------------------+
 ///
@@ -342,6 +342,15 @@ public:
         /// object itself.
         OpaqueValue *storage;
 
+        /// Optional, the completed task that was polled out of the ready queue.
+        ///
+        /// # Important: swift_release
+        /// If if a task is returned here, the task MUST be swift_release'd
+        /// once we are done with it, to balance out the retain made before
+        /// when the task was enqueued into the ready queue to keep it alive
+        /// until a next() call eventually picks it up.
+        AsyncTask *task;
+
         bool isStorageAccessible() {
           return status == ChannelPollStatus::Success ||
               status == ChannelPollStatus::Error ||
@@ -465,7 +474,8 @@ public:
     ///
     /// The low bits contain the status, the rest of the pointer is the
     /// AsyncTask.
-    mpsc_queue_t<ReadyQueueItem> readyQueue;
+    // mpsc_queue_t<ReadyQueueItem> readyQueue;
+    MutexQueue<ReadyQueueItem> readyQueue;
 
     /// Queue containing all of the tasks that are waiting in `get()`.
     ///
@@ -474,15 +484,13 @@ public:
     // TODO: these are like Future, had tough time making it be BOTH future and channel
     std::atomic<WaitQueueItem> waitQueue; // TODO: reuse the future's wait queue instead?
 
-    // FIXME: seems shady...?
     // Trailing storage for the result itself. The storage will be uninitialized.
     // Use the `readyQueue` to poll for values from the channel instead.
     friend class AsyncTask;
 
   public:
     explicit GroupFragment(const Metadata *resultType)
-        : //readyQueue(ReadyQueueItem::get(ReadyQueueStatus::Empty, nullptr)),
-          status(GroupStatus::initial().status),
+        : status(GroupStatus::initial().status),
           readyQueue(),
           waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)) {}  // TODO: reuse FutureFragment's waitQ
 
@@ -558,6 +566,9 @@ public:
   void
   groupOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
 
+//  FutureFragment::Status
+//  AsyncTask::waitGroupNext(AsyncTask *waitingTask);
+
   /// Attempt to dequeue ready tasks and complete the waitingTask.
   ///
   /// If unable to complete the waiting task immediately (with an readily
@@ -569,11 +580,13 @@ public:
 
   // ==== TaskGroup Child ------------------------------------------------------
 
-  // Flag indicating this task is a child of a group; no additional fragments.
+  // Checks if task is a child of a TaskGroup task.
   //
   // A child task that is a group child knows that it's parent is a group
   // and therefore may `groupOffer` to it upon completion.
-  bool isGroupChild() const { return Flags.task_isGroupChild(); }
+  bool isTaskGroupChild() {
+    return hasChildFragment() && childFragment()->getParent()->isTaskGroup();
+  }
 
   // ==== Future ---------------------------------------------------------------
 
@@ -675,8 +688,8 @@ public:
   FutureFragment *futureFragment() {
     assert(isFuture());
 
-    // TODO: can we simplify this? maybe a channel is ALWAYS
     if (hasChildFragment()) {
+      // TODO: do this via calculating an offset
       if (isTaskGroup()) {
         return reinterpret_cast<FutureFragment *>(
             reinterpret_cast<GroupFragment *>(

@@ -34,60 +34,53 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 // ==== ------------------------------------------------------------------------
 // MARK: Tests
 
-/// Tasks complete before they are next() polled.
-func test_sum_nextOnCompleted() {
-  let numbers = [1, 2, 3, 4, 5]
-  let expected = numbers.reduce(0, +)
+func test_skipCallingNext_butInvokeCancelAll() {
+  let numbers = [1, 1]
 
   let taskHandle = launch { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
       for n in numbers {
+        print("group.add { \(n) }")
         await group.add { () async -> Int in
+          sleep(1)
           print("  inside group.add { \(n) }")
+          let cancelled = await Task.isCancelled()
+          print("  inside group.add { \(n) } (canceled: \(cancelled))")
           return n
         }
       }
 
-      sleep(3)
+      group.cancelAll()
 
-      var sum = 0
-      do {
-        while let r = await try group.next() { // FIXME: unlock it working on while
-          print("next: \(r)")
-          sum += r
-          print("sum: \(sum)")
-        }
-      } catch {
-        print("ERROR: \(error)")
-      }
-
-      print("task group returning: \(sum)")
-      return sum
+      // return immediately; the group should wait on the tasks anyway
+      print("return immediately 0 (canceled: \(await Task.isCancelled()))")
+      return 0
     }
   }
 
   // CHECK: main task
-  // CHECK-DAG: inside group.add { [[N:[0-9]+]] }
-  // CHECK-DAG: next: {{[0-9]+}}
-  //
-  // CHECK-DAG: inside group.add { [[N:[0-9]+]] }
-  // CHECK-DAG: next: {{[0-9]+}}
-  //
-  // CHECK: sum: 3
-  //
-  // CHECK: task group returning: 3
 
-  launch { () async in
-    let sum = await try! taskHandle.get()
-    // CHECK: result: 3
-    print("result: \(sum)")
+  launch { () async -> () in
+    let result = await try! taskHandle.get()
+    // CHECK: group.add { 1 }
+    // CHECK: group.add { 1 }
+    // CHECK: return immediately 0 (canceled: true)
+
+    // CHECK: inside group.add { 1 }
+    // COM: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
+
+    // CHECK: inside group.add { 1 }
+    // COM: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
+
+    // CHECK: result: 0
+    print("result: \(result)")
+    assert(result == 0)
     exit(0)
   }
 
   print("main task")
-  sleep(3)
 }
 
-test_sum_nextOnCompleted()
+test_skipCallingNext_butInvokeCancelAll()
 
 dispatchMain()

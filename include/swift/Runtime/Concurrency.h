@@ -141,12 +141,12 @@ swift_task_future_wait;
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_poll(on groupTask: Builtin.NativeObject) async
+/// func swift_task_group_wait_next(on groupTask: Builtin.NativeObject) async
 ///     -> RawGroupPollResult?
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncFunctionType<TaskFutureWaitResult(AsyncTask *task)>
-swift_task_group_poll;
+swift_task_group_wait_next;
 
 /// This can be called from any thread. Its Swift signature is
 ///
@@ -162,7 +162,7 @@ swift_task_group_add_pending(AsyncTask *groupTask, AsyncTask *childTask);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void
-swift_task_print_ID(const void* name, const void* file, int line, AsyncTask *task);
+swift_task_print_ID(const char* name, const char* file, int line, AsyncTask *task);
 
 /// Check the readyQueue of a Channel, return true if it has no pending tasks.
 ///

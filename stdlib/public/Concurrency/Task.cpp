@@ -80,6 +80,9 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
+  fprintf(stderr, "error: %s[%d %s:%d]: complete future: %d\n",
+      __FUNCTION__, pthread_self(), __FILE__, __LINE__, this);
+
   assert(isFuture());
   auto fragment = futureFragment();
 
@@ -100,6 +103,17 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
       newQueueHead, std::memory_order_acquire);
   assert(queueHead.getStatus() == Status::Executing);
 
+  // If this is task group child, notify the parent group about the completion.
+  if (isTaskGroupChild()) {
+    // then we must offer into the parent group's channel that we completed,
+    // so it may `next()` poll completed child tasks in completion order.
+    auto parent = childFragment()->getParent();
+    fprintf(stderr, "error: %s[%d %s:%d]:     complete future: %d, signal completion to group -> %d\n",
+            __FUNCTION__, pthread_self(), __FILE__, __LINE__, this, parent);
+    assert(parent->isTaskGroup());
+    parent->groupOffer(this, context, executor);
+  }
+
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
@@ -118,7 +132,10 @@ SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
 
-  // For a group, destroy the queues and results.
+  fprintf(stderr, "error: %s[%d %s:%d]: destroy: %d\n",
+    __FUNCTION__, pthread_self(), __FILE__, __LINE__, task);
+
+// For a group, destroy the queues and results.
   if (task->isTaskGroup()) {
     task->groupFragment()->destroy();
   }
@@ -166,24 +183,12 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
     task->completeFuture(context, executor);
   }
 
-  // Offer the future to the parent task group's channel.
-  if (task->isGroupChild()) {
-    assert(task->isFuture());
-    auto futureContext = static_cast<FutureAsyncContext *>(context);
-    fprintf(stderr, "error: completeTask[%d %s:%d]: complete group child: %d\n",
-            pthread_self(), __FILE__, __LINE__, task->futureFragment()->getStoragePtr());
-    // then we must offer into the parent group's channel that we completed,
-    // so it may `next()` poll completed child tasks in completion order.
-    auto parent = task->childFragment()->getParent();
-    parent->groupOffer(task, context, executor);
-  }
-
   // TODO: set something in the status?
   // TODO: notify the parent somehow?
   // TODO: remove this task from the child-task chain?
 
-  // Release the task, balancing the retain that a running task
-  // has on itself.
+  // Release the task, balancing the retain that a running task has on itself.
+  // If it was a group child task, it will remain until the group returns it.
   swift_release(task);
 }
 
@@ -217,11 +222,6 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
   assert((parent != nullptr) == flags.task_isChildTask());
-
-  if (flags.task_isGroupChild()) { // TODO: express without the `if`?
-    assert(flags.task_isChildTask());
-    assert(parent->Flags.task_isTaskGroup());
-  }
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -311,19 +311,8 @@ void swift::swift_task_future_wait(
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
 
-  fprintf(stderr, "error: swift_task_future_wait[%d %s:%d]: waitingTask: %d rawContext: %d task: %s\n",
-          pthread_self(), __FILE__, __LINE__, waitingTask, rawContext, task);
-
   // Wait on the future.
   assert(task->isFuture());
-
-  // TODO: Would be nicer perhaps to make a new function swift_task_group_poll
-  //       to not mix it into the future_wait which is somewhat different but very similar...
-  if (task->isTaskGroup()) {
-    swift::swift_task_group_poll(waitingTask, executor, rawContext);
-    return;
-  }
-
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
@@ -353,6 +342,8 @@ void swift::swift_task_run(AsyncTask *taskToRun) {
 }
 
 JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
+  size_t v = (task->Flags.getOpaqueValue());
+  assert((v <= ~(SIZE_MAX << 27)) && "corrupted task->Flags detected!");
   return task->Flags;
 }
 

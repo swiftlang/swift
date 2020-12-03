@@ -229,20 +229,6 @@ extension Task {
       }
     }
 
-    /// Whether this is a groupChild.
-    var isGroupChild: Bool {
-      get {
-        (bits & (1 << 27)) != 0
-      }
-
-      set {
-        if newValue {
-          bits = bits | 1 << 27
-        } else {
-          bits = (bits & ~(1 << 27))
-        }
-      }
-    }
   }
 }
 
@@ -362,34 +348,27 @@ public func runAsync(_ asyncFun: @escaping () async -> ()) {
   runTask(childTask.0)
 }
 
+// TODO: _taskFUturePoll -- need to return the Task, which we need to
+// builting native object is treated as owned and releases
+// TODO: if noone holds the the handle to a task, after next we should destroy it
+// -- check this by printing in destroyFuture
+// (error, storage, child NativeObject?) // TODO check if the child is automatically released
+
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
   on task: Builtin.NativeObject
-) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer)
 
 public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
   let rawResult = await _taskFutureWait(on: task)
   assert(!rawResult.hadErrorResult)
 
-  guard let storage = rawResult.storage else {
-    fatalError("\(#function): async result storage was null!")
-  }
+//  guard let storage = rawResult.storage else {
+//    fatalError("\(#function): async result storage was null!")
+//  }
 
   // Take the value.
-  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
-  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
-}
-
-public func _taskFutureGetOptional<T>(_ task: Builtin.NativeObject) async -> T? {
-  let rawResult = await _taskFutureWait(on: task)
-  assert(!rawResult.hadErrorResult)
-
-  guard let storage = rawResult.storage else {
-    return nil
-  }
-
-  // Take the value.
-  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
+  let storagePtr = rawResult.storage.bindMemory(to: T.self, capacity: 1)
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
@@ -402,32 +381,32 @@ public func _taskFutureGetThrowing<T>(
     throw unsafeBitCast(rawResult.storage, to: Error.self)
   }
 
-  guard let storage = rawResult.storage else {
-    fatalError("\(#function): async result storage was null!")
-  }
+//  guard let storage = rawResult.storage else {
+//    fatalError("\(#function): async result storage was null!")
+//  }
 
   // Take the value on success
-  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
+  let storagePtr = rawResult.storage.bindMemory(to: T.self, capacity: 1)
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
-public func _taskFutureGetOptionalThrowing<T>(
-    _ task: Builtin.NativeObject
-) async throws -> T? {
-  let rawResult = await _taskFutureWait(on: task)
-  if rawResult.hadErrorResult {
-    // Throw the result on error.
-    throw unsafeBitCast(rawResult.storage, to: Error.self)
-  }
-
-  guard let storage = rawResult.storage else {
-    return nil
-  }
-
-  // Take the value on success
-  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
-  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
-}
+//public func _taskFutureGetOptionalThrowing<T>(
+//    _ task: Builtin.NativeObject
+//) async throws -> T? {
+//  let rawResult = await _taskFutureWait(on: task)
+//  if rawResult.hadErrorResult {
+//    // Throw the result on error.
+//    throw unsafeBitCast(rawResult.storage, to: Error.self)
+//  }
+//
+//  guard let storage = rawResult.storage else {
+//    return nil
+//  }
+//
+//  // Take the value on success
+//  let storagePtr = storage.bindMemory(to: T.self, capacity: 1)
+//  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
+//}
 
 public func _runChildTask<T>(operation: @escaping () async throws -> T) async
     -> Builtin.NativeObject

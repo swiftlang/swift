@@ -66,25 +66,40 @@ extension Task {
   public static func withGroup<TaskResult, BodyResult>(
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
-    cancelOutstandingTasksOnReturn: Bool = false,
     body: @escaping ((inout Task.Group<TaskResult>) async throws -> BodyResult)
   ) async throws -> BodyResult {
-    let drainPendingTasksOnSuccessfulReturn = !cancelOutstandingTasksOnReturn
     let parent = Builtin.getCurrentAsyncTask()
 
     // Set up the job flags for a new task.
     var groupFlags = JobFlags()
     groupFlags.kind = .task
     groupFlags.priority = getJobFlags(parent).priority
-    groupFlags.isFuture = true
     groupFlags.isChildTask = true
+    groupFlags.isTaskGroup = true
+    groupFlags.isFuture = true
 
-    // 1. Prepare the Group task
-    var group = Task.Group<TaskResult>(parentTask: parent)
+//    // 1. Prepare the Group task
+//    var group = Task.Group<TaskResult>(parentTask: parent)
 
+    await _taskPrintIDCurrent("parentTask")
     let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
-        await try body(&group)
+        let task = Builtin.getCurrentAsyncTask()
+        var group = Task.Group<TaskResult>(task: task)
+
+        // This defer handles both return/throw cases in the following way:
+        // - body throws: all tasks must be cancelled immediately as we re-throw
+        // - body returns: as good measure, cancel tasks after draining
+        //   (although there should be none left by that time)
+        defer { group.cancelAll() }
+
+        let result = await try body(&group)
+
+        /// Drain all remaining tasks by awaiting on them;
+        /// Their failures are ignored;
+        await group._tearDown()
+
+        return result
       }
     let groupHandle = Handle<BodyResult>(task: groupTask)
 
@@ -93,22 +108,8 @@ extension Task {
       groupHandle.run()
     }
 
-    // 2.1) ensure that if we fail and exit by throwing we will cancel all tasks,
-    // if we succeed, there is nothing to cancel anymore so this is noop
-    defer { group.cancelAll() }
-
-    // 2.2) Await the group completing it's run ("until the withGroup returns")
-    let result = await try groupHandle.get() // if we throw, so be it -- group tasks will be cancelled
-
-// TODO: do drain before exiting
-//    if drainPendingTasksOnSuccessfulReturn {
-//      // drain all outstanding tasks
-//      while await try group.next() != nil {
-//        continue // awaiting all remaining tasks
-//      }
-//    }
-
-    return result
+    // 2.2) Await the group completing
+    return await try groupHandle.get()
   }
 
   /// A task group serves as storage for dynamically started tasks.
@@ -116,26 +117,14 @@ extension Task {
   /// Its intended use is with the `Task.withGroup` function.
   /* @unmoveable */
   public struct Group<TaskResult> {
-    // private let parentTask: Builtin.NativeObject // TODO: maybe use the groupTask as parent for all add()ed tasks instead and remove this one
-
-    /// Channel task into which child tasks offer their results,
+    /// Group task into which child tasks offer their results,
     /// and the `next()` function polls those results from.
-    private let groupTask: Builtin.NativeObject
+    private let task: Builtin.NativeObject
 
     /// No public initializers
-    init(parentTask: Builtin.NativeObject) {
-      var flags = JobFlags()
-      flags.kind = .task // TODO: taskGroup?
-      flags.priority = getJobFlags(parentTask).priority
-      flags.isTaskGroup = true
-      flags.isChildTask = true
-      // TODO: make sure we inherit everything from the parent
-      let (groupTask, _) = Builtin.createAsyncTask(flags.bits, parentTask, { () async throws -> () in
-        () // ...nothing...
-      })
-      _taskPrintID(("parentTask" as NSString).utf8String, (#file as NSString).utf8String, #line, parentTask)
-      _taskPrintID(("groupTask" as NSString).utf8String, (#file as NSString).utf8String, #line, groupTask)
-      self.groupTask = groupTask
+    init(task: Builtin.NativeObject) {
+      _taskPrintID(("groupTask" as NSString).utf8String, (#file as NSString).utf8String, #line, task)
+      self.task = task
     }
 
     // Swift will statically prevent this type from being copied or moved.
@@ -161,15 +150,14 @@ extension Task {
     ) async -> Task.Handle<TaskResult> {
       var flags = JobFlags()
       flags.kind = .task
-      flags.priority = overridingPriority ?? getJobFlags(groupTask).priority
+      flags.priority = overridingPriority ?? getJobFlags(task).priority
       flags.isFuture = true
       flags.isChildTask = true
-      flags.isGroupChild = true
 
       let (childTask, _) =
-        Builtin.createAsyncTaskFuture(flags.bits, groupTask, operation)
+        Builtin.createAsyncTaskFuture(flags.bits, self.task, operation)
       _taskPrintID(("childTask(add)" as NSString).utf8String, (#file as NSString).utf8String, #line, childTask)
-      _taskGroupAddPending(groupTask, childTask)
+      _taskGroupAddPending(task, childTask)
       let handle = Handle<TaskResult>(task: childTask)
 
       // FIXME: use executors or something else to launch the task
@@ -190,18 +178,17 @@ extension Task {
     public mutating func next() async throws -> TaskResult? {
       // We reuse the taskFutureWait -> swift_task_future_wait since it seems to have special sauce,
       // but actually we
-      fputs("error: next[\(#file):\(#line)]: invoked: \(self.groupTask)\n", stderr)
-      let rawResult = await _taskFutureWait(on: self.groupTask)
-//      let rawResult = await _taskGroupPoll(on: self.groupTask) // TODO: consider if we can implement this way
+      fputs("error: next[\(#file):\(#line)]: invoked: \(self.task)\n", stderr)
+      let rawResult = await _taskGroupWaitNext(on: self.task) // TODO: _taskGroupWaitNext
       fputs("error: next[\(#file):\(#line)]: NEXT RESULT RAW: \(rawResult)\n", stderr)
 
       if rawResult.hadErrorResult {
         // Throw the result on error.
-        print("error: next[\(#file):\(#line)]: after await, error: \(rawResult)");
+        fputs("error: next[\(#file):\(#line)]: after await, error: \(rawResult)", stderr)
         throw unsafeBitCast(rawResult.storage, to: Error.self)
       }
 
-      print("error: next[\(#file):\(#line)]: after await, result: \(rawResult)");
+      fputs("error: next[\(#file):\(#line)]: after await, result: \(rawResult)\n", stderr)
 
       guard let storage = rawResult.storage else {
         return nil
@@ -223,7 +210,7 @@ extension Task {
     ///
     /// - Returns: `true` if the group has no pending tasks, `false` otherwise.
     public var isEmpty: Bool {
-      _taskGroupIsEmpty(self.groupTask)
+      _taskGroupIsEmpty(self.task)
     }
 
     /// Cancel all the remaining tasks in the group.
@@ -235,11 +222,38 @@ extension Task {
     ///
     /// - SeeAlso: `Task.addCancellationHandler`
     public mutating func cancelAll() {
-      _taskCancel(groupTask) // TODO: do we also have to go over all child tasks and cancel there?
+      _taskCancel(self.task) // TODO: do we also have to go over all child tasks and cancel there?
     }
   }
 }
 
+/// ==== -----------------------------------------------------------------------
+
+extension Task.Group {
+  /// Invoked after a withGroup's body returns, and initiates an orderly
+  /// teardown of the task.group. No new tasks are accepted by the group // TODO: don't accept new tasks once body returned to avoid infinitely waiting on accident
+  ///
+  /// This function waits until all pending tasks have been processed before
+  /// returning.
+  ///
+  /// Child tasks are NOT cancelled by this function implicitly.
+  /// If tasks should be cancelled before returning this must be done by an
+  /// explicit `group.cancelAll()` call within the `withGroup`'s function body.
+  mutating func _tearDown() async {
+    // Drain any not next() awaited tasks if the group wasn't cancelled
+    // If any of these tasks were to throw
+    //
+    // Failures of tasks are ignored.
+    while !self.isEmpty {
+      print(">>>>> self.isEmpty == \(self.isEmpty)")
+      _ = await try? self.next()
+    // TODO: Should a failure cause a cancellation of the task group?
+    //       This looks very much like supervision trees, 
+    //       where one may have various decisions depending on use cases...
+      continue // keep awaiting on all pending tasks
+    }
+  }
+}
 /// ==== -----------------------------------------------------------------------
 
 @_silgen_name("swift_task_group_offer")
@@ -247,6 +261,12 @@ func taskGroupOffer(
   group: Builtin.NativeObject,
   completedTask: Builtin.NativeObject
 )
+
+@_silgen_name("swift_task_group_wait_next")
+func _taskGroupWaitNext(
+  on groupTask: Builtin.NativeObject
+) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+// ) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?, completedTask: Any?) // FIXME: the task too
 
 /// SeeAlso: GroupPollResult
 struct RawGroupPollResult {
@@ -261,11 +281,6 @@ enum ChannelPollStatus: Int {
   case error   = 3
 }
 
-@_silgen_name("swift_task_group_poll")
-func _taskGroupPoll(
-  on groupTask: Builtin.NativeObject
-) async -> RawTaskFutureWaitResult
-
 @_silgen_name("swift_task_group_is_empty")
 func _taskGroupIsEmpty(
   _ groupTask: Builtin.NativeObject
@@ -276,6 +291,8 @@ func _taskGroupAddPending(
   _ groupTask: Builtin.NativeObject,
   _ childTask: Builtin.NativeObject
 )
+
+// ==== Debugging utils --------------------------------------------------------
 
 // TODO: remove this
 @_silgen_name("swift_task_print_ID")
