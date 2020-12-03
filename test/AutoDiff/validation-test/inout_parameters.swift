@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.
+// UNSUPPORTED: use_os_stdlib
+
 // `inout` parameter differentiation tests.
 
 import DifferentiationUnittest
