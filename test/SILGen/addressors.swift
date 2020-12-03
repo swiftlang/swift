@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-sil -parse-stdlib %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
 // RUN: %target-swift-emit-ir -parse-stdlib %s
@@ -60,7 +59,8 @@ func test0() {
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unsafe] [[T3]] : $*Int32
-// CHECK: [[Z:%.*]] = load [[ACCESS]] : $*Int32
+// CHECK: [[ACCESS_GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: [[Z:%.*]] = load [[ACCESS_GEP]]
   let z = a[10]
 
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[A]] : $*A
@@ -106,8 +106,8 @@ var global: Int32 {
   }
 // CHECK-LABEL: sil hidden @$s10addressors6globals5Int32Vvlu : $@convention(thin) () -> UnsafePointer<Int32> {
 // CHECK:   [[T0:%.*]] = global_addr @$s10addressors10uninitAddrSpys5Int32VGvp : $*UnsafeMutablePointer<Int32>
-// CHECK:   [[T1:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
-// CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
+// CHECK:   [[T1:%.*]] = struct_element_addr [[T0]]
+// CHECK:   [[T2:%.*]] = load [[T1]]
 // CHECK:   [[T3:%.*]] = struct $UnsafePointer<Int32> ([[T2]] : $Builtin.RawPointer)
 // CHECK:   return [[T3]] : $UnsafePointer<Int32>
 }

@@ -31,6 +31,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
@@ -52,6 +53,54 @@ static bool areAllValuesTrivial(Values values, SILFunction &function) {
     return value->getType().isTrivial(function);
   });
 }
+
+//===----------------------------------------------------------------------===//
+//      CanonicalizeInstruction subclass for use in Mandatory Combiner.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class MandatoryCombineCanonicalize final : CanonicalizeInstruction {
+public:
+  using Worklist = SmallSILInstructionWorklist<256>;
+
+private:
+  Worklist &worklist;
+  bool changed = false;
+
+public:
+  MandatoryCombineCanonicalize(Worklist &worklist)
+      : CanonicalizeInstruction(DEBUG_TYPE), worklist(worklist) {}
+
+  void notifyNewInstruction(SILInstruction *inst) override {
+    worklist.add(inst);
+    worklist.addUsersOfAllResultsToWorklist(inst);
+    changed = true;
+  }
+
+  // Just delete the given 'inst' and record its operands. The callback isn't
+  // allowed to mutate any other instructions.
+  void killInstruction(SILInstruction *inst) override {
+    worklist.eraseSingleInstFromFunction(*inst,
+                                         /*AddOperandsToWorklist*/ true);
+    changed = true;
+  }
+
+  void notifyHasNewUsers(SILValue value) override {
+    if (worklist.size() < 10000) {
+      worklist.addUsersToWorklist(value);
+    }
+    changed = true;
+  }
+
+  bool tryCanonicalize(SILInstruction *inst) {
+    changed = false;
+    canonicalize(inst);
+    return changed;
+  }
+};
+
+} // anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                        MandatoryCombiner Interface
@@ -177,10 +226,16 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
+  MandatoryCombineCanonicalize mcCanonicialize(worklist);
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
     if (instruction == nullptr) {
+      continue;
+    }
+
+    if (mcCanonicialize.tryCanonicalize(instruction)) {
+      madeChange = true;
       continue;
     }
 
