@@ -259,6 +259,18 @@ function(_add_target_variant_c_compile_flags)
     if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
       list(APPEND result "-U_DEBUG")
     endif()
+
+    # The concurrency library uses double-word atomics.  MSVC's std::atomic
+    # uses a spin lock for this, so to get reasonable behavior we have to
+    # implement it ourselves using _InterlockedCompareExchange128.
+    # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
+    if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
+      if(SWIFT_COMPILER_IS_MSVC_LIKE)
+        list(APPEND result /clang:-mcx16)
+      else()
+        list(APPEND result -mcx16)
+      endif()
+    endif()
   endif()
 
   if(${CFLAGS_SDK} STREQUAL ANDROID)

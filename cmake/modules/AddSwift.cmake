@@ -248,18 +248,6 @@ function(_add_host_variant_c_compile_flags target)
     endif()
   endif()
 
-  # The concurrency library uses double-word atomics.  MSVC's std::atomic
-  # uses a spin lock for this, so to get reasonable behavior we have to
-  # implement it ourselves using _InterlockedCompareExchange128.
-  # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
-      if(CMAKE_C_COMPILER_ID MATCHES Clang)
-        target_compile_options(${target} PRIVATE -mcx16)
-      endif()
-    endif()
-  endif()
-
   if(LLVM_ENABLE_ASSERTIONS)
     target_compile_options(${target} PRIVATE -UNDEBUG)
   else()
