@@ -80,7 +80,7 @@ option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
 
 option(SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL
-  "Enable experimental Swift automatic requirement satisfication features"
+  "Enable experimental Swift structural generic programming features"
   FALSE)
 
 #

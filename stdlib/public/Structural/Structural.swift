@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the Structural protocol, used to support extensible
-// library-defined automatic derived conformances. This API is not stable 
+// library-defined automatic derived conformances. This API is not stable
 // and subject to change.
 //
 // Please see forum discussion for more information about the proposal:
@@ -23,12 +23,14 @@ import Swift
 
 /// A type that can be converted to and from its structural representation.
 public protocol Structural {
-    /// A structural representation for `Self`.
-    associatedtype StructuralRepresentation
+  /// A structural representation for `Self`.
+  associatedtype StructuralRepresentation
 
-    /// Creates an instance from the given structural representation.
-    init(structuralRepresentation: StructuralRepresentation)
+  /// Creates an instance from the given structural representation.
+  init(structuralRepresentation: StructuralRepresentation)
 
-    /// A structural representation of `self`.
-    var structuralRepresentation: StructuralRepresentation { get set }
+  /// A structural representation of `self`.
+  var structuralRepresentation: StructuralRepresentation {
+    get set
+  }
 }

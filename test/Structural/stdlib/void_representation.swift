@@ -8,35 +8,27 @@ import StdlibUnittest
 import _Structural
 
 struct Dummy: Structural, Equatable {
-    typealias StructuralRepresentation = Void
+  typealias StructuralRepresentation = Void
 
-    init() {
-    }
+  init() {}
 
-    init(structuralRepresentation: StructuralRepresentation) {
-    }
+  init(structuralRepresentation: StructuralRepresentation) {}
 
-    var structuralRepresentation: StructuralRepresentation {
-        get {
-            return ()
-        }
-        set(newValue) {
-        }
-    }
+  var structuralRepresentation: StructuralRepresentation { () }
 }
 
-let VoidRepresentationTests = TestSuite("VoidRepresentation") 
+let VoidRepresentationTests = TestSuite("VoidRepresentation")
 
 VoidRepresentationTests.test("init(structuralRepresentation:)") {
-    let dummy1 = Dummy()
-    let dummy2 = Dummy(structuralRepresentation: ())
-    expectEqual(dummy1, dummy2)
+  let dummy1 = Dummy()
+  let dummy2 = Dummy(structuralRepresentation: ())
+  expectEqual(dummy1, dummy2)
 }
 
-VoidRepresentationTests.test("structuralRepresentation") {
-    let dummy = Dummy()
-    let repr: Void = dummy.structuralRepresentation
-    expectTrue(repr == ())
+VoidRepresentationTests.test("var structuralRepresentation") {
+  let dummy = Dummy()
+  let repr = dummy.structuralRepresentation
+  expectTrue(repr == ())
 }
 
 runAllTests()

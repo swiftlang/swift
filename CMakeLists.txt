@@ -858,7 +858,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "")
-  message(STATUS "Structural Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL}")
+  message(STATUS "Structural Generic Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL}")
   message(STATUS "")
   message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "")

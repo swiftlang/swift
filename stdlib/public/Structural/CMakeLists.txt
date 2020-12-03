@@ -1,4 +1,4 @@
-#===--- CMakeLists.txt - Differentiable programming support library ------===#
+#===--- CMakeLists.txt - Structural generic programming support ----------===#
 #
 # This source file is part of the Swift.org open source project
 #
