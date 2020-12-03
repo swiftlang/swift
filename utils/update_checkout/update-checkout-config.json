@@ -365,7 +365,7 @@
                 "PythonKit": "master",
                 "swift-format": "main",
                 "tensorflow": "v2.3.0",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "make-it-work-with-non-hardcoded-conformances"
             }
         }
     }
