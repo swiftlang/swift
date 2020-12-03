@@ -67,6 +67,11 @@ public:
 protected:
   Type getStdlibType(StringRef name) const;
 
+  NominalTypeDecl *getStdlibNominalTypeDecl(StringRef name) const;
+
+  VarDecl *addExtensionVarMember(NominalTypeDecl *decl, StringRef name,
+                                 Type type) const;
+
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
