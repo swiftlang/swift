@@ -476,12 +476,15 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 
 static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
-                                        unsigned paramIndex, bool allowSRet) {
+                                        unsigned paramIndex, bool allowSRet,
+                                        llvm::Type *storageType) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::NoAlias);
   b.addAttribute(llvm::Attribute::NoCapture);
-  if (allowSRet)
-    b.addAttribute(llvm::Attribute::StructRet);
+  if (allowSRet) {
+    assert(storageType);
+    b.addStructRetAttr(storageType);
+  }
   attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               paramIndex + llvm::AttributeList::FirstArgIndex,
                               b);
@@ -620,8 +623,10 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
   auto resultType = getSILFuncConventions().getSILResultType(
       IGM.getMaximalTypeExpansionContext());
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
-  addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet());
-  addPointerParameter(resultTI.getStorageType());
+  auto storageTy = resultTI.getStorageType();
+  addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
+                              storageTy);
+  addPointerParameter(storageTy);
   return IGM.VoidTy;
 }
 
@@ -652,8 +657,9 @@ void SignatureExpansion::expandResult() {
   // Expand the indirect results.
   for (auto indirectResultType :
        fnConv.getIndirectSILResultTypes(IGM.getMaximalTypeExpansionContext())) {
-    addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet());
-    addPointerParameter(IGM.getStorageType(indirectResultType));
+    auto storageTy = IGM.getStorageType(indirectResultType);
+    addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(), storageTy);
+    addPointerParameter(storageTy);
   }
 }
 
@@ -1527,9 +1533,12 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       case clang::ParameterABI::SwiftErrorResult:
         IGM.addSwiftErrorAttributes(Attrs, getCurParamIndex());
         break;
-      case clang::ParameterABI::SwiftIndirectResult:
-        addIndirectResultAttributes(IGM, Attrs, getCurParamIndex(),claimSRet());
+      case clang::ParameterABI::SwiftIndirectResult: {
+        auto *coercedTy = AI.getCoerceToType();
+        addIndirectResultAttributes(IGM, Attrs, getCurParamIndex(), claimSRet(),
+                                    coercedTy->getPointerElementType());
         break;
+      }
       }
 
       // If the coercion type is a struct which can be flattened, we need to
@@ -2502,8 +2511,16 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   Args[0] = result.getAddress();
   SILFunctionConventions FnConv(CurCallee.getSubstFunctionType(),
                                 IGF.getSILModule());
-  addIndirectResultAttributes(IGF.IGM, CurCallee.getMutableAttributes(),
-                              0, FnConv.getNumIndirectSILResults() <= 1);
+
+  llvm::Type *storageTy = Args[0]->getType()->getPointerElementType();;
+  if (FnConv.getNumIndirectSILResults() == 1) {
+    for (auto indirectResultType : FnConv.getIndirectSILResultTypes(
+             IGF.IGM.getMaximalTypeExpansionContext()))
+      storageTy = IGF.IGM.getStorageType(indirectResultType);
+  }
+  addIndirectResultAttributes(IGF.IGM, CurCallee.getMutableAttributes(), 0,
+                              FnConv.getNumIndirectSILResults() <= 1,
+                              storageTy);
 #ifndef NDEBUG
   LastArgWritten = 0; // appease an assert
 #endif
