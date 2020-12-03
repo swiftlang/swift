@@ -4485,6 +4485,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 // Concurrency
 //===----------------------------------------------------------------------===//
 
+/// If the current function is associated with an actor, then this
+/// function emits a hop_to_executor to that actor's executor at loc.
 void SILGenFunction::emitHopToCurrentExecutor(SILLocation loc) {
   if (actor)
     B.createHopToExecutor(loc, actor);
