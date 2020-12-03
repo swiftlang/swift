@@ -29,6 +29,83 @@
 
 using namespace swift;
 
+const Metadata *getCanonicalTypeMetadata(const ProtocolConformanceDescriptor *);
+
+namespace placeholder_conformance_table {
+
+struct Entry {
+  struct Key {
+    const Metadata *metadata;
+    const ContextDescriptor *typeDescriptor;
+    const ProtocolDescriptor *protocol;
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      return llvm::hash_combine(key.metadata, key.typeDescriptor, key.protocol);
+    }
+  };
+
+  Key key;
+  ProtocolConformanceDescriptor *conformanceDescriptor;
+
+  bool matchesKey(const Key &otherKey) {
+    return key.metadata == otherKey.metadata &&
+           key.typeDescriptor == otherKey.typeDescriptor &&
+           key.protocol == otherKey.protocol;
+  }
+
+  friend llvm::hash_code hash_value(const Entry &value) {
+    return hash_value(value.key);
+  }
+};
+
+ConcurrentReadableHashMap<Entry> Table;
+
+enum protocol_conformance_result_kind {
+  protocol_conformance_result_kind_found_descriptor,
+  protocol_conformance_result_kind_found_witness_table,
+  protocol_conformance_result_kind_not_found,
+  protocol_conformance_result_kind_definitive_failure
+};
+
+struct protocol_conformance_result {
+  enum protocol_conformance_result_kind kind;
+  union {
+    // Valid iff `kind` is protocol_conformance_result_kind_found_descriptor
+    const ProtocolConformanceDescriptor *descriptor;
+
+    // Valid iff `kind` is protocol_conformance_result_kind_found_witness_table
+    const WitnessTable *witnessTable;
+  };
+};
+
+struct protocol_conformance_result
+find_protocol_conformance(const ProtocolDescriptor *protocol,
+                          const Metadata *type,
+                          const TypeContextDescriptor *typeDescriptor) {
+  auto snapshot = Table.snapshot();
+  Entry::Key key{type, typeDescriptor, protocol};
+
+  if (auto *entry = snapshot.find(key)) {
+    return {protocol_conformance_result_kind_found_descriptor,
+            {entry->conformanceDescriptor}};
+  }
+
+  return {protocol_conformance_result_kind_not_found, {}};
+}
+
+void add_descriptor(ProtocolConformanceDescriptor *descriptor) {
+  Entry::Key key{getCanonicalTypeMetadata(descriptor),
+                 descriptor->getTypeDescriptor(), descriptor->getProtocol()};
+  Table.getOrInsert(key, [&](Entry *entry, bool created) {
+    if (created) {
+      new (entry) Entry{key, descriptor};
+    }
+    return true;
+  });
+}
+
+}; // namespace placeholder_conformance_table
+
 #ifndef NDEBUG
 template <> SWIFT_USED void ProtocolDescriptor::dump() const {
   printf("TargetProtocolDescriptor.\n"
@@ -158,6 +235,11 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   swift_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 
+const Metadata *
+getCanonicalTypeMetadata(const ProtocolConformanceDescriptor *descriptor) {
+  return descriptor->getCanonicalTypeMetadata();
+}
+
 template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
@@ -238,7 +320,8 @@ namespace {
 struct ConformanceState {
   ConcurrentReadableHashMap<ConformanceCacheEntry> Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
-  
+  std::atomic<bool> NeedsPrecaching;
+
   ConformanceState() {
     initializeProtocolConformanceLookup();
   }
@@ -305,6 +388,7 @@ _registerProtocolConformances(ConformanceState &C,
                               const ProtocolConformanceRecord *begin,
                               const ProtocolConformanceRecord *end) {
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
+  C.NeedsPrecaching.store(true, std::memory_order_relaxed);
 
   // Blow away the conformances cache to get rid of any negative entries that
   // may now be obsolete.
@@ -458,12 +542,36 @@ swift_conformsToProtocolImpl(const Metadata *const type,
                              const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
 
+  if (C.NeedsPrecaching.load(std::memory_order_relaxed)) {
+    auto snapshot = C.SectionsToScan.snapshot();
+    for (auto &section : snapshot)
+      for (const auto &record : section)
+        placeholder_conformance_table::add_descriptor(record.get());
+  }
+
+  const ProtocolConformanceDescriptor *cachedConformanceDescriptor = nullptr;
+  auto result = placeholder_conformance_table::find_protocol_conformance(
+      protocol, type, type->getTypeContextDescriptor());
+  if (result.kind == placeholder_conformance_table::
+                         protocol_conformance_result_kind_found_descriptor) {
+    cachedConformanceDescriptor = result.descriptor;
+    if (!cachedConformanceDescriptor->getGenericWitnessTable()) {
+      result.descriptor->getWitnessTable(type);
+    }
+  }
+
   // See if we have an authoritative cached conformance. The
   // ConcurrentReadableHashMap data structure allows us to search the map
   // concurrently without locking.
   auto found = searchInConformanceCache(type, protocol);
   if (found.first)
     return found.second;
+
+  if (cachedConformanceDescriptor) {
+    auto witness = cachedConformanceDescriptor->getWitnessTable(type);
+    C.cacheResult(type, protocol, witness, /*always cache*/ 0);
+    return witness;
+  }
 
   // Scan conformance records.
   auto snapshot = C.SectionsToScan.snapshot();
