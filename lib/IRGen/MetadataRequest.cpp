@@ -1298,6 +1298,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinRawUnsafeContinuationType(CanBuiltinRawUnsafeContinuationType type,
+                                          DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);

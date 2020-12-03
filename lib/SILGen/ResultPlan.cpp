@@ -480,23 +480,32 @@ public:
   emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc)
   override {
     // Get the current continuation for the task.
-    auto continuationDecl = calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
+    bool throws = calleeTypeInfo.foreign.async
+        ->completionHandlerErrorParamIndex().hasValue();
+    
+    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
+                               calleeTypeInfo.substResultType, throws);
+
+    // Wrap the Builtin.RawUnsafeContinuation in an
+    // Unsafe[Throwing]Continuation<T>.
+    auto continuationDecl = throws
       ? SGF.getASTContext().getUnsafeThrowingContinuationDecl()
       : SGF.getASTContext().getUnsafeContinuationDecl();
     
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                 calleeTypeInfo.substResultType)
       ->getCanonicalType();
-    
-    
-    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
-                               SILType::getPrimitiveObjectType(continuationTy));
-    
+    auto wrappedContinuation =
+        SGF.B.createStruct(loc,
+                           SILType::getPrimitiveObjectType(continuationTy),
+                           {continuation});
+
     // Stash it in a buffer for a block object.
-    auto blockStorageTy = SILType::getPrimitiveAddressType(SILBlockStorageType::get(continuationTy));
+    auto blockStorageTy = SILType::getPrimitiveAddressType(
+        SILBlockStorageType::get(continuationTy));
     auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-    SGF.B.createStore(loc, continuation, continuationAddr,
+    SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
                       StoreOwnershipQualifier::Trivial);
 
     // Get the block invocation function for the given completion block type.

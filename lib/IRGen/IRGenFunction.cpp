@@ -513,38 +513,17 @@ llvm::Value *IRGenFunction::alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::
   return Builder.CreateAnd(Builder.CreateAdd(val, alignMask), invertedMask);
 }
 
-/// Returns the current task \p currTask as an UnsafeContinuation at +1.
+/// Returns the current task \p currTask as a Builtin.RawUnsafeContinuation at +1.
 static llvm::Value *unsafeContinuationFromTask(IRGenFunction &IGF,
-                                               SILType unsafeContinuationTy,
                                                llvm::Value *currTask) {
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-  auto &rawPonterTI = IGM.getRawPointerTypeInfo();
-  auto object =
-      Builder.CreateBitOrPointerCast(currTask, rawPonterTI.getStorageType());
-
-  // Wrap the native object in the UnsafeContinuation struct.
-  //   struct UnsafeContinuation<T> {
-  //     let _continuation : Builtin.RawPointer
-  //   }
-  auto &unsafeContinuationTI =
-      cast<LoadableTypeInfo>(IGF.getTypeInfo(unsafeContinuationTy));
-  auto unsafeContinuationStructTy =
-      cast<llvm::StructType>(unsafeContinuationTI.getStorageType());
-  auto fieldTy =
-      cast<llvm::StructType>(unsafeContinuationStructTy->getElementType(0));
-  auto reference =
-      Builder.CreateBitOrPointerCast(object, fieldTy->getElementType(0));
-  auto field =
-      Builder.CreateInsertValue(llvm::UndefValue::get(fieldTy), reference, 0);
-  auto unsafeContinuation = Builder.CreateInsertValue(
-      llvm::UndefValue::get(unsafeContinuationStructTy), field, 0);
-
-  return unsafeContinuation;
+  auto &rawPointerTI = IGM.getRawUnsafeContinuationTypeInfo();
+  return Builder.CreateBitOrPointerCast(currTask, rawPointerTI.getStorageType());
 }
 
-void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
+void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
                                              StackAddress resultAddr,
                                              Explosion &out) {
   // Create the continuation.
@@ -571,10 +550,9 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
   // continuation_context.resumeExecutor = .. // current executor
 
   auto currTask = getAsyncTask();
-  auto unsafeContinuation =
-      unsafeContinuationFromTask(*this, unsafeContinuationTy, currTask);
+  auto unsafeContinuation = unsafeContinuationFromTask(*this, currTask);
 
-  // Create and setup the continuation context for UnsafeContinuation<T>.
+  // Create and setup the continuation context.
   // continuation_context.resumeCtxt = currCtxt;
   // continuation_context.errResult = nulllptr;
   // continuation_context.result = ... // local alloca T
@@ -596,18 +574,9 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
   auto contResultAddr =
       Builder.CreateStructGEP(continuationContext.getAddress(), 3);
   if (!resultAddr.getAddress().isValid()) {
-    assert(unsafeContinuationTy.getASTType()
-                   ->castTo<BoundGenericType>()
-                   ->getGenericArgs()
-                   .size() == 1 &&
-           "expect UnsafeContinuation<T> to have one generic arg");
-    auto resultTy = IGM.getLoweredType(unsafeContinuationTy.getASTType()
-                                           ->castTo<BoundGenericType>()
-                                           ->getGenericArgs()[0]
-                                           ->getCanonicalType());
-    auto &resultTI = getTypeInfo(resultTy);
+    auto &resumeTI = getTypeInfo(resumeTy);
     auto resultAddr =
-        resultTI.allocateStack(*this, resultTy, "async.continuation.result");
+        resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
     Builder.CreateStore(Builder.CreateBitOrPointerCast(
                             resultAddr.getAddress().getAddress(),
                             contResultAddr->getType()->getPointerElementType()),
@@ -662,7 +631,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType unsafeContinuationTy,
 }
 
 void IRGenFunction::emitAwaitAsyncContinuation(
-    SILType unsafeContinuationTy, bool isIndirectResult,
+    SILType resumeTy, bool isIndirectResult,
     Explosion &outDirectResult, llvm::BasicBlock *&normalBB,
     llvm::PHINode *&optionalErrorResult, llvm::BasicBlock *&optionalErrorBB) {
   assert(AsyncCoroutineCurrentContinuationContext && "no active continuation");
@@ -753,17 +722,13 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto resultAddrVal =
         Builder.CreateLoad(Address(contResultAddrAddr, pointerAlignment));
     // Take the result.
-    auto resultTy = IGM.getLoweredType(unsafeContinuationTy.getASTType()
-                                           ->castTo<BoundGenericType>()
-                                           ->getGenericArgs()[0]
-                                           ->getCanonicalType());
-    auto &resultTI = cast<LoadableTypeInfo>(getTypeInfo(resultTy));
-    auto resultStorageTy = resultTI.getStorageType();
+    auto &resumeTI = cast<LoadableTypeInfo>(getTypeInfo(resumeTy));
+    auto resultStorageTy = resumeTI.getStorageType();
     auto resultAddr =
         Address(Builder.CreateBitOrPointerCast(resultAddrVal,
                                                resultStorageTy->getPointerTo()),
-                resultTI.getFixedAlignment());
-    resultTI.loadAsTake(*this, resultAddr, outDirectResult);
+                resumeTI.getFixedAlignment());
+    resumeTI.loadAsTake(*this, resultAddr, outDirectResult);
   }
   Builder.CreateBr(normalBB);
   AsyncCoroutineCurrentResume = nullptr;
