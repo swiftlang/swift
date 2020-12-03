@@ -1358,7 +1358,7 @@ void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
     return asImpl(executor.getDefaultActor())->enqueue(job);
 
   // FIXME: call the general method.
-  assert(false && "don't know how to enqueue on this executor");
+  job->run(executor);
 }
 
 SWIFT_CC(swift)

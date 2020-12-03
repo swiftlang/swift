@@ -39,10 +39,10 @@ bb0:
 // CHECK:  [[exe:%.*]] = load %swift.executor*, %swift.executor** [[exe_addr]]
 // CHECK:  store %swift.executor* [[exe]], %swift.executor** [[exectuor_addr]]
 //   Initialize the async task with the continuation function and async continuation context.
-// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 3
+// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
 // CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
 // CHECK: store i8* [[continuation_fn]], i8** [[task_continuation_fn_addr]]
-// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
+// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 5
 // CHECK: [[cont_context2:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
 // CHECK: store %swift.context* [[cont_context2]], %swift.context** [[task_resume_context_addr]]
 //  Initialize the synchronization variable.
