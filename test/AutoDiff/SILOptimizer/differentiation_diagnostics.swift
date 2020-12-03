@@ -714,7 +714,7 @@ func modify(_ s: Struct, _ x: Float) -> Float {
 func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
   // `Array<(Float, Float)>` does not conform to `Differentiable`.
   let array = [(x * y, x * y)]
-  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at: }} {{15-15=)}}
+  // expected-note @-1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}} {{15-15=withoutDerivative(at: }} {{31-31=)}}
   return array[0].0
 }
 
