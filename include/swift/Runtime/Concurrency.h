@@ -20,6 +20,7 @@
 #include "swift/ABI/TaskStatus.h"
 
 namespace swift {
+class DefaultActor;
 
 struct AsyncTaskAndContext {
   AsyncTask *Task;
@@ -205,6 +206,70 @@ swift_task_getNearestDeadline(AsyncTask *task);
 // TODO: Remove this hack.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_run(AsyncTask *taskToRun);
+
+/// Switch the current task to a new executor if we aren't already
+/// running on a compatible executor.
+///
+/// The resumption function pointer and continuation should be set
+/// appropriately in the task.
+///
+/// Generally the compiler should inline a fast-path compatible-executor
+/// check to avoid doing the suspension work.  This function should
+/// generally be tail-called, as it may continue executing the task
+/// synchronously if possible.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_task_switch(AsyncTask *task,
+                       ExecutorRef currentExecutor,
+                       ExecutorRef newExecutor);
+
+/// Enqueue the given job to run asynchronously on the given executor.
+///
+/// The resumption function pointer and continuation should be set
+/// appropriately in the task.
+///
+/// Generally you should call swift_task_switch to switch execution
+/// synchronously when possible.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueue(Job *job, ExecutorRef executor);
+
+/// Enqueue the given job to run asynchronously on the global
+/// execution pool.
+///
+/// The resumption function pointer and continuation should be set
+/// appropriately in the task.
+///
+/// Generally you should call swift_task_switch to switch execution
+/// synchronously when possible.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueGlobal(Job *job);
+
+/// A hook to take over global enqueuing.
+/// TODO: figure out a better abstraction plan than this.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void (*swift_task_enqueueGlobal_hook)(Job *job);
+
+/// Initialize the runtime storage for a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_initialize(DefaultActor *actor);
+
+/// Destroy the runtime storage for a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_destroy(DefaultActor *actor);
+
+/// Enqueue a job on the default actor implementation.
+///
+/// The job must be ready to run.  Notably, if it's a task, that
+/// means that the resumption function and context should have been
+/// set appropriately.
+///
+/// Jobs are assumed to be "self-consuming": once it starts running,
+/// the job memory is invalidated and the executor should not access it
+/// again.
+///
+/// Jobs are generally expected to keep the actor alive during their
+/// execution.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
 }
 

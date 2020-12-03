@@ -10,7 +10,14 @@
 #
 #===----------------------------------------------------------------------===#
 
+set(swift_concurrency_objc_sources
+  SwiftNativeNSObject.mm)
+
+set(LLVM_OPTIONAL_SOURCES
+  ${swift_concurrency_objc_sources})
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  Actor.cpp
   Actor.swift
   PartialAsyncTask.swift
   Task.cpp
@@ -21,6 +28,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskStatus.cpp
   TaskGroup.swift
   Mutex.cpp
+  ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
   SWIFT_MODULE_DEPENDS_IOS Darwin
