@@ -44,34 +44,9 @@ struct TestNoDerivative : EuclideanDifferentiable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct TangentVector {{(([:,] (Differentiable|AdditiveArithmetic|ElementaryFunctions|VectorProtocol)){4})}} {
+// CHECK-AST:         internal struct TangentVector {{(([:,] (Differentiable|AdditiveArithmetic)){2})}} {
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.TangentVector
 // CHECK-AST:         internal var differentiableVectorView: TestNoDerivative.TangentVector { get }
-
-struct TestPointwiseMultiplicative : Differentiable {
-  var w: PointwiseMultiplicativeDummy
-  @noDerivative var technicallyDifferentiable: PointwiseMultiplicativeDummy
-}
-
-// CHECK-AST-LABEL: internal struct TestPointwiseMultiplicative : Differentiable {
-// CHECK-AST:         var w: PointwiseMultiplicativeDummy
-// CHECK-AST:         @noDerivative internal var technicallyDifferentiable: PointwiseMultiplicativeDummy
-// CHECK-AST:         internal init(w: PointwiseMultiplicativeDummy, technicallyDifferentiable: PointwiseMultiplicativeDummy)
-// CHECK-AST:         internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|PointwiseMultiplicative)){3} }}{
-// CHECK-AST:           internal typealias TangentVector = TestPointwiseMultiplicative.TangentVector
-
-
-struct TestKeyPathIterable : Differentiable, KeyPathIterable {
-  var w: Float
-  @noDerivative var technicallyDifferentiable: Float
-}
-
-// CHECK-AST-LABEL: internal struct TestKeyPathIterable : Differentiable, KeyPathIterable {
-// CHECK-AST:         var w: Float
-// CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
-// CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|ElementaryFunctions|VectorProtocol|KeyPathIterable)){5} }}{
-// CHECK-AST:           internal typealias TangentVector = TestKeyPathIterable.TangentVector
 
 struct GenericTanMember<T : Differentiable> : Differentiable, AdditiveArithmetic {
   var x: T.TangentVector
@@ -131,7 +106,7 @@ public struct FrozenStruct: Differentiable {}
 
 // CHECK-AST-LABEL: @frozen public struct FrozenStruct : Differentiable {
 // CHECK-AST:   internal init()
-// CHECK-AST:   @frozen public struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|PointwiseMultiplicative|ElementaryFunctions)){4} }}{
+// CHECK-AST:   @frozen public struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic)){2} }}{
 
 @usableFromInline
 struct UsableFromInlineStruct: Differentiable {}
@@ -140,4 +115,4 @@ struct UsableFromInlineStruct: Differentiable {}
 // CHECK-AST: struct UsableFromInlineStruct : Differentiable {
 // CHECK-AST:   internal init()
 // CHECK-AST:   @usableFromInline
-// CHECK-AST:   struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|PointwiseMultiplicative|ElementaryFunctions)){4} }}{
+// CHECK-AST:   struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic)){2} }}{

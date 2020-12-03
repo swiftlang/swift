@@ -70,9 +70,7 @@ public struct FrozenStruct: Differentiable {}
 
 // CHECK-AST-LABEL: @frozen public struct FrozenStruct : Differentiable {
 // CHECK-AST:   internal init()
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   @frozen public struct TangentVector {{(([:,] (Differentiable|AdditiveArithmetic|PointwiseMultiplicative|ElementaryFunctions)){4})}} {
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   @frozen public struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 
 @usableFromInline
 struct UsableFromInlineStruct: Differentiable {}
@@ -81,9 +79,7 @@ struct UsableFromInlineStruct: Differentiable {}
 // CHECK-AST: struct UsableFromInlineStruct : Differentiable {
 // CHECK-AST:   internal init()
 // CHECK-AST:   @usableFromInline
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|PointwiseMultiplicative|ElementaryFunctions)){4} }}{
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 
 // Test property wrappers.
 
@@ -100,9 +96,7 @@ struct WrappedPropertiesStruct: Differentiable {
 }
 
 // CHECK-AST-LABEL: internal struct WrappedPropertiesStruct : Differentiable {
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|VectorProtocol|ElementaryFunctions)){4} }}{
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   internal struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 // CHECK-AST:     internal var x: Float.TangentVector
 // CHECK-AST:     internal var y: Float.TangentVector
 // CHECK-AST:     internal var z: Float.TangentVector
@@ -117,9 +111,7 @@ class WrappedPropertiesClass: Differentiable {
 }
 
 // CHECK-AST-LABEL: internal class WrappedPropertiesClass : Differentiable {
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|VectorProtocol|ElementaryFunctions)){4} }}{
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   internal struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 // CHECK-AST:     internal var x: Float.TangentVector
 // CHECK-AST:     internal var y: Float.TangentVector
 // CHECK-AST:     internal var z: Float.TangentVector
@@ -133,9 +125,7 @@ struct AutoDeriveEncodableTV1: TangentVectorMustBeEncodable {
 }
 
 // CHECK-AST-LABEL: internal struct AutoDeriveEncodableTV1 : TangentVectorMustBeEncodable {
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|VectorProtocol|ElementaryFunctions|Encodable)){5} }}{
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   internal struct TangentVector : {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
 
 struct AutoDeriveEncodableTV2 {
   var x: Float
@@ -144,9 +134,7 @@ struct AutoDeriveEncodableTV2 {
 extension AutoDeriveEncodableTV2: TangentVectorMustBeEncodable {}
 
 // CHECK-AST-LABEL: extension AutoDeriveEncodableTV2 : TangentVectorMustBeEncodable {
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|VectorProtocol|ElementaryFunctions|Encodable)){5} }}{
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   internal struct TangentVector : {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
 
 protocol TangentVectorP: Differentiable {
   var requirement: Int { get }
@@ -167,6 +155,4 @@ extension TangentVectorP where Self == StructWithTangentVectorConstrained.Tangen
 }
 
 // CHECK-AST-LABEL: internal struct StructWithTangentVectorConstrained : TangentVectorConstrained {
-// SWIFT_ENABLE_TENSORFLOW
-// CHECK-AST:   internal struct TangentVector {{([:,] (Differentiable|AdditiveArithmetic|VectorProtocol|ElementaryFunctions|TangentVectorP)){5} }}{
-// SWIFT_ENABLE_TENSORFLOW END
+// CHECK-AST:   internal struct TangentVector : {{(TangentVectorP, Differentiable, AdditiveArithmetic)|(TangentVectorP, AdditiveArithmetic, Differentiable)|(Differentiable, TangentVectorP, AdditiveArithmetic)|(AdditiveArithmetic, TangentVectorP, Differentiable)|(Differentiable, AdditiveArithmetic, TangentVectorP)|(AdditiveArithmetic, Differentiable, TangentVectorP)}} {

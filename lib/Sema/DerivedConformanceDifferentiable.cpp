@@ -125,23 +125,6 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   return tanType->hasArchetype() ? tanType->mapTypeOutOfContext() : tanType;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Returns the `Differentiable.TangentVector` associated type witness
-/// for the given property declaration and declaration context.
-static Type getTangentVectorType(VarDecl *varDecl, DeclContext *DC) {
-  auto &C = varDecl->getASTContext();
-  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  assert(diffableProto && "`Differentiable` protocol not found");
-  auto contextualType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
-  auto conf =
-      TypeChecker::conformsToProtocol(contextualType, diffableProto, DC);
-  assert(conf && "Contextual type must conform to `Differentiable`");
-  if (!conf)
-    return nullptr;
-  return conf.getTypeWitnessByName(contextualType, C.Id_TangentVector);
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
 /// Returns true iff the given nominal type declaration can derive
 /// `TangentVector` as `Self` in the given conformance context.
 static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
@@ -734,88 +717,13 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       tvDesiredProtos.insert(tvRequiredProto);
     }
   }
+  SmallVector<TypeLoc, 4> tvDesiredProtoTypeLocs;
+  for (auto *p : tvDesiredProtos)
+    tvDesiredProtoTypeLocs.push_back(TypeLoc::withoutLoc(p));
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // Add ad-hoc implicit conformances for `TangentVector`.
-  // TODO(TF-632): Remove this implicit conformance logic when synthesized
-  // member types can be extended.
-
-  auto *pointMulProto =
-      C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
-  auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
-  auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
-  auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
-
-  // `TangentVector` struct can derive `PointwiseMultiplicative` if the
-  // `TangentVector` types of all stored properties conform to
-  // `PointwiseMultiplicative`.
-  bool canDerivePointwiseMultiplicative =
-      llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        return TypeChecker::conformsToProtocol(
-            getTangentVectorType(vd, parentDC), pointMulProto, parentDC);
-      });
-
-  // `TangentVector` struct can derive `ElementaryFunctions` if the
-  // `TangentVector` types of all stored properties conform to
-  // `ElementaryFunctions`.
-  bool canDeriveElementaryFunctions =
-      llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        return TypeChecker::conformsToProtocol(
-            getTangentVectorType(vd, parentDC), mathProto, parentDC);
-      });
-
-  // `TangentVector` struct can derive `VectorProtocol` if the `TangentVector`
-  // types of all members conform to `VectorProtocol` and share the same
-  // `VectorSpaceScalar` type.
-  Type sameScalarType;
-  bool canDeriveVectorProtocol =
-      !diffProperties.empty() && llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        auto tanType = getTangentVectorType(vd, parentDC);
-        auto conf = TypeChecker::conformsToProtocol(tanType, vectorProto,
-                                                    nominal);
-        if (!conf)
-          return false;
-        auto scalarType =
-            conf.getTypeWitnessByName(tanType, C.Id_VectorSpaceScalar);
-        if (!sameScalarType) {
-          sameScalarType = scalarType;
-          return true;
-        }
-        return scalarType->isEqual(sameScalarType);
-      });
-
-  // `TangentVector` struct should derive `KeyPathIterable` if the parent struct
-  // conforms to `KeyPathIterable`.
-  bool shouldDeriveKeyPathIterable =
-      !TypeChecker::conformsToProtocol(nominal->getDeclaredInterfaceType(),
-                                       kpIterableProto, parentDC)
-           .isInvalid();
-
-  // If all members conform to `PointwiseMultiplicative`, make the
-  // `TangentVector` struct conform to `PointwiseMultiplicative`.
-  if (canDerivePointwiseMultiplicative)
-    tvDesiredProtos.insert(pointMulProto->getDeclaredInterfaceType()->castTo<ProtocolType>());
-  // If all members conform to `ElementaryFunctions`, make the `TangentVector`
-  // struct conform to `ElementaryFunctions`.
-  if (canDeriveElementaryFunctions)
-    tvDesiredProtos.insert(mathProto->getDeclaredInterfaceType()->castTo<ProtocolType>());
-  // If all members also conform to `VectorProtocol` with the same `Scalar`
-  // type, make the `TangentVector` struct conform to `VectorProtocol`.
-  if (canDeriveVectorProtocol)
-    tvDesiredProtos.insert(vectorProto->getDeclaredInterfaceType()->castTo<ProtocolType>());
-  // If parent type conforms to `KeyPathIterable`, make the `TangentVector`
-  // struct conform to `KeyPathIterable`.
-  if (shouldDeriveKeyPathIterable)
-    tvDesiredProtos.insert(kpIterableProto->getDeclaredInterfaceType()->castTo<ProtocolType>());
-
-  SmallVector<TypeLoc, 4> tvDesiredProtoTypeLocs;
-  for (auto *p : tvDesiredProtos)
-    tvDesiredProtoTypeLocs.push_back(TypeLoc::withoutLoc(p));
-  // SWIFT_ENABLE_TENSORFLOW END
 
   auto synthesizedLoc = derived.ConformanceDecl->getEndLoc();
   auto *structDecl =
