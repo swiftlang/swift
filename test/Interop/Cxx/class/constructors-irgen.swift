@@ -12,11 +12,11 @@ struct UnsafePointer<T> { }
 struct UnsafeMutablePointer<T> { }
 
 public func createHasVirtualBase() -> HasVirtualBase {
-  // ITANIUM_X64: define swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret %0)
+  // ITANIUM_X64: define swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret({{.*}}) %0)
   // ITANIUM_X64-NOT: define
   // ITANIUM_X64: call void @_ZN14HasVirtualBaseC1E7ArgType(%struct.HasVirtualBase* %{{[0-9]+}}, i32 %{{[0-9]+}})
   //
-  // ITANIUM_ARM: define protected swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret %0)
+  // ITANIUM_ARM: define protected swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret({{.*}}) %0)
   // To verify that the thunk is inlined, make sure there's no intervening
   // `define`, i.e. the call to the C++ constructor happens in
   // createHasVirtualBase(), not some later function.
@@ -24,7 +24,7 @@ public func createHasVirtualBase() -> HasVirtualBase {
   // Note `this` return type.
   // ITANIUM_ARM: call %struct.HasVirtualBase* @_ZN14HasVirtualBaseC1E7ArgType(%struct.HasVirtualBase* %{{[0-9]+}}, [1 x i32] %{{[0-9]+}})
   //
-  // MICROSOFT_X64: define dllexport swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret %0)
+  // MICROSOFT_X64: define dllexport swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret({{.*}}) %0)
   // MICROSOFT_X64-NOT: define
   // Note `this` return type and implicit "most derived" argument.
   // MICROSOFT_X64: call %struct.HasVirtualBase* @"??0HasVirtualBase@@QEAA@UArgType@@@Z"(%struct.HasVirtualBase* %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 1)
