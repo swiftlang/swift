@@ -793,36 +793,13 @@ void DiagnosticVerifier::verifyAllExpectedDiagnosticsAppeared(
   }
 }
 
-/// After the file has been processed, check to see if we got all of
-/// the expected diagnostics and check to see if there were any unexpected
-/// ones.
-DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
+void DiagnosticVerifier::diagnoseIncorrectDiagnostics(
+    StringRef BufferName, std::vector<llvm::SMDiagnostic> &Errors,
+    std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics) {
   using llvm::SMLoc;
-
-  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
-  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
-  StringRef InputFile = SM.extractText(EntireRange);
-  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
-
-  // Queue up all of the diagnostics, allowing us to sort them and emit them in
-  // file order.
-  std::vector<llvm::SMDiagnostic> Errors;
-  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
-
-  // Scan the memory buffer looking for expected-note/warning/error.
-  parseExpectedDiagnosticsFromBuffer(
-      BufferID, BufferStartLoc, ExpectedDiagnostics, InputFile, SM, Errors);
-
-  // Then verify that all the expected diagnostics actually appeared.
-  std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
-  verifyAllExpectedDiagnosticsAppeared(BufferName, InputFile,
-                                       ExpectedDiagnostics, Errors);
-
-  // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
-  // such.
   auto addError = [&](const char *Loc, const Twine &message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
-    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag =
         SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
     Errors.push_back(diag);
@@ -838,7 +815,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       if (I->Line != expectedDiagIter->LineNo || I->FileName != BufferName ||
           I->Classification != expectedDiagIter->Classification)
         continue;
-      
+
       // Otherwise, we found it, break out.
       break;
     }
@@ -868,6 +845,44 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     CapturedDiagnostics.erase(I);
     expectedDiagIter = ExpectedDiagnostics.erase(expectedDiagIter);
   }
+}
+
+/// After the file has been processed, check to see if we got all of
+/// the expected diagnostics and check to see if there were any unexpected
+/// ones.
+DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
+  using llvm::SMLoc;
+
+  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
+  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
+  StringRef InputFile = SM.extractText(EntireRange);
+  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
+
+  // Queue up all of the diagnostics, allowing us to sort them and emit them in
+  // file order.
+  std::vector<llvm::SMDiagnostic> Errors;
+  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
+
+  // Scan the memory buffer looking for expected-note/warning/error.
+  parseExpectedDiagnosticsFromBuffer(
+      BufferID, BufferStartLoc, ExpectedDiagnostics, InputFile, SM, Errors);
+
+  // Then verify that all the expected diagnostics actually appeared.
+  std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
+  verifyAllExpectedDiagnosticsAppeared(BufferName, InputFile,
+                                       ExpectedDiagnostics, Errors);
+
+  // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
+  // such.
+  diagnoseIncorrectDiagnostics(BufferName, Errors, ExpectedDiagnostics);
+
+  auto addError = [&](const char *Loc, const Twine &message,
+                      ArrayRef<llvm::SMFixIt> FixIts = {}) {
+    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    auto diag =
+        SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
+    Errors.push_back(diag);
+  };
 
   // Diagnose expected diagnostics that didn't appear.
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
