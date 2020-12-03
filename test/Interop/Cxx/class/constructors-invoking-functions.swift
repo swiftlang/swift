@@ -3,21 +3,16 @@
 // REQUIRES: executable_test
 
 import ConstructorsInvokingFunctions
-// import StdlibUnittest
+import StdlibUnittest
 
-// var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
+var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-// TemplatesTestSuite.test("transitive-function-constructor") {
-//   expectEqual(42, badIncrement())
-//   expectEqual(42, badMemberIncrement())
-// }
-
-// TemplatesTestSuite.test("inline-experiment") {
-//  // expectEqual(42, goodIncrement())
-// }
-
-// runAllTests()
-
-public func callIncrement() {
-  let _ = badIncrement()
+TemplatesTestSuite.test("transitive-function-constructor") {
+  expectEqual(42, badIncrement())
 }
+
+TemplatesTestSuite.test("transitive-function-member") {
+  expectEqual(42, badMemberIncrement())
+}
+
+runAllTests()

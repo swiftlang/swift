@@ -103,9 +103,6 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second)
       return;
     stack.push_back(D);
-    llvm::errs() << "Pushing to stack: \n";
-    D->dump();
-    llvm::errs() << "Pushed to stack.\n";
   });
 
   while (!stack.empty()) {
@@ -117,7 +114,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
 
     if (auto var = dyn_cast<clang::VarDecl>(next))
       if (!var->isFileVarDecl())
-	continue;
+	      continue;
 
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
