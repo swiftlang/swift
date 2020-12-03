@@ -506,6 +506,8 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   while (!tempObj->use_empty()) {
     Operand *use = *tempObj->use_begin();
     SILInstruction *user = use->getUser();
+    aa->invalidateInstruction(user);
+
     switch (user->getKind()) {
     case SILInstructionKind::DestroyAddrInst:
     case SILInstructionKind::DeallocStackInst:
