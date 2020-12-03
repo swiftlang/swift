@@ -93,9 +93,8 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // we want to add the entire file-level declaration because Clang doesn't
     // expect to see members directly here.
     for (auto *DC = D->getDeclContext();; DC = DC->getParent()) {
-      if (DC->isFunctionOrMethod()) {
+      if (DC->isFunctionOrMethod())
         return;
-      }
       if (DC->isFileContext())
         break;
       D = cast<const clang::Decl>(DC);

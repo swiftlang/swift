@@ -1,0 +1,3 @@
+module ConstructorsInvokingFunctions {
+  header "constructors-invoking-functions.h"
+}

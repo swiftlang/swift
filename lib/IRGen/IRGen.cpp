@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/Decl.h"
 #define DEBUG_TYPE "irgen"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
@@ -47,8 +46,6 @@
 #include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/CodeGen/ModuleBuilder.h"
-#include "clang/AST/ASTContext.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -1004,6 +1001,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
 
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return GeneratedModule::null();
+
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), primaryFile, desc.ModuleName,
                   PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
@@ -1013,16 +1011,6 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
 
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
-
-  auto decls = Ctx.getClangModuleLoader()
-                   ->getClangASTContext()
-                   .getTranslationUnitDecl()
-                   ->decls();
-  // for (auto decl : decls) {
-  //   if(auto namedDecl = dyn_cast<clang::NamedDecl>(decl)) {
-  //     IGM.ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(decl));
-  //   }
-  // }
 
   {
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");

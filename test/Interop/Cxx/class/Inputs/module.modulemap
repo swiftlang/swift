@@ -45,7 +45,3 @@ module DebugInfo {
 module NestedRecords {
   header "nested-records.h"
 }
-
-module ConstructorsInvokingFunctions {
-  header "constructors-invoking-functions.h"
-}
