@@ -253,6 +253,7 @@ bool TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
         user->eraseFromParent();
         break;
       default:
+        AA->invalidateInstruction(user);
         use->set(destination);
     }
   }
