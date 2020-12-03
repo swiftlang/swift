@@ -207,8 +207,8 @@ foreach(SDK ${SWIFT_SDKS})
       # Configure variables for this subdirectory.
       set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
       get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
+      get_swift_test_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${SDK}" "${ARCH}" "default")
       get_swift_test_versioned_target_triple(VARIANT_TRIPLE "${SDK}" "${ARCH}" "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}" "${BUILD_FLAVOR}")
-      get_swift_test_default_osx_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${VARIANT_SUFFIX}" "${BUILD_FLAVOR}")
 
       # A directory where to put the xUnit-style XML test results.
       set(SWIFT_TEST_RESULTS_DIR
