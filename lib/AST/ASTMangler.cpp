@@ -1837,6 +1837,13 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         return ASTMangler::ObjCContext;
       }
     }
+
+    // Types apparently defined in the Builtin module are actually
+    // synthetic declarations for types defined in the runtime,
+    // and they should be mangled as C-namespace entities; see e.g.
+    // IRGenModule::getObjCRuntimeBaseClass.
+    if (decl->getModuleContext()->isBuiltinModule())
+      return ASTMangler::ObjCContext;
   }
 
   // Importer-synthesized types should always be mangled in the

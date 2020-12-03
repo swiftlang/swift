@@ -853,6 +853,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether the given class is a default actor.
+class IsDefaultActorRequest :
+    public SimpleRequest<IsDefaultActorRequest,
+                         bool(ClassDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///

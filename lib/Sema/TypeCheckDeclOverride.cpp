@@ -728,9 +728,7 @@ static bool isNSObjectHashValue(ValueDecl *baseDecl) {
   if (auto baseVar = dyn_cast<VarDecl>(baseDecl)) {
     if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
       return baseVar->getName() == ctx.Id_hashValue &&
-        classDecl->getName().is("NSObject") &&
-        (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
-         classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
+             classDecl->isNSObject();
     }
   }
   return false;

@@ -4221,6 +4221,13 @@ bool ClassDecl::isActor() const {
                            false);
 }
 
+bool ClassDecl::isDefaultActor() const {
+  auto mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsDefaultActorRequest{mutableThis},
+                           false);
+}
+
 bool ClassDecl::hasMissingDesignatedInitializers() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
@@ -4270,6 +4277,7 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
                                     ClassDecl *value) const {
   AncestryOptions result;
   const ClassDecl *CD = value;
+  const ClassDecl *PreviousCD = nullptr;
   auto *M = value->getParentModule();
 
   do {
@@ -4284,8 +4292,16 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
     if (CD->getAttrs().hasAttribute<ObjCMembersAttr>())
       result |= AncestryFlags::ObjCMembers;
 
-    if (CD->hasClangNode())
+    if (CD->hasClangNode()) {
       result |= AncestryFlags::ClangImported;
+
+      // Inheriting from an ObjC-defined class generally forces the use
+      // of the ObjC object model, but certain classes that directly
+      // inherit from NSObject can change that.
+      if (!PreviousCD ||
+          !(CD->isNSObject() && PreviousCD->isNativeNSObjectSubclass()))
+        result |= AncestryFlags::ObjCObjectModel;
+    }
 
     if (CD->hasResilientMetadata())
       result |= AncestryFlags::Resilient;
@@ -4296,6 +4312,7 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
     if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>())
       result |= AncestryFlags::RequiresStoredPropertyInits;
 
+    PreviousCD = CD;
     CD = CD->getSuperclassDecl();
   } while (CD != nullptr);
 
@@ -7947,6 +7964,46 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
         return varDecl->getType();
 
   return {};
+}
+
+bool ClassDecl::hasExplicitCustomActorMethods() const {
+  auto &ctx = getASTContext();
+  for (auto member: getMembers()) {
+    if (member->isImplicit()) continue;
+
+    // Methods called enqueue(partialTask:)
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      if (FuncDecl::isEnqueuePartialTaskName(ctx, func->getName()))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+bool ClassDecl::isRootDefaultActor() const {
+  if (!isDefaultActor()) return false;
+  auto superclass = getSuperclassDecl();
+  return (!superclass || superclass->isNSObject());
+}
+
+bool ClassDecl::isNativeNSObjectSubclass() const {
+  // Only if we inherit from NSObject.
+  auto superclass = getSuperclassDecl();
+  if (!superclass || !superclass->isNSObject())
+    return false;
+
+  // For now, only actors (regardless of whether they're default actors).
+  // Eventually we should roll this out to more classes, but we have to
+  // do it with ABI compatibility.
+  return isActor();
+}
+
+bool ClassDecl::isNSObject() const {
+  if (!getName().is("NSObject")) return false;
+  ASTContext &ctx = getASTContext();
+  return (getModuleContext()->getName() == ctx.Id_Foundation ||
+          getModuleContext()->getName() == ctx.Id_ObjectiveC);
 }
 
 Type ClassDecl::getSuperclass() const {

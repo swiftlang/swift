@@ -52,8 +52,9 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   SILValue resultSelfValue;
   SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
   SILType classTy = selfValue->getType();
-  if (cd->hasSuperclass()) {
-    Type superclassTy = dd->mapTypeIntoContext(cd->getSuperclass());
+  if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
+    Type superclassTy =
+      dd->mapTypeIntoContext(cd->getSuperclass());
     ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =

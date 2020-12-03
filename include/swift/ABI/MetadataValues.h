@@ -42,6 +42,10 @@ enum {
 
   /// The number of words in a yield-many coroutine buffer.
   NumWords_YieldManyBuffer = 8,
+
+  /// The number of words (in addition to the heap-object header)
+  /// in a default actor.
+  NumWords_DefaultActor = 10,
 };
 
 struct InProcess;
@@ -113,6 +117,9 @@ enum class NominalTypeKind : uint32_t {
 
 /// The maximum supported type alignment.
 const size_t MaximumAlignment = 16;
+
+/// The alignment of a DefaultActor.
+const size_t Alignment_DefaultActor = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1885,7 +1892,11 @@ enum class JobKind : size_t {
   Task = 0,
 
   /// Job kinds >= 192 are private to the implementation.
-  First_Reserved = 192
+  First_Reserved = 192,
+
+  DefaultActorInline = First_Reserved,
+  DefaultActorSeparate,
+  DefaultActorOverride
 };
 
 /// The priority of a job.  Higher priorities are larger values.
@@ -1920,6 +1931,10 @@ public:
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
   JobFlags(JobKind kind) { setKind(kind); }
+  JobFlags(JobKind kind, JobPriority priority) {
+    setKind(kind);
+    setPriority(priority);
+  }
   constexpr JobFlags() {}
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, JobKind,
