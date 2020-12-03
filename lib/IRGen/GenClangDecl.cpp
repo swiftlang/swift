@@ -34,53 +34,12 @@ public:
   explicit ClangDeclFinder(Fn fn) : callback(fn) {}
 
   bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
-    llvm::errs() << "DeclRefExpr TRORORORO\n";
-    llvm::errs() << DRE->getDecl()->getQualifiedNameAsString() << "\n";
-    DRE->getDecl()->dump();
-    llvm::errs() << "End DeclRefExpr TRORORORO\n";
-    callback(DRE->getReferencedDeclOfCallee());
-    return false;
+    callback(DRE->getDecl());
+    return true;
   }
 
   bool VisitMemberExpr(clang::MemberExpr *DRE) {
-    llvm::errs() << "DeclRefExpr TRORORORO\n";
-    llvm::errs() << DRE->getMemberDecl()->getQualifiedNameAsString() << "\n";
-    DRE->getMemberDecl()->dump();
-    llvm::errs() << "End DeclRefExpr TRORORORO\n";
     callback(DRE->getMemberDecl());
-    return false;
-  }
-  bool VisitCallExpr(clang::CallExpr *DRE) {
-    if(DRE->getCalleeDecl()) {
-      llvm::errs() << "CallExpr CalleeDecl\n";
-      DRE->getCalleeDecl()->dump();  
-      llvm::errs() << "END CallExpr TRORORORO\n";
-      callback(DRE->getCalleeDecl());
-    } else {
-      llvm::errs() << "CallExpr NULLPTR\n";
-    }
-    return false;
-  }
-  bool VisitCXXMemberCallExpr(clang::CXXMemberCallExpr *DRE) {
-    if(DRE->getMethodDecl()) {
-      llvm::errs() << "CXXMemberCallExpr gMethodDecl\n";
-      DRE->getMethodDecl()->dump();  
-      llvm::errs() << "END CXXMemberCallExpr TRORORORO\n";
-      callback(DRE->getMethodDecl());
-    } else {
-      llvm::errs() << "CXXMemberCallExpr NULLPTR\n";
-    }
-    return false;
-  }
-  bool VisitImplicitCastExpr(clang::ImplicitCastExpr *DRE) {
-    if(DRE->getReferencedDeclOfCallee()) {
-      llvm::errs() << "ImplicitCastExpr TRORORORO\n";
-      DRE->getReferencedDeclOfCallee()->dump();
-      llvm::errs() << "End ImplicitCastExpr TRORORORO\n";
-      callback(DRE->getReferencedDeclOfCallee());
-    } else {
-      llvm::errs() << "ImplicitCastExpr NULLPTR\n";
-    }
     return true;
   }
 };
@@ -100,6 +59,10 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
     if (initializingDecl) {
       return initializingDecl;
+    }
+  } else if (auto rd = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    if(rd->getBraceRange().isValid()) {
+      return rd;
     }
   }
 
