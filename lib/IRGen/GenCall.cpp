@@ -4539,18 +4539,25 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     return Value;
   case KindTy::Value::AsyncFunctionPointer: {
     if (!isFunctionPointerWithoutContext) {
+      auto *fnPtr = Value;
+      if (auto authInfo = AuthInfo) {
+        fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
+      }
       auto *descriptorPtr =
-          IGF.Builder.CreateBitCast(Value, IGF.IGM.AsyncFunctionPointerPtrTy);
+          IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.AsyncFunctionPointerPtrTy);
       auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
-      return IGF.emitLoadOfRelativePointer(
+      auto *result = IGF.emitLoadOfRelativePointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ getFunctionType()->getPointerTo());
+      if (auto authInfo = AuthInfo) {
+        result = emitPointerAuthSign(IGF, result, authInfo);
+      }
+      return result;
     } else {
       return IGF.Builder.CreateBitOrPointerCast(
           Value, getFunctionType()->getPointerTo());
     }
   }
-
   }
 }
 
