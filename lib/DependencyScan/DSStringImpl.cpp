@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DependencyScan/DSString.h"
+#include "swift/DependencyScan/DSStringImpl.h"
 
 /// Describes the kind of underlying data in ds_string_t.
 enum ds_string_management {

@@ -3,7 +3,7 @@ add_swift_host_library(SwiftScan STATIC
   DependencyScanImpl.cpp
   DependencyScanningTool.cpp
   ScanDependencies.cpp
-  DSString.cpp
+  DSStringImpl.cpp
   c-include-check.c)
 
 add_dependencies(SwiftScan

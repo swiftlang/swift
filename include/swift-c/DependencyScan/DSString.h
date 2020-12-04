@@ -48,5 +48,3 @@ DEPSCAN_PUBLIC void ds_string_set_dispose(ds_string_set_t *set);
 DEPSCAN_END_DECLS
 
 #endif // SWIFT_C_DSSTRING_H
-
-

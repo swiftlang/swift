@@ -92,6 +92,24 @@ typedef struct {
   ds_string_set_t *import_set;
 } ds_prescan_result_t;
 
+//=== Batch Scan Input Specification --------------------------------------===//
+
+typedef struct {
+  ds_string_t module_name;
+  ds_string_t arguments;
+  bool is_swift;
+} ds_batch_scan_entry_t;
+
+typedef struct {
+  int count;
+  ds_batch_scan_entry_t *modules;
+} ds_batch_scan_input_t;
+
+typedef struct {
+  int count;
+  ds_dependency_result_t **results;
+} ds_batch_scan_result_t;
+
 //=== Dependency Result Functions -----------------------------------------===//
 
 DEPSCAN_PUBLIC ds_dependency_info_kind_t
@@ -175,6 +193,13 @@ ds_dependency_result_dispose(ds_dependency_result_t *result);
 
 DEPSCAN_PUBLIC void ds_prescan_result_dispose(ds_prescan_result_t *result);
 
+DEPSCAN_PUBLIC void ds_batch_scan_entry_dispose(ds_batch_scan_entry_t *entry);
+
+DEPSCAN_PUBLIC void ds_batch_scan_input_dispose(ds_batch_scan_input_t *input);
+
+DEPSCAN_PUBLIC void
+ds_batch_scan_result_dispose(ds_batch_scan_result_t *result);
+
 //=== Scanner Functions ---------------------------------------------------===//
 
 /// Container of the configuration state and shared cache for dependency
@@ -188,6 +213,11 @@ DEPSCAN_PUBLIC void ds_scanner_dispose(ds_scanner_t);
 DEPSCAN_PUBLIC ds_dependency_result_t *
 ds_scan_dependencies(ds_scanner_t *scanner, const char *working_directory,
                      int argc, const char *const *argv);
+
+DEPSCAN_PUBLIC ds_batch_scan_result_t *
+ds_batch_scan_dependencies(ds_scanner_t *scanner, const char *working_directory,
+                           ds_batch_scan_input_t *batch_input,
+                           int argc, const char *const *argv);
 
 DEPSCAN_PUBLIC ds_prescan_result_t *
 ds_prescan_dependencies(ds_scanner_t *scanner, const char *working_directory,

@@ -45,6 +45,41 @@ ds_dependency_result_t *ds_scan_dependencies(ds_scanner_t *scanner,
   return DependencyGraph;
 }
 
+ds_batch_scan_result_t *
+ds_batch_scan_dependencies(ds_scanner_t *scanner, const char *working_directory,
+                           ds_batch_scan_input_t *batch_input,
+                           int argc, const char *const *argv) {
+  DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(argv[i]);
+
+  std::vector<BatchScanInput> BatchInput;
+  for (int i = 0; i < batch_input->count; ++i) {
+    ds_batch_scan_entry_t &Entry = batch_input->modules[i];
+    BatchInput.push_back({ds_get_C_string(Entry.module_name),
+                          ds_get_C_string(Entry.arguments),
+                          /*outputPath*/ "", Entry.is_swift});
+  }
+
+
+  // Execute the scan and bridge the result
+  auto BatchScanResult =
+              ScanningTool->getDependencies(Compilation, BatchInput, {});
+  ds_batch_scan_result_t *Result = new ds_batch_scan_result_t;
+  Result->results = new ds_dependency_result_t*[BatchScanResult.size()];
+
+  for (size_t i = 0; i < BatchScanResult.size(); ++i) {
+    auto &ResultOrErr = BatchScanResult[i];
+    if (ResultOrErr.getError())
+      Result->results[i] = nullptr;
+
+    Result->results[i] = ResultOrErr.get();
+  }
+
+  return Result;
+}
+
 ds_prescan_result_t *ds_prescan_dependencies(ds_scanner_t *scanner,
                                              const char *working_directory,
                                              int argc,
@@ -232,4 +267,23 @@ void ds_dependency_result_dispose(ds_dependency_result_t *result) {
 void ds_prescan_result_dispose(ds_prescan_result_t *result) {
   ds_string_set_dispose(result->import_set);
   delete result;
+}
+
+void ds_batch_scan_entry_dispose(ds_batch_scan_entry_t *entry) {
+  ds_string_dispose(entry->module_name);
+  ds_string_dispose(entry->arguments);
+  delete entry;
+}
+
+void ds_batch_scan_input_dispose(ds_batch_scan_input_t *input) {
+  for (int i = 0; i < input->count; ++i) {
+    ds_batch_scan_entry_dispose(&input->modules[i]);
+  }
+}
+
+void
+ds_batch_scan_result_dispose(ds_batch_scan_result_t *result) {
+  for (int i = 0; i < result->count; ++i) {
+    ds_dependency_result_dispose(result->results[i]);
+  }
 }
