@@ -3714,9 +3714,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     llvm::DenseMap<const clang::Module *, ModuleDecl *> Result;
 
     // For the current module, consider both private and public imports.
-    ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Public;
-    Filter |= ModuleDecl::ImportFilterKind::Private;
-    SmallVector<ModuleDecl::ImportedModule, 4> Imports;
+    ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
+    Filter |= ModuleDecl::ImportFilterKind::Default;
+    SmallVector<ImportedModule, 4> Imports;
     Options.CurrentModule->getImportedModules(Imports, Filter);
 
     SmallVector<ModuleDecl *, 4> ModulesToProcess;
@@ -3737,7 +3737,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
       // For transitive imports, consider only public imports.
       Imports.clear();
-      Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Public);
+      Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Exported);
       for (const auto &Import : Imports) {
         ModulesToProcess.push_back(Import.importedModule);
       }
@@ -3764,7 +3764,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
-    std::string ExportedModuleName = File->getExportedModuleName();
+    StringRef ExportedModuleName = File->getExportedModuleName();
 
     // Clang declarations need special treatment: Multiple Clang modules can
     // contain the same declarations from a textually included header, but not
