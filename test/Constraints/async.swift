@@ -5,9 +5,9 @@
 func doAsynchronously() async { }
 func doSynchronously() { }
 
-func testNonConversions() async {
-  let _: () -> Void = doAsynchronously // expected-error{{cannot convert value of type '() async -> ()' to specified type '() -> Void'}}
-  let _: () async -> Void = doSynchronously // expected-error{{cannot convert value of type '() -> ()' to specified type '() async -> Void'}}
+func testConversions() async {
+  let _: () -> Void = doAsynchronously // expected-error{{invalid conversion from 'async' function of type '() async -> ()' to synchronous function type '() -> Void'}}
+  let _: () async -> Void = doSynchronously // okay
 }
 
 // Overloading
@@ -93,4 +93,25 @@ func testPassAsyncClosure() {
 
   let b = takesAsyncClosure { overloadedSame() } // expected-warning{{synchronous is no fun}}
   let _: Double = b // expected-error{{convert value of type 'String'}}
+}
+
+struct FunctionTypes {
+  var syncNonThrowing: () -> Void
+  var syncThrowing: () throws -> Void
+  var asyncNonThrowing: () async -> Void
+  var asyncThrowing: () async throws -> Void
+
+  mutating func demonstrateConversions() {
+    // Okay to add 'async' and/or 'throws'
+    asyncNonThrowing = syncNonThrowing
+    asyncThrowing = syncThrowing
+    syncThrowing = syncNonThrowing
+    asyncThrowing = asyncNonThrowing
+
+    // Error to remove 'async' or 'throws'
+    syncNonThrowing = asyncNonThrowing // expected-error{{invalid conversion}}
+    syncThrowing = asyncThrowing       // expected-error{{invalid conversion}}
+    syncNonThrowing = syncThrowing     // expected-error{{invalid conversion}}
+    asyncNonThrowing = syncThrowing    // expected-error{{invalid conversion}}
+  }
 }

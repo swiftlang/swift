@@ -1873,9 +1873,19 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
-  // 'async' and non-'async' function types are not compatible.
-  if (func1->isAsync() != func2->isAsync())
-    return getTypeMatchFailure(locator);
+  // A synchronous function can be a subtype of an 'async' function.
+  if (func1->isAsync() != func2->isAsync()) {
+    // Cannot drop 'async'.
+    if (func1->isAsync() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = DropAsyncAttribute::create(*this, func1, func2,
+                                             getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+  }
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
