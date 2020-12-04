@@ -430,3 +430,19 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
       flags.bits, currentTask, operation)
   return task
 }
+
+#if _runtime(_ObjC)
+
+/// Intrinsic used by SILGen to launch a task for bridging a Swift async method
+/// which was called through its ObjC-exported completion-handler-based API.
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
+  // TODO: As a start, we should invoke Task.runDetached here, but we
+  // can probably do better if we're already running on behalf of a task,
+  // if the receiver of the method invocation is itself an Actor, or in other
+  // situations.
+  fatalError("not implemented")
+}
+
+#endif
