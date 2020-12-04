@@ -690,7 +690,7 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       SpecialPointerAuthDiscriminators::ResilientClassStubInitCallback);
 
   opts.AsyncContextParent =
-      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
                         SpecialPointerAuthDiscriminators::AsyncContextParent);
 
   opts.AsyncContextResume =
