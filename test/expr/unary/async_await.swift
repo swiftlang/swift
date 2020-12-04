@@ -65,14 +65,14 @@ func testClosure() {
      await getInt()
   }
 
-  let _: () -> Int = closure // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+  let _: () -> Int = closure // expected-error{{invalid conversion from 'async' function of type '() async -> Int' to synchronous function type '() -> Int'}}
 
   let closure2 = { () async -> Int in
     print("here")
     return await getInt()
   }
 
-  let _: () -> Int = closure2 // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+  let _: () -> Int = closure2 // expected-error{{invalid conversion from 'async' function of type '() async -> Int' to synchronous function type '() -> Int'}}
 }
 
 // Nesting async and await together
