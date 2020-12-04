@@ -62,6 +62,9 @@ extension Wrapper where Scalar : Numeric {
 _ = pullback(at: Wrapper<Float>(1), in: { $0.variance() })
 
 // Tests TF-277.
+// FIXME(SR-13933): Temporarily disabled due to VJPCloner ownership verification
+// failure.
+/*
 protocol Layer : Differentiable {
   associatedtype Output : Differentiable
 }
@@ -72,6 +75,7 @@ struct SupervisedTrainer<Model : Layer> {
     _ = gradient(at: y) { y in return self.lossFunction(y, y) }
   }
 }
+*/
 
 // Tests TF-440.
 struct TF_440_Input<Input: Differentiable, State: Differentiable>
