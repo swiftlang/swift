@@ -197,6 +197,8 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
     blockAlreadyAddedToWorklist.insert(firstBlock);
   }
 
+  bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
+                                   OptimizationMode::NoOptimization;
   while (!blockWorklist.empty()) {
     auto *block = blockWorklist.pop_back_val();
 
@@ -205,6 +207,10 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       ++iterator;
 
       if (isInstructionTriviallyDead(instruction)) {
+        if (compilingWithOptimization) {
+          instruction->replaceAllUsesOfAllResultsWithUndef();
+          instruction->eraseFromParent();
+        }
         continue;
       }
 
@@ -228,10 +234,21 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   addReachableCodeToWorklist(function);
   MandatoryCombineCanonicalize mcCanonicialize(worklist);
 
+  bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
+                                   OptimizationMode::NoOptimization;
+
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
     if (instruction == nullptr) {
       continue;
+    }
+
+    if (compilingWithOptimization) {
+      if (isInstructionTriviallyDead(instruction)) {
+        worklist.eraseInstFromFunction(*instruction);
+        madeChange = true;
+        continue;
+      }
     }
 
     if (mcCanonicialize.tryCanonicalize(instruction)) {
