@@ -253,7 +253,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public var count: Int {
     if let pos = _position {
-      return _end! - pos
+      return _assumeNonNegative(_end! - pos)
     }
     return 0
   }
