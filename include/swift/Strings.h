@@ -116,6 +116,9 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATIO
 /// The name of the Builtin type for UnsafeValueBuffer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
     {"Builtin.UnsafeValueBuffer"};
+/// The name of the Builtin type for Job
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
+    "Builtin.Job"};
 /// The name of the Builtin type for UnknownObject
 ///
 /// This no longer exists as an AST-accessible type, but it's still used for

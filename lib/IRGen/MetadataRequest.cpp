@@ -1304,6 +1304,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinJobType(CanBuiltinJobType type,
+                        DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
