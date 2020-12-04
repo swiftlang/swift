@@ -224,9 +224,9 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     });
 
     if (canOptimizePhi) {
+      Context::ConsumingOperandState state(opPhi);
       opPhi.visitResults([&](SILValue value) {
-        ctx.joinedOwnedIntroducerToConsumedOperands.insert(value,
-                                                           opPhi.getOperand());
+        ctx.joinedOwnedIntroducerToConsumedOperands.insert(value, state);
         return true;
       });
     }
