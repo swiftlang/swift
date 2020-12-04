@@ -175,8 +175,7 @@ bool swift_task_removeStatusRecord(AsyncTask *task,
                                    TaskStatusRecord *record);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-JobFlags
-swift_task_getJobFlags(AsyncTask* task);
+size_t swift_task_getJobFlags(AsyncTask* task);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {

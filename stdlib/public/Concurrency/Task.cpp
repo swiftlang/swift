@@ -352,6 +352,6 @@ void swift::swift_task_run(AsyncTask *taskToRun) {
   taskToRun->run(ExecutorRef::generic());
 }
 
-JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
-  return task->Flags;
+size_t swift::swift_task_getJobFlags(AsyncTask *task) {
+  return task->Flags.getOpaqueValue();
 }
