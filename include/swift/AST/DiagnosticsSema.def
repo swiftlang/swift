@@ -999,7 +999,7 @@ ERROR(did_not_call_method,none,
 
 ERROR(init_not_instance_member_use_assignment,none,
       "'init' is a member of the type; use assignment "
-      "to initalize the value instead", ())
+      "to initialize the value instead", ())
 
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
