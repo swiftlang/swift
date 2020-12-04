@@ -116,5 +116,23 @@ RangeTraps.test("throughNaN")
   _ = ...Double.nan
 }
 
+RangeTraps.test("UncheckedHalfOpen")
+  .xfail(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .code {
+    expectCrashLater()
+    var range = Range(uncheckedBounds: (lower: 1, upper: 0))
+  }
+
+RangeTraps.test("UncheckedClosed")
+  .xfail(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .code {
+    expectCrashLater()
+    var range = ClosedRange(uncheckedBounds: (lower: 1, upper: 0))
+  }
+
 runAllTests()
 

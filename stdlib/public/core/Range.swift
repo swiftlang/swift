@@ -157,6 +157,12 @@ public struct Range<Bound: Comparable> {
   /// instance does not contain its upper bound.
   public let upperBound: Bound
 
+  @_alwaysEmitIntoClient @inline(__always)
+  internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.lowerBound = bounds.lower
+    self.upperBound = bounds.upper
+  }
+
   /// Creates an instance with the given bounds.
   ///
   /// Because this initializer does not perform any checks, it should be used
@@ -167,8 +173,9 @@ public struct Range<Bound: Comparable> {
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @inlinable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-    self.lowerBound = bounds.lower
-    self.upperBound = bounds.upper
+    _debugPrecondition(bounds.lower <= bounds.upper,
+      "Range requires lowerBound <= upperBound")
+    self.init(_uncheckedBounds: (lower: bounds.lower, upper: bounds.upper))
   }
 
   /// Returns a Boolean value indicating whether the given element is contained
@@ -729,7 +736,7 @@ extension Comparable {
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
       "Range requires lowerBound <= upperBound")
-    return Range(uncheckedBounds: (lower: minimum, upper: maximum))
+    return Range(_uncheckedBounds: (lower: minimum, upper: maximum))
   }
 
   /// Returns a partial range up to, but not including, its upper bound.
