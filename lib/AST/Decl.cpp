@@ -4928,6 +4928,26 @@ bool ProtocolDecl::existentialTypeSupported() const {
     ExistentialTypeSupportedRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const ProtocolRethrowsRequirementList list) {
+  for (auto entry : list) {
+    simple_display(out, entry.first);
+    simple_display(out, entry.second);
+  }
+}
+
+
+ProtocolRethrowsRequirementList 
+ProtocolDecl::getRethrowingRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    ProtocolRethrowsRequirementsRequest{const_cast<ProtocolDecl *>(this)}, 
+    ProtocolRethrowsRequirementList());
+}
+
+bool 
+ProtocolDecl::isRethrowingProtocol() const {
+  return getRethrowingRequirements().size() > 0;
+}
+
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) const {
   // If there is an 'objc' attribute with a name, use that name.
@@ -6761,6 +6781,12 @@ bool AbstractFunctionDecl::canBeAsyncHandler() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            CanBeAsyncHandlerRequest{mutableFunc},
                            false);
+}
+
+FunctionRethrowingKind AbstractFunctionDecl::getRethrowingKind() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    FunctionRethrowingKindRequest{const_cast<AbstractFunctionDecl *>(this)}, 
+    FunctionRethrowingKind::Invalid);
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {

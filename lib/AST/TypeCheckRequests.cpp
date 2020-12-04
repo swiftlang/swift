@@ -279,6 +279,31 @@ void ExistentialTypeSupportedRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// getRethrowingKind computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FunctionRethrowingKind kind) {
+  switch (kind) {
+  case FunctionRethrowingKind::None:
+    out << "non-throwing";
+    break;
+  case FunctionRethrowingKind::ByClosure:
+    out << "by closure";
+    break;
+  case FunctionRethrowingKind::ByConformance:
+    out << "by conformance";
+    break;
+  case FunctionRethrowingKind::Throws:
+    out << "throws";
+    break;
+  case FunctionRethrowingKind::Invalid:
+    out << "invalid";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
 // isFinal computation.
 //----------------------------------------------------------------------------//
 
