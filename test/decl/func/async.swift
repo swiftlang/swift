@@ -33,9 +33,9 @@ struct ConformsToP1: P1 { // expected-error{{type 'ConformsToP1' does not confor
 }
 
 protocol P2 {
-  func f() async // expected-note{{protocol requires function 'f()' with type '() async -> ()'; do you want to add a stub?}}
+  func f() async
 }
 
-struct ConformsToP2: P2 { // expected-error{{type 'ConformsToP2' does not conform to protocol 'P2'}}
-  func f() { }  // expected-note{{candidate is not 'async', but protocol requirement is}}
+struct ConformsToP2: P2 {
+  func f() { }  // okay
 }
