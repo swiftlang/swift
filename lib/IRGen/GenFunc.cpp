@@ -2391,7 +2391,12 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
         auto &Builder = IGF.Builder;
         auto addr = Builder.CreateBitOrPointerCast(&(*it), IGF.IGM.Int8PtrPtrTy);
         Address callerContextAddr(addr, IGF.IGM.getPointerAlignment());
-        auto callerContext = Builder.CreateLoad(callerContextAddr);
+        llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
+        if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+          auto authInfo =
+              PointerAuthInfo::emit(IGF, schema, addr, PointerAuthEntity());
+          callerContext = emitPointerAuthAuth(IGF, callerContext, authInfo);
+        }
         Builder.CreateRet(callerContext);
       },
       false /*isNoInline*/));
