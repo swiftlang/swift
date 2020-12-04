@@ -1941,16 +1941,19 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 2> sizePhiValues;
     { // thin
       IGF.Builder.emitBlock(thinBlock);
+      auto *ptr = functionPointer.getRawPointer();
+      auto *afpPtr =
+          IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
       if (emitFunction) {
-        auto *uncastFnPtr = functionPointer.getPointer(IGF);
+        llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+        auto *uncastFnPtr = IGF.emitLoadOfRelativePointer(
+            Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+            /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
         auto *fnPtr = IGF.Builder.CreateBitCast(uncastFnPtr, IGF.IGM.Int8PtrTy);
         fnPhiValues.push_back({thinBlock, fnPtr});
       }
       if (emitSize) {
-        auto *ptr = functionPointer.getRawPointer();
-        auto *descriptorPtr =
-            IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-        auto *sizePtr = IGF.Builder.CreateStructGEP(descriptorPtr, 1);
+        auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
         auto *size =
             IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
         sizePhiValues.push_back({thinBlock, size});
@@ -2026,9 +2029,15 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Block: {
+    auto *ptr = functionPointer.getRawPointer();
+    auto *afpPtr =
+        IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
     llvm::Value *fn = nullptr;
     if (emitFunction) {
-      fn = functionPointer.getPointer(IGF);
+      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+      fn = IGF.emitLoadOfRelativePointer(
+          Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+          /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
     }
     llvm::Value *size = nullptr;
     if (emitSize) {
@@ -2036,10 +2045,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
         size = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                       initialContextSize.getValue());
       }  else {
-        auto *ptr = functionPointer.getRawPointer();
-        auto *descriptorPtr =
-            IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-        auto *sizePtr = IGF.Builder.CreateStructGEP(descriptorPtr, 1);
+        auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
         size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
       }
     }
