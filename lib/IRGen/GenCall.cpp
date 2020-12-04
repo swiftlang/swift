@@ -1945,6 +1945,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     { // thin
       IGF.Builder.emitBlock(thinBlock);
       auto *ptr = functionPointer.getRawPointer();
+      if (auto authInfo = functionPointer.getAuthInfo()) {
+        ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
+      }
       auto *afpPtr =
           IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
       if (emitFunction) {
@@ -1953,6 +1956,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
             Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
             /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
         auto *fnPtr = IGF.Builder.CreateBitCast(uncastFnPtr, IGF.IGM.Int8PtrTy);
+        if (auto authInfo = functionPointer.getAuthInfo()) {
+          fnPtr = emitPointerAuthSign(IGF, fnPtr, authInfo);
+        }
         fnPhiValues.push_back({thinBlock, fnPtr});
       }
       if (emitSize) {
