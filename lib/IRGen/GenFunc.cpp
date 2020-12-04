@@ -769,7 +769,7 @@ public:
   virtual void addArgument(llvm::Value *argValue, unsigned index) = 0;
   virtual SILParameterInfo getParameterInfo(unsigned index) = 0;
   virtual llvm::Value *getContext() = 0;
-  virtual llvm::Value *getDynamicFunctionPointer() = 0;
+  virtual llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) = 0;
   virtual llvm::Value *getDynamicFunctionContext() = 0;
   virtual void addDynamicFunctionContext(Explosion &explosion,
                                          DynamicFunctionKind kind) = 0;
@@ -931,7 +931,9 @@ public:
     return substType->getParameters()[index];
   }
   llvm::Value *getContext() override { return origParams.claimNext(); }
-  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
+  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
+    return args.takeLast();
+  }
   llvm::Value *getDynamicFunctionContext() override { return args.takeLast(); }
   void addDynamicFunctionContext(Explosion &explosion,
                                  DynamicFunctionKind kind) override {
@@ -1127,7 +1129,7 @@ public:
   llvm::Value *getContext() override {
     return loadValue(layout.getLocalContextLayout());
   }
-  llvm::Value *getDynamicFunctionPointer() override {
+  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
     assert(dynamicFunction && dynamicFunction->pointer);
     auto *context = dynamicFunction->context;
     if (!context) {
@@ -1135,7 +1137,6 @@ public:
     }
     auto *rawFunction = subIGF.Builder.CreateBitCast(
         dynamicFunction->pointer, origSig.getType()->getPointerTo());
-    auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, origType);
     auto functionPointer =
         FunctionPointer(FunctionPointer::KindTy::AsyncFunctionPointer,
                         rawFunction, authInfo, origSig);
@@ -1719,18 +1720,18 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
     // Otherwise, it was the last thing we added to the layout.
 
-    // The dynamic function pointer is packed "last" into the context,
-    // and we pulled it out as an argument.  Just pop it off.
-    auto fnPtr = emission->getDynamicFunctionPointer();
-
-    // It comes out of the context as an i8*. Cast to the function type.
-    fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
-
     assert(lastCapturedFieldPtr);
     auto authInfo = PointerAuthInfo::emit(subIGF,
                             IGM.getOptions().PointerAuth.PartialApplyCapture,
                             lastCapturedFieldPtr,
                             PointerAuthEntity::Special::PartialApplyCapture);
+
+    // The dynamic function pointer is packed "last" into the context,
+    // and we pulled it out as an argument.  Just pop it off.
+    auto fnPtr = emission->getDynamicFunctionPointer(authInfo);
+
+    // It comes out of the context as an i8*. Cast to the function type.
+    fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
     return FunctionPointer(FunctionPointer::KindTy::Function, fnPtr, authInfo,
                            origSig);
