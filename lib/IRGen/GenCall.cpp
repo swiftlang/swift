@@ -2039,6 +2039,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Block: {
     auto *ptr = functionPointer.getRawPointer();
+    if (auto authInfo = functionPointer.getAuthInfo()) {
+      ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
+    }
     auto *afpPtr =
         IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
     llvm::Value *fn = nullptr;
@@ -2050,6 +2053,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
         fn = IGF.emitLoadOfRelativePointer(
             Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
             /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
+      }
+      if (auto authInfo = functionPointer.getAuthInfo()) {
+        fn = emitPointerAuthSign(IGF, fn, authInfo);
       }
     }
     llvm::Value *size = nullptr;
