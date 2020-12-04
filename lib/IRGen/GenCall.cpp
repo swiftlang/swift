@@ -3666,14 +3666,34 @@ llvm::Value *irgen::emitTaskCreate(
   auto layout = getAsyncContextLayout(
       IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType, subs);
 
+  CanSILFunctionType taskContinuationFunctionTy = [&]() {
+    ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
+    auto extInfo =
+        ASTExtInfoBuilder()
+            .withRepresentation(FunctionTypeRepresentation::CFunctionPointer)
+            .build();
+    // FIXME: Use the appropriate signature for TaskContinuationFunction:
+    //
+    //            using TaskContinuationFunction =
+    //              SWIFT_CC(swift)
+    //              void (AsyncTask *, ExecutorRef, AsyncContext *);
+    auto ty = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+    return IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
+  }();
+
   // Call the function.
   llvm::CallInst *result;
   llvm::Value *theSize, *theFunction;
+  auto taskFunctionPointer = FunctionPointer::forExplosionValue(
+      IGF, taskFunction, taskFunctionCanSILType);
   std::tie(theFunction, theSize) =
       getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
-                              FunctionPointer::forExplosionValue(
-                                  IGF, taskFunction, taskFunctionCanSILType),
-                              localContextInfo);
+                              taskFunctionPointer, localContextInfo);
+  if (auto authInfo = PointerAuthInfo::forFunctionPointer(
+          IGF.IGM, taskContinuationFunctionTy)) {
+    theFunction = emitPointerAuthResign(
+        IGF, theFunction, taskFunctionPointer.getAuthInfo(), authInfo);
+  }
   theFunction = IGF.Builder.CreateBitOrPointerCast(
       theFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
   theSize = IGF.Builder.CreateZExtOrBitCast(theSize, IGF.IGM.SizeTy);
