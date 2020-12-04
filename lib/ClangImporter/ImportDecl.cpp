@@ -3591,8 +3591,10 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      switch (Impl.getEnumKind(clangEnum)) {
-      case EnumKind::Constants: {
+      auto enumKind = Impl.getEnumKind(clangEnum);
+      switch (enumKind) {
+      case EnumKind::Constants:
+      case EnumKind::Unknown: {
         // The enumeration was simply mapped to an integral type. Create a
         // constant with that integral type.
 
@@ -3609,54 +3611,14 @@ namespace {
             isInSystemModule(dc), Bridgeability::None);
         if (!type)
           return nullptr;
-        // FIXME: Importing the type will recursively revisit this same
-        // EnumConstantDecl. Short-circuit out if we already emitted the import
-        // for this decl.
-        if (auto Known = Impl.importDeclCached(decl, getVersion()))
-          return Known;
 
         // Create the global constant.
-        auto result = Impl.createConstant(name, dc, type,
-                                          clang::APValue(decl->getInitVal()),
-                                          ConstantConvertKind::None,
-                                          /*static*/dc->isTypeContext(), decl);
-        Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-
-        // If this is a compatibility stub, mark it as such.
-        if (correctSwiftName)
-          markAsVariant(result, *correctSwiftName);
-
-        return result;
-      }
-
-      case EnumKind::Unknown: {
-        // The enumeration was mapped to a struct containing the integral
-        // type. Create a constant with that struct type.
-
-        // The context where the constant will be introduced.
-        auto dc =
-            Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
-        if (!dc)
-          return nullptr;
-
-        // Import the enumeration type.
-        auto enumType = Impl.importTypeIgnoreIUO(
-            Impl.getClangASTContext().getTagDeclType(clangEnum),
-            ImportTypeKind::Value, isInSystemModule(dc), Bridgeability::None);
-        if (!enumType)
-          return nullptr;
-
-        // FIXME: Importing the type will can recursively revisit this same
-        // EnumConstantDecl. Short-circuit out if we already emitted the import
-        // for this decl.
-        if (auto Known = Impl.importDeclCached(decl, getVersion()))
-          return Known;
-
-        // Create the global constant.
-        auto result = Impl.createConstant(name, dc, enumType,
-                                          clang::APValue(decl->getInitVal()),
-                                          ConstantConvertKind::Construction,
-                                          /*static*/ false, decl);
+        bool isStatic = enumKind != EnumKind::Unknown && dc->isTypeContext();
+        auto result = Impl.createConstant(
+            name, dc, type, clang::APValue(decl->getInitVal()),
+            enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
+                                          : ConstantConvertKind::None,
+            isStatic, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
         // If this is a compatibility stub, mark it as such.
@@ -3678,7 +3640,7 @@ namespace {
         return nullptr;
       }
       }
-      
+
       llvm_unreachable("Invalid EnumKind.");
     }
 
