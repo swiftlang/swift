@@ -66,8 +66,7 @@ public:
   }
 };
 
-// FIXME: get this to build reliably
-#if 0 && defined(_WIN64)
+#if defined(_WIN64)
 #include <intrin.h>
 
 /// MSVC's std::atomic uses an inline spin lock for 16-byte atomics,
@@ -76,11 +75,7 @@ public:
 /// AMD processors that lack cmpxchg16b, so we just use the intrinsic.
 template <class Value>
 class alignas(2 * sizeof(void*)) atomic_impl<Value, 2 * sizeof(void*)> {
-  // MSVC is not strict about aliasing, so we can get away with this.
-  union {
-    volatile Value atomicValue;
-    volatile __int64 atomicArray[2];
-  };
+  volatile Value atomicValue;
 public:
   constexpr atomic_impl(Value initialValue) : atomicValue(initialValue) {}
 
@@ -98,10 +93,14 @@ public:
     __int64 resultArray[2] = {};
 #if SWIFT_HAS_MSVC_ARM_ATOMICS
     if (order != std::memory_order_acquire) {
-      (void) _InterlockedCompareExchange128_nf(atomicArray, 0, 0, resultArray);
+      (void) _InterlockedCompareExchange128_nf(
+                            reinterpret_cast<volatile __int64*>(&atomicValue),
+                            0, 0, resultArray);
     } else {
 #endif
-      (void) _InterlockedCompareExchange128(atomicArray, 0, 0, resultArray);
+      (void) _InterlockedCompareExchange128(
+                            reinterpret_cast<volatile __int64*>(&atomicValue),
+                            0, 0, resultArray);
 #if SWIFT_HAS_MSVC_ARM_ATOMICS
     }
 #endif
@@ -116,31 +115,33 @@ public:
            failureOrder == std::memory_order_consume);
     assert(successOrder == std::memory_order_relaxed ||
            successOrder == std::memory_order_release);
-    __int64 newValueArray[2];
-    memcpy(newValueArray, &newValue, sizeof(Value));
 #if SWIFT_HAS_MSVC_ARM_ATOMICS
     if (successOrder == std::memory_order_relaxed &&
         failureOrder != std::memory_order_acquire) {
-      return _InterlockedCompareExchange128_nf(atomicArray,
-                                               newValueArray[0],
-                                               newValueArray[1],
-                                     reinterpret_cast<__int64*>(&oldValue));
+      return _InterlockedCompareExchange128_nf(
+                            reinterpret_cast<volatile __int64*>(&atomicValue),
+                            reinterpret_cast<const __int64*>(&newValue)[1],
+                            reinterpret_cast<const __int64*>(&newValue)[0],
+                            reinterpret_cast<__int64*>(&oldValue));
     } else if (successOrder == std::memory_order_relaxed) {
-      return _InterlockedCompareExchange128_acq(atomicArray,
-                                                newValueArray[0],
-                                                newValueArray[1],
-                                     reinterpret_cast<__int64*>(&oldValue));
+      return _InterlockedCompareExchange128_acq(
+                            reinterpret_cast<volatile __int64*>(&atomicValue),
+                            reinterpret_cast<const __int64*>(&newValue)[1],
+                            reinterpret_cast<const __int64*>(&newValue)[0],
+                            reinterpret_cast<__int64*>(&oldValue));
     } else if (failureOrder != std::memory_order_acquire) {
-      return _InterlockedCompareExchange128_rel(atomicArray,
-                                                newValueArray[0],
-                                                newValueArray[1],
-                                     reinterpret_cast<__int64*>(&oldValue));
+      return _InterlockedCompareExchange128_rel(
+                            reinterpret_cast<volatile __int64*>(&atomicValue),
+                            reinterpret_cast<const __int64*>(&newValue)[1],
+                            reinterpret_cast<const __int64*>(&newValue)[0],
+                            reinterpret_cast<__int64*>(&oldValue));
     } else {
 #endif
-      return _InterlockedCompareExchange128(atomicArray,
-                                            newValueArray[0],
-                                            newValueArray[1],
-                                     reinterpret_cast<__int64*>(&oldValue));
+      return _InterlockedCompareExchange128(
+                            reinterpret_cast<volatile __int64*>(&atomicValue),
+                            reinterpret_cast<const __int64*>(&newValue)[1],
+                            reinterpret_cast<const __int64*>(&newValue)[0],
+                            reinterpret_cast<__int64*>(&oldValue));
 #if SWIFT_HAS_MSVC_ARM_ATOMICS
     }
 #endif
