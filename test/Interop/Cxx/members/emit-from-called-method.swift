@@ -2,12 +2,12 @@
 //
 // REQUIRES: executable_test
 
-import EmitCalledMethod
+import CallMethod
 import StdlibUnittest
 
-var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
+var MembersTestSuite = TestSuite("MembersTestSuite")
 
-TemplatesTestSuite.test("emit-called-method") {
+MembersTestSuite.test("emit-from-called-method") {
   expectEqual(42, callMethod())
 }
 

@@ -2,12 +2,12 @@
 //
 // REQUIRES: executable_test
 
-import EmitCalledConstructor
+import CallConstructor
 import StdlibUnittest
 
 var MembersTestSuite = TestSuite("MembersTestSuite")
 
-MembersTestSuite.test("transitive-function-constructor") {
+MembersTestSuite.test("emit-from-called-constructor") {
   expectEqual(42, useIncrementor())
 }
 

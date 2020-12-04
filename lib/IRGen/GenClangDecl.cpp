@@ -61,8 +61,8 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
       return initializingDecl;
     }
   } else if (auto rd = dyn_cast<clang::CXXRecordDecl>(decl)) {
-    if(rd->getBraceRange().isValid()) {
-      return rd;
+    if(rd->hasDefinition()) {
+      return rd->getDefinition();
     }
   }
 

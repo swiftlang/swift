@@ -1,3 +1,7 @@
-module ConstructorsInvokingFunctions {
-  header "constructors-invoking-functions.h"
+module CallConstructor {
+  header "call-constructor.h"
+}
+
+module  CallMethod {
+  header "call-method.h"
 }
