@@ -54,11 +54,11 @@ func test_unsafeContinuations() async {
 }
 
 func test_unsafeThrowingContinuations() async {
-  let _: String = try await Task.withUnsafeThrowingContinuation { continuation in
+  let _: String = await try Task.withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
   }
 
-  let _: String = try await Task.withUnsafeThrowingContinuation { continuation in
+  let _: String = await try Task.withUnsafeThrowingContinuation { continuation in
     continuation.resume(throwing: MyError())
   }
 

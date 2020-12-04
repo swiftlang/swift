@@ -436,6 +436,13 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       : parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
+    // "await" must precede "try".
+    if (auto await = dyn_cast<AwaitExpr>(sub.get())) {
+      diagnose(await->getLoc(), diag::try_before_await)
+        .fixItRemove(await->getLoc())
+        .fixItInsert(tryLoc, "await ");
+    }
+
     ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
     switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
     case tok::exclaim_postfix:
