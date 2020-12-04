@@ -511,6 +511,17 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter slice: The raw buffer slice to rebase.
   @inlinable
   public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
+      "Invalid slice")
     let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = slice.endIndex &- slice.startIndex
     self.init(start: base, count: count)
