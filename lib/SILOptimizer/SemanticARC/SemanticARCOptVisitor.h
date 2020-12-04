@@ -148,6 +148,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
+  bool visitSILPhiArgument(SILPhiArgument *arg);
 
   static bool shouldVisitInst(SILInstruction *i) {
     switch (i->getKind()) {
@@ -158,6 +159,24 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     case SILInstructionKind::LoadInst:
       return true;
     }
+  }
+
+  static bool shouldVisitArg(SILArgument *arg) {
+    auto *phiArg = dyn_cast<SILPhiArgument>(arg);
+    if (!phiArg || !phiArg->isPhiArgument())
+      return false;
+
+    switch (phiArg->getOwnershipKind()) {
+    case OwnershipKind::Any:
+      llvm_unreachable("Value should never have any ownership");
+    case OwnershipKind::None:
+    case OwnershipKind::Unowned:
+      return false;
+    case OwnershipKind::Owned:
+    case OwnershipKind::Guaranteed:
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
 #define FORWARDING_INST(NAME)                                                  \

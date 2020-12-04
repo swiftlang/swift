@@ -115,6 +115,17 @@ bool SemanticARCOptVisitor::processWorklist() {
       }
       continue;
     }
+
+    // Optimize phi args.
+    if (auto *arg = dyn_cast<SILPhiArgument>(next)) {
+      bool madeSingleChange = visit(arg);
+      assert((!madeSingleChange || !ctx.assumingAtFixedPoint) &&
+             "Assumed was at fixed point and modified state?!");
+      madeChange |= madeSingleChange;
+      if (madeSingleChange) {
+        ctx.verify();
+      }
+    }
   }
 
   return madeChange;
