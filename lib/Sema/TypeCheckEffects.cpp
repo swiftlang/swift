@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 
@@ -44,33 +45,44 @@ private:
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
   unsigned ParamCount : 2;
+  FunctionRethrowingKind rethrowingKind;
+  ConcreteDeclRef declRef;
 
 public:
-  explicit AbstractFunction(Kind kind, Expr *fn)
+  explicit AbstractFunction(Kind kind, Expr *fn, ConcreteDeclRef declRef)
     : TheKind(kind),
       IsRethrows(false),
-      ParamCount(1) {
+      ParamCount(1),
+      rethrowingKind(FunctionRethrowingKind::Invalid),
+      declRef(declRef) {
     TheExpr = fn;
   }
 
-  explicit AbstractFunction(AbstractFunctionDecl *fn)
+  explicit AbstractFunction(AbstractFunctionDecl *fn, ConcreteDeclRef declRef)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->getNumCurryLevels()) {
+      ParamCount(fn->getNumCurryLevels()),
+      rethrowingKind(fn->getRethrowingKind()),
+      declRef(declRef) {
     TheFunction = fn;
   }
 
-  explicit AbstractFunction(AbstractClosureExpr *closure)
+  explicit AbstractFunction(AbstractClosureExpr *closure, 
+                            ConcreteDeclRef declRef)
     : TheKind(Kind::Closure),
       IsRethrows(false),
-      ParamCount(1) {
+      ParamCount(1),
+      rethrowingKind(FunctionRethrowingKind::Invalid),
+      declRef(declRef) {
     TheClosure = closure;
   }
 
-  explicit AbstractFunction(ParamDecl *parameter)
+  explicit AbstractFunction(ParamDecl *parameter, ConcreteDeclRef declRef)
     : TheKind(Kind::Parameter),
       IsRethrows(false),
-      ParamCount(1) {
+      ParamCount(1),
+      rethrowingKind(FunctionRethrowingKind::Invalid),
+      declRef(declRef) {
     TheParameter = parameter;
   }
 
@@ -78,6 +90,8 @@ public:
 
   /// Whether the function is marked 'rethrows'.
   bool isBodyRethrows() const { return IsRethrows; }
+
+  FunctionRethrowingKind getRethrowingKind() const { return rethrowingKind; }
 
   unsigned getNumArgumentsForFullApply() const {
     return ParamCount;
@@ -116,18 +130,34 @@ public:
     return TheExpr;
   }
 
+  ConcreteDeclRef getDeclRef() {
+    return declRef;
+  }
+
+  ModuleDecl *getModuleContext() {
+    assert(getKind() == Kind::Function);
+    return TheFunction->getModuleContext();
+  }
+
   static AbstractFunction decomposeApply(ApplyExpr *apply,
                                          SmallVectorImpl<Expr*> &args) {
     Expr *fn;
+    ConcreteDeclRef declRef;
     do {
       args.push_back(apply->getArg());
-      fn = apply->getFn()->getValueProvidingExpr();
+      auto applyFn = apply->getFn();
+      if (!declRef) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(applyFn)) {
+          declRef = DRE->getDeclRef();
+        }
+      }
+      fn = applyFn->getValueProvidingExpr();
     } while ((apply = dyn_cast<ApplyExpr>(fn)));
 
-    return decomposeFunction(fn);
+    return decomposeFunction(fn, declRef);
   }
 
-  static AbstractFunction decomposeFunction(Expr *fn) {
+  static AbstractFunction decomposeFunction(Expr *fn, ConcreteDeclRef declRef = ConcreteDeclRef()) {
     assert(fn->getValueProvidingExpr() == fn);
 
     while (true) {
@@ -158,25 +188,25 @@ public:
     
     // Constructor delegation.
     if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      return AbstractFunction(otherCtorDeclRef->getDecl());
+      return AbstractFunction(otherCtorDeclRef->getDecl(), declRef);
     }
 
     // Normal function references.
-    if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
-      ValueDecl *decl = declRef->getDecl();
+    if (auto DRE = dyn_cast<DeclRefExpr>(fn)) {
+      ValueDecl *decl = DRE->getDecl();
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-        return AbstractFunction(fn);
+        return AbstractFunction(fn, declRef);
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
-        return AbstractFunction(param);
+        return AbstractFunction(param, declRef);
       }
 
     // Closures.
     } else if (auto closure = dyn_cast<AbstractClosureExpr>(fn)) {
-      return AbstractFunction(closure);
+      return AbstractFunction(closure, declRef);
     }
 
     // Everything else is opaque.
-    return AbstractFunction(Kind::Opaque, fn);
+    return AbstractFunction(Kind::Opaque, fn, declRef);
   }
 };
 
@@ -451,6 +481,90 @@ public:
   DeclContext *RethrowsDC = nullptr;
   bool inRethrowsContext() const { return RethrowsDC != nullptr; }
 
+  bool classifyWitnessAsThrows(ModuleDecl *module, 
+                               SubstitutionMap substitutions) {
+
+
+    for (auto conformanceRef : substitutions.getConformances()) {
+      if (!conformanceRef.isConcrete()) {
+        return true;
+      }
+      auto conformance = conformanceRef.getConcrete();
+      auto DC = conformance->getDeclContext();
+      auto requiredProtocol = conformanceRef.getRequirement();
+      for (auto req : requiredProtocol->getRethrowingRequirements()) {
+        auto reqProtocol = cast<ProtocolDecl>(req.second->getDeclContext());
+        auto reqConformanceRef = 
+          conformance->getAssociatedConformance(req.first, reqProtocol);
+        if (!reqConformanceRef.isConcrete()) {
+          return true;
+        }
+        auto reqConformance = reqConformanceRef.getConcrete();
+        auto reqTy = reqConformance->getType();
+        auto declRef = reqConformance->getWitnessDeclRef(req.second);
+        auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
+        switch (witnessDecl->getRethrowingKind()) {
+          case FunctionRethrowingKind::ByConformance:
+            if (classifyWitnessAsThrows(module, 
+              reqTy->getContextSubstitutionMap(module, DC))) {
+              return true;
+            }
+            break;
+          case FunctionRethrowingKind::None:
+            break;
+          case FunctionRethrowingKind::Throws:
+            return true;
+          default:
+            return true; // should return none
+        }
+      }
+    }
+
+    return false;
+      // if (conformanceRef.isConcrete()) {
+        
+      //   auto conformance = conformanceRef.getConcrete();
+        
+        
+      //   // SmallVector<std::pair<Type, ValueDecl *>, 4> unsatisfied;
+      //   // for (auto req : requirements) {
+      //   //   if (req.first->isEqual(requiredProtocol->getSelfInterfaceType())) {
+      //   //     auto declRef = conformance->getWitnessDeclRef(req.second);
+      //   //     auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
+      //   //     switch (witnessDecl->getRethrowingKind()) {
+      //   //     case FunctionRethrowingKind::ByConformance:
+      //   //       classification.merge(
+      //   //         classifyWitness(module, declRef.getSubstitutions(), isAsync));
+      //   //       break;
+      //   //     case FunctionRethrowingKind::None:
+      //   //       classification.merge(isAsync ? 
+      //   //         Classification::forAsync() : Classification());
+      //   //       break;
+      //   //     case FunctionRethrowingKind::Throws:
+      //   //       classification.merge(
+      //   //         Classification::forThrow(
+      //   //           PotentialThrowReason::forThrowingApply(), isAsync));
+      //   //       break;
+      //   //     default:
+      //   //       classification.merge(Classification::forInvalidCode());
+      //   //       break;
+      //   //     }
+      //   //   } else {
+      //   //     unsatisfied.push_back(req);
+      //   //   }
+      //   // }
+        
+      // } else {
+      //   auto protocol = conformanceRef.getAbstract();
+      //   if (protocol->isRethrowingProtocol()) {
+      //     // NOT TRUE, but eh close enough....
+      //     classification.merge(Classification::forRethrowingOnly(
+      //           PotentialThrowReason::forThrowingApply(), isAsync));
+      //   }
+      // }
+
+  }
+
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
@@ -464,14 +578,30 @@ public:
     if (!fnType) return Classification::forInvalidCode();
 
     bool isAsync = fnType->isAsync() || E->implicitlyAsync();
-    
-    // If the function doesn't throw at all, we're done here.
-    if (!fnType->isThrowing())
-      return isAsync ? Classification::forAsync() : Classification();
-
     // Decompose the application.
     SmallVector<Expr*, 4> args;
     auto fnRef = AbstractFunction::decomposeApply(E, args);
+    auto rethrowsKind = fnRef.getRethrowingKind();
+
+    // If the function doesn't throw at all, we're done here.
+    if (rethrowsKind == FunctionRethrowingKind::None) {
+      return isAsync ? Classification::forAsync() : Classification();
+    } else if (rethrowsKind == FunctionRethrowingKind::ByConformance) {
+      auto substitutions = fnRef.getDeclRef().getSubstitutions();
+      if (classifyWitnessAsThrows(fnRef.getModuleContext(), substitutions)) {
+        return Classification::forRethrowingOnly(
+          PotentialThrowReason::forThrowingApply(), isAsync);
+      } else {
+        return isAsync ? Classification::forAsync() : Classification();
+      }
+    } else if (rethrowsKind == FunctionRethrowingKind::Throws) {
+      return Classification::forThrow(
+          PotentialThrowReason::forThrowingApply(), isAsync);
+    }
+
+    // If the function doesn't throw at all, we're done here.
+    if (!fnType->isThrowing())
+      return isAsync ? Classification::forAsync() : Classification();
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : args) {
@@ -1967,6 +2097,7 @@ private:
   }
   
   ShouldRecurse_t checkTry(TryExpr *E) {
+    
     // Walk the operand.
     ContextScope scope(*this, None);
     scope.enterTry();

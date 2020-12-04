@@ -696,6 +696,150 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
+static bool hasThrowingFunctionClosureParameter(CanType type) {
+  // Only consider throwing function types.
+  if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
+    return fnType->getExtInfo().isThrowing();
+  }
+
+  // Look through tuples.
+  if (auto tuple = dyn_cast<TupleType>(type)) {
+    for (auto eltType : tuple.getElementTypes()) {
+      auto elt = eltType->lookThroughAllOptionalTypes()->getCanonicalType();
+      if (hasThrowingFunctionClosureParameter(elt))
+        return true;
+    }
+    return false;
+  }
+
+  // Suppress diagnostics in the presence of errors.
+  if (type->hasError()) {
+    return true;
+  }
+
+  return false;
+}
+
+static FunctionRethrowingKind
+getTypeThrowingKind(Type interfaceTy, GenericSignature genericSig) {
+  if (interfaceTy->isTypeParameter()) {
+    for (auto proto : genericSig->getRequiredProtocols(interfaceTy)) {
+      if (proto->isRethrowingProtocol()) {
+        return FunctionRethrowingKind::ByConformance;
+      }
+    }
+  } else if (auto NTD = interfaceTy->getNominalOrBoundGenericNominal()) {
+    if (auto genericSig = NTD->getGenericSignature()) {
+      for (auto req : genericSig->getRequirements()) {
+        if (req.getKind() == RequirementKind::Conformance) {
+          if (req.getSecondType()->castTo<ProtocolType>()
+                                 ->getDecl()
+                                 ->isRethrowingProtocol()) {
+            return FunctionRethrowingKind::ByConformance;
+          }
+        }
+      }
+    }
+  }
+  return FunctionRethrowingKind::Invalid;
+}
+
+static FunctionRethrowingKind 
+getParameterThrowingKind(AbstractFunctionDecl *decl, 
+                         GenericSignature genericSig) {
+  FunctionRethrowingKind kind = FunctionRethrowingKind::Invalid;
+  // check all parameters to determine if any are closures that throw
+
+  for (auto param : *decl->getParameters()) {
+    auto interfaceTy = param->getInterfaceType();
+    if (hasThrowingFunctionClosureParameter(interfaceTy
+          ->lookThroughAllOptionalTypes()
+          ->getCanonicalType())) {
+      // closure rethrowing supersedes conformance rethrowing 
+      return FunctionRethrowingKind::ByClosure;
+    }
+
+    if (kind == FunctionRethrowingKind::Invalid) {
+      kind = getTypeThrowingKind(interfaceTy, genericSig);
+    }
+  }
+
+  return kind;
+}
+
+ProtocolRethrowsRequirementList
+ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
+                                              ProtocolDecl *decl) const {
+  SmallVector<std::pair<Type, ValueDecl*>, 2> found;
+
+  // check if immediate members of protocol are 'rethrows'
+  for (auto member : decl->getMembers()) {
+    auto fnDecl = dyn_cast<AbstractFunctionDecl>(member);
+    // it must be a function
+    // it must have a rethrows attribute
+    // it must not have any parameters that are closures that cause rethrowing
+    if (!fnDecl || 
+        !fnDecl->getAttrs().hasAttribute<RethrowsAttr>()) {
+      continue;
+    }
+
+    GenericSignature genericSig = fnDecl->getGenericSignature();
+    auto kind = getParameterThrowingKind(fnDecl, genericSig);
+    // skip closure based rethrowing cases
+    if (kind == FunctionRethrowingKind::ByClosure) {
+      continue;
+    }
+    // we now have a protocol member that has a rethrows and no closure 
+    // parameters contributing to it's rethrowing-ness
+    found.push_back(
+      std::pair<Type, ValueDecl*>(decl->getSelfInterfaceType(), fnDecl));
+  }
+  llvm::DenseSet<ProtocolDecl*> checkedProtocols;
+  checkedProtocols.insert(decl);
+
+  // check associated conformances of associated types or inheritance
+  for (auto requirement : decl->getRequirementSignature()) {
+    if (requirement.getKind() != RequirementKind::Conformance) {
+      continue;
+    }
+    auto protoTy = requirement.getSecondType()->castTo<ProtocolType>();
+    auto proto = protoTy->getDecl();
+    if (checkedProtocols.count(proto) != 0) {
+      continue;
+    }
+    checkedProtocols.insert(proto);
+    for (auto entry : proto->getRethrowingRequirements()) {
+      found.emplace_back(requirement.getFirstType(), entry.second);
+    }
+  }
+  ASTContext &ctx = decl->getASTContext();
+  return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
+}
+
+FunctionRethrowingKind
+FunctionRethrowingKindRequest::evaluate(Evaluator &evaluator,
+                                        AbstractFunctionDecl *decl) const {
+  if (decl->getAttrs().hasAttribute<RethrowsAttr>()) {
+    GenericSignature genericSig = decl->getGenericSignature();
+    FunctionRethrowingKind kind = getParameterThrowingKind(decl, genericSig);
+    // since we have checked all arguments, if we still havent found anything
+    // check the self parameter
+    if (kind == FunctionRethrowingKind::Invalid && 
+        decl->hasImplicitSelfDecl()) {
+      auto selfParam = decl->getImplicitSelfDecl();
+      if (selfParam) {
+        auto interfaceTy = selfParam->getInterfaceType();
+        kind = getTypeThrowingKind(interfaceTy, genericSig);
+      }
+    }
+
+    return kind;
+  } else if (decl->hasThrows()) {
+    return FunctionRethrowingKind::Throws;
+  }
+  return FunctionRethrowingKind::None;
+}
+
 bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))

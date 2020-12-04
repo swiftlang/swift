@@ -3870,6 +3870,66 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Actor,
 };
 
+class ProtocolRethrowsRequirementList {
+public:
+  typedef std::pair<Type, ValueDecl *> Entry;
+
+private:
+  ArrayRef<Entry> entries;
+
+public:
+  ProtocolRethrowsRequirementList(ArrayRef<Entry> entries) : entries(entries) {}
+  ProtocolRethrowsRequirementList() : entries() {}
+
+  typedef const Entry *const_iterator;
+  typedef const_iterator iterator;
+
+  const_iterator begin() const { return entries.begin(); }
+  const_iterator end() const { return entries.end(); }
+
+  size_t size() const { return entries.size(); }
+
+  void print(raw_ostream &OS) const;
+
+  SWIFT_DEBUG_DUMP;
+
+  friend bool operator==(const ProtocolRethrowsRequirementList &lhs,
+                         const ProtocolRethrowsRequirementList &rhs) {
+    if (lhs.size() != rhs.size()) {
+      return false;
+    }
+    auto lhsIter = lhs.begin();
+    auto rhsIter = rhs.begin();
+    while (lhsIter != lhs.end() && rhsIter != rhs.end()) {
+      if (lhsIter->first->isEqual(rhsIter->first)) {
+        return false;
+      }
+      if (lhsIter->second != rhsIter->second) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  friend bool operator!=(const ProtocolRethrowsRequirementList &lhs,
+                         const ProtocolRethrowsRequirementList &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::hash_code hash_value(
+    const ProtocolRethrowsRequirementList &list) {
+    return llvm::hash_combine(list.size()); // it is good enought for
+    // llvm::hash_code hash;
+    // for (auto entry : list) {
+    //   hash = llvm::hash_combine(hash, entry.first->getCanonicalType());
+    //   hash = llvm::hash_combine(hash, entry.second);
+    // }
+    // return hash;
+  }
+};
+
+void simple_display(raw_ostream &out, const ProtocolRethrowsRequirementList reqs);
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -4050,6 +4110,9 @@ public:
   /// all the members do not contain any associated types, and do not
   /// contain 'Self' in 'parameter' or 'other' position.
   bool existentialTypeSupported() const;
+
+  ProtocolRethrowsRequirementList getRethrowingRequirements() const;
+  bool isRethrowingProtocol() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -5460,6 +5523,23 @@ public:
   }
 };
 
+enum class FunctionRethrowingKind : uint8_t {
+  /// The function is not throwing
+  None,
+
+  /// The function rethrows by closure
+  ByClosure, 
+
+  /// The function rethrows by conformance
+  ByConformance, 
+
+  /// The function throws
+  Throws, 
+
+  /// The function throwing determinate is invalid
+  Invalid
+};
+
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
@@ -5662,6 +5742,8 @@ public:
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }
+
+  FunctionRethrowingKind getRethrowingKind() const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
