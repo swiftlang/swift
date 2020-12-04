@@ -2350,7 +2350,8 @@ public:
   }
   FunctionPointer getCalleeFunctionPointer() override {
     return FunctionPointer(
-        FunctionPointer::KindTy::Function, calleeFunction, PointerAuthInfo(),
+        FunctionPointer::KindTy::Function, calleeFunction,
+        CurCallee.getFunctionPointer().getAuthInfo(),
         IGF.IGM.getSignature(getCallee().getSubstFunctionType()));
   }
   SILType getParameterType(unsigned index) override {
