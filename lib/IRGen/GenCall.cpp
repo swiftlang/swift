@@ -2374,8 +2374,7 @@ public:
           llvm::Intrinsic::coro_async_resume, {});
       auto fnVal = currentResumeFn;
       // Sign the pointer.
-      // TODO: use a distinct schema.
-      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
         Address fieldAddr =
             fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
         auto authInfo = PointerAuthInfo::emit(
@@ -4577,8 +4576,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
       .loadAsCopy(IGF, returnToCallerAddr, fn);
   llvm::Value *fnVal = fn.claimNext();
 
-  // TODO: use distinct schema
-  if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+  if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
     Address fieldAddr =
         returnToCallerLayout.project(IGF, contextAddr, /*offsets*/ llvm::None);
     auto authInfo = PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
