@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
 
 // REQUIRES: concurrency
-// UNSUPPORTED: CPU=arm64e
 
 sil_stage canonical
 
