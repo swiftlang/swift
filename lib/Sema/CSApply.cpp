@@ -115,10 +115,12 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   auto newFnType = oldFnType->substGenericArgs(subst);
   // The constructor type is a function type as follows:
   //   (CType.Type) -> (Generic) -> CType
-  // But we only want the result of that function type because that is the
-  // function type with the generic params that need to be substituted:
+  // And a method's function type is as follows:
+  //   (inout CType) -> (Generic) -> Void
+  // In either case, we only want the result of that function type because that
+  // is the function type with the generic params that need to be substituted:
   //   (Generic) -> CType
-  if (isa<ConstructorDecl>(oldDecl))
+  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember())
     newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
   SmallVector<ParamDecl *, 4> newParams;
   unsigned i = 0;
@@ -159,6 +161,7 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
       /*Async=*/false, oldDecl->hasThrows(), newParamList,
       newFnType->getResult(), /*GenericParams=*/nullptr,
       oldDecl->getDeclContext(), specialized);
+  newFnDecl->setSelfAccessKind(cast<FuncDecl>(oldDecl)->getSelfAccessKind());
   return ConcreteDeclRef(newFnDecl);
 }
 
