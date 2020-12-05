@@ -322,7 +322,8 @@ extension Substring: CustomDebugStringConvertible {
 
 extension Substring: LosslessStringConvertible {
   public init(_ content: String) {
-    self = content[...]
+    let range = Range(_uncheckedBounds: (content.startIndex, content.endIndex))
+    self.init(Slice(base: content, bounds: range))
   }
 }
 
@@ -727,14 +728,14 @@ extension Substring: RangeReplaceableCollection {
   public init<S: Sequence>(_ elements: S)
   where S.Element == Character {
     if let str = elements as? String {
-      self = str[...]
+      self.init(str)
       return
     }
     if let subStr = elements as? Substring {
       self = subStr
       return
     }
-    self = String(elements)[...]
+    self.init(String(elements))
   }
 
   @inlinable // specialize
