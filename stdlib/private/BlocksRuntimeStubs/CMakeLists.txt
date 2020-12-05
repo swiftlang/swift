@@ -25,6 +25,15 @@ foreach(SDK ${SWIFT_SDKS})
         LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
         RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
         OUTPUT_NAME BlocksRuntime)
+
+      # When built in a unified build, ensure that we add a dependency on the
+      # compiler to serialize this behind the compiler.  Otherwise, we would
+      # attempt to build this before the compiler is ready, which breaks the
+      # build.
+      if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
+          TARGET clang)
+        add_dependencies(BlocksRuntimeStub${VARIANT_SUFFIX} clang)
+      endif()
     endforeach()
   endforeach()
 endforeach()
