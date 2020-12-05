@@ -603,3 +603,29 @@ func genericFuncWithConversion<T: C>(list : [T]) {
     print(item)
   }
 }
+
+// FIXME SR-8688: Make sure that branch on result of next() precedes optional injection.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySaySiGF
+// CHECK: [[NEXT_RESULT:%.*]] = load [trivial] {{.*}} : $*Optional<Int>
+// CHECK: [[PACKED_NEXT_RESULT:%.*]] = enum $Optional<Optional<Int>>, #Optional.some!enumelt, [[NEXT_RESULT]] : $Optional<Int>
+// CHECK: switch_enum [[PACKED_NEXT_RESULT]] : $Optional<Optional<Int>>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
+// CHECK: [[BB_SOME]]([[X_BINDING:%.*]] : $Optional<Int>):
+// CHECK: debug_value [[X_BINDING]] : $Optional<Int>, let, name "x"
+func injectForEachElementIntoOptional(_ xs: [Int]) {
+  for x : Int? in xs {}
+}
+
+// FIXME SR-8688: Make sure that branch on result of next() precedes optional injection.
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySayxGlF
+// CHECK: [[PACKED_NEXT_RESULT_ADDR:%.*]] = init_enum_data_addr [[PACKED_NEXT_RESULT:%.*]] : $*Optional<Optional<T>>, #Optional.some!enumelt
+// CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [initialization] [[PACKED_NEXT_RESULT_ADDR:%.*]] : $*Optional<T>
+// CHECK: inject_enum_addr [[PACKED_NEXT_RESULT]] : $*Optional<Optional<T>>, #Optional.some!enumelt
+// CHECK: switch_enum_addr [[PACKED_NEXT_RESULT]] : $*Optional<Optional<T>>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
+// CHECK: [[BB_SOME]]:
+// CHECK: [[X_BINDING:%.*]] = alloc_stack $Optional<T>, let, name "x"
+// CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr [[PACKED_NEXT_RESULT]] : $*Optional<Optional<T>>, #Optional.some!enumelt
+// CHECK: copy_addr [take] [[ADDR]] to [initialization] [[X_BINDING]] : $*Optional<T>
+func injectForEachElementIntoOptional<T>(_ xs: [T]) {
+  for x : T? in xs {}
+}
