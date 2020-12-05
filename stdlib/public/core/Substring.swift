@@ -105,7 +105,7 @@ public struct Substring {
 
     self._slice = Slice(
       base: slice.base,
-      bounds: Range(uncheckedBounds: (start, end)))
+      bounds: Range(_uncheckedBounds: (start, end)))
     _invariantCheck()
   }
 
@@ -132,7 +132,7 @@ extension Substring {
   @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> {
     return Range(
-      uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
+      _uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
   }
 
   #if !INTERNAL_CHECKS_ENABLED
