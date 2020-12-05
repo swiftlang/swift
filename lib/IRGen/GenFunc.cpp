@@ -2418,6 +2418,10 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                      ArrayRef<llvm::Type *> argTypes) {
   SmallVector<llvm::Type*, 8> argTys;
   argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
+  auto originalAuthInfo = fnPtr.getAuthInfo();
+  if (fnPtr.getAuthInfo()) {
+    argTys.push_back(IGM.Int64Ty); // Discriminator for the function pointer.
+  }
   for (auto ty : argTypes) {
     argTys.push_back(ty);
   }
@@ -2437,13 +2441,18 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
     IGM.DebugInfo->emitArtificialFunction(dispatchIGF, dispatch);
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
-  llvm::Value *ptrArg = &*(it++);
+  llvm::Value *fnPtrArg = &*(it++);
+  llvm::Value *discriminatorArg = ((bool)originalAuthInfo) ? &*(it++) : nullptr;
   SmallVector<llvm::Value *, 8> callArgs;
   for (; it != end; ++it) {
     callArgs.push_back(&*it);
   }
-  ptrArg = Builder.CreateBitOrPointerCast(ptrArg, calleeFnPtrType);
-  auto callee = FunctionPointer(fnPtr.getKind(), ptrArg, fnPtr.getAuthInfo(),
+  fnPtrArg = Builder.CreateBitOrPointerCast(fnPtrArg, calleeFnPtrType);
+  PointerAuthInfo newAuthInfo =
+      ((bool)originalAuthInfo)
+          ? PointerAuthInfo(fnPtr.getAuthInfo().getKey(), discriminatorArg)
+          : originalAuthInfo;
+  auto callee = FunctionPointer(fnPtr.getKind(), fnPtrArg, newAuthInfo,
                                 fnPtr.getSignature());
   auto call = Builder.CreateCall(callee, callArgs);
   call->setTailCall();

@@ -2480,6 +2480,9 @@ public:
         Builder.CreateBitOrPointerCast(dispatchFn, IGM.Int8PtrTy));
     arguments.push_back(
         Builder.CreateBitOrPointerCast(fn.getRawPointer(), IGM.Int8PtrTy));
+    if (auto authInfo = fn.getAuthInfo()) {
+      arguments.push_back(fn.getAuthInfo().getDiscriminator());
+    }
     for (auto arg: args)
       arguments.push_back(arg);
     return IGF.emitSuspendAsyncCall(arguments);
