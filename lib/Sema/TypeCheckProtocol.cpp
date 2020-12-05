@@ -713,8 +713,8 @@ swift::matchWitness(
     }
 
     // If the witness is 'async', the requirement must be.
-    if (witnessFnType->getExtInfo().isAsync() !=
-          reqFnType->getExtInfo().isAsync()) {
+    if (witnessFnType->getExtInfo().isAsync() &&
+          !reqFnType->getExtInfo().isAsync()) {
       return RequirementMatch(witness, MatchKind::AsyncConflict);
     }
 

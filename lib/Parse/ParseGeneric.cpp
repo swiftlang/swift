@@ -71,7 +71,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
-    if (parseIdentifier(Name, NameLoc,
+    if (parseIdentifier(Name, NameLoc, /*diagnoseDollarPrefix=*/true,
                         diag::expected_generics_parameter_name)) {
       Result.setIsParseError();
       break;
@@ -307,7 +307,8 @@ ParserStatus Parser::parseGenericWhereClause(
               ->isKnownLayout()) {
         // Parse a layout constraint.
         Identifier LayoutName;
-        auto LayoutLoc = consumeIdentifier(&LayoutName);
+        auto LayoutLoc = consumeIdentifier(LayoutName,
+                                           /*diagnoseDollarPrefix=*/false);
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
         if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.

@@ -4928,12 +4928,7 @@ public:
   
   void checkGetAsyncContinuationInstBase(GetAsyncContinuationInstBase *GACI) {
     auto resultTy = GACI->getType();
-    auto &C = resultTy.getASTContext();
-    auto resultBGT = resultTy.getAs<BoundGenericType>();
-    require(resultBGT, "Instruction type must be a continuation type");
-    auto resultDecl = resultBGT->getDecl();
-    require(resultDecl == C.getUnsafeContinuationDecl()
-             || resultDecl == C.getUnsafeThrowingContinuationDecl(),
+    require(resultTy.is<BuiltinRawUnsafeContinuationType>(),
             "Instruction type must be a continuation type");
   }
   
@@ -5485,6 +5480,16 @@ public:
 
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
+
+    // Don't verify functions that were skipped. We are likely to see them in
+    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+    auto Ctx = F->getDeclContext();
+    if (Ctx) {
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+        if (AFD->isBodySkipped())
+          return;
+      }
+    }
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

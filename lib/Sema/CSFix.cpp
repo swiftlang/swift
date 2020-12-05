@@ -1140,6 +1140,21 @@ DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
       DropThrowsAttribute(cs, fromType, toType, locator);
 }
 
+bool DropAsyncAttribute::diagnose(const Solution &solution,
+                                   bool asNote) const {
+  AsyncFunctionConversionFailure failure(solution, getFromType(),
+                                         getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+DropAsyncAttribute *DropAsyncAttribute::create(ConstraintSystem &cs,
+                                               FunctionType *fromType,
+                                               FunctionType *toType,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DropAsyncAttribute(cs, fromType, toType, locator);
+}
+
 bool IgnoreContextualType::diagnose(const Solution &solution,
                                     bool asNote) const {
   ContextualFailure failure(solution, getFromType(), getToType(), getLocator());

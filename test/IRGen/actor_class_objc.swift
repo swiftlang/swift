@@ -34,7 +34,7 @@ public actor class MyClass: NSObject {
 
 // CHECK-LABEL: define {{.*}}void @"$s16actor_class_objc7MyClassC7enqueue11partialTasky12_Concurrency012PartialAsyncH0V_tF"
 // CHECK:      [[T0:%.*]] = bitcast %T16actor_class_objc7MyClassC* %1 to %objc_object*
-// CHECK-NEXT: call swiftcc void @swift_defaultActor_enqueue(%swift.opaque* noalias nocapture %0, %objc_object* [[T0]])
+// CHECK-NEXT: call swiftcc void @swift_defaultActor_enqueue(%swift.job* %0, %objc_object* [[T0]])
 
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"
 // CHECK: [[T0:%.*]] = getelementptr inbounds %T16actor_class_objc7MyClassC, %T16actor_class_objc7MyClassC* %0, i32 0, i32 2

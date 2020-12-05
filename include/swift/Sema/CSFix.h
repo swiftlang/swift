@@ -630,6 +630,26 @@ public:
                                      ConstraintLocator *locator);
 };
 
+/// This is a contextual mismatch between async and non-async
+/// function types, repair it by dropping `async` attribute.
+class DropAsyncAttribute final : public ContextualMismatch {
+  DropAsyncAttribute(ConstraintSystem &cs, FunctionType *fromType,
+                     FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, fromType, toType, locator) {
+    assert(fromType->isAsync() != toType->isAsync());
+  }
+
+public:
+  std::string getName() const override { return "drop 'async' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static DropAsyncAttribute *create(ConstraintSystem &cs,
+                                    FunctionType *fromType,
+                                    FunctionType *toType,
+                                    ConstraintLocator *locator);
+};
+
 /// Append 'as! T' to force a downcast to the specified type.
 class ForceDowncast final : public ContextualMismatch {
   ForceDowncast(ConstraintSystem &cs, Type fromType, Type toType,

@@ -21,11 +21,9 @@ bb0:
 // CHECK: [[result_storage:%.*]] = alloca i32
 // CHECK: call token @llvm.coro.id.async
 // CHECK: call i8* @llvm.coro.begin(
-//   Create UnsafeContinuation<Int32>.
+//   Create a Builtin.RawUnsafeContinuation.
 // CHECK: [[tsk:%.*]] = load %swift.task*, %swift.task** [[tsk_addr]]
-// CHECK: [[tmp0:%.*]] = bitcast %swift.task* [[tsk]] to i8*
-// CHECK: [[tmp1:%.*]] = insertvalue %TSV undef, i8* [[tmp0]], 0
-// CHECK: [[continuation:%.*]] = insertvalue %T12_Concurrency18UnsafeContinuationV undef, %TSV [[tmp1]], 0
+// CHECK: [[continuation:%.*]] = bitcast %swift.task* [[tsk]] to i8*
 //   Initialize the async  continuation context.
 // CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 0
 // CHECK: [[ctxt:%.*]] = load %swift.context*, %swift.context** [[ctxt_addr]]
@@ -39,10 +37,10 @@ bb0:
 // CHECK:  [[exe:%.*]] = load %swift.executor*, %swift.executor** [[exe_addr]]
 // CHECK:  store %swift.executor* [[exe]], %swift.executor** [[exectuor_addr]]
 //   Initialize the async task with the continuation function and async continuation context.
-// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 3
+// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
 // CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
 // CHECK: store i8* [[continuation_fn]], i8** [[task_continuation_fn_addr]]
-// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
+// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 5
 // CHECK: [[cont_context2:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
 // CHECK: store %swift.context* [[cont_context2]], %swift.context** [[task_resume_context_addr]]
 //  Initialize the synchronization variable.
@@ -88,10 +86,10 @@ bb0:
 
 sil @async_continuation : $@async () -> () {
 entry:
-  %c = get_async_continuation $Builtin.Int32
+  %c = get_async_continuation Builtin.Int32
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
-  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
 
 bb1(%r : $Builtin.Int32):
   %t = tuple()
@@ -100,10 +98,10 @@ bb1(%r : $Builtin.Int32):
 
 sil @async_continuation_throws : $@async () -> () {
 entry:
-  %c = get_async_continuation [throws] $Builtin.Int32
+  %c = get_async_continuation [throws] Builtin.Int32
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
-  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
 bb1(%r : $Builtin.Int32):
   br bb3
 bb2(%e : $Error):
@@ -117,10 +115,10 @@ bb3:
 sil @async_continuation_addr : $@async () -> () {
 entry:
   %a = alloc_stack $Builtin.Int32
-  %c = get_async_continuation_addr $Builtin.Int32, %a : $*Builtin.Int32
+  %c = get_async_continuation_addr Builtin.Int32, %a : $*Builtin.Int32
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
-  await_async_continuation %c : $UnsafeContinuation<Builtin.Int32>, resume bb1
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
 bb1:
   dealloc_stack %a : $*Builtin.Int32
   %t = tuple()
@@ -130,10 +128,10 @@ bb1:
 sil @async_continuation_throws_addr : $@async () -> () {
 entry:
   %a = alloc_stack $Builtin.Int32
-  %c = get_async_continuation_addr [throws] $Builtin.Int32, %a : $*Builtin.Int32
+  %c = get_async_continuation_addr [throws] Builtin.Int32, %a : $*Builtin.Int32
   %f = function_ref @not_async_test : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
-  await_async_continuation %c : $UnsafeThrowingContinuation<Builtin.Int32>, resume bb1, error bb2
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
 bb1:
   dealloc_stack %a : $*Builtin.Int32
   br bb3

@@ -5764,6 +5764,12 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AsyncFunctionConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();

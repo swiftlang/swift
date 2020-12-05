@@ -3332,6 +3332,14 @@ namespace {
           continue;
         }
 
+        if (auto recordDecl = dyn_cast<clang::RecordDecl>(m)) {
+          // An injected class name decl will just point back to the parent
+          // decl, so don't import it.
+          if (recordDecl->isInjectedClassName()) {
+            continue;
+          }
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -3573,6 +3581,19 @@ namespace {
           def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
 
       return VisitCXXRecordDecl(def);
+    }
+
+    Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
+      // When loading a namespace's sub-decls, we won't add template
+      // specilizations, so make sure to do that here.
+      for (auto spec : decl->specializations()) {
+        if (auto importedSpec = Impl.importDecl(spec, getVersion())) {
+          if (auto namespaceDecl =
+                  dyn_cast<EnumDecl>(importedSpec->getDeclContext()))
+            namespaceDecl->addMember(importedSpec);
+        }
+      }
+      return nullptr;
     }
 
     Decl *VisitClassTemplatePartialSpecializationDecl(

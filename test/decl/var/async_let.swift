@@ -2,7 +2,10 @@
 
 // REQUIRES: concurrency
 
-async let x = 1 // okay
+func test() async {
+  async let x = 1 // okay
+  _ = await x
+}
 
 struct X {
   async let x = 1 // expected-error{{'async let' can only be used on local declarations}}

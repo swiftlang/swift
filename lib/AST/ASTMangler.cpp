@@ -973,8 +973,12 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
     }
     case TypeKind::BuiltinIntegerLiteral:
       return appendOperator("BI");
+    case TypeKind::BuiltinJob:
+      return appendOperator("Bj");
     case TypeKind::BuiltinRawPointer:
       return appendOperator("Bp");
+    case TypeKind::BuiltinRawUnsafeContinuation:
+      return appendOperator("Bc");
     case TypeKind::BuiltinNativeObject:
       return appendOperator("Bo");
     case TypeKind::BuiltinBridgeObject:

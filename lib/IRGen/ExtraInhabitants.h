@@ -27,6 +27,7 @@ namespace swift {
 namespace irgen {
 
 class Address;
+class Alignment;
 class IRGenFunction;
 class IRGenModule;
 
@@ -59,6 +60,39 @@ llvm::Value *getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,
 void storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest);
+
+/*****************************************************************************/
+
+/// \group Extra inhabitants of aligned object pointers.
+
+/// Return the number of extra inhabitant representations for aligned
+/// object pointers.
+unsigned getAlignedPointerExtraInhabitantCount(IRGenModule &IGM,
+                                               Alignment pointeeAlign);
+
+/// Return an indexed extra inhabitant constant for an aligned pointer.
+///
+/// If the pointer appears within a larger aggregate, the 'bits' and 'offset'
+/// arguments can be used to position the inhabitant within the larger integer
+/// constant.
+llvm::APInt getAlignedPointerExtraInhabitantValue(IRGenModule &IGM,
+                                                  Alignment pointeeAlign,
+                                                  unsigned bits,
+                                                  unsigned index,
+                                                  unsigned offset);
+
+/// Calculate the index of an aligned pointer extra inhabitant
+/// representation stored in memory.
+llvm::Value *getAlignedPointerExtraInhabitantIndex(IRGenFunction &IGF,
+                                                   Alignment pointeeAlign,
+                                                   Address src);
+
+/// Calculate an extra inhabitant representation from an index and store it to
+/// memory.
+void storeAlignedPointerExtraInhabitant(IRGenFunction &IGF,
+                                        Alignment pointeeAlign,
+                                        llvm::Value *index,
+                                        Address dest);
 
 /*****************************************************************************/
 

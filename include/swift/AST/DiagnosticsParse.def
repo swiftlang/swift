@@ -1222,6 +1222,8 @@ ERROR(super_in_closure_with_capture,none,
 NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
+ERROR(try_before_await,none, "'await' must precede 'try'", ())
+
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,none,
       "expected expression in list of expressions", ())
