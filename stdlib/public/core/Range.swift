@@ -315,7 +315,7 @@ extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// require an upper bound of `Int.max + 1`, which is not representable as
   public init(_ other: ClosedRange<Bound>) {
     let upperBound = other.upperBound.advanced(by: 1)
-    self.init(uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
+    self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
   }
 }
 
@@ -332,7 +332,7 @@ extension Range: RangeExpression {
   @inlinable // trivial-implementation
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
-    return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    self
   }
 }
 
@@ -366,7 +366,7 @@ extension Range {
       limits.upperBound < self.upperBound ? limits.upperBound
           : limits.lowerBound > self.upperBound ? limits.lowerBound
           : self.upperBound
-    return Range(uncheckedBounds: (lower: lower, upper: upper))
+    return Range(_uncheckedBounds: (lower: lower, upper: upper))
   }
 }
 
@@ -442,7 +442,7 @@ extension Range: Decodable where Bound: Decodable {
           codingPath: decoder.codingPath,
           debugDescription: "Cannot initialize \(Range.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
     }
-    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 

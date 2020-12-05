@@ -107,8 +107,9 @@ extension ClosedRange: RangeExpression {
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return Range(
-      uncheckedBounds: (
-        lower: lowerBound, upper: collection.index(after: self.upperBound)))
+      _uncheckedBounds: (
+        lower: lowerBound,
+        upper: collection.index(after: self.upperBound)))
   }
 
   /// Returns a Boolean value indicating whether the given element is contained
@@ -430,7 +431,7 @@ extension ClosedRange {
       limits.upperBound < self.upperBound ? limits.upperBound
           : limits.lowerBound > self.upperBound ? limits.lowerBound
           : self.upperBound
-    return ClosedRange(uncheckedBounds: (lower: lower, upper: upper))
+    return ClosedRange(_uncheckedBounds: (lower: lower, upper: upper))
   }
 }
 
@@ -446,7 +447,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
-    self.init(uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
+    self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
   }
 }
 
@@ -483,7 +484,7 @@ extension ClosedRange: Decodable where Bound: Decodable {
           codingPath: decoder.codingPath,
           debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
     }
-    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 
