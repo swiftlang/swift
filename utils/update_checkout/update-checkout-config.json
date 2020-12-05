@@ -83,7 +83,7 @@
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "main"
             }
         },
         "next" : {
@@ -114,7 +114,7 @@
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "main"
             }
         },
        "swift-3.0-branch" : {
@@ -311,7 +311,7 @@
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
                 "swift-format": "main",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "main"
             }
        },
        "release/5.3-20201012": {
@@ -365,7 +365,7 @@
                 "PythonKit": "master",
                 "swift-format": "main",
                 "tensorflow": "v2.3.0",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "main"
             }
         }
     }
