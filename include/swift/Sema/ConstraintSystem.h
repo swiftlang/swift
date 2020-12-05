@@ -5826,6 +5826,9 @@ public:
         TypeVar(bindings.TypeVar),
         Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
 
+  /// Retrieve a set of bindings available in the current state.
+  ArrayRef<Binding> getCurrentBindings() const { return Bindings; }
+
   Optional<Element> operator()() override {
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
