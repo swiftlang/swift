@@ -302,11 +302,15 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
                                                     SILDeclRef declRef) {
   auto entity = LinkEntity::forMethodDescriptor(declRef);
-  auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  auto *var = cast<llvm::GlobalVariable>(
+      getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
   if (!var->isDeclaration()) {
     assert(IRGen.isLazilyReemittingNominalTypeDescriptor(VTable->getClass()));
     return;
   }
+
+  var->setConstant(true);
+  setTrueConstGlobal(var);
 
   ConstantInitBuilder ib(*this);
   ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
