@@ -38,6 +38,7 @@ FrontendInputsAndOutputs::FrontendInputsAndOutputs(
   for (InputFile input : other.AllInputs)
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+  ShouldRecoverMissingInputs = other.ShouldRecoverMissingInputs;
 }
 
 FrontendInputsAndOutputs &FrontendInputsAndOutputs::
@@ -46,6 +47,7 @@ operator=(const FrontendInputsAndOutputs &other) {
   for (InputFile input : other.AllInputs)
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+  ShouldRecoverMissingInputs = other.ShouldRecoverMissingInputs;
   return *this;
 }
 

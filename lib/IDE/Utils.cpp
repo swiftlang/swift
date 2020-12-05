@@ -215,6 +215,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
       ++primaryCount;
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
+
     replacementInputsAndOutputs.addInput(
         InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
   }
@@ -310,6 +311,11 @@ bool ide::initCompilerInvocation(
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
           UnresolvedPrimaryFile, FileSystem, Error);
+
+  // SourceKit functionalities want to proceed even if there are missing inputs.
+  Invocation.getFrontendOptions().InputsAndOutputs
+      .setShouldRecoverMissingInputs();
+
   if (!Error.empty())
     return true;
 
