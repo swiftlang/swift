@@ -1867,12 +1867,15 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     FunctionPointer functionPointer, llvm::Value *thickContext,
     std::pair<bool, bool> values, Size initialContextSize) {
   assert(values.first || values.second);
+  assert(functionPointer.getKind() ==
+         FunctionPointer::KindTy::AsyncFunctionPointer);
   bool emitFunction = values.first;
   bool emitSize = values.second;
   // TODO: This calculation should be extracted out into standalone functions
   //       emitted on-demand per-module to improve codesize.
   switch (representation) {
   case SILFunctionTypeRepresentation::Thick: {
+    assert(!functionPointer.useStaticContextSize());
     // If the called function is thick, the size of the called function's
     // async context is not statically knowable.
     //
@@ -2034,17 +2037,22 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
         IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
     llvm::Value *fn = nullptr;
     if (emitFunction) {
-      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
-      fn = IGF.emitLoadOfRelativePointer(
-          Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
-          /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
+      if (functionPointer.useStaticContextSize()) {
+        fn = functionPointer.getRawPointer();
+      } else {
+        llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+        fn = IGF.emitLoadOfRelativePointer(
+            Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+            /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
+      }
     }
     llvm::Value *size = nullptr;
     if (emitSize) {
       if (functionPointer.useStaticContextSize()) {
         size = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                       initialContextSize.getValue());
-      }  else {
+      } else {
+        assert(!functionPointer.useStaticContextSize());
         auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
         size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
       }
