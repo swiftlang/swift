@@ -130,12 +130,8 @@ bb3(%1 : @owned $Klass):
 // CHECK-LABEL: sil [ossa] @dead_guaranteed_phi_arg : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
 // CHECK: bb1:
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:   end_borrow [[BORROW]]
 // CHECK-NEXT:   br bb3(undef : $Klass)
 // CHECK: bb2:
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:   end_borrow [[BORROW]]
 // CHECK-NEXT:   br bb3(undef : $Klass)
 // CHECK: bb3({{%.*}} : $Klass):
 sil [ossa] @dead_guaranteed_phi_arg : $@convention(thin) (@guaranteed Klass) -> () {

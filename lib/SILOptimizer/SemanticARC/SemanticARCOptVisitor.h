@@ -225,6 +225,8 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);
   bool tryPerformOwnedCopyValueOptimization(CopyValueInst *cvi);
+
+  bool deleteDeadArgs();
 };
 
 } // namespace semanticarc

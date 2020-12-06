@@ -161,22 +161,29 @@ struct SemanticARCOpts : SILFunctionTransform {
     }
 #endif
 
+    using InvalidationKind = SILAnalysis::InvalidationKind;
+    auto invalidationKind = InvalidationKind::Nothing;
+
     // Otherwise, perform our standard optimizations.
-    bool didEliminateARCInsts = performPeepholes(visitor);
+    if (performPeepholes(visitor))
+      invalidationKind = invalidationKind | InvalidationKind::Instructions;
 
     // Now that we have seeded the map of phis to incoming values that could be
     // converted to guaranteed, ignoring the phi, try convert those phis to be
     // guaranteed.
-    if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
-      // We return here early to save a little compile time so we do not
-      // invalidate analyses redundantly.
-      return invalidateAnalysis(
-          SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    }
+    if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx))
+      invalidationKind =
+          invalidationKind | InvalidationKind::BranchesAndInstructions;
 
-    // Otherwise, we only deleted instructions and did not touch phis.
-    if (didEliminateARCInsts)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (visitor.deleteDeadArgs())
+      invalidationKind = invalidationKind | InvalidationKind::Branches;
+
+    // Then invalidate as we need.
+    //
+    // NOTE: This is only safe since we are not using any analyses internally to
+    // this pass... If we ever do so, we will need to be significantly more
+    // careful about this and may need to invalidate above.
+    invalidateAnalysis(invalidationKind);
   }
 };
 

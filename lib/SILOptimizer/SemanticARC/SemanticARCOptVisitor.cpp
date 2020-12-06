@@ -19,6 +19,7 @@
 
 #include "SemanticARCOptVisitor.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -129,4 +130,17 @@ bool SemanticARCOptVisitor::processWorklist() {
   }
 
   return madeChange;
+}
+
+bool SemanticARCOptVisitor::deleteDeadArgs() {
+  if (ctx.phiArgumentToDelete.empty())
+    return false;
+
+  do {
+    auto *arg = ctx.phiArgumentToDelete.pop_back_val();
+    assert(arg->use_empty() && arg->getOwnershipKind() == OwnershipKind::None);
+    erasePhiArgument(arg->getParent(), arg->getIndex());
+  } while (!ctx.phiArgumentToDelete.empty());
+
+  return true;
 }
