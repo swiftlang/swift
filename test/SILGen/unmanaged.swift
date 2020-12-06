@@ -24,8 +24,7 @@ func set(holder holder: inout Holder) {
 // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [static] [[ADDR]] : $*Holder
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[WRITE]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[C]]
-// CHECK-NEXT:   [[T2:%.*]] = struct $Holder ([[T1]] : $@sil_unmanaged C)
-// CHECK-NEXT:   store [[T2]] to [[WRITE]]
+// CHECK-NEXT:   store [[T1]] to [[T0]]
 // CHECK-NEXT:   strong_release [[C]]
 // CHECK-NEXT:   end_access [[WRITE]] : $*Holder
 // CHECK-NEXT:   tuple ()

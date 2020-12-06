@@ -186,6 +186,13 @@ public:
 //               MandatoryCombiner Non-Visitor Utility Methods
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
+    "sil-mandatory-combine-enable-canon-and-simple-dce", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("An option for compiler developers that cause the Mandatory "
+                   "Combiner to be more aggressive at eliminating trivially "
+                   "dead code and canonicalizing SIL"));
+
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
   SmallVector<SILBasicBlock *, 32> blockWorklist;
   SmallPtrSet<SILBasicBlock *, 32> blockAlreadyAddedToWorklist;
@@ -207,9 +214,11 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       ++iterator;
 
       if (isInstructionTriviallyDead(instruction)) {
-        if (compilingWithOptimization) {
-          instruction->replaceAllUsesOfAllResultsWithUndef();
-          instruction->eraseFromParent();
+        if (EnableCanonicalizationAndTrivialDCE) {
+          if (compilingWithOptimization) {
+            instruction->replaceAllUsesOfAllResultsWithUndef();
+            instruction->eraseFromParent();
+          }
         }
         continue;
       }
@@ -243,17 +252,19 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
       continue;
     }
 
-    if (compilingWithOptimization) {
-      if (isInstructionTriviallyDead(instruction)) {
-        worklist.eraseInstFromFunction(*instruction);
+    if (EnableCanonicalizationAndTrivialDCE) {
+      if (compilingWithOptimization) {
+        if (isInstructionTriviallyDead(instruction)) {
+          worklist.eraseInstFromFunction(*instruction);
+          madeChange = true;
+          continue;
+        }
+      }
+
+      if (mcCanonicialize.tryCanonicalize(instruction)) {
         madeChange = true;
         continue;
       }
-    }
-
-    if (mcCanonicialize.tryCanonicalize(instruction)) {
-      madeChange = true;
-      continue;
     }
 
 #ifndef NDEBUG
