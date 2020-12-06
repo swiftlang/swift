@@ -1005,7 +1005,8 @@ namespace {
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistential(record.Archetype)) {
-        Type erasedTy = resultTy->eraseOpenedExistential(record.Archetype);
+        Type erasedTy =
+            resultTy->typeEraseOpenedArchetypesWithRoot(record.Archetype);
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
@@ -1487,7 +1488,8 @@ namespace {
         } else {
           // Erase opened existentials from the type of the thunk; we're
           // going to open the existential inside the thunk's body.
-          containerTy = containerTy->eraseOpenedExistential(knownOpened->second);
+          containerTy = containerTy->typeEraseOpenedArchetypesWithRoot(
+              knownOpened->second);
           selfTy = containerTy;
         }
       }
@@ -1546,7 +1548,7 @@ namespace {
         // If the base was an opened existential, erase the opened
         // existential.
         if (openedExistential) {
-          refType = refType->eraseOpenedExistential(
+          refType = refType->typeEraseOpenedArchetypesWithRoot(
               baseTy->castTo<OpenedArchetypeType>());
         }
 
@@ -1687,8 +1689,9 @@ namespace {
                                memberLocator));
         if (knownOpened != solution.OpenedExistentialTypes.end()) {
           curryThunkTy =
-            curryThunkTy->eraseOpenedExistential(knownOpened->second)
-              ->castTo<FunctionType>();
+              curryThunkTy
+                  ->typeEraseOpenedArchetypesWithRoot(knownOpened->second)
+                  ->castTo<FunctionType>();
         }
 
         auto discriminator = AutoClosureExpr::InvalidDiscriminator;

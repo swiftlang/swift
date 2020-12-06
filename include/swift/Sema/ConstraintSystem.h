@@ -5296,12 +5296,13 @@ public:
   /// in (if any) has a result builder applied to its body.
   bool isInResultBuilderContext(ClosureExpr *closure) const;
 
-  /// Determine whether we are allowed to refer to an existential type
-  /// conforming to the given protocol. This is only permitted if the type of
-  /// the member does not contain any associated types, and does not
-  /// contain 'Self' in 'parameter' or 'other' position.
-  bool isAvailableInExistential(const ProtocolDecl *proto,
-                                const ValueDecl *member) const;
+  /// Determine whether referencing the given member on the
+  /// given existential base type is supported. This is the case only if the
+  /// type of the member, spelled in the context of \p baseTy,
+  /// - does not contain any 'Self'-rooted dependent member types, and
+  /// - does not contain 'Self' in non-covariant position.
+  bool isMemberAvailableOnExistential(Type baseTy,
+                                      const ValueDecl *member) const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

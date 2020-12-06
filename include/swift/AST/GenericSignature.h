@@ -390,6 +390,8 @@ public:
 
   bool isCanonicalTypeInContext(Type type) const;
 
+  /// Determine whether the given type parameter is defined under this generic
+  /// signature.
   bool isValidTypeInContext(Type type) const;
 
   /// Retrieve the conformance access path used to extract the conformance of
@@ -427,6 +429,13 @@ public:
   /// Get the sugared form of a type by substituting any
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
+
+  /// Given a type parameter, compute the most specific supertype (upper bound)
+  /// that is not dependent on other type parameters.
+  ///
+  /// \note If the upper bound is a protocol or protocol composition,
+  /// will return an instance of \c ExistentialType.
+  Type getNonDependentUpperBounds(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,

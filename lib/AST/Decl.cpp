@@ -3739,12 +3739,13 @@ SelfReferenceInfo::operator|=(const SelfReferenceInfo &other) {
   return *this;
 }
 
-/// Report references to 'Self' within the given type.
+/// Report references to 'Self' within the given type using the given
+/// existential generic signature.
 ///
 /// \param position The current position in terms of variance.
-static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
-                                                    Type type,
-                                                    TypePosition position) {
+static SelfReferenceInfo
+findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
+                              TypePosition position) {
   // If there are no type parameters, we're done.
   if (!type->hasTypeParameter())
     return SelfReferenceInfo();
@@ -3753,7 +3754,8 @@ static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
   if (auto tuple = type->getAs<TupleType>()) {
     auto info = SelfReferenceInfo();
     for (auto &elt : tuple->getElements()) {
-      info |= findProtocolSelfReferences(proto, elt.getType(), position);
+      info |= findExistentialSelfReferences(existentialSig, elt.getType(),
+                                            position);
     }
 
     // A covariant Self result inside a tuple will not be bona fide.
@@ -3769,19 +3771,19 @@ static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
     for (auto param : funcTy->getParams()) {
       // inout parameters are invariant.
       if (param.isInOut()) {
-        inputInfo |= findProtocolSelfReferences(proto, param.getPlainType(),
-                                                TypePosition::Invariant);
+        inputInfo |= findExistentialSelfReferences(
+            existentialSig, param.getPlainType(), TypePosition::Invariant);
         continue;
       }
-      inputInfo |= findProtocolSelfReferences(proto, param.getParameterType(),
-                                              position.flipped());
+      inputInfo |= findExistentialSelfReferences(
+          existentialSig, param.getParameterType(), position.flipped());
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
     inputInfo.hasCovariantSelfResult = false;
 
-    auto resultInfo =
-        findProtocolSelfReferences(proto, funcTy->getResult(), position);
+    auto resultInfo = findExistentialSelfReferences(
+        existentialSig, funcTy->getResult(), position);
     if (resultInfo.selfRef == TypePosition::Covariant) {
       resultInfo.hasCovariantSelfResult = true;
     }
@@ -3790,20 +3792,21 @@ static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
 
   // Metatypes preserve variance.
   if (auto metaTy = type->getAs<MetatypeType>()) {
-    return findProtocolSelfReferences(proto, metaTy->getInstanceType(),
-                                      position);
+    return findExistentialSelfReferences(existentialSig,
+                                         metaTy->getInstanceType(), position);
   }
 
   // Optionals preserve variance.
   if (auto optType = type->getOptionalObjectType()) {
-    return findProtocolSelfReferences(proto, optType, position);
+    return findExistentialSelfReferences(existentialSig, optType, position);
   }
 
   // DynamicSelfType preserves variance.
   // FIXME: This shouldn't ever appear in protocol requirement
   // signatures.
   if (auto selfType = type->getAs<DynamicSelfType>()) {
-    return findProtocolSelfReferences(proto, selfType->getSelfType(), position);
+    return findExistentialSelfReferences(existentialSig,
+                                         selfType->getSelfType(), position);
   }
 
   if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
@@ -3811,25 +3814,26 @@ static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
 
     // Don't forget to look in the parent.
     if (const auto parent = nominal->getParent()) {
-      info |= findProtocolSelfReferences(proto, parent, position);
+      info |= findExistentialSelfReferences(existentialSig, parent, position);
     }
 
     // Most bound generic types are invariant.
     if (auto *const bgt = type->getAs<BoundGenericType>()) {
       if (bgt->isArray()) {
-        // Swift.Array preserves variance in its Value type.
-        info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
-                                           position);
+        // Swift.Array preserves variance in its 'Value' type.
+        info |= findExistentialSelfReferences(
+            existentialSig, bgt->getGenericArgs().front(), position);
       } else if (bgt->isDictionary()) {
-        // Swift.Dictionary preserves variance in its Element type.
-        info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
-                                           TypePosition::Invariant);
-        info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().back(),
-                                           position);
+        // Swift.Dictionary preserves variance in its 'Element' type.
+        info |= findExistentialSelfReferences(existentialSig,
+                                              bgt->getGenericArgs().front(),
+                                              TypePosition::Invariant);
+        info |= findExistentialSelfReferences(
+            existentialSig, bgt->getGenericArgs().back(), position);
       } else {
         for (auto paramType : bgt->getGenericArgs()) {
-          info |= findProtocolSelfReferences(proto, paramType,
-                                             TypePosition::Invariant);
+          info |= findExistentialSelfReferences(existentialSig, paramType,
+                                                TypePosition::Invariant);
         }
       }
     }
@@ -3849,29 +3853,45 @@ static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
   if (auto *comp = constraint->getAs<ProtocolCompositionType>()) {
     // 'Self' may be referenced only in a superclass component.
     if (const auto superclass = comp->getSuperclass()) {
-      return findProtocolSelfReferences(proto, superclass, position);
+      return findExistentialSelfReferences(existentialSig, superclass,
+                                           position);
     }
 
     return SelfReferenceInfo();
   }
 
-  // A direct reference to 'Self'.
-  if (proto->getSelfInterfaceType()->isEqual(type))
-    return SelfReferenceInfo::forSelfRef(position);
-
-  // A reference to an associated type rooted on 'Self'.
-  if (type->is<DependentMemberType>()) {
-    type = type->getRootGenericParam();
-    if (proto->getSelfInterfaceType()->isEqual(type))
-      return SelfReferenceInfo::forAssocTypeRef(position);
+  if (!type->isTypeParameter()) {
+    return SelfReferenceInfo();
   }
 
-  return SelfReferenceInfo();
+  const auto selfTy = existentialSig.getGenericParams().front();
+  if (!type->getRootGenericParam()->isEqual(selfTy)) {
+    return SelfReferenceInfo();
+  }
+
+  // A direct reference to 'Self'.
+  if (selfTy->isEqual(type)) {
+    return SelfReferenceInfo::forSelfRef(position);
+  }
+
+  // If the type parameter is beyond the domain of the existential generic
+  // signature, ignore it.
+  if (!existentialSig->isValidTypeInContext(type)) {
+    return SelfReferenceInfo();
+  }
+
+  if (const auto concreteTy = existentialSig->getConcreteType(type)) {
+    return findExistentialSelfReferences(existentialSig, concreteTy, position);
+  }
+
+  // A reference to an associated type rooted on 'Self'.
+  return SelfReferenceInfo::forAssocTypeRef(position);
 }
 
-SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
-    const ProtocolDecl *proto,
-    bool treatNonResultCovariantSelfAsInvariant) const {
+SelfReferenceInfo ValueDecl::findExistentialSelfReferences(
+    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
+  assert(baseTy->isExistentialType());
+
   // Types never refer to 'Self'.
   if (isa<TypeDecl>(this))
     return SelfReferenceInfo();
@@ -3882,6 +3902,8 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
   if (type->hasError())
     return SelfReferenceInfo();
 
+  const auto sig = getASTContext().getOpenedArchetypeSignature(baseTy);
+
   if (isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this)) {
     // For a method, skip the 'self' parameter.
     if (isa<AbstractFunctionDecl>(this))
@@ -3891,12 +3913,12 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
     for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
       // inout parameters are invariant.
       if (param.isInOut()) {
-        inputInfo |= ::findProtocolSelfReferences(proto, param.getPlainType(),
-                                                  TypePosition::Invariant);
+        inputInfo |= ::findExistentialSelfReferences(sig, param.getPlainType(),
+                                                     TypePosition::Invariant);
         continue;
       }
-      inputInfo |= ::findProtocolSelfReferences(proto, param.getParameterType(),
-                                                TypePosition::Contravariant);
+      inputInfo |= ::findExistentialSelfReferences(
+          sig, param.getParameterType(), TypePosition::Contravariant);
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
@@ -3913,8 +3935,8 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
       inputInfo.selfRef = TypePosition::Invariant;
     }
 
-    auto resultInfo = ::findProtocolSelfReferences(
-        proto, type->castTo<AnyFunctionType>()->getResult(),
+    auto resultInfo = ::findExistentialSelfReferences(
+        sig, type->castTo<AnyFunctionType>()->getResult(),
         TypePosition::Covariant);
     if (resultInfo.selfRef == TypePosition::Covariant) {
       resultInfo.hasCovariantSelfResult = true;
@@ -3925,7 +3947,7 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
     assert(isa<VarDecl>(this));
 
     auto info =
-        ::findProtocolSelfReferences(proto, type, TypePosition::Covariant);
+        ::findExistentialSelfReferences(sig, type, TypePosition::Covariant);
     if (info.selfRef == TypePosition::Covariant) {
       info.hasCovariantSelfResult = true;
     }

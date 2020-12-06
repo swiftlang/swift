@@ -116,7 +116,7 @@ GenericTypeDecl *CanType::getAnyGeneric() const {
 //===----------------------------------------------------------------------===//
 
 /// isEqual - Return true if these two types are equal, ignoring sugar.
-bool TypeBase::isEqual(Type Other) {
+bool TypeBase::isEqual(Type Other) const {
   return getCanonicalType() == Other.getPointer()->getCanonicalType();
 }
 
@@ -439,7 +439,7 @@ bool TypeBase::isSpecialized() {
   return false;
 }
 
-bool TypeBase::hasOpenedExistential(OpenedArchetypeType *opened) {
+bool TypeBase::hasOpenedExistential(const OpenedArchetypeType *opened) {
   if (!hasOpenedExistential())
     return false;
 
@@ -466,33 +466,67 @@ void TypeBase::getOpenedExistentials(
   });
 }
 
-Type TypeBase::eraseOpenedExistential(OpenedArchetypeType *opened) {
+Type TypeBase::typeEraseOpenedArchetypesWithRoot(
+    const OpenedArchetypeType *root) const {
+  assert(root->isRoot() && "Expected a root archetype");
+
+  Type type = Type(const_cast<TypeBase *>(this));
   if (!hasOpenedExistential())
-    return Type(this);
+    return type;
 
-  auto existentialType = opened->getOpenedExistentialType();
+  const auto sig = root->getASTContext().getOpenedArchetypeSignature(
+      root->getOpenedExistentialType());
 
-  return Type(this).transform([&](Type t) -> Type {
-    // A metatype with an opened existential type becomes an
-    // existential metatype.
-    if (auto *metatypeType = dyn_cast<MetatypeType>(t.getPointer())) {
-      auto instanceType = metatypeType->getInstanceType();
-      if (instanceType->hasOpenedExistential()) {
-        instanceType = instanceType->eraseOpenedExistential(opened);
-        if (auto existential = instanceType->getAs<ExistentialType>())
-          instanceType = existential->getConstraintType();
-        return ExistentialMetatypeType::get(instanceType);
+  unsigned metatypeDepth = 0;
+
+  std::function<Type(Type)> transformFn;
+  transformFn = [&](Type type) -> Type {
+    return type.transformRec([&](TypeBase *ty) -> Optional<Type> {
+      // Don't recurse into children unless we have to.
+      if (!ty->hasOpenedExistential())
+        return Type(ty);
+
+      if (isa<MetatypeType>(ty)) {
+        const auto instanceTy = ty->getMetatypeInstanceType();
+        ++metatypeDepth;
+        const auto erasedTy = transformFn(instanceTy);
+        --metatypeDepth;
+
+        if (instanceTy.getPointer() == erasedTy.getPointer()) {
+          return Type(ty);
+        }
+
+        return Type(ExistentialMetatypeType::get(erasedTy));
       }
-    }
 
-    // @opened P => P
-    if (auto *archetypeType = dyn_cast<ArchetypeType>(t.getPointer())) {
-      if (archetypeType == opened)
-        return existentialType;
-    }
+      auto *const archetype = dyn_cast<OpenedArchetypeType>(ty);
+      if (!archetype) {
+        // Recurse.
+        return None;
+      }
 
-    return t;
-  });
+      if (!root->isEqual(archetype->getRoot())) {
+        return Type(ty);
+      }
+
+      Type erasedTy;
+      if (root->isEqual(archetype)) {
+        erasedTy = root->getOpenedExistentialType();
+      } else {
+        erasedTy =
+            sig->getNonDependentUpperBounds(archetype->getInterfaceType());
+      }
+
+      if (metatypeDepth) {
+        if (const auto existential = erasedTy->getAs<ExistentialType>())
+          return existential->getConstraintType();
+      }
+
+      return erasedTy;
+    });
+  };
+
+  return transformFn(type);
 }
 
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
@@ -4385,6 +4419,7 @@ static Type substType(Type derivedType,
     auto substOrig = dyn_cast<SubstitutableType>(type);
     if (!substOrig)
       return None;
+
     // Opaque types can't normally be directly substituted unless we
     // specifically were asked to substitute them.
     if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)

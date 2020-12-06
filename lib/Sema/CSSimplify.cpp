@@ -7777,11 +7777,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     const auto isUnsupportedExistentialMemberAccess = [&] {
       // We may not be able to derive a well defined type for an existential
       // member access if the member's signature references 'Self'.
-      if (instanceTy->isExistentialType()) {
-        if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
-          if (!isAvailableInExistential(proto, decl)) {
-            return true;
-          }
+      if (instanceTy->isExistentialType() &&
+          decl->getDeclContext()->getSelfProtocolDecl()) {
+        if (!isMemberAvailableOnExistential(instanceTy, decl)) {
+          return true;
         }
       }
 

@@ -2674,14 +2674,15 @@ public:
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
 
-  /// Report 'Self' references within the type of this protocol member.
+  /// Report 'Self' references within the type of this declaration as a
+  /// member of the given existential base type.
   ///
   /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' or 'Self?'
   /// is considered covariant only when it appears as the immediate type of a
-  /// property, or the uncurried result type of a method/subscript.
-  SelfReferenceInfo
-  findProtocolSelfReferences(const ProtocolDecl *proto,
-                             bool treatNonResultCovariantSelfAsInvariant) const;
+  /// property, or the uncurried result type of a method/subscript, e.g.
+  /// '() -> () -> Self'.
+  SelfReferenceInfo findExistentialSelfReferences(
+      Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 };
 
 /// This is a common base class for declarations which declare a type.

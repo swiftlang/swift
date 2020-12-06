@@ -290,8 +290,11 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     switch (getKind()) {
     case Kind::Normal:
     case Kind::OpenedExistential:
-      return mapTypeIntoContext(type, conformanceLookupFn);
-
+      if (type->hasTypeParameter()) {
+        return mapTypeIntoContext(type, conformanceLookupFn);
+      } else {
+        return type;
+      }
     case Kind::Opaque:
       return maybeApplyOpaqueTypeSubstitutions(type);
     }

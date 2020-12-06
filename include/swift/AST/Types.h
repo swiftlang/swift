@@ -513,13 +513,13 @@ public:
   TypeBase *getWithoutSyntaxSugar();
 
   /// getASTContext - Return the ASTContext that this type belongs to.
-  ASTContext &getASTContext();
-  
+  ASTContext &getASTContext() const;
+
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   ///
   /// To compare sugar, check for pointer equality of the underlying TypeBase *
   /// values, obtained by calling getPointer().
-  bool isEqual(Type Other);
+  bool isEqual(Type Other) const;
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -621,7 +621,7 @@ public:
 
   /// Determine whether the type involves the given opened existential
   /// archetype.
-  bool hasOpenedExistential(OpenedArchetypeType *opened);
+  bool hasOpenedExistential(const OpenedArchetypeType *opened);
 
   /// Determine whether the type involves an opaque type.
   bool hasOpaqueArchetype() const {
@@ -641,9 +641,9 @@ public:
   /// within this type.
   void getOpenedExistentials(SmallVectorImpl<OpenedArchetypeType *> &opened);
 
-  /// Erase the given opened existential type by replacing it with its
-  /// existential type throughout the given type.
-  Type eraseOpenedExistential(OpenedArchetypeType *opened);
+  /// Replace opened archetypes with the given root with their most
+  /// specific non-dependent upper bounds throughout this type.
+  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root) const;
 
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
@@ -6287,7 +6287,7 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
-inline ASTContext &TypeBase::getASTContext() {
+inline ASTContext &TypeBase::getASTContext() const {
   // If this type is canonical, it has the ASTContext in it.
   if (isCanonical())
     return *const_cast<ASTContext*>(Context);
