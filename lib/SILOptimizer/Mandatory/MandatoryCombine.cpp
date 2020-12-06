@@ -31,6 +31,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
@@ -52,6 +53,54 @@ static bool areAllValuesTrivial(Values values, SILFunction &function) {
     return value->getType().isTrivial(function);
   });
 }
+
+//===----------------------------------------------------------------------===//
+//      CanonicalizeInstruction subclass for use in Mandatory Combiner.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class MandatoryCombineCanonicalize final : CanonicalizeInstruction {
+public:
+  using Worklist = SmallSILInstructionWorklist<256>;
+
+private:
+  Worklist &worklist;
+  bool changed = false;
+
+public:
+  MandatoryCombineCanonicalize(Worklist &worklist)
+      : CanonicalizeInstruction(DEBUG_TYPE), worklist(worklist) {}
+
+  void notifyNewInstruction(SILInstruction *inst) override {
+    worklist.add(inst);
+    worklist.addUsersOfAllResultsToWorklist(inst);
+    changed = true;
+  }
+
+  // Just delete the given 'inst' and record its operands. The callback isn't
+  // allowed to mutate any other instructions.
+  void killInstruction(SILInstruction *inst) override {
+    worklist.eraseSingleInstFromFunction(*inst,
+                                         /*AddOperandsToWorklist*/ true);
+    changed = true;
+  }
+
+  void notifyHasNewUsers(SILValue value) override {
+    if (worklist.size() < 10000) {
+      worklist.addUsersToWorklist(value);
+    }
+    changed = true;
+  }
+
+  bool tryCanonicalize(SILInstruction *inst) {
+    changed = false;
+    canonicalize(inst);
+    return changed;
+  }
+};
+
+} // anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                        MandatoryCombiner Interface
@@ -137,6 +186,13 @@ public:
 //               MandatoryCombiner Non-Visitor Utility Methods
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
+    "sil-mandatory-combine-enable-canon-and-simple-dce", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("An option for compiler developers that cause the Mandatory "
+                   "Combiner to be more aggressive at eliminating trivially "
+                   "dead code and canonicalizing SIL"));
+
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
   SmallVector<SILBasicBlock *, 32> blockWorklist;
   SmallPtrSet<SILBasicBlock *, 32> blockAlreadyAddedToWorklist;
@@ -148,6 +204,8 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
     blockAlreadyAddedToWorklist.insert(firstBlock);
   }
 
+  bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
+                                   OptimizationMode::NoOptimization;
   while (!blockWorklist.empty()) {
     auto *block = blockWorklist.pop_back_val();
 
@@ -156,6 +214,12 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       ++iterator;
 
       if (isInstructionTriviallyDead(instruction)) {
+        if (EnableCanonicalizationAndTrivialDCE) {
+          if (compilingWithOptimization) {
+            instruction->replaceAllUsesOfAllResultsWithUndef();
+            instruction->eraseFromParent();
+          }
+        }
         continue;
       }
 
@@ -177,11 +241,30 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
+  MandatoryCombineCanonicalize mcCanonicialize(worklist);
+
+  bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
+                                   OptimizationMode::NoOptimization;
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
     if (instruction == nullptr) {
       continue;
+    }
+
+    if (EnableCanonicalizationAndTrivialDCE) {
+      if (compilingWithOptimization) {
+        if (isInstructionTriviallyDead(instruction)) {
+          worklist.eraseInstFromFunction(*instruction);
+          madeChange = true;
+          continue;
+        }
+      }
+
+      if (mcCanonicialize.tryCanonicalize(instruction)) {
+        madeChange = true;
+        continue;
+      }
     }
 
 #ifndef NDEBUG
