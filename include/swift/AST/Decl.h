@@ -2157,78 +2157,41 @@ public:
   
 class OpaqueTypeDecl;
 
-/// A convenience wrapper around the \c SelfReferencePosition::Kind enum.
-struct SelfReferencePosition final {
-  enum Kind : uint8_t { None, Covariant, Contravariant, Invariant };
-
-private:
-  Kind kind;
+/// Describes the least favorable positions at which a requirement refers
+/// to 'Self' in terms of variance, for use in the is-inheritable and
+/// is-available-existential checks.
+class SelfReferenceInfo final {
+  using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
-  SelfReferencePosition(Kind kind) : kind(kind) {}
-
-  SelfReferencePosition flipped() const {
-    switch (kind) {
-    case None:
-    case Invariant:
-      return *this;
-    case Covariant:
-      return Contravariant;
-    case Contravariant:
-      return Covariant;
-    }
-    llvm_unreachable("unhandled self reference position!");
-  }
-
-  explicit operator bool() const { return kind > None; }
-
-  operator Kind() const { return kind; }
-};
-
-/// Describes the least favorable positions at which a protocol member refers
-/// to 'Self' in terms of variance. Used in the is-inheritable and
-/// is-available-in-existential checks.
-struct SelfReferenceInfo final {
-  using Position = SelfReferencePosition;
-
   bool hasCovariantSelfResult;
-  Position selfRef;
-  Position assocTypeRef;
+
+  OptionalTypePosition selfRef;
+  OptionalTypePosition assocTypeRef;
 
   /// A reference to 'Self'.
-  static SelfReferenceInfo forSelfRef(Position position) {
-    assert(position);
-    return SelfReferenceInfo(false, position, Position::None);
+  static SelfReferenceInfo forSelfRef(TypePosition position) {
+    return SelfReferenceInfo(false, position, llvm::None);
   }
 
   /// A reference to 'Self' through an associated type.
-  static SelfReferenceInfo forAssocTypeRef(Position position) {
-    assert(position);
-    return SelfReferenceInfo(false, Position::None, position);
+  static SelfReferenceInfo forAssocTypeRef(TypePosition position) {
+    return SelfReferenceInfo(false, llvm::None, position);
   }
 
-  SelfReferenceInfo operator|=(const SelfReferenceInfo &pos) {
-    hasCovariantSelfResult |= pos.hasCovariantSelfResult;
-    if (pos.selfRef > selfRef) {
-      selfRef = pos.selfRef;
-    }
-    if (pos.assocTypeRef > assocTypeRef) {
-      assocTypeRef = pos.assocTypeRef;
-    }
-    return *this;
-  }
+  SelfReferenceInfo &operator|=(const SelfReferenceInfo &other);
 
   explicit operator bool() const {
     return hasCovariantSelfResult || selfRef || assocTypeRef;
   }
 
   SelfReferenceInfo()
-      : hasCovariantSelfResult(false), selfRef(Position::None),
-        assocTypeRef(Position::None) {}
+      : hasCovariantSelfResult(false), selfRef(llvm::None),
+        assocTypeRef(llvm::None) {}
 
 private:
-  SelfReferenceInfo(bool hasCovariantSelfResult, Position selfRef,
-                    Position assocTypeRef)
+  SelfReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
+                    OptionalTypePosition assocTypeRef)
       : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
         assocTypeRef(assocTypeRef) {}
 };

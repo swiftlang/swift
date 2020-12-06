@@ -203,6 +203,34 @@ enum class ForeignRepresentableKind : uint8_t {
   StaticBridged,
 };
 
+/// An enum wrapper used to describe the variance position of a type within
+/// another type. For example, a function type is covariant in its result type;
+/// therefore, the result type is in covariant position relative to the function
+/// type.
+struct TypePosition final {
+  enum : uint8_t { Covariant, Contravariant, Invariant };
+
+private:
+  decltype(Covariant) kind;
+
+public:
+  TypePosition(decltype(kind) kind) : kind(kind) {}
+
+  TypePosition flipped() const {
+    switch (kind) {
+    case Invariant:
+      return *this;
+    case Covariant:
+      return Contravariant;
+    case Contravariant:
+      return Covariant;
+    }
+    llvm_unreachable("Unhandled type position!");
+  }
+
+  operator decltype(kind)() const { return kind; }
+};
+
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase
 /// instead of a raw "TypeBase*" to disable equality comparison, which is unsafe

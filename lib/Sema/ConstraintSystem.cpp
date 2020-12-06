@@ -5857,7 +5857,7 @@ bool ConstraintSystem::isAvailableInExistential(const ProtocolDecl *proto,
   // an associated type in any position, we cannot make use of the member.
   const auto info = member->findProtocolSelfReferences(
       proto, /*treatNonResultCovariantSelfAsInvariant=*/false);
-  if (info.selfRef > SelfReferencePosition::Covariant || info.assocTypeRef) {
+  if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
     return false;
   }
 

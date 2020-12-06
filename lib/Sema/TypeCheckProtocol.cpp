@@ -4058,7 +4058,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   const auto selfRefInfo = requirement->findProtocolSelfReferences(
       Proto, /*treatNonResultCovariantSelfAsInvariant=*/true);
 
-  if (selfRefInfo.selfRef == SelfReferencePosition::Invariant) {
+  if (selfRefInfo.selfRef == TypePosition::Invariant) {
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.

@@ -3727,12 +3727,24 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   }
 }
 
+SelfReferenceInfo &
+SelfReferenceInfo::operator|=(const SelfReferenceInfo &other) {
+  hasCovariantSelfResult |= other.hasCovariantSelfResult;
+  if (other.selfRef > selfRef) {
+    selfRef = other.selfRef;
+  }
+  if (other.assocTypeRef > assocTypeRef) {
+    assocTypeRef = other.assocTypeRef;
+  }
+  return *this;
+}
+
 /// Report references to 'Self' within the given type.
 ///
 /// \param position The current position in terms of variance.
-static SelfReferenceInfo
-findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
-                           SelfReferencePosition position) {
+static SelfReferenceInfo findProtocolSelfReferences(const ProtocolDecl *proto,
+                                                    Type type,
+                                                    TypePosition position) {
   // If there are no type parameters, we're done.
   if (!type->hasTypeParameter())
     return SelfReferenceInfo();
@@ -3757,8 +3769,8 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     for (auto param : funcTy->getParams()) {
       // inout parameters are invariant.
       if (param.isInOut()) {
-        inputInfo |= findProtocolSelfReferences(
-            proto, param.getPlainType(), SelfReferencePosition::Invariant);
+        inputInfo |= findProtocolSelfReferences(proto, param.getPlainType(),
+                                                TypePosition::Invariant);
         continue;
       }
       inputInfo |= findProtocolSelfReferences(proto, param.getParameterType(),
@@ -3770,7 +3782,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 
     auto resultInfo =
         findProtocolSelfReferences(proto, funcTy->getResult(), position);
-    if (resultInfo.selfRef == SelfReferencePosition::Covariant) {
+    if (resultInfo.selfRef == TypePosition::Covariant) {
       resultInfo.hasCovariantSelfResult = true;
     }
     return inputInfo |= resultInfo;
@@ -3811,13 +3823,13 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
       } else if (bgt->isDictionary()) {
         // Swift.Dictionary preserves variance in its Element type.
         info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
-                                           SelfReferencePosition::Invariant);
+                                           TypePosition::Invariant);
         info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().back(),
                                            position);
       } else {
         for (auto paramType : bgt->getGenericArgs()) {
           info |= findProtocolSelfReferences(proto, paramType,
-                                             SelfReferencePosition::Invariant);
+                                             TypePosition::Invariant);
         }
       }
     }
@@ -3828,7 +3840,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // Opaque result types of protocol extension members contain an invariant
   // reference to 'Self'.
   if (type->is<OpaqueTypeArchetypeType>())
-    return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
+    return SelfReferenceInfo::forSelfRef(TypePosition::Invariant);
 
   // Protocol compositions preserve variance.
   auto constraint = type;
@@ -3879,13 +3891,12 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
     for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
       // inout parameters are invariant.
       if (param.isInOut()) {
-        inputInfo |= ::findProtocolSelfReferences(
-            proto, param.getPlainType(), SelfReferencePosition::Invariant);
+        inputInfo |= ::findProtocolSelfReferences(proto, param.getPlainType(),
+                                                  TypePosition::Invariant);
         continue;
       }
-      inputInfo |=
-          ::findProtocolSelfReferences(proto, param.getParameterType(),
-                                       SelfReferencePosition::Contravariant);
+      inputInfo |= ::findProtocolSelfReferences(proto, param.getParameterType(),
+                                                TypePosition::Contravariant);
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
@@ -3898,14 +3909,14 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
     // Methods of non-final classes can only contain a covariant 'Self'
     // as their result type.
     if (treatNonResultCovariantSelfAsInvariant &&
-        inputInfo.selfRef == SelfReferencePosition::Covariant) {
-      inputInfo.selfRef = SelfReferencePosition::Invariant;
+        inputInfo.selfRef == TypePosition::Covariant) {
+      inputInfo.selfRef = TypePosition::Invariant;
     }
 
     auto resultInfo = ::findProtocolSelfReferences(
         proto, type->castTo<AnyFunctionType>()->getResult(),
-        SelfReferencePosition::Covariant);
-    if (resultInfo.selfRef == SelfReferencePosition::Covariant) {
+        TypePosition::Covariant);
+    if (resultInfo.selfRef == TypePosition::Covariant) {
       resultInfo.hasCovariantSelfResult = true;
     }
 
@@ -3913,9 +3924,9 @@ SelfReferenceInfo ValueDecl::findProtocolSelfReferences(
   } else {
     assert(isa<VarDecl>(this));
 
-    auto info = ::findProtocolSelfReferences(proto, type,
-                                             SelfReferencePosition::Covariant);
-    if (info.selfRef == SelfReferencePosition::Covariant) {
+    auto info =
+        ::findProtocolSelfReferences(proto, type, TypePosition::Covariant);
+    if (info.selfRef == TypePosition::Covariant) {
       info.hasCovariantSelfResult = true;
     }
 
