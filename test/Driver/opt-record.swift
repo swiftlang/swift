@@ -8,8 +8,7 @@
 // RUN: %target-swiftc_driver -O -wmo -save-optimization-record -save-optimization-record-passes unknown -save-optimization-record-path %t/optrecordmod-filtered.opt.yaml %s -module-name optrecordmod -o %t/opt-record 2>&1 | %FileCheck -allow-empty %s
 // RUN: %FileCheck -allow-empty -check-prefix=YAML-FILTERED %s < %t/optrecordmod-filtered.opt.yaml
 
-// CHECK-NOT: warning
-// CHECK-NOT: error
+// CHECK-NOT: remark
 
 var a: Int = 1
 

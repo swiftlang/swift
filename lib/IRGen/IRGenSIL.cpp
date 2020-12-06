@@ -1091,9 +1091,7 @@ public:
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i);
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
 
-  void visitHopToExecutorInst(HopToExecutorInst *i) {
-    //TODO(async)
-  }
+  void visitHopToExecutorInst(HopToExecutorInst *i);
 
   void visitKeyPathInst(KeyPathInst *I);
 
@@ -5715,6 +5713,13 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                        getLoweredBB(i->getFailureBB()).bb);
 }
 
+void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
+  llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
+          llvm::Intrinsic::coro_async_resume, {});
+          
+  emitSuspensionPoint(getLoweredSingletonExplosion(i->getOperand()), resumeFn);
+}
+
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
@@ -6373,7 +6378,7 @@ void IRGenModule::emitSILStaticInitializers() {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getType(), StackAddress(), out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out);
   setLoweredExplosion(i, out);
 }
 
@@ -6381,7 +6386,7 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
   auto resultAddr = getLoweredStackAddress(i->getOperand());
   Explosion out;
-  emitGetAsyncContinuation(i->getType(), resultAddr, out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out);
   setLoweredExplosion(i, out);
 }
 
@@ -6389,9 +6394,11 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
   Explosion resumeResult;
 
-  auto continuationTy = i->getOperand()->getType();
-
   bool isIndirect = i->getResumeBB()->args_empty();
+  SILType resumeTy;
+  if (!isIndirect)
+    resumeTy = (*i->getResumeBB()->args_begin())->getType();
+
   auto &normalDest = getLoweredBB(i->getResumeBB());
   auto *normalDestBB = normalDest.bb;
 
@@ -6401,7 +6408,7 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
   assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
                           "error basic block should only expect one value");
 
-  emitAwaitAsyncContinuation(continuationTy, isIndirect, resumeResult,
+  emitAwaitAsyncContinuation(resumeTy, isIndirect, resumeResult,
                              normalDestBB, errorPhi, errorDestBB);
   if (!isIndirect) {
     unsigned firstIndex = 0;

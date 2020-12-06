@@ -385,9 +385,7 @@ fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
 //   that is closest (as an infinitely-precise real number) to the original
 //   binary float (interpreted as an infinitely-precise real number).
 % if FloatType == 'Float16':
-@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
-@available(macOS, unavailable)
-@available(macCatalyst, unavailable)
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 % end
 fileprivate func expectAccurateDescription(_ object: ${FloatType},
   _ message: @autoclosure () -> String = "",

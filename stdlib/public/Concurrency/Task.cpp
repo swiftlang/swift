@@ -303,7 +303,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
   initialContext->ResumeParent = &completeTask;
-  initialContext->ResumeParentExecutor = ExecutorRef::noPreference();
+  initialContext->ResumeParentExecutor = ExecutorRef::generic();
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
@@ -349,9 +349,9 @@ void swift::swift_task_future_wait(
 
 // TODO: Remove this hack.
 void swift::swift_task_run(AsyncTask *taskToRun) {
-  taskToRun->run(ExecutorRef::noPreference());
+  taskToRun->run(ExecutorRef::generic());
 }
 
-JobFlags swift::swift_task_getJobFlags(AsyncTask *task) {
-  return task->Flags;
+size_t swift::swift_task_getJobFlags(AsyncTask *task) {
+  return task->Flags.getOpaqueValue();
 }

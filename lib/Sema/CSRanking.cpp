@@ -52,6 +52,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
   case SK_DisfavoredOverload:
     return "disfavored overload";
 
+  case SK_UnresolvedMemberViaOptional:
+    return "unwrapping optional at unresolved member base";
+
   case SK_ForceUnchecked:
     return "force of an implicitly unwrapped optional";
 

@@ -2961,7 +2961,8 @@ void SILCloner<ImplClass>
   recordClonedInstruction(Inst,
                           getBuilder().createGetAsyncContinuation(
                             getOpLocation(Inst->getLoc()),
-                            getOpType(Inst->getType())));
+                            getOpASTType(Inst->getFormalResumeType()),
+                            Inst->throws()));
 }
 
 template <typename ImplClass>
@@ -2972,7 +2973,8 @@ void SILCloner<ImplClass>
                           getBuilder().createGetAsyncContinuationAddr(
                             getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getOperand()),
-                            getOpType(Inst->getType())));
+                            getOpASTType(Inst->getFormalResumeType()),
+                            Inst->throws()));
 }
 
 template <typename ImplClass>

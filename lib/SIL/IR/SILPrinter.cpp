@@ -2077,13 +2077,13 @@ public:
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
-    *this << '$' << GI->getFormalResumeType();
+    *this << GI->getFormalResumeType();
   }
 
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
-    *this << '$' << GI->getFormalResumeType()
+    *this << GI->getFormalResumeType()
           << ", " << getIDAndType(GI->getOperand());
   }
   

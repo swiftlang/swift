@@ -1056,12 +1056,49 @@ namespace {
           if (isa<SequenceExpr>(parent))
             return finish(true, expr);
 
+          SourceLoc lastInnerParenLoc;
+          // Unwrap to the outermost paren in the sequence.
+          if (isa<ParenExpr>(parent)) {
+            for (;;) {
+              auto nextParent = parents.find(parent);
+              if (nextParent == parents.end())
+                break;
+
+              // e.g. `foo((&bar), x: ...)`
+              if (isa<TupleExpr>(nextParent->second)) {
+                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
+                parent = nextParent->second;
+                break;
+              }
+
+              // e.g. `foo(((&bar))`
+              if (isa<ParenExpr>(nextParent->second)) {
+                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
+                parent = nextParent->second;
+                continue;
+              }
+
+              break;
+            }
+          }
+
           if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
             auto call = parents.find(parent);
             if (call != parents.end()) {
               if (isa<ApplyExpr>(call->getSecond()) ||
-                  isa<UnresolvedMemberExpr>(call->getSecond()))
+                  isa<UnresolvedMemberExpr>(call->getSecond())) {
+                // If outermost paren is associated with a call or
+                // a member reference, it might be valid to have `&`
+                // before all of the parens.
+                if (lastInnerParenLoc.isValid()) {
+                  auto &DE = getASTContext().Diags;
+                  auto diag = DE.diagnose(expr->getStartLoc(),
+                                          diag::extraneous_address_of);
+                  diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
+                }
+
                 return finish(true, expr);
+              }
 
               if (isa<SubscriptExpr>(call->getSecond())) {
                 getASTContext().Diags.diagnose(

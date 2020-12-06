@@ -342,7 +342,6 @@ void OwnershipModelEliminatorVisitor::splitDestructure(
   // instruction operands.
 
   SILModule &M = destructureInst->getModule();
-  SILLocation loc = destructureInst->getLoc();
   SILType opType = destructureOperand->getType();
 
   llvm::SmallVector<Projection, 8> projections;

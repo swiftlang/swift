@@ -301,11 +301,15 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
                                                     SILDeclRef declRef) {
   auto entity = LinkEntity::forMethodDescriptor(declRef);
-  auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  auto *var = cast<llvm::GlobalVariable>(
+      getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
   if (!var->isDeclaration()) {
     assert(IRGen.isLazilyReemittingNominalTypeDescriptor(VTable->getClass()));
     return;
   }
+
+  var->setConstant(true);
+  setTrueConstGlobal(var);
 
   ConstantInitBuilder ib(*this);
   ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
@@ -1542,8 +1546,11 @@ namespace {
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
       if (auto superclassDecl = getType()->getSuperclassDecl()) {
-        if (MetadataLayout && MetadataLayout->hasResilientSuperclass())
+        if (MetadataLayout && MetadataLayout->hasResilientSuperclass()) {
+          assert(!getType()->isRootDefaultActor() &&
+                 "root default actor has a resilient superclass?");
           ResilientSuperClassRef = IGM.getTypeEntityReference(superclassDecl);
+        }
       }
 
       addVTableEntries(getType());
@@ -1772,7 +1779,7 @@ namespace {
     void addLayoutInfo() {
 
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
-      if (auto superclassType = getType()->getSuperclass()) {
+      if (auto superclassType = getSuperclassForMetadata(IGM, getType())) {
         GenericSignature genericSig = getType()->getGenericSignature();
         B.addRelativeAddress(IGM.getTypeRef(superclassType, genericSig,
                                             MangledTypeRefRole::Metadata)
@@ -2937,12 +2944,15 @@ namespace {
       }
     }
 
-    llvm::Constant *getSuperclassMetadata() {
-      Type type = Target->mapTypeIntoContext(Target->getSuperclass());
-      auto *metadata =
-          tryEmitConstantHeapMetadataRef(IGM, type->getCanonicalType(),
-                                         /*allowUninit*/ false);
-      return metadata;
+    CanType getSuperclassTypeForMetadata() {
+      if (auto superclass = getSuperclassForMetadata(IGM, Target))
+        return Target->mapTypeIntoContext(superclass)->getCanonicalType();
+      return CanType();
+    }
+
+    llvm::Constant *getSuperclassMetadata(CanType superclass) {
+      return tryEmitConstantHeapMetadataRef(IGM, superclass,
+                                            /*allowUninit*/ false);
     }
 
     bool shouldAddNullSuperclass() {
@@ -2966,7 +2976,8 @@ namespace {
       }
 
       // If this is a root class, use SwiftObject as our formal parent.
-      if (!Target->hasSuperclass()) {
+      CanType superclass = asImpl().getSuperclassTypeForMetadata();
+      if (!superclass) {
         // This is only required for ObjC interoperation.
         if (!IGM.ObjCInterop) {
           B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -2982,8 +2993,10 @@ namespace {
         return;
       }
 
-      auto *metadata = asImpl().getSuperclassMetadata();
-      assert(metadata != nullptr);
+      // This should succeed because the cases where it doesn't should
+      // lead to shouldAddNullSuperclass returning true above.
+      auto metadata = asImpl().getSuperclassMetadata(superclass);
+      assert(metadata);
       B.add(metadata);
     }
 
@@ -3668,11 +3681,13 @@ namespace {
 
     bool shouldAddNullSuperclass() { return false; }
 
-    llvm::Constant *getSuperclassMetadata() {
-      Type superclass = type->getSuperclass(/*useArchetypes=*/false);
-      auto *metadata =
-          IGM.getAddrOfTypeMetadata(superclass->getCanonicalType());
-      return metadata;
+    CanType getSuperclassTypeForMetadata() {
+      return getSuperclassForMetadata(IGM, type, /*useArchetypes=*/false);
+    }
+
+    llvm::Constant *getSuperclassMetadata(CanType superclass) {
+      // We know that this is safe (???)
+      return IGM.getAddrOfTypeMetadata(superclass);
     }
 
     uint64_t getClassDataPointerHasSwiftMetadataBits() {
@@ -4844,7 +4859,7 @@ namespace {
 
       // Emit a reference to the superclass.
       auto superclass = IGF.emitAbstractTypeMetadataRef(
-                                   Target->getSuperclass()->getCanonicalType());
+                          getSuperclassForMetadata(IGM, Target));
 
       // Dig out the address of the superclass field and store.
       auto &layout = IGF.IGM.getForeignMetadataLayout(Target);

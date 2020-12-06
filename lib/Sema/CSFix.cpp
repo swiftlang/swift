@@ -1140,6 +1140,21 @@ DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
       DropThrowsAttribute(cs, fromType, toType, locator);
 }
 
+bool DropAsyncAttribute::diagnose(const Solution &solution,
+                                   bool asNote) const {
+  AsyncFunctionConversionFailure failure(solution, getFromType(),
+                                         getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+DropAsyncAttribute *DropAsyncAttribute::create(ConstraintSystem &cs,
+                                               FunctionType *fromType,
+                                               FunctionType *toType,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DropAsyncAttribute(cs, fromType, toType, locator);
+}
+
 bool IgnoreContextualType::diagnose(const Solution &solution,
                                     bool asNote) const {
   ContextualFailure failure(solution, getFromType(), getToType(), getLocator());
@@ -1580,7 +1595,7 @@ bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
     return true; // Already diagnosed by `matchResultBuilder`.
   }
 
-  auto *S = getAnchor().get<Stmt *>();
+  auto *S = castToExpr<ClosureExpr>(getAnchor())->getBody();
 
   class PreCheckWalker : public ASTWalker {
     DeclContext *DC;
@@ -1644,4 +1659,17 @@ AllowRefToInvalidDecl *
 AllowRefToInvalidDecl::create(ConstraintSystem &cs,
                               ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowRefToInvalidDecl(cs, locator);
+}
+
+bool IgnoreResultBuilderWithReturnStmts::diagnose(const Solution &solution,
+                                                  bool asNote) const {
+  InvalidReturnInResultBuilderBody failure(solution, BuilderType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreResultBuilderWithReturnStmts *
+IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
+                                           ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
 }

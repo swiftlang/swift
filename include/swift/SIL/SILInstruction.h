@@ -3247,15 +3247,22 @@ class GetAsyncContinuationInstBase
     : public SingleValueInstruction
 {
 protected:
-  using SingleValueInstruction::SingleValueInstruction;
-  
+  CanType ResumeType;
+  bool Throws;
+
+  GetAsyncContinuationInstBase(SILInstructionKind Kind, SILDebugLocation Loc,
+                               SILType ContinuationType, CanType ResumeType,
+                               bool Throws)
+    : SingleValueInstruction(Kind, Loc, ContinuationType),
+      ResumeType(ResumeType), Throws(Throws) {}
+
 public:
   /// Get the type of the value the async task receives on a resume.
-  CanType getFormalResumeType() const;
+  CanType getFormalResumeType() const { return ResumeType; }
   SILType getLoweredResumeType() const;
   
   /// True if the continuation can be used to resume the task by throwing an error.
-  bool throws() const;
+  bool throws() const { return Throws; }
   
   static bool classof(const SILNode *I) {
     return I->getKind() >= SILNodeKind::First_GetAsyncContinuationInstBase &&
@@ -3271,8 +3278,9 @@ class GetAsyncContinuationInst final
   friend SILBuilder;
   
   GetAsyncContinuationInst(SILDebugLocation Loc,
-                           SILType ContinuationTy)
-    : InstructionBase(Loc, ContinuationTy)
+                           SILType ContinuationType, CanType ResumeType,
+                           bool Throws)
+    : InstructionBase(Loc, ContinuationType, ResumeType, Throws)
   {}
   
 public:
@@ -3292,9 +3300,10 @@ class GetAsyncContinuationAddrInst final
 {
   friend SILBuilder;
   GetAsyncContinuationAddrInst(SILDebugLocation Loc,
-                               SILValue Operand,
-                               SILType ContinuationTy)
-    : UnaryInstructionBase(Loc, Operand, ContinuationTy)
+                               SILValue ResumeBuf,
+                               SILType ContinuationType, CanType ResumeType,
+                               bool Throws)
+    : UnaryInstructionBase(Loc, ResumeBuf, ContinuationType, ResumeType, Throws)
   {}
 };
 

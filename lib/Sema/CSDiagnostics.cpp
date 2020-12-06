@@ -5762,6 +5762,12 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AsyncFunctionConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();
@@ -7068,5 +7074,24 @@ bool ReferenceToInvalidDeclaration::diagnoseAsError() {
 
   emitDiagnostic(diag::reference_to_invalid_decl, decl->getName());
   emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
+  return true;
+}
+
+bool InvalidReturnInResultBuilderBody::diagnoseAsError() {
+  auto *closure = castToExpr<ClosureExpr>(getAnchor());
+
+  auto returnStmts = TypeChecker::findReturnStatements(closure);
+  assert(!returnStmts.empty());
+
+  auto loc = returnStmts.front()->getReturnLoc();
+  emitDiagnosticAt(loc, diag::result_builder_disabled_by_return, BuilderType);
+
+  // Note that one can remove all of the return statements.
+  {
+    auto diag = emitDiagnosticAt(loc, diag::result_builder_remove_returns);
+    for (auto returnStmt : returnStmts)
+      diag.fixItRemove(returnStmt->getReturnLoc());
+  }
+
   return true;
 }

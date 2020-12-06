@@ -215,10 +215,7 @@ bool IsActorRequest::evaluate(
 
     // The superclass is 'NSObject', which is known to have no state and no
     // superclass.
-    if (superclassDecl->hasClangNode() &&
-        superclassDecl->getName().is("NSObject") &&
-        superclassDecl->getModuleContext()->getName().is("ObjectiveC") &&
-        actorAttr != nullptr)
+    if (superclassDecl->isNSObject() && actorAttr != nullptr)
       return true;
 
     // This class cannot be an actor; complain if the 'actor' modifier was
@@ -233,6 +230,35 @@ bool IsActorRequest::evaluate(
   }
 
   return actorAttr != nullptr;
+}
+
+bool IsDefaultActorRequest::evaluate(
+    Evaluator &evaluator, ClassDecl *classDecl) const {
+  // If the class isn't an actor class, it's not a default actor.
+  if (!classDecl->isActor())
+    return false;
+
+  // If there is a superclass, and it's an actor class, we defer
+  // the decision to it.
+  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+    // If the superclass is an actor, we inherit its default-actor-ness.
+    if (superclassDecl->isActor())
+      return superclassDecl->isDefaultActor();
+
+    // If the superclass is not an actor class, it can only be
+    // a default actor if it's NSObject.  (For now, other classes simply
+    // can't be actors at all.)  We don't need to diagnose this; we
+    // should've done that already in isActor().
+    if (!superclassDecl->isNSObject())
+      return false;
+  }
+
+  // If the class has explicit custom-actor methods, it's not
+  // a default actor.
+  if (classDecl->hasExplicitCustomActorMethods())
+    return false;
+
+  return true;
 }
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,

@@ -140,10 +140,11 @@ public:
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Type *> argTypes);
 
-  void emitGetAsyncContinuation(SILType silTy, StackAddress optionalResultAddr,
+  void emitGetAsyncContinuation(SILType resumeTy,
+                                StackAddress optionalResultAddr,
                                 Explosion &out);
 
-  void emitAwaitAsyncContinuation(SILType unsafeContinuationTy,
+  void emitAwaitAsyncContinuation(SILType resumeTy,
                                   bool isIndirectResult,
                                   Explosion &outDirectResult,
                                   llvm::BasicBlock *&normalBB,
@@ -152,6 +153,10 @@ public:
 
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
+
+  void emitSuspensionPoint(llvm::Value *toExecutor, llvm::Value *asyncResume);
+  llvm::Function *getOrCreateResumeFromSuspensionFn();
+  llvm::Function *createAsyncSuspendFn();
 
 private:
   void emitPrologue();

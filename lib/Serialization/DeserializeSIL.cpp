@@ -1225,8 +1225,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       
   case SILInstructionKind::GetAsyncContinuationInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    ResultInst = Builder.createGetAsyncContinuation(Loc,
-              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createGetAsyncContinuation(
+        Loc, MF->getType(TyID)->getCanonicalType(),
+        /*throws*/ Attr != 0);
     break;
   
   case SILInstructionKind::GetAsyncContinuationAddrInst:
@@ -1235,7 +1236,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createGetAsyncContinuationAddr(Loc,
       getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                       (SILValueCategory)TyCategory2, Fn)),
-      getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+      MF->getType(TyID)->getCanonicalType(),
+      /*throws*/ Attr != 0);
     break;
 
 #define ONETYPE_ONEOPERAND_INST(ID)                                            \

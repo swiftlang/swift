@@ -103,6 +103,10 @@ ERROR(generic_signature_not_equal,none,
       "generic signature %0 is not equal to new signature %1",
       (StringRef, StringRef))
 
+// Used in diagnostics that are split across requests implemented in several places.
+ERROR(concurrency_default_actor_not_found,none,
+      "broken standard library: cannot find default actor type '%0'", (StringRef))
+
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
 ERROR(sdk_node_unrecognized_key,none,

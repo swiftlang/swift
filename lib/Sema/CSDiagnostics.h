@@ -809,6 +809,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose failures related to conversion between 'async' function type
+/// and a synchronous one e.g.
+///
+/// ```swift
+/// func foo<T>(_ t: T) async -> Void {}
+/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+///                            // synchronous function type `(Int) -> Void`
+/// ```
+class AsyncFunctionConversionFailure final : public ContextualFailure {
+public:
+  AsyncFunctionConversionFailure(const Solution &solution, Type fromType,
+                                 Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->isAsync() != fnType2->isAsync());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related attempt to implicitly convert types which
 /// do not support such implicit converstion.
 /// "as" or "as!" has to be specified explicitly in cases like that.
@@ -2307,6 +2328,26 @@ public:
   ReferenceToInvalidDeclaration(const Solution &solution,
                                 ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose use of `return` statements in a body of a result builder.
+///
+/// \code
+/// struct S : Builder {
+///   var foo: some Builder {
+///     return EmptyBuilder()
+///   }
+/// }
+/// \endcode
+class InvalidReturnInResultBuilderBody final : public FailureDiagnostic {
+  Type BuilderType;
+
+public:
+  InvalidReturnInResultBuilderBody(const Solution &solution, Type builderTy,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BuilderType(builderTy) {}
 
   bool diagnoseAsError() override;
 };

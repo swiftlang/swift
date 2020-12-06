@@ -3528,8 +3528,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc KindLoc = P.Tok.getLoc();
     if (P.consumeIf(tok::kw_var))
       KindId = P.Context.getIdentifier("var");
-    else if (P.parseIdentifier(KindId, KindLoc, diag::expected_tok_in_sil_instr,
-                               "kind"))
+    else if (P.parseIdentifier(KindId, KindLoc, /*diagnoseDollarPrefix=*/false,
+                               diag::expected_tok_in_sil_instr, "kind"))
       return true;
 
     if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
@@ -5288,8 +5288,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         throws = true;
       }
       
-      SILType resumeTy;
-      if (parseSILType(resumeTy)) {
+      CanType resumeTy;
+      if (parseASTType(resumeTy)) {
         return true;
       }
       
@@ -5304,21 +5304,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILDebugLocation(InstLoc, B))
         return true;
       
-      auto &M = B.getModule();
-      NominalTypeDecl *continuationDecl = throws
-        ? M.getASTContext().getUnsafeThrowingContinuationDecl()
-        : M.getASTContext().getUnsafeContinuationDecl();
-      
-      auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
-                                                  resumeTy.getASTType());
-      auto continuationSILTy
-        = SILType::getPrimitiveObjectType(continuationTy->getCanonicalType());
-      
       if (Opcode == SILInstructionKind::GetAsyncContinuationAddrInst) {
         ResultVal = B.createGetAsyncContinuationAddr(InstLoc, resumeBuffer,
-                                                     continuationSILTy);
+                                                     resumeTy, throws);
       } else {
-        ResultVal = B.createGetAsyncContinuation(InstLoc, continuationSILTy);
+        ResultVal = B.createGetAsyncContinuation(InstLoc, resumeTy, throws);
       }
       break;
     }
@@ -5783,7 +5773,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-      P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
+      P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
+                        diag::expected_sil_function_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
     return true;
   {
@@ -6009,7 +6000,8 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
-      P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
+      P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
+                        diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
     return true;
 
@@ -6095,6 +6087,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
   if (!P.consumeIf(tok::r_paren)) {
     KeyPathPatternComponent parsedComponent;
     if (P.parseIdentifier(ComponentKind, ComponentLoc,
+                          /*diagnoseDollarPrefix=*/false,
                           diag::expected_tok_in_sil_instr, "component kind")
         || SP.parseKeyPathPatternComponent(parsedComponent, OperandTypes,
                  ComponentLoc, ComponentKind, InstLoc,
@@ -6316,22 +6309,18 @@ static CanType parseAssociatedTypePath(Parser &P, SILParser &SP,
 static ProtocolConformanceRef
 parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
                              ProtocolDecl *&proto) {
-  Identifier ModuleKeyword, ModuleName;
+  const StringRef ModuleKeyword = "module";
+  Identifier ModuleName;
   SourceLoc Loc, KeywordLoc;
   proto = parseProtocolDecl(P, SP);
   if (!proto)
     return ProtocolConformanceRef();
 
-  if (P.parseIdentifier(ModuleKeyword, KeywordLoc,
-                        diag::expected_tok_in_sil_instr, "module") ||
-      SP.parseSILIdentifier(ModuleName, Loc,
-                            diag::expected_sil_value_name))
+  if (P.parseSpecificIdentifier(
+          ModuleKeyword, KeywordLoc,
+          Diagnostic(diag::expected_tok_in_sil_instr, ModuleKeyword)) ||
+      SP.parseSILIdentifier(ModuleName, Loc, diag::expected_sil_value_name))
     return ProtocolConformanceRef();
-
-  if (ModuleKeyword.str() != "module") {
-    P.diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "module");
-    return ProtocolConformanceRef();
-  }
 
   // Calling lookupConformance on a BoundGenericType will return a specialized
   // conformance. We use UnboundGenericType to find the normal conformance.
@@ -6460,9 +6449,10 @@ static bool parseSILWitnessTableEntry(
   Identifier EntryKeyword;
   SourceLoc KeywordLoc;
   if (P.parseIdentifier(EntryKeyword, KeywordLoc,
-        diag::expected_tok_in_sil_instr,
-        "method, associated_type, associated_type_protocol, base_protocol"
-        ", no_default"))
+                        /*diagnoseDollarPrefix=*/false,
+                        diag::expected_tok_in_sil_instr,
+                        "method, associated_type, associated_type_protocol"
+                        ", base_protocol, no_default"))
     return true;
 
   if (EntryKeyword.str() == "no_default") {
@@ -6894,11 +6884,8 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
     auto LHS = parseSILCoverageExpr(Builder);
     if (!LHS)
       return None;
-    Identifier Operator;
-    SourceLoc Loc;
-    if (P.parseAnyIdentifier(Operator, Loc,
-                             diag::sil_coverage_invalid_operator))
-      return None;
+    const Identifier Operator = P.Context.getIdentifier(P.Tok.getText());
+    const SourceLoc Loc = P.consumeToken();
     if (Operator.str() != "+" && Operator.str() != "-") {
       P.diagnose(Loc, diag::sil_coverage_invalid_operator);
       return None;
