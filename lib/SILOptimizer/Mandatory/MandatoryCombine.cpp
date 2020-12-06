@@ -25,8 +25,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-mandatory-combiner"
+
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -69,8 +71,9 @@ private:
   bool changed = false;
 
 public:
-  MandatoryCombineCanonicalize(Worklist &worklist)
-      : CanonicalizeInstruction(DEBUG_TYPE), worklist(worklist) {}
+  MandatoryCombineCanonicalize(Worklist &worklist, DeadEndBlocks &deadEndBlocks)
+      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks), worklist(worklist) {
+  }
 
   void notifyNewInstruction(SILInstruction *inst) override {
     worklist.add(inst);
@@ -129,9 +132,11 @@ class MandatoryCombiner final
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
   SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
+  DeadEndBlocks &deadEndBlocks;
 
 public:
-  MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
+  MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions,
+                    DeadEndBlocks &deadEndBlocks)
       : worklist("MC"), madeChange(false), iteration(0),
         instModCallbacks(
             [&](SILInstruction *instruction) {
@@ -142,7 +147,8 @@ public:
             [this](SILValue oldValue, SILValue newValue) {
               worklist.replaceValueUsesWith(oldValue, newValue);
             }),
-        createdInstructions(createdInstructions){};
+        createdInstructions(createdInstructions),
+        deadEndBlocks(deadEndBlocks){};
 
   void addReachableCodeToWorklist(SILFunction &function);
 
@@ -241,7 +247,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
-  MandatoryCombineCanonicalize mcCanonicialize(worklist);
+  MandatoryCombineCanonicalize mcCanonicialize(worklist, deadEndBlocks);
 
   bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
                                    OptimizationMode::NoOptimization;
@@ -389,7 +395,8 @@ class MandatoryCombine final : public SILFunctionTransform {
       return;
     }
 
-    MandatoryCombiner combiner(createdInstructions);
+    DeadEndBlocks deadEndBlocks(function);
+    MandatoryCombiner combiner(createdInstructions, deadEndBlocks);
     bool madeChange = combiner.runOnFunction(*function);
 
     if (madeChange) {

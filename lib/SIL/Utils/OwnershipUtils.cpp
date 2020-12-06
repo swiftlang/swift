@@ -221,9 +221,17 @@ bool BorrowingOperand::visitLocalEndScopeUses(
   case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::Yield:
     return true;
-  case BorrowingOperandKind::Branch:
+  case BorrowingOperandKind::Branch: {
+    auto *br = cast<BranchInst>(op->getUser());
+    for (auto *use : br->getArgForOperand(op)->getUses())
+      if (use->isLifetimeEnding())
+        if (!func(use))
+          return false;
     return true;
   }
+  }
+
+  llvm_unreachable("Covered switch isn't covered");
 }
 
 void BorrowingOperand::visitBorrowIntroducingUserResults(
