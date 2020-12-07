@@ -57,18 +57,18 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
 
   std::vector<BatchScanInput> BatchInput;
   for (int i = 0; i < batch_input->count; ++i) {
-    swiftscan_batch_scan_entry_t &Entry = batch_input->modules[i];
-    BatchInput.push_back({swiftscan_get_C_string(Entry.module_name),
-                          swiftscan_get_C_string(Entry.arguments),
-                          /*outputPath*/ "", Entry.is_swift});
+    swiftscan_impl_batch_scan_entry_t *Entry =
+        unwrap_batch_entry(batch_input->modules[i]);
+    BatchInput.push_back({swiftscan_get_C_string(Entry->module_name),
+                          swiftscan_get_C_string(Entry->arguments),
+                          /*outputPath*/ "", Entry->is_swift});
   }
 
   // Execute the scan and bridge the result
   auto BatchScanResult =
       ScanningTool->getDependencies(Compilation, BatchInput, {});
   swiftscan_batch_scan_result_t *Result = new swiftscan_batch_scan_result_t;
-  auto ResultGraphs =
-      new swiftscan_dependency_result_t[BatchScanResult.size()];
+  auto ResultGraphs = new swiftscan_dependency_result_t[BatchScanResult.size()];
   for (size_t i = 0; i < BatchScanResult.size(); ++i) {
     auto &ResultOrErr = BatchScanResult[i];
     if (ResultOrErr.getError())
@@ -237,6 +237,23 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return unwrap_details(details)->clang_details.command_line;
 }
 
+//=== Batch Scan Entry Functions ------------------------------------------===//
+
+swiftscan_string_t
+swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry) {
+  return unwrap_batch_entry(entry)->module_name;
+}
+
+swiftscan_string_t
+swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry) {
+  return unwrap_batch_entry(entry)->arguments;
+}
+
+bool swiftscan_batch_scan_entry_get_is_swift(
+    swiftscan_batch_scan_entry_t entry) {
+  return unwrap_batch_entry(entry)->is_swift;
+}
+
 //=== Cleanup Functions ---------------------------------------------------===//
 
 void swiftscan_dependency_info_details_dispose(
@@ -285,12 +302,14 @@ void swiftscan_dependency_info_details_dispose(
   delete details_impl;
 }
 
-void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t *info) {
-  swiftscan_string_dispose(unwrap_info(info)->module_name);
-  swiftscan_string_dispose(unwrap_info(info)->module_path);
-  swiftscan_string_set_dispose(unwrap_info(info)->source_files);
-  swiftscan_string_set_dispose(unwrap_info(info)->direct_dependencies);
-  swiftscan_dependency_info_details_dispose(unwrap_info(info)->details);
+void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info) {
+  swiftscan_impl_dependency_info_t *info_impl = unwrap_info(info);
+  swiftscan_string_dispose(info_impl->module_name);
+  swiftscan_string_dispose(info_impl->module_path);
+  swiftscan_string_set_dispose(info_impl->source_files);
+  swiftscan_string_set_dispose(info_impl->direct_dependencies);
+  swiftscan_dependency_info_details_dispose(info_impl->details);
+  delete info_impl;
 }
 
 void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
@@ -301,8 +320,7 @@ void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
   delete set;
 }
 
-void swiftscan_dependency_result_dispose(
-    swiftscan_dependency_result_t result) {
+void swiftscan_dependency_result_dispose(swiftscan_dependency_result_t result) {
   swiftscan_impl_dependency_result_t *result_impl = unwrap_result(result);
   swiftscan_string_dispose(result_impl->main_module_name);
   swiftscan_dependency_set_dispose(result_impl->module_set);
@@ -314,10 +332,11 @@ void swiftscan_prescan_result_dispose(swiftscan_prescan_result_t *result) {
   delete result;
 }
 
-void swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t *entry) {
-  swiftscan_string_dispose(entry->module_name);
-  swiftscan_string_dispose(entry->arguments);
-  delete entry;
+void swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry) {
+  swiftscan_impl_batch_scan_entry_t *entry_impl = unwrap_batch_entry(entry);
+  swiftscan_string_dispose(entry_impl->module_name);
+  swiftscan_string_dispose(entry_impl->arguments);
+  delete entry_impl;
 }
 
 void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {

@@ -63,11 +63,8 @@ typedef struct {
 
 //=== Batch Scan Input Specification --------------------------------------===//
 
-typedef struct {
-  swiftscan_string_t module_name;
-  swiftscan_string_t arguments;
-  bool is_swift;
-} swiftscan_batch_scan_entry_t;
+/// Opaque container to a container of batch scan entry information.
+typedef void *swiftscan_batch_scan_entry_t;
 
 typedef struct {
   int count;
@@ -186,25 +183,36 @@ swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details);
 
+//=== Batch Scan Entry Functions ------------------------------------------===//
+
+SWIFTSCAN_PUBLIC swiftscan_string_t
+swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry);
+
+SWIFTSCAN_PUBLIC swiftscan_string_t
+swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry);
+
+SWIFTSCAN_PUBLIC bool
+swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
+
 //=== Cleanup Functions ---------------------------------------------------===//
 
 SWIFTSCAN_PUBLIC void
 swiftscan_dependency_info_details_dispose(swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC void
-swiftscan_dependency_info_dispose(swiftscan_dependency_info_t *info);
+swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set);
 
 SWIFTSCAN_PUBLIC void
-swiftscan_dependency_result_dispose(swiftscan_dependency_result_t *result);
+swiftscan_dependency_result_dispose(swiftscan_dependency_result_t result);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_prescan_result_dispose(swiftscan_prescan_result_t *result);
 
 SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t *entry);
+swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input);
