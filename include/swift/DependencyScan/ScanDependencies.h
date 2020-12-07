@@ -59,7 +59,7 @@ performModuleScan(CompilerInstance &instance,
                   ModuleDependenciesCache &cache);
 
 /// Scans the main module of \c instance for all direct module imports
-llvm::ErrorOr<swiftscan_prescan_result_t*>
+llvm::ErrorOr<swiftscan_prescan_result_t>
 performModulePrescan(CompilerInstance &instance);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
@@ -69,7 +69,7 @@ performBatchModuleScan(CompilerInstance &instance,
                        const std::vector<BatchScanInput> &BatchInput);
 
 /// Batch prescan the imports of modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<swiftscan_prescan_result_t*>>
+std::vector<llvm::ErrorOr<swiftscan_prescan_result_t>>
 performBatchModulePrescan(CompilerInstance &instance,
                           ModuleDependenciesCache &cache,
                           llvm::StringSaver &saver,

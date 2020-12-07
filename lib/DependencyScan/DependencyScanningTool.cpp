@@ -47,7 +47,7 @@ DependencyScanningTool::getDependencies(
   return Dependencies;
 }
 
-llvm::ErrorOr<swiftscan_prescan_result_t *>
+llvm::ErrorOr<swiftscan_prescan_result_t>
 DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
   // The primary instance used to scan the query Swift source-code
   auto InstanceOrErr = initCompilerInstanceForScan(Command);

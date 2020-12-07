@@ -141,6 +141,11 @@ typedef struct {
   bool is_swift;
 } swiftscan_impl_batch_scan_entry_t;
 
+typedef struct {
+  /// The complete list of imports discovered
+  swiftscan_string_set_t *import_set;
+} swiftscan_impl_prescan_result_t;
+
 inline swift::dependencies::DependencyScanningTool *
 unwrap_scanner(swiftscan_scanner_t P) {
   return reinterpret_cast<swift::dependencies::DependencyScanningTool *>(P);
@@ -183,6 +188,17 @@ inline swiftscan_dependency_result_t
 wrap_result(const swiftscan_impl_dependency_result_t *P) {
   return reinterpret_cast<swiftscan_dependency_result_t>(
       const_cast<swiftscan_impl_dependency_result_t *>(P));
+}
+
+inline swiftscan_impl_prescan_result_t *
+unwrap_prescan_result(swiftscan_prescan_result_t P) {
+  return reinterpret_cast<swiftscan_impl_prescan_result_t *>(P);
+}
+
+inline swiftscan_prescan_result_t
+wrap_prescan_result(const swiftscan_impl_prescan_result_t *P) {
+  return reinterpret_cast<swiftscan_prescan_result_t>(
+      const_cast<swiftscan_impl_prescan_result_t *>(P));
 }
 
 inline swiftscan_impl_batch_scan_entry_t *

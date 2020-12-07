@@ -50,16 +50,14 @@ typedef void *swiftscan_dependency_info_t;
 /// Opaque container to an overall result of a dependency scan.
 typedef void *swiftscan_dependency_result_t;
 
+/// Opaque container to contain the result of a dependency prescan.
+typedef void *swiftscan_prescan_result_t;
+
 /// Full Dependency Graph (Result)
 typedef struct {
   int count;
   swiftscan_dependency_info_t *modules;
 } swiftscan_dependency_set_t;
-
-typedef struct {
-  /// The complete list of imports discovered
-  swiftscan_string_set_t *import_set;
-} swiftscan_prescan_result_t;
 
 //=== Batch Scan Input Specification --------------------------------------===//
 
@@ -194,6 +192,11 @@ swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry);
 SWIFTSCAN_PUBLIC bool
 swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
 
+//=== Prescan Result Functions --------------------------------------------===//
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result);
+
 //=== Cleanup Functions ---------------------------------------------------===//
 
 SWIFTSCAN_PUBLIC void
@@ -209,7 +212,7 @@ SWIFTSCAN_PUBLIC void
 swiftscan_dependency_result_dispose(swiftscan_dependency_result_t result);
 
 SWIFTSCAN_PUBLIC void
-swiftscan_prescan_result_dispose(swiftscan_prescan_result_t *result);
+swiftscan_prescan_result_dispose(swiftscan_prescan_result_t result);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry);
@@ -241,7 +244,7 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
                                   swiftscan_batch_scan_input_t *batch_input,
                                   int argc, const char *const *argv);
 
-SWIFTSCAN_PUBLIC swiftscan_prescan_result_t *
+SWIFTSCAN_PUBLIC swiftscan_prescan_result_t
 swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
                                const char *working_directory, int argc,
                                const char *const *argv);

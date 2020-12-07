@@ -81,7 +81,7 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
   return Result;
 }
 
-swiftscan_prescan_result_t *
+swiftscan_prescan_result_t
 swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
                                const char *working_directory, int argc,
                                const char *const *argv) {
@@ -254,6 +254,13 @@ bool swiftscan_batch_scan_entry_get_is_swift(
   return unwrap_batch_entry(entry)->is_swift;
 }
 
+//=== Prescan Result Functions --------------------------------------------===//
+
+swiftscan_string_set_t *
+swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result) {
+  return unwrap_prescan_result(result)->import_set;
+}
+
 //=== Cleanup Functions ---------------------------------------------------===//
 
 void swiftscan_dependency_info_details_dispose(
@@ -327,9 +334,10 @@ void swiftscan_dependency_result_dispose(swiftscan_dependency_result_t result) {
   delete result_impl;
 }
 
-void swiftscan_prescan_result_dispose(swiftscan_prescan_result_t *result) {
-  swiftscan_string_set_dispose(result->import_set);
-  delete result;
+void swiftscan_prescan_result_dispose(swiftscan_prescan_result_t result) {
+  swiftscan_impl_prescan_result_t *result_impl = unwrap_prescan_result(result);
+  swiftscan_string_set_dispose(result_impl->import_set);
+  delete result_impl;
 }
 
 void swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry) {
@@ -343,6 +351,8 @@ void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {
   for (int i = 0; i < input->count; ++i) {
     swiftscan_batch_scan_entry_dispose(&input->modules[i]);
   }
+  delete[] input->modules;
+  delete input;
 }
 
 void swiftscan_batch_scan_result_dispose(
@@ -350,4 +360,6 @@ void swiftscan_batch_scan_result_dispose(
   for (int i = 0; i < result->count; ++i) {
     swiftscan_dependency_result_dispose(result->results[i]);
   }
+  delete[] result->results;
+  delete result;
 }

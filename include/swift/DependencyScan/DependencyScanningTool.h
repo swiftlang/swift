@@ -44,7 +44,7 @@ public:
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_prescan_result_t otherwise.
-  llvm::ErrorOr<swiftscan_prescan_result_t*>
+  llvm::ErrorOr<swiftscan_prescan_result_t>
   getImports(ArrayRef<const char *> Command);
 
   /// Collect the full module depenedency graph for the input collection of

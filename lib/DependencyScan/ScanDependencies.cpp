@@ -479,7 +479,7 @@ getAsClangDependencyModule(swiftscan_module_details_t details) {
 }
 
 static void writePrescanJSON(llvm::raw_ostream &out,
-                             const swiftscan_prescan_result_t *importSet) {
+                             const swiftscan_prescan_result_t importSet) {
   // Write out a JSON containing all main module imports.
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
@@ -1275,13 +1275,13 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   return dependencyGraph;
 }
 
-llvm::ErrorOr<swiftscan_prescan_result_t *>
+llvm::ErrorOr<swiftscan_prescan_result_t>
 swift::dependencies::performModulePrescan(CompilerInstance &instance) {
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies = identifyMainModuleDependencies(instance);
-  swiftscan_prescan_result_t *importSet = new swiftscan_prescan_result_t;
+  auto *importSet = new swiftscan_impl_prescan_result_t;
   importSet->import_set = create_set(mainDependencies.getModuleDependencies());
-  return importSet;
+  return wrap_prescan_result(importSet);
 }
 
 std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
@@ -1353,11 +1353,11 @@ swift::dependencies::performBatchModuleScan(
   return batchScanResult;
 }
 
-std::vector<llvm::ErrorOr<swiftscan_prescan_result_t *>>
+std::vector<llvm::ErrorOr<swiftscan_prescan_result_t>>
 swift::dependencies::performBatchModulePrescan(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
-  std::vector<llvm::ErrorOr<swiftscan_prescan_result_t *>> batchPrescanResult;
+  std::vector<llvm::ErrorOr<swiftscan_prescan_result_t>> batchPrescanResult;
 
   // Perform a full dependency scan for each batch entry module
   forEachBatchEntry(
@@ -1400,7 +1400,7 @@ swift::dependencies::performBatchModulePrescan(
           return;
         }
 
-        swiftscan_prescan_result_t *importSet = new swiftscan_prescan_result_t;
+        auto *importSet = new swiftscan_impl_prescan_result_t;
         importSet->import_set = create_set(rootDeps->getModuleDependencies());
         batchPrescanResult.push_back(importSet);
       });
