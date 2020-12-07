@@ -2,6 +2,9 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
+// rdar_72047158
+// XFAIL: CPU=arm64e
+
 import Foundation
 
 // CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, [10 x i8*], %TSi }>

@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency | %target-FileCheck %s
 // REQUIRES: concurrency
 
+// rdar_72047158
+// XFAIL: CPU=arm64e
+
 // CHECK: %T11actor_class7MyClassC = type <{ %swift.refcounted, [10 x i8*], %TSi }>
 
 // CHECK-objc-LABEL: @"$s11actor_class7MyClassCMm" = global
