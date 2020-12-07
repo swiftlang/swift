@@ -883,7 +883,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // of bindings for them until closure's body is opened.
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
-        result.InvolvesTypeVariables = true;
         result.DelayedBy.push_back(constraint);
         return None;
       }
@@ -1140,10 +1139,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     break;
 
   case ConstraintKind::Disjunction:
-    // FIXME: Recurse into these constraints to see whether this
-    // type variable is fully bound by any of them.
-    InvolvesTypeVariables = true;
-
     // If there is additional context available via disjunction
     // associated with closure literal (e.g. coercion to some other
     // type) let's delay resolving the closure until the disjunction
@@ -1151,6 +1146,7 @@ bool ConstraintSystem::PotentialBindings::infer(
     if (TypeVar->getImpl().isClosureType())
       return true;
 
+    DelayedBy.push_back(constraint);
     break;
 
   case ConstraintKind::ConformsTo:
@@ -1188,25 +1184,30 @@ bool ConstraintSystem::PotentialBindings::infer(
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
-    // If our type variable shows up in the base type, there's
-    // nothing to do.
-    // FIXME: Can we avoid simplification here?
-    if (ConstraintSystem::typeVarOccursInType(
-            TypeVar, cs.simplifyType(constraint->getFirstType()),
-            &InvolvesTypeVariables)) {
-      return false;
+  case ConstraintKind::ValueWitness: {
+    // If current type variable represents a member type of some reference,
+    // it would be bound once member is resolved either to a actual member
+    // type or to a hole if member couldn't be found.
+    auto memberTy = constraint->getSecondType()->castTo<TypeVariableType>();
+
+    if (memberTy->getImpl().hasRepresentativeOrFixed()) {
+      if (auto type = memberTy->getImpl().getFixedType(/*record=*/nullptr)) {
+        // It's possible that member has been bound to some other type variable
+        // instead of merged with it because it's wrapped in an l-value type.
+        if (type->getWithoutSpecifierType()->isEqual(TypeVar)) {
+          DelayedBy.push_back(constraint);
+          break;
+        }
+      } else {
+        memberTy = memberTy->getImpl().getRepresentative(/*record=*/nullptr);
+      }
     }
 
-    // If the type variable is in the list of member type
-    // variables, it is fully bound.
-    // FIXME: Can we avoid simplification here?
-    if (ConstraintSystem::typeVarOccursInType(
-            TypeVar, cs.simplifyType(constraint->getSecondType()),
-            &InvolvesTypeVariables)) {
+    if (memberTy == TypeVar)
       DelayedBy.push_back(constraint);
-    }
+
     break;
+  }
 
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam: {
