@@ -30,6 +30,11 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   let _: Int = await slowServer.bestName("hello")
   let _: Int = await slowServer.customize("hello")
+
+  let _: String = await slowServer.dance("slide")
+  let _: String = await slowServer.__leap(17)
+
+  slowServer.repeatTrick("jump") // expected-error{{missing argument for parameter 'completionHandler' in call}}
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
@@ -37,6 +42,10 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
   let _: Int = slowServer.doSomethingConflicted("thinking")
   slowServer.poorlyNamed("hello") { (i: Int) in print(i) }
   slowServer.customize(with: "hello") { (i: Int) in print(i) }
+
+  slowServer.dance("jig") { s in print(s + "") }
+  slowServer.leap(17) { s in print(s + "") }
+  slowServer.repeatTrick("jump") { i in print(i + 1) }
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
