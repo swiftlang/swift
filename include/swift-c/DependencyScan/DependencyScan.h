@@ -47,19 +47,14 @@ typedef void *swiftscan_module_details_t;
 /// Opaque container to a dependency info of a given module.
 typedef void *swiftscan_dependency_info_t;
 
+/// Opaque container to an overall result of a dependency scan.
+typedef void *swiftscan_dependency_result_t;
+
 /// Full Dependency Graph (Result)
 typedef struct {
   int count;
   swiftscan_dependency_info_t *modules;
 } swiftscan_dependency_set_t;
-
-typedef struct {
-  /// The name of the main module for this dependency graph (root node)
-  swiftscan_string_t main_module_name;
-
-  /// The complete list of modules discovered
-  swiftscan_dependency_set_t *module_set;
-} swiftscan_dependency_result_t;
 
 typedef struct {
   /// The complete list of imports discovered
@@ -81,10 +76,20 @@ typedef struct {
 
 typedef struct {
   int count;
-  swiftscan_dependency_result_t **results;
+  swiftscan_dependency_result_t *results;
 } swiftscan_batch_scan_result_t;
 
 //=== Dependency Result Functions -----------------------------------------===//
+
+SWIFTSCAN_PUBLIC swiftscan_string_t
+swiftscan_dependency_result_get_main_module_name(
+    swiftscan_dependency_result_t result);
+
+SWIFTSCAN_PUBLIC swiftscan_dependency_set_t *
+swiftscan_dependency_result_get_module_set(
+    swiftscan_dependency_result_t result);
+
+//=== Dependency Module Info Functions ------------------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_t
 swiftscan_module_info_get_module_name(swiftscan_dependency_info_t info);
@@ -100,6 +105,8 @@ swiftscan_module_info_get_direct_dependencies(swiftscan_dependency_info_t info);
 
 SWIFTSCAN_PUBLIC swiftscan_module_details_t
 swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
+
+//=== Dependency Module Info Details Functions ----------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_dependency_info_kind_t
 swiftscan_module_detail_get_kind(swiftscan_module_details_t details);
@@ -215,7 +222,7 @@ SWIFTSCAN_PUBLIC swiftscan_scanner_t swiftscan_scanner_create(void);
 
 SWIFTSCAN_PUBLIC void swiftscan_scanner_dispose(swiftscan_scanner_t);
 
-SWIFTSCAN_PUBLIC swiftscan_dependency_result_t *
+SWIFTSCAN_PUBLIC swiftscan_dependency_result_t
 swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
                             const char *working_directory, int argc,
                             const char *const *argv);

@@ -36,7 +36,7 @@ public:
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_dependency_result_t otherwise.
-  llvm::ErrorOr<swiftscan_dependency_result_t*>
+  llvm::ErrorOr<swiftscan_dependency_result_t>
   getDependencies(ArrayRef<const char *> Command,
                   const llvm::StringSet<> &PlaceholderModules);
 
@@ -52,7 +52,7 @@ public:
   /// BatchScanInput-specified output locations.
   ///
   /// \returns a \c std::error_code if errors occured during scan.
-  std::vector<llvm::ErrorOr<swiftscan_dependency_result_t*>>
+  std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
   getDependencies(ArrayRef<const char *> Command,
                   const std::vector<BatchScanInput> &BatchInput,
                   const llvm::StringSet<> &PlaceholderModules);

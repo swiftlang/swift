@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -25,6 +24,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/DependencyScan/DSStringImpl.h"
+#include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -341,7 +341,8 @@ void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_set_t *value_set,
   out << "]";
 }
 
-void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out, swiftscan_string_t value,
+void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
+                                   swiftscan_string_t value,
                                    unsigned indentLevel) {
   out << "{\n";
   static const std::string textualPrefix("swiftTextual");
@@ -487,18 +488,21 @@ static void writePrescanJSON(llvm::raw_ostream &out,
 }
 
 static void writeJSON(llvm::raw_ostream &out,
-                      const swiftscan_dependency_result_t *fullDependencies) {
+                      const swiftscan_dependency_result_t fullDependencies) {
+  const swiftscan_impl_dependency_result_t *fullDependenciesImpl =
+      unwrap_result(fullDependencies);
+
   // Write out a JSON description of all of the dependencies.
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
   // Name of the main module.
   writeJSONSingleField(out, "mainModuleName",
-                       fullDependencies->main_module_name,
+                       fullDependenciesImpl->main_module_name,
                        /*indentLevel=*/1, /*trailingComma=*/true);
   // Write out all of the modules.
   out << "  \"modules\": [\n";
   SWIFT_DEFER { out << "  ]\n"; };
-  const auto module_set = fullDependencies->module_set;
+  const auto module_set = fullDependenciesImpl->module_set;
   for (int mi = 0; mi < module_set->count; ++mi) {
     const auto &moduleInfo = *unwrap_info(module_set->modules[mi]);
     auto &directDependencies = moduleInfo.direct_dependencies;
@@ -526,7 +530,8 @@ static void writeJSON(llvm::raw_ostream &out,
       modulePath =
           swiftscan_get_C_string(swiftPlaceholderDeps->compiled_module_path);
     else if (swiftBinaryDeps)
-      modulePath = swiftscan_get_C_string(swiftBinaryDeps->compiled_module_path);
+      modulePath =
+          swiftscan_get_C_string(swiftBinaryDeps->compiled_module_path);
     else
       modulePath = moduleName + modulePathSuffix;
 
@@ -564,8 +569,8 @@ static void writeJSON(llvm::raw_ostream &out,
         out << "\"commandLine\": [\n";
         for (int i = 0, count = swiftTextualDeps->command_line->count;
              i < count; ++i) {
-          const auto &arg =
-              swiftscan_get_C_string(swiftTextualDeps->command_line->strings[i]);
+          const auto &arg = swiftscan_get_C_string(
+              swiftTextualDeps->command_line->strings[i]);
           out.indent(6 * 2);
           out << "\"" << arg << "\"";
           if (i != count - 1)
@@ -723,7 +728,7 @@ static std::string createEncodedModuleKindAndName(ModuleDependencyID id) {
   }
 }
 
-static swiftscan_dependency_result_t *
+static swiftscan_dependency_result_t
 generateFullDependencyGraph(CompilerInstance &instance,
                             ModuleDependenciesCache &cache,
                             InterfaceSubContextDelegate &ASTDelegate,
@@ -735,7 +740,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
   std::string mainModuleName = allModules.front().first;
   swiftscan_dependency_set_t *dependencySet = new swiftscan_dependency_set_t;
   dependencySet->count = allModules.size();
-  dependencySet->modules = new swiftscan_dependency_info_t[dependencySet->count];
+  dependencySet->modules =
+      new swiftscan_dependency_info_t[dependencySet->count];
 
   for (size_t i = 0; i < allModules.size(); ++i) {
     const auto &module = allModules[i];
@@ -774,7 +780,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
-      swiftscan_impl_module_details_t *details = new swiftscan_impl_module_details_t;
+      swiftscan_impl_module_details_t *details =
+          new swiftscan_impl_module_details_t;
       if (swiftTextualDeps) {
         swiftscan_string_t moduleInterfacePath =
             swiftTextualDeps->swiftInterfaceFile.hasValue()
@@ -861,10 +868,11 @@ generateFullDependencyGraph(CompilerInstance &instance,
     moduleInfo.details = getModuleDetails();
   }
 
-  swiftscan_dependency_result_t *result = new swiftscan_dependency_result_t;
+  swiftscan_impl_dependency_result_t *result =
+      new swiftscan_impl_dependency_result_t;
   result->main_module_name = create_dup(mainModuleName.c_str());
   result->module_set = dependencySet;
-  return result;
+  return wrap_result(result);
 }
 
 static bool diagnoseCycle(CompilerInstance &instance,
@@ -1186,7 +1194,7 @@ bool swift::dependencies::batchPrescanDependencies(
   return false;
 }
 
-llvm::ErrorOr<swiftscan_dependency_result_t *>
+llvm::ErrorOr<swiftscan_dependency_result_t>
 swift::dependencies::performModuleScan(CompilerInstance &instance,
                                        ModuleDependenciesCache &cache) {
   ModuleDecl *mainModule = instance.getMainModule();
@@ -1276,11 +1284,11 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance) {
   return importSet;
 }
 
-std::vector<llvm::ErrorOr<swiftscan_dependency_result_t *>>
+std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
 swift::dependencies::performBatchModuleScan(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
-  std::vector<llvm::ErrorOr<swiftscan_dependency_result_t *>> batchScanResult;
+  std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>> batchScanResult;
   batchScanResult.reserve(batchInput.size());
 
   // Perform a full dependency scan for each batch entry module

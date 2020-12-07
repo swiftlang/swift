@@ -54,7 +54,7 @@ bool batchPrescanDependencies(CompilerInstance &instance,
 
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
-llvm::ErrorOr<swiftscan_dependency_result_t*>
+llvm::ErrorOr<swiftscan_dependency_result_t>
 performModuleScan(CompilerInstance &instance,
                   ModuleDependenciesCache &cache);
 
@@ -63,7 +63,7 @@ llvm::ErrorOr<swiftscan_prescan_result_t*>
 performModulePrescan(CompilerInstance &instance);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<swiftscan_dependency_result_t*>>
+std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
 performBatchModuleScan(CompilerInstance &instance,
                        ModuleDependenciesCache &cache, llvm::StringSaver &saver,
                        const std::vector<BatchScanInput> &BatchInput);

@@ -20,6 +20,14 @@
 #include "swift/DependencyScan/DependencyScanningTool.h"
 
 typedef struct {
+  /// The name of the main module for this dependency graph (root node)
+  swiftscan_string_t main_module_name;
+
+  /// The complete list of modules discovered
+  swiftscan_dependency_set_t *module_set;
+} swiftscan_impl_dependency_result_t;
+
+typedef struct {
   /// The module's name
   /// The format is:
   /// `<module-kind>:<module-name>`
@@ -158,6 +166,17 @@ inline swiftscan_dependency_info_t
 wrap_info(const swiftscan_impl_dependency_info_t *P) {
   return reinterpret_cast<swiftscan_dependency_info_t>(
       const_cast<swiftscan_impl_dependency_info_t *>(P));
+}
+
+inline swiftscan_impl_dependency_result_t *
+unwrap_result(swiftscan_dependency_result_t P) {
+  return reinterpret_cast<swiftscan_impl_dependency_result_t *>(P);
+}
+
+inline swiftscan_dependency_result_t
+wrap_result(const swiftscan_impl_dependency_result_t *P) {
+  return reinterpret_cast<swiftscan_dependency_result_t>(
+      const_cast<swiftscan_impl_dependency_result_t *>(P));
 }
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H
