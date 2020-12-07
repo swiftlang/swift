@@ -11,21 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 #ifdef  __cplusplus
-# define DEPSCAN_BEGIN_DECLS  extern "C" {
-# define DEPSCAN_END_DECLS    }
+# define SWIFTSCAN_BEGIN_DECLS  extern "C" {
+# define SWIFTSCAN_END_DECLS    }
 #else
-# define DEPSCAN_BEGIN_DECLS
-# define DEPSCAN_END_DECLS
+# define SWIFTSCAN_BEGIN_DECLS
+# define SWIFTSCAN_END_DECLS
 #endif
 
-#ifndef DEPSCAN_PUBLIC
+#ifndef SWIFTSCAN_PUBLIC
 # ifdef _WIN32
 #  ifdef libSwiftScan_EXPORTS
-#    define DEPSCAN_PUBLIC __declspec(dllexport)
+#    define SWIFTSCAN_PUBLIC __declspec(dllexport)
 #  else
-#    define DEPSCAN_PUBLIC __declspec(dllimport)
+#    define SWIFTSCAN_PUBLIC __declspec(dllimport)
 #  endif
 # else
-#  define DEPSCAN_PUBLIC
+#  define SWIFTSCAN_PUBLIC
 # endif
 #endif

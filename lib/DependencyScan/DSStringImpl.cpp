@@ -12,57 +12,57 @@
 
 #include "swift/DependencyScan/DSStringImpl.h"
 
-/// Describes the kind of underlying data in ds_string_t.
-enum ds_string_management {
+/// Describes the kind of underlying data in swiftscan_string_t.
+enum swiftscan_string_management {
   /// c_string_t contains a 'const char *' that it doesn't own.
-  ds_string_unmanaged,
+  swiftscan_string_unmanaged,
   /// c_string_t contains a 'const char *' that it allocated with malloc().
-  ds_string_malloc
+  swiftscan_string_malloc
 };
 
 namespace swift {
 namespace dependencies {
-ds_string_t create_empty() {
-  ds_string_t str;
+swiftscan_string_t create_empty() {
+  swiftscan_string_t str;
   str.data = "";
-  str.private_flags = ds_string_unmanaged;
+  str.private_flags = swiftscan_string_unmanaged;
   return str;
 }
 
-ds_string_t create_null() {
-  ds_string_t str;
+swiftscan_string_t create_null() {
+  swiftscan_string_t str;
   str.data = nullptr;
-  str.private_flags = ds_string_unmanaged;
+  str.private_flags = swiftscan_string_unmanaged;
   return str;
 }
 
-ds_string_t create_ref(const char *string) {
+swiftscan_string_t create_ref(const char *string) {
   if (string && string[0] == '\0')
     return create_empty();
 
-  ds_string_t str;
+  swiftscan_string_t str;
   str.data = string;
-  str.private_flags = ds_string_unmanaged;
+  str.private_flags = swiftscan_string_unmanaged;
   return str;
 }
 
-ds_string_t create_dup(const char *string) {
+swiftscan_string_t create_dup(const char *string) {
   if (!string)
     return create_null();
 
   if (string[0] == '\0')
     return create_empty();
 
-  ds_string_t str;
+  swiftscan_string_t str;
   str.data = strdup(string);
-  str.private_flags = ds_string_malloc;
+  str.private_flags = swiftscan_string_malloc;
   return str;
 }
 
-ds_string_set_t *create_set(const std::vector<std::string> &strings) {
-  ds_string_set_t *set = new ds_string_set_t;
+swiftscan_string_set_t *create_set(const std::vector<std::string> &strings) {
+  swiftscan_string_set_t *set = new swiftscan_string_set_t;
   set->count = strings.size();
-  set->strings = new ds_string_t[set->count];
+  set->strings = new swiftscan_string_t[set->count];
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
     set->strings[SI] = create_dup(strings[SI].c_str());
   return set;
@@ -74,16 +74,16 @@ ds_string_set_t *create_set(const std::vector<std::string> &strings) {
 // libSwiftScan public APIs.
 //===----------------------------------------------------------------------===//
 
-const char *ds_get_C_string(ds_string_t string) {
+const char *swiftscan_get_C_string(swiftscan_string_t string) {
   return static_cast<const char *>(string.data);
 }
 
 /// Free the given string.
-void ds_string_dispose(ds_string_t string) {
-  switch ((ds_string_management)string.private_flags) {
-  case ds_string_unmanaged:
+void swiftscan_string_dispose(swiftscan_string_t string) {
+  switch ((swiftscan_string_management)string.private_flags) {
+  case swiftscan_string_unmanaged:
     break;
-  case ds_string_malloc:
+  case swiftscan_string_malloc:
     if (string.data)
       free(const_cast<void *>(string.data));
     break;
@@ -91,9 +91,9 @@ void ds_string_dispose(ds_string_t string) {
 }
 
 /// Free the given string set.
-void ds_string_set_dispose(ds_string_set_t *set) {
+void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
-    ds_string_dispose(set->strings[SI]);
+    swiftscan_string_dispose(set->strings[SI]);
   delete[] set->strings;
   delete set;
 }

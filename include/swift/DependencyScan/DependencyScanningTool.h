@@ -35,16 +35,16 @@ public:
   /// placeholder modules.
   ///
   /// \returns a \c StringError with the diagnostic output if errors
-  /// occurred, \c ds_dependency_result_t otherwise.
-  llvm::ErrorOr<ds_dependency_result_t*>
+  /// occurred, \c swiftscan_dependency_result_t otherwise.
+  llvm::ErrorOr<swiftscan_dependency_result_t*>
   getDependencies(ArrayRef<const char *> Command,
                   const llvm::StringSet<> &PlaceholderModules);
 
   /// Collect the set of imports for the input module
   ///
   /// \returns a \c StringError with the diagnostic output if errors
-  /// occurred, \c ds_prescan_result_t otherwise.
-  llvm::ErrorOr<ds_prescan_result_t*>
+  /// occurred, \c swiftscan_prescan_result_t otherwise.
+  llvm::ErrorOr<swiftscan_prescan_result_t*>
   getImports(ArrayRef<const char *> Command);
 
   /// Collect the full module depenedency graph for the input collection of
@@ -52,7 +52,7 @@ public:
   /// BatchScanInput-specified output locations.
   ///
   /// \returns a \c std::error_code if errors occured during scan.
-  std::vector<llvm::ErrorOr<ds_dependency_result_t*>>
+  std::vector<llvm::ErrorOr<swiftscan_dependency_result_t*>>
   getDependencies(ArrayRef<const char *> Command,
                   const std::vector<BatchScanInput> &BatchInput,
                   const llvm::StringSet<> &PlaceholderModules);

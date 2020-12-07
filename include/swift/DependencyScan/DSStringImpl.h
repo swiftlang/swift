@@ -20,25 +20,25 @@
 namespace swift {
 namespace dependencies {
 /// Create an empty "" string
-ds_string_t create_empty();
+swiftscan_string_t create_empty();
 
 /// Create null string
-ds_string_t create_null();
+swiftscan_string_t create_null();
 
 /// Create a c_string_t object from a nul-terminated C string.  New
 /// c_string_t may contain a pointer to \p String.
 ///
 /// \p String should not be changed by the caller afterwards.
-ds_string_t create_ref(const char *string);
+swiftscan_string_t create_ref(const char *string);
 
 /// Create a c_string_t object from a nul-terminated C string.  New
 /// c_string_t will contain a copy of \p String.
-ds_string_t create_dup(const char *string);
+swiftscan_string_t create_dup(const char *string);
 
 // std::string is already intended to be used as backing storage for CXString.
 // Instead, call \c create_ref(string.c_str()).
-ds_string_t create_ref(std::string string) = delete;
+swiftscan_string_t create_ref(std::string string) = delete;
 
-ds_string_set_t *create_set(const std::vector<std::string> &strings);
+swiftscan_string_set_t *create_set(const std::vector<std::string> &strings);
 }
 }
