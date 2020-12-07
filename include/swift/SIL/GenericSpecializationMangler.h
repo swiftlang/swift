@@ -89,8 +89,8 @@ public:
                               Serialized, F) {}
 
   std::string mangleNotReabstracted(SubstitutionMap subs);
-                                    
-  std::string mangleReabstracted(SubstitutionMap subs);
+
+  std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling);
 
   std::string mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs,
                                  bool forInlining);

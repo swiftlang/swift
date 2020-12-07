@@ -103,10 +103,13 @@ mangleNotReabstracted(SubstitutionMap subs) {
 }
                                   
 std::string GenericSpecializationMangler::
-mangleReabstracted(SubstitutionMap subs) {
+mangleReabstracted(SubstitutionMap subs, bool alternativeMangling) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
-  appendSpecializationOperator("Tg");
+  
+  // See ReabstractionInfo::hasConvertedResilientParams for why and when to use
+  // the alternative mangling.
+  appendSpecializationOperator(alternativeMangling ? "TB" : "Tg");
   return finalize();
 }
 

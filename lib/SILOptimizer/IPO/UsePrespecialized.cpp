@@ -106,7 +106,8 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // are serialized without bodies. Thus use IsNotSerialized here.
     Mangle::GenericSpecializationMangler NewGenericMangler(ReferencedF,
                                                            IsNotSerialized);
-    std::string ClonedName = NewGenericMangler.mangleReabstracted(Subs);
+    std::string ClonedName = NewGenericMangler.mangleReabstracted(Subs,
+       ReInfo.needAlternativeMangling());
       
     SILFunction *NewF = nullptr;
     // If we already have this specialization, reuse it.
