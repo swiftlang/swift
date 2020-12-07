@@ -146,6 +146,11 @@ typedef struct {
   swiftscan_string_set_t *import_set;
 } swiftscan_impl_prescan_result_t;
 
+typedef struct {
+  swiftscan_string_t working_directory;
+  swiftscan_string_set_t *argv;
+} swiftscan_impl_scan_invocation_t;
+
 inline swift::dependencies::DependencyScanningTool *
 unwrap_scanner(swiftscan_scanner_t P) {
   return reinterpret_cast<swift::dependencies::DependencyScanningTool *>(P);
@@ -210,6 +215,17 @@ inline swiftscan_batch_scan_entry_t
 wrap_batch_entry(const swiftscan_impl_batch_scan_entry_t *P) {
   return reinterpret_cast<swiftscan_batch_scan_entry_t>(
       const_cast<swiftscan_impl_batch_scan_entry_t *>(P));
+}
+
+inline swiftscan_impl_scan_invocation_t *
+unwrap_scan_invocation(swiftscan_scan_invocation_t P) {
+  return reinterpret_cast<swiftscan_impl_scan_invocation_t *>(P);
+}
+
+inline swiftscan_batch_scan_entry_t
+wrap_scan_invocation(const swiftscan_impl_scan_invocation_t *P) {
+  return reinterpret_cast<swiftscan_scan_invocation_t>(
+      const_cast<swiftscan_impl_scan_invocation_t *>(P));
 }
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

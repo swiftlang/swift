@@ -30,12 +30,15 @@ void swiftscan_scanner_dispose(swiftscan_scanner_t c_scanner) {
 
 swiftscan_dependency_result_t
 swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
-                            const char *working_directory, int argc,
-                            const char *const *argv) {
+                            swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  swiftscan_impl_scan_invocation_t *InvocationImpl =
+      unwrap_scan_invocation(invocation);
+  int argc = InvocationImpl->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(argv[i]);
+    Compilation.push_back(
+        swiftscan_get_C_string(InvocationImpl->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto ScanResult = ScanningTool->getDependencies(Compilation, {});
@@ -47,13 +50,16 @@ swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
 
 swiftscan_batch_scan_result_t *
 swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
-                                  const char *working_directory,
                                   swiftscan_batch_scan_input_t *batch_input,
-                                  int argc, const char *const *argv) {
+                                  swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  swiftscan_impl_scan_invocation_t *InvocationImpl =
+      unwrap_scan_invocation(invocation);
+  int argc = InvocationImpl->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(argv[i]);
+    Compilation.push_back(
+        swiftscan_get_C_string(InvocationImpl->argv->strings[i]));
 
   std::vector<BatchScanInput> BatchInput;
   for (int i = 0; i < batch_input->count; ++i) {
@@ -83,12 +89,15 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
 
 swiftscan_prescan_result_t
 swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
-                               const char *working_directory, int argc,
-                               const char *const *argv) {
+                               swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  swiftscan_impl_scan_invocation_t *InvocationImpl =
+      unwrap_scan_invocation(invocation);
+  int argc = InvocationImpl->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(argv[i]);
+    Compilation.push_back(
+        swiftscan_get_C_string(InvocationImpl->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto PreScanResult = ScanningTool->getImports(Compilation);
@@ -261,6 +270,22 @@ swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result) {
   return unwrap_prescan_result(result)->import_set;
 }
 
+//=== Scanner Invocation Functions ----------------------------------------===//
+
+swiftscan_string_t swiftscan_scan_invocation_get_working_directory(
+    swiftscan_scan_invocation_t invocation) {
+  return unwrap_scan_invocation(invocation)->working_directory;
+}
+
+int swiftscan_scan_invocation_get_argc(swiftscan_scan_invocation_t invocation) {
+  return unwrap_scan_invocation(invocation)->argv->count;
+}
+
+swiftscan_string_set_t *
+swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
+  return unwrap_scan_invocation(invocation)->argv;
+}
+
 //=== Cleanup Functions ---------------------------------------------------===//
 
 void swiftscan_dependency_info_details_dispose(
@@ -362,4 +387,12 @@ void swiftscan_batch_scan_result_dispose(
   }
   delete[] result->results;
   delete result;
+}
+
+void swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation) {
+  swiftscan_impl_scan_invocation_t *invocation_impl =
+      unwrap_scan_invocation(invocation);
+  swiftscan_string_dispose(invocation_impl->working_directory);
+  swiftscan_string_set_dispose(invocation_impl->argv);
+  delete invocation_impl;
 }

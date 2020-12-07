@@ -74,6 +74,12 @@ typedef struct {
   swiftscan_dependency_result_t *results;
 } swiftscan_batch_scan_result_t;
 
+//=== Scanner Invocation Specification ------------------------------------===//
+
+/// Opaque container of all relevant context required to launch a dependency
+/// scan (command line arguments, working directory, etc.)
+typedef void *swiftscan_scan_invocation_t;
+
 //=== Dependency Result Functions -----------------------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_t
@@ -197,6 +203,18 @@ swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result);
 
+//=== Scanner Invocation Functions ----------------------------------------===//
+
+SWIFTSCAN_PUBLIC swiftscan_string_t
+swiftscan_scan_invocation_get_working_directory(
+    swiftscan_scan_invocation_t invocation);
+
+SWIFTSCAN_PUBLIC int
+swiftscan_scan_invocation_get_argc(swiftscan_scan_invocation_t invocation);
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation);
+
 //=== Cleanup Functions ---------------------------------------------------===//
 
 SWIFTSCAN_PUBLIC void
@@ -223,6 +241,9 @@ swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input);
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result);
 
+SWIFTSCAN_PUBLIC void
+swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
+
 //=== Scanner Functions ---------------------------------------------------===//
 
 /// Container of the configuration state and shared cache for dependency
@@ -233,21 +254,16 @@ SWIFTSCAN_PUBLIC swiftscan_scanner_t swiftscan_scanner_create(void);
 
 SWIFTSCAN_PUBLIC void swiftscan_scanner_dispose(swiftscan_scanner_t);
 
-SWIFTSCAN_PUBLIC swiftscan_dependency_result_t
-swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
-                            const char *working_directory, int argc,
-                            const char *const *argv);
+SWIFTSCAN_PUBLIC swiftscan_dependency_result_t swiftscan_scan_dependencies(
+    swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
 SWIFTSCAN_PUBLIC swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
-                                  const char *working_directory,
+swiftscan_batch_scan_dependencies(swiftscan_scanner_t scanner,
                                   swiftscan_batch_scan_input_t *batch_input,
-                                  int argc, const char *const *argv);
+                                  swiftscan_scan_invocation_t invocation);
 
-SWIFTSCAN_PUBLIC swiftscan_prescan_result_t
-swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
-                               const char *working_directory, int argc,
-                               const char *const *argv);
+SWIFTSCAN_PUBLIC swiftscan_prescan_result_t swiftscan_prescan_dependencies(
+    swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
 SWIFTSCAN_END_DECLS
 
