@@ -4743,10 +4743,11 @@ Identifier DependentMemberType::getName() const {
   return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
 }
 
+/// \param pos The variance position of the result type.
 static bool transformSILResult(
-                           SILResultInfo &result, bool &changed,
-                           llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = result.getInterfaceType().transformRec(fn);
+    TypePosition pos, SILResultInfo &result, bool &changed,
+    llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> fn) {
+  Type transType = result.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
@@ -4757,10 +4758,11 @@ static bool transformSILResult(
   return false;
 }
 
+/// \param pos The variance position of the yield type.
 static bool transformSILYield(
-                            SILYieldInfo &yield, bool &changed,
-                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = yield.getInterfaceType().transformRec(fn);
+    TypePosition pos, SILYieldInfo &yield, bool &changed,
+    llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> fn) {
+  Type transType = yield.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
@@ -4771,10 +4773,11 @@ static bool transformSILYield(
   return false;
 }
 
+/// \param pos The variance position of the parameter type.
 static bool transformSILParameter(
-                            SILParameterInfo &param, bool &changed,
-                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = param.getInterfaceType().transformRec(fn);
+    TypePosition pos, SILParameterInfo &param, bool &changed,
+    llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> fn) {
+  Type transType = param.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
@@ -4786,13 +4789,14 @@ static bool transformSILParameter(
 }
 
 Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
-  return transformRec([&fn](TypeBase *type) -> Optional<Type> {
+  return transformWithPosition(TypePosition::Invariant,
+                               [fn](TypeBase *type, auto) -> Optional<Type> {
     Type transformed = fn(Type(type));
     if (!transformed)
       return Type();
 
-    // If the function didn't change the type at all, let transformRec()
-    // recurse.
+    // If the function didn't change the type at
+    // all, let transformRec() recurse.
     if (transformed.getPointer() == type)
       return None;
 
@@ -4801,17 +4805,24 @@ Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
 }
 
 Type Type::transformRec(
-                    llvm::function_ref<Optional<Type>(TypeBase *)> fn) const {
+    llvm::function_ref<Optional<Type>(TypeBase *)> fn) const {
+  return transformWithPosition(TypePosition::Invariant,
+                               [fn](TypeBase *type, auto) { return fn(type); });
+}
+
+Type Type::transformWithPosition(
+    TypePosition pos,
+    llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> fn) const {
   if (!isa<ParenType>(getPointer())) {
     // Transform this type node.
-    if (Optional<Type> transformed = fn(getPointer()))
+    if (Optional<Type> transformed = fn(getPointer(), pos))
       return *transformed;
 
     // Recur.
   }
 
   // Recur into children of this type.
-  TypeBase *base = getPointer();
+  TypeBase *const base = getPointer();
   switch (base->getKind()) {
 #define BUILTIN_TYPE(Id, Parent) \
 case TypeKind::Id:
@@ -4835,7 +4846,7 @@ case TypeKind::Id:
   case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
-      parentTy = parentTy.transformRec(fn);
+      parentTy = parentTy.transformWithPosition(pos, fn);
       if (!parentTy)
         return Type();
 
@@ -4851,7 +4862,8 @@ case TypeKind::Id:
       
   case TypeKind::SILBlockStorage: {
     auto storageTy = cast<SILBlockStorageType>(base);
-    Type transCap = storageTy->getCaptureType().transformRec(fn);
+    Type transCap = storageTy->getCaptureType().transformWithPosition(
+        TypePosition::Invariant, fn);
     if (!transCap)
       return Type();
     CanType canTransCap = transCap->getCanonicalType();
@@ -4867,15 +4879,18 @@ case TypeKind::Id:
     // This interface isn't suitable for updating the substitution map in a
     // generic SILBox.
     for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
-      assert(type->isEqual(type.transformRec(fn))
-             && "SILBoxType substitutions can't be transformed");
+      assert(type->isEqual(
+                 type.transformWithPosition(TypePosition::Invariant, fn)) &&
+             "SILBoxType substitutions can't be transformed");
     }
 #endif
     SmallVector<SILField, 4> newFields;
     auto *l = boxTy->getLayout();
     for (auto f : l->getFields()) {
       auto fieldTy = f.getLoweredType();
-      auto transformed = fieldTy.transformRec(fn)->getCanonicalType();
+      auto transformed =
+          fieldTy.transformWithPosition(TypePosition::Invariant, fn)
+              ->getCanonicalType();
       changed |= fieldTy != transformed;
       newFields.push_back(SILField(transformed, f.isMutable()));
     }
@@ -4905,7 +4920,8 @@ case TypeKind::Id:
       // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
       SmallVector<Type, 4> newReplacements;
       for (Type type : subs.getReplacementTypes()) {
-        auto transformed = type.transformRec(fn);
+        auto transformed =
+            type.transformWithPosition(TypePosition::Invariant, fn);
         assert((type->isEqual(transformed) ||
                 (type->hasTypeParameter() && transformed->hasTypeParameter()) ||
                 (hasTypeErasedGenericClassType(type) &&
@@ -4945,26 +4961,27 @@ case TypeKind::Id:
 
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
     for (SILParameterInfo param : fnTy->getParameters()) {
-      if (transformSILParameter(param, changed, fn)) return Type();
+      if (transformSILParameter(pos.flipped(), param, changed, fn))
+        return Type();
       transInterfaceParams.push_back(param);
     }
 
     SmallVector<SILYieldInfo, 8> transInterfaceYields;
     for (SILYieldInfo yield : fnTy->getYields()) {
-      if (transformSILYield(yield, changed, fn)) return Type();
+      if (transformSILYield(pos, yield, changed, fn)) return Type();
       transInterfaceYields.push_back(yield);
     }
 
     SmallVector<SILResultInfo, 8> transInterfaceResults;
     for (SILResultInfo result : fnTy->getResults()) {
-      if (transformSILResult(result, changed, fn)) return Type();
+      if (transformSILResult(pos, result, changed, fn)) return Type();
       transInterfaceResults.push_back(result);
     }
 
     Optional<SILResultInfo> transErrorResult;
     if (fnTy->hasErrorResult()) {
       SILResultInfo result = fnTy->getErrorResult();
-      if (transformSILResult(result, changed, fn)) return Type();
+      if (transformSILResult(pos, result, changed, fn)) return Type();
       transErrorResult = result;
     }
 
@@ -4991,7 +5008,7 @@ case TypeKind::Id:
   {
     auto storageTy = cast<ReferenceStorageType>(base);
     Type refTy = storageTy->getReferentType();
-    Type substRefTy = refTy.transformRec(fn);
+    Type substRefTy = refTy.transformWithPosition(pos, fn);
     if (!substRefTy)
       return Type();
 
@@ -5006,7 +5023,7 @@ case TypeKind::Id:
     auto unbound = cast<UnboundGenericType>(base);
     Type substParentTy;
     if (auto parentTy = unbound->getParent()) {
-      substParentTy = parentTy.transformRec(fn);
+      substParentTy = parentTy.transformWithPosition(pos, fn);
       if (!substParentTy)
         return Type();
 
@@ -5028,7 +5045,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     Type substParentTy;
     if (auto parentTy = bound->getParent()) {
-      substParentTy = parentTy.transformRec(fn);
+      substParentTy = parentTy.transformWithPosition(pos, fn);
       if (!substParentTy)
         return Type();
 
@@ -5036,13 +5053,33 @@ case TypeKind::Id:
         anyChanged = true;
     }
 
-    for (auto arg : bound->getGenericArgs()) {
-      Type substArg = arg.transformRec(fn);
+    const auto transformGenArg = [&](Type arg, TypePosition p) -> bool {
+      Type substArg = arg.transformWithPosition(p, fn);
       if (!substArg)
-        return Type();
+        return true;
       substArgs.push_back(substArg);
       if (substArg.getPointer() != arg.getPointer())
         anyChanged = true;
+
+      return false;
+    };
+
+    if (bound->isArray() || bound->isOptional()) {
+      // Swift.Array preserves variance in its 'Value' type.
+      // Swift.Optional preserves variance in its 'Wrapped' type.
+      if (transformGenArg(bound->getGenericArgs().front(), pos))
+        return Type();
+    } else if (bound->isDictionary()) {
+      // Swift.Dictionary preserves variance in its 'Element' type.
+      if (transformGenArg(bound->getGenericArgs().front(),
+                          TypePosition::Invariant) ||
+          transformGenArg(bound->getGenericArgs().back(), pos))
+        return Type();
+    } else {
+      for (auto arg : bound->getGenericArgs()) {
+        if (transformGenArg(arg, TypePosition::Invariant))
+          return Type();
+      }
     }
 
     if (!anyChanged)
@@ -5059,7 +5096,8 @@ case TypeKind::Id:
     SmallVector<Type, 4> newSubs;
     bool anyChanged = false;
     for (auto replacement : opaque->getSubstitutions().getReplacementTypes()) {
-      Type newReplacement = replacement.transformRec(fn);
+      Type newReplacement =
+          replacement.transformWithPosition(TypePosition::Invariant, fn);
       if (!newReplacement)
         return Type();
       newSubs.push_back(newReplacement);
@@ -5087,7 +5125,7 @@ case TypeKind::Id:
 
   case TypeKind::ExistentialMetatype: {
     auto meta = cast<ExistentialMetatypeType>(base);
-    auto instanceTy = meta->getInstanceType().transformRec(fn);
+    auto instanceTy = meta->getInstanceType().transformWithPosition(pos, fn);
     if (!instanceTy)
       return Type();
 
@@ -5102,7 +5140,7 @@ case TypeKind::Id:
 
   case TypeKind::Metatype: {
     auto meta = cast<MetatypeType>(base);
-    auto instanceTy = meta->getInstanceType().transformRec(fn);
+    auto instanceTy = meta->getInstanceType().transformWithPosition(pos, fn);
     if (!instanceTy)
       return Type();
 
@@ -5116,7 +5154,7 @@ case TypeKind::Id:
 
   case TypeKind::DynamicSelf: {
     auto dynamicSelf = cast<DynamicSelfType>(base);
-    auto selfTy = dynamicSelf->getSelfType().transformRec(fn);
+    auto selfTy = dynamicSelf->getSelfType().transformWithPosition(pos, fn);
     if (!selfTy)
       return Type();
 
@@ -5128,40 +5166,41 @@ case TypeKind::Id:
 
   case TypeKind::TypeAlias: {
     auto alias = cast<TypeAliasType>(base);
-    Type oldUnderlyingType = Type(alias->getSinglyDesugaredType());
-    Type newUnderlyingType = oldUnderlyingType.transformRec(fn);
-    if (!newUnderlyingType) return Type();
+    Type oldUnderlyingTy = Type(alias->getSinglyDesugaredType());
+    Type newUnderlyingTy = oldUnderlyingTy.transformWithPosition(pos, fn);
+    if (!newUnderlyingTy) return Type();
 
     Type oldParentType = alias->getParent();
     Type newParentType;
     if (oldParentType) {
-      newParentType = oldParentType.transformRec(fn);
-      if (!newParentType) return newUnderlyingType;
+      newParentType = oldParentType.transformWithPosition(pos, fn);
+      if (!newParentType) return newUnderlyingTy;
     }
 
     auto subMap = alias->getSubstitutionMap();
     for (Type oldReplacementType : subMap.getReplacementTypes()) {
-      Type newReplacementType = oldReplacementType.transformRec(fn);
+      Type newReplacementType =
+          oldReplacementType.transformWithPosition(TypePosition::Invariant, fn);
       if (!newReplacementType)
-        return newUnderlyingType;
+        return newUnderlyingTy;
 
       // If anything changed with the replacement type, we lose the sugar.
       // FIXME: This is really unfortunate.
       if (newReplacementType.getPointer() != oldReplacementType.getPointer())
-        return newUnderlyingType;
+        return newUnderlyingTy;
     }
 
     if (oldParentType.getPointer() == newParentType.getPointer() &&
-        oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+        oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer())
       return *this;
 
     return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
-                              newUnderlyingType);
+                              newUnderlyingTy);
   }
 
   case TypeKind::Paren: {
     auto paren = cast<ParenType>(base);
-    Type underlying = paren->getUnderlyingType().transformRec(fn);
+    Type underlying = paren->getUnderlyingType().transformWithPosition(pos, fn);
     if (!underlying)
       return Type();
 
@@ -5178,7 +5217,8 @@ case TypeKind::Id:
     SmallVector<Type, 4> elements;
     unsigned Index = 0;
     for (Type eltTy : pack->getElementTypes()) {
-      Type transformedEltTy = eltTy.transformRec(fn);
+      Type transformedEltTy =
+          eltTy.transformWithPosition(TypePosition::Invariant, fn);
       if (!transformedEltTy)
         return Type();
 
@@ -5211,17 +5251,18 @@ case TypeKind::Id:
   case TypeKind::PackExpansion: {
     auto expand = cast<PackExpansionType>(base);
     struct ExpansionGatherer {
-      llvm::function_ref<Optional<Type>(TypeBase *)> baselineFn;
+      llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> baselineFn;
       llvm::DenseMap<TypeBase *, PackType *> cache;
       unsigned maxArity;
 
     public:
       ExpansionGatherer(
-          llvm::function_ref<Optional<Type>(TypeBase *)> baselineFn)
+          llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)>
+              baselineFn)
           : baselineFn(baselineFn), maxArity(0) {}
 
-      Optional<Type> operator()(TypeBase *input) {
-        auto remap = baselineFn(input);
+      Optional<Type> operator()(TypeBase *input, TypePosition pos) {
+        auto remap = baselineFn(input, pos);
         if (!remap) {
           return remap;
         }
@@ -5249,7 +5290,8 @@ case TypeKind::Id:
     // First, substitute down the pattern type to gather the mapping from
     // contained substitutable types to packs.
     auto gather = ExpansionGatherer{fn};
-    Type transformedPat = expand->getPatternType().transformRec(gather);
+    Type transformedPat =
+        expand->getPatternType().transformWithPosition(pos, gather);
     if (!transformedPat)
       return Type();
 
@@ -5282,20 +5324,20 @@ case TypeKind::Id:
     for (unsigned i = 0; i < arity; ++i) {
       struct ElementExpander {
         const llvm::DenseMap<TypeBase *, PackType *> &expansions;
-        llvm::function_ref<Optional<Type>(TypeBase *)> outerFn;
+        llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> outerFn;
         unsigned index;
 
       public:
-        Optional<Type> operator()(TypeBase *input) {
+        Optional<Type> operator()(TypeBase *input, TypePosition pos) {
           // FIXME: Does this need to do bounds checking?
           if (PackType *element = expansions.lookup(input))
             return element->getElementType(index);
-          return outerFn(input);
+          return outerFn(input, pos);
         }
       };
 
-      auto expandedElt = expand->getPatternType().transformRec(
-          ElementExpander{expansions, fn, i});
+      auto expandedElt = expand->getPatternType().transformWithPosition(
+          pos, ElementExpander{expansions, fn, i});
       if (!expandedElt)
         return Type();
 
@@ -5311,7 +5353,7 @@ case TypeKind::Id:
     unsigned Index = 0;
     for (const auto &elt : tuple->getElements()) {
       Type eltTy = elt.getType();
-      Type transformedEltTy = eltTy.transformRec(fn);
+      Type transformedEltTy = eltTy.transformWithPosition(pos, fn);
       if (!transformedEltTy)
         return Type();
 
@@ -5354,7 +5396,7 @@ case TypeKind::Id:
 
   case TypeKind::DependentMember: {
     auto dependent = cast<DependentMemberType>(base);
-    auto dependentBase = dependent->getBase().transformRec(fn);
+    auto dependentBase = dependent->getBase().transformWithPosition(pos, fn);
     if (!dependentBase)
       return Type();
 
@@ -5381,7 +5423,11 @@ case TypeKind::Id:
       auto flags = param.getParameterFlags();
       auto internalLabel = param.getInternalLabel();
 
-      auto substType = type.transformRec(fn);
+      TypePosition paramPos = pos.flipped();
+      if (param.isInOut())
+        paramPos = TypePosition::Invariant;
+
+      auto substType = type.transformWithPosition(paramPos, fn);
       if (!substType)
         return Type();
 
@@ -5402,7 +5448,7 @@ case TypeKind::Id:
     }
 
     // Transform result type.
-    auto resultTy = function->getResult().transformRec(fn);
+    auto resultTy = function->getResult().transformWithPosition(pos, fn);
     if (!resultTy)
       return Type();
 
@@ -5412,7 +5458,8 @@ case TypeKind::Id:
     // Transform the global actor.
     Type globalActorType;
     if (Type origGlobalActorType = function->getGlobalActor()) {
-      globalActorType = origGlobalActorType.transformRec(fn);
+      globalActorType = origGlobalActorType.transformWithPosition(
+          TypePosition::Invariant, fn);
       if (!globalActorType)
         return Type();
 
@@ -5425,7 +5472,9 @@ case TypeKind::Id:
       // Check that generic parameters won't be trasnformed.
       // Transform generic parameters.
       for (auto param : genericFnType->getGenericParams()) {
-        assert(Type(param).transformRec(fn).getPointer() == param &&
+        assert(Type(param)
+                   .transformWithPosition(TypePosition::Invariant, fn)
+                   ->isEqual(param) &&
                "GenericFunctionType transform() changes type parameter");
       }
 #endif
@@ -5451,7 +5500,7 @@ case TypeKind::Id:
 
   case TypeKind::ArraySlice: {
     auto slice = cast<ArraySliceType>(base);
-    auto baseTy = slice->getBaseType().transformRec(fn);
+    auto baseTy = slice->getBaseType().transformWithPosition(pos, fn);
     if (!baseTy)
       return Type();
 
@@ -5463,7 +5512,7 @@ case TypeKind::Id:
 
   case TypeKind::Optional: {
     auto optional = cast<OptionalType>(base);
-    auto baseTy = optional->getBaseType().transformRec(fn);
+    auto baseTy = optional->getBaseType().transformWithPosition(pos, fn);
     if (!baseTy)
       return Type();
 
@@ -5475,7 +5524,7 @@ case TypeKind::Id:
 
   case TypeKind::VariadicSequence: {
     auto seq = cast<VariadicSequenceType>(base);
-    auto baseTy = seq->getBaseType().transformRec(fn);
+    auto baseTy = seq->getBaseType().transformWithPosition(pos, fn);
     if (!baseTy)
       return Type();
 
@@ -5487,11 +5536,12 @@ case TypeKind::Id:
 
   case TypeKind::Dictionary: {
     auto dict = cast<DictionaryType>(base);
-    auto keyTy = dict->getKeyType().transformRec(fn);
+    auto keyTy =
+        dict->getKeyType().transformWithPosition(TypePosition::Invariant, fn);
     if (!keyTy)
       return Type();
 
-    auto valueTy = dict->getValueType().transformRec(fn);
+    auto valueTy = dict->getValueType().transformWithPosition(pos, fn);
     if (!valueTy)
       return Type();
 
@@ -5504,7 +5554,8 @@ case TypeKind::Id:
 
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
-    auto objectTy = lvalue->getObjectType().transformRec(fn);
+    auto objectTy = lvalue->getObjectType().transformWithPosition(
+        TypePosition::Invariant, fn);
     if (!objectTy || objectTy->hasError())
       return objectTy;
 
@@ -5514,7 +5565,8 @@ case TypeKind::Id:
 
   case TypeKind::InOut: {
     auto inout = cast<InOutType>(base);
-    auto objectTy = inout->getObjectType().transformRec(fn);
+    auto objectTy = inout->getObjectType().transformWithPosition(
+        TypePosition::Invariant, fn);
     if (!objectTy || objectTy->hasError())
       return objectTy;
     
@@ -5524,7 +5576,8 @@ case TypeKind::Id:
 
   case TypeKind::Existential: {
     auto *existential = cast<ExistentialType>(base);
-    auto constraint = existential->getConstraintType().transformRec(fn);
+    auto constraint =
+        existential->getConstraintType().transformWithPosition(pos, fn);
     if (!constraint || constraint->hasError())
       return constraint;
 
@@ -5542,7 +5595,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     unsigned index = 0;
     for (auto member : members) {
-      auto substMember = member.transformRec(fn);
+      auto substMember = member.transformWithPosition(pos, fn);
       if (!substMember)
         return Type();
       
@@ -5576,14 +5629,14 @@ case TypeKind::Id:
 
     bool anyChanged = false;
 
-    auto substBase = base.transformRec(fn);
+    auto substBase = base.transformWithPosition(pos, fn);
     if (!substBase)
       return Type();
 
     if (substBase.getPointer() != base.getPointer())
       anyChanged = true;
 
-    auto substArg = arg.transformRec(fn);
+    auto substArg = arg.transformWithPosition(TypePosition::Invariant, fn);
     if (!substArg)
       return Type();
 
@@ -5602,7 +5655,6 @@ case TypeKind::Id:
   
   llvm_unreachable("Unhandled type in transformation");
 }
-
 
 bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
   class Walker : public TypeWalker {
