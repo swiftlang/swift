@@ -92,8 +92,8 @@ static void runTaskWithGroupPollResult(
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  fprintf(stderr, "error: runTaskWithGroupPollResult[%d %s:%d]: polled STATUS: %d\n",
-          pthread_self(), __FILE__, __LINE__, result.status);
+  fprintf(stderr, "error: runTaskWithGroupPollResult[%d %s:%d]: runTaskWithGroupPollResult polled, storage: %d, retainedTask: %d, STATUS: %d\n",
+          pthread_self(), __FILE__, __LINE__, result.storage, result.retainedTask, result.status);
 
   // Was it an error or successful return?
   waitingTaskContext->result.hadErrorResult =
@@ -116,15 +116,15 @@ static void runTaskWithGroupPollResult(
       assert(false && "Must not attempt to run with a Waiting result.");
   }
 
-  // FIXME: fix this, to cause a release once we're done here
-  // FIXME: not sure where the right place is for it
-//  // if we need to, release the now completed task so it can be destroyed
-//  if (result->task) {
-//    swift_release(result->task)
-//  }
-
   // TODO: schedule this task on the executor rather than running it directly.
   waitingTask->run(executor);
+
+  // if we need to, release the now completed task so it can be destroyed
+  if (result.retainedTask) {
+    swift_release(result.retainedTask);
+    fprintf(stderr, "error: %s[%d %s:%d]: group swift_released retained task: %d, REF_COUNT: %d\n",
+            __FUNCTION__, pthread_self(), __FILE__, __LINE__, result.retainedTask, swift::swift_retainCount(result.retainedTask));
+  }
 }
 
 } // end namespace swift

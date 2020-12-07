@@ -36,10 +36,8 @@ func launch<R>(operation: @escaping () async -> R) -> Task.Handle<R> {
 // MARK: Tests
 
 func completeSlowly(n: Int) async -> Int {
-  print("start group.add { \(n) }")
-  sleep(5)
-  print("complete group.add { \(n) }")
-  fputs("error: complete group.add { \(n) }\n", stderr)
+  sleep(UInt32(n + 1))
+  print("  complete group.add { \(n) }")
   return n
 }
 
@@ -50,21 +48,21 @@ func test_sum_nextOnPending() {
 
   let taskHandle = launch { () async -> Int in
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
-      await _taskPrintIDCurrent("TASK_ID: ADDING")
+      // await _taskPrintIDCurrent("TASK_ID: ADDING")
       for n in numbers {
         await group.add {
-          await _taskPrintIDCurrent("TASK_ID: ADDING-\(n) INSIDE")
+          // await _taskPrintIDCurrent("TASK_ID: ADDING-\(n) INSIDE")
           let res = await completeSlowly(n: n)
-          await _taskPrintIDCurrent("TASK_ID: ADDING-\(n) AFTER")
+          // await _taskPrintIDCurrent("TASK_ID: ADDING-\(n) AFTER")
           return res
         }
       }
 
       var sum = 0
       print("before group.next(), sum: \(sum)")
-      await _taskPrintIDCurrent("TASK_ID: BEFORE NEXT")
+      // await _taskPrintIDCurrent("TASK_ID: BEFORE NEXT")
       while let n = await try! group.next() {
-        await _taskPrintIDCurrent("TASK_ID: AFTER NEXT-\(n)")
+        // await _taskPrintIDCurrent("TASK_ID: AFTER NEXT-\(n)")
         assert(numbers.contains(n), "Unexpected value: \(n)! Expected any of \(numbers)")
         print("next: \(n)")
         DispatchQueue.main.sync {
@@ -73,23 +71,25 @@ func test_sum_nextOnPending() {
         print("before group.next(), sum: \(sum)")
       }
 
-      await _taskPrintIDCurrent("TASK_ID: AFTER LOOP")
+      // await _taskPrintIDCurrent("TASK_ID: AFTER LOOP")
       print("task group returning: \(sum)")
       return sum
     }
   }
 
-  // CHECK: complete group.add { [[REG1:[0-9]+]] }
-  // CHECK: complete group.add { [[REG2:[0-9]+]] }
-  // CHECK: complete group.add { [[REG3:[0-9]+]] }
-  // CHECK: complete group.add { [[REG4:[0-9]+]] }
-  // CHECK: complete group.add { [[REG5:[0-9]+]] }
-
-  // CON: next: [[REG1]]
-  // CON: next: [[REG2]]
-  // CON: next: [[REG3]]
-  // CON: next: [[REG4]]
-  // CON: next: [[REG5]]
+  // The completions are set apart by n seconds, so we expect them to arrive
+  // in the order as the numbers (and delays) would suggest:
+  //
+  // CHECK: complete group.add { 1 }
+  // CHECK: next: 1
+  // CHECK: complete group.add { 2 }
+  // CHECK: next: 2
+  // CHECK: complete group.add { 3 }
+  // CHECK: next: 3
+  // CHECK: complete group.add { 4 }
+  // CHECK: next: 4
+  // CHECK: complete group.add { 5 }
+  // CHECK: next: 5
 
   // CHECK: task group returning: 15
 
@@ -97,7 +97,7 @@ func test_sum_nextOnPending() {
     let sum = await try! taskHandle.get()
     // CHECK: result: 15
     print("result: \(sum)")
-    assert(sum == expected)
+    assert(sum == expected, "Expected: \(expected), got: \(sum)")
     exit(0)
   }
 

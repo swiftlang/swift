@@ -54,17 +54,24 @@ func test_skipCallingNext() {
     }
   }
 
-  DispatchQueue.main.async { () async in
+  // CHECK: main task
+
+  launch { () async -> () in
     let result = await try! taskHandle.get()
     // CHECK: group.add { 1 }
     // CHECK: group.add { 1 }
     // CHECK: return immediately 0 (canceled: false)
+
     // CHECK: inside group.add { 1 } (canceled: false)
     // CHECK: inside group.add { 1 } (canceled: false)
+
     // CHECK: result: 0
     print("result: \(result)")
     assert(result == 0)
+    exit(0)
   }
+
+  print("main task")
 }
 
 test_skipCallingNext()

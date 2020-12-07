@@ -1953,7 +1953,7 @@ enum class TaskStatusRecordKind : uint8_t {
 
   /// A ChildTaskStatusRecord, which represents the potential for
   /// active child tasks.
-  ChildTask = 1, // TODO: should we do this for GroupChild?
+  ChildTask = 1,
 
   /// A CancellationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task is cancelled.

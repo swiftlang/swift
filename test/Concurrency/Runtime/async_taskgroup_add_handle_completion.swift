@@ -42,7 +42,7 @@ func completeImmediately(n: Int) async -> Int {
 
 func completeSlowly(n: Int) async -> Int {
   sleep(3)
-  print("error: complete group.add { \(n) }")
+  print("complete group.add { \(n) }")
   return n
 }
 
@@ -85,10 +85,6 @@ func test_sum_nextOnPending() {
       return sum
     }
   }
-
-  // CHECK: complete group.add { [[REG1:[0-9]+]] }
-  // CHECK: complete group.add { [[REG2:[0-9]+]] }
-  // CHECK: complete group.add { [[REG3:[0-9]+]] }
 
   // CHECK: firstHandle.get(): 1
   // CHECK: secondHandle.get(): 2

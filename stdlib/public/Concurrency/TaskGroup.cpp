@@ -56,9 +56,8 @@ GroupFragment::destroy() {
 // =============================================================================
 // ==== groupOffer -------------------------------------------------------------
 
-void
-AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
-                       ExecutorRef executor) {
+void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
+                           ExecutorRef executor) {
   assert(completedTask);
   assert(completedTask->isFuture());
   assert(completedTask->hasChildFragment() &&
@@ -68,10 +67,7 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
 
   assert(isTaskGroup());
   auto fragment = groupFragment();
-
   auto status = fragment->statusLoad();
-//  fprintf(stderr, "error: %s[%d %s:%d]: old status %s \n",
-//          __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
 
   // TODO: is this right? we should rather reuse the child I guess?
   // If an error was thrown, save it in the future fragment.
@@ -83,43 +79,46 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
     hadErrorResult = true;
   }
 
-  // TODO: try to move only into "enqueued + waiting" path
-  swift_retain(completedTask);
+  fprintf(stderr, "error: %s[%d %s:%d]: group swift completedTask: %d REF_COUNT: %d\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, completedTask, swift::swift_retainCount(completedTask));
+
+//  // TODO: try to move only into "enqueued + waiting" path
+//  swift_retain(completedTask);
 
   while (true) {
     // Loop until we either:
     // a) no waiters available, and we enqueued the completed task to readyQueue
     // b) successfully claim a waiter to complete with this task
-    assert(status.pendingTasks());
-    fprintf(stderr, "error: %s[%d %s:%d]: spin, taking P/W tasks %s \n",
-            __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
+    assert(status.pendingTasks() && "attempted to offer value, when no pending tasks remaining");
+//    fprintf(stderr, "error: %s[%d %s:%d]: spin, taking P/W tasks %s \n",
+//            __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
     if (status.waitingTasks() == 0) {
-      fprintf(stderr, "error: %s[%d %s:%d]: spin complete, zero waiting tasks; enqueue future; old status: %s\n",
-              __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
+//      fprintf(stderr, "error: %s[%d %s:%d]: spin complete, zero waiting tasks; enqueue future; old status: %s\n",
+//              __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
       // ==== a) enqueue message -----------------------------------------------
       //
       // no-one was waiting (yet), so we have to instead enqueue to the message queue
       // when a task polls during next() it will notice that we have a value ready
       // for it, and will process it immediately without suspending.
 
-      // TODO: nicer to retain here, but harder to know if we need to release in
-      //       the poll then, we need to know if we got it from queue or directly there
-//      // retain the task while it is in the queue;
-//      // it must remain alive until the task group is alive.
-//      swift_retain(completedTask);
-      // TODO: is this right? we copy when we enqueue...
+      // Retain the task while it is in the queue;
+      // it must remain alive until the task group is alive.
+      swift_retain(completedTask);
+      fprintf(stderr, "error: %s[%d %s:%d]: group swift_retained completedTask: %d REF_COUNT: %d\n",
+              __FUNCTION__, pthread_self(), __FILE__, __LINE__, completedTask, swift::swift_retainCount(completedTask));
       auto readyItem = ReadyQueueItem::get(
           hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success,
           completedTask
       );
+
+      fprintf(stderr, "error: %s[%d %s:%d]: completedTask: %d, readyItem.getTask(): %d\n",
+              __FUNCTION__, pthread_self(), __FILE__, __LINE__, completedTask, readyItem.getTask());
       assert(completedTask == readyItem.getTask());
-      assert(readyItem.getTask()->isFuture()); // NEW
-      // TODO: The enqueue performs a copy; so we pass a local value there but it is just a pointer
-      // so this works out well I think? Originally enqueue was defined to take a reference.
+      assert(readyItem.getTask()->isFuture());
       fragment->readyQueue.enqueue(readyItem);
       return;
     } else if (fragment->statusCompletePendingWaitingTasks(status)) {
-      fprintf(stderr, "error: %s[%d %s:%d]: spin complete, got waiter; value [%s], old status: %s \n",
+      fprintf(stderr, "error: %s[%d %s:%d]: spin complete, got waiter; value [%d], old status: %s \n",
               __FUNCTION__, pthread_self(), __FILE__, __LINE__,
               completedTask->futureFragment()->getStoragePtr(), status.to_string().c_str());
       if (status.waitingTasks()) { // TODO: ordering
@@ -146,9 +145,9 @@ AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_acquire)) {
             // Run the task.
-            auto completedFragment = completedTask->futureFragment();
-            swift::runTaskWithFutureResult(waitingTask, executor,
-                                           completedFragment, hadErrorResult);
+            auto result = GroupPollResult::get(
+                completedTask, hadErrorResult, /*needsRelease*/ false);
+            swift::runTaskWithGroupPollResult(waitingTask, executor, result);
             return;
           }
 
@@ -231,7 +230,7 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
 
     result.status = GroupFragment::ChannelPollStatus::Empty;
     result.storage = nullptr;
-    result.task = nullptr;
+    result.retainedTask = nullptr;
     return result;
   }
 
@@ -278,11 +277,17 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
   assert(item.getTask()->isFuture());
   auto futureFragment = item.getTask()->futureFragment();
 
-  status = GroupFragment::GroupStatus { status.status + 1 };
-  fprintf(stderr, "error: %s[%d %s:%d]: dequeued task, assume status to be: %s\n",
-          __FUNCTION__, pthread_self(), __FILE__, __LINE__, status.to_string().c_str());
+  // Store the task in the result, so after we're done processing it it may
+  // be swift_release'd; we kept it alive while it was in the readyQueue by
+  // an additional retain issued as we enqueued it there.
+  result.retainedTask = item.getTask();
+
   while (status.pendingTasks()) {
-    if (fragment->statusCompletePendingWaitingTasks(status)) { // TODO: This is just a sub, no need for CAS I think?
+    auto oldStatus = status;
+    status = GroupFragment::GroupStatus { status.status + 1 };
+    fprintf(stderr, "error: %s[%d %s:%d]: dequeued task, (s: %s), attempt cas assume status to be: %s\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, oldStatus.to_string().c_str(), status.to_string().c_str());
+    if (fragment->statusCompletePendingWaitingTasks(status)) {
       switch (item.getStatus()) {
         case ReadyStatus::Success:
           fprintf(stderr, "error: %s[%d %s:%d]: eagerly return success task\n",
@@ -292,22 +297,23 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
           // great, we can immediately return the polled value
           result.status = GroupFragment::ChannelPollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
-          result.task = item.getTask();
+          assert(result.retainedTask && "polled a task, it must be not null");
           return result;
         case ReadyStatus::Error:
-          fprintf(stderr, "error: %s[%d %s:%d]: eagerly return error task, status now: \n",
+          fprintf(stderr, "error: %s[%d %s:%d]: eagerly return error task, status now: %s\n",
                   __FUNCTION__, pthread_self(), __FILE__, __LINE__, fragment->statusLoad().to_string().c_str());
           // great, we can immediately return the polled value
           result.status = GroupFragment::ChannelPollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-          result.task = item.getTask();
+          assert(result.retainedTask && "polled a task, it must be not null");
           return result;
         case ReadyStatus::Empty:
           fprintf(stderr, "error: %s[%d %s:%d]: EMPTY! status now: \n",
                   __FUNCTION__, pthread_self(), __FILE__, __LINE__, fragment->statusLoad().to_string().c_str());
           result.status = GroupFragment::ChannelPollStatus::Empty;
           result.storage = nullptr;
+          result.retainedTask = nullptr;
           return result;
       }
     } // else, we failed status-cas (some other waiter claimed a ready pending task, try again)
@@ -318,6 +324,7 @@ AsyncTask::groupPoll(AsyncTask *waitingTask) {
   // we are left with nothing to wait for, and must return "empty".
   result.status = GroupFragment::ChannelPollStatus::Empty;
   result.storage = nullptr;
+  result.retainedTask = nullptr;
   return result;
 }
 

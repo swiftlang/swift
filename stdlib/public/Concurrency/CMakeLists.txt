@@ -20,7 +20,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskAlloc.cpp
   TaskStatus.cpp
   TaskGroup.swift
-  TaskGroup.h
+  TaskQueues.h
   TaskGroup.cpp
   Mutex.cpp
 

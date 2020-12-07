@@ -31,6 +31,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <pthread.h>
 #include <thread>
 #include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeShims.h"

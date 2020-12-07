@@ -135,7 +135,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   fprintf(stderr, "error: %s[%d %s:%d]: destroy: %d\n",
     __FUNCTION__, pthread_self(), __FILE__, __LINE__, task);
 
-// For a group, destroy the queues and results.
+  // For a group, destroy the queues and results.
   if (task->isTaskGroup()) {
     task->groupFragment()->destroy();
   }
@@ -174,8 +174,11 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
 SWIFT_CC(swift)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
                          AsyncContext *context) {
-  // Tear down the task-local allocator immediately; there's no need
-  // to wait for the object to be destroyed.
+//  fprintf(stderr, "error: %s[%d %s:%d]: complete task: %d\n",
+//          __FUNCTION__, pthread_self(), __FILE__, __LINE__, task);
+
+  // Tear down the task-local allocator immediately;
+  // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
 
   // Complete the future.
@@ -189,7 +192,14 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 
   // Release the task, balancing the retain that a running task has on itself.
   // If it was a group child task, it will remain until the group returns it.
-  swift_release(task);
+  assert(task && "task to be released MUST NOT BE NULL");
+
+  fprintf(stderr, "error: %s[%d %s:%d]: about to release swift_released: %d, ref_count: %d\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, task, swift::swift_retainCount(task));
+
+//  swift_release(task);
+  fprintf(stderr, "error: %s[%d %s:%d]: swift_released: %d, ref_count: %d\n",
+          __FUNCTION__, pthread_self(), __FILE__, __LINE__, task, swift::swift_retainCount(task));
 }
 
 AsyncTaskAndContext

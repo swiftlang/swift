@@ -81,10 +81,11 @@ extension Task {
 //    // 1. Prepare the Group task
 //    var group = Task.Group<TaskResult>(parentTask: parent)
 
-    await _taskPrintIDCurrent("parentTask")
+//     await _taskPrintIDCurrent("THE____parentTask")
     let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
         let task = Builtin.getCurrentAsyncTask()
+//        await _taskPrintIDCurrent("THE____groupTask")
         var group = Task.Group<TaskResult>(task: task)
 
         // This defer handles both return/throw cases in the following way:
@@ -101,6 +102,7 @@ extension Task {
 
         return result
       }
+//    __forceRetain(groupTask)
     let groupHandle = Handle<BodyResult>(task: groupTask)
 
     // 2.0) Run the task!
@@ -145,8 +147,7 @@ extension Task {
     @discardableResult
     public mutating func add(
       overridingPriority: Priority? = nil,
-      operation: @escaping () async throws -> TaskResult,
-      file: String = #file, line: UInt = #line
+      operation: @escaping () async throws -> TaskResult
     ) async -> Task.Handle<TaskResult> {
       var flags = JobFlags()
       flags.kind = .task
@@ -156,7 +157,7 @@ extension Task {
 
       let (childTask, _) =
         Builtin.createAsyncTaskFuture(flags.bits, self.task, operation)
-      _taskPrintID(("childTask(add)" as NSString).utf8String, (#file as NSString).utf8String, #line, childTask)
+//      _taskPrintID(("childTask(add)" as NSString).utf8String, (#file as NSString).utf8String, #line, childTask)
       _taskGroupAddPending(task, childTask)
       let handle = Handle<TaskResult>(task: childTask)
 
@@ -176,16 +177,15 @@ extension Task {
     /// rather the order of `next()` calls completing is by completion order of
     /// the tasks. This differentiates task groups from streams (
     public mutating func next() async throws -> TaskResult? {
-      // We reuse the taskFutureWait -> swift_task_future_wait since it seems to have special sauce,
-      // but actually we
-      fputs("error: next[\(#file):\(#line)]: invoked: \(self.task)\n", stderr)
-      let rawResult = await _taskGroupWaitNext(on: self.task) // TODO: _taskGroupWaitNext
+      let rawResult = await _taskGroupWaitNext(on: self.task)
       fputs("error: next[\(#file):\(#line)]: NEXT RESULT RAW: \(rawResult)\n", stderr)
 
       if rawResult.hadErrorResult {
         // Throw the result on error.
-        fputs("error: next[\(#file):\(#line)]: after await, error: \(rawResult)", stderr)
-        throw unsafeBitCast(rawResult.storage, to: Error.self)
+        fputs("error: next[\(#file):\(#line)]: after await, error: \(rawResult)\n", stderr)
+        let error = unsafeBitCast(rawResult.storage, to: Error.self)
+        fputs("error: next[\(#file):\(#line)]: after await, the error: \(error)\n", stderr)
+        throw error
       }
 
       fputs("error: next[\(#file):\(#line)]: after await, result: \(rawResult)\n", stderr)
@@ -221,6 +221,8 @@ extension Task {
     /// cancellation, are silently discarded.
     ///
     /// - SeeAlso: `Task.addCancellationHandler`
+    /// - SeeAlso: `Task.checkCancelled`
+    /// - SeeAlso: `Task.isCancelled`
     public mutating func cancelAll() {
       _taskCancel(self.task) // TODO: do we also have to go over all child tasks and cancel there?
     }
@@ -245,16 +247,21 @@ extension Task.Group {
     //
     // Failures of tasks are ignored.
     while !self.isEmpty {
-      print(">>>>> self.isEmpty == \(self.isEmpty)")
+      print("[\(#function)] self.isEmpty == \(self.isEmpty)")
       _ = await try? self.next()
-    // TODO: Should a failure cause a cancellation of the task group?
-    //       This looks very much like supervision trees, 
-    //       where one may have various decisions depending on use cases...
+      // TODO: Should a failure cause a cancellation of the task group?
+      //       This looks very much like supervision trees,
+      //       where one may have various decisions depending on use cases...
       continue // keep awaiting on all pending tasks
     }
   }
 }
+
 /// ==== -----------------------------------------------------------------------
+
+@_silgen_name("swift_retain")
+func __forceRetain(
+  _ task: Builtin.NativeObject)
 
 @_silgen_name("swift_task_group_offer")
 func taskGroupOffer(
@@ -294,7 +301,7 @@ func _taskGroupAddPending(
 
 // ==== Debugging utils --------------------------------------------------------
 
-// TODO: remove this
+//// TODO: remove this
 @_silgen_name("swift_task_print_ID")
 public func _taskPrintID(
   _ name: Optional<UnsafePointer<Int8>>,
@@ -309,5 +316,5 @@ public func _taskPrintIDCurrent(
   file: String = #file,
   line: Int = #line
 ) async {
-  _taskPrintID(name, (file as NSString).utf8String, line, Builtin.getCurrentAsyncTask())
+   _taskPrintID(name, (file as NSString).utf8String, line, Builtin.getCurrentAsyncTask())
 }

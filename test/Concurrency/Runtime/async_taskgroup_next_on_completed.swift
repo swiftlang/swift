@@ -43,18 +43,20 @@ func test_sum_nextOnCompleted() {
     return await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
       for n in numbers {
         await group.add { () async -> Int in
-          print("  inside group.add { \(n) }")
+          print("  complete group.add { \(n) }")
           return n
         }
       }
 
+      // We specifically want to await on completed child tasks in this test,
+      // so give them some time to complete before we hit group.next()
       sleep(3)
 
       var sum = 0
       do {
         while let r = await try group.next() {
           print("next: \(r)")
-          DispatchQueue.main.sync {
+          DispatchQueue.main.sync { // TODO: remove once executors/actors are a thing
             sum += r
           }
           print("sum: \(sum)")
@@ -63,18 +65,27 @@ func test_sum_nextOnCompleted() {
         print("ERROR: \(error)")
       }
 
+      assert(group.isEmpty, "Group must be empty after we consumed all tasks")
+
       print("task group returning: \(sum)")
       return sum
     }
   }
 
   // CHECK: main task
-  // CHECK-DAG: inside group.add { [[N:[0-9]+]] }
-  // CHECK-DAG: next: {{[0-9]+}}
-  //
-  // CHECK-DAG: inside group.add { [[N:[0-9]+]] }
-  // CHECK-DAG: next: {{[0-9]+}}
-  //
+
+  // The completions may arrive in any order, we make no strong guarantees about it:
+  // CHECK-DAG: complete group.add { [[N1:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[N2:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[N3:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[N4:[0-9]+]] }
+  // CHECK-DAG: complete group.add { [[N5:[0-9]+]] }
+  // CHECK-DAG: next: [[N1]]
+  // CHECK-DAG: next: [[N2]]
+  // CHECK-DAG: next: [[N3]]
+  // CHECK-DAG: next: [[N4]]
+  // CHECK-DAG: next: [[N5]]
+
   // CHECK: sum: 15
   //
   // CHECK: task group returning: 15
@@ -87,7 +98,6 @@ func test_sum_nextOnCompleted() {
   }
 
   print("main task")
-  sleep(3)
 }
 
 test_sum_nextOnCompleted()

@@ -20,8 +20,8 @@ extension DispatchQueue {
   }
 }
 
-func asyncInt() async -> Int {
-  42
+func asyncEcho(_ value: Int) async -> Int {
+  value
 }
 
 // ==== ------------------------------------------------------------------------
@@ -37,16 +37,15 @@ func test_taskGroup_isEmpty() {
 
       await group.add {
         sleep(2)
-        return await asyncInt()
+        return await asyncEcho(1)
       }
 
       // CHECK: while add running, outside: isEmpty=false
-      // CHECK: inside add: isEmpty=false
       print("while add running, outside: isEmpty=\(group.isEmpty)")
 
+      // CHECK: next: 1
       while let value = await try! group.next() {
         print("next: \(value)")
-        sleep(1)
       }
 
       // CHECK: after draining tasks: isEmpty=true
@@ -56,7 +55,7 @@ func test_taskGroup_isEmpty() {
   }
 
   DispatchQueue.main.async { () async in
-    _ = await try taskHandle.get()
+    _ = await try! taskHandle.get()
     exit(0)
   }
 

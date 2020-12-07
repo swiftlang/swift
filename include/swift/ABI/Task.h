@@ -23,7 +23,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
-#include "TaskGroup.h"
+#include "TaskQueues.h"
 #include "bitset"
 #include "string"
 
@@ -204,11 +204,6 @@ public:
 ///
 /// The future fragment is dynamic in size, based on the future result type
 /// it can hold, and thus must be the *last* fragment.
-///
-/// A task group uses a task which is simultaneously a channel and future.
-/// The channel is used for communication with its child tasks, offering
-/// their completed selfes into it, and the future fragment is used to
-/// await on the full "body result" of a task group.
 class AsyncTask : public HeapObject, public Job {
 public:
   /// The context for resuming the job.  When a task is scheduled
@@ -282,7 +277,6 @@ public:
   class GroupFragment {
   public:
     /// Describes the status of the channel.
-    // FIXME: the enum needs to be designed better or not be an enum anymo
     enum class ReadyQueueStatus : uintptr_t {
         /// The channel is empty, no tasks are pending.
         /// Return immediately, there is no point in suspending.
@@ -349,7 +343,7 @@ public:
         /// once we are done with it, to balance out the retain made before
         /// when the task was enqueued into the ready queue to keep it alive
         /// until a next() call eventually picks it up.
-        AsyncTask *task;
+        AsyncTask *retainedTask;
 
         bool isStorageAccessible() {
           return status == ChannelPollStatus::Success ||
@@ -357,17 +351,22 @@ public:
               status == ChannelPollStatus::Empty;
         }
 
-//          /// Retrieve a pointer to the storage of result.
-//          OpaqueValue *getStoragePtr() { // FIXME: ???
-//            return reinterpret_cast<OpaqueValue *>(
-//                reinterpret_cast<char *>(this) + storageOffset(resultType));
-//          }
-//
-//          /// Retrieve the error.
-//          SwiftError *&getError() { // FIXME: ???
-//            return *reinterpret_cast<SwiftError **>(
-//                reinterpret_cast<char *>(this) + storageOffset(resultType));
-//          }
+        static GroupPollResult get(AsyncTask *asyncTask, bool hadErrorResult,
+                                   bool needsSwiftRelease) {
+          auto fragment = asyncTask->futureFragment();
+          auto status = hadErrorResult ?
+              GroupFragment::ChannelPollStatus::Error :
+              GroupFragment::ChannelPollStatus::Success;
+          auto storage = hadErrorResult ?
+              reinterpret_cast<OpaqueValue *>(fragment->getError()) :
+              fragment->getStoragePtr();
+          auto task = needsSwiftRelease ? asyncTask : nullptr;
+          return GroupPollResult{
+              /*status*/ status,
+              /*storage*/ storage,
+              /*task*/
+          };
+        }
     };
 
     /// An item within the message queue of a channel.
