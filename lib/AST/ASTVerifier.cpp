@@ -1808,7 +1808,12 @@ public:
           if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(DRE->getDecl())) {
             rethrowingKind = fnDecl->getRethrowingKind();
           }
+        } else if (auto OCDRE = dyn_cast<OtherConstructorDeclRefExpr>(E->getFn())) {
+          if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(OCDRE->getDecl())) {
+            rethrowingKind = fnDecl->getRethrowingKind();
+          }
         }
+
         if (rethrowingKind != FunctionRethrowingKind::ByConformance &&
             rethrowingKind != FunctionRethrowingKind::Throws) {
           Out << "apply expression is marked as throwing, but function operand"
