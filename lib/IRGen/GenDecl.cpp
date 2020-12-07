@@ -2972,11 +2972,19 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
 
   if (IGM.Triple.getObjectFormat() == llvm::Triple::COFF) {
     if (cast<llvm::GlobalValue>(global)->hasDLLImportStorageClass()) {
+      // Add the user label prefix *prior* to the introduction of the linker
+      // synthetic marker `__imp_`.
+      // Failure to do so will re-decorate the generated symbol and miss the
+      // user label prefix, generating e.g. `___imp_$sBoW` instead of
+      // `__imp__$sBoW`.
+      if (auto prefix = IGM.DataLayout.getGlobalPrefix())
+        globalName = (llvm::Twine(prefix) + globalName).str();
+      // Indicate to LLVM that the symbol should not be re-decorated.
       llvm::GlobalVariable *GV =
           new llvm::GlobalVariable(IGM.Module, global->getType(),
                                    /*Constant=*/true,
-                                   llvm::GlobalValue::ExternalLinkage,
-                                   nullptr, llvm::Twine("__imp_") + globalName);
+                                   llvm::GlobalValue::ExternalLinkage, nullptr,
+                                   "\01__imp_" + globalName);
       GV->setExternallyInitialized(true);
       return GV;
     }
