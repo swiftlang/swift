@@ -406,7 +406,6 @@ class UsedDeclEnumerator {
   StringRef swiftDeps;
 
   /// Cache these for efficiency
-  const DependencyKey sourceFileInterface;
   const DependencyKey sourceFileImplementation;
 
   function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
