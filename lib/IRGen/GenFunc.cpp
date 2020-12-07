@@ -781,7 +781,7 @@ public:
   virtual void addArgument(llvm::Value *argValue, unsigned index) = 0;
   virtual SILParameterInfo getParameterInfo(unsigned index) = 0;
   virtual llvm::Value *getContext() = 0;
-  virtual llvm::Value *getDynamicFunctionPointer() = 0;
+  virtual llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) = 0;
   virtual llvm::Value *getDynamicFunctionContext() = 0;
   virtual void addDynamicFunctionContext(Explosion &explosion,
                                          DynamicFunctionKind kind) = 0;
@@ -954,7 +954,9 @@ public:
     return substType->getParameters()[index];
   }
   llvm::Value *getContext() override { return origParams.claimNext(); }
-  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
+  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
+    return args.takeLast();
+  }
   llvm::Value *getDynamicFunctionContext() override { return args.takeLast(); }
   void addDynamicFunctionContext(Explosion &explosion,
                                  DynamicFunctionKind kind) override {
@@ -1150,7 +1152,7 @@ public:
   llvm::Value *getContext() override {
     return loadValue(layout.getLocalContextLayout());
   }
-  llvm::Value *getDynamicFunctionPointer() override {
+  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
     assert(dynamicFunction && dynamicFunction->pointer);
     auto *context = dynamicFunction->context;
     if (!context) {
@@ -1158,7 +1160,6 @@ public:
     }
     auto *rawFunction = subIGF.Builder.CreateBitCast(
         dynamicFunction->pointer, origSig.getType()->getPointerTo());
-    auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, origType);
     auto functionPointer =
         FunctionPointer(FunctionPointer::KindTy::AsyncFunctionPointer,
                         rawFunction, authInfo, origSig);
@@ -1744,18 +1745,18 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
     // Otherwise, it was the last thing we added to the layout.
 
-    // The dynamic function pointer is packed "last" into the context,
-    // and we pulled it out as an argument.  Just pop it off.
-    auto fnPtr = emission->getDynamicFunctionPointer();
-
-    // It comes out of the context as an i8*. Cast to the function type.
-    fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
-
     assert(lastCapturedFieldPtr);
     auto authInfo = PointerAuthInfo::emit(subIGF,
                             IGM.getOptions().PointerAuth.PartialApplyCapture,
                             lastCapturedFieldPtr,
                             PointerAuthEntity::Special::PartialApplyCapture);
+
+    // The dynamic function pointer is packed "last" into the context,
+    // and we pulled it out as an argument.  Just pop it off.
+    auto fnPtr = emission->getDynamicFunctionPointer(authInfo);
+
+    // It comes out of the context as an i8*. Cast to the function type.
+    fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
     return FunctionPointer(FunctionPointer::KindTy::Function, fnPtr, authInfo,
                            origSig);
@@ -2416,7 +2417,12 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
         auto &Builder = IGF.Builder;
         auto addr = Builder.CreateBitOrPointerCast(&(*it), IGF.IGM.Int8PtrPtrTy);
         Address callerContextAddr(addr, IGF.IGM.getPointerAlignment());
-        auto callerContext = Builder.CreateLoad(callerContextAddr);
+        llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
+        if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+          auto authInfo =
+              PointerAuthInfo::emit(IGF, schema, addr, PointerAuthEntity());
+          callerContext = emitPointerAuthAuth(IGF, callerContext, authInfo);
+        }
         Builder.CreateRet(callerContext);
       },
       false /*isNoInline*/));
@@ -2437,6 +2443,10 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                      ArrayRef<llvm::Type *> argTypes) {
   SmallVector<llvm::Type*, 8> argTys;
   argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
+  auto originalAuthInfo = fnPtr.getAuthInfo();
+  if (fnPtr.getAuthInfo()) {
+    argTys.push_back(IGM.Int64Ty); // Discriminator for the function pointer.
+  }
   for (auto ty : argTypes) {
     argTys.push_back(ty);
   }
@@ -2456,13 +2466,18 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
     IGM.DebugInfo->emitArtificialFunction(dispatchIGF, dispatch);
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
-  llvm::Value *ptrArg = &*(it++);
+  llvm::Value *fnPtrArg = &*(it++);
+  llvm::Value *discriminatorArg = ((bool)originalAuthInfo) ? &*(it++) : nullptr;
   SmallVector<llvm::Value *, 8> callArgs;
   for (; it != end; ++it) {
     callArgs.push_back(&*it);
   }
-  ptrArg = Builder.CreateBitOrPointerCast(ptrArg, calleeFnPtrType);
-  auto callee = FunctionPointer(fnPtr.getKind(), ptrArg, fnPtr.getAuthInfo(),
+  fnPtrArg = Builder.CreateBitOrPointerCast(fnPtrArg, calleeFnPtrType);
+  PointerAuthInfo newAuthInfo =
+      ((bool)originalAuthInfo)
+          ? PointerAuthInfo(fnPtr.getAuthInfo().getKey(), discriminatorArg)
+          : originalAuthInfo;
+  auto callee = FunctionPointer(fnPtr.getKind(), fnPtrArg, newAuthInfo,
                                 fnPtr.getSignature());
   auto call = Builder.CreateCall(callee, callArgs);
   call->setTailCall();
