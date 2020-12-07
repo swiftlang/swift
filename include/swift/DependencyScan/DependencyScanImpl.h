@@ -19,6 +19,34 @@
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 
+typedef struct {
+  /// The module's name
+  /// The format is:
+  /// `<module-kind>:<module-name>`
+  /// where `module-kind` is one of:
+  /// "swiftTextual"
+  /// "swiftBinary"
+  /// "swiftPlaceholder"
+  /// "clang""
+  swiftscan_string_t module_name;
+
+  /// The path for the module.
+  swiftscan_string_t module_path;
+
+  /// The source files used to build this module.
+  swiftscan_string_set_t *source_files;
+
+  /**
+   * The list of modules which this module direct depends on.
+   * The format is:
+   * `<module-kind>:<module-name>`
+   */
+  swiftscan_string_set_t *direct_dependencies;
+
+  /// Specific details of a particular kind of module.
+  swiftscan_module_details_t details;
+} swiftscan_impl_dependency_info_t;
+
 /// Swift modules to be built from a module interface, may have a bridging
 /// header.
 typedef struct {
@@ -110,13 +138,26 @@ wrap_scanner(const swift::dependencies::DependencyScanningTool *P) {
       const_cast<swift::dependencies::DependencyScanningTool *>(P));
 }
 
-inline swiftscan_impl_module_details_t *unwrap_details(swiftscan_module_details_t P) {
+inline swiftscan_impl_module_details_t *
+unwrap_details(swiftscan_module_details_t P) {
   return reinterpret_cast<swiftscan_impl_module_details_t *>(P);
 }
 
-inline swiftscan_module_details_t wrap_details(const swiftscan_impl_module_details_t *P) {
+inline swiftscan_module_details_t
+wrap_details(const swiftscan_impl_module_details_t *P) {
   return reinterpret_cast<swiftscan_module_details_t>(
       const_cast<swiftscan_impl_module_details_t *>(P));
+}
+
+inline swiftscan_impl_dependency_info_t *
+unwrap_info(swiftscan_dependency_info_t P) {
+  return reinterpret_cast<swiftscan_impl_dependency_info_t *>(P);
+}
+
+inline swiftscan_dependency_info_t
+wrap_info(const swiftscan_impl_dependency_info_t *P) {
+  return reinterpret_cast<swiftscan_dependency_info_t>(
+      const_cast<swiftscan_impl_dependency_info_t *>(P));
 }
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

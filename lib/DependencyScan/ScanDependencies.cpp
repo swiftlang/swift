@@ -500,7 +500,7 @@ static void writeJSON(llvm::raw_ostream &out,
   SWIFT_DEFER { out << "  ]\n"; };
   const auto module_set = fullDependencies->module_set;
   for (int mi = 0; mi < module_set->count; ++mi) {
-    const auto &moduleInfo = module_set->modules[mi];
+    const auto &moduleInfo = *unwrap_info(module_set->modules[mi]);
     auto &directDependencies = moduleInfo.direct_dependencies;
     // The module we are describing.
     out.indent(2 * 2);
@@ -830,7 +830,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
       return wrap_details(details);
     };
 
-    swiftscan_dependency_info_t &moduleInfo = dependencySet->modules[i];
+    auto &moduleInfo = *unwrap_info(dependencySet->modules[i]);
     moduleInfo.module_name =
         create_dup(createEncodedModuleKindAndName(module).c_str());
     moduleInfo.module_path = create_dup(modulePath.c_str());

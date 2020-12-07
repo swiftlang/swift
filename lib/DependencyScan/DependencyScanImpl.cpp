@@ -97,91 +97,118 @@ swiftscan_prescan_result_t *swiftscan_prescan_dependencies(swiftscan_scanner_t *
   return ImportSet;
 }
 
+//=== Module Dependency Info query APIs -----------------------------------===//
+
+swiftscan_string_t
+swiftscan_module_info_get_module_name(swiftscan_dependency_info_t info) {
+  return unwrap_info(info)->module_name;
+}
+
+swiftscan_string_t
+swiftscan_module_info_get_module_path(swiftscan_dependency_info_t info) {
+  return unwrap_info(info)->module_path;
+}
+
+swiftscan_string_set_t *
+swiftscan_module_info_get_source_files(swiftscan_dependency_info_t info) {
+  return unwrap_info(info)->source_files;
+}
+
+swiftscan_string_set_t *
+swiftscan_module_info_get_direct_dependencies(swiftscan_dependency_info_t info) {
+  return unwrap_info(info)->direct_dependencies;
+}
+
+swiftscan_module_details_t
+swiftscan_module_info_get_details(swiftscan_dependency_info_t info) {
+  return unwrap_info(info)->details;
+}
+
 //=== Swift Textual Module Details query APIs -----------------------------===//
 
 swiftscan_dependency_info_kind_t
-swiftscan_get_module_detail_kind(swiftscan_module_details_t details) {
+swiftscan_module_detail_get_kind(swiftscan_module_details_t details) {
   return unwrap_details(details)->kind;
 }
 
 swiftscan_string_t
-swiftscan_get_swift_textual_detail_module_interface_path(swiftscan_module_details_t details) {
+swiftscan_swift_textual_detail_get_module_interface_path(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.module_interface_path;
 }
 
-swiftscan_string_set_t *swiftscan_get_swift_textual_detail_compiled_module_candidates(
+swiftscan_string_set_t *swiftscan_swift_textual_detail_get_compiled_module_candidates(
     swiftscan_module_details_t details) {
   return unwrap_details(details)
       ->swift_textual_details.compiled_module_candidates;
 }
 
 swiftscan_string_t
-swiftscan_get_swift_textual_detail_bridging_header_path(swiftscan_module_details_t details) {
+swiftscan_swift_textual_detail_get_bridging_header_path(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.bridging_header_path;
 }
 
 swiftscan_string_set_t *
-swiftscan_get_swift_textual_detail_bridging_source_files(swiftscan_module_details_t details) {
+swiftscan_swift_textual_detail_get_bridging_source_files(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.bridging_source_files;
 }
 
-swiftscan_string_set_t *swiftscan_get_swift_textual_detail_bridging_module_dependencies(
+swiftscan_string_set_t *swiftscan_swift_textual_detail_get_bridging_module_dependencies(
     swiftscan_module_details_t details) {
   return unwrap_details(details)
       ->swift_textual_details.bridging_module_dependencies;
 }
 
 swiftscan_string_set_t *
-swiftscan_get_swift_textual_detail_command_line(swiftscan_module_details_t details) {
+swiftscan_swift_textual_detail_get_command_line(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.command_line;
 }
 
 swiftscan_string_set_t *
-swiftscan_get_swift_textual_detail_extra_pcm_args(swiftscan_module_details_t details) {
+swiftscan_swift_textual_detail_get_extra_pcm_args(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.extra_pcm_args;
 }
 
 swiftscan_string_t
-swiftscan_get_swift_textual_detail_context_hash(swiftscan_module_details_t details) {
+swiftscan_swift_textual_detail_get_context_hash(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.context_hash;
 }
 
-bool swiftscan_get_swift_textual_detail_is_framework(swiftscan_module_details_t details) {
+bool swiftscan_swift_textual_detail_get_is_framework(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_textual_details.is_framework;
 }
 
 //=== Swift Binary Module Details query APIs ------------------------------===//
 
 swiftscan_string_t
-swiftscan_get_swift_binary_detail_compiled_module_path(swiftscan_module_details_t details) {
+swiftscan_swift_binary_detail_get_compiled_module_path(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_binary_details.compiled_module_path;
 }
 
 swiftscan_string_t
-swiftscan_get_swift_binary_detail_module_doc_path(swiftscan_module_details_t details) {
+swiftscan_swift_binary_detail_get_module_doc_path(swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_binary_details.module_doc_path;
 }
 
-swiftscan_string_t swiftscan_get_swift_binary_detail_module_source_info_path(
+swiftscan_string_t swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details) {
   return unwrap_details(details)->swift_binary_details.module_source_info_path;
 }
 
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
-swiftscan_string_t swiftscan_get_swift_placeholder_detail_compiled_module_path(
+swiftscan_string_t swiftscan_swift_placeholder_detail_get_compiled_module_path(
     swiftscan_module_details_t details) {
   return unwrap_details(details)
       ->swift_placeholder_details.module_source_info_path;
 }
 
 swiftscan_string_t
-swiftscan_get_swift_placeholder_detail_module_doc_path(swiftscan_module_details_t details) {
+swiftscan_swift_placeholder_detail_get_module_doc_path(swiftscan_module_details_t details) {
   return unwrap_details(details)
       ->swift_placeholder_details.module_source_info_path;
 }
 
-swiftscan_string_t swiftscan_get_swift_placeholder_detail_module_source_info_path(
+swiftscan_string_t swiftscan_swift_placeholder_detail_get_module_source_info_path(
     swiftscan_module_details_t details) {
   return unwrap_details(details)
       ->swift_placeholder_details.module_source_info_path;
@@ -189,15 +216,15 @@ swiftscan_string_t swiftscan_get_swift_placeholder_detail_module_source_info_pat
 
 //=== Clang Module Details query APIs -------------------------------------===//
 
-swiftscan_string_t swiftscan_get_clang_detail_module_map_path(swiftscan_module_details_t details) {
+swiftscan_string_t swiftscan_clang_detail_get_module_map_path(swiftscan_module_details_t details) {
   return unwrap_details(details)->clang_details.module_map_path;
 }
 
-swiftscan_string_t swiftscan_get_clang_detail_context_hash(swiftscan_module_details_t details) {
+swiftscan_string_t swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details) {
   return unwrap_details(details)->clang_details.context_hash;
 }
 
-swiftscan_string_set_t *swiftscan_get_clang_detail_command_line(swiftscan_module_details_t details) {
+swiftscan_string_set_t *swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return unwrap_details(details)->clang_details.command_line;
 }
 
@@ -243,11 +270,11 @@ void swiftscan_dependency_info_details_dispose(swiftscan_module_details_t detail
 }
 
 void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t *info) {
-  swiftscan_string_dispose(info->module_name);
-  swiftscan_string_dispose(info->module_path);
-  swiftscan_string_set_dispose(info->source_files);
-  swiftscan_string_set_dispose(info->direct_dependencies);
-  swiftscan_dependency_info_details_dispose(info->details);
+  swiftscan_string_dispose(unwrap_info(info)->module_name);
+  swiftscan_string_dispose(unwrap_info(info)->module_path);
+  swiftscan_string_set_dispose(unwrap_info(info)->source_files);
+  swiftscan_string_set_dispose(unwrap_info(info)->direct_dependencies);
+  swiftscan_dependency_info_details_dispose(unwrap_info(info)->details);
 }
 
 void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {

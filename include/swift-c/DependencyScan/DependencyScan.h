@@ -44,36 +44,10 @@ typedef enum {
 /// Opaque container of the details specific to a given module dependency.
 typedef void *swiftscan_module_details_t;
 
-typedef struct {
-  /// The module's name
-  /// The format is:
-  /// `<module-kind>:<module-name>`
-  /// where `module-kind` is one of:
-  /// "swiftTextual"
-  /// "swiftBinary"
-  /// "swiftPlaceholder"
-  /// "clang""
-  swiftscan_string_t module_name;
-
-  /// The path for the module.
-  swiftscan_string_t module_path;
-
-  /// The source files used to build this module.
-  swiftscan_string_set_t *source_files;
-
-  /**
-   * The list of modules which this module direct depends on.
-   * The format is:
-   * `<module-kind>:<module-name>`
-   */
-  swiftscan_string_set_t *direct_dependencies;
-
-  /// Specific details of a particular kind of module.
-  swiftscan_module_details_t details;
-} swiftscan_dependency_info_t;
+/// Opaque container to a dependency info of a given module.
+typedef void *swiftscan_dependency_info_t;
 
 /// Full Dependency Graph (Result)
-
 typedef struct {
   int count;
   swiftscan_dependency_info_t *modules;
@@ -112,8 +86,23 @@ typedef struct {
 
 //=== Dependency Result Functions -----------------------------------------===//
 
+SWIFTSCAN_PUBLIC swiftscan_string_t
+swiftscan_module_info_get_module_name(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_string_t
+swiftscan_module_info_get_module_path(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_module_info_get_source_files(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_module_info_get_direct_dependencies(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_module_details_t
+swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
+
 SWIFTSCAN_PUBLIC swiftscan_dependency_info_kind_t
-swiftscan_get_module_detail_kind(swiftscan_module_details_t details);
+swiftscan_module_detail_get_kind(swiftscan_module_details_t details);
 
 //=== Swift Textual Module Details query APIs -----------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_t
