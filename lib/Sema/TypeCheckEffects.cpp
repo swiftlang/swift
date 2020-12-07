@@ -539,12 +539,14 @@ public:
     // Decompose the application.
     SmallVector<Expr*, 4> args;
     auto fnRef = AbstractFunction::decomposeApply(E, args);
-    auto rethrowsKind = fnRef.getRethrowingKind();
 
-    // If the function doesn't throw at all, we're done here.
-    if (rethrowsKind == FunctionRethrowingKind::None) {
-      return isAsync ? Classification::forAsync() : Classification();
-    } else if (rethrowsKind == FunctionRethrowingKind::ByConformance) {
+    // If any of the arguments didn't type check, fail.
+    for (auto arg : args) {
+      if (!arg->getType() || arg->getType()->hasError())
+        return Classification::forInvalidCode();
+    }
+
+    if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
       auto substitutions = fnRef.getDeclRef().getSubstitutions();
       if (classifyWitnessAsThrows(fnRef.getModuleContext(), substitutions)) {
         return Classification::forRethrowingOnly(
@@ -552,19 +554,11 @@ public:
       } else {
         return isAsync ? Classification::forAsync() : Classification();
       }
-    } else if (rethrowsKind == FunctionRethrowingKind::Throws) {
-      return Classification::forThrow(
-          PotentialThrowReason::forThrowingApply(), isAsync);
     }
 
     // If the function doesn't throw at all, we're done here.
-    if (!fnType->isThrowing())
+    if (!fnType->isThrowing()) {
       return isAsync ? Classification::forAsync() : Classification();
-
-    // If any of the arguments didn't type check, fail.
-    for (auto arg : args) {
-      if (!arg->getType() || arg->getType()->hasError())
-        return Classification::forInvalidCode();
     }
 
     // If we're applying more arguments than the natural argument
