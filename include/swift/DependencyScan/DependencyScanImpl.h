@@ -19,15 +19,15 @@
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 
-typedef struct {
+struct swiftscan_dependency_result_s {
   /// The name of the main module for this dependency graph (root node)
   swiftscan_string_t main_module_name;
 
   /// The complete list of modules discovered
   swiftscan_dependency_set_t *module_set;
-} swiftscan_impl_dependency_result_t;
+};
 
-typedef struct {
+struct swiftscan_dependency_info_s {
   /// The module's name
   /// The format is:
   /// `<module-kind>:<module-name>`
@@ -53,7 +53,7 @@ typedef struct {
 
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
-} swiftscan_impl_dependency_info_t;
+};
 
 /// Swift modules to be built from a module interface, may have a bridging
 /// header.
@@ -125,7 +125,7 @@ typedef struct {
   swiftscan_string_set_t *command_line;
 } swiftscan_clang_details_t;
 
-typedef struct {
+struct swiftscan_module_details_s {
   swiftscan_dependency_info_kind_t kind;
   union {
     swiftscan_swift_textual_details_t swift_textual_details;
@@ -133,23 +133,23 @@ typedef struct {
     swiftscan_swift_placeholder_details_t swift_placeholder_details;
     swiftscan_clang_details_t clang_details;
   };
-} swiftscan_impl_module_details_t;
+} ;
 
-typedef struct {
+struct swiftscan_batch_scan_entry_s {
   swiftscan_string_t module_name;
   swiftscan_string_t arguments;
   bool is_swift;
-} swiftscan_impl_batch_scan_entry_t;
+};
 
-typedef struct {
+struct swiftscan_prescan_result_s {
   /// The complete list of imports discovered
   swiftscan_string_set_t *import_set;
-} swiftscan_impl_prescan_result_t;
+};
 
-typedef struct {
+struct swiftscan_scan_invocation_s {
   swiftscan_string_t working_directory;
   swiftscan_string_set_t *argv;
-} swiftscan_impl_scan_invocation_t;
+};
 
 inline swift::dependencies::DependencyScanningTool *
 unwrap_scanner(swiftscan_scanner_t P) {
@@ -160,72 +160,6 @@ inline swiftscan_scanner_t
 wrap_scanner(const swift::dependencies::DependencyScanningTool *P) {
   return reinterpret_cast<swiftscan_scanner_t>(
       const_cast<swift::dependencies::DependencyScanningTool *>(P));
-}
-
-inline swiftscan_impl_module_details_t *
-unwrap_details(swiftscan_module_details_t P) {
-  return reinterpret_cast<swiftscan_impl_module_details_t *>(P);
-}
-
-inline swiftscan_module_details_t
-wrap_details(const swiftscan_impl_module_details_t *P) {
-  return reinterpret_cast<swiftscan_module_details_t>(
-      const_cast<swiftscan_impl_module_details_t *>(P));
-}
-
-inline swiftscan_impl_dependency_info_t *
-unwrap_info(swiftscan_dependency_info_t P) {
-  return reinterpret_cast<swiftscan_impl_dependency_info_t *>(P);
-}
-
-inline swiftscan_dependency_info_t
-wrap_info(const swiftscan_impl_dependency_info_t *P) {
-  return reinterpret_cast<swiftscan_dependency_info_t>(
-      const_cast<swiftscan_impl_dependency_info_t *>(P));
-}
-
-inline swiftscan_impl_dependency_result_t *
-unwrap_result(swiftscan_dependency_result_t P) {
-  return reinterpret_cast<swiftscan_impl_dependency_result_t *>(P);
-}
-
-inline swiftscan_dependency_result_t
-wrap_result(const swiftscan_impl_dependency_result_t *P) {
-  return reinterpret_cast<swiftscan_dependency_result_t>(
-      const_cast<swiftscan_impl_dependency_result_t *>(P));
-}
-
-inline swiftscan_impl_prescan_result_t *
-unwrap_prescan_result(swiftscan_prescan_result_t P) {
-  return reinterpret_cast<swiftscan_impl_prescan_result_t *>(P);
-}
-
-inline swiftscan_prescan_result_t
-wrap_prescan_result(const swiftscan_impl_prescan_result_t *P) {
-  return reinterpret_cast<swiftscan_prescan_result_t>(
-      const_cast<swiftscan_impl_prescan_result_t *>(P));
-}
-
-inline swiftscan_impl_batch_scan_entry_t *
-unwrap_batch_entry(swiftscan_batch_scan_entry_t P) {
-  return reinterpret_cast<swiftscan_impl_batch_scan_entry_t *>(P);
-}
-
-inline swiftscan_batch_scan_entry_t
-wrap_batch_entry(const swiftscan_impl_batch_scan_entry_t *P) {
-  return reinterpret_cast<swiftscan_batch_scan_entry_t>(
-      const_cast<swiftscan_impl_batch_scan_entry_t *>(P));
-}
-
-inline swiftscan_impl_scan_invocation_t *
-unwrap_scan_invocation(swiftscan_scan_invocation_t P) {
-  return reinterpret_cast<swiftscan_impl_scan_invocation_t *>(P);
-}
-
-inline swiftscan_batch_scan_entry_t
-wrap_scan_invocation(const swiftscan_impl_scan_invocation_t *P) {
-  return reinterpret_cast<swiftscan_scan_invocation_t>(
-      const_cast<swiftscan_impl_scan_invocation_t *>(P));
 }
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

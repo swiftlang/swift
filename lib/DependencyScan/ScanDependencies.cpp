@@ -448,33 +448,29 @@ void writeDirectDependencies(llvm::raw_ostream &out,
 
 static const swiftscan_swift_textual_details_t *
 getAsTextualDependencyModule(swiftscan_module_details_t details) {
-  auto *details_impl = unwrap_details(details);
-  if (details_impl->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL)
-    return &details_impl->swift_textual_details;
+  if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL)
+    return &details->swift_textual_details;
   return nullptr;
 }
 
 static const swiftscan_swift_placeholder_details_t *
 getAsPlaceholderDependencyModule(swiftscan_module_details_t details) {
-  auto *details_impl = unwrap_details(details);
-  if (details_impl->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER)
-    return &details_impl->swift_placeholder_details;
+  if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER)
+    return &details->swift_placeholder_details;
   return nullptr;
 }
 
 static const swiftscan_swift_binary_details_t *
 getAsBinaryDependencyModule(swiftscan_module_details_t details) {
-  auto *details_impl = unwrap_details(details);
-  if (details_impl->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY)
-    return &details_impl->swift_binary_details;
+  if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY)
+    return &details->swift_binary_details;
   return nullptr;
 }
 
 static const swiftscan_clang_details_t *
 getAsClangDependencyModule(swiftscan_module_details_t details) {
-  auto *details_impl = unwrap_details(details);
-  if (details_impl->kind == SWIFTSCAN_DEPENDENCY_INFO_CLANG)
-    return &details_impl->clang_details;
+  if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_CLANG)
+    return &details->clang_details;
   return nullptr;
 }
 
@@ -489,22 +485,19 @@ static void writePrescanJSON(llvm::raw_ostream &out,
 
 static void writeJSON(llvm::raw_ostream &out,
                       const swiftscan_dependency_result_t fullDependencies) {
-  const swiftscan_impl_dependency_result_t *fullDependenciesImpl =
-      unwrap_result(fullDependencies);
-
   // Write out a JSON description of all of the dependencies.
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
   // Name of the main module.
   writeJSONSingleField(out, "mainModuleName",
-                       fullDependenciesImpl->main_module_name,
+                       fullDependencies->main_module_name,
                        /*indentLevel=*/1, /*trailingComma=*/true);
   // Write out all of the modules.
   out << "  \"modules\": [\n";
   SWIFT_DEFER { out << "  ]\n"; };
-  const auto module_set = fullDependenciesImpl->module_set;
+  const auto module_set = fullDependencies->module_set;
   for (int mi = 0; mi < module_set->count; ++mi) {
-    const auto &moduleInfo = *unwrap_info(module_set->modules[mi]);
+    const auto &moduleInfo = *module_set->modules[mi];
     auto &directDependencies = moduleInfo.direct_dependencies;
     // The module we are describing.
     out.indent(2 * 2);
@@ -780,8 +773,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
-      swiftscan_impl_module_details_t *details =
-          new swiftscan_impl_module_details_t;
+      swiftscan_module_details_s *details =
+          new swiftscan_module_details_s;
       if (swiftTextualDeps) {
         swiftscan_string_t moduleInterfacePath =
             swiftTextualDeps->swiftInterfaceFile.hasValue()
@@ -834,10 +827,10 @@ generateFullDependencyGraph(CompilerInstance &instance,
             .context_hash = create_dup(clangDeps->contextHash.c_str()),
             .command_line = create_set(clangDeps->nonPathCommandLine)};
       }
-      return wrap_details(details);
+      return details;
     };
 
-    auto &moduleInfo = *unwrap_info(dependencySet->modules[i]);
+    auto &moduleInfo = *dependencySet->modules[i];
     moduleInfo.module_name =
         create_dup(createEncodedModuleKindAndName(module).c_str());
     moduleInfo.module_path = create_dup(modulePath.c_str());
@@ -868,11 +861,10 @@ generateFullDependencyGraph(CompilerInstance &instance,
     moduleInfo.details = getModuleDetails();
   }
 
-  swiftscan_impl_dependency_result_t *result =
-      new swiftscan_impl_dependency_result_t;
+  swiftscan_dependency_result_s *result = new swiftscan_dependency_result_s;
   result->main_module_name = create_dup(mainModuleName.c_str());
   result->module_set = dependencySet;
-  return wrap_result(result);
+  return result;
 }
 
 static bool diagnoseCycle(CompilerInstance &instance,
@@ -1279,9 +1271,9 @@ llvm::ErrorOr<swiftscan_prescan_result_t>
 swift::dependencies::performModulePrescan(CompilerInstance &instance) {
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies = identifyMainModuleDependencies(instance);
-  auto *importSet = new swiftscan_impl_prescan_result_t;
+  auto *importSet = new swiftscan_prescan_result_s;
   importSet->import_set = create_set(mainDependencies.getModuleDependencies());
-  return wrap_prescan_result(importSet);
+  return importSet;
 }
 
 std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
@@ -1400,7 +1392,7 @@ swift::dependencies::performBatchModulePrescan(
           return;
         }
 
-        auto *importSet = new swiftscan_impl_prescan_result_t;
+        auto *importSet = new swiftscan_prescan_result_s;
         importSet->import_set = create_set(rootDeps->getModuleDependencies());
         batchPrescanResult.push_back(importSet);
       });

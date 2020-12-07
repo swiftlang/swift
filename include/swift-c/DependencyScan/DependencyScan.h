@@ -42,16 +42,16 @@ typedef enum {
 } swiftscan_dependency_info_kind_t;
 
 /// Opaque container of the details specific to a given module dependency.
-typedef void *swiftscan_module_details_t;
+typedef struct swiftscan_module_details_s *swiftscan_module_details_t;
 
 /// Opaque container to a dependency info of a given module.
-typedef void *swiftscan_dependency_info_t;
+typedef struct swiftscan_dependency_info_s *swiftscan_dependency_info_t;
 
 /// Opaque container to an overall result of a dependency scan.
-typedef void *swiftscan_dependency_result_t;
+typedef struct swiftscan_dependency_result_s *swiftscan_dependency_result_t;
 
 /// Opaque container to contain the result of a dependency prescan.
-typedef void *swiftscan_prescan_result_t;
+typedef struct swiftscan_prescan_result_s *swiftscan_prescan_result_t;
 
 /// Full Dependency Graph (Result)
 typedef struct {
@@ -62,7 +62,7 @@ typedef struct {
 //=== Batch Scan Input Specification --------------------------------------===//
 
 /// Opaque container to a container of batch scan entry information.
-typedef void *swiftscan_batch_scan_entry_t;
+typedef struct swiftscan_batch_scan_entry_s *swiftscan_batch_scan_entry_t;
 
 typedef struct {
   int count;
@@ -78,7 +78,7 @@ typedef struct {
 
 /// Opaque container of all relevant context required to launch a dependency
 /// scan (command line arguments, working directory, etc.)
-typedef void *swiftscan_scan_invocation_t;
+typedef struct swiftscan_scan_invocation_s *swiftscan_scan_invocation_t;
 
 //=== Dependency Result Functions -----------------------------------------===//
 
