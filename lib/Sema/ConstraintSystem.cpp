@@ -4408,9 +4408,16 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
     auto *call = castToExpr<CallExpr>(anchor);
+    rawFnType = getType(call->getFn());
+
+    // If callee couldn't be resolved due to expression
+    // issues e.g. it's a reference to an invalid member
+    // let's just return here.
+    if (simplifyType(rawFnType)->is<UnresolvedType>())
+      return None;
+
     assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
-    rawFnType = getType(call->getFn());
   }
 
   // Try to resolve the function type by loading lvalues and looking through
