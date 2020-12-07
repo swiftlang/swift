@@ -1867,12 +1867,15 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     FunctionPointer functionPointer, llvm::Value *thickContext,
     std::pair<bool, bool> values, Size initialContextSize) {
   assert(values.first || values.second);
+  assert(functionPointer.getKind() ==
+         FunctionPointer::KindTy::AsyncFunctionPointer);
   bool emitFunction = values.first;
   bool emitSize = values.second;
   // TODO: This calculation should be extracted out into standalone functions
   //       emitted on-demand per-module to improve codesize.
   switch (representation) {
   case SILFunctionTypeRepresentation::Thick: {
+    assert(!functionPointer.useStaticContextSize());
     // If the called function is thick, the size of the called function's
     // async context is not statically knowable.
     //
@@ -1941,16 +1944,25 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 2> sizePhiValues;
     { // thin
       IGF.Builder.emitBlock(thinBlock);
+      auto *ptr = functionPointer.getRawPointer();
+      if (auto authInfo = functionPointer.getAuthInfo()) {
+        ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
+      }
+      auto *afpPtr =
+          IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
       if (emitFunction) {
-        auto *uncastFnPtr = functionPointer.getPointer(IGF);
+        llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+        auto *uncastFnPtr = IGF.emitLoadOfRelativePointer(
+            Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+            /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
         auto *fnPtr = IGF.Builder.CreateBitCast(uncastFnPtr, IGF.IGM.Int8PtrTy);
+        if (auto authInfo = functionPointer.getAuthInfo()) {
+          fnPtr = emitPointerAuthSign(IGF, fnPtr, authInfo);
+        }
         fnPhiValues.push_back({thinBlock, fnPtr});
       }
       if (emitSize) {
-        auto *ptr = functionPointer.getRawPointer();
-        auto *descriptorPtr =
-            IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-        auto *sizePtr = IGF.Builder.CreateStructGEP(descriptorPtr, 1);
+        auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
         auto *size =
             IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
         sizePhiValues.push_back({thinBlock, size});
@@ -2026,20 +2038,34 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Block: {
+    auto *ptr = functionPointer.getRawPointer();
+    if (auto authInfo = functionPointer.getAuthInfo()) {
+      ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
+    }
+    auto *afpPtr =
+        IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
     llvm::Value *fn = nullptr;
     if (emitFunction) {
-      fn = functionPointer.getPointer(IGF);
+      if (functionPointer.useStaticContextSize()) {
+        fn = functionPointer.getRawPointer();
+      } else {
+        llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+        fn = IGF.emitLoadOfRelativePointer(
+            Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+            /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
+      }
+      if (auto authInfo = functionPointer.getAuthInfo()) {
+        fn = emitPointerAuthSign(IGF, fn, authInfo);
+      }
     }
     llvm::Value *size = nullptr;
     if (emitSize) {
       if (functionPointer.useStaticContextSize()) {
         size = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                       initialContextSize.getValue());
-      }  else {
-        auto *ptr = functionPointer.getRawPointer();
-        auto *descriptorPtr =
-            IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-        auto *sizePtr = IGF.Builder.CreateStructGEP(descriptorPtr, 1);
+      } else {
+        assert(!functionPointer.useStaticContextSize());
+        auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
         size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
       }
     }
@@ -2336,7 +2362,8 @@ public:
   }
   FunctionPointer getCalleeFunctionPointer() override {
     return FunctionPointer(
-        FunctionPointer::KindTy::Function, calleeFunction, PointerAuthInfo(),
+        FunctionPointer::KindTy::Function, calleeFunction,
+        CurCallee.getFunctionPointer().getAuthInfo(),
         IGF.IGM.getSignature(getCallee().getSubstFunctionType()));
   }
   SILType getParameterType(unsigned index) override {
@@ -2374,8 +2401,7 @@ public:
           llvm::Intrinsic::coro_async_resume, {});
       auto fnVal = currentResumeFn;
       // Sign the pointer.
-      // TODO: use a distinct schema.
-      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+      if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
         Address fieldAddr =
             fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
         auto authInfo = PointerAuthInfo::emit(
@@ -2454,6 +2480,9 @@ public:
         Builder.CreateBitOrPointerCast(dispatchFn, IGM.Int8PtrTy));
     arguments.push_back(
         Builder.CreateBitOrPointerCast(fn.getRawPointer(), IGM.Int8PtrTy));
+    if (auto authInfo = fn.getAuthInfo()) {
+      arguments.push_back(fn.getAuthInfo().getDiscriminator());
+    }
     for (auto arg: args)
       arguments.push_back(arg);
     return IGF.emitSuspendAsyncCall(arguments);
@@ -3640,14 +3669,34 @@ llvm::Value *irgen::emitTaskCreate(
   auto layout = getAsyncContextLayout(
       IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType, subs);
 
+  CanSILFunctionType taskContinuationFunctionTy = [&]() {
+    ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
+    auto extInfo =
+        ASTExtInfoBuilder()
+            .withRepresentation(FunctionTypeRepresentation::CFunctionPointer)
+            .build();
+    // FIXME: Use the appropriate signature for TaskContinuationFunction:
+    //
+    //            using TaskContinuationFunction =
+    //              SWIFT_CC(swift)
+    //              void (AsyncTask *, ExecutorRef, AsyncContext *);
+    auto ty = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+    return IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
+  }();
+
   // Call the function.
   llvm::CallInst *result;
   llvm::Value *theSize, *theFunction;
+  auto taskFunctionPointer = FunctionPointer::forExplosionValue(
+      IGF, taskFunction, taskFunctionCanSILType);
   std::tie(theFunction, theSize) =
       getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
-                              FunctionPointer::forExplosionValue(
-                                  IGF, taskFunction, taskFunctionCanSILType),
-                              localContextInfo);
+                              taskFunctionPointer, localContextInfo);
+  if (auto authInfo = PointerAuthInfo::forFunctionPointer(
+          IGF.IGM, taskContinuationFunctionTy)) {
+    theFunction = emitPointerAuthResign(
+        IGF, theFunction, taskFunctionPointer.getAuthInfo(), authInfo);
+  }
   theFunction = IGF.Builder.CreateBitOrPointerCast(
       theFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
   theSize = IGF.Builder.CreateZExtOrBitCast(theSize, IGF.IGM.SizeTy);
@@ -4519,18 +4568,25 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     return Value;
   case KindTy::Value::AsyncFunctionPointer: {
     if (!isFunctionPointerWithoutContext) {
+      auto *fnPtr = Value;
+      if (auto authInfo = AuthInfo) {
+        fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
+      }
       auto *descriptorPtr =
-          IGF.Builder.CreateBitCast(Value, IGF.IGM.AsyncFunctionPointerPtrTy);
+          IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.AsyncFunctionPointerPtrTy);
       auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
-      return IGF.emitLoadOfRelativePointer(
+      auto *result = IGF.emitLoadOfRelativePointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ getFunctionType()->getPointerTo());
+      if (auto authInfo = AuthInfo) {
+        result = emitPointerAuthSign(IGF, result, authInfo);
+      }
+      return result;
     } else {
       return IGF.Builder.CreateBitOrPointerCast(
           Value, getFunctionType()->getPointerTo());
     }
   }
-
   }
 }
 
@@ -4577,8 +4633,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
       .loadAsCopy(IGF, returnToCallerAddr, fn);
   llvm::Value *fnVal = fn.claimNext();
 
-  // TODO: use distinct schema
-  if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
+  if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
     Address fieldAddr =
         returnToCallerLayout.project(IGF, contextAddr, /*offsets*/ llvm::None);
     auto authInfo = PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
