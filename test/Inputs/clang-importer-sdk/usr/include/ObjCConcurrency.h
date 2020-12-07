@@ -27,6 +27,11 @@
 -(NSInteger)doSomethingConflicted:(NSString *)operation;
 -(void)server:(NSString *)name restartWithCompletionHandler:(void (^)(void))block;
 -(void)server:(NSString *)name atPriority:(double)priority restartWithCompletionHandler:(void (^)(void))block;
+
+-(void)poorlyNamed:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async_name("bestName(_:)")));
+
+-(void)customizedWithString:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_name("customize(with:completionHandler:)"))) __attribute__((swift_async_name("customize(_:)")));
+
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

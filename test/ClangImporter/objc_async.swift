@@ -27,11 +27,16 @@ func testSlowServer(slowServer: SlowServer) async throws {
   await slowServer.server("localhost", atPriorityRestart: 0.8)
 
   _ = await slowServer.allOperations()
+
+  let _: Int = await slowServer.bestName("hello")
+  let _: Int = await slowServer.customize("hello")
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
   // synchronous version
   let _: Int = slowServer.doSomethingConflicted("thinking")
+  slowServer.poorlyNamed("hello") { (i: Int) in print(i) }
+  slowServer.customize(with: "hello") { (i: Int) in print(i) }
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
