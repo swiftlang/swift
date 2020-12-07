@@ -521,48 +521,6 @@ public:
     }
 
     return false;
-      // if (conformanceRef.isConcrete()) {
-        
-      //   auto conformance = conformanceRef.getConcrete();
-        
-        
-      //   // SmallVector<std::pair<Type, ValueDecl *>, 4> unsatisfied;
-      //   // for (auto req : requirements) {
-      //   //   if (req.first->isEqual(requiredProtocol->getSelfInterfaceType())) {
-      //   //     auto declRef = conformance->getWitnessDeclRef(req.second);
-      //   //     auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
-      //   //     switch (witnessDecl->getRethrowingKind()) {
-      //   //     case FunctionRethrowingKind::ByConformance:
-      //   //       classification.merge(
-      //   //         classifyWitness(module, declRef.getSubstitutions(), isAsync));
-      //   //       break;
-      //   //     case FunctionRethrowingKind::None:
-      //   //       classification.merge(isAsync ? 
-      //   //         Classification::forAsync() : Classification());
-      //   //       break;
-      //   //     case FunctionRethrowingKind::Throws:
-      //   //       classification.merge(
-      //   //         Classification::forThrow(
-      //   //           PotentialThrowReason::forThrowingApply(), isAsync));
-      //   //       break;
-      //   //     default:
-      //   //       classification.merge(Classification::forInvalidCode());
-      //   //       break;
-      //   //     }
-      //   //   } else {
-      //   //     unsatisfied.push_back(req);
-      //   //   }
-      //   // }
-        
-      // } else {
-      //   auto protocol = conformanceRef.getAbstract();
-      //   if (protocol->isRethrowingProtocol()) {
-      //     // NOT TRUE, but eh close enough....
-      //     classification.merge(Classification::forRethrowingOnly(
-      //           PotentialThrowReason::forThrowingApply(), isAsync));
-      //   }
-      // }
-
   }
 
   /// Check to see if the given function application throws or is async.
