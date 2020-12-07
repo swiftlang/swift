@@ -5671,6 +5671,72 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   return endApplyHandle;
 }
 
+ManagedValue SILGenFunction::emitRunChildTask(
+    SILLocation loc, Type functionType, ManagedValue taskFunction) {
+  auto runChildTaskFn = SGM.getRunChildTask();
+
+  Type resultType = functionType->castTo<FunctionType>()->getResult();
+  Type replacementTypes[] = {resultType};
+  auto subs = SubstitutionMap::get(runChildTaskFn->getGenericSignature(),
+                                   replacementTypes,
+                                   ArrayRef<ProtocolConformanceRef>{});
+
+  CanType origParamType = runChildTaskFn->getParameters()->get(0)
+      ->getInterfaceType()->getCanonicalType();
+  CanType substParamType = origParamType.subst(subs)->getCanonicalType();
+
+  // Ensure that the closure has the appropriate type.
+  AbstractionPattern origParam(
+      runChildTaskFn->getGenericSignature().getCanonicalSignature(),
+      origParamType);
+  taskFunction = emitSubstToOrigValue(
+      loc, taskFunction, origParam, substParamType);
+
+  return emitApplyOfLibraryIntrinsic(
+      loc, runChildTaskFn, subs, {taskFunction}, SGFContext()
+    ).getScalarValue();
+}
+
+ManagedValue SILGenFunction::emitCancelAsyncTask(
+    SILLocation loc, SILValue task) {
+  ASTContext &ctx = getASTContext();
+  auto apply = B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
+      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
+      { task });
+  return ManagedValue::forUnmanaged(apply);
+}
+
+void SILGenFunction::completeAsyncLetChildTask(
+    PatternBindingDecl *patternBinding, unsigned index) {
+  SILValue childTask;
+  bool isThrowing;
+  std::tie(childTask, isThrowing)= AsyncLetChildTasks[{patternBinding, index}];
+
+  Type childResultType = patternBinding->getPattern(index)->getType();
+
+  auto taskFutureGetFn = isThrowing
+      ? SGM.getTaskFutureGetThrowing()
+      : SGM.getTaskFutureGet();
+
+  // Get the result from the future.
+  Type replacementTypes[] = {childResultType};
+  auto subs = SubstitutionMap::get(taskFutureGetFn->getGenericSignature(),
+                                   replacementTypes,
+                                   ArrayRef<ProtocolConformanceRef>{});
+  RValue childResult = emitApplyOfLibraryIntrinsic(
+      SILLocation(patternBinding), taskFutureGetFn, subs,
+      { ManagedValue::forBorrowedObjectRValue(childTask) },
+      SGFContext());
+
+  // Write the child result into the pattern variables.
+  emitAssignToPatternVars(
+      SILLocation(patternBinding), patternBinding->getPattern(index),
+      std::move(childResult));
+}
+
+
 // Create a partial application of a dynamic method, applying bridging thunks
 // if necessary.
 static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,

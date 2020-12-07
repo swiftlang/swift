@@ -15,6 +15,8 @@
 
 #include "Context.h"
 #include "OwnershipLiveRange.h"
+#include "SemanticARCOpts.h"
+
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/MultiMapCache.h"
@@ -55,6 +57,12 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
                 [this](SingleValueInstruction *i, SILValue value) {
                   eraseAndRAUWSingleValueInstruction(i, value);
                 })) {}
+
+  void reset() {
+    ctx.reset();
+    worklist.clear();
+    visitedSinceLastMutation.clear();
+  }
 
   DeadEndBlocks &getDeadEndBlocks() { return ctx.getDeadEndBlocks(); }
 
@@ -121,7 +129,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   /// The default visitor.
   bool visitSILInstruction(SILInstruction *i) {
-    assert(!isGuaranteedForwardingInst(i) &&
+    assert(!isa<OwnershipForwardingInst>(i) &&
            "Should have forwarding visitor for all ownership forwarding "
            "instructions");
     return false;
@@ -149,8 +157,11 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     return false;                                                              \
   }
   FORWARDING_INST(Tuple)
+  FORWARDING_INST(Object)
   FORWARDING_INST(Struct)
   FORWARDING_INST(Enum)
+  FORWARDING_INST(UncheckedValueCast)
+  FORWARDING_INST(ThinToThickFunction)
   FORWARDING_INST(OpenExistentialRef)
   FORWARDING_INST(Upcast)
   FORWARDING_INST(UncheckedRefCast)
@@ -161,6 +172,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(UncheckedEnumData)
   FORWARDING_INST(MarkUninitialized)
   FORWARDING_INST(SelectEnum)
+  FORWARDING_INST(SelectValue)
   FORWARDING_INST(DestructureStruct)
   FORWARDING_INST(DestructureTuple)
   FORWARDING_INST(TupleExtract)
@@ -184,7 +196,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     }                                                                          \
     return false;                                                              \
   }
-
   FORWARDING_TERM(SwitchEnum)
   FORWARDING_TERM(CheckedCastBranch)
   FORWARDING_TERM(Branch)
@@ -192,10 +203,12 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   bool processWorklist();
   bool optimize();
+  bool optimizeWithoutFixedPoint();
 
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);
+  bool tryPerformOwnedCopyValueOptimization(CopyValueInst *cvi);
 };
 
 } // namespace semanticarc

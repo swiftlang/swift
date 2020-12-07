@@ -107,17 +107,11 @@ public:
   // non-identical types.
 
   // These types are singleton and can't actually differ.
-#define SINGLETON_TYPE(TYPE)                                  \
-  bool visit##TYPE(Can##TYPE type1, Can##TYPE type2) {        \
+#define SINGLETON_TYPE(SHORT_ID, ID)                               \
+  bool visit##ID##Type(Can##ID##Type type1, Can##ID##Type type2) {\
     llvm_unreachable("singleton type that wasn't identical"); \
   }
-  SINGLETON_TYPE(BuiltinIntegerLiteralType)
-  SINGLETON_TYPE(BuiltinRawPointerType)
-  SINGLETON_TYPE(BuiltinNativeObjectType)
-  SINGLETON_TYPE(BuiltinBridgeObjectType)
-  SINGLETON_TYPE(BuiltinUnsafeValueBufferType)
-  SINGLETON_TYPE(SILTokenType)
-#undef SINGLETON_TYPE
+#include "swift/AST/TypeNodes.def"
 
   bool visitBuiltinIntegerType(CanBuiltinIntegerType type1,
                                CanBuiltinIntegerType type2) {

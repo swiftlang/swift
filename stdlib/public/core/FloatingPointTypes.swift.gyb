@@ -40,7 +40,7 @@ RawSignificand = 'UInt' + str(SignificandSize)
 
 def Availability(bits):
     if bits == 16:
-        return '@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)\n@available(macOS, unavailable)\n@available(macCatalyst, unavailable)'
+        return '@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)'
     return ''
 
 if Self == 'Float16':
@@ -65,6 +65,8 @@ else:
 
 % if bits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+% elif bits == 16:
+#if !(os(macOS) && arch(x86_64))
 % end
 
 ${SelfDocComment}
@@ -1106,8 +1108,10 @@ extension ${Self} {
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name
 
-%   if (srcBits == 80) and (bits != 80):
+%   if srcBits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%   elif srcBits == 16:
+#if !(os(macOS) && arch(x86_64))
 %   end
 
 %   if srcBits == bits:
@@ -1192,7 +1196,7 @@ extension ${Self} {
     }
   }
 
-%   if (srcBits == 80) and (bits != 80):
+%   if srcBits in [16,80]:
 #endif
 %   end
 % end
@@ -1343,12 +1347,18 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 // Deprecated operators
 //===----------------------------------------------------------------------===//
 
-% if bits == 80:
+% if bits in [16,80]:
 #else
 
 ${SelfDocComment}
 @frozen
-@available(*, unavailable, message: "Float80 is not available on target platform.")
+%  if bits == 16:
+@available(iOS 14, tvOS 14, watchOS 7, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
+%  else:
+@available(*, unavailable, message: "${Self} is not available on target platform.")
+%  end
 public struct ${Self} {
   /// Creates a value initialized to zero.
   @_transparent

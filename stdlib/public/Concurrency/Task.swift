@@ -44,7 +44,8 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
-    fatalError("\(#function) not implemented yet.")
+    let flags = getJobFlags(Builtin.getCurrentAsyncTask())
+    return flags.priority
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -80,6 +81,7 @@ extension Task {
   ///       similar to Darwin Dispatch's QoS; bearing in mind that priority is not as
   ///       much of a thing on other platforms (i.e. server side Linux systems).
   public enum Priority: Int, Comparable {
+    // Values must be same as defined by the internal `JobPriority`.
     case userInteractive = 0x21
     case userInitiated   = 0x19
     case `default`       = 0x15
@@ -121,18 +123,7 @@ extension Task {
     /// and throwing a specific error or using `checkCancellation` the error
     /// thrown out of the task will be re-thrown here.
     public func get() async throws -> Success {
-      let rawResult = taskFutureWait(
-        on: task, waiting: Builtin.getCurrentAsyncTask())
-      switch TaskFutureWaitResult<Success>(raw: rawResult) {
-      case .executing:
-        fatalError("don't know how to synchronously return")
-
-      case .success(let result):
-        return result
-
-      case .failure(let error):
-        throw error
-      }
+      return await try _taskFutureGetThrowing(task)
     }
 
     /// Attempt to cancel the task.
@@ -269,8 +260,7 @@ extension Task {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, context) =
-      Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
 
     return Handle<T>(task: task)
   }
@@ -316,11 +306,15 @@ extension Task {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, context) =
-      Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
 
     return Handle<T>(task: task)
   }
+
+}
+
+public func _runAsyncHandler(operation: @escaping () async -> ()) {
+  _ = Task.runDetached(operation: operation)
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -351,43 +345,6 @@ extension Task {
 // ==== UnsafeContinuation -----------------------------------------------------
 
 extension Task {
-  public struct UnsafeContinuation<T> {
-    /// Return a value into the continuation and make the task schedulable.
-    ///
-    /// The task will never run synchronously, even if the task does not
-    /// need to be resumed on a specific executor.
-    ///
-    /// This is appropriate when the caller is something "busy", like an event
-    /// loop, and doesn't want to be potentially delayed by arbitrary work.
-    public func resume(returning: T) {
-      fatalError("\(#function) not implemented yet.")
-    }
-  }
-
-  public struct UnsafeThrowingContinuation<T, E: Error> {
-    /// Return a value into the continuation and make the task schedulable.
-    ///
-    /// The task will never run synchronously, even if the task does not
-    /// need to be resumed on a specific executor.
-    ///
-    /// This is appropriate when the caller is something "busy", like an event
-    /// loop, and doesn't want to be potentially delayed by arbitrary work.
-    public func resume(returning: T) {
-      fatalError("\(#function) not implemented yet.")
-    }
-
-    /// Resume the continuation with an error and make the task schedulable.
-    ///
-    /// The task will never run synchronously, even if the task does not
-    /// need to be resumed on a specific executor.
-    ///
-    /// This is appropriate when the caller is something "busy", like an event
-    /// loop, and doesn't want to be potentially delayed by arbitrary work.
-    public func resume(throwing: E) {
-      fatalError("\(#function) not implemented yet.")
-    }
-  }
-
   /// The operation functions must resume the continuation *exactly once*.
   ///
   /// The continuation will not begin executing until the operation function returns.
@@ -409,7 +366,7 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func withUnsafeThrowingContinuation<T>(
-    operation: (UnsafeThrowingContinuation<T, Error>) -> Void
+    operation: (UnsafeThrowingContinuation<T>) -> Void
   ) async throws -> T {
     fatalError("\(#function) not implemented yet.")
   }
@@ -418,52 +375,58 @@ extension Task {
 @_silgen_name("swift_task_run")
 public func runTask(_ task: __owned Builtin.NativeObject)
 
+@_silgen_name("swift_task_getJobFlags")
+func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
+
 public func runAsync(_ asyncFun: @escaping () async -> ()) {
   let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
   runTask(childTask.0)
 }
 
-/// Describes the result of waiting for a future.
-enum TaskFutureWaitResult<T> {
-  /// The future is still executing, and our waiting task has been placed
-  /// on its queue for when the future completes.
-  case executing
-
-  /// The future has succeeded with the given value.
-  case success(T)
-
-  /// The future has thrown the given error.
-  case failure(Error)
-
-  /// Initialize this instance from a raw result, taking any instance within
-  /// that result.
-  init(raw: RawTaskFutureWaitResult) {
-    switch raw.kind {
-    case 0:
-      self = .executing
-
-    case 1:
-      // Take the value on success
-      let storagePtr = raw.storage.bindMemory(to: T.self, capacity: 1)
-      self = .success(UnsafeMutablePointer<T>(mutating: storagePtr).move())
-
-    case 2:
-      // Take the error on error.
-      self = .failure(unsafeBitCast(raw.storage, to: Error.self))
-
-    default:
-      assert(false)
-      self = .executing
-    }
-  }
-}
-
-struct RawTaskFutureWaitResult {
-  let kind: Int
-  let storage: UnsafeRawPointer
-}
-
 @_silgen_name("swift_task_future_wait")
-func taskFutureWait(
-  on task: Builtin.NativeObject, waiting waitingTask: Builtin.NativeObject
-) -> RawTaskFutureWaitResult
+func _taskFutureWait(
+  on task: Builtin.NativeObject
+) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer)
+
+public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
+  let rawResult = await _taskFutureWait(on: task)
+  assert(!rawResult.hadErrorResult)
+
+  // Take the value.
+  let storagePtr =
+    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
+}
+
+public func _taskFutureGetThrowing<T>(
+    _ task: Builtin.NativeObject
+) async throws -> T {
+  let rawResult = await _taskFutureWait(on: task)
+  if rawResult.hadErrorResult {
+    // Throw the result on error.
+    throw unsafeBitCast(rawResult.storage, to: Error.self)
+  }
+
+  // Take the value on success
+  let storagePtr =
+    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
+}
+
+public func _runChildTask<T>(operation: @escaping () async throws -> T) async
+    -> Builtin.NativeObject
+{
+  let currentTask = Builtin.getCurrentAsyncTask()
+
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = getJobFlags(currentTask).priority
+  flags.isFuture = true
+  flags.isChildTask = true
+
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(
+      flags.bits, currentTask, operation)
+  return task
+}

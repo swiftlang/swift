@@ -19,12 +19,18 @@
 #include "Context.h"
 #include "OwnershipPhiOperand.h"
 #include "Transforms.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
 
+namespace {
+using ConsumingOperandState = Context::ConsumingOperandState;
+} // anonymous namespace
+
+template <typename OperandRangeTy>
 static bool canEliminatePhi(
-    Context::FrozenMultiMapRange optimizableIntroducerRange,
+    OperandRangeTy optimizableIntroducerRange,
     ArrayRef<OwnershipPhiOperand> incomingValueOperandList,
     SmallVectorImpl<OwnedValueIntroducer> &ownedValueIntroducerAccumulator) {
   for (auto incomingValueOperand : incomingValueOperandList) {
@@ -161,9 +167,19 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
     // eliminated if it was not for the given phi. If all of them are, we can
     // optimize!
     {
-      auto rawFoundOptimizableIntroducerArray = pair.second;
-      if (!canEliminatePhi(rawFoundOptimizableIntroducerArray,
-                           incomingValueOperandList, ownedValueIntroducers)) {
+      std::function<Operand *(const Context::ConsumingOperandState)> lambda =
+        [&](const Context::ConsumingOperandState &state) -> Operand * {
+            unsigned opNum = state.operandNumber;
+            if (state.parent.is<SILBasicBlock *>()) {
+              SILBasicBlock *block = state.parent.get<SILBasicBlock *>();
+              return &block->getTerminator()->getAllOperands()[opNum];
+            }
+            SILInstruction *inst = state.parent.get<SILInstruction *>();
+            return &inst->getAllOperands()[opNum];
+        };
+      auto operandsTransformed = makeTransformRange(pair.second, lambda);
+      if (!canEliminatePhi(operandsTransformed, incomingValueOperandList,
+                           ownedValueIntroducers)) {
         continue;
       }
     }

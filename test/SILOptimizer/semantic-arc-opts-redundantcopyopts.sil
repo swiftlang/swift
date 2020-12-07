@@ -1,0 +1,188 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-redundant-copyvalue-elim %s | %FileCheck %s
+// REQUIRES: swift_stdlib_asserts
+
+// NOTE: Some of our tests here depend on borrow elimination /not/ running!
+// Please do not add it to clean up the IR like we did in
+// semanticarcopts-loadcopy-to-loadborrow!
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+typealias AnyObject = Builtin.AnyObject
+
+enum MyNever {}
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [ossa] @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil [ossa] @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+sil [ossa] @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+sil [ossa] @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
+sil [ossa] @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
+sil [ossa] @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+
+struct FakeOptionalNativeObjectPairPair {
+  var pair1 : FakeOptional<NativeObjectPair>
+  var pair2 : FakeOptional<NativeObjectPair>
+}
+sil [ossa] @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+
+sil [ossa] @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+sil [ossa] @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+protocol MyFakeAnyObject : Klass {
+  func myFakeMethod()
+}
+
+final class Klass {
+  var base: Klass
+  let baseLet: Klass
+}
+
+extension Klass : MyFakeAnyObject {
+  func myFakeMethod()
+}
+sil [ossa] @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+sil [ossa] @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+sil [ossa] @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+struct StructWithDataAndOwner {
+  var data : Builtin.Int32
+  var owner : Klass
+}
+
+struct StructMemberTest {
+  var c : Klass
+  var s : StructWithDataAndOwner
+  var t : (Builtin.Int32, StructWithDataAndOwner)
+}
+
+class ClassLet {
+  @_hasStorage let aLet: Klass
+  @_hasStorage var aVar: Klass
+  @_hasStorage let aLetTuple: (Klass, Klass)
+  @_hasStorage let anOptionalLet: FakeOptional<Klass>
+
+  @_hasStorage let anotherLet: ClassLet
+}
+
+class SubclassLet: ClassLet {}
+
+sil_global [let] @a_let_global : $Klass
+sil_global @a_var_global : $Klass
+
+enum EnumWithIndirectCase {
+case first
+indirect case second(Builtin.NativeObject)
+}
+
+struct StructWithEnumWithIndirectCaseField {
+  var i: Builtin.Int23
+  var field : EnumWithIndirectCase
+}
+
+sil [ossa] @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+
+struct NativeObjectWrapper {
+  var innerWrapper : Builtin.NativeObject
+}
+
+sil @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+///////////
+// Tests //
+///////////
+
+// Make sure we do not eliminate copies where only the destroy_value is outside
+// of the lifetime of the parent value, but a begin_borrow extends the lifetime
+// of the value. This is an optimization that can only be performed via lifetime
+// joining.
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_destroying_use_out_of_lifetime'
+sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %pairBorrow = begin_borrow %pair : $NativeObjectPair
+  %3 = struct_extract %pairBorrow : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %pairBorrow : $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  destroy_value %pair : $NativeObjectPair
+  %3a = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  apply %gUserFun(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  br bb3
+
+bb2:
+  destroy_value %pair : $NativeObjectPair
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Second version of the test that consumes the pair in case we make the
+// lifetime joining smart enough to handle the original case.
+//
+// CHECK-LABEL: sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime_2 : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'simple_recursive_copy_case_destroying_use_out_of_lifetime_2'
+sil [ossa] @simple_recursive_copy_case_destroying_use_out_of_lifetime_2 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %pair = apply %f() : $@convention(thin) () -> @owned NativeObjectPair
+  %pairBorrow = begin_borrow %pair : $NativeObjectPair
+  %3 = struct_extract %pairBorrow : $NativeObjectPair, #NativeObjectPair.obj1
+  %gUserFun = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUserFun(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %pairBorrow : $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = copy_value %pair : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  destroy_value %pair : $NativeObjectPair
+  %3a = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  apply %gUserFun(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  br bb3
+
+bb2:
+  %consumePair = function_ref @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+  apply %consumePair(%pair) : $@convention(thin) (@owned NativeObjectPair) -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

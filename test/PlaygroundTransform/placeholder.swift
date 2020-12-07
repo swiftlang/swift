@@ -10,12 +10,11 @@
 // status doesn't reflect whether its child process crashed or not. So "not
 // --crash %target-run ..." always fails when testing for the iOS Simulator.
 // not.py also works on win32, where ! does not.
-// Checking for ".[Ff]atal" because of d03a575279c.
 
 func f(crash crash: Bool) -> Int {
   if crash {
     return <#T#>
-    // CRASH-CHECK: {{[fF]}}atal error: attempt to evaluate editor placeholder: file {{.*}}/main.swift, line [[@LINE-1]]
+    // CRASH-CHECK: {{.*}}/main.swift:[[@LINE-1]]: Fatal error: attempt to evaluate editor placeholder
   } else {
     return 42
   }

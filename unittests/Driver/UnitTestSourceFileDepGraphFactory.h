@@ -28,7 +28,7 @@ class UnitTestSourceFileDepGraphFactory
 public:
   UnitTestSourceFileDepGraphFactory(
       bool hadCompilationError, StringRef swiftDeps,
-      StringRef fileFingerprint, bool emitDotFileAfterConstruction,
+      Fingerprint fileFingerprint, bool emitDotFileAfterConstruction,
       const DependencyDescriptions &dependencyDescriptions,
       DiagnosticEngine &diags)
       : AbstractSourceFileDepGraphFactory(

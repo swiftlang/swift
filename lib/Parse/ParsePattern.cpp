@@ -70,7 +70,7 @@ static ParserStatus parseDefaultArgument(
   SourceLoc equalLoc = P.consumeToken();
 
   if (P.SF.Kind == SourceFileKind::Interface) {
-    // Swift module interfaces don't synthesize inherited intializers and
+    // Swift module interfaces don't synthesize inherited initializers and
     // instead include them explicitly in subclasses. Since the
     // \c DefaultArgumentKind of these initializers is \c Inherited, this is
     // represented textually as `= super` in the interface.
@@ -975,7 +975,7 @@ ParserResult<Pattern> Parser::parsePattern() {
   case tok::identifier: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
-    SourceLoc loc = consumeIdentifier(&name);
+    SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
       diagnoseConsecutiveIDs(name.str(), loc,
                              introducer == VarDecl::Introducer::Let
@@ -1054,7 +1054,7 @@ Parser::parsePatternTupleElement() {
 
   // If the tuple element has a label, parse it.
   if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelLoc = consumeIdentifier(&Label);
+    LabelLoc = consumeIdentifier(Label, /*diagnoseDollarPrefix=*/true);
     consumeToken(tok::colon);
   }
 

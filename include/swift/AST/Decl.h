@@ -242,14 +242,10 @@ struct OverloadSignature {
   /// Whether this declaration has an opaque return type.
   unsigned HasOpaqueReturnType : 1;
 
-  /// Whether this declaration is 'async'
-  unsigned HasAsync : 1;
-
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false),
-        HasAsync(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -3459,6 +3455,10 @@ enum class AncestryFlags : uint8_t {
 
   /// The class or one of its superclasses requires stored property initializers.
   RequiresStoredPropertyInits = (1<<6),
+
+  /// The class uses the ObjC object model (reference counting,
+  /// isa encoding, etc.).
+  ObjCObjectModel = (1<<7),
 };
 
 /// Return type of ClassDecl::checkAncestry(). Describes a set of interesting
@@ -3624,6 +3624,30 @@ public:
 
   /// Whether the class is an actor.
   bool isActor() const;
+
+  /// Whether the class is (known to be) a default actor.
+  bool isDefaultActor() const;
+
+  /// Whether the class is known to be a *root* default actor,
+  /// i.e. the first class in its hierarchy that is a default actor.
+  bool isRootDefaultActor() const;
+
+  /// Does this class explicitly declare any of the methods that
+  /// would prevent it from being a default actor?
+  bool hasExplicitCustomActorMethods() const;
+
+  /// Is this the NSObject class type?
+  bool isNSObject() const;
+
+  /// Whether the class directly inherits from NSObject but should use
+  /// Swift's native object model.
+  bool isNativeNSObjectSubclass() const;
+
+  /// Whether the class uses the ObjC object model (reference counting,
+  /// allocation, etc.) instead of the Swift model.
+  bool usesObjCObjectModel() const {
+    return checkAncestry(AncestryFlags::ObjCObjectModel);
+  }
 
   /// Returns true if the class has designated initializers that are not listed
   /// in its members.

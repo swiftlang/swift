@@ -1019,9 +1019,7 @@ namespace {
       // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
       // independent of the wider expression containing the ErrorExpr, so
       // there's no point attempting to produce a solution for it.
-      SourceRange range = E->getSourceRange();
-      if (range.isInvalid() ||
-          CS.getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(range))
+      if (CS.containsCodeCompletionLoc(E))
         return nullptr;
 
       return HoleType::get(CS.getASTContext(), E);

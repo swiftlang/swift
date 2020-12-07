@@ -32,74 +32,86 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
+static StringRef getScoreKindName(ScoreKind kind) {
+  switch (kind) {
+  case SK_Hole:
+    return "hole in the constraint system";
+
+  case SK_Unavailable:
+    return "use of an unavailable declaration";
+
+  case SK_AsyncSyncMismatch:
+    return "async/synchronous mismatch";
+
+  case SK_ForwardTrailingClosure:
+    return "forward scan when matching a trailing closure";
+
+  case SK_Fix:
+    return "attempting to fix the source";
+
+  case SK_DisfavoredOverload:
+    return "disfavored overload";
+
+  case SK_UnresolvedMemberViaOptional:
+    return "unwrapping optional at unresolved member base";
+
+  case SK_ForceUnchecked:
+    return "force of an implicitly unwrapped optional";
+
+  case SK_UserConversion:
+    return "user conversion";
+
+  case SK_FunctionConversion:
+    return "function conversion";
+
+  case SK_NonDefaultLiteral:
+    return "non-default literal";
+
+  case SK_CollectionUpcastConversion:
+    return "collection upcast conversion";
+
+  case SK_ValueToOptional:
+    return "value to optional";
+
+  case SK_EmptyExistentialConversion:
+    return "empty-existential conversion";
+
+  case SK_KeyPathSubscript:
+    return "key path subscript";
+
+  case SK_ValueToPointerConversion:
+    return "value-to-pointer conversion";
+  }
+}
+
 void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  if (isForCodeCompletion()) {
+    switch (kind) {
+    case SK_NonDefaultLiteral:
+      // Don't increase score for non-default literals in expressions involving
+      // a code completion. In the below example, members of EnumA and EnumB
+      // should be ranked equally:
+      //   func overloaded(_ x: Float, _ y: EnumA) {}
+      //   func overloaded(_ x: Int, _ y: EnumB) {}
+      //   func overloaded(_ x: Float) -> EnumA {}
+      //   func overloaded(_ x: Int) -> EnumB {}
+      //
+      //   overloaded(1, .<complete>) {}
+      //   overloaded(1).<complete>
+      return;
+    default:
+      break;
+    }
+  }
 
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->depth * 2);
-    llvm::errs() << "(increasing score due to ";
-    switch (kind) {
-    case SK_Hole:
-      llvm::errs() << "hole in the constraint system";
-      break;
-
-    case SK_Unavailable:
-      llvm::errs() << "use of an unavailable declaration";
-      break;
-
-    case SK_AsyncSyncMismatch:
-      llvm::errs() << "async/synchronous mismatch";
-      break;
-
-    case SK_ForwardTrailingClosure:
-      llvm::errs() << "forward scan when matching a trailing closure";
-      break;
-
-    case SK_Fix:
-      llvm::errs() << "attempting to fix the source";
-      break;
-
-    case SK_DisfavoredOverload:
-      llvm::errs() << "disfavored overload";
-      break;
-
-    case SK_ForceUnchecked:
-      llvm::errs() << "force of an implicitly unwrapped optional";
-      break;
-
-    case SK_UserConversion:
-      llvm::errs() << "user conversion";
-      break;
-
-    case SK_FunctionConversion:
-      llvm::errs() << "function conversion";
-      break;
-
-    case SK_NonDefaultLiteral:
-      llvm::errs() << "non-default literal";
-      break;
-        
-    case SK_CollectionUpcastConversion:
-      llvm::errs() << "collection upcast conversion";
-      break;
-        
-    case SK_ValueToOptional:
-      llvm::errs() << "value to optional";
-      break;
-    case SK_EmptyExistentialConversion:
-      llvm::errs() << "empty-existential conversion";
-      break;
-    case SK_KeyPathSubscript:
-      llvm::errs() << "key path subscript";
-      break;
-    case SK_ValueToPointerConversion:
-      llvm::errs() << "value-to-pointer conversion";
-      break;
-    }
-    llvm::errs() << ")\n";
+    llvm::errs() << "(increasing score due to " << getScoreKindName(kind) << ")\n";
   }
+
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {

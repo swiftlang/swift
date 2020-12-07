@@ -504,6 +504,20 @@ BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
 /// linearFunction
 BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
 
+/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> T
+///
+/// Unsafely capture the current continuation and pass it to the given
+/// function value. Returns a value of type T when the continuation is
+/// resumed.
+BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
+
+/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> T
+///
+/// Unsafely capture the current continuation and pass it to the given
+/// function value. Returns a value of type T or throws an error when
+/// the continuation is resumed.
+BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -751,6 +765,15 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
 /// does not read any memory (note that even though it reads from a string, it
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
+
+// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "n", Special)
+
+// autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
+
+// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

@@ -1409,14 +1409,7 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
 static ManagedValue emitBuiltinCancelAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto argument = args[0].borrow(SGF, loc).forward(SGF);
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      SGF.getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { argument });
-  return ManagedValue::forUnmanaged(apply);
+  return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
@@ -1446,7 +1439,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
   // Form the metatype of the result type.
   CanType futureResultType =
       Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext())))
+        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
           .subst(subs)->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
@@ -1467,6 +1460,127 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
       { flags, parentTask, futureResultMetadata, function });
   return SGF.emitManagedRValueWithCleanup(apply);
+}
+
+// Shared implementation of withUnsafeContinuation and
+// withUnsafe[Throwing]Continuation.
+static ManagedValue emitBuiltinWithUnsafeContinuation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C, bool throws) {
+  // Allocate space to receive the resume value when the continuation is
+  // resumed.
+  auto substResultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                             substResultType);
+  auto resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
+
+  // Capture the current continuation.
+  auto continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
+                                                           substResultType,
+                                                           throws);
+
+  // Get the callee value.
+  auto substFnType = args[0].getType().castTo<SILFunctionType>();
+  SILValue fnValue = (substFnType->isCalleeConsumed()
+                      ? args[0].forward(SGF)
+                      : args[0].getValue());
+
+  // Call the provided function value.
+  SGF.B.createApply(loc, fnValue, {}, {continuation});
+
+  // Await the continuation.
+  SILBasicBlock *resumeBlock = SGF.createBasicBlock();
+  SILBasicBlock *errorBlock = nullptr;
+
+  if (throws)
+    errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
+
+  SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock, errorBlock);
+
+  // Propagate an error if we have one.
+  if (throws) {
+    SGF.B.emitBlock(errorBlock);
+
+    Scope errorScope(SGF, loc);
+
+    auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
+      ->getCanonicalType();
+    auto errorVal
+      = SGF.B.createOwnedPhiArgument(SILType::getPrimitiveObjectType(errorTy));
+
+    SGF.emitThrow(loc, errorVal, true);
+  }
+
+  SGF.B.emitBlock(resumeBlock);
+
+  // The incoming value is the maximally-abstracted result type of the
+  // continuation. Move it out of the resume buffer and reabstract it if
+  // necessary.
+  auto resumeResult = SGF.emitLoad(loc, resumeBuf,
+                                   AbstractionPattern::getOpaque(),
+                                   substResultType,
+                                   SGF.getTypeLowering(substResultType),
+                                   SGFContext(), IsTake);
+
+  return resumeResult;
+}
+
+// Emit SIL for the named builtin: withUnsafeContinuation
+static ManagedValue emitBuiltinWithUnsafeContinuation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinWithUnsafeContinuation(SGF, loc, subs, args, C,
+                                           /*throws=*/false);
+}
+
+// Emit SIL for the named builtin: withUnsafeThrowingContinuation
+static ManagedValue emitBuiltinWithUnsafeThrowingContinuation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinWithUnsafeContinuation(SGF, loc, subs, args, C,
+                                           /*throws=*/true);
+}
+
+static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
+      SILType::getNativeObjectType(ctx),
+      subs,
+      /*args*/ {args[0].getValue()});
+  return SGF.emitManagedRValueWithCleanup(builtinApply);
+}
+
+static ManagedValue emitBuiltinAutoDiffProjectTopLevelSubcontext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext)),
+      SILType::getRawPointerType(ctx),
+      subs,
+      /*args*/ {args[0].borrow(SGF, loc).getValue()});
+  return ManagedValue::forUnmanaged(builtinApply);
+}
+
+static ManagedValue emitBuiltinAutoDiffAllocateSubcontext(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto *builtinApply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+      SILType::getRawPointerType(ctx),
+      subs,
+      /*args*/ {args[0].borrow(SGF, loc).getValue(), args[1].getValue()});
+  return ManagedValue::forUnmanaged(builtinApply);
 }
 
 Optional<SpecializedEmitter>

@@ -114,7 +114,8 @@ func basicSubtyping(
   // let _ = Unrelated() as AnyObject
   // let _ = Unrelated() as? AnyObject
 
-  let _ = anyObject as Unrelated // expected-error {{'AnyObject' is not convertible to 'Unrelated'; did you mean to use 'as!' to force downcast?}}
+  let _ = anyObject as Unrelated // expected-error {{'AnyObject' is not convertible to 'Unrelated'}}
+  //expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = anyObject as? Unrelated
 
   // No-ops
@@ -199,13 +200,16 @@ func basicSubtyping(
   let _: Base<Int> & P2 = baseAndP2.protocolSelfReturn()
 
   // Downcasts
-  let _ = baseAndP2 as Derived // expected-error {{did you mean to use 'as!' to force downcast?}}
+  let _ = baseAndP2 as Derived //expected-error {{'Base<Int> & P2' is not convertible to 'Derived'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = baseAndP2 as? Derived
   
-  let _ = baseAndP2 as Derived & P3 // expected-error {{did you mean to use 'as!' to force downcast?}}
+  let _ = baseAndP2 as Derived & P3 // expected-error {{'Base<Int> & P2' is not convertible to 'Derived & P3'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = baseAndP2 as? Derived & P3
 
-  let _ = base as Derived & P2 // expected-error {{did you mean to use 'as!' to force downcast?}}
+  let _ = base as Derived & P2 //expected-error {{'Base<Int>' is not convertible to 'Derived & P2'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}}
   let _ = base as? Derived & P2
 
   // Invalid cases

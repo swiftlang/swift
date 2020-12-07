@@ -10,6 +10,7 @@ set(sources
   MetadataSections.h
   Random.h
   RefCount.h
+  Reflection.h
   RuntimeShims.h
   RuntimeStubs.h
   SwiftStdbool.h

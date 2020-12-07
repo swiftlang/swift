@@ -541,10 +541,13 @@ CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, GetCurrentAsyncTask)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskFuture)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -591,10 +594,19 @@ ValueOwnershipKind SILValue::getOwnershipKind() const {
   //
   // We assume that any time we are in SILBuilder and call this without having a
   // value in a block yet, ossa is enabled.
-  if (auto *block = Value->getParentBlock())
-    if (auto *f = block->getParent())
-      if (!f->hasOwnership())
-        return OwnershipKind::None;
+  if (auto *block = Value->getParentBlock()) {
+    auto *f = block->getParent();
+    // If our block isn't in a function, then it must be in a global
+    // variable. We don't verify ownership there so just return
+    // OwnershipKind::None.
+    if (!f)
+      return OwnershipKind::None;
+
+    // Now that we know that we do have a block/function, check if we have
+    // ownership.
+    if (!f->hasOwnership())
+      return OwnershipKind::None;
+  }
 
   ValueOwnershipKindClassifier Classifier;
   auto result = Classifier.visit(const_cast<ValueBase *>(Value));

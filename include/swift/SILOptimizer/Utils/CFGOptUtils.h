@@ -25,6 +25,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace llvm {
 template <typename T> class TinyPtrVector;
@@ -35,6 +36,19 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
+struct InstModCallbacks;
+
+/// Adds a new argument to an edge between a branch and a destination
+/// block. Allows for user injected callbacks via \p callbacks.
+///
+/// \param branch The terminator to add the argument to.
+/// \param dest The destination block of the edge.
+/// \param val The value to the arguments of the branch.
+/// \return The created branch. The old branch is deleted.
+/// The argument is appended at the end of the argument tuple.
+TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
+                                  SILValue val,
+                                  const InstModCallbacks &callbacks);
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block.
@@ -44,8 +58,10 @@ class SILLoopInfo;
 /// \param val The value to the arguments of the branch.
 /// \return The created branch. The old branch is deleted.
 /// The argument is appended at the end of the argument tuple.
-TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
-                                  SILValue val);
+inline TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
+                                         SILValue val) {
+  return addNewEdgeValueToBranch(branch, dest, val, InstModCallbacks());
+}
 
 /// Changes the edge value between a branch and destination basic block
 /// at the specified index. Changes all edges from \p Branch to \p Dest to carry

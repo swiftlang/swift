@@ -1,3 +1,7 @@
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+include(SwiftTestUtils)
+
 function(swift_configure_lit_site_cfg source_path destination_path installed_name)
   if (CMAKE_CFG_INTDIR STREQUAL ".")
     set(SWIFT_BUILD_MODE ".")
@@ -197,261 +201,230 @@ foreach(SDK ${SWIFT_SDKS})
     # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
     # have have only the "default" flavor for all SDKs and architectures except
     # OSX when macCatalyst support is enabled.
-    set(build_flavors "default")
-    if(SWIFT_ENABLE_MACCATALYST AND "${SDK}" STREQUAL "OSX")
-      list(APPEND build_flavors "ios-like" )
-    endif()
+    get_swift_test_build_flavors(build_flavors "${SDK}")
 
     foreach(BUILD_FLAVOR ${build_flavors})
-    # Configure variables for this subdirectory.
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    get_versioned_target_triple(VARIANT_TRIPLE ${SDK} ${ARCH} "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
-    set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
-    set(DEFAULT_OSX_VARIANT_SUFFIX "")
+      # Configure variables for this subdirectory.
+      set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
+      get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
+      get_swift_test_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${SDK}" "${ARCH}" "default")
+      get_swift_test_versioned_target_triple(VARIANT_TRIPLE "${SDK}" "${ARCH}" "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}" "${BUILD_FLAVOR}")
 
-    if(BUILD_FLAVOR STREQUAL "ios-like")
-      set(DEFAULT_OSX_VARIANT_SUFFIX "${VARIANT_SUFFIX}")
-      # Use the macCatalyst target triple and compiler resources for the iOS-like build flavor.
-      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-maccatalyst-${ARCH}")
-      set(VARIANT_TRIPLE "${ARCH}-apple-ios13.0-macabi")
-    endif()
+      # A directory where to put the xUnit-style XML test results.
+      set(SWIFT_TEST_RESULTS_DIR
+          "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
 
-    # A directory where to put the xUnit-style XML test results.
-    set(SWIFT_TEST_RESULTS_DIR
-        "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+      set(command_clean_test_results_dir
+          COMMAND "${CMAKE_COMMAND}" -E remove_directory "${SWIFT_TEST_RESULTS_DIR}"
+          COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIFT_TEST_RESULTS_DIR}")
 
-    set(command_clean_test_results_dir
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${SWIFT_TEST_RESULTS_DIR}"
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIFT_TEST_RESULTS_DIR}")
+      set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
+      set(validation_test_bin_dir
+          "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
-    set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
-    set(validation_test_bin_dir
-        "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
-
-    if(LLVM_ENABLE_LIBXML2)
-      set(SWIFT_HAVE_LIBXML2 TRUE)
-    else()
-      set(SWIFT_HAVE_LIBXML2 FALSE)
-    endif()
-
-    swift_configure_lit_site_cfg(
-        "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
-        "${test_bin_dir}/lit.site.cfg"
-        "test${VARIANT_SUFFIX}.lit.site.cfg")
-
-    swift_configure_lit_site_cfg(
-        "${CMAKE_CURRENT_SOURCE_DIR}/Unit/lit.site.cfg.in"
-        "${test_bin_dir}/Unit/lit.site.cfg"
-        "")
-
-    swift_configure_lit_site_cfg(
-        "${CMAKE_CURRENT_SOURCE_DIR}/../validation-test/lit.site.cfg.in"
-        "${validation_test_bin_dir}/lit.site.cfg"
-        "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
-
-    set(test_dependencies)
-    get_test_dependencies("${SDK}" test_dependencies)
-
-    # Keep in sync with stdlib/tools/CMakeLists.txt: swift-reflection-test is
-    # only used when testing dynamic stdlib.
-    if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
-      # NOTE create a stub BlocksRuntime library that can be used for the
-      # reflection tests
-      file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
-        "void
-#if defined(_WIN32)
-__declspec(dllexport)
-#endif
-_Block_release(void) { }\n")
-      _add_swift_target_library_single(
-        BlocksRuntimeStub${VARIANT_SUFFIX}
-        BlocksRuntimeStub
-        SHARED
-        ARCHITECTURE ${ARCH}
-        SDK ${SDK}
-        INSTALL_IN_COMPONENT dev
-        ${test_bin_dir}/Inputs/BlocksRuntime.c)
-      set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
-        LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
-        RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
-        OUTPUT_NAME BlocksRuntime)
-      list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
-
-      list(APPEND test_dependencies
-          "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-
-      if(BUILD_FLAVOR STREQUAL "ios-like")
-        # When testing the iOS-like build flavor, use the the normal macOS
-        # swift-reflection-test-tool. That tool runs out of process so it
-        # doesn't need to be build for macCatalyst.
-        list(APPEND test_dependencies
-            "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
+      if(LLVM_ENABLE_LIBXML2)
+        set(SWIFT_HAVE_LIBXML2 TRUE)
       else()
+        set(SWIFT_HAVE_LIBXML2 FALSE)
+      endif()
+
+      swift_configure_lit_site_cfg(
+          "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+          "${test_bin_dir}/lit.site.cfg"
+          "test${VARIANT_SUFFIX}.lit.site.cfg")
+
+      swift_configure_lit_site_cfg(
+          "${CMAKE_CURRENT_SOURCE_DIR}/Unit/lit.site.cfg.in"
+          "${test_bin_dir}/Unit/lit.site.cfg"
+          "")
+
+      swift_configure_lit_site_cfg(
+          "${CMAKE_CURRENT_SOURCE_DIR}/../validation-test/lit.site.cfg.in"
+          "${validation_test_bin_dir}/lit.site.cfg"
+          "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
+
+      set(test_dependencies)
+      get_test_dependencies("${SDK}" test_dependencies)
+
+      # Keep in sync with stdlib/tools/CMakeLists.txt: swift-reflection-test is
+      # only used when testing dynamic stdlib.
+      if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
+        list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+
         list(APPEND test_dependencies
-            "swift-reflection-test${VARIANT_SUFFIX}_signed")
-      endif()
-    endif()
+            "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
-    if(NOT "${COVERAGE_DB}" STREQUAL "")
-      list(APPEND test_dependencies "touch-covering-tests")
-    endif()
-
-    set(validation_test_dependencies
-        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-
-    set(command_upload_stdlib)
-    set(command_upload_swift_reflection_test)
-    if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
-      # These are supported testing SDKs, but their implementation of
-      # `command_upload_stdlib` is hidden.
-    elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
-      # This adb setup is only needed when cross-compiling for Android, so the
-      # second check above makes sure we don't bother when the host is Android.
-      if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
-        message(FATAL_ERROR
-            "When running Android host tests, you must specify the directory on the device "
-            "to which Swift build products will be deployed.")
+        if(BUILD_FLAVOR STREQUAL "ios-like")
+          # When testing the iOS-like build flavor, use the the normal macOS
+          # swift-reflection-test-tool. That tool runs out of process so it
+          # doesn't need to be build for macCatalyst.
+          list(APPEND test_dependencies
+              "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
+        else()
+          list(APPEND test_dependencies
+              "swift-reflection-test${VARIANT_SUFFIX}_signed")
+        endif()
       endif()
 
-      # Warning: This step will fail if you do not have an Android device
-      #          connected via USB. See docs/Android.md for details on
-      #          how to run the test suite for Android.
-      set(command_upload_stdlib
-          COMMAND
-              # Reboot the device and remove everything in its tmp
-              # directory. Build products and test executables are pushed
-              # to that directory when running the test suite.
-              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
-          COMMAND
-              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
-              --ndk "${SWIFT_ANDROID_NDK_PATH}"
-              --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
-              --destination-arch "${ARCH}"
-              # Build products like libswiftCore.so.
-              "${SWIFTLIB_DIR}/android"
-              # These two directories may contain the same libraries,
-              # but upload both to device just in case. Duplicates will be
-              # overwritten, and uploading doesn't take very long anyway.
-              "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
-              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
-              "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
-    endif()
-    add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
-        ${command_upload_stdlib}
-        ${command_upload_swift_reflection_test}
-        COMMENT "Uploading stdlib")
-
-    foreach(test_mode ${TEST_MODES})
-      set(LIT_ARGS "${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
-      separate_arguments(LIT_ARGS)
-
-      if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
-        list(APPEND LIT_ARGS
-            "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      if(NOT "${COVERAGE_DB}" STREQUAL "")
+        list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      execute_process(COMMAND
-          $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
-          RESULT_VARIABLE python_psutil_status
-          TIMEOUT 1 # second
-          ERROR_QUIET)
-      if(NOT python_psutil_status)
-        list(APPEND LIT_ARGS "--timeout=3000") # 50 minutes
-      endif()
+      set(validation_test_dependencies
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
-      list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
-
-      if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-        list(APPEND LIT_ARGS "--param" "differentiable_programming")
-      endif()
-
-      if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-        list(APPEND LIT_ARGS "--param" "concurrency")
-      endif()
-
-      foreach(test_subset ${TEST_SUBSETS})
-        set(directories)
-        set(dependencies ${test_dependencies})
-
-        if((test_subset STREQUAL "primary") OR
-           (test_subset STREQUAL "validation") OR
-           (test_subset STREQUAL "only_long") OR
-           (test_subset STREQUAL "only_stress") OR
-           (test_subset STREQUAL "all"))
-          list(APPEND directories "${test_bin_dir}")
-        endif()
-        if((test_subset STREQUAL "validation") OR
-           (test_subset STREQUAL "only_validation") OR
-           (test_subset STREQUAL "only_long") OR
-           (test_subset STREQUAL "only_stress") OR
-           (test_subset STREQUAL "all"))
-          list(APPEND directories "${validation_test_bin_dir}")
-          list(APPEND dependencies ${validation_test_dependencies})
+      set(command_upload_stdlib)
+      set(command_upload_swift_reflection_test)
+      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
+        # These are supported testing SDKs, but their implementation of
+        # `command_upload_stdlib` is hidden.
+      elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
+        # This adb setup is only needed when cross-compiling for Android, so the
+        # second check above makes sure we don't bother when the host is Android.
+        if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
+          message(FATAL_ERROR
+              "When running Android host tests, you must specify the directory on the device "
+              "to which Swift build products will be deployed.")
         endif()
 
-        if("${SWIFT_SDK_${SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-          list(APPEND dependencies swiftImageRegistration${VARIANT_SUFFIX})
-        endif()
-
-        set(test_subset_target_suffix "-${test_subset}")
-        if(test_subset STREQUAL "primary")
-          set(test_subset_target_suffix "")
-        endif()
-
-        set(test_mode_target_suffix "")
-        if(NOT test_mode STREQUAL "optimize_none")
-          set(test_mode_target_suffix "-${test_mode}")
-        endif()
-
-        set(maybe_command_upload_stdlib)
-        if(NOT test_mode STREQUAL "only_non_executable")
-          set(maybe_command_upload_stdlib ${command_upload_stdlib})
-        endif()
-
-        set(test_target_name
-            "check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}")
-        add_custom_target("${test_target_name}"
-            ${maybe_command_upload_stdlib}
-            ${command_upload_swift_reflection_test}
-            ${command_clean_test_results_dir}
+        # Warning: This step will fail if you do not have an Android device
+        #          connected via USB. See docs/Android.md for details on
+        #          how to run the test suite for Android.
+        set(command_upload_stdlib
             COMMAND
-              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
-              ${LIT_ARGS}
-              "--param" "swift_test_subset=${test_subset}"
-              "--param" "swift_test_mode=${test_mode}"
-              ${directories}
-            DEPENDS ${dependencies}
-            COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
-            USES_TERMINAL)
-
-        set(test_dependencies_target_name
-            "swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}-test-depends")
-        add_custom_target("${test_dependencies_target_name}"
-            DEPENDS ${dependencies})
-
-        add_custom_target("${test_target_name}-custom"
-            ${command_upload_stdlib}
-            ${command_upload_swift_reflection_test}
-            ${command_clean_test_results_dir}
+                # Reboot the device and remove everything in its tmp
+                # directory. Build products and test executables are pushed
+                # to that directory when running the test suite.
+                $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
             COMMAND
-              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
-              ${LIT_ARGS}
-              "--param" "swift_test_subset=${test_subset}"
-              "--param" "swift_test_mode=${test_mode}"
-              ${SWIFT_LIT_TEST_PATHS}
-            DEPENDS ${dependencies}
-            COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE} from custom test locations"
-            USES_TERMINAL)
-        set_property(TARGET
-            "${test_target_name}"
-            "${test_target_name}-custom"
-            "${test_dependencies_target_name}"
-            PROPERTY FOLDER "Tests/check-swift")
+                $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+                --ndk "${SWIFT_ANDROID_NDK_PATH}"
+                --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
+                --destination-arch "${ARCH}"
+                # Build products like libswiftCore.so.
+                "${SWIFTLIB_DIR}/android"
+                # These two directories may contain the same libraries,
+                # but upload both to device just in case. Duplicates will be
+                # overwritten, and uploading doesn't take very long anyway.
+                "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
+                "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
+                "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
+      endif()
+      add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
+          ${command_upload_stdlib}
+          ${command_upload_swift_reflection_test}
+          COMMENT "Uploading stdlib")
+
+      foreach(test_mode ${TEST_MODES})
+        set(LIT_ARGS "${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
+        separate_arguments(LIT_ARGS)
+
+        if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
+          list(APPEND LIT_ARGS
+              "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+        endif()
+
+        execute_process(COMMAND
+            $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
+            RESULT_VARIABLE python_psutil_status
+            TIMEOUT 1 # second
+            ERROR_QUIET)
+        if(NOT python_psutil_status)
+          list(APPEND LIT_ARGS "--timeout=3000") # 50 minutes
+        endif()
+
+        list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+          list(APPEND LIT_ARGS "--param" "differentiable_programming")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+          list(APPEND LIT_ARGS "--param" "concurrency")
+        endif()
+
+        foreach(test_subset ${TEST_SUBSETS})
+          set(directories)
+          set(dependencies ${test_dependencies})
+
+          if((test_subset STREQUAL "primary") OR
+             (test_subset STREQUAL "validation") OR
+             (test_subset STREQUAL "only_long") OR
+             (test_subset STREQUAL "only_stress") OR
+             (test_subset STREQUAL "all"))
+            list(APPEND directories "${test_bin_dir}")
+          endif()
+          if((test_subset STREQUAL "validation") OR
+             (test_subset STREQUAL "only_validation") OR
+             (test_subset STREQUAL "only_long") OR
+             (test_subset STREQUAL "only_stress") OR
+             (test_subset STREQUAL "all"))
+            list(APPEND directories "${validation_test_bin_dir}")
+            list(APPEND dependencies ${validation_test_dependencies})
+          endif()
+
+          if("${SWIFT_SDK_${SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+            list(APPEND dependencies swiftImageRegistration${VARIANT_SUFFIX})
+          endif()
+
+          set(test_subset_target_suffix "-${test_subset}")
+          if(test_subset STREQUAL "primary")
+            set(test_subset_target_suffix "")
+          endif()
+
+          set(test_mode_target_suffix "")
+          if(NOT test_mode STREQUAL "optimize_none")
+            set(test_mode_target_suffix "-${test_mode}")
+          endif()
+
+          set(maybe_command_upload_stdlib)
+          if(NOT test_mode STREQUAL "only_non_executable")
+            set(maybe_command_upload_stdlib ${command_upload_stdlib})
+          endif()
+
+          set(test_target_name
+              "check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}")
+          add_custom_target("${test_target_name}"
+              ${maybe_command_upload_stdlib}
+              ${command_upload_swift_reflection_test}
+              ${command_clean_test_results_dir}
+              COMMAND
+                $<TARGET_FILE:Python3::Interpreter> "${LIT}"
+                ${LIT_ARGS}
+                "--param" "swift_test_subset=${test_subset}"
+                "--param" "swift_test_mode=${test_mode}"
+                ${directories}
+              DEPENDS ${dependencies}
+              COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
+              USES_TERMINAL)
+
+          set(test_dependencies_target_name
+              "swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}-test-depends")
+          add_custom_target("${test_dependencies_target_name}"
+              DEPENDS ${dependencies})
+
+          add_custom_target("${test_target_name}-custom"
+              ${command_upload_stdlib}
+              ${command_upload_swift_reflection_test}
+              ${command_clean_test_results_dir}
+              COMMAND
+                $<TARGET_FILE:Python3::Interpreter> "${LIT}"
+                ${LIT_ARGS}
+                "--param" "swift_test_subset=${test_subset}"
+                "--param" "swift_test_mode=${test_mode}"
+                ${SWIFT_LIT_TEST_PATHS}
+              DEPENDS ${dependencies}
+              COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE} from custom test locations"
+              USES_TERMINAL)
+          set_property(TARGET
+              "${test_target_name}"
+              "${test_target_name}-custom"
+              "${test_dependencies_target_name}"
+              PROPERTY FOLDER "Tests/check-swift")
+        endforeach()
       endforeach()
     endforeach()
-  endforeach()
   endforeach()
 endforeach()
 

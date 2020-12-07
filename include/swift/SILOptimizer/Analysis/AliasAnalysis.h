@@ -164,7 +164,16 @@ public:
   }
   
   virtual void initialize(SILPassManager *PM) override;
-  
+
+  /// Explicitly invalidate an instruction.
+  ///
+  /// This can be useful to update the alias analysis within a pass.
+  /// It's needed if e.g. \p inst is an address projection and its operand gets
+  /// replaced with a different underlying object.
+  void invalidateInstruction(SILInstruction *inst) {
+    handleDeleteNotification(inst);
+  }
+
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
                     SILType TBAAType2 = SILType());

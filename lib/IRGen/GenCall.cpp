@@ -331,25 +331,60 @@ static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
 }
 
+void IRGenFunction::setupAsync() {
+  llvm::Value *t = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
+  asyncTaskLocation = createAlloca(t->getType(), IGM.getPointerAlignment());
+  Builder.CreateStore(t, asyncTaskLocation);
+
+  llvm::Value *e = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
+  asyncExecutorLocation = createAlloca(e->getType(), IGM.getPointerAlignment());
+  Builder.CreateStore(e, asyncExecutorLocation);
+
+  llvm::Value *c = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
+  asyncContextLocation = createAlloca(c->getType(), IGM.getPointerAlignment());
+  Builder.CreateStore(c, asyncContextLocation);
+}
+
 llvm::Value *IRGenFunction::getAsyncTask() {
   assert(isAsync());
-  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
-  assert(value->getType() == IGM.SwiftTaskPtrTy);
-  return value;
+  return Builder.CreateLoad(asyncTaskLocation);
 }
 
 llvm::Value *IRGenFunction::getAsyncExecutor() {
   assert(isAsync());
-  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
-  assert(value->getType() == IGM.SwiftExecutorPtrTy);
-  return value;
+  return Builder.CreateLoad(asyncExecutorLocation);
 }
 
 llvm::Value *IRGenFunction::getAsyncContext() {
   assert(isAsync());
-  auto *value = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
-  assert(value->getType() == IGM.SwiftContextPtrTy);
-  return value;
+  return Builder.CreateLoad(asyncContextLocation);
+}
+
+llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args) {
+  auto *id =
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async, args);
+
+  // Update the current values of task, executor and context.
+
+  auto *rawTask = Builder.CreateExtractValue(id,
+      (unsigned)AsyncFunctionArgumentIndex::Task);
+  auto *task = Builder.CreateBitCast(rawTask, IGM.SwiftTaskPtrTy);
+  Builder.CreateStore(task, asyncTaskLocation);
+
+  auto *rawExecutor = Builder.CreateExtractValue(id,
+      (unsigned)AsyncFunctionArgumentIndex::Executor);
+  auto *executor = Builder.CreateBitCast(rawExecutor, IGM.SwiftExecutorPtrTy);
+  Builder.CreateStore(executor, asyncExecutorLocation);
+
+  auto *calleeContext = Builder.CreateExtractValue(id,
+      (unsigned)AsyncFunctionArgumentIndex::Context);
+  llvm::Constant *projectFn = cast<llvm::Constant>(args[1])->stripPointerCasts();
+  // Get the caller context from the calle context.
+  llvm::Value *context = Builder.CreateCall(projectFn, {calleeContext});
+  context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
+  Builder.CreateStore(context, asyncContextLocation);
+
+  return id;
 }
 
 llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
@@ -2390,28 +2425,12 @@ public:
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
-    SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
-                                  IGF.getSILModule());
-    auto resultType =
-        fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-    auto &nativeSchema =
-        IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
-    auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
-    if (expectedNativeResultType->isVoidTy()) {
-      // If the async return is void, there is no return to move out of the
-      // argument buffer.
-      return;
-    }
-    // Gather the values.
-    Explosion nativeExplosion;
     auto layout = getAsyncContextLayout();
     for (unsigned index = 0, count = layout.getDirectReturnCount();
          index < count; ++index) {
       auto fieldLayout = layout.getDirectReturnLayout(index);
-      loadValue(fieldLayout, nativeExplosion);
+      loadValue(fieldLayout, out);
     }
-
-    out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
   Address getCalleeErrorSlot(SILType errorType) override {
     auto layout = getAsyncContextLayout();
@@ -2437,9 +2456,7 @@ public:
         Builder.CreateBitOrPointerCast(fn.getRawPointer(), IGM.Int8PtrTy));
     for (auto arg: args)
       arguments.push_back(arg);
-    auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
-                                           arguments);
-    return id;
+    return IGF.emitSuspendAsyncCall(arguments);
   }
 };
 
@@ -4580,4 +4597,47 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   Args.push_back(IGF.getAsyncContext());
   auto call = IGF.Builder.CreateCall(fnPtr, Args);
   call->setTailCall();
+}
+
+FunctionPointer
+IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
+  auto *fnTy = llvm::FunctionType::get(
+      IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
+      false /*vaargs*/);
+  auto signature =
+      Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftCC);
+  auto fnPtr = FunctionPointer(
+      FunctionPointer::KindTy::Function,
+      Builder.CreateBitOrPointerCast(resume, fnTy->getPointerTo()),
+      PointerAuthInfo(), signature);
+  return fnPtr;
+}
+
+Address irgen::emitAutoDiffCreateLinearMapContext(
+    IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffCreateLinearMapContextFn(), {topLevelSubcontextSize});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}
+
+Address irgen::emitAutoDiffProjectTopLevelSubcontext(
+    IRGenFunction &IGF, Address context) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffProjectTopLevelSubcontextFn(),
+      {context.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
+}
+
+Address irgen::emitAutoDiffAllocateSubcontext(
+    IRGenFunction &IGF, Address context, llvm::Value *size) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getAutoDiffAllocateSubcontextFn(),
+      {context.getAddress(), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return Address(call, IGF.IGM.getPointerAlignment());
 }

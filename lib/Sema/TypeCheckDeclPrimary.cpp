@@ -179,6 +179,20 @@ static void checkInheritanceClause(
     // GenericSignatureBuilder (for protocol inheritance) or the
     // ConformanceLookupTable (for protocol conformance).
     if (inheritedTy->isAnyObject()) {
+      // Warn inherited AnyObject written as 'class' as deprecated
+      // for Swift >= 5.
+      auto sourceRange = inherited.getSourceRange();
+      bool isWrittenAsClass =
+          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
+              .is(tok::kw_class);
+      if (ctx.LangOpts.isSwiftVersionAtLeast(5) && isWrittenAsClass) {
+        diags
+            .diagnose(sourceRange.Start,
+                      diag::anyobject_class_inheritance_deprecated)
+            .fixItReplace(sourceRange, "AnyObject");
+      }
+
       if (inheritedAnyObject) {
         // If the first occurrence was written as 'class', downgrade the error
         // to a warning in such case for backward compatibility with

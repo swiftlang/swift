@@ -34,7 +34,7 @@ actor class MyActor {
   // CHECK:      } // end sil function '$s4test7MyActorC0A13AsyncFunctionyyYKF'
   func testAsyncFunction() async throws {
     await callee(p)
-    try await throwingCallee(p)
+    await try throwingCallee(p)
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A22ConsumingAsyncFunctionyyYF : $@convention(method) @async (@owned MyActor) -> () {
@@ -45,6 +45,17 @@ actor class MyActor {
   // CHECK:      } // end sil function '$s4test7MyActorC0A22ConsumingAsyncFunctionyyYF'
   __consuming func testConsumingAsyncFunction() async {
     await callee(p)
+  }
+
+
+  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A7ClosureSiyYFSiyYXEfU_ : $@convention(thin) @async (@guaranteed MyActor) -> Int {
+  // CHECK:        [[COPIED_SELF:%[0-9]+]] = copy_value %0 : $MyActor
+  // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow [[COPIED_SELF]] : $MyActor
+  // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 
+  // CHECK:        = apply
+  // CHECK:      } // end sil function '$s4test7MyActorC0A7ClosureSiyYFSiyYXEfU_'
+  func testClosure() async -> Int {
+    return await { () async in p }()
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC13dontInsertHTESiyF : $@convention(method) (@guaranteed MyActor) -> Int {
@@ -75,6 +86,20 @@ struct GlobalActor {
 // CHECK: } // end sil function '$s4test0A11GlobalActoryyYF'
 @GlobalActor
 func testGlobalActor() async {
+}
+
+// CHECK-LABEL: sil private [ossa] @$s4test0A22GlobalActorWithClosureyyYFyyYXEfU_ : $@convention(thin) @async () -> () {
+// CHECK:   [[F:%[0-9]+]] = function_ref @$s4test11GlobalActorV6sharedAA02MyC0Cvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK:   [[P:%[0-9]+]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK:   [[A:%[0-9]+]] = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*MyActor
+// CHECK:   [[ACC:%[0-9]+]] = begin_access [read] [dynamic] [[A]] : $*MyActor
+// CHECK:   [[L:%[0-9]+]] = load [copy] [[ACC]] : $*MyActor
+// CHECK:   [[B:%[0-9]+]] = begin_borrow [[L]] : $MyActor
+// CHECK:   hop_to_executor [[B]] : $MyActor
+// CHECK: } // end sil function '$s4test0A22GlobalActorWithClosureyyYFyyYXEfU_'
+@GlobalActor
+func testGlobalActorWithClosure() async {
+  await { () async in }()
 }
 
 @globalActor

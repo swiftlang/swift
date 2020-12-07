@@ -1222,6 +1222,8 @@ ERROR(super_in_closure_with_capture,none,
 NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
+ERROR(try_before_await,none, "'await' must precede 'try'", ())
+
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,none,
       "expected expression in list of expressions", ())
@@ -1566,6 +1568,9 @@ ERROR(attr_specialize_missing_comma,none,
 
 ERROR(attr_specialize_unknown_parameter_name,none,
       "unknown parameter %0 in '_specialize attribute'", (StringRef))
+
+ERROR(attr_specialize_unsupported_exported_true ,none,
+      "'exported: true' has no effect in '_specialize' attribute", (StringRef))
 
 ERROR(attr_specialize_expected_bool_value,none,
       "expected a boolean true or false value in '_specialize' attribute", ())

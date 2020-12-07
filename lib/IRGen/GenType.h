@@ -103,6 +103,8 @@ private:
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
+  const LoadableTypeInfo *RawUnsafeContinuationTI = nullptr;
+  const LoadableTypeInfo *JobTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
@@ -133,9 +135,6 @@ private:
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
-  const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
-                                                   Size size, Alignment align,
-                                                   Alignment pointerAlignment);
   const FixedTypeInfo *createImmovable(llvm::Type *T,
                                        Size size, Alignment align);
 
@@ -183,6 +182,8 @@ public:
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
+  const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
+  const LoadableTypeInfo &getJobTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();

@@ -964,20 +964,29 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   return true;
 }
 
-ASTNode MissingForcedDowncastFailure::getAnchor() const {
+ASTNode InvalidCoercionFailure::getAnchor() const {
   auto anchor = FailureDiagnostic::getAnchor();
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
     return assignExpr->getSrc();
   return anchor;
 }
 
-bool MissingForcedDowncastFailure::diagnoseAsError() {
+bool InvalidCoercionFailure::diagnoseAsError() {
   auto fromType = getFromType();
   auto toType = getToType();
 
-  emitDiagnostic(diag::missing_forced_downcast, fromType, toType)
-      .highlight(getSourceRange())
-      .fixItReplace(getLoc(), "as!");
+  emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
+
+  if (UseConditionalCast) {
+    emitDiagnostic(diag::missing_optional_downcast)
+        .highlight(getSourceRange())
+        .fixItReplace(getLoc(), "as?");
+  } else {
+    emitDiagnostic(diag::missing_forced_downcast)
+        .highlight(getSourceRange())
+        .fixItReplace(getLoc(), "as!");
+  }
+
   return true;
 }
 
@@ -1051,10 +1060,19 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (needsParensOutside)
     insertAfter += ")";
 
-  auto diagID =
-      useAs ? diag::missing_explicit_conversion : diag::missing_forced_downcast;
-  auto diag = emitDiagnostic(diagID, fromType, toType);
+  auto diagnose = [&]() {
+    if (useAs) {
+      return emitDiagnostic(diag::missing_explicit_conversion, fromType,
+                            toType);
+    } else {
+      // Emit error diagnostic.
+      emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
+      // Emit and return note suggesting as! where the fix-it will be placed.
+      return emitDiagnostic(diag::missing_forced_downcast);
+    }
+  };
 
+  auto diag = diagnose();
   if (!insertBefore.empty()) {
     diag.fixItInsert(getSourceRange().Start, insertBefore);
   }
@@ -5744,6 +5762,12 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AsyncFunctionConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();
@@ -7050,5 +7074,24 @@ bool ReferenceToInvalidDeclaration::diagnoseAsError() {
 
   emitDiagnostic(diag::reference_to_invalid_decl, decl->getName());
   emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
+  return true;
+}
+
+bool InvalidReturnInResultBuilderBody::diagnoseAsError() {
+  auto *closure = castToExpr<ClosureExpr>(getAnchor());
+
+  auto returnStmts = TypeChecker::findReturnStatements(closure);
+  assert(!returnStmts.empty());
+
+  auto loc = returnStmts.front()->getReturnLoc();
+  emitDiagnosticAt(loc, diag::result_builder_disabled_by_return, BuilderType);
+
+  // Note that one can remove all of the return statements.
+  {
+    auto diag = emitDiagnosticAt(loc, diag::result_builder_remove_returns);
+    for (auto returnStmt : returnStmts)
+      diag.fixItRemove(returnStmt->getReturnLoc());
+  }
+
   return true;
 }

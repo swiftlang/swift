@@ -415,9 +415,6 @@ public:
   // value which would be returned directly cannot fit into registers.
   Address IndirectReturn;
 
-  /// The unique block that calls @llvm.coro.end.
-  llvm::BasicBlock *CoroutineExitBlock = nullptr;
-
   // A cached dominance analysis.
   std::unique_ptr<DominanceInfo> Dominance;
   
@@ -758,7 +755,7 @@ public:
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
         IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
-        Storage->getType() == IGM.RefCountedPtrTy || !needsShadowCopy(Storage))
+        !needsShadowCopy(Storage))
       return Storage;
 
     // Emit a shadow copy.
@@ -1090,22 +1087,11 @@ public:
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
-  void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i) {
-    //TODO(async)
-    llvm_unreachable("not implemented");
-  }
-  void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i) {
-    //TODO(async)
-    llvm_unreachable("not implemented");
-  }
-  void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i) {
-    //TODO(async)
-    llvm_unreachable("not implemented");
-  }
+  void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i);
+  void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i);
+  void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
 
-  void visitHopToExecutorInst(HopToExecutorInst *i) {
-    //TODO(async)
-  }
+  void visitHopToExecutorInst(HopToExecutorInst *i);
 
   void visitKeyPathInst(KeyPathInst *I);
 
@@ -1516,7 +1502,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     IGM.createReplaceableProlog(*this, f);
   }
 
-  setAsync(f->getLoweredFunctionType()->isAsync());
+  if (f->getLoweredFunctionType()->isAsync())
+    setupAsync();
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -3170,28 +3157,28 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
   Builder.CreateUnreachable();
 }
 
-static void emitCoroutineOrAsyncExit(IRGenSILFunction &IGF) {
+void IRGenFunction::emitCoroutineOrAsyncExit() {
   // The LLVM coroutine representation demands that there be a
   // unique call to llvm.coro.end.
 
   // If the coroutine exit block already exists, just branch to it.
-  if (auto coroEndBB = IGF.CoroutineExitBlock) {
-    IGF.Builder.CreateBr(coroEndBB);
+  if (auto coroEndBB = CoroutineExitBlock) {
+    Builder.CreateBr(coroEndBB);
     return;
   }
 
   // Otherwise, create it and branch to it.
-  auto coroEndBB = IGF.createBasicBlock("coro.end");
-  IGF.CoroutineExitBlock = coroEndBB;
-  IGF.Builder.CreateBr(coroEndBB);
+  auto coroEndBB = createBasicBlock("coro.end");
+  CoroutineExitBlock = coroEndBB;
+  Builder.CreateBr(coroEndBB);
 
   // Emit the block.
-  IGF.Builder.emitBlock(coroEndBB);
-  auto handle = IGF.getCoroutineHandle();
-  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
-                                  {handle,
-                                   /*is unwind*/ IGF.Builder.getFalse()});
-  IGF.Builder.CreateUnreachable();
+  Builder.emitBlock(coroEndBB);
+  auto handle = getCoroutineHandle();
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                              {handle,
+                               /*is unwind*/ Builder.getFalse()});
+  Builder.CreateUnreachable();
 }
 
 static void emitReturnInst(IRGenSILFunction &IGF,
@@ -3202,7 +3189,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   if (IGF.isCoroutine() && !IGF.isAsync()) {
     assert(result.empty() &&
            "coroutines do not currently support non-void returns");
-    emitCoroutineOrAsyncExit(IGF);
+    IGF.emitCoroutineOrAsyncExit();
     return;
   }
 
@@ -3234,7 +3221,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
           .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
     }
     emitAsyncReturn(IGF, layout, fnType);
-    emitCoroutineOrAsyncExit(IGF);
+    IGF.emitCoroutineOrAsyncExit();
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
@@ -3277,7 +3264,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   if (isAsync()) {
     auto layout = getAsyncContextLayout(*this);
     emitAsyncReturn(*this, layout, i->getFunction()->getLoweredFunctionType());
-    emitCoroutineOrAsyncExit(*this);
+    emitCoroutineOrAsyncExit();
     return;
   }
 
@@ -3294,7 +3281,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
 void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
   // Just call coro.end; there's no need to distinguish 'unwind'
   // and 'return' at the LLVM level.
-  emitCoroutineOrAsyncExit(*this);
+  emitCoroutineOrAsyncExit();
 }
 
 void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
@@ -5725,6 +5712,13 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                        getLoweredBB(i->getFailureBB()).bb);
 }
 
+void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
+  llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
+          llvm::Intrinsic::coro_async_resume, {});
+          
+  emitSuspensionPoint(getLoweredSingletonExplosion(i->getOperand()), resumeFn);
+}
+
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
@@ -6377,5 +6371,47 @@ void IRGenModule::emitSILStaticInitializers() {
     // tuple.
     auto *TI = cast<TupleInst>(InitValue);
     IRGlobal->setInitializer(emitConstantTuple(*this, TI));
+  }
+}
+
+void IRGenSILFunction::visitGetAsyncContinuationInst(
+    GetAsyncContinuationInst *i) {
+  Explosion out;
+  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out);
+  setLoweredExplosion(i, out);
+}
+
+void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
+    GetAsyncContinuationAddrInst *i) {
+  auto resultAddr = getLoweredStackAddress(i->getOperand());
+  Explosion out;
+  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out);
+  setLoweredExplosion(i, out);
+}
+
+void IRGenSILFunction::visitAwaitAsyncContinuationInst(
+    AwaitAsyncContinuationInst *i) {
+  Explosion resumeResult;
+
+  bool isIndirect = i->getResumeBB()->args_empty();
+  SILType resumeTy;
+  if (!isIndirect)
+    resumeTy = (*i->getResumeBB()->args_begin())->getType();
+
+  auto &normalDest = getLoweredBB(i->getResumeBB());
+  auto *normalDestBB = normalDest.bb;
+
+  bool hasError = i->getErrorBB() != nullptr;
+  auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
+  auto *errorPhi = hasError ? getLoweredBB(i->getErrorBB()).phis[0] : nullptr;
+  assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
+                          "error basic block should only expect one value");
+
+  emitAwaitAsyncContinuation(resumeTy, isIndirect, resumeResult,
+                             normalDestBB, errorPhi, errorDestBB);
+  if (!isIndirect) {
+    unsigned firstIndex = 0;
+    addIncomingExplosionToPHINodes(*this, normalDest, firstIndex, resumeResult);
+    assert(firstIndex == normalDest.phis.size());
   }
 }

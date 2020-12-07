@@ -65,14 +65,14 @@ func testClosure() {
      await getInt()
   }
 
-  let _: () -> Int = closure // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+  let _: () -> Int = closure // expected-error{{invalid conversion from 'async' function of type '() async -> Int' to synchronous function type '() -> Int'}}
 
   let closure2 = { () async -> Int in
     print("here")
     return await getInt()
   }
 
-  let _: () -> Int = closure2 // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+  let _: () -> Int = closure2 // expected-error{{invalid conversion from 'async' function of type '() async -> Int' to synchronous function type '() -> Int'}}
 }
 
 // Nesting async and await together
@@ -84,7 +84,7 @@ enum HomeworkError : Error {
 
 func testThrowingAndAsync() async throws {
   _ = await try throwingAndAsync()
-  _ = try await throwingAndAsync()
+  _ = try await throwingAndAsync() // expected-error{{'await' must precede 'try'}}{{11-17=}}{{7-7=await }}
   _ = await (try throwingAndAsync())
   _ = try (await throwingAndAsync())
 
@@ -136,13 +136,12 @@ func testStringInterpolation() async throws {
   _ = await "Eventually produces \(getInt())"
 }
 
-// Make sure try await works too
 func invalidAsyncFunction() async {
-  _ = try await throwingAndAsync() // expected-error {{errors thrown from here are not handled}}
+  _ = await try throwingAndAsync() // expected-error {{errors thrown from here are not handled}}
 }
 
 func validAsyncFunction() async throws {
-  _ = try await throwingAndAsync()
+  _ = await try throwingAndAsync()
 }
 
 // Async let checking

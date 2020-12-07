@@ -48,6 +48,7 @@ import Chars
 import ClassArrayGetter
 import Codable
 import Combos
+import CreateObjects
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -68,6 +69,9 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+#if canImport(_Differentiation)
+import Differentiation
+#endif
 import Diffing
 import DiffingMyers
 import DropFirst
@@ -236,6 +240,7 @@ registerBenchmark(Chars)
 registerBenchmark(Codable)
 registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
+registerBenchmark(CreateObjects)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
 registerBenchmark(DevirtualizeProtocolComposition)
@@ -256,6 +261,9 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+#if canImport(_Differentiation)
+registerBenchmark(Differentiation)
+#endif
 registerBenchmark(Diffing)
 registerBenchmark(DiffingMyers)
 registerBenchmark(DropFirst)

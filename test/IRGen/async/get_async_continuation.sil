@@ -1,0 +1,145 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
+
+// REQUIRES: concurrency
+
+import Builtin
+import Swift
+import _Concurrency
+
+sil @not_async_test : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: define{{.*}} @async_continuation(
+// CHECK: [[tsk_addr:%.*]] = alloca %swift.task*
+// CHECK: [[exe_addr:%.*]] = alloca %swift.executor*
+// CHECK: [[ctxt_addr:%.*]] = alloca %swift.context*
+// CHECK: [[cont_context:%.*]] = alloca %swift.async_continuation_context
+// CHECK: [[result_storage:%.*]] = alloca i32
+// CHECK: call token @llvm.coro.id.async
+// CHECK: call i8* @llvm.coro.begin(
+//   Create a Builtin.RawUnsafeContinuation.
+// CHECK: [[tsk:%.*]] = load %swift.task*, %swift.task** [[tsk_addr]]
+// CHECK: [[continuation:%.*]] = bitcast %swift.task* [[tsk]] to i8*
+//   Initialize the async  continuation context.
+// CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 0
+// CHECK: [[ctxt:%.*]] = load %swift.context*, %swift.context** [[ctxt_addr]]
+// CHECK: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
+// CHECK: [[error_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 2
+// CHECK: store %swift.error* null, %swift.error** [[error_addr]]
+// CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 3
+// CHECK: [[result_storage_as_opaque:%.*]] = bitcast i32* [[result_storage]] to %swift.opaque*
+// CHECK: store %swift.opaque* [[result_storage_as_opaque]], %swift.opaque** [[result_addr]]
+// CHECK:  [[exectuor_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 4
+// CHECK:  [[exe:%.*]] = load %swift.executor*, %swift.executor** [[exe_addr]]
+// CHECK:  store %swift.executor* [[exe]], %swift.executor** [[exectuor_addr]]
+//   Initialize the async task with the continuation function and async continuation context.
+// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
+// CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
+// CHECK: store i8* [[continuation_fn]], i8** [[task_continuation_fn_addr]]
+// CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 5
+// CHECK: [[cont_context2:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
+// CHECK: store %swift.context* [[cont_context2]], %swift.context** [[task_resume_context_addr]]
+//  Initialize the synchronization variable.
+// CHECK: [[synchronization_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 1
+// CHECK: store atomic {{(i64|i32)}} 0, {{(i64|i32)}}* [[synchronization_addr]] release
+//  Do some stuff.
+// CHECK: call swiftcc void @not_async_test()
+//  Arrive at the await_async_continuation point.
+// CHECK: [[synchronization_addr_before_await:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 1
+// CHECK: [[first_at_sync_pt:%.*]] = cmpxchg {{(i64|i32)}}* [[synchronization_addr_before_await]], {{(i64|i32)}} 0, {{(i64|i32)}} 1 release acquire
+// CHECK: [[first_at_sync_pt_bool:%.*]] = extractvalue { {{(i64|i32)}}, i1 } [[first_at_sync_pt]], 1
+// CHECK: br i1 [[first_at_sync_pt_bool]], label %await.async.abort, label %await.async.maybe.resume
+
+//  Abort if we are the first to arrive at the await/or continuation point --
+//  we must wait on the other to arrive.
+// CHECK: await.async.abort:
+// CHECK:  br label %coro.end
+
+// CHECK: coro.end:
+// CHECK:   call i1 @llvm.coro.end(
+// CHECK:   unreachable
+
+// CHECK: await.async.maybe.resume:
+// CHECK:   call { i8*, i8*, i8* } (i8*, i8*, ...) @llvm.coro.suspend.async({{.*}} @__swift_async_resume_project_context
+//  Abort if we are the first to arrive at the continuation point we must wait
+//  on the await to arrive.
+// CHECK:   [[first_at_sync_pt:%.*]] = cmpxchg {{(i64|i32)}}* [[synchronization_addr_before_await]], {{(i64|i32)}} 0, {{(i64|i32)}} 1 release acquire
+// CHECK:   [[first_at_sync_pt_bool:%.*]] = extractvalue { {{(i64|i32)}}, i1 } [[first_at_sync_pt]], 1
+// CHECK:   br i1 [[first_at_sync_pt_bool]], label %await.async.abort, label %await.async.resume
+
+// CHECK: await.async.resume:
+// CHECK:   br label %await.async.normal
+
+// CHECK: await.async.normal:
+// CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 3
+// CHECK:   [[result_addr:%.*]] = load %swift.opaque*, %swift.opaque** [[result_addr_addr]]
+// CHECK:   [[typed_result_addr:%.*]] = bitcast %swift.opaque* [[result_addr]] to i32*
+// CHECK:   [[result_value:%.*]] = load i32, i32* [[typed_result_addr]]
+// CHECK:   br label %[[result_bb:[0-9]+]]
+
+// CHECK: [[result_bb]]:
+// CHECK:   phi i32 [ [[result_value]], %await.async.normal ]
+
+sil @async_continuation : $@async () -> () {
+entry:
+  %c = get_async_continuation Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
+
+bb1(%r : $Builtin.Int32):
+  %t = tuple()
+  return %t : $()
+}
+
+sil @async_continuation_throws : $@async () -> () {
+entry:
+  %c = get_async_continuation [throws] Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
+bb1(%r : $Builtin.Int32):
+  br bb3
+bb2(%e : $Error):
+  br bb3
+
+bb3:
+  %t = tuple()
+  return %t : $()
+}
+
+sil @async_continuation_addr : $@async () -> () {
+entry:
+  %a = alloc_stack $Builtin.Int32
+  %c = get_async_continuation_addr Builtin.Int32, %a : $*Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  %t = tuple()
+  return %t : $()
+}
+
+sil @async_continuation_throws_addr : $@async () -> () {
+entry:
+  %a = alloc_stack $Builtin.Int32
+  %c = get_async_continuation_addr [throws] Builtin.Int32, %a : $*Builtin.Int32
+  %f = function_ref @not_async_test : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  %t = tuple()
+  return %t : $()
+}

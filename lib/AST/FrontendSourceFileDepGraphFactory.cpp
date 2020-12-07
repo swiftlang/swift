@@ -218,23 +218,9 @@ FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
     const SourceFile *SF, StringRef outputPath,
     const DependencyTracker &depTracker, const bool alsoEmitDotFile)
     : AbstractSourceFileDepGraphFactory(
-          SF->getASTContext().hadError(), outputPath, getInterfaceHash(SF),
+          SF->getASTContext().hadError(), outputPath, SF->getInterfaceHash(),
           alsoEmitDotFile, SF->getASTContext().Diags),
       SF(SF), depTracker(depTracker) {}
-
-/// Centralize the invariant that the fingerprint of the whole file is the
-/// interface hash
-std::string
-FrontendSourceFileDepGraphFactory::getFingerprint(const SourceFile *SF) {
-  return getInterfaceHash(SF);
-}
-
-std::string
-FrontendSourceFileDepGraphFactory::getInterfaceHash(const SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
-}
 
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
@@ -520,9 +506,18 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
                                              bool emitDot)
     : AbstractSourceFileDepGraphFactory(Mod->getASTContext().hadError(),
-                                        Mod->getNameStr(), "0xBADBEEF", emitDot,
-                                        Mod->getASTContext().Diags),
-      Mod(Mod) {}
+                                        Mod->getNameStr(), Fingerprint::ZERO(),
+                                        emitDot, Mod->getASTContext().Diags),
+
+      Mod(Mod) {
+  // Since a fingerprint only summarizes the state of the module but not
+  // the state of its fingerprinted sub-declarations, and since a module
+  // contains no state other than sub-declarations, its fingerprint does not
+  // matter and can just be some arbitrary value. Should it be the case that a
+  // change in a declaration that does not have a fingerprint must cause
+  // a rebuild of a file outside of the module, this assumption will need
+  // to be revisited.
+}
 
 void ModuleDepGraphFactory::addAllDefinedDecls() {
   // TODO: express the multiple provides and depends streams with variadic

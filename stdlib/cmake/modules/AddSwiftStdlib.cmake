@@ -261,6 +261,18 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
+  # The concurrency library uses double-word atomics.  MSVC's std::atomic
+  # uses a spin lock for this, so to get reasonable behavior we have to
+  # implement it ourselves using _InterlockedCompareExchange128.
+  # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
+  if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result /clang:-mcx16)
+    else()
+      list(APPEND result -mcx16)
+    endif()
+  endif()
+
   if(${CFLAGS_SDK} STREQUAL ANDROID)
     if(${CFLAGS_ARCH} STREQUAL x86_64)
       # NOTE(compnerd) Android NDK 21 or lower will generate library calls to

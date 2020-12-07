@@ -379,6 +379,13 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   return *AlternativeLiteralTypes[index];
 }
 
+bool ConstraintSystem::containsCodeCompletionLoc(Expr *expr) const {
+  SourceRange range = expr->getSourceRange();
+  if (range.isInvalid())
+    return false;
+  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
+}
+
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
     ASTNode anchor, ArrayRef<ConstraintLocator::PathElement> path) {
   auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
@@ -2794,6 +2801,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (choice.isDecl() &&
       choice.getDecl()->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
     increaseScore(SK_DisfavoredOverload);
+  }
+
+  if (choice.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional &&
+      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+    increaseScore(SK_UnresolvedMemberViaOptional);
   }
 }
 

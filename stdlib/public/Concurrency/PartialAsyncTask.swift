@@ -14,25 +14,36 @@ import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// A partial task is a unit of scheduleable work.
+@frozen
 public struct PartialAsyncTask {
-  private var context: UnsafeMutablePointer<_SwiftContext>
+  private var context: Builtin.Job
 
   public func run() { }
 }
 
 @frozen
 public struct UnsafeContinuation<T> {
-  private var context: UnsafeRawPointer
+  @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
-  public func resume(_: __owned T) { }
+  public func resume(returning: __owned T) { }
+
+  @_alwaysEmitIntoClient
+  internal init(_ context: Builtin.RawUnsafeContinuation) {
+    self.context = context
+  }
 }
 
 @frozen
 public struct UnsafeThrowingContinuation<T> {
-  private var context: UnsafeRawPointer
+  @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
-  public func resume(_: __owned T) { }
-  public func fail(_: __owned Error) { }
+  public func resume(returning: __owned T) { }
+  public func resume(throwing: __owned Error) { }
+
+  @_alwaysEmitIntoClient
+  internal init(_ context: Builtin.RawUnsafeContinuation) {
+    self.context = context
+  }
 }
 
 #if _runtime(_ObjC)
@@ -40,30 +51,46 @@ public struct UnsafeThrowingContinuation<T> {
 // Intrinsics used by SILGen to resume or fail continuations
 // for
 @_alwaysEmitIntoClient
-@usableFromInline
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T>,
   _ value: __owned T
 ) {
-  continuation.resume(value)
+  continuation.resume(returning: value)
 }
 
 @_alwaysEmitIntoClient
-@usableFromInline
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeThrowingContinuation<T>,
   _ value: __owned T
 ) {
-  continuation.resume(value)
+  continuation.resume(returning: value)
 }
 
 @_alwaysEmitIntoClient
-@usableFromInline
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeThrowingContinuation<T>,
   _ error: __owned Error
 ) {
-  continuation.fail(error)
+  continuation.resume(throwing: error)
 }
 
 #endif
+
+// Wrappers around unsafe continuation builtins
+@_alwaysEmitIntoClient
+public func withUnsafeContinuation<T>(
+  _ fn: (UnsafeContinuation<T>) -> Void
+) async -> T {
+  return await Builtin.withUnsafeContinuation {
+    fn(UnsafeContinuation<T>($0))
+  }
+}
+
+@_alwaysEmitIntoClient
+public func withUnsafeThrowingContinuation<T>(
+  _ fn: (UnsafeThrowingContinuation<T>) -> Void
+) async throws -> T {
+  return await try Builtin.withUnsafeThrowingContinuation {
+    fn(UnsafeThrowingContinuation<T>($0))
+  }
+}

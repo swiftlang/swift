@@ -15,6 +15,7 @@
 
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/Job.h"
@@ -55,7 +56,8 @@ class ModuleDepGraphNode : public DepGraphNode {
   bool hasBeenTracedAsADependent = false;
 
 public:
-  ModuleDepGraphNode(const DependencyKey &key, Optional<StringRef> fingerprint,
+  ModuleDepGraphNode(const DependencyKey &key,
+                     Optional<Fingerprint> fingerprint,
                      Optional<std::string> swiftDeps)
       : DepGraphNode(key, fingerprint), swiftDeps(swiftDeps) {}
 

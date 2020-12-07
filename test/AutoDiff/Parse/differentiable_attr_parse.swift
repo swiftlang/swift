@@ -92,6 +92,11 @@ func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
+@differentiable(wrt: $x) // ok
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
 /// Bad
 
 // expected-error @+1 {{expected 'wrt:' or 'where'}}

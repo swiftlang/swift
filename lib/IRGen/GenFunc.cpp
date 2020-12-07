@@ -1332,7 +1332,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
-  subIGF.setAsync(origType->isAsync());
+  if (origType->isAsync())
+    subIGF.setupAsync();
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
 
@@ -2395,21 +2396,31 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
       },
       false /*isNoInline*/));
 }
-
 llvm::Function *
 IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                      ArrayRef<llvm::Value *> args) {
   SmallVector<llvm::Type*, 8> argTys;
-  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
   for (auto arg : args) {
     auto *ty = arg->getType();
+    argTys.push_back(ty);
+  }
+  return createAsyncDispatchFn(fnPtr, argTys);
+}
+
+llvm::Function *
+IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
+                                     ArrayRef<llvm::Type *> argTypes) {
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // Function pointer to be called.
+  for (auto ty : argTypes) {
     argTys.push_back(ty);
   }
   auto calleeFnPtrType = fnPtr.getRawPointer()->getType();
   auto *dispatchFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
   llvm::SmallString<40> name;
-  llvm::raw_svector_ostream(name) << "__swift_suspend_dispatch_" << args.size();
+  llvm::raw_svector_ostream(name)
+      << "__swift_suspend_dispatch_" << argTypes.size();
   llvm::Function *dispatch =
       llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(name), &IGM.Module);
@@ -2432,4 +2443,84 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   call->setTailCall();
   Builder.CreateRetVoid();
   return dispatch;
+}
+
+void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
+                                        llvm::Value *asyncResume) {
+  // TODO: pointerauth
+
+  // Setup the suspend point.
+  SmallVector<llvm::Value *, 8> arguments;
+  arguments.push_back(asyncResume);
+  auto resumeProjFn = getOrCreateResumeFromSuspensionFn();
+  arguments.push_back(
+      Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+  llvm::Function *suspendFn = createAsyncSuspendFn();
+  arguments.push_back(
+      Builder.CreateBitOrPointerCast(suspendFn, IGM.Int8PtrTy));
+
+  arguments.push_back(asyncResume);
+  arguments.push_back(
+      Builder.CreateBitOrPointerCast(toExecutor, getAsyncExecutor()->getType()));
+  arguments.push_back(getAsyncTask());
+  arguments.push_back(getAsyncExecutor());
+  arguments.push_back(getAsyncContext());
+
+  emitSuspendAsyncCall(arguments);
+}
+
+llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
+  auto name = "__swift_async_resume_get_context";
+  return cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+      name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
+      [&](IRGenFunction &IGF) {
+        auto &Builder = IGF.Builder;
+        Builder.CreateRet(&*IGF.CurFn->arg_begin());
+      },
+      false /*isNoInline*/));
+}
+
+llvm::Function *IRGenFunction::createAsyncSuspendFn() {
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // Resume function.
+  argTys.push_back(getAsyncExecutor()->getType()); // Executor to hop to.
+  argTys.push_back(getAsyncTask()->getType());
+  argTys.push_back(getAsyncExecutor()->getType());
+  argTys.push_back(getAsyncContext()->getType());
+  auto *suspendFnTy =
+      llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
+
+  StringRef name = "__swift_suspend_point";
+  if (llvm::GlobalValue *F = IGM.Module.getNamedValue(name))
+    return cast<llvm::Function>(F);
+
+  llvm::Function *suspendFn =
+      llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
+                             name, &IGM.Module);
+  suspendFn->setCallingConv(IGM.DefaultCC);
+  suspendFn->setDoesNotThrow();
+  IRGenFunction suspendIGF(IGM, suspendFn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+  auto &Builder = suspendIGF.Builder;
+
+  llvm::Value *resumeFunction = suspendFn->getArg(0);
+  llvm::Value *targetExecutor = suspendFn->getArg(1);
+  llvm::Value *task = suspendFn->getArg(2);
+  llvm::Value *executor = suspendFn->getArg(3);
+  llvm::Value *context = suspendFn->getArg(4);
+
+  Alignment ptrAlign = IGM.getPointerAlignment();
+  auto *resumeAddr = Builder.CreateStructGEP(task, 4);
+  Builder.CreateStore(resumeFunction, Address(resumeAddr, ptrAlign));
+  auto *contextAddr = Builder.CreateStructGEP(task, 5);
+  Builder.CreateStore(context, Address(contextAddr, ptrAlign));
+  auto *suspendCall = Builder.CreateCall(
+      IGM.getTaskSwitchFuncFn(),
+      { task, executor, targetExecutor });
+  suspendCall->setDoesNotThrow();
+  suspendCall->setCallingConv(IGM.SwiftCC);
+  suspendCall->setTailCall();
+  Builder.CreateRetVoid();
+  return suspendFn;
 }

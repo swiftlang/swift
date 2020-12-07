@@ -249,3 +249,36 @@ bb0(%0 : $*T, %1 : $*T):
   return %78 : $()
 }
 
+class Child { }
+
+struct Parent {
+  var c : Child
+}
+
+sil @gen_child : $@convention(thin) () -> @out Child
+
+// Check that alias analysis is invalidated correctly and that the pass does
+// not produce invalid SIL (which would trigger a MemoryLifetime failure).
+//
+// CHECK-LABEL: sil [ossa] @invalidateAliasAnalysis :
+// CHECK:   copy_addr
+// CHECK: } // end sil function 'invalidateAliasAnalysis'
+sil [ossa] @invalidateAliasAnalysis : $@convention(thin) (@owned Child) -> () {
+bb0(%0 :@owned  $Child):
+  %2 = alloc_stack $Parent 
+  %4 = alloc_stack $Child
+  store %0 to [init] %4 : $*Child
+  %7 = alloc_stack $Child 
+  %func = function_ref @gen_child : $@convention(thin) () -> @out Child
+  %10 = apply %func(%7) : $@convention(thin)() -> @out Child
+  %11 = struct_element_addr %2 : $*Parent, #Parent.c
+  copy_addr [take] %7 to [initialization] %11 : $*Child
+  dealloc_stack %7 : $*Child
+  copy_addr [take] %4 to %11 : $*Child
+  %17 = tuple ()
+  dealloc_stack %4 : $*Child
+  destroy_addr %2 : $*Parent
+  dealloc_stack %2 : $*Parent
+  %res = tuple ()
+  return %res : $()
+}

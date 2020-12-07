@@ -986,7 +986,7 @@ constraints::matchCallArguments(
 }
 
 static Optional<unsigned>
-getCompletionArgIndex(ASTNode anchor, SourceManager &SM) {
+getCompletionArgIndex(ASTNode anchor, ConstraintSystem &CS) {
   Expr *arg = nullptr;
   if (auto *CE = getAsExpr<CallExpr>(anchor))
     arg = CE->getArg();
@@ -998,20 +998,15 @@ getCompletionArgIndex(ASTNode anchor, SourceManager &SM) {
   if (!arg)
     return None;
 
-  auto containsCompletion = [&](Expr *elem) {
-    if (!elem)
-      return false;
-    SourceRange range = elem->getSourceRange();
-    return range.isValid() && SM.rangeContainsCodeCompletionLoc(range);
-  };
-
   if (auto *TE = dyn_cast<TupleExpr>(arg)) {
     auto elems = TE->getElements();
-    auto idx = llvm::find_if(elems, containsCompletion);
+    auto idx = llvm::find_if(elems, [&](Expr *elem) {
+      return CS.containsCodeCompletionLoc(elem);
+    });
     if (idx != elems.end())
       return std::distance(elems.begin(), idx);
   } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
-    if (containsCompletion(PE->getSubExpr()))
+    if (CS.containsCodeCompletionLoc(PE->getSubExpr()))
       return 0;
   }
   return None;
@@ -1069,9 +1064,8 @@ public:
       // completion location, later arguments shouldn't be considered missing
       // (causing the solution to have a worse score) as the user just hasn't
       // written them yet. Early exit to avoid recording them in this case.
-      SourceManager &SM = CS.getASTContext().SourceMgr;
       if (!CompletionArgIdx)
-        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), SM);
+        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), CS);
       if (CompletionArgIdx && *CompletionArgIdx < argInsertIdx)
         return newArgIdx;
     }
@@ -1817,9 +1811,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // code completion location, since they may have just not been written yet.
   if (cs.isForCodeCompletion()) {
     if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-      SourceManager &SM = closure->getASTContext().SourceMgr;
-      SourceRange range = closure->getSourceRange();
-      if (range.isValid() && SM.rangeContainsCodeCompletionLoc(range) &&
+      if (cs.containsCodeCompletionLoc(closure) &&
           (closure->hasAnonymousClosureVars() ||
            (args.empty() && closure->getInLoc().isInvalid())))
           return false;
@@ -1881,9 +1873,19 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
-  // 'async' and non-'async' function types are not compatible.
-  if (func1->isAsync() != func2->isAsync())
-    return getTypeMatchFailure(locator);
+  // A synchronous function can be a subtype of an 'async' function.
+  if (func1->isAsync() != func2->isAsync()) {
+    // Cannot drop 'async'.
+    if (func1->isAsync() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = DropAsyncAttribute::create(*this, func1, func2,
+                                             getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+  }
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
@@ -3559,9 +3561,26 @@ bool ConstraintSystem::repairFailures(
                                   getConstraintLocator(coercion->getSubExpr())))
         return true;
 
-      // Repair a coercion ('as') with a forced checked cast ('as!').
-      if (auto *coerceToCheckCastFix = CoerceToCheckedCast::attempt(
-              *this, lhs, rhs, getConstraintLocator(locator))) {
+      // If the result type of the coercion has an value to optional conversion
+      // we can instead suggest the conditional downcast as it is safer in
+      // situations like conditional binding.
+      auto useConditionalCast = llvm::any_of(
+          ConstraintRestrictions,
+          [&](std::tuple<Type, Type, ConversionRestrictionKind> restriction) {
+            ConversionRestrictionKind restrictionKind;
+            Type type1, type2;
+            std::tie(type1, type2, restrictionKind) = restriction;
+
+            if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
+              return false;
+
+            return rhs->isEqual(type1);
+          });
+
+      // Repair a coercion ('as') with a runtime checked cast ('as!' or 'as?').
+      if (auto *coerceToCheckCastFix =
+              CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
+                                           getConstraintLocator(locator))) {
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
@@ -3799,6 +3818,22 @@ bool ConstraintSystem::repairFailures(
       if (nominal->isStdlibDecl() &&
           nominal->getName() == getASTContext().Id_OptionalNilComparisonType) {
         return false;
+      }
+    }
+
+    if (isForCodeCompletion()) {
+      // If the argument contains the code completion location, the user has not
+      // finished typing out this argument yet. Treat the mismatch as valid so
+      // we don't penalize this solution.
+      if (auto *arg = getAsExpr(simplifyLocatorToAnchor(loc))) {
+        // Ignore synthesized args like $match in implicit pattern match
+        // operator calls. Their source location is usually the same as the
+        // other (explicit) argument's so source range containment alone isn't
+        // sufficient.
+        bool isSynthesizedArg = arg->isImplicit() && isa<DeclRefExpr>(arg);
+        if (!isSynthesizedArg && containsCodeCompletionLoc(arg) &&
+            !lhs->isVoid() && !lhs->isUninhabited())
+          return true;
       }
     }
 
@@ -6742,13 +6777,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // through optional types.
   //
   // FIXME: Unify with the above code path.
-  if (result.ViableCandidates.empty() &&
-      baseObjTy->is<AnyMetatypeType>() &&
+  if (baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getOptionalObjectType()) {
       // If we don't have a wrapped type yet, we can't look through the optional
       // type.
-      if (objectType->getAs<TypeVariableType>()) {
+      if (objectType->getAs<TypeVariableType>() && result.ViableCandidates.empty()) {
         MemberLookupResult result;
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
@@ -9552,8 +9586,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
-        if (auto *fix =
-                CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
+        if (auto *fix = CoerceToCheckedCast::attempt(
+                *this, fromType, toType, /*useConditionalCast*/ false, loc))
           return !recordFix(fix, impact);
       }
       

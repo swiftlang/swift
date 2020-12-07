@@ -463,7 +463,7 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    bool isAsync = fnType->isAsync();
+    bool isAsync = fnType->isAsync() || E->implicitlyAsync();
     
     // If the function doesn't throw at all, we're done here.
     if (!fnType->isThrowing())
@@ -985,8 +985,9 @@ public:
   }
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
-    // Top-level code implicitly handles errors and 'async' calls.
-    return Context(/*handlesErrors=*/true, /*handlesAsync=*/true, None);
+    // Top-level code implicitly handles errors.
+    // TODO: Eventually, it will handle async as well.
+    return Context(/*handlesErrors=*/true, /*handlesAsync=*/false, None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {

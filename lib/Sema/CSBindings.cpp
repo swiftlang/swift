@@ -22,6 +22,17 @@
 using namespace swift;
 using namespace constraints;
 
+bool ConstraintSystem::PotentialBinding::isViableForJoin() const {
+  return Kind == AllowedBindingKind::Supertypes &&
+         !BindingType->hasLValueType() &&
+         !BindingType->hasUnresolvedType() &&
+         !BindingType->hasTypeVariable() &&
+         !BindingType->hasHole() &&
+         !BindingType->hasUnboundGenericType() &&
+         !hasDefaultedLiteralProtocol() &&
+         !isDefaultableBinding();
+}
+
 bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
   if (isGenericParameter())
@@ -76,6 +87,25 @@ bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
     if (locator->directlyAt<NilLiteralExpr>())
       return true;
   }
+
+  // If there is a `bind param` constraint associated with
+  // current type variable, result should be aware of that
+  // fact. Binding set might be incomplete until
+  // this constraint is resolved, because we currently don't
+  // look-through constraints expect to `subtype` to try and
+  // find related bindings.
+  // This only affects type variable that appears one the
+  // right-hand side of the `bind param` constraint and
+  // represents result type of the closure body, because
+  // left-hand side gets types from overload choices.
+  if (llvm::any_of(
+          EquivalentTo,
+          [&](const std::pair<TypeVariableType *, Constraint *> &equivalence) {
+            auto *constraint = equivalence.second;
+            return constraint->getKind() == ConstraintKind::BindParam &&
+                   constraint->getSecondType()->isEqual(TypeVar);
+          }))
+    return true;
 
   return false;
 }
@@ -679,30 +709,30 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
-  if (binding.Kind == AllowedBindingKind::Supertypes &&
-      !binding.BindingType->hasUnresolvedType() &&
-      !binding.BindingType->hasTypeVariable() &&
-      !binding.BindingType->hasHole() &&
-      !binding.BindingType->hasUnboundGenericType() &&
-      !binding.hasDefaultedLiteralProtocol() &&
-      !binding.isDefaultableBinding() && allowJoinMeet) {
-    if (lastSupertypeIndex) {
-      auto &lastBinding = Bindings[*lastSupertypeIndex];
-      auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
-      auto bindingType = binding.BindingType->getWithoutSpecifierType();
+  if (binding.isViableForJoin() && allowJoinMeet) {
+    bool joined = false;
 
-      auto join = Type::join(lastType, bindingType);
-      if (join && !(*join)->isAny() &&
-          (!(*join)->getOptionalObjectType()
-           || !(*join)->getOptionalObjectType()->isAny())) {
-        // Replace the last supertype binding with the join. We're done.
-        lastBinding.BindingType = *join;
-        return;
+    auto isAcceptableJoin = [](Type type) {
+      return !type->isAny() && (!type->getOptionalObjectType() ||
+                                !type->getOptionalObjectType()->isAny());
+    };
+
+    for (auto &existingBinding : Bindings) {
+      if (!existingBinding.isViableForJoin())
+        continue;
+
+      auto join = Type::join(existingBinding.BindingType, binding.BindingType);
+
+      if (join && isAcceptableJoin(*join)) {
+        existingBinding.BindingType = *join;
+        joined = true;
       }
     }
 
-    // Record this as the most recent supertype index.
-    lastSupertypeIndex = Bindings.size();
+    // If new binding has been joined with at least one of existing
+    // bindings, there is no reason to include it into the set.
+    if (joined)
+      return;
   }
 
   if (auto *literalProtocol = binding.getDefaultedLiteralProtocol())
@@ -1387,7 +1417,8 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // under-constrained due to e.g. lack of expressions on the
     // right-hand side of the token, which are required for a
     // regular type-check.
-    if (dstLocator->directlyAt<CodeCompletionExpr>())
+    if (dstLocator->directlyAt<CodeCompletionExpr>() ||
+        srcLocator->directlyAt<CodeCompletionExpr>())
       return None;
   }
 
@@ -1423,7 +1454,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // If the whole body is being ignored due to a pre-check failure,
     // let's not record a fix about result type since there is
     // just not enough context to infer it without a body.
-    if (cs.hasFixFor(cs.getConstraintLocator(closure->getBody()),
+    if (cs.hasFixFor(cs.getConstraintLocator(closure),
                      FixKind::IgnoreInvalidResultBuilderBody))
       return None;
 

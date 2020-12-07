@@ -2610,21 +2610,32 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           return isDifferentiable(param.getPlainType(),
                                   /*tangentVectorEqualsSelf*/ isLinear);
         }) != elements.end();
+    bool alreadyDiagnosedOneParam = false;
     for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
       auto *eltTypeRepr = inputRepr->getElementType(i);
       auto param = elements[i];
       if (param.isNoDerivative())
         continue;
       auto paramType = param.getPlainType();
-      if (isDifferentiable(paramType, /*tangentVectorEqualsSelf*/ isLinear))
+      if (isDifferentiable(paramType, isLinear))
         continue;
       auto paramTypeString = paramType->getString();
       auto diagnostic =
           diagnose(eltTypeRepr->getLoc(),
                    diag::differentiable_function_type_invalid_parameter,
                    paramTypeString, isLinear, hasValidDifferentiabilityParam);
+      alreadyDiagnosedOneParam = true;
       if (hasValidDifferentiabilityParam)
         diagnostic.fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
+    }
+    // Reject the case where all parameters have '@noDerivative'.
+    if (!alreadyDiagnosedOneParam && !hasValidDifferentiabilityParam) {
+      diagnose(
+          inputRepr->getLoc(),
+          diag::
+              differentiable_function_type_no_differentiability_parameters,
+          isLinear)
+          .highlight(inputRepr->getSourceRange());
     }
   }
 

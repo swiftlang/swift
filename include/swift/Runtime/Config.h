@@ -176,6 +176,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_INDIRECT_RESULT
 #endif
 
+// SWIFT_CC(swiftasync) is the Swift async calling convention.
+// We assume that it supports mandatory tail call elimination.
+#if __has_attribute(swiftasynccall)
+#define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
+#else
+#define SWIFT_CC_swiftasync SWIFT_CC_swift
+#endif
+
 // SWIFT_CC(PreserveMost) is used in the runtime implementation to prevent
 // register spills on the hot path.
 // It is not safe to use for external calls; the loader's lazy function

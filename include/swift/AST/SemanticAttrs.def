@@ -106,5 +106,10 @@ SEMANTICS_ATTR(KEYPATH_KVC_KEY_PATH_STRING, "keypath.kvcKeyPathString")
 /// consider inlining where to put these.
 SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
 
+/// An attribute that when attached to a class causes instances of the class to
+/// be forbidden from having associated objects set upon them. This is only used
+/// for testing purposes.
+SEMANTICS_ATTR(OBJC_FORBID_ASSOCIATED_OBJECTS, "objc.forbidAssociatedObjects")
+
 #undef SEMANTICS_ATTR
 
