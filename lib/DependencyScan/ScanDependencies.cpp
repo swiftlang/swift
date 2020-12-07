@@ -773,8 +773,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
-      swiftscan_module_details_s *details =
-          new swiftscan_module_details_s;
+      swiftscan_module_details_s *details = new swiftscan_module_details_s;
       if (swiftTextualDeps) {
         swiftscan_string_t moduleInterfacePath =
             swiftTextualDeps->swiftInterfaceFile.hasValue()

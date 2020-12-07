@@ -35,8 +35,7 @@ swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(
-        swiftscan_get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto ScanResult = ScanningTool->getDependencies(Compilation, {});
@@ -54,8 +53,7 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(
-        swiftscan_get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
 
   std::vector<BatchScanInput> BatchInput;
   for (int i = 0; i < batch_input->count; ++i) {
@@ -89,8 +87,7 @@ swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(
-        swiftscan_get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto PreScanResult = ScanningTool->getImports(Compilation);
@@ -259,6 +256,22 @@ swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result) {
 }
 
 //=== Scanner Invocation Functions ----------------------------------------===//
+
+swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
+  return new swiftscan_scan_invocation_s;
+}
+
+void swiftscan_scan_invocation_set_working_directory(
+    swiftscan_scan_invocation_t invocation,
+    swiftscan_string_t working_directory) {
+  invocation->working_directory = working_directory;
+}
+
+SWIFTSCAN_PUBLIC void
+swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
+                                   swiftscan_string_set_t *argv) {
+  invocation->argv = argv;
+}
 
 swiftscan_string_t swiftscan_scan_invocation_get_working_directory(
     swiftscan_scan_invocation_t invocation) {

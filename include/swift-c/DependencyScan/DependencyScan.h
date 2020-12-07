@@ -205,6 +205,16 @@ swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result);
 
 //=== Scanner Invocation Functions ----------------------------------------===//
 
+SWIFTSCAN_PUBLIC swiftscan_scan_invocation_t swiftscan_scan_invocation_create();
+
+SWIFTSCAN_PUBLIC void swiftscan_scan_invocation_set_working_directory(
+    swiftscan_scan_invocation_t invocation,
+    swiftscan_string_t working_directory);
+
+SWIFTSCAN_PUBLIC void
+swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
+                                   swiftscan_string_set_t *argv);
+
 SWIFTSCAN_PUBLIC swiftscan_string_t
 swiftscan_scan_invocation_get_working_directory(
     swiftscan_scan_invocation_t invocation);
