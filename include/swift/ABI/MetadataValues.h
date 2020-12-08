@@ -1914,9 +1914,9 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask      = 24,
-    Task_IsFuture         = 25,
-    Task_IsTaskGroup      = 26,
+    Task_IsChildTask  = 24,
+    Task_IsFuture     = 25,
+    Task_IsTaskGroup  = 26,
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}

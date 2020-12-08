@@ -354,17 +354,16 @@ public:
         static GroupPollResult get(AsyncTask *asyncTask, bool hadErrorResult,
                                    bool needsSwiftRelease) {
           auto fragment = asyncTask->futureFragment();
-          auto status = hadErrorResult ?
-              GroupFragment::ChannelPollStatus::Error :
-              GroupFragment::ChannelPollStatus::Success;
-          auto storage = hadErrorResult ?
-              reinterpret_cast<OpaqueValue *>(fragment->getError()) :
-              fragment->getStoragePtr();
-          auto task = needsSwiftRelease ? asyncTask : nullptr;
           return GroupPollResult{
-              /*status*/ status,
-              /*storage*/ storage,
-              /*task*/
+              /*status*/ hadErrorResult ?
+                  GroupFragment::ChannelPollStatus::Error :
+                  GroupFragment::ChannelPollStatus::Success,
+              /*storage*/ hadErrorResult ?
+                  reinterpret_cast<OpaqueValue *>(fragment->getError()) :
+                  fragment->getStoragePtr(),
+              /*task*/ needsSwiftRelease ?
+                  asyncTask :
+                  nullptr
           };
         }
     };
@@ -475,23 +474,26 @@ public:
     /// AsyncTask.
     // mpsc_queue_t<ReadyQueueItem> readyQueue;
     MutexQueue<ReadyQueueItem> readyQueue;
+    // TODO: Try the same queue strategy as the waitQueue
 
     /// Queue containing all of the tasks that are waiting in `get()`.
     ///
+    /// A task group is also a future, and awaits on the group's result *itself*
+    /// are enqueued on its future fragment.
+    ///
     /// The low bits contain the status, the rest of the pointer is the
     /// AsyncTask.
-    // TODO: these are like Future, had tough time making it be BOTH future and channel
-    std::atomic<WaitQueueItem> waitQueue; // TODO: reuse the future's wait queue instead?
+    std::atomic<WaitQueueItem> waitQueue;
 
     // Trailing storage for the result itself. The storage will be uninitialized.
     // Use the `readyQueue` to poll for values from the channel instead.
     friend class AsyncTask;
 
   public:
-    explicit GroupFragment(const Metadata *resultType)
+    explicit GroupFragment()
         : status(GroupStatus::initial().status),
           readyQueue(),
-          waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)) {}  // TODO: reuse FutureFragment's waitQ
+          waitQueue(WaitQueueItem::get(WaitStatus::Executing, nullptr)) {}
 
     /// Destroy the storage associated with the channel.
     void destroy();
@@ -538,11 +540,6 @@ public:
           /*failure*/ std::memory_order_relaxed);
     }
 
-    /// Determine the size of the channel fragment given a particular channel
-    /// result type.
-    static size_t fragmentSize() {
-      return sizeof(GroupFragment);
-    }
   };
 
   bool isTaskGroup() const { return Flags.task_isTaskGroup(); }
@@ -687,24 +684,18 @@ public:
   FutureFragment *futureFragment() {
     assert(isFuture());
 
-    if (hasChildFragment()) {
-      // TODO: do this via calculating an offset
-      if (isTaskGroup()) {
-        return reinterpret_cast<FutureFragment *>(
-            reinterpret_cast<GroupFragment *>(
-                reinterpret_cast<ChildFragment*>(this + 1) + 1) + 1);
-      }
+    auto base = reinterpret_cast<uintptr_t>( this );
+    base += sizeof(AsyncTask);
 
-      return reinterpret_cast<FutureFragment *>(
-          reinterpret_cast<ChildFragment*>(this + 1) + 1);
+    if (hasChildFragment()) {
+      base += sizeof(ChildFragment);
     }
 
     if (isTaskGroup()) {
-      return reinterpret_cast<FutureFragment *>(
-          reinterpret_cast<GroupFragment *>(this + 1) + 1);
+      base += sizeof(GroupFragment);
     }
 
-    return reinterpret_cast<FutureFragment *>(this + 1);
+    return reinterpret_cast<FutureFragment *>(base);
   }
 
   /// Wait for this future to complete.

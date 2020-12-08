@@ -240,7 +240,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   }
 
   if (flags.task_isTaskGroup()) {
-    headerSize += GroupFragment::fragmentSize();
+    headerSize += sizeof(AsyncTask::GroupFragment);
   }
 
   if (futureResultType) {
@@ -277,7 +277,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   // Initialize the channel fragment if applicable.
   if (flags.task_isTaskGroup()) {
     auto groupFragment = task->groupFragment();
-    new (groupFragment) GroupFragment(futureResultType);
+    new (groupFragment) GroupFragment();
   }
 
   // Initialize the future fragment if applicable.

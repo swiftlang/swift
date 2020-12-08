@@ -656,7 +656,7 @@ the coroutine until the continuation is invoked to resume it.  A use of
 
   func waitForCallback() async -> Int {
     return await withUnsafeContinuation { cc in
-      registerCallback { cc.resume(returning: $0) }
+      registerCallback { cc.resume($0) }
     }
   }
 
