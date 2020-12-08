@@ -216,8 +216,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   case SILArgumentConvention::Direct_Guaranteed:
     value = OwnershipKind::Guaranteed;
     return;
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("Not handled");
   }
 }
 
