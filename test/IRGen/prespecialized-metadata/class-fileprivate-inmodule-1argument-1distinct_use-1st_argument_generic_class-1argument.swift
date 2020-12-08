@@ -53,7 +53,7 @@
 //                   :         }*, 
 //                   :         i8*, 
 //                   :         i8* 
-//                   :       }* @_DATA__TtC4mainP33_7FA9B79F85D716E7DB33358C0057E87D9Argument1 to i64
+//                   :       }* @"_DATA_$s4main9Argument1[[UNIQUE_ID_1]]CySiGMf" to i64
 //                   :     ), 
 //                   :     i64 2
 //                   :   ), 
@@ -148,7 +148,7 @@
 //   CHECK-apple-SAME:         }*, 
 //   CHECK-apple-SAME:         i8*, 
 //   CHECK-apple-SAME:         i8* 
-//   CHECK-apple-SAME:       }* @_DATA__TtC4mainP33_7FA9B79F85D716E7DB33358C0057E87D5Value to [[INT]]
+//   CHECK-apple-SAME:       }* @"_DATA_$s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMf" to [[INT]]
 //   CHECK-apple-SAME:     ), 
 //   CHECK-apple-SAME:     [[INT]] 2
 //   CHECK-apple-SAME:   ), 
