@@ -169,6 +169,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskFuture:
+    case BuiltinValueKind::ConvertTaskToJob:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
       return true;
