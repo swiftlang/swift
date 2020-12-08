@@ -1322,10 +1322,10 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   }
 
   // If this is an asynchronous function where the completion handler is
-  // the second parameter, and the corresponding name has some additional
-  // information prior to WithCompletion(Handler), append that
+  // past the first parameter the corresponding name has some additional
+  // information prior to the completion-handled suffix, append that
   // additional text to the base name.
-  if (isAsync && *completionHandlerIndex == 1 && completionHandlerName) {
+  if (isAsync && *completionHandlerIndex >= 1 && completionHandlerName) {
     if (auto extraParamText = stripWithCompletionHandlerSuffix(
             *completionHandlerName)) {
       SmallString<32> newBaseName;
@@ -1354,20 +1354,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     StringRef newName = omitTrailingTypeNameWithSpecialCases(
         name, paramTypes[i], role,
         role == NameRole::BaseName ? allPropertyNames : nullptr);
-
-    // If this is an asynchronous function where the completion handler is
-    // past the second parameter and has additional information in the name,
-    // add that information to the prior argument name.
-    if (isAsync && completionHandlerName && *completionHandlerIndex > 1 &&
-        *completionHandlerIndex == i + 1) {
-      if (auto extraParamText = stripWithCompletionHandlerSuffix(
-              *completionHandlerName)) {
-        SmallString<32> extendedName;
-        extendedName += newName;
-        appendSentenceCase(extendedName, *extraParamText);
-        newName = scratch.copyString(extendedName);
-      }
-    }
 
     if (name == newName) continue;
 

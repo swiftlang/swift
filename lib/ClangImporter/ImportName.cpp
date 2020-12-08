@@ -1139,7 +1139,7 @@ static bool isCompletionHandlerParamName(StringRef paramName) {
       paramName == "withCompletionHandler" ||
       paramName == "completion" || paramName == "withCompletion" ||
       paramName == "completionBlock" || paramName == "withCompletionBlock" ||
-      paramName == "reply" || paramName == "withReply";
+      paramName == "reply" || paramName == "withReply" ||
       paramName == "replyTo" || paramName == "withReplyTo";
 }
 
