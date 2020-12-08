@@ -23,7 +23,7 @@
 #include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Bitstream/BitCodes.h"
 
 namespace swift {
