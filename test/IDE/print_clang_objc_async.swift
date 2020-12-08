@@ -13,6 +13,9 @@
 // CHECK-DAG:     func doSomethingDangerous(_ operation: String) async throws -> String
 // CHECK-DAG:     func checkAvailability(completionHandler: @escaping (Bool) -> Void)
 // CHECK-DAG:     func checkAvailability() async -> Bool
+// CHECK-DAG:     func anotherExample() async -> String
+// CHECK-DAG:     func finalExample() async -> String
+// CHECK-DAG:     func replyingOperation(_ operation: String) async -> String
 // CHECK-DAG:     func findAnswer(completionHandler handler: @escaping (String?, Error?) -> Void)
 // CHECK-DAG:     func findAnswer() async throws -> String
 // CHECK-DAG:     func findAnswerFailingly(completionHandler handler: @escaping (String?, Error?) -> Void) throws
