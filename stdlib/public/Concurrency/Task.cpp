@@ -311,6 +311,8 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
   // Initialize the task-local allocator.
+  // TODO: consider providing an initial pre-allocated first slab to the
+  //       allocator.
   _swift_task_alloc_initialize(task);
 
   return {task, initialContext};

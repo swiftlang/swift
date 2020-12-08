@@ -60,6 +60,9 @@ private:
   /// True if the first slab is pre-allocated.
   bool firstSlabIsPreallocated;
 
+  /// The minimal alignment of allocated memory.
+  static constexpr size_t alignment = alignof(std::max_align_t);
+  
   /// If set to true, memory allocations are checked for buffer overflows and
   /// use-after-free, similar to guard-malloc.
   static constexpr bool guardAllocations =
@@ -90,11 +93,21 @@ private:
       assert((size_t)capacity == newCapacity && "capacity overflow");
     }
 
+    /// The size of the slab header.
+    static size_t headerSize() {
+      return llvm::alignTo(sizeof(Slab), llvm::Align(alignment));
+    }
+
+    /// Return \p size with the added overhead of the slab header.
+    static size_t includingHeader(size_t size) {
+      return headerSize() + size;
+    }
+
     /// Return the payload buffer address at \p atOffset.
     ///
     /// Note: it's valid to call this function on a not-yet-constructed slab.
     char *getAddr(size_t atOffset) {
-      return (char *)(this + 1) + atOffset;
+      return (char *)this + headerSize() + atOffset;
     }
 
     /// Return true if this slab can fit an allocation of \p size.
@@ -162,22 +175,19 @@ private:
       previous(previous), slab(slab) {}
 
     void *getAllocatedMemory() {
-      return (void *)(this + 1);
+      return (char *)this + headerSize();
+    }
+
+    /// The size of the allocation header.
+    static size_t headerSize() {
+      return llvm::alignTo(sizeof(Allocation), llvm::Align(alignment));
     }
 
     /// Return \p size with the added overhead of the allocation header.
     static size_t includingHeader(size_t size) {
-      return size + sizeof(Allocation);
+      return headerSize() + size;
     }
   };
-
-  static constexpr size_t alignment = alignof(std::max_align_t);
-  
-  static_assert(sizeof(Slab) % StackAllocator::alignment == 0,
-      "Slab size must be a multiple of the max allocation alignment");
-
-  static_assert(sizeof(Allocation) % StackAllocator::alignment == 0,
-      "Allocation size must be a multiple of the max allocation alignment");
 
   // Return a slab which is suitable to allocate \p size memory.
   Slab *getSlabForAllocation(size_t size) {
@@ -204,7 +214,7 @@ private:
     }
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
-    void *slabBuffer = malloc(sizeof(Slab) + capacity);
+    void *slabBuffer = malloc(Slab::includingHeader(capacity));
     Slab *newSlab = new (slabBuffer) Slab(capacity);
     if (slab)
       slab->next = newSlab;
@@ -235,10 +245,12 @@ public:
 
   /// Construct a StackAllocator with a pre-allocated first slab.
   StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) {
-    char *start = (char *)llvm::alignAddr(firstSlabBuffer, llvm::Align(alignment));
+    char *start = (char *)llvm::alignAddr(firstSlabBuffer,
+                                          llvm::Align(alignment));
     char *end = (char *)firstSlabBuffer + bufferCapacity;
-    assert(start + sizeof(Slab) <= end && "buffer for first slab too small");
-    firstSlab = new (start) Slab(end - start - sizeof(Slab));
+    assert(start + Slab::headerSize() <= end &&
+           "buffer for first slab too small");
+    firstSlab = new (start) Slab(end - start - Slab::headerSize());
     firstSlabIsPreallocated = true;
   }
 
