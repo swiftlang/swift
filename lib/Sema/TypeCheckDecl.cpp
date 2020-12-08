@@ -749,21 +749,23 @@ getParameterThrowingKind(AbstractFunctionDecl *decl,
                          GenericSignature genericSig) {
   FunctionRethrowingKind kind = FunctionRethrowingKind::Invalid;
   // check all parameters to determine if any are closures that throw
-
+  bool foundThrowingClosure = false;
   for (auto param : *decl->getParameters()) {
     auto interfaceTy = param->getInterfaceType();
     if (hasThrowingFunctionClosureParameter(interfaceTy
           ->lookThroughAllOptionalTypes()
           ->getCanonicalType())) {
-      // closure rethrowing supersedes conformance rethrowing 
-      return FunctionRethrowingKind::ByClosure;
+      foundThrowingClosure = true;
     }
 
     if (kind == FunctionRethrowingKind::Invalid) {
       kind = getTypeThrowingKind(interfaceTy, genericSig);
     }
   }
-
+  if (kind == FunctionRethrowingKind::Invalid &&
+      foundThrowingClosure) {
+    return FunctionRethrowingKind::ByClosure;
+  }
   return kind;
 }
 
