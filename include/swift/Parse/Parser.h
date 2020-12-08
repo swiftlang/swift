@@ -408,14 +408,14 @@ public:
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserStateBase *SIL, PersistentParserState *PersistentState,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
+         std::shared_ptr<HiddenLibSyntaxAction> SPActions = nullptr);
   Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
+         std::shared_ptr<HiddenLibSyntaxAction> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
+         std::shared_ptr<HiddenLibSyntaxAction> SPActions = nullptr);
   ~Parser();
 
   /// Returns true if the buffer being parsed is allowed to contain SIL.

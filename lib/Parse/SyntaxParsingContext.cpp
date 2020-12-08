@@ -35,7 +35,7 @@ using RootContextData = SyntaxParsingContext::RootContextData;
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF, unsigned BufferID,
-                                 std::shared_ptr<SyntaxParseActions> SPActions)
+                              std::shared_ptr<HiddenLibSyntaxAction> SPActions)
     : RootDataOrParent(new RootContextData(
           SF, SF.getASTContext().Diags, SF.getASTContext().SourceMgr, BufferID,
           std::move(SPActions))),

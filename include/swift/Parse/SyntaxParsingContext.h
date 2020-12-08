@@ -13,11 +13,12 @@
 #ifndef SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
 #define SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
 
-#include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/HiddenLibSyntaxAction.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
 
@@ -99,7 +100,7 @@ public:
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    std::shared_ptr<SyntaxParseActions> spActions)
+                    std::shared_ptr<HiddenLibSyntaxAction> spActions)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
           Recorder(std::move(spActions)) {}
   };
@@ -194,7 +195,7 @@ public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
                        unsigned BufferID,
-                       std::shared_ptr<SyntaxParseActions> SPActions);
+                       std::shared_ptr<HiddenLibSyntaxAction> SPActions);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)

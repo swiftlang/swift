@@ -145,10 +145,16 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   if (!bufferID)
     return {};
 
-  std::shared_ptr<SyntaxTreeCreator> sTreeCreator;
+  std::shared_ptr<SyntaxTreeCreator> sTreeCreator =
+      std::make_shared<SyntaxTreeCreator>(ctx.SourceMgr, *bufferID,
+                                          SF->SyntaxParsingCache,
+                                          ctx.getSyntaxArena());
+  std::shared_ptr<HiddenLibSyntaxAction> spActions;
   if (SF->shouldBuildSyntaxTree()) {
-    sTreeCreator = std::make_shared<SyntaxTreeCreator>(
-        ctx.SourceMgr, *bufferID, SF->SyntaxParsingCache, ctx.getSyntaxArena());
+    spActions =
+        std::make_shared<HiddenLibSyntaxAction>(sTreeCreator, sTreeCreator);
+  } else {
+    spActions = std::make_shared<HiddenLibSyntaxAction>(nullptr, sTreeCreator);
   }
 
   // If we've been asked to silence warnings, do so now. This is needed for
@@ -168,16 +174,16 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     SF->setDelayedParserState({state, &deletePersistentParserState});
   }
 
-  Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state, sTreeCreator);
+  Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state, spActions);
   PrettyStackTraceParser StackTrace(parser);
 
   SmallVector<Decl *, 128> decls;
   parser.parseTopLevel(decls);
 
   Optional<SourceFileSyntax> syntaxRoot;
-  if (sTreeCreator) {
+  if (SF->shouldBuildSyntaxTree()) {
     auto rawNode = parser.finalizeSyntaxTree();
-    syntaxRoot.emplace(*sTreeCreator->realizeSyntaxRoot(rawNode, *SF));
+    syntaxRoot.emplace(*spActions->realizeSyntaxRoot(rawNode, *SF));
   }
 
   Optional<ArrayRef<Token>> tokensRef;
