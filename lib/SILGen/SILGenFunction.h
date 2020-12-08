@@ -835,6 +835,27 @@ public:
   void mergeCleanupBlocks();
 
   //===--------------------------------------------------------------------===//
+  // Concurrency
+  //===--------------------------------------------------------------------===//
+
+  /// Generates code into the given SGF that obtains the callee function's 
+  /// executor, if the function is actor-isolated.
+  /// @returns a SILValue representing the executor, if an executor exists.
+  static Optional<SILValue> EmitLoadActorExecutorForCallee(
+                                                  SILGenFunction *SGF, 
+                                                  ValueDecl *calleeVD,
+                                                  ArrayRef<ManagedValue> args);
+
+  /// Generates code to obtain the executor given the actor's decl.
+  /// @returns a SILValue representing the executor.
+  SILValue emitLoadActorExecutor(VarDecl *actorDecl);
+
+  /// Generates the code to obtain the executor for the shared instance 
+  /// of the \p globalActor based on the type.
+  /// @returns a SILValue representing the executor.
+  SILValue emitLoadGlobalActorExecutor(Type globalActor);
+
+  //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
 
@@ -851,10 +872,6 @@ public:
   uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
                       Type resultType, DeclContext *DC,
                       bool throws, SourceLoc throwsLoc);
-
-  /// Initializes 'actor' with the loaded shared instance of the \p globalActor
-  /// type.
-  void loadGlobalActor(Type globalActor);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1544,7 +1561,8 @@ public:
                    SILLocation loc, ManagedValue fn, SubstitutionMap subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
-                   SGFContext evalContext);
+                   SGFContext evalContext, 
+                   Optional<ValueDecl *> implicitlyAsyncApply);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,

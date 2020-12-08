@@ -243,7 +243,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
                     ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                    calleeTypeInfo, ApplyOptions::None, context);
+                    calleeTypeInfo, ApplyOptions::None, context, None);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -1875,7 +1875,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forUnmanaged(fn), subs, args,
-                  calleeTypeInfo, ApplyOptions::None, context)
+                  calleeTypeInfo, ApplyOptions::None, context, None)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {
