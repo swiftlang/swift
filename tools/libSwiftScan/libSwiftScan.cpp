@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 
 using namespace swift::dependencies;
 
@@ -29,7 +30,7 @@ void swiftscan_scanner_dispose(swiftscan_scanner_t c_scanner) {
 }
 
 swiftscan_dependency_result_t
-swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
+swiftscan_scan_dependencies(swiftscan_scanner_t scanner,
                             swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
   int argc = invocation->argv->count;
@@ -46,7 +47,7 @@ swiftscan_scan_dependencies(swiftscan_scanner_t *scanner,
 }
 
 swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
+swiftscan_batch_scan_dependencies(swiftscan_scanner_t scanner,
                                   swiftscan_batch_scan_input_t *batch_input,
                                   swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
@@ -81,7 +82,7 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t *scanner,
 }
 
 swiftscan_prescan_result_t
-swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
+swiftscan_prescan_dependencies(swiftscan_scanner_t scanner,
                                swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
   int argc = invocation->argv->count;
@@ -95,6 +96,18 @@ swiftscan_prescan_dependencies(swiftscan_scanner_t *scanner,
     return nullptr;
   auto ImportSet = std::move(*PreScanResult);
   return ImportSet;
+}
+
+//=== Dependency Result Functions -----------------------------------------===//
+
+swiftscan_string_t swiftscan_dependency_result_get_main_module_name(
+    swiftscan_dependency_result_t result) {
+  return result->main_module_name;
+}
+
+swiftscan_dependency_set_t *swiftscan_dependency_result_get_module_set(
+    swiftscan_dependency_result_t result) {
+  return result->module_set;
 }
 
 //=== Module Dependency Info query APIs -----------------------------------===//

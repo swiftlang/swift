@@ -160,7 +160,7 @@ swiftscan_swift_binary_detail_get_module_doc_path(
 
 SWIFTSCAN_PUBLIC swiftscan_string_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
-    swiftscan_module_details_t *details);
+    swiftscan_module_details_t details);
 
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 

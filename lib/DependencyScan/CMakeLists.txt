@@ -1,20 +1,13 @@
-set_swift_llvm_is_available()
-add_swift_host_library(SwiftScan STATIC
-  DependencyScanImpl.cpp
+#set_swift_llvm_is_available()
+
+add_swift_host_library(swiftDependencyScan STATIC
   DependencyScanningTool.cpp
   ScanDependencies.cpp
-  DSStringImpl.cpp
-  c-include-check.c)
+  DSString.cpp)
 
-add_dependencies(SwiftScan
-  swift-syntax-generated-headers
-  SwiftOptions)
-
-target_link_libraries(SwiftScan INTERFACE
-  clangAPINotes
+target_link_libraries(swiftDependencyScan INTERFACE
   clangBasic)
 
-target_link_libraries(SwiftScan PRIVATE
+target_link_libraries(swiftDependencyScan PRIVATE
     swiftClangImporter
-    swiftDemangling
     swiftFrontend)

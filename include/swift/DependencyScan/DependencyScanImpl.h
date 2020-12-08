@@ -17,7 +17,12 @@
 #define SWIFT_C_DEPENDENCY_SCAN_IMPL_H
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "swift/DependencyScan/DependencyScanningTool.h"
+
+namespace swift {
+namespace dependencies {
+class DependencyScanningTool;
+}
+}
 
 struct swiftscan_dependency_result_s {
   /// The name of the main module for this dependency graph (root node)
