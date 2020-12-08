@@ -38,3 +38,17 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @_silgen_name("swift_defaultActor_enqueue")
 public func _defaultActorEnqueue(partialTask: PartialAsyncTask,
                                  actor: AnyObject)
+
+/// A singleton actor whose executor is equivalent to 
+/// \c DispatchQueue.main, which is the main dispatch queue.
+@globalActor public final class MainActor {
+  public static let shared = _Impl()
+  
+  public actor class _Impl {
+    @actorIndependent
+    public func enqueue(partialTask: PartialAsyncTask) {
+      // TODO: implement this.
+      _ = (nil as String?)! + "MainActor is not implemented yet."
+    }
+  }
+}
