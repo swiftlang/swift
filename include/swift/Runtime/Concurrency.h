@@ -22,6 +22,8 @@
 namespace swift {
 class DefaultActor;
 
+struct SwiftError;
+
 struct AsyncTaskAndContext {
   AsyncTask *Task;
   AsyncContext *InitialContext;
@@ -269,6 +271,24 @@ void swift_defaultActor_destroy(DefaultActor *actor);
 /// execution.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
+
+/// Resume a task from its continuation, given a normal result value.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_resume(/* +1 */ OpaqueValue *result,
+                               void *continuation,
+                               const Metadata *resumeType);
+
+/// Resume a task from its throwing continuation, given a normal result value.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
+                                       void *continuation,
+                                       const Metadata *resumeType);
+
+/// Resume a task from its throwing continuation by throwing an error.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
+                                                void *continuation,
+                                                const Metadata *resumeType);
 
 }
 
