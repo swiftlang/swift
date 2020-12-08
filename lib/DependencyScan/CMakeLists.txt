@@ -3,7 +3,7 @@
 add_swift_host_library(swiftDependencyScan STATIC
   DependencyScanningTool.cpp
   ScanDependencies.cpp
-  DSString.cpp)
+  StringUtils.cpp)
 
 target_link_libraries(swiftDependencyScan INTERFACE
   clangBasic)

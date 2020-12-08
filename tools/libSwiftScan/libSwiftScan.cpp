@@ -19,6 +19,28 @@
 
 using namespace swift::dependencies;
 
+//=== Private String Functions --------------------------------------------===//
+
+/// Free the given string.
+void swiftscan_string_dispose(swiftscan_string_ref_t string) {
+  if (string.data)
+    free(const_cast<void *>(string.data));
+}
+
+/// Free the given string set.
+void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
+  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
+    swiftscan_string_dispose(set->strings[SI]);
+  delete[] set->strings;
+  delete set;
+}
+
+//=== Public C-API String Functions ---------------------------------------===//
+
+const char *swiftscan_get_C_string(swiftscan_string_ref_t string) {
+  return static_cast<const char *>(string.data);
+}
+
 //=== Scanner Functions ---------------------------------------------------===//
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
@@ -100,7 +122,7 @@ swiftscan_prescan_dependencies(swiftscan_scanner_t scanner,
 
 //=== Dependency Result Functions -----------------------------------------===//
 
-swiftscan_string_t swiftscan_dependency_result_get_main_module_name(
+swiftscan_string_ref_t swiftscan_dependency_result_get_main_module_name(
     swiftscan_dependency_result_t result) {
   return result->main_module_name;
 }
@@ -112,12 +134,12 @@ swiftscan_dependency_set_t *swiftscan_dependency_result_get_module_set(
 
 //=== Module Dependency Info query APIs -----------------------------------===//
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_module_info_get_module_name(swiftscan_dependency_info_t info) {
   return info->module_name;
 }
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_module_info_get_module_path(swiftscan_dependency_info_t info) {
   return info->module_path;
 }
@@ -144,7 +166,7 @@ swiftscan_module_detail_get_kind(swiftscan_module_details_t details) {
   return details->kind;
 }
 
-swiftscan_string_t swiftscan_swift_textual_detail_get_module_interface_path(
+swiftscan_string_ref_t swiftscan_swift_textual_detail_get_module_interface_path(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.module_interface_path;
 }
@@ -155,7 +177,7 @@ swiftscan_swift_textual_detail_get_compiled_module_candidates(
   return details->swift_textual_details.compiled_module_candidates;
 }
 
-swiftscan_string_t swiftscan_swift_textual_detail_get_bridging_header_path(
+swiftscan_string_ref_t swiftscan_swift_textual_detail_get_bridging_header_path(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.bridging_header_path;
 }
@@ -182,7 +204,7 @@ swiftscan_string_set_t *swiftscan_swift_textual_detail_get_extra_pcm_args(
   return details->swift_textual_details.extra_pcm_args;
 }
 
-swiftscan_string_t swiftscan_swift_textual_detail_get_context_hash(
+swiftscan_string_ref_t swiftscan_swift_textual_detail_get_context_hash(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.context_hash;
 }
@@ -194,34 +216,36 @@ bool swiftscan_swift_textual_detail_get_is_framework(
 
 //=== Swift Binary Module Details query APIs ------------------------------===//
 
-swiftscan_string_t swiftscan_swift_binary_detail_get_compiled_module_path(
+swiftscan_string_ref_t swiftscan_swift_binary_detail_get_compiled_module_path(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.compiled_module_path;
 }
 
-swiftscan_string_t swiftscan_swift_binary_detail_get_module_doc_path(
+swiftscan_string_ref_t swiftscan_swift_binary_detail_get_module_doc_path(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.module_doc_path;
 }
 
-swiftscan_string_t swiftscan_swift_binary_detail_get_module_source_info_path(
+swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.module_source_info_path;
 }
 
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
-swiftscan_string_t swiftscan_swift_placeholder_detail_get_compiled_module_path(
+swiftscan_string_ref_t
+swiftscan_swift_placeholder_detail_get_compiled_module_path(
     swiftscan_module_details_t details) {
   return details->swift_placeholder_details.module_source_info_path;
 }
 
-swiftscan_string_t swiftscan_swift_placeholder_detail_get_module_doc_path(
+swiftscan_string_ref_t swiftscan_swift_placeholder_detail_get_module_doc_path(
     swiftscan_module_details_t details) {
   return details->swift_placeholder_details.module_source_info_path;
 }
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_module_source_info_path(
     swiftscan_module_details_t details) {
   return details->swift_placeholder_details.module_source_info_path;
@@ -229,12 +253,12 @@ swiftscan_swift_placeholder_detail_get_module_source_info_path(
 
 //=== Clang Module Details query APIs -------------------------------------===//
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_clang_detail_get_module_map_path(swiftscan_module_details_t details) {
   return details->clang_details.module_map_path;
 }
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details) {
   return details->clang_details.context_hash;
 }
@@ -246,12 +270,12 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
 
 //=== Batch Scan Entry Functions ------------------------------------------===//
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry) {
   return entry->module_name;
 }
 
-swiftscan_string_t
+swiftscan_string_ref_t
 swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry) {
   return entry->arguments;
 }
@@ -276,7 +300,7 @@ swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
 
 void swiftscan_scan_invocation_set_working_directory(
     swiftscan_scan_invocation_t invocation,
-    swiftscan_string_t working_directory) {
+    swiftscan_string_ref_t working_directory) {
   invocation->working_directory = working_directory;
 }
 
@@ -286,7 +310,7 @@ swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
   invocation->argv = argv;
 }
 
-swiftscan_string_t swiftscan_scan_invocation_get_working_directory(
+swiftscan_string_ref_t swiftscan_scan_invocation_get_working_directory(
     swiftscan_scan_invocation_t invocation) {
   return invocation->working_directory;
 }

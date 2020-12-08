@@ -22,11 +22,11 @@ namespace swift {
 namespace dependencies {
 class DependencyScanningTool;
 }
-}
+} // namespace swift
 
 struct swiftscan_dependency_result_s {
   /// The name of the main module for this dependency graph (root node)
-  swiftscan_string_t main_module_name;
+  swiftscan_string_ref_t main_module_name;
 
   /// The complete list of modules discovered
   swiftscan_dependency_set_t *module_set;
@@ -41,10 +41,10 @@ struct swiftscan_dependency_info_s {
   /// "swiftBinary"
   /// "swiftPlaceholder"
   /// "clang""
-  swiftscan_string_t module_name;
+  swiftscan_string_ref_t module_name;
 
   /// The path for the module.
-  swiftscan_string_t module_path;
+  swiftscan_string_ref_t module_path;
 
   /// The source files used to build this module.
   swiftscan_string_set_t *source_files;
@@ -64,13 +64,13 @@ struct swiftscan_dependency_info_s {
 /// header.
 typedef struct {
   /// The module interface from which this module was built, if any.
-  swiftscan_string_t module_interface_path;
+  swiftscan_string_ref_t module_interface_path;
 
   /// The paths of potentially ready-to-use compiled modules for the interface.
   swiftscan_string_set_t *compiled_module_candidates;
 
   /// The bridging header, if any.
-  swiftscan_string_t bridging_header_path;
+  swiftscan_string_ref_t bridging_header_path;
 
   /// The source files referenced by the bridging header.
   swiftscan_string_set_t *bridging_source_files;
@@ -87,7 +87,7 @@ typedef struct {
   swiftscan_string_set_t *extra_pcm_args;
 
   /// The hash value that will be used for the generated module
-  swiftscan_string_t context_hash;
+  swiftscan_string_ref_t context_hash;
 
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
@@ -96,35 +96,35 @@ typedef struct {
 /// Swift modules with only a binary module file.
 typedef struct {
   /// The path to the pre-compiled binary module
-  swiftscan_string_t compiled_module_path;
+  swiftscan_string_ref_t compiled_module_path;
 
   /// The path to the .swiftModuleDoc file.
-  swiftscan_string_t module_doc_path;
+  swiftscan_string_ref_t module_doc_path;
 
   /// The path to the .swiftSourceInfo file.
-  swiftscan_string_t module_source_info_path;
+  swiftscan_string_ref_t module_source_info_path;
 } swiftscan_swift_binary_details_t;
 
 /// Swift placeholder modules carry additional details that specify their
 /// module doc path and source info paths.
 typedef struct {
   /// The path to the pre-compiled binary module
-  swiftscan_string_t compiled_module_path;
+  swiftscan_string_ref_t compiled_module_path;
 
   /// The path to the .swiftModuleDoc file.
-  swiftscan_string_t module_doc_path;
+  swiftscan_string_ref_t module_doc_path;
 
   /// The path to the .swiftSourceInfo file.
-  swiftscan_string_t module_source_info_path;
+  swiftscan_string_ref_t module_source_info_path;
 } swiftscan_swift_placeholder_details_t;
 
 /// Clang modules are built from a module map file.
 typedef struct {
   /// The path to the module map used to build this module.
-  swiftscan_string_t module_map_path;
+  swiftscan_string_ref_t module_map_path;
 
   /// clang-generated context hash
-  swiftscan_string_t context_hash;
+  swiftscan_string_ref_t context_hash;
 
   /// Options to the compile command required to build this clang modulemap
   swiftscan_string_set_t *command_line;
@@ -138,11 +138,11 @@ struct swiftscan_module_details_s {
     swiftscan_swift_placeholder_details_t swift_placeholder_details;
     swiftscan_clang_details_t clang_details;
   };
-} ;
+};
 
 struct swiftscan_batch_scan_entry_s {
-  swiftscan_string_t module_name;
-  swiftscan_string_t arguments;
+  swiftscan_string_ref_t module_name;
+  swiftscan_string_ref_t arguments;
   bool is_swift;
 };
 
@@ -152,7 +152,7 @@ struct swiftscan_prescan_result_s {
 };
 
 struct swiftscan_scan_invocation_s {
-  swiftscan_string_t working_directory;
+  swiftscan_string_ref_t working_directory;
   swiftscan_string_set_t *argv;
 };
 

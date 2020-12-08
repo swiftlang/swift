@@ -23,8 +23,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/DependencyScan/DSStringImpl.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/StringUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -315,10 +315,10 @@ void writeJSONValue(llvm::raw_ostream &out, StringRef value,
   out << "\"";
 }
 
-void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_t value,
+void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_ref_t value,
                     unsigned indentLevel) {
   out << "\"";
-  out << swiftscan_get_C_string(value);
+  out << get_C_string(value);
   out << "\"";
 }
 
@@ -342,14 +342,14 @@ void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_set_t *value_set,
 }
 
 void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
-                                   swiftscan_string_t value,
+                                   swiftscan_string_ref_t value,
                                    unsigned indentLevel) {
   out << "{\n";
   static const std::string textualPrefix("swiftTextual");
   static const std::string binaryPrefix("swiftBinary");
   static const std::string placeholderPrefix("swiftPlaceholder");
   static const std::string clangPrefix("clang");
-  std::string valueStr = swiftscan_get_C_string(value);
+  std::string valueStr = get_C_string(value);
   std::string moduleKind;
   std::string moduleName;
   if (!valueStr.compare(0, textualPrefix.size(), textualPrefix)) {
@@ -516,15 +516,13 @@ static void writeJSON(llvm::raw_ostream &out,
 
     std::string modulePath;
     std::string moduleKindAndName =
-        std::string(swiftscan_get_C_string(moduleInfo.module_name));
+        std::string(get_C_string(moduleInfo.module_name));
     std::string moduleName =
         moduleKindAndName.substr(moduleKindAndName.find(":") + 1);
     if (swiftPlaceholderDeps)
-      modulePath =
-          swiftscan_get_C_string(swiftPlaceholderDeps->compiled_module_path);
+      modulePath = get_C_string(swiftPlaceholderDeps->compiled_module_path);
     else if (swiftBinaryDeps)
-      modulePath =
-          swiftscan_get_C_string(swiftBinaryDeps->compiled_module_path);
+      modulePath = get_C_string(swiftBinaryDeps->compiled_module_path);
     else
       modulePath = moduleName + modulePathSuffix;
 
@@ -551,7 +549,7 @@ static void writeJSON(llvm::raw_ostream &out,
       /// Swift interface file, if there is one. The main module, for
       /// example, will not have an interface file.
       std::string moduleInterfacePath =
-          swiftscan_get_C_string(swiftTextualDeps->module_interface_path);
+          get_C_string(swiftTextualDeps->module_interface_path);
       if (!moduleInterfacePath.empty()) {
         writeJSONSingleField(out, "moduleInterfacePath", moduleInterfacePath, 5,
                              /*trailingComma=*/true);
@@ -562,8 +560,8 @@ static void writeJSON(llvm::raw_ostream &out,
         out << "\"commandLine\": [\n";
         for (int i = 0, count = swiftTextualDeps->command_line->count;
              i < count; ++i) {
-          const auto &arg = swiftscan_get_C_string(
-              swiftTextualDeps->command_line->strings[i]);
+          const auto &arg =
+              get_C_string(swiftTextualDeps->command_line->strings[i]);
           out.indent(6 * 2);
           out << "\"" << arg << "\"";
           if (i != count - 1)
@@ -577,7 +575,7 @@ static void writeJSON(llvm::raw_ostream &out,
         for (int i = 0,
                  count = swiftTextualDeps->compiled_module_candidates->count;
              i < count; ++i) {
-          const auto &candidate = swiftscan_get_C_string(
+          const auto &candidate = get_C_string(
               swiftTextualDeps->compiled_module_candidates->strings[i]);
           out.indent(6 * 2);
           out << "\"" << candidate << "\"";
@@ -591,8 +589,7 @@ static void writeJSON(llvm::raw_ostream &out,
 
       bool hasBridgingHeaderPath =
           swiftTextualDeps->bridging_header_path.data &&
-          swiftscan_get_C_string(swiftTextualDeps->bridging_header_path)[0] !=
-              '\0';
+          get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0';
       bool commaAfterFramework =
           swiftTextualDeps->extra_pcm_args->count != 0 || hasBridgingHeaderPath;
 
@@ -604,8 +601,8 @@ static void writeJSON(llvm::raw_ostream &out,
         out << "\"extraPcmArgs\": [\n";
         for (int i = 0, count = swiftTextualDeps->extra_pcm_args->count;
              i < count; ++i) {
-          const auto &arg = swiftscan_get_C_string(
-              swiftTextualDeps->extra_pcm_args->strings[i]);
+          const auto &arg =
+              get_C_string(swiftTextualDeps->extra_pcm_args->strings[i]);
           out.indent(6 * 2);
           out << "\"" << arg << "\"";
           if (i != count - 1)
@@ -636,8 +633,7 @@ static void writeJSON(llvm::raw_ostream &out,
 
       // Module doc file
       if (swiftPlaceholderDeps->module_doc_path.data &&
-          swiftscan_get_C_string(swiftPlaceholderDeps->module_doc_path)[0] !=
-              '\0')
+          get_C_string(swiftPlaceholderDeps->module_doc_path)[0] != '\0')
         writeJSONSingleField(out, "moduleDocPath",
                              swiftPlaceholderDeps->module_doc_path,
                              /*indentLevel=*/5,
@@ -645,8 +641,8 @@ static void writeJSON(llvm::raw_ostream &out,
 
       // Module Source Info file
       if (swiftPlaceholderDeps->module_source_info_path.data &&
-          swiftscan_get_C_string(
-              swiftPlaceholderDeps->module_source_info_path)[0] != '\0')
+          get_C_string(swiftPlaceholderDeps->module_source_info_path)[0] !=
+              '\0')
         writeJSONSingleField(out, "moduleSourceInfoPath",
                              swiftPlaceholderDeps->module_source_info_path,
                              /*indentLevel=*/5,
@@ -655,8 +651,7 @@ static void writeJSON(llvm::raw_ostream &out,
       out << "\"swiftPrebuiltExternal\": {\n";
       bool hasCompiledModulePath =
           swiftBinaryDeps->compiled_module_path.data &&
-          swiftscan_get_C_string(swiftBinaryDeps->compiled_module_path)[0] !=
-              '\0';
+          get_C_string(swiftBinaryDeps->compiled_module_path)[0] != '\0';
       assert(hasCompiledModulePath &&
              "Expected .swiftmodule for a Binary Swift Module Dependency.");
 
@@ -666,15 +661,14 @@ static void writeJSON(llvm::raw_ostream &out,
                            /*trailingComma=*/true);
       // Module doc file
       if (swiftBinaryDeps->module_doc_path.data &&
-          swiftscan_get_C_string(swiftBinaryDeps->module_doc_path)[0] != '\0')
+          get_C_string(swiftBinaryDeps->module_doc_path)[0] != '\0')
         writeJSONSingleField(out, "moduleDocPath",
                              swiftBinaryDeps->module_doc_path,
                              /*indentLevel=*/5,
                              /*trailingComma=*/true);
       // Module Source Info file
       if (swiftBinaryDeps->module_source_info_path.data &&
-          swiftscan_get_C_string(swiftBinaryDeps->module_source_info_path)[0] !=
-              '\0')
+          get_C_string(swiftBinaryDeps->module_source_info_path)[0] != '\0')
         writeJSONSingleField(out, "moduleSourceInfoPath",
                              swiftBinaryDeps->module_source_info_path,
                              /*indentLevel=*/5,
@@ -775,16 +769,16 @@ generateFullDependencyGraph(CompilerInstance &instance,
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
       swiftscan_module_details_s *details = new swiftscan_module_details_s;
       if (swiftTextualDeps) {
-        swiftscan_string_t moduleInterfacePath =
+        swiftscan_string_ref_t moduleInterfacePath =
             swiftTextualDeps->swiftInterfaceFile.hasValue()
                 ? create_dup(
                       swiftTextualDeps->swiftInterfaceFile.getValue().c_str())
-                : create_empty();
-        swiftscan_string_t bridgingHeaderPath =
+                : create_null();
+        swiftscan_string_ref_t bridgingHeaderPath =
             swiftTextualDeps->bridgingHeaderFile.hasValue()
                 ? create_dup(
                       swiftTextualDeps->bridgingHeaderFile.getValue().c_str())
-                : create_empty();
+                : create_null();
 
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
         details->swift_textual_details = {

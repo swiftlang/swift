@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/Frontend/Frontend.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"

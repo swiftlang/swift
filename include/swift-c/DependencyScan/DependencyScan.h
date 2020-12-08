@@ -18,7 +18,6 @@
 #ifndef SWIFT_C_DEPENDENCY_SCAN_H
 #define SWIFT_C_DEPENDENCY_SCAN_H
 
-#include "DSString.h"
 #include "DependencyScanMacros.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -33,6 +32,22 @@
 SWIFTSCAN_BEGIN_DECLS
 
 //=== Public Scanner Data Types -------------------------------------------===//
+
+/**
+ * A character string used to pass around dependency scan result metadata.
+ * Lifetime of the string is strictly tied to the object whose field it represents.
+ * When the owning object is released, string memory is freed. Use \c
+ * swiftscan_get_C_string() to retrieve the string data.
+ */
+typedef struct {
+  const void *data;
+  unsigned length;
+} swiftscan_string_ref_t;
+
+typedef struct {
+  swiftscan_string_ref_t *strings;
+  unsigned count;
+} swiftscan_string_set_t;
 
 typedef enum {
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL = 0,
@@ -80,9 +95,15 @@ typedef struct {
 /// scan (command line arguments, working directory, etc.)
 typedef struct swiftscan_scan_invocation_s *swiftscan_scan_invocation_t;
 
+//=== String Functions ----------------------------------------------------===//
+
+/// Retrieve the character data associated with the given string.
+SWIFTSCAN_PUBLIC const char *
+swiftscan_get_C_string(swiftscan_string_ref_t string);
+
 //=== Dependency Result Functions -----------------------------------------===//
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_dependency_result_get_main_module_name(
     swiftscan_dependency_result_t result);
 
@@ -92,10 +113,10 @@ swiftscan_dependency_result_get_module_set(
 
 //=== Dependency Module Info Functions ------------------------------------===//
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_module_info_get_module_name(swiftscan_dependency_info_t info);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_module_info_get_module_path(swiftscan_dependency_info_t info);
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
@@ -113,7 +134,7 @@ SWIFTSCAN_PUBLIC swiftscan_dependency_info_kind_t
 swiftscan_module_detail_get_kind(swiftscan_module_details_t details);
 
 //=== Swift Textual Module Details query APIs -----------------------------===//
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_module_interface_path(
     swiftscan_module_details_t details);
 
@@ -121,7 +142,7 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_textual_detail_get_compiled_module_candidates(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_bridging_header_path(
     swiftscan_module_details_t details);
 
@@ -141,7 +162,7 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_textual_detail_get_extra_pcm_args(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_context_hash(
     swiftscan_module_details_t details);
 
@@ -150,38 +171,38 @@ SWIFTSCAN_PUBLIC bool swiftscan_swift_textual_detail_get_is_framework(
 
 //=== Swift Binary Module Details query APIs ------------------------------===//
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_compiled_module_path(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_doc_path(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details);
 
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_compiled_module_path(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_module_doc_path(
     swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_module_source_info_path(
     swiftscan_module_details_t details);
 
 //=== Clang Module Details query APIs -------------------------------------===//
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_clang_detail_get_module_map_path(swiftscan_module_details_t details);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
@@ -189,10 +210,10 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details);
 
 //=== Batch Scan Entry Functions ------------------------------------------===//
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry);
 
 SWIFTSCAN_PUBLIC bool
@@ -209,13 +230,13 @@ SWIFTSCAN_PUBLIC swiftscan_scan_invocation_t swiftscan_scan_invocation_create();
 
 SWIFTSCAN_PUBLIC void swiftscan_scan_invocation_set_working_directory(
     swiftscan_scan_invocation_t invocation,
-    swiftscan_string_t working_directory);
+    swiftscan_string_ref_t working_directory);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
                                    swiftscan_string_set_t *argv);
 
-SWIFTSCAN_PUBLIC swiftscan_string_t
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_scan_invocation_get_working_directory(
     swiftscan_scan_invocation_t invocation);
 

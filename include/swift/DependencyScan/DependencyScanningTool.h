@@ -15,8 +15,8 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/AST/ModuleDependencies.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/DependencyScan/ScanDependencies.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"

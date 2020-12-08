@@ -49,5 +49,3 @@ swiftscan_scan_dependencies
 swiftscan_batch_scan_dependencies
 swiftscan_prescan_dependencies
 swiftscan_get_C_string
-swiftscan_string_dispose
-swiftscan_string_set_dispose
