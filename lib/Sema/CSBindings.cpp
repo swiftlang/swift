@@ -33,7 +33,7 @@ bool ConstraintSystem::PotentialBinding::isViableForJoin() const {
          !isDefaultableBinding();
 }
 
-bool ConstraintSystem::PotentialBindings::isFullyBound() const {
+bool ConstraintSystem::PotentialBindings::isDelayed() const {
   if (!DelayedBy.empty())
     return true;
 
@@ -788,7 +788,7 @@ bool ConstraintSystem::PotentialBindings::isViable(
 
 bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     Constraint *disjunction) const {
-  if (isHole() || isFullyBound())
+  if (isHole() || isDelayed())
     return false;
 
   // If this bindings are for a closure and there are no holes,
