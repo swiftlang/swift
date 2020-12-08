@@ -1,0 +1,28 @@
+module Classes {
+  header "classes.h"
+}
+
+module ClassesSecondHeader {
+  // TODO: we shouldn't have to include both of these, and the decls defined in
+  // these headers should be added to the correct module: SR-14214.
+  header "classes.h"
+  header "classes-second-header.h"
+}
+
+module FreeFunctions {
+  header "free-functions.h"
+}
+
+module FreeFunctionsSecondHeader {
+  header "free-functions.h"
+  header "free-functions-second-header.h"
+}
+
+module Templates {
+  header "templates.h"
+}
+
+module TemplatesSecondHeader {
+  header "templates.h"
+  header "templates-second-header.h"
+}
