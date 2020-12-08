@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/StringExtras.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
@@ -53,11 +54,12 @@ static Identifier getVarNameForCoding(VarDecl *var) {
   return var->getName();
 }
 
-/// Combine two identifiers separated by an '_'
-static Identifier combineIdentifiers(const ASTContext &C, Identifier first,
-                                     Identifier second) {
-  std::string enumIdentifierName = first.str().str() + "_" + second.str().str();
-  return C.getIdentifier(StringRef(enumIdentifierName));
+/// Compute the Identifier for the CodingKey of an enum case
+static Identifier caseCodingKeyIdentifier(const ASTContext &C, EnumElementDecl* elt) {
+  llvm::SmallString<16> scratch;
+  camel_case::appendSentenceCase(scratch, elt->getBaseIdentifier().str());
+  llvm::StringRef result = camel_case::appendSentenceCase(scratch, C.Id_CodingKeys.str());
+  return C.getIdentifier(result);
 }
 
 // Create CodingKeys in the parent type always, because both
@@ -386,6 +388,16 @@ static EnumElementDecl *lookupEnumCase(ASTContext &C, NominalTypeDecl *target,
 
   return dyn_cast<EnumElementDecl>(elementDecl);
 }
+static NominalTypeDecl *lookupErrorContext(ASTContext &C, NominalTypeDecl *errorDecl) {
+  auto elementDecls = errorDecl->lookupDirect(C.Id_Context);
+  if (elementDecls.empty())
+    return nullptr;
+
+  auto *decl = elementDecls.front();
+
+  return dyn_cast<NominalTypeDecl>(decl);
+}
+
 static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
                                           EnumDecl *target) {
   auto &C = derived.Context;
@@ -454,9 +466,14 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
     codingKeysEnum = enumDecl;
   }
 
+  llvm::SmallSetVector<Identifier, 4> caseNames;
   for (auto *elementDecl : target->getAllElements()) {
-    auto enumIdentifier = combineIdentifiers(C, C.Id_CodingKeys,
-                                             elementDecl->getBaseIdentifier());
+    if (!caseNames.insert(elementDecl->getBaseIdentifier())) {
+      elementDecl->diagnose(diag::codable_enum_duplicate_case_name_here,
+                        derived.getProtocolType(), target->getDeclaredType(), elementDecl->getBaseIdentifier());
+      return false;
+    }
+    auto enumIdentifier = caseCodingKeyIdentifier(C, elementDecl);
 
     // Only derive if this case exist in the CodingKeys enum
     auto *codingKeyCase =
@@ -664,6 +681,69 @@ static CallExpr *createNestedUnkeyedContainerForKeyCall(ASTContext &C,
   return CallExpr::createImplicit(C, unboundCall, {keyExpr}, {C.Id_forKey});
 }
 
+static ThrowStmt *createThrowDecodingErrorTypeMismatchStmt(ASTContext &C, DeclContext *DC,
+        NominalTypeDecl *targetDecl, Expr *containerExpr, Expr *debugMessage) {
+  auto *errorDecl = C.getDecodingErrorDecl();
+  auto *contextDecl = lookupErrorContext(C, errorDecl);
+  assert(contextDecl && "Missing Context decl.");
+
+  auto *contextTypeExpr = TypeExpr::createImplicit(contextDecl->getDeclaredType(), C);
+
+  // Context.init(codingPath:, debugDescription:)
+  auto *contextInitCall = UnresolvedDotExpr::createImplicit(
+          C, contextTypeExpr, DeclBaseName::createConstructor(),
+          {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
+
+  auto *codingPathExpr = UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_codingPath);
+
+  auto *contextInitCallExpr = CallExpr::createImplicit(C, contextInitCall,
+                                                       {codingPathExpr, debugMessage, new (C) NilLiteralExpr(SourceLoc(), /* Implicit */ true)},
+                                                       {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
+
+  auto *decodingErrorTypeExpr = TypeExpr::createImplicit(errorDecl->getDeclaredType(), C);
+  auto *decodingErrorCall = UnresolvedDotExpr::createImplicit(C, decodingErrorTypeExpr,
+                                                              C.Id_typeMismatch,
+                                                              {Identifier(), Identifier()});
+  auto *targetType = TypeExpr::createImplicit(
+          DC->mapTypeIntoContext(targetDecl->getDeclaredInterfaceType()), C);
+  auto *targetTypeExpr = new (C) DotSelfExpr(targetType, SourceLoc(), SourceLoc());
+
+  auto *decodingErrorCallExpr = CallExpr::createImplicit(C, decodingErrorCall,
+                                                         {targetTypeExpr, contextInitCallExpr},
+                                                         {Identifier(), Identifier()});
+  return new (C) ThrowStmt(SourceLoc(), decodingErrorCallExpr);
+}
+
+static ThrowStmt *createThrowEncodingErrorInvalidValueStmt(ASTContext &C, DeclContext *DC,
+                                                           Expr *valueExpr, Expr *containerExpr, Expr *debugMessage) {
+  auto *errorDecl = C.getEncodingErrorDecl();
+  auto *contextDecl = lookupErrorContext(C, errorDecl);
+  assert(contextDecl && "Missing Context decl.");
+
+  auto *contextTypeExpr = TypeExpr::createImplicit(contextDecl->getDeclaredType(), C);
+
+  // Context.init(codingPath:, debugDescription:)
+  auto *contextInitCall = UnresolvedDotExpr::createImplicit(
+          C, contextTypeExpr, DeclBaseName::createConstructor(),
+          {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
+
+  auto *codingPathExpr = UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_codingPath);
+
+  auto *contextInitCallExpr = CallExpr::createImplicit(C, contextInitCall,
+                                                       {codingPathExpr, debugMessage, new (C) NilLiteralExpr(SourceLoc(), /* Implicit */ true)},
+                                                       {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
+
+  auto *decodingErrorTypeExpr = TypeExpr::createImplicit(errorDecl->getDeclaredType(), C);
+  auto *decodingErrorCall = UnresolvedDotExpr::createImplicit(C, decodingErrorTypeExpr,
+                                                              C.Id_invalidValue,
+                                                              {Identifier(), Identifier()});
+
+  auto *decodingErrorCallExpr = CallExpr::createImplicit(C, decodingErrorCall,
+                                                         {valueExpr, contextInitCallExpr},
+                                                         {Identifier(), Identifier()});
+  return new (C) ThrowStmt(SourceLoc(), decodingErrorCallExpr);
+}
+
 /// Looks up the property corresponding to the indicated coding key.
 ///
 /// \param conformanceDC The DeclContext we're generating code within.
@@ -832,50 +912,93 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
     if (!codingKeyCase) {
       // This case should not be encodable, so throw an error if an attempt is
       // made to encode it
-      // FIXME: throw EncodingError
-      continue;
+      llvm::SmallString<128> buffer;
+      buffer.append("Case `");
+      buffer.append(elt->getBaseIdentifier().str());
+      buffer.append("` cannot be decoded because it is not defined in CodingKeys.");
+      auto *debugMessage = new (C) StringLiteralExpr(C.AllocateCopy(buffer.str()), SourceRange(), /* Implicit */ true);
+      auto *selfRefExpr = new (C) DeclRefExpr(ConcreteDeclRef(selfRef), DeclNameLoc(), /* Implicit */ true);
+      auto *throwStmt = createThrowEncodingErrorInvalidValueStmt(C, funcDC, selfRefExpr, containerExpr, debugMessage);
+      caseStatements.push_back(throwStmt);
     } else if (elt->hasAnyUnnamedParameters()) {
-      auto *nestedContainerDecl =
-          createUnkeyedContainer(C, funcDC, C.getUnkeyedEncodingContainerDecl(),
-                                 VarDecl::Introducer::Var,
-                                 C.getIdentifier(StringRef("nestedContainer")));
+      if (payloadVars.size() == 1) {
+        for (auto *payloadVar : payloadVars) {
+          auto payloadVarRef = new(C) DeclRefExpr(payloadVar, DeclNameLoc(),
+                  /*implicit*/ true);
 
-      auto *nestedContainerExpr = new (C)
-          DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
-                      /*Implicit=*/true, AccessSemantics::DirectToStorage);
-      auto *nestedContainerCall = createNestedUnkeyedContainerForKeyCall(
-          C, funcDC, containerExpr, nestedContainerDecl->getInterfaceType(),
-          codingKeyCase);
+          // encode(_:, forKey:)
+          auto *encodeCall = UnresolvedDotExpr::createImplicit(
+                  C, containerExpr, C.Id_encode, {Identifier(), C.Id_forKey});
 
-      auto *containerPattern =
-          NamedPattern::createImplicit(C, nestedContainerDecl);
-      auto *bindingDecl = PatternBindingDecl::createImplicit(
-          C, StaticSpellingKind::None, containerPattern, nestedContainerCall,
-          funcDC);
+          // key expr
+          auto *keyTypeExpr = TypeExpr::createImplicit(
+                  funcDC->mapTypeIntoContext(codingKeysEnum->getDeclaredInterfaceType()),
+                  C);
+          auto *keyExpr = new (C) MemberRefExpr(keyTypeExpr, SourceLoc(), codingKeyCase,
+                                                DeclNameLoc(), /*Implicit=*/true);
 
-      caseStatements.push_back(bindingDecl);
-      caseStatements.push_back(nestedContainerDecl);
+          // container.encode(x, forKey: CodingKeys.bar)
+          auto *callExpr = CallExpr::createImplicit(
+                  C, encodeCall, {payloadVarRef, keyExpr}, {Identifier(), C.Id_forKey});
 
-      for (auto *payloadVar : payloadVars) {
-        auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
-                                                 /*implicit*/ true);
+          // try nestedContainer.encode(x, forKey: CodingKeys.x)
+          auto *tryExpr = new(C) TryExpr(SourceLoc(), callExpr, Type(),
+                  /*Implicit=*/true);
+          caseStatements.push_back(tryExpr);
+        }
+      } else {
+        auto *nestedContainerDecl =
+                createUnkeyedContainer(C, funcDC, C.getUnkeyedEncodingContainerDecl(),
+                                       VarDecl::Introducer::Var,
+                                       C.getIdentifier(StringRef("nestedContainer")));
 
-        // encode(_:)
-        auto *encodeCall = UnresolvedDotExpr::createImplicit(
-            C, nestedContainerExpr, C.Id_encode, {Identifier()});
+        auto *nestedContainerExpr = new(C)
+                DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
+                /*Implicit=*/true, AccessSemantics::DirectToStorage);
+        auto *nestedContainerCall = createNestedUnkeyedContainerForKeyCall(
+                C, funcDC, containerExpr, nestedContainerDecl->getInterfaceType(),
+                codingKeyCase);
 
-        // nestedContainer.encode(x)
-        auto *callExpr = CallExpr::createImplicit(
-            C, encodeCall, {payloadVarRef}, {Identifier()});
+        auto *containerPattern =
+                NamedPattern::createImplicit(C, nestedContainerDecl);
+        auto *bindingDecl = PatternBindingDecl::createImplicit(
+                C, StaticSpellingKind::None, containerPattern, nestedContainerCall,
+                funcDC);
 
-        // try nestedContainer.encode(x, forKey: CodingKeys.x)
-        auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                        /*Implicit=*/true);
-        caseStatements.push_back(tryExpr);
+        caseStatements.push_back(bindingDecl);
+        caseStatements.push_back(nestedContainerDecl);
+
+        for (auto *payloadVar : payloadVars) {
+          auto payloadVarRef = new(C) DeclRefExpr(payloadVar, DeclNameLoc(),
+                  /*implicit*/ true);
+
+          // encode(_:)
+          auto *encodeCall = UnresolvedDotExpr::createImplicit(
+                  C, nestedContainerExpr, C.Id_encode, {Identifier()});
+
+          // nestedContainer.encode(x)
+          auto *callExpr = CallExpr::createImplicit(
+                  C, encodeCall, {payloadVarRef}, {Identifier()});
+
+          // try nestedContainer.encode(x, forKey: CodingKeys.x)
+          auto *tryExpr = new(C) TryExpr(SourceLoc(), callExpr, Type(),
+                  /*Implicit=*/true);
+          caseStatements.push_back(tryExpr);
+        }
       }
+    } else if (!elt->hasAssociatedValues()) {
+      auto *encodeNilExpr = UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_encodeNil, {C.Id_forKey});
+      auto *metaTyRef = TypeExpr::createImplicit(
+              funcDC->mapTypeIntoContext(codingKeysEnum->getDeclaredInterfaceType()),
+              C);
+      auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), codingKeyCase,
+                                            DeclNameLoc(), /*Implicit=*/true);
+      auto *callExpr = CallExpr::createImplicit(C, encodeNilExpr, {keyExpr}, {C.Id_forKey});
+      auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
+              /*Implicit=*/true);
+      caseStatements.push_back(tryExpr);
     } else {
-      auto caseIdentifier =
-          combineIdentifiers(C, C.Id_CodingKeys, elt->getBaseIdentifier());
+      auto caseIdentifier = caseCodingKeyIdentifier(C, elt);
       auto *caseCodingKeys =
           lookupEvaluatedCodingKeysEnum(C, enumDecl, caseIdentifier);
 
@@ -1174,7 +1297,6 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   encodeDecl->setSynthesized();
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(targetDecl)) {
-    // TODO: differentiate between cases
     encodeDecl->setBodySynthesizer(deriveBodyEncodable_enum_encode);
   } else {
     encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
@@ -1333,79 +1455,112 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
         caseStatements.push_back(assignExpr);
       } else if (elt->hasAnyUnnamedParameters()) {
-        auto *nestedContainerDecl = createUnkeyedContainer(
-            C, funcDC, C.getUnkeyedDecodingContainerDecl(),
-            VarDecl::Introducer::Var,
-            C.getIdentifier(StringRef("nestedContainer")));
-
-        auto *nestedContainerCall = createNestedUnkeyedContainerForKeyCall(
-            C, funcDC, containerExpr, nestedContainerDecl->getInterfaceType(),
-            codingKeyCase);
-        auto *tryNestedContainerCall = new (C) TryExpr(
-            SourceLoc(), nestedContainerCall, Type(), /* Implicit */ true);
-
-        auto *containerPattern =
-            NamedPattern::createImplicit(C, nestedContainerDecl);
-        auto *bindingDecl = PatternBindingDecl::createImplicit(
-            C, StaticSpellingKind::None, containerPattern,
-            tryNestedContainerCall, funcDC);
-
-        caseStatements.push_back(bindingDecl);
-        caseStatements.push_back(nestedContainerDecl);
-
-        llvm::SmallVector<Expr *, 3> decodeCalls;
+        llvm::SmallVector < Expr * , 3 > decodeCalls;
         llvm::SmallVector<Identifier, 3> params;
-        for (auto *paramDecl : elt->getParameterList()->getArray()) {
-          Identifier identifier = getVarNameForCoding(paramDecl);
-          params.push_back(identifier);
+        if (elt->getParameterList()->size() == 1) {
+          for (auto *paramDecl : elt->getParameterList()->getArray()) {
+            Identifier identifier = getVarNameForCoding(paramDecl);
+            params.push_back(identifier);
 
-          // Type.self
-          auto *parameterTypeExpr =
-              TypeExpr::createImplicit(paramDecl->getType(), C);
-          auto *parameterMetaTypeExpr =
-              new (C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
-          auto *nestedContainerExpr = new (C)
-              DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
-                          /*Implicit=*/true, AccessSemantics::DirectToStorage);
-          // decode(_:)
-          auto *decodeCall = UnresolvedDotExpr::createImplicit(
-              C, nestedContainerExpr, C.Id_decode, {Identifier()});
+            // Type.self
+            auto *parameterTypeExpr =
+                    TypeExpr::createImplicit(paramDecl->getType(), C);
+            auto *parameterMetaTypeExpr =
+                    new(C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
+            // decode(_:)
+            auto *decodeCall = UnresolvedDotExpr::createImplicit(
+                    C, containerExpr, C.Id_decode, {Identifier(), C.Id_forKey});
 
-          // nestedContainer.decode(Type.self)
-          auto *callExpr = CallExpr::createImplicit(
-              C, decodeCall, {parameterMetaTypeExpr}, {Identifier()});
+            // key expr
+            auto *keyTypeExpr = TypeExpr::createImplicit(
+                    funcDC->mapTypeIntoContext(codingKeysEnum->getDeclaredInterfaceType()),
+                    C);
+            auto *keyExpr = new (C) MemberRefExpr(keyTypeExpr, SourceLoc(), codingKeyCase,
+                                                  DeclNameLoc(), /*Implicit=*/true);
 
-          // try nestedContainer.decode(Type.self)
-          auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                          /*Implicit=*/true);
+            // nestedContainer.decode(Type.self)
+            auto *callExpr = CallExpr::createImplicit(
+                    C, decodeCall, {parameterMetaTypeExpr, keyExpr},
+                    {Identifier(), C.Id_forKey});
 
-          decodeCalls.push_back(tryExpr);
+            // try nestedContainer.decode(Type.self)
+            auto *tryExpr = new(C) TryExpr(SourceLoc(), callExpr, Type(),
+                    /*Implicit=*/true);
+
+            decodeCalls.push_back(tryExpr);
+          }
+        } else {
+          auto *nestedContainerDecl = createUnkeyedContainer(
+                  C, funcDC, C.getUnkeyedDecodingContainerDecl(),
+                  VarDecl::Introducer::Var,
+                  C.getIdentifier(StringRef("nestedContainer")));
+
+          auto *nestedContainerCall = createNestedUnkeyedContainerForKeyCall(
+                  C, funcDC, containerExpr, nestedContainerDecl->getInterfaceType(),
+                  codingKeyCase);
+          auto *tryNestedContainerCall = new(C) TryExpr(
+                  SourceLoc(), nestedContainerCall, Type(), /* Implicit */ true);
+
+          auto *containerPattern =
+                  NamedPattern::createImplicit(C, nestedContainerDecl);
+          auto *bindingDecl = PatternBindingDecl::createImplicit(
+                  C, StaticSpellingKind::None, containerPattern,
+                  tryNestedContainerCall, funcDC);
+
+          caseStatements.push_back(bindingDecl);
+          caseStatements.push_back(nestedContainerDecl);
+
+          for (auto *paramDecl : elt->getParameterList()->getArray()) {
+            Identifier identifier = getVarNameForCoding(paramDecl);
+            params.push_back(identifier);
+
+            // Type.self
+            auto *parameterTypeExpr =
+                    TypeExpr::createImplicit(paramDecl->getType(), C);
+            auto *parameterMetaTypeExpr =
+                    new(C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
+            auto *nestedContainerExpr = new(C)
+                    DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
+                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
+            // decode(_:)
+            auto *decodeCall = UnresolvedDotExpr::createImplicit(
+                    C, nestedContainerExpr, C.Id_decode, {Identifier()});
+
+            // nestedContainer.decode(Type.self)
+            auto *callExpr = CallExpr::createImplicit(
+                    C, decodeCall, {parameterMetaTypeExpr}, {Identifier()});
+
+            // try nestedContainer.decode(Type.self)
+            auto *tryExpr = new(C) TryExpr(SourceLoc(), callExpr, Type(),
+                    /*Implicit=*/true);
+
+            decodeCalls.push_back(tryExpr);
+          }
         }
 
         auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
 
         // Foo.bar
         auto *selfTypeExpr =
-            TypeExpr::createImplicit(targetEnum->getDeclaredType(), C);
+                TypeExpr::createImplicit(targetEnum->getDeclaredType(), C);
 
         // Foo.bar(x:)
         auto *selfCaseExpr = UnresolvedDotExpr::createImplicit(
-            C, selfTypeExpr, elt->getBaseIdentifier(), C.AllocateCopy(params));
+                C, selfTypeExpr, elt->getBaseIdentifier(), C.AllocateCopy(params));
 
         // Foo.bar(x: try nestedContainer.decode(Int.self))
         auto *caseCallExpr = CallExpr::createImplicit(
-            C, selfCaseExpr, C.AllocateCopy(decodeCalls),
-            C.AllocateCopy(params));
+                C, selfCaseExpr, C.AllocateCopy(decodeCalls),
+                C.AllocateCopy(params));
 
         // self = Foo.bar(x: try nestedContainer.decode(Int.self))
         auto *assignExpr =
-            new (C) AssignExpr(selfRef, SourceLoc(), caseCallExpr,
-                               /*Implicit=*/true);
+                new(C) AssignExpr(selfRef, SourceLoc(), caseCallExpr,
+                        /*Implicit=*/true);
 
         caseStatements.push_back(assignExpr);
       } else {
-        auto caseIdentifier =
-            combineIdentifiers(C, C.Id_CodingKeys, elt->getBaseIdentifier());
+        auto caseIdentifier = caseCodingKeyIdentifier(C, elt);
         auto *caseCodingKeys =
             lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier);
 
@@ -1440,7 +1595,6 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
           // If no key is defined for this parameter, use the default value
           if (!caseCodingKey) {
-            // FIXME: Better use DefaultArgumentExpr instead?
             // This should have been verified to have a default expr in the
             // CodingKey synthesis
             assert(paramDecl->hasDefaultExpr());
@@ -1511,25 +1665,46 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                                        /*case body vardecls*/ None));
     }
 
-    auto *fatalErrorExpr =
-        new (C) DeclRefExpr(C.getFatalError(), DeclNameLoc(), true);
-    auto *errorMessage =
-        new (C) StringLiteralExpr(StringRef("foo"), SourceRange(), true);
-    auto *fatalErrorCall = CallExpr::createImplicit(
-        C, fatalErrorExpr, {errorMessage}, {Identifier()});
+    // generate:
+    //
+    //  if container.allKeys.count != 1 {
+    //    let context = DecodingError.Context(
+    //            codingPath: container.codingPath,
+    //            debugDescription: "Invalid number of keys found, expected one.")
+    //    throw DecodingError.typeMismatch(Foo.self, context)
+    //  }
+    auto *debugMessage = new (C) StringLiteralExpr(StringRef("Invalid number of keys found, expected one."), SourceRange(), /* Implicit */ true);
+    auto *throwStmt = createThrowDecodingErrorTypeMismatchStmt(C, funcDC, targetEnum, containerExpr, debugMessage);
 
-    auto labelItem = CaseLabelItem::getDefault(AnyPattern::createImplicit(C));
-    auto body =
-        BraceStmt::create(C, SourceLoc(), ASTNode(fatalErrorCall), SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body vardecls*/ None));
+    // container.allKeys
+    auto *allKeysExpr =
+            UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_allKeys);
+
+    // container.allKeys.count
+    auto *keysCountExpr = UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_count);
+
+    // container.allKeys.count == 1
+    auto *cmpFunc = C.getEqualIntDecl();
+    auto *fnType = cmpFunc->getInterfaceType()->castTo<FunctionType>();
+    auto *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
+            /*implicit*/ true,
+                                      AccessSemantics::Ordinary,
+                                      fnType);
+    auto *oneExpr = IntegerLiteralExpr::createFromUnsigned(C, 1);
+
+    auto *tupleExpr = TupleExpr::createImplicit(C, { keysCountExpr, oneExpr }, { Identifier(), Identifier() });
+
+    auto *cmpExpr = new (C) BinaryExpr(
+            cmpFuncExpr, tupleExpr, /*implicit*/ true);
+    cmpExpr->setThrows(false);
+
+    auto *guardBody = BraceStmt::create(C, SourceLoc(), { throwStmt }, SourceLoc(), /* Implicit */ true);
+
+    auto *guardStmt = new (C) GuardStmt(SourceLoc(), cmpExpr, guardBody, /* Implicit */ true, C);
+
+    statements.push_back(guardStmt);
 
     // generate: switch container.allKeys.first { }
-
-    auto *allKeysExpr =
-        UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_allKeys);
-
     auto *firstExpr =
         UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_first);
 
