@@ -55,7 +55,6 @@ public:
   Optional<syntax::SourceFileSyntax>
   realizeSyntaxRoot(OpaqueSyntaxNode root, const SourceFile &SF) override;
 
-private:
   OpaqueSyntaxNode recordToken(tok tokenKind,
                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
                                ArrayRef<ParsedTriviaPiece> trailingTrivia,

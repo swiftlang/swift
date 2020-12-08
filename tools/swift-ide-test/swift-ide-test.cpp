@@ -1604,11 +1604,14 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
             SM, BufferID, Invocation.getMainFileSyntaxParsingCache(),
             syntaxArena);
 
+    auto hiddenAction =
+        std::make_shared<HiddenLibSyntaxAction>(SynTreeCreator, SynTreeCreator);
+
     ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
                       Invocation.getLangOptions(),
                       Invocation.getTypeCheckerOptions(),
                       Invocation.getModuleName(),
-                      SynTreeCreator,
+                      hiddenAction,
                       Invocation.getMainFileSyntaxParsingCache());
 
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
@@ -1838,11 +1841,14 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
           SM, BufferID, Invocation.getMainFileSyntaxParsingCache(),
           syntaxArena);
 
+  auto hiddenAction =
+      std::make_shared<HiddenLibSyntaxAction>(SynTreeCreator, SynTreeCreator);
+
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
                     Invocation.getLangOptions(),
                     Invocation.getTypeCheckerOptions(),
                     Invocation.getModuleName(),
-                    SynTreeCreator,
+                    hiddenAction,
                     Invocation.getMainFileSyntaxParsingCache());
 
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);

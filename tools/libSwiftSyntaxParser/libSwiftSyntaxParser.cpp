@@ -155,6 +155,7 @@ private:
     node.present = true;
   }
 
+public:
   OpaqueSyntaxNode recordToken(tok tokenKind,
                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
                                ArrayRef<ParsedTriviaPiece> trailingTrivia,
@@ -291,10 +292,16 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);
+
+  RC<SyntaxArena> syntaxArena{new syntax::SyntaxArena()};
+  auto libSyntaxTreeCreator = std::make_shared<SyntaxTreeCreator>(
+      SM, bufID, /*syntaxCache=*/nullptr, syntaxArena);
+  auto hiddenAction = std::make_shared<HiddenLibSyntaxAction>(
+      std::move(parseActions), std::move(libSyntaxTreeCreator));
   // We have to use SourceFileKind::Main to avoid diagnostics like
   // illegal_top_level_expr
   ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts, tyckOpts,
-                "syntax_parse_module", std::move(parseActions),
+                "syntax_parse_module", std::move(hiddenAction),
                 /*SyntaxCache=*/nullptr);
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {

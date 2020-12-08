@@ -379,14 +379,14 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions)
+               std::shared_ptr<HiddenLibSyntaxAction> SPActions)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
              std::move(SPActions)) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserStateBase *SIL,
                PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions)
+               std::shared_ptr<HiddenLibSyntaxAction> SPActions)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -518,20 +518,25 @@ public:
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserStateBase *SIL, PersistentParserState *PersistentState,
-               std::shared_ptr<SyntaxParseActions> SPActions)
-  : SourceMgr(SF.getASTContext().SourceMgr),
-    Diags(SF.getASTContext().Diags),
-    SF(SF),
-    L(Lex.release()),
-    SIL(SIL),
-    CurDeclContext(&SF),
-    Context(SF.getASTContext()),
-    TokReceiver(SF.shouldCollectTokens() ?
-                new TokenRecorder(SF.getASTContext(), L->getBufferID()) :
-                new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
-                                           L->getBufferID(),
-                                           std::move(SPActions))) {
+               std::shared_ptr<HiddenLibSyntaxAction> SPActions)
+    : SourceMgr(SF.getASTContext().SourceMgr), Diags(SF.getASTContext().Diags),
+      SF(SF), L(Lex.release()), SIL(SIL), CurDeclContext(&SF),
+      Context(SF.getASTContext()),
+      TokReceiver(SF.shouldCollectTokens()
+                      ? new TokenRecorder(SF.getASTContext(), L->getBufferID())
+                      : new ConsumeTokenReceiver()) {
+  // If no syntax parsing actions were provided, generate a hidden syntax
+  // parsing action that only generates the libSyntax tree. This makes sure
+  // that the libSyntax tree is always generated.
+  if (SPActions == nullptr) {
+    auto LibSyntaxTreeCreator = std::make_shared<SyntaxTreeCreator>(
+        SourceMgr, L->getBufferID(), SF.SyntaxParsingCache,
+        Context.getSyntaxArena());
+    SPActions =
+        std::make_shared<HiddenLibSyntaxAction>(nullptr, LibSyntaxTreeCreator);
+  }
+  SyntaxContext =
+      new SyntaxParsingContext(SyntaxContext, SF, L->getBufferID(), SPActions);
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
@@ -1209,7 +1214,7 @@ bool Parser::shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body) {
 }
 
 struct ParserUnit::Implementation {
-  std::shared_ptr<SyntaxParseActions> SPActions;
+  std::shared_ptr<HiddenLibSyntaxAction> SPActions;
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
@@ -1222,7 +1227,7 @@ struct ParserUnit::Implementation {
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  StringRef ModuleName,
-                 std::shared_ptr<SyntaxParseActions> spActions)
+                 std::shared_ptr<HiddenLibSyntaxAction> spActions)
       : SPActions(std::move(spActions)), LangOpts(Opts),
         TypeCheckerOpts(TyOpts), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
@@ -1252,7 +1257,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                        const LangOptions &LangOpts,
                        const TypeCheckerOptions &TypeCheckOpts,
                        StringRef ModuleName,
-                       std::shared_ptr<SyntaxParseActions> spActions,
+                       std::shared_ptr<HiddenLibSyntaxAction> spActions,
                        SyntaxParsingCache *SyntaxCache)
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
                                ModuleName, std::move(spActions))) {
@@ -1296,7 +1301,7 @@ OpaqueSyntaxNode ParserUnit::parse() {
 
   auto rawNode = P.finalizeSyntaxTree();
   Optional<SourceFileSyntax> syntaxRoot;
-  if (Impl.SPActions) {
+  if (rawNode) {
     if (auto root = Impl.SPActions->realizeSyntaxRoot(rawNode, *Impl.SF))
       syntaxRoot.emplace(*root);
   }
@@ -1304,6 +1309,9 @@ OpaqueSyntaxNode ParserUnit::parse() {
   auto result = SourceFileParsingResult{ctx.AllocateCopy(decls), tokensRef,
                                         P.CurrentTokenHash, syntaxRoot};
   ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF}, std::move(result));
+  if (rawNode) {
+    rawNode = Impl.SPActions->getExplicitNodeFor(rawNode);
+  }
   return rawNode;
 }
 
