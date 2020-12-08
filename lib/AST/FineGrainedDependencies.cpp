@@ -339,9 +339,9 @@ void DepGraphNode::dump() const {
 void DepGraphNode::dump(raw_ostream &os) const {
   key.dump(os);
   if (fingerprint.hasValue())
-    llvm::errs() << "fingerprint: " << fingerprint.getValue() << "";
+    os << "fingerprint: " << fingerprint.getValue() << "";
   else
-    llvm::errs() << "no fingerprint";
+    os << "no fingerprint";
 }
 
 void SourceFileDepGraphNode::dump() const {

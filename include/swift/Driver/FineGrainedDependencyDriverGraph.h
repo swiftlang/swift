@@ -493,7 +493,12 @@ public:
 
   template <typename Nodes>
   std::vector<const driver::Job *>
-  findJobsToRecompileWhenNodesChange(const Nodes &);
+  findJobsToRecompileWhenNodesChange(const Nodes &nodes) {
+    std::vector<ModuleDepGraphNode *> foundDependents;
+    for (ModuleDepGraphNode *n : nodes)
+      findPreviouslyUntracedDependents(foundDependents, n);
+    return jobsContaining(foundDependents);
+  }
 
 private:
   std::vector<const driver::Job *>

@@ -156,25 +156,6 @@ std::vector<const Job *> ModuleDepGraph::findJobsToRecompileWhenWholeJobChanges(
   return findJobsToRecompileWhenNodesChange(allNodesInJob);
 }
 
-template <typename Nodes>
-std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange(const Nodes &nodes) {
-  std::vector<ModuleDepGraphNode *> foundDependents;
-  for (ModuleDepGraphNode *n : nodes)
-    findPreviouslyUntracedDependents(foundDependents, n);
-  return jobsContaining(foundDependents);
-}
-
-template std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange<
-    std::unordered_set<ModuleDepGraphNode *>>(
-    const std::unordered_set<ModuleDepGraphNode *> &);
-
-template std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange<
-    std::vector<ModuleDepGraphNode *>>(
-    const std::vector<ModuleDepGraphNode *> &);
-
 std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
     ArrayRef<const ModuleDepGraphNode *> nodes) const {
   llvm::StringSet<> swiftDepsOfNodes;

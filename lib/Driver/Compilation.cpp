@@ -488,13 +488,6 @@ namespace driver {
     reloadAndRemarkDepsOnNormalExit(const Job *FinishedCmd,
                                     const bool cmdFailed, const bool forRanges,
                                     StringRef DependenciesFile) {
-      return reloadAndRemarkFineGrainedDepsOnNormalExit(
-          FinishedCmd, cmdFailed, forRanges, DependenciesFile);
-    }
-
-    std::vector<const Job *> reloadAndRemarkFineGrainedDepsOnNormalExit(
-        const Job *FinishedCmd, const bool cmdFailed, const bool forRanges,
-        StringRef DependenciesFile) {
       const auto changedNodes = getFineGrainedDepGraph(forRanges).loadFromPath(
           FinishedCmd, DependenciesFile, Comp.getDiags());
       const bool loadFailed = !changedNodes;
