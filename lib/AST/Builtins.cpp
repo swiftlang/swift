@@ -1439,6 +1439,13 @@ static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
                             _job);
 }
 
+static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
+                                             Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_nativeObject),
+                            _void);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -2650,6 +2657,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     return getTriggerFallbackDiagnosticOperation(Context, Id);
+
+  case BuiltinValueKind::InitializeDefaultActor:
+  case BuiltinValueKind::DestroyDefaultActor:
+    return getDefaultActorInitDestroy(Context, Id);
 
   case BuiltinValueKind::WithUnsafeContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/false);

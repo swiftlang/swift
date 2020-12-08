@@ -435,10 +435,18 @@ option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB "Only build the Swift Syntax Parser libr
 option(SWIFT_BUILD_SOURCEKIT "Build SourceKit" TRUE)
 option(SWIFT_ENABLE_SOURCEKIT_TESTS "Enable running SourceKit tests" ${SWIFT_BUILD_SOURCEKIT})
 
-if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
+# Use dispatch as the system scheduler by default.
+# For convenience, we set this to false when concurrency is disabled.
+# TODO: don't do this when building a single-threaded runtime
+set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
+if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+  set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
+endif()
+
+if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT OR SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-      message(SEND_ERROR "SyntaxParserLib and SourceKit require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+      message(SEND_ERROR "SyntaxParserLib, SourceKit, and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
     endif()
   endif()
 endif()
@@ -941,7 +949,7 @@ if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
 endif()
 
-if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
+if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT OR SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
        CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.8

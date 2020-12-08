@@ -10,7 +10,8 @@
 ///
 ///===----------------------------------------------------------------------===///
 ///
-/// The standard actor implementation for Swift actors.
+/// The default actor implementation for Swift actors, plus related
+/// routines such as generic executor enqueuing and switching.
 ///
 ///===----------------------------------------------------------------------===///
 
@@ -1357,21 +1358,9 @@ void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
   if (executor.isDefaultActor())
     return asImpl(executor.getDefaultActor())->enqueue(job);
 
+  // Just assume it's actually a default actor that we haven't tagged
+  // properly.
   // FIXME: call the general method.
-  job->run(executor);
+  return asImpl(reinterpret_cast<DefaultActor*>(executor.getRawValue()))
+    ->enqueue(job);
 }
-
-SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobal_hook)(Job *job) = nullptr;
-
-void swift::swift_task_enqueueGlobal(Job *job) {
-  assert(job && "no job provided");
-
-  // If the hook is defined, use it.
-  if (swift_task_enqueueGlobal_hook)
-    return swift_task_enqueueGlobal_hook(job);
-
-  // FIXME: implement this properly
-  job->run(ExecutorRef::generic());
-}
-

@@ -16,9 +16,21 @@ set(swift_concurrency_objc_sources
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
+set(swift_concurrency_link_libraries
+  swiftCore)
+
+if(SWIFT_CONCURRENCY_USES_DISPATCH)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    list(APPEND swift_concurrency_link_libraries
+      dispatch)
+  endif()
+endif()
+
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Actor.cpp
   Actor.swift
+  GlobalExecutor.cpp
   PartialAsyncTask.swift
   Task.cpp
   Task.swift
@@ -41,7 +53,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
-  LINK_LIBRARIES swiftCore
+  LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
     -Dswift_Concurrency_EXPORTS

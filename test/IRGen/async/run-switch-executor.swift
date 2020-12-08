@@ -45,7 +45,7 @@ final actor class MyActor {
 // CHECK: switch back
 // CHECK: 66
 
-runAsync {
+runAsyncAndBlock {
   let a = MyActor(p: 27)
   print("run")
   await print(a.testit())

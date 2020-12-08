@@ -23,7 +23,7 @@ func sayWithClosure(_ action: () async -> ()) async {
   print("hallo welt")
 }
 
-runAsync {
+runAsyncAndBlock {
   // CHECK: hello
   await sayHello()
 
