@@ -621,7 +621,9 @@ namespace {
         // handler that can also express a thrown error.
         ImportTypeKind paramImportKind = ImportTypeKind::Parameter;
         unsigned paramIdx = param - type->param_type_begin();
-        if (type == CompletionHandlerType &&
+        if (CompletionHandlerType &&
+            Impl.getClangASTContext().hasSameType(
+                CompletionHandlerType, type) &&
             paramIdx != CompletionHandlerErrorParamIndex) {
           paramImportKind = ImportTypeKind::CompletionHandlerResultParameter;
         }
@@ -1585,6 +1587,8 @@ ImportedType ClangImporter::Implementation::importType(
     if (auto blockPtrType = type->getAs<clang::BlockPointerType>()) {
       completionHandlerType =
           blockPtrType->getPointeeType()->castAs<clang::FunctionType>();
+
+      type = clang::QualType(blockPtrType, 0);
     }
   }
 
