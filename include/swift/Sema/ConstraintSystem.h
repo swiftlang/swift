@@ -4743,8 +4743,13 @@ private:
     /// The set of constraints which delay attempting this type variable.
     llvm::TinyPtrVector<Constraint *> DelayedBy;
 
-    /// Whether the bindings of this type involve other type variables.
-    bool InvolvesTypeVariables = false;
+    /// The set of type variables adjacent to the current one.
+    ///
+    /// Type variables contained here are either related through the
+    /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
+    /// reachable through subtype/conversion  relationship e.g.
+    /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
+    llvm::SmallPtrSet<TypeVariableType *, 2> AdjacentVars;
 
     ASTNode AssociatedCodeCompletionToken = ASTNode();
 
@@ -4774,6 +4779,11 @@ private:
     /// disjunctions or type variables left to attempt, it's still
     /// okay to attempt "delayed" type variable to make forward progress.
     bool isDelayed() const;
+
+    /// Whether the bindings of this type involve other type variables,
+    /// or the type variable itself is adjacent to other type variables
+    /// that could become valid bindings in the future.
+    bool involvesTypeVariables() const;
 
     /// Whether the bindings represent (potentially) incomplete set,
     /// there is no way to say with absolute certainty if that's the
@@ -4819,7 +4829,7 @@ private:
                              !hasNoDefaultableBindings,
                              b.isDelayed(),
                              b.isSubtypeOfExistentialType(),
-                             b.InvolvesTypeVariables,
+                             b.involvesTypeVariables(),
                              static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - numDefaults));
     }
@@ -4970,7 +4980,7 @@ public:
         out << "subtype_of_existential ";
       if (LiteralBinding != LiteralBindingKind::None)
         out << "literal=" << static_cast<int>(LiteralBinding) << " ";
-      if (InvolvesTypeVariables)
+      if (involvesTypeVariables())
         out << "involves_type_vars ";
 
       auto numDefaultable = getNumDefaultableBindings();
