@@ -24,7 +24,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await try slowServer.magicNumber(withSeed: 42)
 
   await slowServer.serverRestart("localhost")
-  await slowServer.server("localhost", atPriorityRestart: 0.8)
+  await slowServer.serverRestart("localhost", atPriority: 0.8)
 
   _ = await slowServer.allOperations()
 }
