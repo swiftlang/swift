@@ -5,6 +5,8 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar_72091795
+
 import gizmo
 
 // CHECK: [[CLASS:%objc_class]] = type

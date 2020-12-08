@@ -9,6 +9,7 @@
 
 // rdar71933996
 // UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
 
 import StdlibUnittest
 import StdlibCollectionUnittest
