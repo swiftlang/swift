@@ -773,6 +773,14 @@ ProtocolRethrowsRequirementList
 ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
                                               ProtocolDecl *decl) const {
   SmallVector<std::pair<Type, ValueDecl*>, 2> found;
+  llvm::DenseSet<ProtocolDecl*> checkedProtocols;
+
+  ASTContext &ctx = decl->getASTContext();
+
+  // only allow rethrowing requirements to be determined from marked protocols
+  if (decl->getAttrs().hasAttribute<swift::AtRethrowsAttr>()) {
+    return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
+  }
 
   // check if immediate members of protocol are 'rethrows'
   for (auto member : decl->getMembers()) {
@@ -796,7 +804,6 @@ ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
     found.push_back(
       std::pair<Type, ValueDecl*>(decl->getSelfInterfaceType(), fnDecl));
   }
-  llvm::DenseSet<ProtocolDecl*> checkedProtocols;
   checkedProtocols.insert(decl);
 
   // check associated conformances of associated types or inheritance
@@ -814,7 +821,7 @@ ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
       found.emplace_back(requirement.getFirstType(), entry.second);
     }
   }
-  ASTContext &ctx = decl->getASTContext();
+  
   return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
 }
 

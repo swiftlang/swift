@@ -359,6 +359,10 @@ SIMPLE_DECL_ATTR(rethrows, Rethrows,
   RejectByParser |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   57)
+SIMPLE_DECL_ATTR(rethrows, AtRethrows,
+  OnProtocol |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  58)
 DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
   OnClass |
   UserInaccessible |

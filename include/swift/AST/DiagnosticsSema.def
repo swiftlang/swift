@@ -2981,6 +2981,8 @@ ERROR(override_rethrows_with_non_rethrows,none,
       "be 'rethrows'", (bool))
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
+ERROR(rethrows_attr_on_non_protocol,none,
+      "@rethrows may only be used on 'protocol' declarations", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",

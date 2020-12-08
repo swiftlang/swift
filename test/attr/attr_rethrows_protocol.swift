@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
+@rethrows
 protocol RethrowingProtocol {
   func source() rethrows
 }
@@ -48,12 +49,14 @@ func invalidFreeFloatingRethrows() rethrows {
 let rethrowingFromThrows = Rethrows(other: Throws())
 try rethrowingFromThrows.source()
 
+@rethrows
 protocol HasAssociatedRethrowerWithEnclosedRethrow {
   associatedtype Rethrower: RethrowingProtocol
 
   func source() rethrows
 }
 
+@rethrows
 protocol HasAssociatedRethrower {
   associatedtype Rethrower: RethrowingProtocol
 
