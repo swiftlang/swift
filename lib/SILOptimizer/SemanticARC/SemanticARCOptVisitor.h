@@ -148,6 +148,8 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
+  bool
+  visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *uoci);
 
   static bool shouldVisitInst(SILInstruction *i) {
     switch (i->getKind()) {
@@ -156,6 +158,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     case SILInstructionKind::CopyValueInst:
     case SILInstructionKind::BeginBorrowInst:
     case SILInstructionKind::LoadInst:
+    case SILInstructionKind::UncheckedOwnershipConversionInst:
       return true;
     }
   }
