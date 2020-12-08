@@ -35,6 +35,17 @@ enum class SyntaxKind;
 
 typedef void *OpaqueSyntaxNode;
 
+// TODO: (syntax-parse) Remove once the HiddenLibSyntaxAction has been removed
+enum class OpaqueSyntaxNodeKind {
+  /// Opaque syntax representing a SwiftSyntax node
+  SwiftSyntax,
+  /// Opaque syntax representing a LibSyntax node
+  LibSyntax,
+  /// Opaque syntax represening a hidden node created by the
+  /// HiddenLibSyntaxAction
+  HiddenSyntax
+};
+
 class SyntaxParseActions {
   virtual void _anchor();
 
@@ -75,6 +86,10 @@ public:
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
     return std::make_pair(0, nullptr);
   }
+
+  /// Returns what kind of OpaqueSyntaxNode is created by \c recordXXX and
+  /// \c lookupNode methods.
+  virtual OpaqueSyntaxNodeKind getOpaqueKind() = 0;
 };
 
 } // end namespace swift

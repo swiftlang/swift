@@ -8,6 +8,7 @@ endif()
 
 add_swift_host_library(swiftParse STATIC
   Confusables.cpp
+  HiddenLibSyntaxAction.cpp
   Lexer.cpp
   ParseDecl.cpp
   ParsedRawSyntaxNode.cpp
