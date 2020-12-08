@@ -112,7 +112,7 @@
 //   CHECK-apple-SAME:        }*,
 //   CHECK-apple-SAME:        i8*,
 //   CHECK-apple-SAME:        i8*
-//   CHECK-apple-SAME:      }* @_DATA__TtC4mainP33_4D007063F2EFC1988130B7D42A21EE4C5Value to [[INT]]
+//   CHECK-apple-SAME:      }* @"_DATA_$s4main5Value[[UNIQUE_ID_1]]CySSGMf" to [[INT]]
 //   CHECK-apple-SAME:    ),
 //   CHECK-apple-SAME:    [[INT]] 2
 //   CHECK-apple-SAME:  ),
