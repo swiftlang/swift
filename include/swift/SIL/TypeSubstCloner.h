@@ -428,9 +428,10 @@ protected:
       return ParentFunction;
 
     // Clone the function with the substituted type for the debug info.
-    Mangle::GenericSpecializationMangler Mangler(
-        ParentFunction, SubsMap, IsNotSerialized, false, ForInlining);
-    std::string MangledName = Mangler.mangle(RemappedSig);
+    Mangle::GenericSpecializationMangler Mangler(ParentFunction,
+                                                 IsNotSerialized);
+    std::string MangledName =
+      Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);
 
     if (ParentFunction->getName() == MangledName)
       return ParentFunction;
