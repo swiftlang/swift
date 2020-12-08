@@ -215,6 +215,7 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
+  void visitAtRethrowsAttr(AtRethrowsAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -2137,12 +2138,21 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
-  auto fn = cast<AbstractFunctionDecl>(D);
-  if (fn->getRethrowingKind() != FunctionRethrowingKind::Invalid) {
+  auto fn = dyn_cast<AbstractFunctionDecl>(D);
+  if (fn && fn->getRethrowingKind() != FunctionRethrowingKind::Invalid) {
     return;
   }
 
   diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
+  attr->setInvalid();
+}
+
+void AttributeChecker::visitAtRethrowsAttr(AtRethrowsAttr *attr) {
+  if (isa<ProtocolDecl>(D)) {
+    return;
+  }
+
+  diagnose(attr->getLocation(), diag::rethrows_attr_on_non_protocol);
   attr->setInvalid();
 }
 
