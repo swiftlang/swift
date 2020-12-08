@@ -62,6 +62,16 @@ func test_unsafeThrowingContinuations() async {
     continuation.resume(throwing: MyError())
   }
 
+  // using resume(with:)
+  let _: String = try await withUnsafeThrowingContinuation { continuation in
+    let result : Result<String, MyError> = .success("")
+    continuation.resume(with: result)
+  }
+
+  let _: String = try await withUnsafeThrowingContinuation { continuation in
+    continuation.resume(with: .failure(MyError()))
+  }
+
   // TODO: Potentially could offer some warnings if we know that a continuation was resumed or escaped at all in a closure?
 }
 
