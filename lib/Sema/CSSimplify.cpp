@@ -7109,95 +7109,6 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
   return nullptr;
 }
 
-/// Diagnose if the base type is optional, we're referring to a nominal
-/// type member via the dot syntax and the member name matches
-/// Optional<T>.{member} or a .none member inferred as non-optional static
-/// member e.g. let _ : Foo? = .none where Foo has a static member none.
-static bool attemptUnresolvedMemberFix(ConstraintSystem &cs,
-                                       ConstraintKind kind, Type baseTy,
-                                       DeclNameRef member,
-                                       FunctionRefKind functionRefKind,
-                                       ConstraintLocator *locator,
-                                       MemberLookupResult result) {
-
-  if (kind != ConstraintKind::UnresolvedValueMember)
-    return false;
-
-  // None or only one viable candidate, there is no ambiguity.
-  if (result.ViableCandidates.size() <= 1)
-    return false;
-
-  // Only diagnose those situations for static members.
-  if (!baseTy->is<MetatypeType>())
-    return false;
-
-  // Don't diagnose for function members e.g. Foo? = .none(0).
-  if (functionRefKind != FunctionRefKind::Unapplied)
-    return false;
-
-  Type underlyingBaseType = baseTy->getMetatypeInstanceType();
-  if (!underlyingBaseType->getNominalOrBoundGenericNominal())
-    return false;
-
-  if (!underlyingBaseType->getOptionalObjectType())
-    return false;
-
-  auto unwrappedType = underlyingBaseType->lookThroughAllOptionalTypes();
-  bool allOptionalBaseCandidates = true;
-  auto filterViableCandidates =
-      [&](SmallVector<OverloadChoice, 4> &candidates,
-          SmallVector<OverloadChoice, 4> &viableCandidates,
-          bool &allOptionalBase) {
-        for (OverloadChoice choice : candidates) {
-          if (!choice.isDecl())
-            continue;
-
-          auto memberDecl = choice.getDecl();
-          if (isa<FuncDecl>(memberDecl))
-            continue;
-          if (memberDecl->isInstanceMember())
-            continue;
-
-          allOptionalBase &= bool(choice.getBaseType()
-                                      ->getMetatypeInstanceType()
-                                      ->getOptionalObjectType());
-
-          if (auto EED = dyn_cast<EnumElementDecl>(memberDecl)) {
-            if (!EED->hasAssociatedValues())
-              viableCandidates.push_back(choice);
-          } else if (auto VD = dyn_cast<VarDecl>(memberDecl)) {
-            if (unwrappedType->hasTypeVariable() ||
-                VD->getInterfaceType()->isEqual(unwrappedType))
-              viableCandidates.push_back(choice);
-          }
-        }
-      };
-
-  SmallVector<OverloadChoice, 4> viableCandidates;
-  filterViableCandidates(result.ViableCandidates, viableCandidates,
-                         allOptionalBaseCandidates);
-
-  // Also none or only one viable candidate after filtering candidates, there is
-  // no ambiguity.
-  if (viableCandidates.size() <= 1)
-    return false;
-
-  // Right now, name lookup only unwraps a single layer of optionality, which
-  // for cases where base type is a multi-optional type e.g. Foo?? it only
-  // finds optional base candidates. To produce the correct warning we perform
-  // an extra lookup on unwrapped type.
-  if (!allOptionalBaseCandidates)
-    return true;
-
-  MemberLookupResult unwrappedResult = cs.performMemberLookup(
-      kind, member, MetatypeType::get(unwrappedType), functionRefKind, locator,
-      /*includeInaccessibleMembers*/ false);
-  SmallVector<OverloadChoice, 4> unwrappedViableCandidates;
-  filterViableCandidates(unwrappedResult.ViableCandidates,
-                         unwrappedViableCandidates, allOptionalBaseCandidates);
-  return !unwrappedViableCandidates.empty();
-}
-
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     ConstraintKind kind, Type baseTy, DeclNameRef member, Type memberTy,
     DeclContext *useDC, FunctionRefKind functionRefKind,
@@ -7397,11 +7308,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   //  }
   //
   //  let _: Foo? = .none // Although base is inferred as Optional.none
-  //  it could be also.
-  if (attemptUnresolvedMemberFix(*this, kind, baseObjTy, member,
-                                 functionRefKind, locator, result)) {
-    auto *fix = SpecifyBaseTypeForOptionalUnresolvedMember::create(
-        *this, member, locator);
+  //  it could be also Foo.none.
+  if (auto *fix = SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
+          *this, kind, baseObjTy, member, functionRefKind, result, locator)) {
     (void)recordFix(fix);
   }
 

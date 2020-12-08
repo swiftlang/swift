@@ -46,6 +46,7 @@ class ConstraintLocator;
 class ConstraintLocatorBuilder;
 enum class ConversionRestrictionKind;
 class Solution;
+struct MemberLookupResult;
 
 /// Describes the kind of fix to apply to the given constraint before
 /// visiting it.
@@ -2147,6 +2148,10 @@ public:
                                        ConstraintLocator *locator);
 };
 
+/// Diagnose if the base type is optional, we're referring to a nominal
+/// type member via the dot syntax and the member name matches
+/// Optional<T>.{member} or a .none member inferred as non-optional static
+/// member e.g. let _ : Foo? = .none where Foo has a static member none.
 class SpecifyBaseTypeForOptionalUnresolvedMember final : public ConstraintFix {
   SpecifyBaseTypeForOptionalUnresolvedMember(ConstraintSystem &cs,
                                              DeclNameRef memberName,
@@ -2166,8 +2171,9 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static SpecifyBaseTypeForOptionalUnresolvedMember *
-  create(ConstraintSystem &cs, DeclNameRef memberName,
-         ConstraintLocator *locator);
+  attempt(ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
+          DeclNameRef memberName, FunctionRefKind functionRefKind,
+          MemberLookupResult result, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
