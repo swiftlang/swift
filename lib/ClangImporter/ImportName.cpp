@@ -1135,8 +1135,12 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
 
 /// Whether the given parameter name identifies a completion handler.
 static bool isCompletionHandlerParamName(StringRef paramName) {
-  return paramName == "completionHandler" || paramName == "completion" ||
-      paramName == "withCompletionHandler" || paramName == "withCompletion";
+  return paramName == "completionHandler" ||
+      paramName == "withCompletionHandler" ||
+      paramName == "completion" || paramName == "withCompletion" ||
+      paramName == "completionBlock" || paramName == "withCompletionBlock" ||
+      paramName == "reply" || paramName == "withReply";
+      paramName == "replyTo" || paramName == "withReplyTo";
 }
 
 // Determine whether the given type is a nullable NSError type.

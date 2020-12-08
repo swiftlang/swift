@@ -1392,5 +1392,17 @@ Optional<StringRef> swift::stripWithCompletionHandlerSuffix(StringRef name) {
     return name.drop_back(strlen("WithCompletion"));
   }
 
+  if (name.endswith("WithCompletionBlock")) {
+    return name.drop_back(strlen("WithCompletionBlock"));
+  }
+
+  if (name.endswith("WithReplyTo")) {
+    return name.drop_back(strlen("WithReplyTo"));
+  }
+
+  if (name.endswith("WithReply")) {
+    return name.drop_back(strlen("WithReply"));
+  }
+
   return None;
 }

@@ -12,6 +12,9 @@
 -(void)doSomethingSlow:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)checkAvailabilityWithCompletionHandler:(void (^)(BOOL isAvailable))completionHandler;
+-(void)anotherExampleWithCompletionBlock:(void (^)(NSString *))block;
+-(void)finalExampleWithReplyTo:(void (^)(NSString *))block;
+-(void)replyingOperation:(NSString *)operation replyTo:(void (^)(NSString *))block;
 -(void)findAnswerAsynchronously:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswer(completionHandler:)")));
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
 -(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
