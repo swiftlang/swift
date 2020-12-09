@@ -879,6 +879,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, NonLifetimeEnding, AutoDiffCreateLinearMapConte
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, AutoDiffAllocateSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, AutoDiffProjectTopLevelSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, LifetimeEnding, ConvertTaskToJob)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, InitializeDefaultActor)
+CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, NonLifetimeEnding, DestroyDefaultActor)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

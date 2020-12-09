@@ -45,8 +45,10 @@ final actor class MyActor {
 // CHECK: switch back
 // CHECK: 66
 
+// FIXME: this breaks if we release the actor during the runAsyncAndBlock
+// because we don't switch off it before dropping the actor reference.
+let a = MyActor(p: 27)
 runAsyncAndBlock {
-  let a = MyActor(p: 27)
   print("run")
   await print(a.testit())
 }

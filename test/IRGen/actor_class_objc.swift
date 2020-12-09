@@ -45,9 +45,7 @@ public actor class MyClass: NSObject {
 // CHECK: load [[INT]], [[INT]]* [[T1]], align 16
 
 // CHECK-LABEL: define {{.*}}swiftcc %T16actor_class_objc7MyClassC* @"$s16actor_class_objc7MyClassCACycfc"
-// FIXME: need to do this initialization!
-// CHECK-NOT: swift_defaultActor_initialize
+// CHECK: swift_defaultActor_initialize
 // CHECK-LABEL: ret %T16actor_class_objc7MyClassC*
 
-// FIXME: neeed to do this destruction!
-// CHECK-NOT: swift_defaultActor_destroy
+// CHECK: swift_defaultActor_destroy

@@ -266,6 +266,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::InitializeDefaultActor ||
+      Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
+    auto fn = Builtin.ID == BuiltinValueKind::InitializeDefaultActor
+                ? IGF.IGM.getDefaultActorInitializeFn()
+                : IGF.IGM.getDefaultActorDestroyFn();
+    auto actor = args.claimNext();
+    actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
+    auto call = IGF.Builder.CreateCall(fn, {actor});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->setDoesNotThrow();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
+  }
+
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
