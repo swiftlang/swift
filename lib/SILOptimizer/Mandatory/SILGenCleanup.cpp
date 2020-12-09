@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "silgen-cleanup"
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
@@ -28,7 +29,8 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
   bool changed = false;
   llvm::SmallPtrSet<SILInstruction *, 16> deadOperands;
 
-  SILGenCanonicalize() : CanonicalizeInstruction(DEBUG_TYPE) {}
+  SILGenCanonicalize(DeadEndBlocks &deadEndBlocks)
+      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks) {}
 
   void notifyNewInstruction(SILInstruction *) override { changed = true; }
 
@@ -86,7 +88,8 @@ void SILGenCleanup::run() {
     LLVM_DEBUG(llvm::dbgs()
                << "\nRunning SILGenCleanup on " << function.getName() << "\n");
 
-    SILGenCanonicalize sgCanonicalize;
+    DeadEndBlocks deadEndBlocks(&function);
+    SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 
     // Iterate over all blocks even if they aren't reachable. No phi-less
     // dataflow cycles should have been created yet, and these transformations

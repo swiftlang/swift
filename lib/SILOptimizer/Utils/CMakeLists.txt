@@ -21,4 +21,5 @@ target_sources(swiftSILOptimizer PRIVATE
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp
-  ValueLifetime.cpp)
+  ValueLifetime.cpp
+  OwnershipOptUtils.cpp)
