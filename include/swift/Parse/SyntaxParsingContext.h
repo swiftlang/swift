@@ -16,6 +16,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/HiddenLibSyntaxAction.h"
+#include "swift/Parse/LibSyntaxGenerator.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -61,6 +62,7 @@ enum class SyntaxNodeCreationKind {
 
 constexpr size_t SyntaxAlignInBits = 3;
 
+// TODO: (syntax-parse) remove when/if possible
 /// RAII object which receive RawSyntax parts. On destruction, this constructs
 /// a specified syntax node from received parts and propagate it to the parent
 /// context.
@@ -96,13 +98,17 @@ public:
 
     ParsedRawSyntaxRecorder Recorder;
 
+    /// The \c LibSyntaxGenerator that produces libSyntax node from the data
+    /// recorded in this \c SyntaxParsingContext. See \c topNode() below.
+    LibSyntaxGenerator LibSyntaxCreator;
+
     llvm::BumpPtrAllocator ScratchAlloc;
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
                     std::shared_ptr<HiddenLibSyntaxAction> spActions)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
-          Recorder(std::move(spActions)) {}
+          Recorder(spActions), LibSyntaxCreator(spActions) {}
   };
 
 private:
@@ -266,6 +272,10 @@ public:
     return getRootData()->Storage;
   }
 
+  LibSyntaxGenerator &getSyntaxCreator() {
+    return getRootData()->LibSyntaxCreator;
+  }
+
   const SyntaxParsingContext *getRoot() const;
 
   ParsedRawSyntaxRecorder &getRecorder() { return getRootData()->Recorder; }
@@ -283,6 +293,19 @@ public:
 
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
+
+  /// Whether the top node on the parsing context's storage stack is of the
+  /// given \c Kind.
+  template <SyntaxKind Kind> bool isTopNode() {
+    return getStorage().back().getKind() == Kind;
+  }
+
+  /// Creates a parsed libSyntax node from the top node of the parsing context's
+  /// storage stack. If the node has already been recorded, the data stored in
+  /// the \c LibSyntaxNode of the corresponding \c HiddenNode is returned.
+  /// If the node is deferred, the node will be recorded in the
+  /// \c LibSyntaxAction and returned.
+  template <typename SyntaxNode> SyntaxNode topNode();
 
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
@@ -368,6 +391,25 @@ public:
   /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
   SWIFT_DEBUG_DUMPER(dumpStorage());
 };
+
+template <typename SyntaxNode>
+inline SyntaxNode SyntaxParsingContext::topNode() {
+  ParsedRawSyntaxNode &TopNode = getStorage().back();
+  if (TopNode.isRecorded()) {
+    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
+    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
+  }
+  return getSyntaxCreator().createNode<SyntaxNode>(TopNode.copyDeferred());
+}
+
+template <> inline TokenSyntax SyntaxParsingContext::topNode<TokenSyntax>() {
+  ParsedRawSyntaxNode &TopNode = getStorage().back();
+  if (TopNode.isRecorded()) {
+    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
+    return getSyntaxCreator().getLibSyntaxNodeFor<TokenSyntax>(OpaqueNode);
+  }
+  return getSyntaxCreator().createToken(TopNode.copyDeferred());
+}
 
 } // namespace swift
 #endif // SWIFT_SYNTAX_PARSING_CONTEXT_H

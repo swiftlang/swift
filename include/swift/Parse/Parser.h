@@ -26,10 +26,12 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Parse/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
+#include "swift/Parse/ParsedSyntaxNodes.h"
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -404,6 +406,9 @@ public:
 
   /// Has \c AvailabilityMacros been computed?
   bool AvailabilityMacrosComputed = false;
+
+  /// The AST generator that generates AST nodes from libSyntax nodes.
+  ASTGen ASTGenerator;
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
@@ -892,6 +897,16 @@ public:
   }
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
+  //===--------------------------------------------------------------------===//
+  // MARK: - Primitive Parsing using libSyntax
+
+  /// Consume a token and return the corresponding \c ParsedTokenSyntax.
+  ParsedTokenSyntax consumeTokenSyntax();
+  ParsedTokenSyntax consumeTokenSyntax(tok K) {
+    assert(Tok.is(K) && "Consuming wrong token kind");
+    return consumeTokenSyntax();
+  }
+
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
@@ -1602,6 +1617,21 @@ public:
   UnresolvedDeclRefExpr *parseExprOperator();
 
   void validateCollectionElement(ParserResult<Expr> element);
+
+  //===--------------------------------------------------------------------===//
+  // MARK: - Expression parsing using libSyntax
+
+  // TODO: (syntax-parse) remove when possible
+  /// Parse the upcoming expression of type \c SyntaxNode through libSyntax,
+  /// i.e. parse it into a libSyntax node and generate the \c Expr node from the
+  /// libSyntax node using \c ASTGen.
+  template <typename SyntaxNode> ParserResult<Expr> parseExprAST();
+
+  // TODO: (syntax-parse) create new result type for ParsedSyntax
+  // TODO: (syntax-parse) turn into proper non-templated methods later
+  /// Parse the upcoming expression of type \c SyntaxNode into a libSyntax node
+  /// and return it.
+  template <typename SyntaxNode> ParsedExprSyntax parseExprSyntax();
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing

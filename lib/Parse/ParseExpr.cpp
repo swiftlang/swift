@@ -1416,6 +1416,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 ///     expr-selector
 ///
 ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
+  // Parsing of expressions through the libSyntax tree
+  switch (Tok.getKind()) {
+  case tok::integer_literal:
+    return parseExprAST<IntegerLiteralExprSyntax>();
+  default:
+    break;
+  }
+
+  // Direct parsing of tokens to an AST
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   switch (Tok.getKind()) {
   case tok::integer_literal: {
@@ -3714,4 +3723,27 @@ Parser::parsePlatformVersionConstraintSpec() {
   Version = canonicalizePlatformVersion(*Platform, Version);
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, RuntimeVersion, VersionRange));
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Expression parsing using libSyntax
+
+template <typename SyntaxNode> ParserResult<Expr> Parser::parseExprAST() {
+  SyntaxContext->addSyntax(parseExprSyntax<SyntaxNode>());
+  // TODO: (syntax-parse) improve this somehow
+  if (SyntaxContext->isTopNode<SyntaxKind::UnknownExpr>()) {
+    auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
+    auto ExprAST = ASTGenerator.generate(Expr);
+    return makeParserResult(ExprAST);
+  }
+  auto Expr = SyntaxContext->topNode<SyntaxNode>();
+  auto ExprAST = ASTGenerator.generate(Expr);
+  return makeParserResult(ExprAST);
+}
+
+template <>
+ParsedExprSyntax Parser::parseExprSyntax<IntegerLiteralExprSyntax>() {
+  auto Token = consumeTokenSyntax(tok::integer_literal);
+  return ParsedSyntaxRecorder::makeIntegerLiteralExpr(std::move(Token),
+                                                      *SyntaxContext);
 }

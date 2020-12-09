@@ -119,6 +119,17 @@ public:
   /// Returns the node created by explicit syntax action from the specified
   /// node that has been created by this action.
   OpaqueSyntaxNode getExplicitNodeFor(OpaqueSyntaxNode node);
+
+  /// Whether the generated libSyntax node needs to be released after the tree
+  /// is finalised.
+  bool isReleaseOfLibSyntaxNodeNeeded() {
+    return ExplicitAction == LibSyntaxAction || !areBothLibSyntax();
+  }
+
+  /// Returns the underlying libSyntax \c SyntaxTreeCreator.
+  std::shared_ptr<SyntaxTreeCreator> getLibSyntaxAction() {
+    return LibSyntaxAction;
+  }
 };
 } // namespace swift
 
