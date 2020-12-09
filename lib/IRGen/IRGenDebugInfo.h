@@ -38,7 +38,12 @@ class IRBuilder;
 class IRGenFunction;
 class IRGenModule;
 
-enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
+enum IndirectionKind {
+  DirectValue,
+  IndirectValue,
+  CoroDirectValue,
+  CoroIndirectValue
+};
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
 /// Helper object that keeps track of the current CompileUnit, File,
@@ -61,10 +66,11 @@ public:
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
                      SILLocation Loc);
 
-  /// Replace the current debug location in \p Builder with the same location, but contained in an
-  /// inlined function which is named like \p failureMsg.
+  /// Replace the current debug location in \p Builder with the same location,
+  /// but contained in an inlined function which is named like \p failureMsg.
   ///
-  /// This lets the debugger display the \p failureMsg as an inlined function frame.
+  /// This lets the debugger display the \p failureMsg as an inlined function
+  /// frame.
   void addFailureMessageToCurrentLoc(IRBuilder &Builder, StringRef failureMsg);
 
   void clearLoc(IRBuilder &Builder);
@@ -143,7 +149,7 @@ public:
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS);
+                        const SILDebugScope *DS, bool InCoroContext = false);
 
   enum { NotHeapAllocated = false };
   
