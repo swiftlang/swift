@@ -376,7 +376,7 @@ static bool loadAndValidateVFSOverlay(
     Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
     return true;
   }
-  OverlayFS->pushOverlay(VFS);
+  OverlayFS->pushOverlay(std::move(VFS));
   return false;
 }
 
