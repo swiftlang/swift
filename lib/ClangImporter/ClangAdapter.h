@@ -137,7 +137,11 @@ bool isNSString(clang::QualType);
 bool hasNativeSwiftDecl(const clang::Decl *decl);
 
 /// Translation API nullability from an API note into an optional kind.
-OptionalTypeKind translateNullability(clang::NullabilityKind kind);
+///
+/// \param stripNonResultOptionality Whether strip optionality from
+/// \c _Nullable but not \c _Nullable_result.
+OptionalTypeKind translateNullability(
+    clang::NullabilityKind kind, bool stripNonResultOptionality = false);
 
 /// Determine whether the given method is a required initializer
 /// of the given class.
