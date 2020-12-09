@@ -2174,15 +2174,41 @@ void ConstraintSystem::partitionDisjunction(
       };
 
   // Gather the remaining options.
+
+  SmallVector<unsigned, 4> genericOverloads;
+
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    if (!isForCodeCompletion()) {
+      // Collect generic overload choices separately, and sort these choices
+      // by specificity in order to try the most specific choice first.
+      if (constraint->getKind() == ConstraintKind::BindOverload) {
+        if (auto *decl = constraint->getOverloadChoice().getDeclOrNull()) {
+          auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl);
+          if (fnDecl && fnDecl->isGeneric()) {
+            genericOverloads.push_back(index);
+            return true;
+          }
+        }
+      }
+    }
+
     everythingElse.push_back(index);
     return true;
   });
+
+  llvm::sort(genericOverloads, [&](unsigned lhs, unsigned rhs) -> bool {
+    auto *declA = dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
+    auto *declB = dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
+
+    auto result = TypeChecker::compareDeclarations(DC, declA, declB);
+    return result == Comparison::Better;
+  });
+
+  everythingElse.append(genericOverloads.begin(), genericOverloads.end());
+
   appendPartition(favored);
   appendPartition(everythingElse);
   appendPartition(simdOperators);
-
-  // Now create the remaining partitions from what we previously collected.
   appendPartition(unavailable);
   appendPartition(disabled);
 

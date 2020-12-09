@@ -18,6 +18,7 @@
 #include "CSStep.h"
 #include "TypeChecker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -528,6 +529,60 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   return take(prevFailed);
 }
 
+static bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
+  auto *typeA = declA->getInterfaceType()->getAs<GenericFunctionType>();
+  auto *typeB = declB->getInterfaceType()->getAs<GenericFunctionType>();
+
+  if (!typeA || !typeB)
+    return false;
+
+  auto genericSignatureA = typeA->getGenericSignature();
+  auto genericSignatureB = typeB->getGenericSignature();
+
+  // Substitute generic parameters with their archetypes in each generic function.
+  Type substTypeA = typeA->substGenericArgs(
+      genericSignatureA->getGenericEnvironment()->getForwardingSubstitutionMap());
+  Type substTypeB = typeB->substGenericArgs(
+      genericSignatureB->getGenericEnvironment()->getForwardingSubstitutionMap());
+
+  // Attempt to substitute archetypes from the second type with archetypes in the
+  // same structural position in the first type.
+  TypeSubstitutionMap substMap;
+  substTypeB = substTypeB->substituteBindingsTo(substTypeA,
+      [&](ArchetypeType *origType, CanType substType,
+          ArchetypeType *, ArrayRef<ProtocolConformanceRef>) -> CanType {
+    auto interfaceTy = origType->getInterfaceType()->getCanonicalType();
+    substMap[interfaceTy->getAs<SubstitutableType>()] = substType;
+    return substType;
+  });
+
+  if (!substTypeB)
+    return false;
+
+  auto result = TypeChecker::checkGenericArguments(
+      declA->getDeclContext(), SourceLoc(), SourceLoc(), typeB,
+      genericSignatureB->getGenericParams(),
+      genericSignatureB->getRequirements(),
+      QueryTypeSubstitutionMap{ substMap });
+
+  if (result != RequirementCheckResult::Success)
+    return false;
+
+  return substTypeA->isEqual(substTypeB);
+}
+
+static bool isGenericDisjunctionChoice(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::BindOverload)
+    return false;
+
+  auto choice = constraint->getOverloadChoice();
+  if (!choice.isDecl())
+    return false;
+
+  auto *funcDecl = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
+  return funcDecl && funcDecl->isGeneric();
+}
+
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
@@ -555,6 +610,19 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
 
   if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
+
+  // If the solver already found a solution with a better overload choice that
+  // can be unconditionally substituted by the current choice, skip the current
+  // choice.
+  if (LastSolvedChoice && isGenericDisjunctionChoice(choice)) {
+    auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
+    auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
+
+    if (TypeChecker::compareDeclarations(CS.DC, declA, declB) == Comparison::Better) {
+      if (isDeclSubstitutable(declA, /*by=*/declB))
+        return skip("subtype");
+    }
+  }
 
   // If the solver already found a solution with a choice that did not
   // introduce any conversions (i.e., the score is not worse than the
