@@ -3681,7 +3681,7 @@ Parser::parsePlatformVersionConstraintSpec() {
 template <typename SyntaxNode> ParserResult<Expr> Parser::parseExprAST() {
   SyntaxContext->addSyntax(parseExprSyntax<SyntaxNode>());
   // TODO: (syntax-parse) improve this somehow
-  if (SyntaxContext->isTopNode<SyntaxKind::UnknownExpr>()) {
+  if (SyntaxContext->isTopNode<UnknownExprSyntax>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
     auto ExprAST = ASTGenerator.generate(Expr);
     return makeParserResult(ExprAST);

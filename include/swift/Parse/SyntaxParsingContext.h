@@ -19,6 +19,7 @@
 #include "swift/Parse/LibSyntaxGenerator.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Parse/ParsedSyntaxNodes.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -296,8 +297,9 @@ public:
 
   /// Whether the top node on the parsing context's storage stack is of the
   /// given \c Kind.
-  template <SyntaxKind Kind> bool isTopNode() {
-    return getStorage().back().getKind() == Kind;
+  template <typename SyntaxNode> bool isTopNode() {
+    auto parts = getParts();
+    return (!parts.empty() && SyntaxNode::kindof(parts.back().getKind()));
   }
 
   /// Creates a parsed libSyntax node from the top node of the parsing context's
@@ -394,6 +396,7 @@ public:
 
 template <typename SyntaxNode>
 inline SyntaxNode SyntaxParsingContext::topNode() {
+  assert(isTopNode<SyntaxNode>());
   ParsedRawSyntaxNode &TopNode = getStorage().back();
   if (TopNode.isRecorded()) {
     OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
@@ -403,6 +406,7 @@ inline SyntaxNode SyntaxParsingContext::topNode() {
 }
 
 template <> inline TokenSyntax SyntaxParsingContext::topNode<TokenSyntax>() {
+  assert(isTopNode<TokenSyntax>());
   ParsedRawSyntaxNode &TopNode = getStorage().back();
   if (TopNode.isRecorded()) {
     OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
