@@ -77,6 +77,7 @@ constexpr size_t SyntaxAlignInBits = 3;
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
 class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
+  friend class EnableContextRAII;
 public:
   /// The shared data for all syntax parsing contexts with the same root.
   /// This should be accessible from the root context only.
@@ -353,5 +354,31 @@ public:
   SWIFT_DEBUG_DUMPER(dumpStorage());
 };
 
+/// Ensure that the \c SyntaxParsingContext is enabled while this RAII is alive.
+/// If the context was previously enabled, do nothing. Otherwise, enable the
+/// context and set its accumulation mode to discard. Once the RAII is destroyed
+/// reset the context's accumulation mode to what it was previously.
+class EnableContextRAII {
+  SyntaxParsingContext &Ctx;
+  bool WasEnabled;
+  SyntaxParsingContext::AccumulationMode PreviousMode;
+
+public:
+  explicit EnableContextRAII(SyntaxParsingContext &SPCtx)
+      : Ctx(SPCtx), WasEnabled(Ctx.Enabled), PreviousMode(Ctx.Mode) {
+        if (!WasEnabled) {
+          Ctx.Enabled = true;
+          Ctx.Mode = SyntaxParsingContext::AccumulationMode::Discard;
+        }
+  }
+
+  ~EnableContextRAII() {
+    if (!WasEnabled) {
+      assert(Ctx.Mode == SyntaxParsingContext::AccumulationMode::Discard && "Accumulation mode modified while RAII was alive");
+      Ctx.Enabled = WasEnabled;
+      Ctx.Mode = PreviousMode;
+    }
+  }
+};
 } // namespace swift
 #endif // SWIFT_SYNTAX_PARSING_CONTEXT_H
