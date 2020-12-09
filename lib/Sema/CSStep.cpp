@@ -18,6 +18,7 @@
 #include "CSStep.h"
 #include "TypeChecker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -529,7 +530,9 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   return take(prevFailed);
 }
 
-static bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
+bool IsDeclSubstitutableRequest::evaluate(Evaluator &evaluator,
+                                          ValueDecl *declA,
+                                          ValueDecl *declB) const {
   auto *typeA = declA->getInterfaceType()->getAs<GenericFunctionType>();
   auto *typeB = declB->getInterfaceType()->getAs<GenericFunctionType>();
 
@@ -569,6 +572,12 @@ static bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
     return false;
 
   return substTypeA->isEqual(substTypeB);
+}
+
+static bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
+  return evaluateOrDefault(declA->getASTContext().evaluator,
+                           IsDeclSubstitutableRequest{ declA, declB },
+                           false);
 }
 
 static bool isGenericDisjunctionChoice(Constraint *constraint) {

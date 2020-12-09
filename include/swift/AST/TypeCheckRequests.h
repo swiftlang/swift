@@ -1883,6 +1883,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether substituting the first generic function decl with the
+/// second generic function decl will satisfy all requirements and produce
+/// the same function type.
+class IsDeclSubstitutableRequest
+    : public SimpleRequest<IsDeclSubstitutableRequest,
+                           bool(ValueDecl *, ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *declA, ValueDecl *declB) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether this declaration inherits its superclass' designated and
 /// convenience initializers.
 class InheritsSuperclassInitializersRequest
