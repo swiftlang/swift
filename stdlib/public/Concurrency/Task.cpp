@@ -20,8 +20,10 @@
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
 
+#if defined(__APPLE__)
 // TODO: We shouldn't need this
 #include <dispatch/dispatch.h>
+#endif
 
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
