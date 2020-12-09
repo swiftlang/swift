@@ -414,7 +414,7 @@ extension Unsafe${Mutable}BufferPointer {
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     _position = start
-    self.count = count
+    self.count = _assumeNonNegative(count)
   }
 
   @inlinable // unsafe-performance

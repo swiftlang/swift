@@ -436,7 +436,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
     _position = start
-    _end = start.map { $0 + count }
+    _end = start.map { $0 + _assumeNonNegative(count) }
   }
 
   /// Creates a new buffer over the same memory as the given buffer.
