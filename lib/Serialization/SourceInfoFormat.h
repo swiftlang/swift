@@ -18,7 +18,7 @@
 #ifndef SWIFT_SERIALIZATION_SOURCEINFOFORMAT_H
 #define SWIFT_SERIALIZATION_SOURCEINFOFORMAT_H
 
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 
 namespace swift {
 namespace serialization {
