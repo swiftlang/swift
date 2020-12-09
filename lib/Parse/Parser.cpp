@@ -1512,11 +1512,6 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
   TokReceiver->receive(Tok);
   ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
       Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
-
-  // TODO: (syntax-parse) remove when possible
-  // TODO: (syntax-parse) handle backtracking properly
-  ASTGenerator.pushLoc(Tok.getLoc());
-
   consumeTokenWithoutFeedingReceiver();
   return ParsedToken;
 }

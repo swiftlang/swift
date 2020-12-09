@@ -17,8 +17,6 @@
 using namespace swift;
 using namespace swift::syntax;
 
-void ASTGen::pushLoc(SourceLoc Loc) { LocStack.push_back(Loc); }
-
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
   char *start = static_cast<char *>(Context.Allocate(Orig.size(), 1));
   char *p = start;
@@ -41,17 +39,25 @@ StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);
 }
 
-SourceLoc ASTGen::topLoc() {
-  // TODO: (syntax-parse) create SourceLoc by pointing the offset of Syntax
-  // node into the source buffer
-  return LocStack.back();
+SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
+  return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
 }
 
-MagicIdentifierLiteralExpr *
-ASTGen::generateMagicIdentifierLiteralExpr(const TokenSyntax &PoundToken) {
+SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc,
+                                const TokenSyntax &Token) {
+  return advanceLocAfter(Loc, Token.withTrailingTrivia({}));
+}
+
+SourceLoc ASTGen::advanceLocAfter(const SourceLoc &Loc, const Syntax &Node) {
+  return Loc.getAdvancedLoc(
+      Node.getAbsoluteEndPositionAfterTrailingTrivia().getOffset());
+}
+
+Expr *ASTGen::generateMagicIdentifierLiteralExpr(const TokenSyntax &PoundToken,
+                                                 const SourceLoc &Loc) {
   auto Kind = getMagicIdentifierLiteralKind(PoundToken.getTokenKind());
-  SourceLoc Loc = topLoc();
-  return new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+  SourceLoc TokenLoc = advanceLocBegin(Loc, PoundToken);
+  return new (Context) MagicIdentifierLiteralExpr(Kind, TokenLoc);
 }
 
 /// Map magic literal tokens such as #file to their

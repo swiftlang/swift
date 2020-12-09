@@ -3679,15 +3679,16 @@ Parser::parsePlatformVersionConstraintSpec() {
 // MARK: - Expression parsing using libSyntax
 
 template <typename SyntaxNode> ParserResult<Expr> Parser::parseExprAST() {
+  auto Loc = leadingTriviaLoc();
   SyntaxContext->addSyntax(parseExprSyntax<SyntaxNode>());
   // TODO: (syntax-parse) improve this somehow
   if (SyntaxContext->isTopNode<UnknownExprSyntax>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
-    auto ExprAST = ASTGenerator.generate(Expr);
+    auto ExprAST = ASTGenerator.generate(Expr, Loc);
     return makeParserResult(ExprAST);
   }
   auto Expr = SyntaxContext->topNode<SyntaxNode>();
-  auto ExprAST = ASTGenerator.generate(Expr);
+  auto ExprAST = ASTGenerator.generate(Expr, Loc);
   return makeParserResult(ExprAST);
 }
 

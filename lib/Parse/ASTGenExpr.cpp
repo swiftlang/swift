@@ -17,64 +17,64 @@
 using namespace swift;
 using namespace swift::syntax;
 
-BooleanLiteralExpr *ASTGen::generate(BooleanLiteralExprSyntax &Expr) {
+Expr *ASTGen::generate(const BooleanLiteralExprSyntax &Expr, const SourceLoc &Loc) {
   TokenSyntax Literal = Expr.getBooleanLiteral();
   assert(Literal.getTokenKind() == tok::kw_true || 
          Literal.getTokenKind() == tok::kw_false);
   bool Value = Literal.getTokenKind() == tok::kw_true;
-  SourceLoc Loc = topLoc();
-  return new (Context) BooleanLiteralExpr(Value, Loc);
+  SourceLoc LiteralLoc = advanceLocBegin(Loc, Literal);
+  return new (Context) BooleanLiteralExpr(Value, LiteralLoc);
 }
 
-FloatLiteralExpr *ASTGen::generate(FloatLiteralExprSyntax &Expr) {
-  TokenSyntax FloatingDigits = Expr.getFloatingDigits();
-  StringRef Text = copyAndStripUnderscores(FloatingDigits.getText());
-  SourceLoc Loc = topLoc();
-  return new (Context) FloatLiteralExpr(Text, Loc);
+Expr *ASTGen::generate(const FloatLiteralExprSyntax &Expr, const SourceLoc &Loc) {
+  TokenSyntax Digits = Expr.getFloatingDigits();
+  StringRef Text = copyAndStripUnderscores(Digits.getText());
+  auto DigitsLoc = advanceLocBegin(Loc, Digits);
+  return new (Context) FloatLiteralExpr(Text, DigitsLoc);
 }
 
-IntegerLiteralExpr *ASTGen::generate(IntegerLiteralExprSyntax &Expr) {
+Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr, const SourceLoc &Loc) {
   TokenSyntax Digits = Expr.getDigits();
   StringRef Text = copyAndStripUnderscores(Digits.getText());
-  SourceLoc Loc = topLoc();
-  return new (Context) IntegerLiteralExpr(Text, Loc);
+  auto DigitsLoc = advanceLocBegin(Loc, Digits);
+  return new (Context) IntegerLiteralExpr(Text, DigitsLoc);
 }
 
-NilLiteralExpr *ASTGen::generate(NilLiteralExprSyntax &Expr) {
+Expr *ASTGen::generate(const NilLiteralExprSyntax &Expr, const SourceLoc &Loc) {
   TokenSyntax Nil = Expr.getNilKeyword();
-  SourceLoc Loc = topLoc();
-  return new (Context) NilLiteralExpr(Loc);
+  SourceLoc NilLoc = advanceLocBegin(Loc, Nil);
+  return new (Context) NilLiteralExpr(NilLoc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundColumnExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundColumn());
+Expr *ASTGen::generate(const PoundColumnExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundColumn(), Loc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundDsohandleExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundDsohandle());
+Expr *ASTGen::generate(const PoundDsohandleExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundDsohandle(), Loc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundFileExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundFile());
+Expr *ASTGen::generate(const PoundFileExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundFile(), Loc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundFileIDExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundFileID());
+Expr *ASTGen::generate(const PoundFileIDExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundFileID(), Loc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundFilePathExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundFilePath());
+Expr *ASTGen::generate(const PoundFilePathExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundFilePath(), Loc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundLineExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundLine());
+Expr *ASTGen::generate(const PoundFunctionExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundFunction(), Loc);
 }
 
-MagicIdentifierLiteralExpr *ASTGen::generate(PoundFunctionExprSyntax &Expr) {
-  return generateMagicIdentifierLiteralExpr(Expr.getPoundFunction());
+Expr *ASTGen::generate(const PoundLineExprSyntax &Expr, const SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundLine(), Loc);
 }
 
-Expr *ASTGen::generate(UnknownExprSyntax &Expr) {
+Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc &Loc) {
   if (Expr.getNumChildren() == 1 && Expr.getChild(0)->isToken()) {
     Syntax Token = *Expr.getChild(0);
     tok Kind = Token.getRaw()->getTokenKind();
@@ -85,8 +85,8 @@ Expr *ASTGen::generate(UnknownExprSyntax &Expr) {
     case tok::kw___FUNCTION__:
     case tok::kw___DSO_HANDLE__: {
       auto MagicKind = getMagicIdentifierLiteralKind(Kind);
-      SourceLoc Loc = topLoc();
-      return new (Context) MagicIdentifierLiteralExpr(MagicKind, Loc);
+      SourceLoc TokenLoc = advanceLocBegin(Loc, Token);
+      return new (Context) MagicIdentifierLiteralExpr(MagicKind, TokenLoc);
     }
     default:
       return nullptr;

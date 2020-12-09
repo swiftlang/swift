@@ -25,39 +25,28 @@ class TupleTypeRepr;
 /// Generates AST nodes from Syntax nodes.
 class ASTGen {
   ASTContext &Context;
-
-  // TODO: (syntax-parse) remove when possible
-  /// A stack of source locations of syntax constructs. Allows us to get the
-  /// SourceLoc necessary to create AST nodes for nodes in not-yet-complete
-  /// Syntax tree. The topmost item should always correspond to the token/node
-  /// that has been parsed/transformed most recently.
-  llvm::SmallVector<SourceLoc, 16> LocStack;
-
 public:
   explicit ASTGen(ASTContext &Context) : Context(Context) {}
 
   //===--------------------------------------------------------------------===//
   // MARK: - Expressions
 public:
-  BooleanLiteralExpr *generate(syntax::BooleanLiteralExprSyntax &Expr);
-  FloatLiteralExpr *generate(syntax::FloatLiteralExprSyntax &Expr);
-  IntegerLiteralExpr *generate(syntax::IntegerLiteralExprSyntax &Expr);
-  NilLiteralExpr *generate(syntax::NilLiteralExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundColumnExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundDsohandleExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundFileExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundFileIDExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundFilePathExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundLineExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *generate(syntax::PoundFunctionExprSyntax &Expr);
-  Expr *generate(syntax::UnknownExprSyntax &Expr);
+  Expr *generate(const syntax::BooleanLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::FloatLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::IntegerLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::NilLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundColumnExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundDsohandleExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundFileExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundFileIDExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundFilePathExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundLineExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::PoundFunctionExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const syntax::UnknownExprSyntax &Expr, const SourceLoc &Loc);
 
   //===--------------------------------------------------------------------===//
   // MARK: Other
 public:
-  /// Stores source location necessary for AST creation.
-  void pushLoc(SourceLoc Loc);
-
   /// Copy a numeric literal value into AST-owned memory, stripping underscores
   /// so the semantic part of the value can be parsed by APInt/APFloat parsers.
   static StringRef copyAndStripUnderscores(StringRef Orig, ASTContext &Context);
@@ -65,10 +54,16 @@ public:
 private:
   StringRef copyAndStripUnderscores(StringRef Orig);
 
-  SourceLoc topLoc();
+  static SourceLoc advanceLocBegin(const SourceLoc &Loc,
+                                   const syntax::Syntax &Node);
+  static SourceLoc advanceLocEnd(const SourceLoc &Loc,
+                                 const syntax::TokenSyntax &Token);
+  static SourceLoc advanceLocAfter(const SourceLoc &Loc,
+                                   const syntax::Syntax &Node);
 
-  MagicIdentifierLiteralExpr *
-  generateMagicIdentifierLiteralExpr(const syntax::TokenSyntax &PoundToken);
+  Expr *
+  generateMagicIdentifierLiteralExpr(const syntax::TokenSyntax &PoundToken,
+                                     const SourceLoc &Loc);
 
   /// Map magic literal tokens such as #file to their MagicIdentifierLiteralExpr
   /// kind.
