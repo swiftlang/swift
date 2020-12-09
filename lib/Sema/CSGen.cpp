@@ -3719,7 +3719,7 @@ generateForEachStmtConstraints(
   ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(),
       isAsync ? 
-        KnownProtocolKind::GeneratorProtocol : KnownProtocolKind::IteratorProtocol);
+        KnownProtocolKind::AsyncIteratorProtocol : KnownProtocolKind::IteratorProtocol);
   if (!iteratorProto)
     return None;
 

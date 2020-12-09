@@ -5082,7 +5082,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Sequence:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::IteratorProtocol:
-  case KnownProtocolKind::GeneratorProtocol:
+  case KnownProtocolKind::AsyncIteratorProtocol:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:

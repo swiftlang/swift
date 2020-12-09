@@ -1003,7 +1003,7 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
 
   // Compute the reference to the the generator's next().
   auto generatorProto =
-      SGF.getASTContext().getProtocol(KnownProtocolKind::GeneratorProtocol);
+      SGF.getASTContext().getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
   ValueDecl *generatorNextReq = generatorProto->getSingleRequirement(
       DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
                ArrayRef<Identifier>()));

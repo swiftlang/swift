@@ -970,12 +970,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Differentiable:
     M = getLoadedModule(Id_Differentiation);
     break;
+  case KnownProtocolKind::Actor:
   case KnownProtocolKind::AsyncSequence:
-  case KnownProtocolKind::GeneratorProtocol:
-    M = getLoadedModule(Id_Concurrency);
-    break;
-  case KnownProtocolKind::AsyncSequence:
-  case KnownProtocolKind::GeneratorProtocol:
+  case KnownProtocolKind::AsyncIteratorProtocol:
     M = getLoadedModule(Id_Concurrency);
     break;
   default:

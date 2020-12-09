@@ -89,7 +89,7 @@ PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Differentiable)
 
 PROTOCOL(AsyncSequence)
-PROTOCOL(GeneratorProtocol)
+PROTOCOL(AsyncIteratorProtocol)
 
 PROTOCOL(FloatingPoint)
 
