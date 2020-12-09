@@ -76,13 +76,6 @@ public:
   SyntaxNode getLibSyntaxNodeFor(OpaqueSyntaxNode Node) {
     return make<SyntaxNode>(Actions->getLibSyntaxNodeFor(Node));
   }
-
-  OpaqueSyntaxNode finalizeNode(OpaqueSyntaxNode Node) {
-    if (Actions->isReleaseOfLibSyntaxNodeNeeded()) {
-      Actions->getLibSyntaxNodeFor(Node)->Release();
-    }
-    return Actions->getExplicitNodeFor(Node);
-  }
 };
 } // namespace swift
 
