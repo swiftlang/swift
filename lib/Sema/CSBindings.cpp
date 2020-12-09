@@ -58,6 +58,16 @@ bool ConstraintSystem::PotentialBindings::isDelayed() const {
   return false;
 }
 
+bool ConstraintSystem::PotentialBindings::involvesTypeVariables() const {
+  // This is effectively O(1) right now since bindings are re-computed
+  // on each step of the solver, but once bindings are computed
+  // incrementally it becomes more important to double-check that
+  // any adjacent type variables found previously are still unresolved.
+  return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
+    return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
+  });
+}
+
 bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
   if (isGenericParameter())
@@ -814,7 +824,7 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
-  return !InvolvesTypeVariables;
+  return !involvesTypeVariables();
 }
 
 ConstraintSystem::PotentialBindings
@@ -888,17 +898,16 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       }
     }
 
-    // Can't infer anything.
-    if (result.InvolvesTypeVariables)
-      return None;
-
     // Check whether both this type and another type variable are
     // inferable.
     SmallPtrSet<TypeVariableType *, 4> typeVars;
     findInferableTypeVars(first, typeVars);
     findInferableTypeVars(second, typeVars);
-    if (typeVars.size() > 1 && typeVars.count(typeVar))
-      result.InvolvesTypeVariables = true;
+
+    if (typeVars.erase(typeVar)) {
+      result.AdjacentVars.insert(typeVars.begin(), typeVars.end());
+    }
+
     return None;
   }
 
@@ -927,10 +936,26 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // If the type we'd be binding to is a dependent member, don't try to
   // resolve this type variable yet.
   if (type->is<DependentMemberType>()) {
-    if (!ConstraintSystem::typeVarOccursInType(typeVar, type,
-                                               &result.InvolvesTypeVariables)) {
-      result.DelayedBy.push_back(constraint);
+    SmallVector<TypeVariableType *, 4> referencedVars;
+    type->getTypeVariables(referencedVars);
+
+    bool containsSelf = false;
+    for (auto *var : referencedVars) {
+      // Add all type variables encountered in the type except
+      // to the current type variable.
+      if (var != typeVar) {
+        result.AdjacentVars.insert(var);
+        continue;
+      }
+
+      containsSelf = true;
     }
+
+    // If inferred type doesn't contain the current type variable,
+    // let's mark bindings as delayed until dependent member type
+    // is resolved.
+    if (!containsSelf)
+      result.DelayedBy.push_back(constraint);
 
     return None;
   }
@@ -951,15 +976,18 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
   if (auto boundType = checkTypeOfBinding(typeVar, type)) {
     type = *boundType;
-    if (type->hasTypeVariable())
-      result.InvolvesTypeVariables = true;
+    if (type->hasTypeVariable()) {
+      SmallVector<TypeVariableType *, 4> referencedVars;
+      type->getTypeVariables(referencedVars);
+      result.AdjacentVars.insert(referencedVars.begin(), referencedVars.end());
+    }
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
     if (!bindingTypeVar)
       return None;
 
-    result.InvolvesTypeVariables = true;
+    result.AdjacentVars.insert(bindingTypeVar);
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
