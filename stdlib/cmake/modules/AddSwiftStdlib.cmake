@@ -1162,7 +1162,7 @@ function(_add_swift_target_library_single target name)
   endif()
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(lto_type "${SWIFT_STDLIB_LLVM_LTO}")
+    set(lto_type "${SWIFT_STDLIB_LTO_TYPE}")
   else()
     set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
   endif()

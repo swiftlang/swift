@@ -79,8 +79,8 @@ option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
 
-set(SWIFT_STDLIB_LLVM_LTO OFF CACHE STRING
-    "Build stdlib with LLVM LTO. Valid values are 'OFF' (the default), 'thin' and 'full'.")
+set(SWIFT_STDLIB_LTO_TYPE "none" CACHE STRING
+    "Build stdlib with LLVM LTO. Valid values are 'none' (the default), 'llvm-thin' and 'llvm-full'.")
 
 #
 # End of user-configurable options.
