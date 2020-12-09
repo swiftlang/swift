@@ -12,8 +12,19 @@
 
 import Swift
 
-public protocol AsyncSequence {
-  associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
-  associatedtype Element
-  func makeAsyncIterator() -> AsyncIterator
+extension AsyncSequence {
+  public func first(where predicate: (Element) async throws -> Bool) async throws /*rethrows*/ -> Element? {
+    var it = makeAsyncIterator()
+    while let element = await try it.next() {
+      if await try predicate(element) {
+        return element
+      }
+    }
+    return nil
+  }
+  
+  public func first() async throws /*rethrows*/ -> Element? {
+    var it = makeAsyncIterator()
+    return await try it.next()
+  }
 }

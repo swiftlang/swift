@@ -12,8 +12,8 @@
 
 import Swift
 
-public protocol AsyncSequence {
-  associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
+public protocol AsyncIteratorProtocol {
   associatedtype Element
-  func makeAsyncIterator() -> AsyncIterator
+  mutating func next() async throws -> Element?
+  mutating func cancel()
 }

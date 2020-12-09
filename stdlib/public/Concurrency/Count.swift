@@ -12,8 +12,13 @@
 
 import Swift
 
-public protocol AsyncSequence {
-  associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
-  associatedtype Element
-  func makeAsyncIterator() -> AsyncIterator
+extension AsyncSequence {
+  public func count() async throws /*rethrows*/ -> Int {
+    var count = 0
+    var it = makeAsyncIterator()
+    while await try it.next() != nil {
+      count += 1
+    }
+    return count
+  }
 }
