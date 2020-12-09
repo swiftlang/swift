@@ -10,6 +10,15 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Bool = await slowServer.checkAvailability()
   let _: String = await try slowServer.findAnswer()
   let _: String = await try slowServer.findAnswerFailingly()
+
+  let (aOpt, b) = await try slowServer.findQAndA()
+  if let a = aOpt { // make sure aOpt is optional
+    print(a)
+  }
+  let _: String = b // make sure b is non-optional
+
+  let _: String = await try slowServer.findAnswer()
+
   let _: Void = await slowServer.doSomethingFun("jump")
   let _: (Int) -> Void = slowServer.completionHandler
 
