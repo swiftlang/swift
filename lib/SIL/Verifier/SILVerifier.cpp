@@ -462,7 +462,6 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
-    case SILArgumentConvention::Direct_Deallocating:
       assert(conv.isIndirectConvention() && "Expect an indirect convention");
       return true; // return something "conservative".
     }
