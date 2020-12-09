@@ -26,6 +26,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -524,7 +525,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
       Context(SF.getASTContext()),
       TokReceiver(SF.shouldCollectTokens()
                       ? new TokenRecorder(SF.getASTContext(), L->getBufferID())
-                      : new ConsumeTokenReceiver()) {
+                      : new ConsumeTokenReceiver()),
+      ASTGenerator(SF.getASTContext()) {
   // If no syntax parsing actions were provided, generate a hidden syntax
   // parsing action that only generates the libSyntax tree. This makes sure
   // that the libSyntax tree is always generated.
@@ -1503,4 +1505,15 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << "With parser at source location: ";
   P.Tok.getLoc().print(out, P.Context.SourceMgr);
   out << '\n';
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Primitive Parsing using libSyntax
+
+ParsedTokenSyntax Parser::consumeTokenSyntax() {
+  TokReceiver->receive(Tok);
+  ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
+      Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
+  consumeTokenWithoutFeedingReceiver();
+  return ParsedToken;
 }
