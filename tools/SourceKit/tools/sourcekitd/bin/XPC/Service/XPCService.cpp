@@ -222,6 +222,8 @@ static std::string getDiagnosticDocumentationPath() {
   return path.str().str();
 }
 
+static dispatch_queue_t msgHandlingQueue;
+
 static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
                                                 xpc_object_t event) {
   xpc_type_t type = xpc_get_type(event);
@@ -245,8 +247,7 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
     assert(type == XPC_TYPE_DICTIONARY);
     // Handle the message
     xpc_retain(event);
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0),
-    ^{
+    dispatch_async(msgHandlingQueue, ^{
       xpc_object_t contents = xpc_dictionary_get_value(event, "msg");
 
       if (!contents) {
@@ -324,7 +325,7 @@ static void sourcekitdServer_event_handler(xpc_connection_t peer) {
   // you can defer this call until after that initialization is done.
   xpc_connection_resume(peer);
 
-  dispatch_async(dispatch_get_main_queue(), ^{
+  dispatch_barrier_async(msgHandlingQueue, ^{
     getInitializationInfo(MainConnection);
   });
 }
@@ -367,6 +368,10 @@ int main(int argc, const char *argv[]) {
   } else {
     LOG_WARN_FUNC("getrlimit failed: " << llvm::sys::StrError());
   }
+
+  auto attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT,
+                                                      QOS_CLASS_DEFAULT, 0);
+  msgHandlingQueue = dispatch_queue_create("request-handling", attr);
 
   xpc_main(sourcekitdServer_event_handler);
   return 0;
