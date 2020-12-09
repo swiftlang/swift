@@ -1044,18 +1044,6 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   }
 }
 
-/// Map magic literal kinds such as #file to their SyntaxKind.
-static SyntaxKind
-getMagicIdentifierSyntaxKind(MagicIdentifierLiteralExpr::Kind LiteralKind) {
-  switch (LiteralKind) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-  case MagicIdentifierLiteralExpr::NAME: \
-    return SyntaxKind::SYNTAX_KIND;
-#include "swift/AST/MagicIdentifierKinds.def"
-  }
-  llvm_unreachable("not a magic literal kind");
-}
-
 ParserResult<Expr>
 Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                                bool periodHasKeyPathBehavior,
@@ -1420,6 +1408,38 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   switch (Tok.getKind()) {
   case tok::integer_literal:
     return parseExprAST<IntegerLiteralExprSyntax>();
+  case tok::floating_literal:
+    return parseExprAST<FloatLiteralExprSyntax>();
+  case tok::kw_nil:
+    return parseExprAST<NilLiteralExprSyntax>();
+  case tok::kw_true:
+  case tok::kw_false:
+    return parseExprAST<BooleanLiteralExprSyntax>();
+  // Cases for magic identifier tokens
+  case tok::pound_file:
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    switch (Kind) {
+    case MagicIdentifierLiteralExpr::FileID:
+      return parseExprAST<PoundFileIDExprSyntax>();
+    case MagicIdentifierLiteralExpr::FilePath:
+      return parseExprAST<PoundFilePathExprSyntax>();
+    case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+      return parseExprAST<PoundFileExprSyntax>();
+    case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+      return parseExprAST<PoundFileExprSyntax>();
+    case MagicIdentifierLiteralExpr::Function:
+      return parseExprAST<PoundFunctionExprSyntax>();
+    case MagicIdentifierLiteralExpr::Line:
+      return parseExprAST<PoundLineExprSyntax>();
+    case MagicIdentifierLiteralExpr::Column:
+      return parseExprAST<PoundColumnExprSyntax>();
+    case MagicIdentifierLiteralExpr::DSOHandle:
+      return parseExprAST<PoundDsohandleExprSyntax>();
+    }
+  }
   default:
     break;
   }
@@ -1427,21 +1447,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   // Direct parsing of tokens to an AST
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   switch (Tok.getKind()) {
-  case tok::integer_literal: {
-    StringRef Text = copyAndStripUnderscores(Tok.getText());
-    SourceLoc Loc = consumeToken(tok::integer_literal);
-    ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
-    return makeParserResult(new (Context)
-                                IntegerLiteralExpr(Text, Loc,
-                                                   /*Implicit=*/false));
-  }
-  case tok::floating_literal: {
-    StringRef Text = copyAndStripUnderscores(Tok.getText());
-    SourceLoc Loc = consumeToken(tok::floating_literal);
-    ExprContext.setCreateSyntax(SyntaxKind::FloatLiteralExpr);
-    return makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
-                                                           /*Implicit=*/false));
-  }
   case tok::at_sign:
     // Objective-C programmers habitually type @"foo", so recover gracefully
     // with a fixit.  If this isn't @"foo", just handle it like an unknown
@@ -1456,49 +1461,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       
   case tok::string_literal:  // "foo"
     return parseExprStringLiteral();
-  
-  case tok::kw_nil:
-    ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
-    return makeParserResult(new (Context)
-                                NilLiteralExpr(consumeToken(tok::kw_nil)));
 
-  case tok::kw_true:
-  case tok::kw_false: {
-    ExprContext.setCreateSyntax(SyntaxKind::BooleanLiteralExpr);
-    bool isTrue = Tok.is(tok::kw_true);
-    return makeParserResult(new (Context)
-                                BooleanLiteralExpr(isTrue, consumeToken()));
-  }
-
-  // Cases for deprecated magic identifier tokens
-#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) case tok::TOKEN:
-#include "swift/AST/MagicIdentifierKinds.def"
-  {
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
-    auto replacement = MagicIdentifierLiteralExpr::getKindString(Kind);
-
-    diagnose(Tok.getLoc(), diag::snake_case_deprecated,
-             Tok.getText(), replacement)
-      .fixItReplace(Tok.getLoc(), replacement);
-    LLVM_FALLTHROUGH;
-  }
-
-  // Cases for non-deprecated magic identifier tokens
-  case tok::pound_file:
-#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
-#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
-#include "swift/AST/MagicIdentifierKinds.def"
-  {
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
-    SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
-
-    ExprContext.setCreateSyntax(SKind);
-    SourceLoc Loc = consumeToken();
-
-    return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
-        Kind, Loc, /*implicit=*/false));
-  }
-      
   case tok::identifier:  // foo
   case tok::kw_self:     // self
 
@@ -3742,8 +3705,119 @@ template <typename SyntaxNode> ParserResult<Expr> Parser::parseExprAST() {
 }
 
 template <>
+ParsedExprSyntax Parser::parseExprSyntax<BooleanLiteralExprSyntax>() {
+  auto Token = consumeTokenSyntax();
+  return ParsedSyntaxRecorder::makeBooleanLiteralExpr(std::move(Token),
+                                                      *SyntaxContext);
+}
+
+template <> ParsedExprSyntax Parser::parseExprSyntax<FloatLiteralExprSyntax>() {
+  auto Token = consumeTokenSyntax(tok::floating_literal);
+  return ParsedSyntaxRecorder::makeFloatLiteralExpr(std::move(Token),
+                                                    *SyntaxContext);
+}
+
+template <>
 ParsedExprSyntax Parser::parseExprSyntax<IntegerLiteralExprSyntax>() {
   auto Token = consumeTokenSyntax(tok::integer_literal);
   return ParsedSyntaxRecorder::makeIntegerLiteralExpr(std::move(Token),
                                                       *SyntaxContext);
+}
+
+template <> ParsedExprSyntax Parser::parseExprSyntax<NilLiteralExprSyntax>() {
+  auto Token = consumeTokenSyntax(tok::kw_nil);
+  return ParsedSyntaxRecorder::makeNilLiteralExpr(std::move(Token),
+                                                  *SyntaxContext);
+}
+
+template <> ParsedExprSyntax Parser::parseExprSyntax<PoundColumnExprSyntax>() {
+  if (Tok.getKind() == tok::kw___COLUMN__) {
+    StringRef fixit = "#column";
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated, Tok.getText(), fixit)
+        .fixItReplace(Tok.getLoc(), fixit);
+
+    auto Token = consumeTokenSyntax(tok::kw___COLUMN__);
+    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+  }
+
+  auto Token = consumeTokenSyntax(tok::pound_column);
+  return ParsedSyntaxRecorder::makePoundColumnExpr(std::move(Token),
+                                                   *SyntaxContext);
+}
+
+template <>
+ParsedExprSyntax Parser::parseExprSyntax<PoundDsohandleExprSyntax>() {
+  if (Tok.getKind() == tok::kw___DSO_HANDLE__) {
+    StringRef fixit = "#dsohandle";
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated, Tok.getText(), fixit)
+        .fixItReplace(Tok.getLoc(), fixit);
+
+    auto Token =
+        consumeTokenSyntax(tok::kw___DSO_HANDLE__);
+    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+  }
+
+  auto Token = consumeTokenSyntax(tok::pound_dsohandle);
+  return ParsedSyntaxRecorder::makePoundDsohandleExpr(std::move(Token),
+                                                      *SyntaxContext);
+}
+
+template <> ParsedExprSyntax Parser::parseExprSyntax<PoundFileExprSyntax>() {
+  if (Tok.getKind() == tok::kw___FILE__) {
+    StringRef fixit = "#file";
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated, Tok.getText(), fixit)
+        .fixItReplace(Tok.getLoc(), fixit);
+
+    auto Token = consumeTokenSyntax(tok::kw___FILE__);
+    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+  }
+
+  auto Token = consumeTokenSyntax(tok::pound_file);
+  return ParsedSyntaxRecorder::makePoundFileExpr(std::move(Token),
+                                                 *SyntaxContext);
+}
+
+template <> ParsedExprSyntax Parser::parseExprSyntax<PoundFileIDExprSyntax>() {
+  auto Token = consumeTokenSyntax(tok::pound_fileID);
+  return ParsedSyntaxRecorder::makePoundFileIDExpr(std::move(Token),
+                                                   *SyntaxContext);
+}
+
+template <>
+ParsedExprSyntax Parser::parseExprSyntax<PoundFilePathExprSyntax>() {
+  auto Token = consumeTokenSyntax(tok::pound_filePath);
+  return ParsedSyntaxRecorder::makePoundFilePathExpr(std::move(Token),
+                                                     *SyntaxContext);
+}
+
+template <> ParsedExprSyntax Parser::parseExprSyntax<PoundLineExprSyntax>() {
+  if (Tok.getKind() == tok::kw___LINE__) {
+    StringRef fixit = "#line";
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated, Tok.getText(), fixit)
+        .fixItReplace(Tok.getLoc(), fixit);
+
+    auto Token = consumeTokenSyntax(tok::kw___LINE__);
+    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+  }
+
+  // FIXME: #line was renamed to #sourceLocation
+  auto Token = consumeTokenSyntax(tok::pound_line);
+  return ParsedSyntaxRecorder::makePoundLineExpr(std::move(Token),
+                                                 *SyntaxContext);
+}
+
+template <>
+ParsedExprSyntax Parser::parseExprSyntax<PoundFunctionExprSyntax>() {
+  if (Tok.getKind() == tok::kw___FUNCTION__) {
+    StringRef fixit = "#function";
+    diagnose(Tok.getLoc(), diag::snake_case_deprecated, Tok.getText(), fixit)
+        .fixItReplace(Tok.getLoc(), fixit);
+
+    auto Token = consumeTokenSyntax(tok::kw___FUNCTION__);
+    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+  }
+
+  auto Token = consumeTokenSyntax(tok::pound_function);
+  return ParsedSyntaxRecorder::makePoundFunctionExpr(std::move(Token),
+                                                     *SyntaxContext);
 }
