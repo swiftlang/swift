@@ -35,87 +35,12 @@
 // For more information, please refer to <http://unlicense.org/>
 
 
-#ifndef __MPSC_BOUNDED_QUEUE_INCLUDED__
-#define __MPSC_BOUNDED_QUEUE_INCLUDED__
+#ifndef __MPSC_BOUNDED_queueINCLUDED__
+#define __MPSC_BOUNDED_queueINCLUDED__
 
 #include <atomic>
 #include <assert.h>
-#include <iostream>
-#include <pthread.h>
-#include <stdio.h>
 #include <mutex>
-#include <queue>
-
-// MPSC Linked Queue
-//
-// It is used for exchange of completed child tasks (futures) and their
-// parent (task group). Any completed group child task must enqueue itself
-// to its parents ready queue, and the task group pulls from the queue when
-// next() is called, suspending the next() call if necessary (i.e. it is known
-// that tasks are pending, and will arrive in the queue).
-//
-// TODO: more docs
-
-// ==== MPMC -------------------------------------------------------------------
-
-template<typename T>
-class MutexQueue {
-    std::queue<T> queue_;
-    mutable std::mutex mutex_;
-
-    // Moved out of public interface to prevent races between this
-    // and pop().
-    bool empty() const {
-      return queue_.empty();
-    }
-
-public:
-    MutexQueue() = default;
-    MutexQueue(const MutexQueue<T> &) = delete ;
-    MutexQueue& operator=(const MutexQueue<T> &) = delete ;
-
-    MutexQueue(MutexQueue<T>&& other) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      queue_ = std::move(other.queue_);
-    }
-
-    virtual ~MutexQueue() { }
-
-    unsigned long size() const {
-      std::lock_guard<std::mutex> lock(mutex_);
-      return queue_.size();
-    }
-
-    bool dequeue(T &output) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      if (queue_.empty()) {
-        return false;
-      }
-      output = queue_.front();
-      queue_.pop();
-      return true;
-    }
-
-    void enqueue(const T item) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      queue_.push(item);
-    }
-
-//    T pop() {
-//      std::lock_guard<std::mutex> lock(mutex_);
-//      if (queue_.empty()) {
-//        return nullptr;
-//      }
-//      T tmp = queue_.front();
-//      queue_.pop();
-//      return tmp;
-//    }
-//
-//    void push(const T &item) {
-//      std::lock_guard<std::mutex> lock(mutex_);
-//      queue_.push(item);
-//    }
-};
 
 //// ==== MPSC ------------------------------------------------------------------------
 //
@@ -124,17 +49,17 @@ public:
 //// which is an C++ implementation of Dmitry Vyukov's non-intrusive lock free
 //// unbound MPSC queue http://www.1024cores.net/home/lock-free-algorithms/queues/non-intrusive-mpsc-node-based-queue
 //template<typename T>
-//class mpsc_queue_t {
+//class mpsc_queuet {
 //public:
 //
-//  mpsc_queue_t() :
+//  mpsc_queuet() :
 //      _head(reinterpret_cast<buffer_node_t *>(new buffer_node_aligned_t)),
 //      _tail(_head.load(std::memory_order_relaxed)) {
 //    buffer_node_t *front = _head.load(std::memory_order_relaxed);
 //    front->next.store(nullptr, std::memory_order_relaxed);
 //  }
 //
-//  ~mpsc_queue_t() {
+//  ~mpsc_queuet() {
 //    T output;
 //    while (this->dequeue(output)) {
 //      // drop;
@@ -187,8 +112,8 @@ public:
 //  std::atomic<buffer_node_t *> _head;
 //  std::atomic<buffer_node_t *> _tail;
 //
-//  mpsc_queue_t(const mpsc_queue_t &) {} // not copyable
-//  void operator=(const mpsc_queue_t &) {} // not movable
+//  mpsc_queuet(const mpsc_queuet &) {} // not copyable
+//  void operator=(const mpsc_queuet &) {} // not movable
 //};
 
 #endif

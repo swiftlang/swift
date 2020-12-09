@@ -75,9 +75,7 @@ func test_sum_nextOnPending() {
       while let n = await try! group.next() {
         assert(n <= 3, "Unexpected value: \(n)! Expected <= 3")
         print("next: \(n)")
-        DispatchQueue.main.sync { // FIXME: remove once executors/actors are a thing; they should provide us a way to guarantee the safety here
-          sum += n
-        }
+        sum += n
         print("before group.next(), sum: \(sum)")
       }
 

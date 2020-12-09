@@ -110,27 +110,24 @@ static void runTaskWithGroupPollResult(
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  fprintf(stderr, "error: runTaskWithGroupPollResult[%d %s:%d]: runTaskWithGroupPollResult polled, storage: %d, retainedTask: %d, STATUS: %d\n",
-          pthread_self(), __FILE__, __LINE__, result.storage, result.retainedTask, result.status);
-
   // Was it an error or successful return?
   waitingTaskContext->result.hadErrorResult =
-      result.status == AsyncTask::GroupFragment::ChannelPollStatus::Error;
+      result.status == AsyncTask::GroupFragment::GroupPollStatus::Error;
 
   // Extract the stored value into the waiting task's result storage:
   switch (result.status) {
-    case AsyncTask::GroupFragment::ChannelPollStatus::Success:
+    case AsyncTask::GroupFragment::GroupPollStatus::Success:
       waitingTaskContext->result.storage = result.storage;
       break;
-    case AsyncTask::GroupFragment::ChannelPollStatus::Error:
+    case AsyncTask::GroupFragment::GroupPollStatus::Error:
       waitingTaskContext->result.storage =
         reinterpret_cast<OpaqueValue *>(result.storage);
       break;
-    case AsyncTask::GroupFragment::ChannelPollStatus::Empty:
+    case AsyncTask::GroupFragment::GroupPollStatus::Empty:
       // return a `nil` here (as result of the `group.next()`)
       waitingTaskContext->result.storage = nullptr;
       break;
-    case AsyncTask::GroupFragment::ChannelPollStatus::Waiting:
+    case AsyncTask::GroupFragment::GroupPollStatus::Waiting:
       assert(false && "Must not attempt to run with a Waiting result.");
   }
 
@@ -140,8 +137,6 @@ static void runTaskWithGroupPollResult(
   // if we need to, release the now completed task so it can be destroyed
   if (result.retainedTask) {
     swift_release(result.retainedTask);
-//    fprintf(stderr, "error: %s[%d %s:%d]: group swift_released retained task: %d, REF_COUNT: %d\n",
-//            __FUNCTION__, pthread_self(), __FILE__, __LINE__, result.retainedTask, swift::swift_retainCount(result.retainedTask));
   }
 }
 

@@ -323,12 +323,6 @@ func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
-// TODO: _taskFUturePoll -- need to return the Task, which we need to
-// builting native object is treated as owned and releases
-// TODO: if noone holds the the handle to a task, after next we should destroy it
-// -- check this by printing in destroyFuture
-// (error, storage, child NativeObject?) // TODO check if the child is automatically released
-
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
   on task: Builtin.NativeObject
@@ -358,15 +352,16 @@ public func _taskFutureGetThrowing<T>(
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
-public func _runChildTask<T>(operation: @escaping () async throws -> T) async
-    -> Builtin.NativeObject
-{
+public func _runChildTask<T>(
+  overridingPriority priorityOverride: Task.Priority? = nil,
+  operation: @escaping () async throws -> T
+) async -> Builtin.NativeObject {
   let currentTask = Builtin.getCurrentAsyncTask()
 
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
   flags.kind = .task
-  flags.priority = getJobFlags(currentTask).priority
+  flags.priority = priorityOverride ?? getJobFlags(currentTask).priority
   flags.isFuture = true
   flags.isChildTask = true
 
@@ -378,11 +373,6 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
   return task
-}
-
-struct RawTaskFutureWaitResult {
-  let hadErrorResult: Bool
-  let storage: UnsafeRawPointer?
 }
 
 @_silgen_name("swift_task_cancel")

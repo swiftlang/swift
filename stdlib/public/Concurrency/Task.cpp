@@ -42,15 +42,14 @@ void FutureFragment::destroy() {
   }
 }
 
-FutureFragment::Status
-AsyncTask::waitFuture(AsyncTask *waitingTask) {
+FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
   assert(isFuture());
   auto fragment = futureFragment();
 
-  WaitQueueItem queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+  auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
@@ -59,7 +58,7 @@ AsyncTask::waitFuture(AsyncTask *waitingTask) {
       return queueHead.getStatus();
 
     case Status::Executing:
-      // Task is not complete. We'll need to add ourselves to the queue.
+      // Task is now complete. We'll need to add ourselves to the queue.
       break;
     }
 
@@ -81,9 +80,6 @@ AsyncTask::waitFuture(AsyncTask *waitingTask) {
 void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
-
-  fprintf(stderr, "error: %s[%d %s:%d]: complete future: %d\n",
-      __FUNCTION__, pthread_self(), __FILE__, __LINE__, this);
 
   assert(isFuture());
   auto fragment = futureFragment();
@@ -107,11 +103,9 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 
   // If this is task group child, notify the parent group about the completion.
   if (isTaskGroupChild()) {
-    // then we must offer into the parent group's channel that we completed,
+    // then we must offer into the parent group that we completed,
     // so it may `next()` poll completed child tasks in completion order.
     auto parent = childFragment()->getParent();
-    fprintf(stderr, "error: %s[%d %s:%d]:     complete future: %d, signal completion to group -> %d\n",
-            __FUNCTION__, pthread_self(), __FILE__, __LINE__, this, parent);
     assert(parent->isTaskGroup());
     parent->groupOffer(this, context, executor);
   }
@@ -133,9 +127,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
-
-  fprintf(stderr, "error: %s[%d %s:%d]: destroy: %d\n",
-    __FUNCTION__, pthread_self(), __FILE__, __LINE__, task);
 
   // For a group, destroy the queues and results.
   if (task->isTaskGroup()) {
@@ -176,9 +167,6 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
 SWIFT_CC(swift)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
                          AsyncContext *context) {
-//  fprintf(stderr, "error: %s[%d %s:%d]: complete task: %d\n",
-//          __FUNCTION__, pthread_self(), __FILE__, __LINE__, task);
-
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
@@ -195,13 +183,7 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   // Release the task, balancing the retain that a running task has on itself.
   // If it was a group child task, it will remain until the group returns it.
   assert(task && "task to be released MUST NOT BE NULL");
-
-  fprintf(stderr, "error: %s[%d %s:%d]: about to release swift_released: %d, ref_count: %d\n",
-          __FUNCTION__, pthread_self(), __FILE__, __LINE__, task, swift::swift_retainCount(task));
-
   swift_release(task);
-  fprintf(stderr, "error: %s[%d %s:%d]: swift_released: %d, ref_count: %d\n",
-          __FUNCTION__, pthread_self(), __FILE__, __LINE__, task, swift::swift_retainCount(task));
 }
 
 AsyncTaskAndContext

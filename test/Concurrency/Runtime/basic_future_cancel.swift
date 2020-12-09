@@ -36,7 +36,7 @@ func testCancel(shouldThrow: Bool) {
       cancelled = true
       print("Future was cancelled")
       if shouldThrow {
-        try await Task.checkCancellation()
+        await try Task.checkCancellation()
       } else {
         return "cancelled"
       }

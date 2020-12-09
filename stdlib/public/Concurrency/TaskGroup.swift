@@ -78,7 +78,7 @@ extension Task {
     groupFlags.isTaskGroup = true
     groupFlags.isFuture = true
 
-//    // 1. Prepare the Group task
+    // 1. Prepare the Group task
     let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
         let task = Builtin.getCurrentAsyncTask()
@@ -98,7 +98,6 @@ extension Task {
 
         return result
       }
-//    __forceRetain(groupTask)
     let groupHandle = Handle<BodyResult>(task: groupTask)
 
     // 2.0) Run the task!
@@ -121,7 +120,6 @@ extension Task {
 
     /// No public initializers
     init(task: Builtin.NativeObject) {
-      _taskPrintID(("groupTask" as NSString).utf8String, (#file as NSString).utf8String, #line, task)
       self.task = task
     }
 
@@ -142,19 +140,19 @@ extension Task {
     ///   - operation: operation to execute and add to the group
     @discardableResult
     public mutating func add(
-      overridingPriority: Priority? = nil,
+      overridingPriority priorityOverride: Priority? = nil,
       operation: @escaping () async throws -> TaskResult
     ) async -> Task.Handle<TaskResult> {
-      var flags = JobFlags()
-      flags.kind = .task
-      flags.priority = overridingPriority ?? getJobFlags(task).priority
-      flags.isFuture = true
-      flags.isChildTask = true
+      // 1) Increment the number of pending tasks immediately;
+      // We don't need to know which specific task is pending, just that pending
+      // ones exist, so that next() can know if to wait or return nil.
+      let groupTask = Builtin.getCurrentAsyncTask()
+      _taskGroupAddPendingTask(groupTask)
 
-      let (childTask, _) =
-        Builtin.createAsyncTaskFuture(flags.bits, self.task, operation)
-//      _taskPrintID(("childTask(add)" as NSString).utf8String, (#file as NSString).utf8String, #line, childTask)
-      _taskGroupAddPending(task, childTask)
+      // 2) Create and run the child task
+      let childTask =
+        await _runChildTask(overridingPriority: priorityOverride, operation: operation)
+
       let handle = Handle<TaskResult>(task: childTask)
 
       // FIXME: use executors or something else to launch the task
@@ -287,10 +285,6 @@ extension Task.Group {
 
 /// ==== -----------------------------------------------------------------------
 
-@_silgen_name("swift_retain")
-func __forceRetain(
-  _ task: Builtin.NativeObject)
-
 @_silgen_name("swift_task_group_offer")
 func taskGroupOffer(
   group: Builtin.NativeObject,
@@ -304,11 +298,11 @@ func _taskGroupWaitNext(
 
 /// SeeAlso: GroupPollResult
 struct RawGroupPollResult {
-  let status: ChannelPollStatus
+  let status: GroupPollStatus
   let storage: UnsafeRawPointer
 }
 
-enum ChannelPollStatus: Int {
+enum GroupPollStatus: Int {
   case empty   = 0
   case waiting = 1
   case success = 2
@@ -321,19 +315,6 @@ func _taskGroupIsEmpty(
 ) -> Bool
 
 @_silgen_name("swift_task_group_add_pending")
-func _taskGroupAddPending(
-  _ groupTask: Builtin.NativeObject,
-  _ childTask: Builtin.NativeObject
+func _taskGroupAddPendingTask(
+  _ groupTask: Builtin.NativeObject
 )
-
-// ==== Debugging utils --------------------------------------------------------
-
-//// TODO: remove this
-@_silgen_name("swift_task_print_ID")
-public func _taskPrintID(
-  _ name: Optional<UnsafePointer<Int8>>,
-  _ file: Optional<UnsafePointer<Int8>>,
-  _ line: Int,
-  _ task: Builtin.NativeObject
-)
-

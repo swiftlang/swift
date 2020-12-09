@@ -161,17 +161,12 @@ swift_task_group_wait_next;
 ///
 /// \code
 /// func swift_task_group_add_pending(
-///     _ groupTask: Builtin.NativeObject),
-///     _ childTask: Builtin.NativeObject
+///     _ groupTask: Builtin.NativeObject)
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void
-swift_task_group_add_pending(AsyncTask *groupTask, AsyncTask *childTask);
-
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void
-swift_task_print_ID(const char* name, const char* file, int line, AsyncTask *task);
+swift_task_group_add_pending(AsyncTask *groupTask);
 
 /// Check the readyQueue of a Channel, return true if it has no pending tasks.
 ///

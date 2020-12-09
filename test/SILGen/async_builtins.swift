@@ -34,11 +34,6 @@ public struct X {
     }
   }
 
-  func launchFuture<T>(_ value: T) {
-    // CHECK: builtin "createAsyncTaskGroup"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>) : $(Builtin.NativeObject, Builtin.RawPointer)
-    let task = Builtin.createAsyncTaskGroup(0, nil)
-  }
-
   public func launchRocker<T>(closure: @escaping () async throws -> T) {
     _ = Builtin.createAsyncTaskFuture(0, nil, closure)
   }

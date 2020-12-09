@@ -58,8 +58,6 @@ func test_skipCallingNext_butInvokeCancelAll() {
     }
   }
 
-  // CHECK: main task
-
   launch { () async -> () in
     let result = await try! taskHandle.get()
     // CHECK: group.add { 1 }
@@ -77,8 +75,6 @@ func test_skipCallingNext_butInvokeCancelAll() {
     assert(result == 0)
     exit(0)
   }
-
-  print("main task")
 }
 
 test_skipCallingNext_butInvokeCancelAll()

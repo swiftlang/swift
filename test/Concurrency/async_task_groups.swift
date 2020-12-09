@@ -212,7 +212,7 @@ extension Collection {
       while let (index, taskResult) = await try group.next() {
         result[index] = taskResult
 
-        try await Task.checkCancellation()
+        await try Task.checkCancellation()
         await try submitNext()
       }
 
