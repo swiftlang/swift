@@ -48,16 +48,11 @@ class HiddenLibSyntaxAction : public SyntaxParseActions {
   /// given, this will be equal to the implicit libSyntaxAction.
   std::shared_ptr<SyntaxParseActions> ExplicitAction;
 
-  /// The implicit action that generates the libSyntax tree.
+  /// The implicit action that generates the libSyntax tree. Is never \c nullptr.
   std::shared_ptr<SyntaxTreeCreator> LibSyntaxAction;
 
   /// An allocator using which the \c HiddenNodes are created.
   llvm::SpecificBumpPtrAllocator<HiddenNode> NodeAllocator;
-
-  /// Whether both the explicit and the implicit action create libSyntax nodes.
-  bool areBothLibSyntax() {
-    return ExplicitAction->getOpaqueKind() == OpaqueSyntaxNodeKind::LibSyntax;
-  }
 
   /// Create a hidden node that contains the given explicit and libSyntax node.
   OpaqueSyntaxNode makeHiddenNode(OpaqueSyntaxNode explicitActionNode,
@@ -70,8 +65,7 @@ public:
   HiddenLibSyntaxAction(
       const std::shared_ptr<SyntaxParseActions> &explicitAction,
       const std::shared_ptr<SyntaxTreeCreator> &libSyntaxAction)
-      : ExplicitAction(explicitAction != nullptr ? explicitAction
-                                                 : libSyntaxAction),
+      : ExplicitAction(explicitAction),
         LibSyntaxAction(libSyntaxAction) {
     assert(libSyntaxAction != nullptr);
   };
@@ -123,7 +117,7 @@ public:
   /// Whether the generated libSyntax node needs to be released after the tree
   /// is finalised.
   bool isReleaseOfLibSyntaxNodeNeeded() {
-    return ExplicitAction == LibSyntaxAction || !areBothLibSyntax();
+    return ExplicitAction == LibSyntaxAction;
   }
 
   /// Returns the underlying libSyntax \c SyntaxTreeCreator.

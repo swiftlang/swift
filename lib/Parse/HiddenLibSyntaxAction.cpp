@@ -33,11 +33,17 @@ HiddenLibSyntaxAction::makeHiddenNode(OpaqueSyntaxNode explicitActionNode,
 OpaqueSyntaxNode HiddenLibSyntaxAction::recordToken(
     tok tokenKind, ArrayRef<ParsedTriviaPiece> leadingTrivia,
     ArrayRef<ParsedTriviaPiece> trailingTrivia, CharSourceRange range) {
-  OpaqueSyntaxNode explicitActionNode = ExplicitAction->recordToken(
-      tokenKind, leadingTrivia, trailingTrivia, range);
-  OpaqueSyntaxNode libSyntaxActionNode = nullptr;
 
-  if (areBothLibSyntax()) {
+  OpaqueSyntaxNode explicitActionNode;
+  if (ExplicitAction) {
+    explicitActionNode = ExplicitAction->recordToken(
+      tokenKind, leadingTrivia, trailingTrivia, range);
+  } else {
+    explicitActionNode = nullptr;
+  }
+
+  OpaqueSyntaxNode libSyntaxActionNode;
+  if (ExplicitAction == LibSyntaxAction) {
     libSyntaxActionNode = explicitActionNode;
   } else {
     libSyntaxActionNode = LibSyntaxAction->recordToken(tokenKind, leadingTrivia,
@@ -49,11 +55,16 @@ OpaqueSyntaxNode HiddenLibSyntaxAction::recordToken(
 
 OpaqueSyntaxNode HiddenLibSyntaxAction::recordMissingToken(tok tokenKind,
                                                            SourceLoc loc) {
-  OpaqueSyntaxNode explicitActionNode =
-      ExplicitAction->recordMissingToken(tokenKind, loc);
-  OpaqueSyntaxNode libSyntaxActionNode = nullptr;
+  OpaqueSyntaxNode explicitActionNode;
+  if (ExplicitAction) {
+    explicitActionNode =
+        ExplicitAction->recordMissingToken(tokenKind, loc);
+  } else {
+    explicitActionNode = nullptr;
+  }
 
-  if (areBothLibSyntax()) {
+  OpaqueSyntaxNode libSyntaxActionNode;
+  if (ExplicitAction == LibSyntaxAction) {
     libSyntaxActionNode = explicitActionNode;
   } else {
     libSyntaxActionNode = LibSyntaxAction->recordMissingToken(tokenKind, loc);
@@ -66,10 +77,8 @@ OpaqueSyntaxNode
 HiddenLibSyntaxAction::recordRawSyntax(syntax::SyntaxKind kind,
                                        ArrayRef<OpaqueSyntaxNode> elements,
                                        CharSourceRange range) {
-  OpaqueSyntaxNode explicitActionNode = nullptr;
-  OpaqueSyntaxNode libSyntaxActionNode = nullptr;
-
-  {
+  OpaqueSyntaxNode explicitActionNode;
+  if (ExplicitAction) {
     SmallVector<OpaqueSyntaxNode, 4> explicitActionElements;
     explicitActionElements.reserve(elements.size());
     for (auto element : elements) {
@@ -83,9 +92,12 @@ HiddenLibSyntaxAction::recordRawSyntax(syntax::SyntaxKind kind,
 
     explicitActionNode =
         ExplicitAction->recordRawSyntax(kind, explicitActionElements, range);
+  } else {
+    explicitActionNode = nullptr;
   }
 
-  if (areBothLibSyntax()) {
+  OpaqueSyntaxNode libSyntaxActionNode;
+  if (ExplicitAction == LibSyntaxAction) {
     libSyntaxActionNode = explicitActionNode;
   } else {
     SmallVector<OpaqueSyntaxNode, 4> libSyntaxActionElements;
@@ -117,7 +129,9 @@ void HiddenLibSyntaxAction::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
     return;
   }
   auto node = static_cast<HiddenNode *>(opaqueN);
-  ExplicitAction->discardRecordedNode(node->ExplicitActionNode);
+  if (ExplicitAction) {
+    ExplicitAction->discardRecordedNode(node->ExplicitActionNode);
+  }
   if (ExplicitAction != LibSyntaxAction) {
     LibSyntaxAction->discardRecordedNode(node->LibSyntaxNode);
   }
@@ -125,15 +139,21 @@ void HiddenLibSyntaxAction::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
 
 std::pair<size_t, OpaqueSyntaxNode>
 HiddenLibSyntaxAction::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
-  // TODO: (syntax-parse) We only perform the node lookup in the explicit action
-  // If HiddenSyntaxAction should stay, we should find an implementation that
-  // also performs lookup in the LibSyntaxAction
-  size_t length;
-  OpaqueSyntaxNode n;
-  std::tie(length, n) = ExplicitAction->lookupNode(lexerOffset, kind);
-  if (length == 0)
+  if (ExplicitAction) {
+    // TODO: (syntax-parse) We only perform the node lookup in the explicit action
+    // If HiddenSyntaxAction should stay, we should find an implementation that
+    // also performs lookup in the LibSyntaxAction
+    size_t length;
+    OpaqueSyntaxNode n;
+    std::tie(length, n) = ExplicitAction->lookupNode(lexerOffset, kind);
+    if (length == 0) {
+      return {0, nullptr};
+    }
+    return {length, makeHiddenNode(n, nullptr)};
+  } else {
     return {0, nullptr};
-  return {length, makeHiddenNode(n, nullptr)};
+
+  }
 }
 
 RawSyntax *HiddenLibSyntaxAction::getLibSyntaxNodeFor(OpaqueSyntaxNode node) {
