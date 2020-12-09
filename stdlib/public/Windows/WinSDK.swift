@@ -46,11 +46,11 @@ public let INVALID_SOCKET: SOCKET = SOCKET(bitPattern: -1)
 public let FIONBIO: Int32 = Int32(bitPattern: 0x8004667e)
 
 // WinUser.h
-public let CW_USEDEFAULT: Int32 = Int32(truncatingIfNeeded: 2147483648)
+public let CW_USEDEFAULT: Int32 = Int32(bitPattern: 2147483648)
 public let WS_OVERLAPPEDWINDOW: UINT =
     UINT(WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)
 public let WS_POPUPWINDOW: UINT =
-    UINT(Int32(WS_POPUP) | WS_BORDER | WS_SYSMENU)
+    UINT(numericCast(WS_POPUP) | WS_BORDER | WS_SYSMENU)
 
 // fileapi.h
 public let INVALID_FILE_ATTRIBUTES: DWORD = DWORD(bitPattern: -1)
@@ -91,16 +91,17 @@ public let DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED: DPI_AWARENESS_CONTEXT =
     DPI_AWARENESS_CONTEXT(bitPattern: -5)!
 
 // winreg.h
-public let HKEY_CLASSES_ROOT: HKEY = HKEY(bitPattern: 0x80000000)!
-public let HKEY_CURRENT_USER: HKEY = HKEY(bitPattern: 0x80000001)!
-public let HKEY_LOCAL_MACHINE: HKEY = HKEY(bitPattern: 0x80000002)!
-public let HKEY_USERS: HKEY = HKEY(bitPattern: 0x80000003)!
-public let HKEY_PERFORMANCE_DATA: HKEY = HKEY(bitPattern: 0x80000004)!
-public let HKEY_PERFORMANCE_TEXT: HKEY = HKEY(bitPattern: 0x80000050)!
-public let HKEY_PERFORMANCE_NLSTEXT: HKEY = HKEY(bitPattern: 0x80000060)!
-public let HKEY_CURRENT_CONFIG: HKEY = HKEY(bitPattern: 0x80000005)!
-public let HKEY_DYN_DATA: HKEY = HKEY(bitPattern: 0x80000006)!
-public let HKEY_CURRENT_USER_LOCAL_SETTINGS: HKEY = HKEY(bitPattern: 0x80000007)!
+public let HKEY_CLASSES_ROOT: HKEY = HKEY(bitPattern: UInt(0x80000000))!
+public let HKEY_CURRENT_USER: HKEY = HKEY(bitPattern: UInt(0x80000001))!
+public let HKEY_LOCAL_MACHINE: HKEY = HKEY(bitPattern: UInt(0x80000002))!
+public let HKEY_USERS: HKEY = HKEY(bitPattern: UInt(0x80000003))!
+public let HKEY_PERFORMANCE_DATA: HKEY = HKEY(bitPattern: UInt(0x80000004))!
+public let HKEY_PERFORMANCE_TEXT: HKEY = HKEY(bitPattern: UInt(0x80000050))!
+public let HKEY_PERFORMANCE_NLSTEXT: HKEY = HKEY(bitPattern: UInt(0x80000060))!
+public let HKEY_CURRENT_CONFIG: HKEY = HKEY(bitPattern: UInt(0x80000005))!
+public let HKEY_DYN_DATA: HKEY = HKEY(bitPattern: UInt(0x80000006))!
+public let HKEY_CURRENT_USER_LOCAL_SETTINGS: HKEY =
+    HKEY(bitPattern: UInt(0x80000007))!
 
 // Richedit.h
 public let MSFTEDIT_CLASS: [WCHAR] = Array<WCHAR>("RICHEDIT50W".utf16)
