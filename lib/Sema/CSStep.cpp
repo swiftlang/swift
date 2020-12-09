@@ -623,7 +623,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   // If the solver already found a solution with a better overload choice that
   // can be unconditionally substituted by the current choice, skip the current
   // choice.
-  if (LastSolvedChoice && isGenericDisjunctionChoice(choice)) {
+  if (LastSolvedChoice && LastSolvedChoice->second == getCurrentScore() &&
+      isGenericDisjunctionChoice(choice)) {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
@@ -639,7 +640,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   // requirements that are not satisfied by any known argument types.
   auto bestScore = getBestScore(Solutions);
   auto bestChoiceNeedsConversions = bestScore && (bestScore > getCurrentScore());
-  if (!bestChoiceNeedsConversions && choice.isGenericOperator() && argFnType) {
+  if (bestScore && !bestChoiceNeedsConversions && choice.isGenericOperator() && argFnType) {
     Constraint *constraint = choice;
     auto *decl = constraint->getOverloadChoice().getDecl();
     auto *useDC = constraint->getOverloadUseDC();
