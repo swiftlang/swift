@@ -893,21 +893,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
                                                      /*Implicit=*/false));
 }
 
-/// Copy a numeric literal value into AST-owned memory, stripping underscores
-/// so the semantic part of the value can be parsed by APInt/APFloat parsers.
 StringRef Parser::copyAndStripUnderscores(StringRef orig) {
-  char *start = static_cast<char*>(Context.Allocate(orig.size(), 1));
-  char *p = start;
-
-  if (p) {
-    for (char c : orig) {
-      if (c != '_') {
-        *p++ = c;
-      }
-    }
-  }
-  
-  return StringRef(start, p - start);
+  return ASTGen::copyAndStripUnderscores(orig, Context);
 }
 
 /// Disambiguate the parse after '{' token that is in a place that might be
