@@ -547,41 +547,6 @@ void ConstraintSystem::PotentialBindings::finalize(
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
   inferDefaultTypes(cs, existingTypes);
 
-  // Adjust optionality of existing bindings based on presence of
-  // `ExpressibleByNilLiteral` requirement.
-  if (llvm::any_of(Protocols, [](Constraint *constraint) {
-        auto *protocol = constraint->getProtocol();
-        return protocol->isSpecificProtocol(
-            KnownProtocolKind::ExpressibleByNilLiteral);
-      })) {
-    for (auto &binding : Bindings) {
-      bool wrapInOptional = false;
-      if (binding.Kind == AllowedBindingKind::Supertypes) {
-        auto type = binding.BindingType->getRValueType();
-        // If the type doesn't conform to ExpressibleByNilLiteral,
-        // produce an optional of that type as a potential binding. We
-        // overwrite the binding in place because the non-optional type
-        // will fail to type-check against the nil-literal conformance.
-        bool conformsToExprByNilLiteral = false;
-        if (auto *nominalBindingDecl = type->getAnyNominal()) {
-          SmallVector<ProtocolConformance *, 2> conformances;
-          conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-              cs.DC->getParentModule(),
-              cs.getASTContext().getProtocol(
-                  KnownProtocolKind::ExpressibleByNilLiteral),
-              conformances);
-        }
-        wrapInOptional = !conformsToExprByNilLiteral;
-      } else if (binding.isDefaultableBinding() &&
-                 binding.BindingType->isAny()) {
-        wrapInOptional = true;
-      }
-
-      if (wrapInOptional)
-        binding.BindingType = OptionalType::get(binding.BindingType);
-    }
-  }
-
   // If there are no bindings, typeVar may be a hole.
   if (cs.shouldAttemptFixes() && Bindings.empty() &&
       TypeVar->getImpl().canBindToHole()) {
