@@ -566,21 +566,6 @@ void ConstraintSystem::PotentialBindings::finalize(
 
     addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
   }
-
-  // Let's always consider `Any` to be a last resort binding because
-  // it's always better to infer concrete type and erase it if required
-  // by the context.
-  if (Bindings.size() > 1) {
-    auto AnyTypePos =
-        llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isAny() &&
-                 !binding.isDefaultableBinding();
-        });
-
-    if (AnyTypePos != Bindings.end()) {
-      std::rotate(AnyTypePos, AnyTypePos + 1, Bindings.end());
-    }
-  }
 }
 
 Optional<ConstraintSystem::PotentialBindings>

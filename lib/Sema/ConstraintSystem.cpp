@@ -5366,14 +5366,30 @@ TypeVarBindingProducer::TypeVarBindingProducer(
         return false;
       };
 
+  // A binding to `Any` which should always be considered as a last resort.
+  Optional<Binding> Any;
+
   for (const auto &binding : bindings.Bindings) {
+    auto type = binding.BindingType;
+
+    if (!CanBeNil && type->isAny()) {
+      Any.emplace(binding);
+      continue;
+    }
+
     // Adjust optionality of existing bindings based on presence of
     // `ExpressibleByNilLiteral` requirement.
     if (CanBeNil && requiresOptionalAdjustment(binding)) {
-      Bindings.push_back(
-          binding.withType(OptionalType::get(binding.BindingType)));
+      Bindings.push_back(binding.withType(OptionalType::get(type)));
     } else {
       Bindings.push_back(binding);
     }
+  }
+
+  // Let's always consider `Any` to be a last resort binding because
+  // it's always better to infer concrete type and erase it if required
+  // by the context.
+  if (Any) {
+    Bindings.push_back(*Any);
   }
 }
