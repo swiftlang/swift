@@ -7,6 +7,8 @@ else()
 endif()
 
 add_swift_host_library(swiftParse STATIC
+  ASTGen.cpp
+  ASTGenExpr.cpp
   Confusables.cpp
   HiddenLibSyntaxAction.cpp
   Lexer.cpp
