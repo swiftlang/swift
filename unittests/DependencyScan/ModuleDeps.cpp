@@ -164,5 +164,5 @@ export *\n\
   // TODO: Output/verify dependency graph correctness
   // llvm::dbgs() << "Deps: " << Dependencies << "\n";
 
-  depscan_dependency_result_dispose(Dependencies);
+  swiftscan_dependency_result_dispose(Dependencies);
 }

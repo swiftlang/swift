@@ -29,7 +29,6 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Strings.h"
-#include "clang-c/CXString.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -823,11 +822,15 @@ generateFullDependencyGraph(CompilerInstance &instance,
       return details;
     };
 
-    auto &moduleInfo = *dependencySet->modules[i];
-    moduleInfo.module_name =
-        create_dup(createEncodedModuleKindAndName(module).c_str());
-    moduleInfo.module_path = create_dup(modulePath.c_str());
-    moduleInfo.source_files = create_set(sourceFiles);
+    swiftscan_dependency_info_s *moduleInfo = new swiftscan_dependency_info_s;
+    dependencySet->modules[i] = moduleInfo;
+
+    std::string encodedModuleName = createEncodedModuleKindAndName(module);
+    auto ttt = create_dup(encodedModuleName.c_str());
+    moduleInfo->module_name = ttt;
+    moduleInfo->module_path = create_dup(modulePath.c_str());
+    moduleInfo->source_files = create_set(sourceFiles);
+
     // Create a direct dependencies set according to the output format
     std::vector<std::string> bridgedDependencyNames;
     for (const auto &dep : directDependencies) {
@@ -850,8 +853,9 @@ generateFullDependencyGraph(CompilerInstance &instance,
       dependencyKindAndName += dep.first;
       bridgedDependencyNames.push_back(dependencyKindAndName);
     }
-    moduleInfo.direct_dependencies = create_set(bridgedDependencyNames);
-    moduleInfo.details = getModuleDetails();
+
+    moduleInfo->direct_dependencies = create_set(bridgedDependencyNames);
+    moduleInfo->details = getModuleDetails();
   }
 
   swiftscan_dependency_result_s *result = new swiftscan_dependency_result_s;
@@ -1196,7 +1200,6 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
 
   cache.recordDependencies(mainModuleName, std::move(mainDependencies));
-
   auto &ctx = instance.getASTContext();
   auto ModuleCachePath = getModuleCachePathFromClang(
       ctx.getClangModuleLoader()->getClangInstance());
@@ -1229,10 +1232,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   if (diagnoseCycle(instance, cache, /*MainModule*/ allModules.front(),
                     ASTDelegate))
     return std::make_error_code(std::errc::not_supported);
-
   auto dependencyGraph = generateFullDependencyGraph(
       instance, cache, ASTDelegate, allModules.getArrayRef());
-
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
