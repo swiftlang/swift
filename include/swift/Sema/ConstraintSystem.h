@@ -5852,6 +5852,10 @@ private:
   /// \returns true if some new bindings were sucessfully computed,
   /// false otherwise.
   bool computeNext();
+
+  /// Check whether binding type is required to either conform to
+  /// `ExpressibleByNilLiteral` protocol or be wrapped into an optional type.
+  bool requiresOptionalAdjustment(const Binding &binding) const;
 };
 
 /// Iterator over disjunction choices, makes it
