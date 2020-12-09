@@ -363,11 +363,47 @@ struct ThickAsyncFunctionContext: HeapObject {
   uint32_t ExpectedContextSize;
 };
 
-struct RunAndBlockSemaphore {
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+
+class RunAndBlockSemaphore {
+  bool Finished = false;
+public:
+  void wait() {
+    donateThreadToGlobalExecutorUntil([](void *context) {
+      return *reinterpret_cast<bool*>(context);
+    }, &Finished);
+
+    assert(Finished && "ran out of tasks before we were signalled");
+  }
+
+  void signal() {
+    Finished = true;
+  }
+};
+
+#else
+
+class RunAndBlockSemaphore {
   ConditionVariable Queue;
   ConditionVariable::Mutex Lock;
   bool Finished = false;
+public:
+  /// Wait for a signal.
+  void wait() {
+    Lock.withLockOrWait(Queue, [&] {
+      return Finished;
+    });
+  }
+
+  void signal() {
+    Lock.withLockThenNotifyAll(Queue, [&]{
+      Finished = true;
+    });
+  }
 };
+
+#endif
 
 using RunAndBlockSignature =
   AsyncSignature<void(HeapObject*), /*throws*/ false>;
@@ -388,10 +424,7 @@ static void runAndBlock_finish(AsyncTask *task, ExecutorRef executor,
   auto calleeContext = static_cast<RunAndBlockCalleeContext*>(_context);
   auto context = popAsyncContext(task, calleeContext);
 
-  auto semaphore = context->Semaphore;
-  semaphore->Lock.withLockThenNotifyAll(semaphore->Queue, [&]{
-    semaphore->Finished = true;
-  });
+  context->Semaphore->signal();
 
   return context->ResumeParent(task, executor, context);
 }
@@ -450,10 +483,8 @@ void swift::swift_task_runAndBlockThread(const void *function,
   // Enqueue the task.
   swift_task_enqueueGlobal(pair.Task);
 
-  // Wait for the task to finish.
-  semaphore.Lock.withLockOrWait(semaphore.Queue, [&] {
-    return semaphore.Finished;
-  });
+  // Wait until the task completes.
+  semaphore.wait();
 }
 
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {

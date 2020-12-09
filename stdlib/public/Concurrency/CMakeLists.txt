@@ -21,8 +21,14 @@ set(swift_concurrency_link_libraries
 
 if(SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-    list(APPEND swift_concurrency_link_libraries
-      dispatch)
+    include_directories(AFTER
+                          ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+
+    # FIXME: we can't rely on libdispatch having been built for the
+    # target at this point in the process.  Currently, we're relying
+    # on soft-linking.
+    #list(APPEND swift_concurrency_link_libraries
+    #  dispatch)
   endif()
 endif()
 

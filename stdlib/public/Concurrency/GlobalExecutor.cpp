@@ -54,6 +54,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "swift/Runtime/Concurrency.h"
+#include "TaskPrivate.h"
 
 #include <dispatch/dispatch.h>
 
@@ -62,10 +63,58 @@ using namespace swift;
 SWIFT_CC(swift)
 void (*swift::swift_task_enqueueGlobal_hook)(Job *job) = nullptr;
 
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+static Job *JobQueue = nullptr;
+
+/// Get the next-in-queue storage slot.
+static Job *&nextInQueue(Job *cur) {
+  return reinterpret_cast<Job*&>(cur->SchedulerPrivate);
+}
+
+/// Insert a job into the cooperative global queue.
+static void insertIntoJobQueue(Job *newJob) {
+  Job **position = &JobQueue;
+  while (auto cur = *position) {
+    // If we find a job with lower priority, insert here.
+    if (cur->getPriority() < newJob->getPriority()) {
+      nextInQueue(newJob) = cur;
+      *position = newJob;
+      return;
+    }
+
+    // Otherwise, keep advancing through the queue.
+    position = &nextInQueue(cur);
+  }
+  nextInQueue(newJob) = nullptr;
+  *position = newJob;
+}
+
+/// Claim the next job from the cooperative global queue.
+static Job *claimNextFromJobQueue() {
+  if (auto job = JobQueue) {
+    JobQueue = nextInQueue(job);
+    return job;
+  }
+  return nullptr;
+}
+
+void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
+                                              void *conditionContext) {
+  while (!condition(conditionContext)) {
+    auto job = claimNextFromJobQueue();
+    if (!job) return;
+    job->run(ExecutorRef::generic());
+  }
+}
+
+#else
+
+/// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   Job *job = (Job*) _job;
   job->run(ExecutorRef::generic());
 }
+#endif
 
 void swift::swift_task_enqueueGlobal(Job *job) {
   assert(job && "no job provided");
@@ -74,6 +123,9 @@ void swift::swift_task_enqueueGlobal(Job *job) {
   if (swift_task_enqueueGlobal_hook)
     return swift_task_enqueueGlobal_hook(job);
 
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  insertIntoJobQueue(job);
+#else
   // We really want four things from the global execution service:
   //  - Enqueuing work should have minimal runtime and memory overhead.
   //  - Adding work should never result in an "explosion" where many
@@ -113,4 +165,5 @@ void swift::swift_task_enqueueGlobal(Job *job) {
                                          /*flags*/ 0);
 
   dispatch_async_f(queue, dispatchContext, dispatchFunction);
+#endif
 }
