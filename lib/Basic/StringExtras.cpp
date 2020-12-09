@@ -427,42 +427,34 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   // ending of the type name.
   auto nameWords = camel_case::getWords(name);
   auto typeWords = camel_case::getWords(typeName.Name);
-  auto nameWordIter = nameWords.begin(),
-    nameWordIterEnd = nameWords.end();
-  auto typeWordRevIter = typeWords.rbegin(),
-    typeWordRevIterEnd = typeWords.rend();
+  auto nameWordIter = nameWords.begin();
+  auto typeWordRevIter = typeWords.rbegin();
 
   // Find the last instance of the first word in the name within
   // the words in the type name.
-  typeWordRevIter = std::find_if(typeWordRevIter, typeWordRevIterEnd,
-                                 [nameWordIter](StringRef word) {
-    return matchNameWordToTypeWord(*nameWordIter, word);
-  });
+  typeWordRevIter = std::find_if(
+      typeWordRevIter, typeWords.rend(), [nameWordIter](StringRef word) {
+        return matchNameWordToTypeWord(*nameWordIter, word);
+      });
 
   // If we didn't find the first word in the name at all, we're
   // done.
-  if (typeWordRevIter == typeWordRevIterEnd)
+  if (typeWordRevIter == typeWords.rend())
     return name;
 
   // Now, match from the first word up until the end of the type name.
-  auto typeWordIter = typeWordRevIter.base(),
-    typeWordIterEnd = typeWords.end();
-  ++nameWordIter;
-
-  // FIXME: Use std::mismatch once we update to C++14.
-  while (typeWordIter != typeWordIterEnd &&
-         nameWordIter != nameWordIterEnd &&
-         matchNameWordToTypeWord(*nameWordIter, *typeWordIter)) {
-    ++typeWordIter;
-    ++nameWordIter;
-  }
+  std::advance(nameWordIter, 1);
+  WordIterator typeMismatch = typeWords.end(), nameMismatch = nameWords.end();
+  std::tie(typeMismatch, nameMismatch) =
+      std::mismatch(typeWordRevIter.base(), typeWords.end(), nameWordIter,
+                    nameWords.end(), matchNameWordToTypeWord);
 
   // If we didn't reach the end of the type name, don't match.
-  if (typeWordIter != typeWordIterEnd)
+  if (typeMismatch != typeWords.end())
     return name;
 
   // Chop of the beginning of the name.
-  return nameWordIter.getRestOfStr();
+  return nameMismatch.getRestOfStr();
 }
 
 StringRef StringScratchSpace::copyString(StringRef string) {
