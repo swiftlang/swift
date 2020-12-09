@@ -280,6 +280,7 @@ ParserStatus Parser::parseGenericWhereClause(
         CodeCompletion->completeGenericRequirement();
       EndLoc = consumeToken(tok::code_complete);
       Status.setHasCodeCompletionAndIsError();
+      BodyContext->setTransparent();
       break;
     }
 

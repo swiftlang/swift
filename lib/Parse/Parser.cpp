@@ -398,9 +398,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.getASTContext().LangOpts.AttachCommentsToDecls
                   ? CommentRetentionMode::AttachToNextToken
                   : CommentRetentionMode::None,
-              SF.shouldBuildSyntaxTree()
-                  ? TriviaRetentionMode::WithTrivia
-                  : TriviaRetentionMode::WithoutTrivia)),
+              TriviaRetentionMode::WithTrivia)),
           SF, SIL, PersistentState, std::move(SPActions)) {}
 
 namespace {

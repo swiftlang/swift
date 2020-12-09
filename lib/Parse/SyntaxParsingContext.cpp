@@ -41,7 +41,10 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
           std::move(SPActions))),
       CtxtHolder(CtxtHolder),
       RootData(RootDataOrParent.get<RootContextData *>()), Offset(0),
-      Mode(AccumulationMode::Root), Enabled(SF.shouldBuildSyntaxTree()) {
+      Mode(AccumulationMode::Root), _Enabled(SF.shouldBuildSyntaxTree()) {
+  if (!SF.shouldBuildSyntaxTree()) {
+    disable();
+  }
   CtxtHolder = this;
   getStorage().reserve(128);
 }
@@ -317,6 +320,9 @@ static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
 OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   if (!isEnabled())
     return nullptr;
+  if (Mode == AccumulationMode::Discard) {
+    return nullptr;
+  }
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);

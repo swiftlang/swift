@@ -5482,8 +5482,9 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
 }
 
 bool Parser::skipBracedBlock(bool &HasNestedTypeDeclarations) {
-  SyntaxParsingContext disabled(SyntaxContext);
-  SyntaxContext->disable();
+  // TODO: (syntax-parse) We should not need to generate a libSyntax tree for
+  // the skipped block.
+  SyntaxParsingContext CodeBlockContext(SyntaxContext, SyntaxKind::CodeBlock);
   consumeToken(tok::l_brace);
 
   // We don't care if a skipped function body contained any of these, so

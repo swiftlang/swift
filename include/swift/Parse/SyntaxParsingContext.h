@@ -168,8 +168,12 @@ private:
   /// deferred nodes
   bool ShouldDefer = false;
 
-  // If false, context does nothing.
-  bool Enabled;
+  // TODO: (syntax-parse) This is currently a leftover to try and selectively
+  // disable the SyntaxParsingContext again. Either allow selectively disabling
+  // the SyntaxParsingContext or remove this property. The property is currently
+  // never used.
+  /// If false, context does nothing.
+  bool _Enabled;
 
   /// Create a syntax node using the tail \c N elements of collected parts and
   /// replace those parts with the single result.
@@ -202,8 +206,7 @@ public:
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
         IsBacktracking(CtxtHolder->IsBacktracking),
-        ShouldDefer(CtxtHolder->ShouldDefer),
-        Enabled(CtxtHolder->isEnabled()) {
+        ShouldDefer(CtxtHolder->ShouldDefer), _Enabled(CtxtHolder->_Enabled) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     assert(CtxtHolder->Mode != AccumulationMode::SkippedForIncrementalUpdate &&
@@ -231,8 +234,21 @@ public:
   /// offset. If nothing is found \c 0 is returned.
   size_t lookupNode(size_t LexerOffset, SourceLoc Loc);
 
-  void disable() { Enabled = false; }
-  bool isEnabled() const { return Enabled; }
+  void disable() {
+    // Keep track that disable has been called on this SyntaxParsingContext
+    // for debugging purposes.
+    _Enabled = false;
+    // Since we always need the SyntaxParsing context to generate a libSyntax
+    // tree, we cannot disable it entirely. Instead discard any generated nodes.
+    Mode = AccumulationMode::Discard;
+  }
+  bool isEnabled() const {
+    // TODO: (syntax-parse) Leftover to selectively disable the SyntaxParsing
+    // context again. Either remove the check for isEnabled or make this
+    // property return a non-static value again.
+    return true;
+  }
+
   bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
 

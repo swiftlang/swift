@@ -1950,15 +1950,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // whole InterpolatedStringLiteral.
   llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
 
-  // We're not in a place where an interpolation would be valid.
-  if (!CurLocalContext) {
-    // Return an error, but include an empty InterpolatedStringLiteralExpr
-    // so that parseDeclPoundDiagnostic() can figure out why this string
-    // literal was bad.
-    return makeParserErrorResult(new (Context) InterpolatedStringLiteralExpr(
-        Loc, Loc.getAdvancedLoc(CloseQuoteBegin), 0, 0, nullptr));
-  }
-
   unsigned LiteralCapacity = 0;
   unsigned InterpolationCount = 0;
   TapExpr * AppendingExpr;
@@ -1998,6 +1989,15 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   } else {
     // Without custom delimiter the quote owns trailing trivia.
     SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+  }
+
+  // We're not in a place where an interpolation would be valid.
+  if (!CurLocalContext) {
+    // Return an error, but include an empty InterpolatedStringLiteralExpr
+    // so that parseDeclPoundDiagnostic() can figure out why this string
+    // literal was bad.
+    return makeParserErrorResult(new (Context) InterpolatedStringLiteralExpr(
+        Loc, Loc.getAdvancedLoc(CloseQuoteBegin), 0, 0, nullptr));
   }
 
   if (AppendingExpr->getBody()->getNumElements() == 1) {
