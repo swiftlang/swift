@@ -30,6 +30,8 @@ class SILInstruction;
 /// analysis of the operands of the instruction, without looking at its uses
 /// (e.g. constant folding).  If a simpler result can be found, it is
 /// returned, otherwise a null SILValue is returned.
+///
+/// This is assumed to implement read-none transformations.
 SILValue simplifyInstruction(SILInstruction *I);
 
 /// Replace an instruction with a simplified result and erase it. If the
@@ -38,9 +40,17 @@ SILValue simplifyInstruction(SILInstruction *I);
 ///
 /// If it is nonnull, eraseNotify will be called before each instruction is
 /// deleted.
+///
+/// If it is nonnull and inst is in OSSA, newInstNotify will be called with each
+/// new instruction inserted to compensate for ownership.
+///
+/// NOTE: When OSSA is enabled this API assumes OSSA is properly formed and will
+/// insert compensating instructions.
 SILBasicBlock::iterator replaceAllSimplifiedUsesAndErase(
     SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify = nullptr);
+    std::function<void(SILInstruction *)> eraseNotify = nullptr,
+    std::function<void(SILInstruction *)> newInstNotify = nullptr,
+    DeadEndBlocks *deadEndBlocks = nullptr);
 
 /// Simplify invocations of builtin operations that may overflow.
 /// All such operations return a tuple (result, overflow_flag).

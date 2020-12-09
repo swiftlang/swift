@@ -20,12 +20,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
+
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -298,6 +301,13 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // (pointer_to_address strict (address_to_pointer x)) -> x
+  //
+  // NOTE: We can not perform this optimization in OSSA without dealing with
+  // interior pointers since we may be escaping an interior pointer address from
+  // a borrow scope.
+  if (PTAI->getFunction()->hasOwnership())
+    return SILValue();
+
   // If this address is not strict, then it cannot be replaced by an address
   // that may be strict.
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
@@ -332,6 +342,9 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 
 /// If the only use of a cast is a destroy, just destroy the cast operand.
 static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
+  if (!Cast->hasUsesOfAnyResult())
+    return SILValue();
+
   for (Operand *op : Cast->getUses()) {
     switch (op->getUser()->getKind()) {
       case SILInstructionKind::DestroyValueInst:
@@ -718,13 +731,38 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
-/// Try to simplify the specified instruction, performing local
-/// analysis of the operands of the instruction, without looking at its uses
-/// (e.g. constant folding).  If a simpler result can be found, it is
-/// returned, otherwise a null SILValue is returned.
-///
-SILValue swift::simplifyInstruction(SILInstruction *I) {
-  return InstSimplifier().visit(I);
+//===----------------------------------------------------------------------===//
+//                           Top Level Entrypoints
+//===----------------------------------------------------------------------===//
+
+static SILBasicBlock::iterator
+replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
+                            std::function<void(SILInstruction *)> eraseNotify) {
+  assert(svi != newValue && "Cannot RAUW a value with itself");
+  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
+
+  // Only SingleValueInstructions are currently simplified.
+  while (!svi->use_empty()) {
+    Operand *use = *svi->use_begin();
+    SILInstruction *user = use->getUser();
+    // Erase the end of scope marker.
+    if (isEndOfScopeMarker(user)) {
+      if (&*nextii == user)
+        ++nextii;
+      if (eraseNotify)
+        eraseNotify(user);
+      else
+        user->eraseFromParent();
+      continue;
+    }
+    use->set(newValue);
+  }
+  if (eraseNotify)
+    eraseNotify(svi);
+  else
+    svi->eraseFromParent();
+
+  return nextii;
 }
 
 /// Replace an instruction with a simplified result, including any debug uses,
@@ -733,37 +771,25 @@ SILValue swift::simplifyInstruction(SILInstruction *I) {
 ///
 /// This is a simple transform based on the above analysis.
 ///
+/// We assume that when ownership is enabled that the IR is in valid OSSA form
+/// before this is called. It will perform fixups as necessary to preserve OSSA.
+///
 /// Return an iterator to the next (nondeleted) instruction.
 SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
-    SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseHandler) {
+    SILInstruction *i, SILValue result,
+    std::function<void(SILInstruction *)> eraseNotify,
+    std::function<void(SILInstruction *)> newInstNotify,
+    DeadEndBlocks *deadEndBlocks) {
+  auto *svi = cast<SingleValueInstruction>(i);
+  assert(svi != result && "Cannot RAUW a value with itself");
 
-  auto *SVI = cast<SingleValueInstruction>(I);
-  assert(SVI != result && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(I->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!SVI->use_empty()) {
-    Operand *use = *SVI->use_begin();
-    SILInstruction *user = use->getUser();
-    // Erase the end of scope marker.
-    if (isEndOfScopeMarker(user)) {
-      if (&*nextii == user)
-        ++nextii;
-      if (eraseHandler)
-        eraseHandler(user);
-      else
-        user->eraseFromParent();
-      continue;
-    }
-    use->set(result);
+  if (svi->getFunction()->hasOwnership()) {
+    JointPostDominanceSetComputer computer(*deadEndBlocks);
+    OwnershipFixupContext ctx{eraseNotify, newInstNotify, *deadEndBlocks,
+                              computer};
+    return ctx.replaceAllUsesAndEraseFixingOwnership(svi, result);
   }
-  if (eraseHandler)
-    eraseHandler(I);
-  else
-    I->eraseFromParent();
-
-  return nextii;
+  return replaceAllUsesAndEraseInner(svi, result, eraseNotify);
 }
 
 /// Simplify invocations of builtin operations that may overflow.
@@ -776,4 +802,28 @@ SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
 /// In case when a simplification is not possible, a null SILValue is returned.
 SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
   return InstSimplifier().simplifyOverflowBuiltin(BI);
+}
+
+/// Try to simplify the specified instruction, performing local
+/// analysis of the operands of the instruction, without looking at its uses
+/// (e.g. constant folding).  If a simpler result can be found, it is
+/// returned, otherwise a null SILValue is returned.
+///
+/// NOTE: We assume that the insertion point associated with the SILValue must
+/// dominate \p i.
+SILValue swift::simplifyInstruction(SILInstruction *i) {
+  SILValue result = InstSimplifier().visit(i);
+  if (!result)
+    return SILValue();
+
+  // If we have a result, we know that we must have a single value instruction
+  // by assumption since we have not implemented support in the rest of inst
+  // simplify for non-single value instructions. We put the cast here so that
+  // this code is not updated at this point in time.
+  auto *svi = cast<SingleValueInstruction>(i);
+  if (svi->getFunction()->hasOwnership())
+    if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(svi, result))
+      return SILValue();
+
+  return result;
 }

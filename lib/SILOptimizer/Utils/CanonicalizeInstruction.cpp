@@ -81,11 +81,6 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 // intruction that wasn't erased.
 static Optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
-  // FIXME: temporarily bypass simplification untill all simplifications
-  // preserve ownership SIL.
-  if (inst->getFunction()->hasOwnership())
-    return None;
-
   SILValue result = simplifyInstruction(inst);
   if (!result)
     return None;
@@ -100,7 +95,9 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // because the instruction and all non-replaced users will be deleted.
   auto nextII = replaceAllSimplifiedUsesAndErase(
       inst, result,
-      [&pass](SILInstruction *deleted) { pass.killInstruction(deleted); });
+      [&pass](SILInstruction *deleted) { pass.killInstruction(deleted); },
+      [&pass](SILInstruction *newInst) { pass.notifyNewInstruction(newInst); },
+      &pass.deadEndBlocks);
 
   // Push the new instruction and any users onto the worklist.
   pass.notifyHasNewUsers(result);

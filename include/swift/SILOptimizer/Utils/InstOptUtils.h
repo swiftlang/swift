@@ -35,13 +35,13 @@ namespace swift {
 class DominanceInfo;
 template <class T> class NullablePtr;
 
-/// Transform a Use Range (Operand*) into a User Range (SILInstruction*)
+/// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
 using UserTransform = std::function<SILInstruction *(Operand *)>;
 using ValueBaseUserRange =
     TransformRange<iterator_range<ValueBase::use_iterator>, UserTransform>;
 
-inline ValueBaseUserRange
-makeUserRange(iterator_range<ValueBase::use_iterator> range) {
+template <typename Range>
+inline TransformRange<Range, UserTransform> makeUserRange(Range range) {
   auto toUser = [](Operand *operand) { return operand->getUser(); };
   return makeTransformRange(range, UserTransform(toUser));
 }
