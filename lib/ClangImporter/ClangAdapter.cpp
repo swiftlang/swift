@@ -617,6 +617,9 @@ OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
 
   case clang::NullabilityKind::Unspecified:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
+
+  default:
+    return OptionalTypeKind::OTK_Optional;
   }
 
   llvm_unreachable("Invalid NullabilityKind.");
