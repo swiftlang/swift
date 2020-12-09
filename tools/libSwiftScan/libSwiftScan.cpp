@@ -20,6 +20,8 @@
 
 using namespace swift::dependencies;
 
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t);
+
 //=== String Functions ----------------------------------------------------===//
 
 const char *swiftscan_get_C_string(swiftscan_string_ref_t string) {
@@ -108,17 +110,17 @@ void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
 //=== Scanner Functions ---------------------------------------------------===//
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
-  return wrap_scanner(new DependencyScanningTool());
+  return wrap(new DependencyScanningTool());
 }
 
 void swiftscan_scanner_dispose(swiftscan_scanner_t c_scanner) {
-  delete unwrap_scanner(c_scanner);
+  delete unwrap(c_scanner);
 }
 
 swiftscan_dependency_graph_t
 swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
                                   swiftscan_scan_invocation_t invocation) {
-  DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
@@ -136,7 +138,7 @@ swiftscan_batch_scan_result_t *
 swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
                                    swiftscan_batch_scan_input_t *batch_input,
                                    swiftscan_scan_invocation_t invocation) {
-  DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
@@ -170,7 +172,7 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
 swiftscan_import_set_t
 swiftscan_import_set_create(swiftscan_scanner_t scanner,
                             swiftscan_scan_invocation_t invocation) {
-  DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)

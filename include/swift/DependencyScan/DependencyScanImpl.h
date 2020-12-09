@@ -156,15 +156,4 @@ struct swiftscan_scan_invocation_s {
   swiftscan_string_set_t *argv;
 };
 
-inline swift::dependencies::DependencyScanningTool *
-unwrap_scanner(swiftscan_scanner_t P) {
-  return reinterpret_cast<swift::dependencies::DependencyScanningTool *>(P);
-}
-
-inline swiftscan_scanner_t
-wrap_scanner(const swift::dependencies::DependencyScanningTool *P) {
-  return reinterpret_cast<swiftscan_scanner_t>(
-      const_cast<swift::dependencies::DependencyScanningTool *>(P));
-}
-
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H
