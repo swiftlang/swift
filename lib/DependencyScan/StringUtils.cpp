@@ -24,7 +24,7 @@ swiftscan_string_ref_t create_null() {
   return str;
 }
 
-swiftscan_string_ref_t create_dup(const char *string) {
+swiftscan_string_ref_t create_clone(const char *string) {
   if (!string)
     return create_null();
 
@@ -42,7 +42,16 @@ swiftscan_string_set_t *create_set(const std::vector<std::string> &strings) {
   set->count = strings.size();
   set->strings = new swiftscan_string_ref_t[set->count];
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
-    set->strings[SI] = create_dup(strings[SI].c_str());
+    set->strings[SI] = create_clone(strings[SI].c_str());
+  return set;
+}
+
+swiftscan_string_set_t *create_set(int count, const char **strings) {
+  swiftscan_string_set_t *set = new swiftscan_string_set_t;
+  set->count = count;
+  set->strings = new swiftscan_string_ref_t[set->count];
+  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
+    set->strings[SI] = create_clone(strings[SI]);
   return set;
 }
 

@@ -35,9 +35,9 @@ SWIFTSCAN_BEGIN_DECLS
 
 /**
  * A character string used to pass around dependency scan result metadata.
- * Lifetime of the string is strictly tied to the object whose field it represents.
- * When the owning object is released, string memory is freed. Use \c
- * swiftscan_get_C_string() to retrieve the string data.
+ * Lifetime of the string is strictly tied to the object whose field it
+ * represents. When the owning object is released, string memory is freed. Use
+ * \c swiftscan_get_C_string() to retrieve the string data.
  */
 typedef struct {
   const void *data;
@@ -63,10 +63,10 @@ typedef struct swiftscan_module_details_s *swiftscan_module_details_t;
 typedef struct swiftscan_dependency_info_s *swiftscan_dependency_info_t;
 
 /// Opaque container to an overall result of a dependency scan.
-typedef struct swiftscan_dependency_result_s *swiftscan_dependency_result_t;
+typedef struct swiftscan_dependency_graph_s *swiftscan_dependency_graph_t;
 
 /// Opaque container to contain the result of a dependency prescan.
-typedef struct swiftscan_prescan_result_s *swiftscan_prescan_result_t;
+typedef struct swiftscan_import_set_s *swiftscan_import_set_t;
 
 /// Full Dependency Graph (Result)
 typedef struct {
@@ -86,7 +86,7 @@ typedef struct {
 
 typedef struct {
   int count;
-  swiftscan_dependency_result_t *results;
+  swiftscan_dependency_graph_t *results;
 } swiftscan_batch_scan_result_t;
 
 //=== Scanner Invocation Specification ------------------------------------===//
@@ -104,12 +104,12 @@ swiftscan_get_C_string(swiftscan_string_ref_t string);
 //=== Dependency Result Functions -----------------------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
-swiftscan_dependency_result_get_main_module_name(
-    swiftscan_dependency_result_t result);
+swiftscan_dependency_graph_get_main_module_name(
+    swiftscan_dependency_graph_t result);
 
 SWIFTSCAN_PUBLIC swiftscan_dependency_set_t *
-swiftscan_dependency_result_get_module_set(
-    swiftscan_dependency_result_t result);
+swiftscan_dependency_graph_get_dependencies(
+    swiftscan_dependency_graph_t result);
 
 //=== Dependency Module Info Functions ------------------------------------===//
 
@@ -208,7 +208,38 @@ swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details);
 
+//=== Batch Scan Input Functions ------------------------------------------===//
+
+/// Create an \c swiftscan_batch_scan_input_t instance.
+/// The returned \c swiftscan_batch_scan_input_t is owned by the caller and must be disposed
+/// of using \c swiftscan_batch_scan_input_dispose .
+SWIFTSCAN_PUBLIC swiftscan_batch_scan_input_t *
+swiftscan_batch_scan_input_create();
+
+SWIFTSCAN_PUBLIC void
+swiftscan_batch_scan_input_set_modules(swiftscan_batch_scan_input_t *input,
+                                       int count,
+                                       swiftscan_batch_scan_entry_t *modules);
+
 //=== Batch Scan Entry Functions ------------------------------------------===//
+
+/// Create an \c swiftscan_batch_scan_entry_t instance.
+/// The returned \c swiftscan_batch_scan_entry_t is owned by the caller and must be disposed
+/// of using \c swiftscan_batch_scan_entry_dispose .
+SWIFTSCAN_PUBLIC swiftscan_batch_scan_entry_t
+swiftscan_batch_scan_entry_create();
+
+SWIFTSCAN_PUBLIC void
+swiftscan_batch_scan_entry_set_module_name(swiftscan_batch_scan_entry_t entry,
+                                           const char *name);
+
+SWIFTSCAN_PUBLIC void
+swiftscan_batch_scan_entry_set_arguments(swiftscan_batch_scan_entry_t entry,
+                                         const char *arguments);
+
+SWIFTSCAN_PUBLIC void
+swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
+                                        bool is_swift);
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry);
@@ -222,19 +253,21 @@ swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
 //=== Prescan Result Functions --------------------------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
-swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result);
+swiftscan_import_set_get_imports(swiftscan_import_set_t result);
 
 //=== Scanner Invocation Functions ----------------------------------------===//
 
+/// Create an \c swiftscan_scan_invocation_t instance.
+/// The returned \c swiftscan_scan_invocation_t is owned by the caller and must be disposed
+/// of using \c swiftscan_scan_invocation_dispose .
 SWIFTSCAN_PUBLIC swiftscan_scan_invocation_t swiftscan_scan_invocation_create();
 
 SWIFTSCAN_PUBLIC void swiftscan_scan_invocation_set_working_directory(
-    swiftscan_scan_invocation_t invocation,
-    swiftscan_string_ref_t working_directory);
+    swiftscan_scan_invocation_t invocation, const char *working_directory);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
-                                   swiftscan_string_set_t *argv);
+                                   int argc, const char **argv);
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_scan_invocation_get_working_directory(
@@ -249,19 +282,10 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation);
 //=== Cleanup Functions ---------------------------------------------------===//
 
 SWIFTSCAN_PUBLIC void
-swiftscan_dependency_info_details_dispose(swiftscan_module_details_t details);
+swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result);
 
 SWIFTSCAN_PUBLIC void
-swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_dependency_result_dispose(swiftscan_dependency_result_t result);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_prescan_result_dispose(swiftscan_prescan_result_t result);
+swiftscan_import_set_dispose(swiftscan_import_set_t result);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry);
@@ -281,19 +305,33 @@ swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
 /// scanning.
 typedef void *swiftscan_scanner_t;
 
+/// Create an \c swiftscan_scanner_t instance.
+/// The returned \c swiftscan_scanner_t is owned by the caller and must be disposed
+/// of using \c swiftscan_scanner_dispose .
 SWIFTSCAN_PUBLIC swiftscan_scanner_t swiftscan_scanner_create(void);
-
 SWIFTSCAN_PUBLIC void swiftscan_scanner_dispose(swiftscan_scanner_t);
 
-SWIFTSCAN_PUBLIC swiftscan_dependency_result_t swiftscan_scan_dependencies(
+/// Invoke a dependency scan using arguments specified in the \c
+/// swiftscan_scan_invocation_t argument. The returned \c
+/// swiftscan_dependency_graph_t is owned by the caller and must be disposed of
+/// using \c swiftscan_dependency_graph_dispose .
+SWIFTSCAN_PUBLIC swiftscan_dependency_graph_t swiftscan_dependency_graph_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
+/// Invoke the scan for an input batch of modules specified in the
+/// \c swiftscan_batch_scan_input_t argument. The returned
+/// \c swiftscan_batch_scan_result_t is owned by the caller and must be disposed
+/// of using \c swiftscan_batch_scan_result_dispose .
 SWIFTSCAN_PUBLIC swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_dependencies(swiftscan_scanner_t scanner,
-                                  swiftscan_batch_scan_input_t *batch_input,
-                                  swiftscan_scan_invocation_t invocation);
+swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
+                                   swiftscan_batch_scan_input_t *batch_input,
+                                   swiftscan_scan_invocation_t invocation);
 
-SWIFTSCAN_PUBLIC swiftscan_prescan_result_t swiftscan_prescan_dependencies(
+/// Invoke the import prescan using arguments specified in the \c
+/// swiftscan_scan_invocation_t argument. The returned \c swiftscan_import_set_t
+/// is owned by the caller and must be disposed of using \c
+/// swiftscan_import_set_dispose .
+SWIFTSCAN_PUBLIC swiftscan_import_set_t swiftscan_import_set_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
 SWIFTSCAN_END_DECLS

@@ -16,10 +16,17 @@
 
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/DependencyScan/StringUtils.h"
 
 using namespace swift::dependencies;
 
-//=== Private String Functions --------------------------------------------===//
+//=== String Functions ----------------------------------------------------===//
+
+const char *swiftscan_get_C_string(swiftscan_string_ref_t string) {
+  return static_cast<const char *>(string.data);
+}
+
+//=== Private Cleanup Functions -------------------------------------------===//
 
 /// Free the given string.
 void swiftscan_string_dispose(swiftscan_string_ref_t string) {
@@ -35,10 +42,67 @@ void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   delete set;
 }
 
-//=== Public C-API String Functions ---------------------------------------===//
+void swiftscan_dependency_info_details_dispose(
+    swiftscan_module_details_t details) {
+  swiftscan_module_details_s *details_impl = details;
+  switch (details_impl->kind) {
+  case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL:
+    swiftscan_string_dispose(
+        details_impl->swift_textual_details.module_interface_path);
+    swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.compiled_module_candidates);
+    swiftscan_string_dispose(
+        details_impl->swift_textual_details.bridging_header_path);
+    swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.bridging_source_files);
+    swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.bridging_module_dependencies);
+    swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.command_line);
+    swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.extra_pcm_args);
+    swiftscan_string_dispose(details_impl->swift_textual_details.context_hash);
+    break;
+  case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY:
+    swiftscan_string_dispose(
+        details_impl->swift_binary_details.compiled_module_path);
+    swiftscan_string_dispose(
+        details_impl->swift_binary_details.module_doc_path);
+    swiftscan_string_dispose(
+        details_impl->swift_binary_details.module_source_info_path);
+    break;
+  case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER:
+    swiftscan_string_dispose(
+        details_impl->swift_placeholder_details.compiled_module_path);
+    swiftscan_string_dispose(
+        details_impl->swift_placeholder_details.module_doc_path);
+    swiftscan_string_dispose(
+        details_impl->swift_placeholder_details.module_source_info_path);
+    break;
+  case SWIFTSCAN_DEPENDENCY_INFO_CLANG:
+    swiftscan_string_dispose(details_impl->clang_details.module_map_path);
+    swiftscan_string_dispose(details_impl->clang_details.context_hash);
+    swiftscan_string_set_dispose(details_impl->clang_details.command_line);
+    break;
+  }
+  delete details_impl;
+}
 
-const char *swiftscan_get_C_string(swiftscan_string_ref_t string) {
-  return static_cast<const char *>(string.data);
+void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info) {
+  swiftscan_string_dispose(info->module_name);
+  swiftscan_string_dispose(info->module_path);
+  swiftscan_string_set_dispose(info->source_files);
+  swiftscan_string_set_dispose(info->direct_dependencies);
+  swiftscan_dependency_info_details_dispose(info->details);
+  delete info;
+}
+
+void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
+  for (int i = 0; i < set->count; ++i) {
+    swiftscan_dependency_info_dispose(set->modules[i]);
+  }
+  delete[] set->modules;
+  delete set;
 }
 
 //=== Scanner Functions ---------------------------------------------------===//
@@ -51,9 +115,9 @@ void swiftscan_scanner_dispose(swiftscan_scanner_t c_scanner) {
   delete unwrap_scanner(c_scanner);
 }
 
-swiftscan_dependency_result_t
-swiftscan_scan_dependencies(swiftscan_scanner_t scanner,
-                            swiftscan_scan_invocation_t invocation) {
+swiftscan_dependency_graph_t
+swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
+                                  swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
@@ -69,9 +133,9 @@ swiftscan_scan_dependencies(swiftscan_scanner_t scanner,
 }
 
 swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_dependencies(swiftscan_scanner_t scanner,
-                                  swiftscan_batch_scan_input_t *batch_input,
-                                  swiftscan_scan_invocation_t invocation) {
+swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
+                                   swiftscan_batch_scan_input_t *batch_input,
+                                   swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
@@ -90,7 +154,7 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t scanner,
   auto BatchScanResult =
       ScanningTool->getDependencies(Compilation, BatchInput, {});
   swiftscan_batch_scan_result_t *Result = new swiftscan_batch_scan_result_t;
-  auto ResultGraphs = new swiftscan_dependency_result_t[BatchScanResult.size()];
+  auto ResultGraphs = new swiftscan_dependency_graph_t[BatchScanResult.size()];
   for (size_t i = 0; i < BatchScanResult.size(); ++i) {
     auto &ResultOrErr = BatchScanResult[i];
     if (ResultOrErr.getError())
@@ -103,9 +167,9 @@ swiftscan_batch_scan_dependencies(swiftscan_scanner_t scanner,
   return Result;
 }
 
-swiftscan_prescan_result_t
-swiftscan_prescan_dependencies(swiftscan_scanner_t scanner,
-                               swiftscan_scan_invocation_t invocation) {
+swiftscan_import_set_t
+swiftscan_import_set_create(swiftscan_scanner_t scanner,
+                            swiftscan_scan_invocation_t invocation) {
   DependencyScanningTool *ScanningTool = unwrap_scanner(scanner);
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
@@ -122,14 +186,14 @@ swiftscan_prescan_dependencies(swiftscan_scanner_t scanner,
 
 //=== Dependency Result Functions -----------------------------------------===//
 
-swiftscan_string_ref_t swiftscan_dependency_result_get_main_module_name(
-    swiftscan_dependency_result_t result) {
+swiftscan_string_ref_t swiftscan_dependency_graph_get_main_module_name(
+    swiftscan_dependency_graph_t result) {
   return result->main_module_name;
 }
 
-swiftscan_dependency_set_t *swiftscan_dependency_result_get_module_set(
-    swiftscan_dependency_result_t result) {
-  return result->module_set;
+swiftscan_dependency_set_t *swiftscan_dependency_graph_get_dependencies(
+    swiftscan_dependency_graph_t result) {
+  return result->dependencies;
 }
 
 //=== Module Dependency Info query APIs -----------------------------------===//
@@ -268,7 +332,39 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return details->clang_details.command_line;
 }
 
+//=== Batch Scan Input Functions ------------------------------------------===//
+
+swiftscan_batch_scan_input_t *swiftscan_batch_scan_input_create() {
+  return new swiftscan_batch_scan_input_t;
+}
+
+void swiftscan_batch_scan_input_set_modules(
+    swiftscan_batch_scan_input_t *input, int count,
+    swiftscan_batch_scan_entry_t *modules) {
+  input->count = count;
+  input->modules = modules;
+}
+
 //=== Batch Scan Entry Functions ------------------------------------------===//
+
+swiftscan_batch_scan_entry_t swiftscan_batch_scan_entry_create() {
+  return new swiftscan_batch_scan_entry_s;
+}
+
+void swiftscan_batch_scan_entry_set_module_name(
+    swiftscan_batch_scan_entry_t entry, const char *name) {
+  entry->module_name = create_clone(name);
+}
+
+void swiftscan_batch_scan_entry_set_arguments(
+    swiftscan_batch_scan_entry_t entry, const char *arguments) {
+  entry->arguments = create_clone(arguments);
+}
+
+void swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
+                                             bool is_swift) {
+  entry->is_swift = is_swift;
+}
 
 swiftscan_string_ref_t
 swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry) {
@@ -288,8 +384,8 @@ bool swiftscan_batch_scan_entry_get_is_swift(
 //=== Prescan Result Functions --------------------------------------------===//
 
 swiftscan_string_set_t *
-swiftscan_prescan_result_get_import_set(swiftscan_prescan_result_t result) {
-  return result->import_set;
+swiftscan_import_set_get_imports(swiftscan_import_set_t result) {
+  return result->imports;
 }
 
 //=== Scanner Invocation Functions ----------------------------------------===//
@@ -299,15 +395,14 @@ swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
 }
 
 void swiftscan_scan_invocation_set_working_directory(
-    swiftscan_scan_invocation_t invocation,
-    swiftscan_string_ref_t working_directory) {
-  invocation->working_directory = working_directory;
+    swiftscan_scan_invocation_t invocation, const char *working_directory) {
+  invocation->working_directory = create_clone(working_directory);
 }
 
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
-                                   swiftscan_string_set_t *argv) {
-  invocation->argv = argv;
+                                   int argc, const char **argv) {
+  invocation->argv = create_set(argc, argv);
 }
 
 swiftscan_string_ref_t swiftscan_scan_invocation_get_working_directory(
@@ -324,79 +419,16 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
   return invocation->argv;
 }
 
-//=== Cleanup Functions ---------------------------------------------------===//
+//=== Public Cleanup Functions --------------------------------------------===//
 
-void swiftscan_dependency_info_details_dispose(
-    swiftscan_module_details_t details) {
-  swiftscan_module_details_s *details_impl = details;
-  switch (details_impl->kind) {
-  case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL:
-    swiftscan_string_dispose(
-        details_impl->swift_textual_details.module_interface_path);
-    swiftscan_string_set_dispose(
-        details_impl->swift_textual_details.compiled_module_candidates);
-    swiftscan_string_dispose(
-        details_impl->swift_textual_details.bridging_header_path);
-    swiftscan_string_set_dispose(
-        details_impl->swift_textual_details.bridging_source_files);
-    swiftscan_string_set_dispose(
-        details_impl->swift_textual_details.bridging_module_dependencies);
-    swiftscan_string_set_dispose(
-        details_impl->swift_textual_details.command_line);
-    swiftscan_string_set_dispose(
-        details_impl->swift_textual_details.extra_pcm_args);
-    swiftscan_string_dispose(details_impl->swift_textual_details.context_hash);
-    break;
-  case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY:
-    swiftscan_string_dispose(
-        details_impl->swift_binary_details.compiled_module_path);
-    swiftscan_string_dispose(
-        details_impl->swift_binary_details.module_doc_path);
-    swiftscan_string_dispose(
-        details_impl->swift_binary_details.module_source_info_path);
-    break;
-  case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER:
-    swiftscan_string_dispose(
-        details_impl->swift_placeholder_details.compiled_module_path);
-    swiftscan_string_dispose(
-        details_impl->swift_placeholder_details.module_doc_path);
-    swiftscan_string_dispose(
-        details_impl->swift_placeholder_details.module_source_info_path);
-    break;
-  case SWIFTSCAN_DEPENDENCY_INFO_CLANG:
-    swiftscan_string_dispose(details_impl->clang_details.module_map_path);
-    swiftscan_string_dispose(details_impl->clang_details.context_hash);
-    swiftscan_string_set_dispose(details_impl->clang_details.command_line);
-    break;
-  }
-  delete details_impl;
-}
-
-void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info) {
-  swiftscan_string_dispose(info->module_name);
-  swiftscan_string_dispose(info->module_path);
-  swiftscan_string_set_dispose(info->source_files);
-  swiftscan_string_set_dispose(info->direct_dependencies);
-  swiftscan_dependency_info_details_dispose(info->details);
-  delete info;
-}
-
-void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
-  for (int i = 0; i < set->count; ++i) {
-    swiftscan_dependency_info_dispose(set->modules[i]);
-  }
-  delete[] set->modules;
-  delete set;
-}
-
-void swiftscan_dependency_result_dispose(swiftscan_dependency_result_t result) {
+void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
   swiftscan_string_dispose(result->main_module_name);
-  swiftscan_dependency_set_dispose(result->module_set);
+  swiftscan_dependency_set_dispose(result->dependencies);
   delete result;
 }
 
-void swiftscan_prescan_result_dispose(swiftscan_prescan_result_t result) {
-  swiftscan_string_set_dispose(result->import_set);
+void swiftscan_import_set_dispose(swiftscan_import_set_t result) {
+  swiftscan_string_set_dispose(result->imports);
   delete result;
 }
 
@@ -417,7 +449,7 @@ void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {
 void swiftscan_batch_scan_result_dispose(
     swiftscan_batch_scan_result_t *result) {
   for (int i = 0; i < result->count; ++i) {
-    swiftscan_dependency_result_dispose(result->results[i]);
+    swiftscan_dependency_graph_dispose(result->results[i]);
   }
   delete[] result->results;
   delete result;

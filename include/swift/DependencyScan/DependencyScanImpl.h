@@ -24,12 +24,12 @@ class DependencyScanningTool;
 }
 } // namespace swift
 
-struct swiftscan_dependency_result_s {
+struct swiftscan_dependency_graph_s {
   /// The name of the main module for this dependency graph (root node)
   swiftscan_string_ref_t main_module_name;
 
   /// The complete list of modules discovered
-  swiftscan_dependency_set_t *module_set;
+  swiftscan_dependency_set_t *dependencies;
 };
 
 struct swiftscan_dependency_info_s {
@@ -146,9 +146,9 @@ struct swiftscan_batch_scan_entry_s {
   bool is_swift;
 };
 
-struct swiftscan_prescan_result_s {
+struct swiftscan_import_set_s {
   /// The complete list of imports discovered
-  swiftscan_string_set_t *import_set;
+  swiftscan_string_set_t *imports;
 };
 
 struct swiftscan_scan_invocation_s {

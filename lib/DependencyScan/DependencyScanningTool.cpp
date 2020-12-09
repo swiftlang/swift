@@ -28,7 +28,7 @@ DependencyScanningTool::DependencyScanningTool()
     : SharedCache(std::make_unique<ModuleDependenciesCache>()), PDC(), Alloc(),
       Saver(Alloc) {}
 
-llvm::ErrorOr<swiftscan_dependency_result_t>
+llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const llvm::StringSet<> &PlaceholderModules) {
@@ -47,7 +47,7 @@ DependencyScanningTool::getDependencies(
   return Dependencies;
 }
 
-llvm::ErrorOr<swiftscan_prescan_result_t>
+llvm::ErrorOr<swiftscan_import_set_t>
 DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
   // The primary instance used to scan the query Swift source-code
   auto InstanceOrErr = initCompilerInstanceForScan(Command);
@@ -64,7 +64,7 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
   return Dependencies;
 }
 
-std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
+std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const std::vector<BatchScanInput> &BatchInput,
@@ -72,7 +72,7 @@ DependencyScanningTool::getDependencies(
   // The primary instance used to scan Swift modules
   auto InstanceOrErr = initCompilerInstanceForScan(Command);
   if (std::error_code EC = InstanceOrErr.getError())
-    return std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>(
+    return std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>(
         BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
   auto Instance = std::move(*InstanceOrErr);
 

@@ -474,7 +474,7 @@ getAsClangDependencyModule(swiftscan_module_details_t details) {
 }
 
 static void writePrescanJSON(llvm::raw_ostream &out,
-                             const swiftscan_prescan_result_t importSet) {
+                             const swiftscan_import_set_t importSet) {
   // Write out a JSON containing all main module imports.
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
@@ -483,7 +483,7 @@ static void writePrescanJSON(llvm::raw_ostream &out,
 }
 
 static void writeJSON(llvm::raw_ostream &out,
-                      const swiftscan_dependency_result_t fullDependencies) {
+                      const swiftscan_dependency_graph_t fullDependencies) {
   // Write out a JSON description of all of the dependencies.
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
@@ -494,7 +494,7 @@ static void writeJSON(llvm::raw_ostream &out,
   // Write out all of the modules.
   out << "  \"modules\": [\n";
   SWIFT_DEFER { out << "  ]\n"; };
-  const auto module_set = fullDependencies->module_set;
+  const auto module_set = fullDependencies->dependencies;
   for (int mi = 0; mi < module_set->count; ++mi) {
     const auto &moduleInfo = *module_set->modules[mi];
     auto &directDependencies = moduleInfo.direct_dependencies;
@@ -714,7 +714,7 @@ static std::string createEncodedModuleKindAndName(ModuleDependencyID id) {
   }
 }
 
-static swiftscan_dependency_result_t
+static swiftscan_dependency_graph_t
 generateFullDependencyGraph(CompilerInstance &instance,
                             ModuleDependenciesCache &cache,
                             InterfaceSubContextDelegate &ASTDelegate,
@@ -770,12 +770,12 @@ generateFullDependencyGraph(CompilerInstance &instance,
       if (swiftTextualDeps) {
         swiftscan_string_ref_t moduleInterfacePath =
             swiftTextualDeps->swiftInterfaceFile.hasValue()
-                ? create_dup(
+                ? create_clone(
                       swiftTextualDeps->swiftInterfaceFile.getValue().c_str())
                 : create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
             swiftTextualDeps->bridgingHeaderFile.hasValue()
-                ? create_dup(
+                ? create_clone(
                       swiftTextualDeps->bridgingHeaderFile.getValue().c_str())
                 : create_null();
 
@@ -791,32 +791,32 @@ generateFullDependencyGraph(CompilerInstance &instance,
                 create_set(swiftTextualDeps->bridgingModuleDependencies),
             .command_line = create_set(swiftTextualDeps->buildCommandLine),
             .extra_pcm_args = create_set(swiftTextualDeps->extraPCMArgs),
-            .context_hash = create_dup(swiftTextualDeps->contextHash.c_str()),
+            .context_hash = create_clone(swiftTextualDeps->contextHash.c_str()),
             .is_framework = swiftTextualDeps->isFramework};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
             .compiled_module_path =
-                create_dup(swiftPlaceholderDeps->compiledModulePath.c_str()),
+                create_clone(swiftPlaceholderDeps->compiledModulePath.c_str()),
             .module_doc_path =
-                create_dup(swiftPlaceholderDeps->moduleDocPath.c_str()),
+                create_clone(swiftPlaceholderDeps->moduleDocPath.c_str()),
             .module_source_info_path =
-                create_dup(swiftPlaceholderDeps->sourceInfoPath.c_str())};
+                create_clone(swiftPlaceholderDeps->sourceInfoPath.c_str())};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
         details->swift_binary_details = {
             .compiled_module_path =
-                create_dup(swiftBinaryDeps->compiledModulePath.c_str()),
+                create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
             .module_doc_path =
-                create_dup(swiftBinaryDeps->moduleDocPath.c_str()),
+                create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             .module_source_info_path =
-                create_dup(swiftBinaryDeps->sourceInfoPath.c_str())};
+                create_clone(swiftBinaryDeps->sourceInfoPath.c_str())};
       } else {
         // Clang module details
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_CLANG;
         details->clang_details = {
-            .module_map_path = create_dup(clangDeps->moduleMapFile.c_str()),
-            .context_hash = create_dup(clangDeps->contextHash.c_str()),
+            .module_map_path = create_clone(clangDeps->moduleMapFile.c_str()),
+            .context_hash = create_clone(clangDeps->contextHash.c_str()),
             .command_line = create_set(clangDeps->nonPathCommandLine)};
       }
       return details;
@@ -826,9 +826,9 @@ generateFullDependencyGraph(CompilerInstance &instance,
     dependencySet->modules[i] = moduleInfo;
 
     std::string encodedModuleName = createEncodedModuleKindAndName(module);
-    auto ttt = create_dup(encodedModuleName.c_str());
+    auto ttt = create_clone(encodedModuleName.c_str());
     moduleInfo->module_name = ttt;
-    moduleInfo->module_path = create_dup(modulePath.c_str());
+    moduleInfo->module_path = create_clone(modulePath.c_str());
     moduleInfo->source_files = create_set(sourceFiles);
 
     // Create a direct dependencies set according to the output format
@@ -858,9 +858,9 @@ generateFullDependencyGraph(CompilerInstance &instance,
     moduleInfo->details = getModuleDetails();
   }
 
-  swiftscan_dependency_result_s *result = new swiftscan_dependency_result_s;
-  result->main_module_name = create_dup(mainModuleName.c_str());
-  result->module_set = dependencySet;
+  swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
+  result->main_module_name = create_clone(mainModuleName.c_str());
+  result->dependencies = dependencySet;
   return result;
 }
 
@@ -1183,7 +1183,7 @@ bool swift::dependencies::batchPrescanDependencies(
   return false;
 }
 
-llvm::ErrorOr<swiftscan_dependency_result_t>
+llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(CompilerInstance &instance,
                                        ModuleDependenciesCache &cache) {
   ModuleDecl *mainModule = instance.getMainModule();
@@ -1261,20 +1261,20 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   return dependencyGraph;
 }
 
-llvm::ErrorOr<swiftscan_prescan_result_t>
+llvm::ErrorOr<swiftscan_import_set_t>
 swift::dependencies::performModulePrescan(CompilerInstance &instance) {
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies = identifyMainModuleDependencies(instance);
-  auto *importSet = new swiftscan_prescan_result_s;
-  importSet->import_set = create_set(mainDependencies.getModuleDependencies());
+  auto *importSet = new swiftscan_import_set_s;
+  importSet->imports = create_set(mainDependencies.getModuleDependencies());
   return importSet;
 }
 
-std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>>
+std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 swift::dependencies::performBatchModuleScan(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
-  std::vector<llvm::ErrorOr<swiftscan_dependency_result_t>> batchScanResult;
+  std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>> batchScanResult;
   batchScanResult.reserve(batchInput.size());
 
   // Perform a full dependency scan for each batch entry module
@@ -1339,11 +1339,11 @@ swift::dependencies::performBatchModuleScan(
   return batchScanResult;
 }
 
-std::vector<llvm::ErrorOr<swiftscan_prescan_result_t>>
+std::vector<llvm::ErrorOr<swiftscan_import_set_t>>
 swift::dependencies::performBatchModulePrescan(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
-  std::vector<llvm::ErrorOr<swiftscan_prescan_result_t>> batchPrescanResult;
+  std::vector<llvm::ErrorOr<swiftscan_import_set_t>> batchPrescanResult;
 
   // Perform a full dependency scan for each batch entry module
   forEachBatchEntry(
@@ -1386,8 +1386,8 @@ swift::dependencies::performBatchModulePrescan(
           return;
         }
 
-        auto *importSet = new swiftscan_prescan_result_s;
-        importSet->import_set = create_set(rootDeps->getModuleDependencies());
+        auto *importSet = new swiftscan_import_set_s;
+        importSet->imports = create_set(rootDeps->getModuleDependencies());
         batchPrescanResult.push_back(importSet);
       });
 
