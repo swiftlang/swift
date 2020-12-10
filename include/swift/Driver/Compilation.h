@@ -90,6 +90,11 @@ public:
 
     Result &operator=(const Result &) = delete;
     Result &operator=(Result &&) = default;
+
+    static Result code(int code) {
+      return Compilation::Result{false, code,
+                                 fine_grained_dependencies::ModuleDepGraph()};
+    }
   };
 
   class IncrementalSchemeComparator {

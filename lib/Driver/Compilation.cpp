@@ -1697,8 +1697,10 @@ namespace driver {
       if (ResultCode == 0)
         ResultCode = Comp.getDiags().hadAnyError();
       const bool forRanges = Comp.getEnableSourceRangeDependencies();
-      return Compilation::Result{
-          ResultCode, std::move(*this).takeFineGrainedDepGraph(forRanges)};
+      const bool hadAbnormalExit = hadAnyAbnormalExit();
+      const auto resultCode = ResultCode;
+      auto &&graph = std::move(*this).takeFineGrainedDepGraph(forRanges);
+      return Compilation::Result{hadAbnormalExit, resultCode, std::move(graph)};
     }
 
     bool hadAnyAbnormalExit() {
@@ -1970,7 +1972,7 @@ Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
 
   switch (Cmd->getCondition()) {
   case Job::Condition::CheckDependencies:
-    return Compilation::Result{0, fine_grained_dependencies::ModuleDepGraph()};
+    return Compilation::Result::code(0);
   case Job::Condition::RunWithoutCascading:
   case Job::Condition::Always:
   case Job::Condition::NewlyAdded:
@@ -1978,7 +1980,7 @@ Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
   }
 
   if (!writeFilelistIfNecessary(Cmd, *TranslatedArgs.get(), Diags))
-    return Compilation::Result{1, fine_grained_dependencies::ModuleDepGraph()};
+    return Compilation::Result::code(1);
 
   switch (Level) {
   case OutputLevel::Normal:
@@ -1986,7 +1988,7 @@ Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
     break;
   case OutputLevel::PrintJobs:
     Cmd->printCommandLineAndEnvironment(llvm::outs());
-    return Compilation::Result{0, fine_grained_dependencies::ModuleDepGraph()};
+    return Compilation::Result::code(0);
   case OutputLevel::Verbose:
     Cmd->printCommandLine(llvm::errs());
     break;
@@ -2010,14 +2012,12 @@ Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
           "expected environment variable to be set successfully");
     // Bail out early in release builds.
     if (envResult != 0) {
-      return Compilation::Result{envResult,
-                                 fine_grained_dependencies::ModuleDepGraph()};
+      return Compilation::Result::code(envResult);
     }
   }
 
   const auto returnCode = ExecuteInPlace(ExecPath, argv);
-  return Compilation::Result{returnCode,
-                             fine_grained_dependencies::ModuleDepGraph()};
+  return Compilation::Result::code(returnCode);
 }
 
 static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
@@ -2043,8 +2043,7 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
 Compilation::Result Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   if (AllSourceFilesPath)
     if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
-      return Compilation::Result{EXIT_FAILURE,
-                                 fine_grained_dependencies::ModuleDepGraph()};
+      return Compilation::Result::code(EXIT_FAILURE);
 
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
