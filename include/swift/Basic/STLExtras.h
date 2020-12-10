@@ -27,6 +27,7 @@
 #include <iterator>
 #include <numeric>
 #include <type_traits>
+#include <unordered_set>
 
 namespace swift {
 
@@ -751,6 +752,22 @@ using all_true =
 /// traits class for checking whether Ts consists only of compound types.
 template <class... Ts>
 using are_all_compound = all_true<std::is_compound<Ts>::value...>;
+
+/// Erase all elements in \p c that match the given predicate \p pred.
+// FIXME: Remove this when C++20 is the new baseline.
+template <class Key, class Hash, class KeyEqual, class Alloc, class Pred>
+typename std::unordered_set<Key, Hash, KeyEqual, Alloc>::size_type
+erase_if(std::unordered_set<Key, Hash, KeyEqual, Alloc> &c, Pred pred) {
+  auto startingSize = c.size();
+  for (auto i = c.begin(), last = c.end(); i != last;) {
+    if (pred(*i)) {
+      i = c.erase(i);
+    } else {
+      ++i;
+    }
+  }
+  return startingSize - c.size();
+}
 
 } // end namespace swift
 
