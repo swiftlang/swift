@@ -397,7 +397,14 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
- 
+
+  /// Mapping from each async let clause to the child task that will produce
+  /// the initializer value for that clause and a Boolean value indicating
+  /// whether the task can throw.
+  llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
+                      std::pair<SILValue, bool /*isThrowing*/> >
+      AsyncLetChildTasks;
+
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
   /// because of assumptions in framework code. This enum tracks the state of
@@ -616,6 +623,8 @@ public:
   
   /// Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
+  /// Generate code for @asyncHandler functions.
+  void emitAsyncHandler(FuncDecl *fd);
   /// Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
@@ -671,9 +680,15 @@ public:
 
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
-  /// Generates a thunk from a native function to the conventions.
+  /// Generates a thunk from a native function to foreign conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
-  
+  /// Generates a stub that launches a detached task for running the NativeToForeignThunk of an
+  /// async native method.
+  ///
+  /// Returns the SILFunction created for the closure implementation function that is enqueued on the
+  /// new task.
+  SILFunction *emitNativeAsyncToForeignThunk(SILDeclRef thunk);
+
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
   /// \p value.
@@ -826,6 +841,27 @@ public:
   void mergeCleanupBlocks();
 
   //===--------------------------------------------------------------------===//
+  // Concurrency
+  //===--------------------------------------------------------------------===//
+
+  /// Generates code into the given SGF that obtains the callee function's 
+  /// executor, if the function is actor-isolated.
+  /// @returns a SILValue representing the executor, if an executor exists.
+  static Optional<SILValue> EmitLoadActorExecutorForCallee(
+                                                  SILGenFunction *SGF, 
+                                                  ValueDecl *calleeVD,
+                                                  ArrayRef<ManagedValue> args);
+
+  /// Generates code to obtain the executor given the actor's decl.
+  /// @returns a SILValue representing the executor.
+  SILValue emitLoadActorExecutor(VarDecl *actorDecl);
+
+  /// Generates the code to obtain the executor for the shared instance 
+  /// of the \p globalActor based on the type.
+  /// @returns a SILValue representing the executor.
+  SILValue emitLoadGlobalActorExecutor(Type globalActor);
+
+  //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
 
@@ -842,10 +878,6 @@ public:
   uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
                       Type resultType, DeclContext *DC,
                       bool throws, SourceLoc throwsLoc);
-
-  /// Initializes 'actor' with the loaded shared instance of the \p globalActor
-  /// type.
-  void loadGlobalActor(Type globalActor);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1257,7 +1289,8 @@ public:
                                          SGFAccessKind accessKind);
 
   // FIXME: demote this to private state.
-  ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
+  ManagedValue maybeEmitValueOfLocalVarDecl(
+      VarDecl *var, AccessKind accessKind);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
@@ -1320,6 +1353,14 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
+
+  ManagedValue emitRunChildTask(
+      SILLocation loc, Type functionType, ManagedValue taskFunction);
+
+  ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
+
+  void completeAsyncLetChildTask(
+      PatternBindingDecl *patternBinding, unsigned index);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -1466,6 +1507,12 @@ public:
                                 LValue &&src, LValue &&dest);
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
+
+  /// Emit an assignment to the variables in the destination pattern, given
+  /// an rvalue source that has the same type as the pattern.
+  void emitAssignToPatternVars(
+      SILLocation loc, Pattern *destPattern, RValue &&src);
+
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
@@ -1520,7 +1567,8 @@ public:
                    SILLocation loc, ManagedValue fn, SubstitutionMap subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
-                   SGFContext evalContext);
+                   SGFContext evalContext, 
+                   Optional<ValueDecl *> implicitlyAsyncApply);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -2025,6 +2073,9 @@ public:
                                               SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
+
+  /// Enter a cleanup to cancel the given task.
+  CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,

@@ -8,12 +8,19 @@
 -(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
 @end
 
+typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_result, NSError * _Nullable);
+
 @interface SlowServer : NSObject <ServiceProvider>
 -(void)doSomethingSlow:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)checkAvailabilityWithCompletionHandler:(void (^)(BOOL isAvailable))completionHandler;
+-(void)anotherExampleWithCompletionBlock:(void (^)(NSString *))block;
+-(void)finalExampleWithReplyTo:(void (^)(NSString *))block;
+-(void)replyingOperation:(NSString *)operation replyTo:(void (^)(NSString *))block;
 -(void)findAnswerAsynchronously:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswer(completionHandler:)")));
 -(BOOL)findAnswerFailinglyWithError:(NSError * _Nullable * _Nullable)error completion:(void (^)(NSString *_Nullable, NSError * _Nullable))handler __attribute__((swift_name("findAnswerFailingly(completionHandler:)")));
+-(void)findQAndAWithCompletionHandler:(void (^)(NSString *_Nullable_result, NSString *_Nullable answer, NSError * _Nullable))handler;
+-(void)findQuestionableAnswersWithCompletionHandler:(CompletionHandler)handler;
 -(void)doSomethingFun:(NSString *)operation then:(void (^)(void))completionHandler;
 -(void)getFortuneAsynchronouslyWithCompletionHandler:(void (^)(NSString *_Nullable, NSError * _Nullable))handler;
 -(void)getMagicNumberAsynchronouslyWithSeed:(NSInteger)seed completionHandler:(void (^)(NSInteger, NSError * _Nullable))handler;
@@ -27,6 +34,11 @@
 -(NSInteger)doSomethingConflicted:(NSString *)operation;
 -(void)server:(NSString *)name restartWithCompletionHandler:(void (^)(void))block;
 -(void)server:(NSString *)name atPriority:(double)priority restartWithCompletionHandler:(void (^)(void))block;
+
+-(void)poorlyNamed:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async_name("bestName(_:)")));
+
+-(void)customizedWithString:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_name("customize(with:completionHandler:)"))) __attribute__((swift_async_name("customize(_:)")));
+
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

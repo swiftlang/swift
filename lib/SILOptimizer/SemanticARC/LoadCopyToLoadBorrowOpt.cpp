@@ -329,6 +329,10 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (ctx.onlyGuaranteedOpts)
     return false;
 
+  // If we are not supposed to perform this transform, bail.
+  if (!ctx.shouldPerform(ARCTransformKind::LoadCopyToLoadBorrowPeephole))
+    return false;
+
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 

@@ -1554,7 +1554,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
-        diag::result_builder_disabled_by_return, builderType);
+        diag::result_builder_disabled_by_return_warn, builderType);
 
     // Note that one can remove the result builder attribute.
     auto attr = func->getAttachedResultBuilder();
@@ -1671,7 +1671,7 @@ ConstraintSystem::matchResultBuilder(
   if (InvalidResultBuilderBodies.count(fn)) {
     (void)recordFix(
         IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
-            *this, getConstraintLocator(fn.getBody())));
+            *this, getConstraintLocator(fn.getAbstractClosureExpr())));
     return getTypeMatchSuccess();
   }
 
@@ -1690,13 +1690,25 @@ ConstraintSystem::matchResultBuilder(
       return getTypeMatchFailure(locator);
 
     if (recordFix(IgnoreInvalidResultBuilderBody::duringPreCheck(
-            *this, getConstraintLocator(fn.getBody()))))
+            *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
   }
 
   case ResultBuilderBodyPreCheck::HasReturnStmt:
+    // Diagnostic mode means that solver couldn't reach any viable
+    // solution, so let's diagnose presence of a `return` statement
+    // in the closure body.
+    if (shouldAttemptFixes()) {
+      if (recordFix(IgnoreResultBuilderWithReturnStmts::create(
+              *this, builderType,
+              getConstraintLocator(fn.getAbstractClosureExpr()))))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
     return None;
@@ -1744,7 +1756,7 @@ ConstraintSystem::matchResultBuilder(
 
       if (recordFix(
               IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
-                  *this, getConstraintLocator(fn.getBody()))))
+                  *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
         return getTypeMatchFailure(locator);
 
       return getTypeMatchSuccess();

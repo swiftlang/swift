@@ -300,6 +300,7 @@ class Remangler : public RemanglerBase {
     mangleChildNodesReversed(FuncType);
   }
 
+  void mangleGenericSpecializationNode(Node *node, const char *operatorStr);
   void mangleAnyNominalType(Node *node);
   void mangleAnyGenericType(Node *node, StringRef TypeOp);
   void mangleGenericArgs(Node *node, char &Separator,
@@ -743,6 +744,10 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'o';
   } else if (text == BUILTIN_TYPE_NAME_RAWPOINTER) {
     Buffer << 'p';
+  } else if (text == BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION) {
+    Buffer << 'c';
+  } else if (text == BUILTIN_TYPE_NAME_JOB) {
+    Buffer << 'j';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
@@ -1294,7 +1299,8 @@ void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
   mangleGenericPartialSpecialization(node);
 }
 
-void Remangler::mangleGenericSpecialization(Node *node) {
+void Remangler::
+mangleGenericSpecializationNode(Node *node, const char *operatorStr) {
   bool FirstParam = true;
   for (NodePointer Child : *node) {
     if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
@@ -1304,22 +1310,7 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   }
   assert(!FirstParam && "generic specialization with no substitutions");
 
-  switch (node->getKind()) {
-  case Node::Kind::GenericSpecialization:
-    Buffer << "Tg";
-    break;
-  case Node::Kind::GenericSpecializationPrespecialized:
-    Buffer << "Ts";
-    break;
-  case Node::Kind::GenericSpecializationNotReAbstracted:
-    Buffer << "TG";
-    break;
-  case Node::Kind::InlinedGenericFunction:
-    Buffer << "Ti";
-    break;
- default:
-   unreachable("unsupported node");
-  }
+  Buffer << operatorStr;
 
   for (NodePointer Child : *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
@@ -1327,16 +1318,24 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   }
 }
 
+void Remangler::mangleGenericSpecialization(Node *node) {
+  mangleGenericSpecializationNode(node, "Tg");
+}
+
 void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
-  mangleGenericSpecialization(node);
+  mangleGenericSpecializationNode(node, "Ts");
 }
 
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
-  mangleGenericSpecialization(node);
+  mangleGenericSpecializationNode(node, "TG");
+}
+
+void Remangler::mangleGenericSpecializationInResilienceDomain(Node *node) {
+  mangleGenericSpecializationNode(node, "TB");
 }
 
 void Remangler::mangleInlinedGenericFunction(Node *node) {
-  mangleGenericSpecialization(node);
+  mangleGenericSpecializationNode(node, "Ti");
 }
 
 
@@ -1368,6 +1367,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::GenericSpecialization:
       case Node::Kind::GenericSpecializationPrespecialized:
       case Node::Kind::GenericSpecializationNotReAbstracted:
+      case Node::Kind::GenericSpecializationInResilienceDomain:
       case Node::Kind::InlinedGenericFunction:
       case Node::Kind::GenericPartialSpecialization:
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:

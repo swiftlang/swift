@@ -221,6 +221,7 @@ struct SILDeclRef {
   enum class ManglingKind {
     Default,
     DynamicThunk,
+    AsyncHandlerBody
   };
 
   /// Produce a mangled form of this constant.
@@ -427,6 +428,8 @@ struct SILDeclRef {
     assert(isAutoDiffDerivativeFunction());
     return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
   }
+  
+  bool hasAsync() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

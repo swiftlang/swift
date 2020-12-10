@@ -215,7 +215,7 @@ preset=buildbot,tools=RA,stdlib=RD,test=non_executable
 
 ### Build and Test the Minimal Freestanding Stdlib using Toolchain Specific Preset Testing
 
-To test the minimal freestanding stdlib on macho, you can use the support for running a miscellanous preset against a snapshot toolchain.
+To test the minimal freestanding stdlib on macho, you can use the support for running a miscellaneous preset against a snapshot toolchain.
 
 ```
 preset=stdlib_S_standalone_minimal_macho_x86_64,build,test

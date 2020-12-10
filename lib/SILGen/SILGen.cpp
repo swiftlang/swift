@@ -327,10 +327,9 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
-static FuncDecl *
-lookUpResumeContinuationIntrinsic(ASTContext &C,
-                                  Optional<FuncDecl*> &cache,
-                                  StringRef name) {
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
+                                            Optional<FuncDecl*> &cache,
+                                            StringRef name) {
   if (cache)
     return *cache;
   
@@ -356,22 +355,54 @@ lookUpResumeContinuationIntrinsic(ASTContext &C,
 }
 
 FuncDecl *
+SILGenModule::getRunChildTask() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunChildTask,
+                                    "_runChildTask");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGet,
+                                    "_taskFutureGet");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGetThrowing,
+                                    "_taskFutureGetThrowing");
+}
+
+FuncDecl *
 SILGenModule::getResumeUnsafeContinuation() {
-  return lookUpResumeContinuationIntrinsic(getASTContext(),
-                                           ResumeUnsafeContinuation,
-                                           "_resumeUnsafeContinuation");
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeContinuation,
+                                    "_resumeUnsafeContinuation");
 }
 FuncDecl *
 SILGenModule::getResumeUnsafeThrowingContinuation() {
-  return lookUpResumeContinuationIntrinsic(getASTContext(),
-                                           ResumeUnsafeThrowingContinuation,
-                                           "_resumeUnsafeThrowingContinuation");
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuation,
+                                    "_resumeUnsafeThrowingContinuation");
 }
 FuncDecl *
 SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
-  return lookUpResumeContinuationIntrinsic(getASTContext(),
-                                 ResumeUnsafeThrowingContinuationWithError,
-                                 "_resumeUnsafeThrowingContinuationWithError");
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuationWithError,
+                                  "_resumeUnsafeThrowingContinuationWithError");
+}
+FuncDecl *
+SILGenModule::getRunTaskForBridgedAsyncMethod() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunTaskForBridgedAsyncMethod,
+                                    "_runTaskForBridgedAsyncMethod");
+}
+FuncDecl *
+SILGenModule::getRunAsyncHandler() {
+  return lookupConcurrencyIntrinsic(getASTContext(), RunAsyncHandler,
+                                    "_runAsyncHandler");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -751,7 +782,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
+    // If the native function is async, then the foreign entry point is not,
+    // so it needs to spawn a detached task in which to run the native
+    // implementation, so the actual thunk logic needs to go into a closure
+    // implementation function.
+    if (constant.hasAsync()) {
+      f = SILGenFunction(*this, *f, dc).emitNativeAsyncToForeignThunk(constant);
+    }
+
     SILGenFunction(*this, *f, dc).emitNativeToForeignThunk(constant);
+
     postEmitFunction(constant, f);
     return;
   }
@@ -2097,6 +2137,20 @@ static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
 }
 
 void SILGenModule::visitImportDecl(ImportDecl *import) {
+  // Importing `@_specializet(targetFunction: otherFunc)` only supported in
+  // experimental pre-specialization mode.
+  if (!getASTContext().LangOpts.EnableExperimentalPrespecialization)
+    return;
+
+  // TODO: this horrible full AST deserializing walk should be replaced by a
+  // 'single place' to lookup those declarations in the module
+  // E.g
+  // prespecializations {
+  //    extension Array {
+  //       @_specialize(exported: true, targetFunction: other(_:), T == Int)
+  //       func prespecialzie_other() {}
+  //    }
+  // }
   auto *module = import->getModule();
   if (module->isNonSwiftModule())
     return;

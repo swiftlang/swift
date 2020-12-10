@@ -764,6 +764,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;
+    case SILDeclRef::ManglingKind::AsyncHandlerBody:
+      SKind = ASTMangler::SymbolKind::AsyncHandlerBody;
+      break;
   }
 
   switch (kind) {
@@ -1226,4 +1229,14 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
   // For now, we only support this behavior if -enable-implicit-dynamic is
   // enabled.
   return decl->shouldUseNativeMethodReplacement();
+}
+
+bool SILDeclRef::hasAsync() const {
+  if (hasDecl()) {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {
+      return afd->hasAsync();
+    }
+    return false;
+  }
+  return getAbstractClosureExpr()->isBodyAsync();
 }

@@ -803,6 +803,7 @@ function(_compile_swift_files
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
 
     if(SWIFTFILE_STATIC)
@@ -859,6 +860,7 @@ function(_compile_swift_files
           ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${obj_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT
           "Generating ${maccatalyst_module_file}")
 
@@ -882,6 +884,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sib_file}"
         EXCLUDE_FROM_ALL)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
@@ -898,6 +901,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sibopt_file}"
         EXCLUDE_FROM_ALL)
     set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
@@ -915,6 +919,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
           COMMENT "Generating ${sibgen_file}"
           EXCLUDE_FROM_ALL)
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)

@@ -18,6 +18,7 @@
 #define SWIFT_ABI_TASK_H
 
 #include "swift/Basic/RelativePointer.h"
+#include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
@@ -25,67 +26,12 @@
 #include "swift/Basic/STLExtras.h"
 
 namespace swift {
-
 class AsyncTask;
 class AsyncContext;
-class Executor;
 class Job;
 struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
-
-/// An ExecutorRef isn't necessarily just a pointer to an executor
-/// object; it may have other bits set.
-struct ExecutorRef {
-  Executor *Pointer;
-
-  /// Get an executor ref that represents a lack of preference about
-  /// where execution resumes.  This is only valid in continuations,
-  /// return contexts, and so on; it is not generally passed to
-  /// executing functions.
-  static ExecutorRef noPreference() {
-    return { nullptr };
-  }
-
-  bool operator==(ExecutorRef other) const {
-    return Pointer == other.Pointer;
-  }
-};
-
-using JobInvokeFunction =
-  SWIFT_CC(swift)
-  void (Job *, ExecutorRef);
-
-using TaskContinuationFunction =
-  SWIFT_CC(swift)
-  void (AsyncTask *, ExecutorRef, AsyncContext *);
-
-template <class Fn>
-struct AsyncFunctionTypeImpl;
-template <class Result, class... Params>
-struct AsyncFunctionTypeImpl<Result(Params...)> {
-  // TODO: expand and include the arguments in the parameters.
-  using type = TaskContinuationFunction;
-};
-
-template <class Fn>
-using AsyncFunctionType = typename AsyncFunctionTypeImpl<Fn>::type;
-
-/// A "function pointer" for an async function.
-///
-/// Eventually, this will always be signed with the data key
-/// using a type-specific discriminator.
-template <class FnType>
-class AsyncFunctionPointer {
-public:
-  /// The function to run.
-  RelativeDirectPointer<AsyncFunctionType<FnType>,
-                        /*nullable*/ false,
-                        int32_t> Function;
-
-  /// The expected size of the context.
-  uint32_t ExpectedContextSize;
-};
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job {
@@ -436,6 +382,16 @@ public:
 
   AsyncContext(const AsyncContext &) = delete;
   AsyncContext &operator=(const AsyncContext &) = delete;
+
+  /// Perform a return from this context.
+  ///
+  /// Generally this should be tail-called.
+  SWIFT_CC(swiftasync)
+  void resumeParent(AsyncTask *task, ExecutorRef executor) {
+    // TODO: destroy context before returning?
+    // FIXME: force tail call
+    return ResumeParent(task, executor, Parent);
+  }
 };
 
 /// An async context that supports yielding.

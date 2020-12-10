@@ -841,7 +841,7 @@ func inoutTests(_ arr: inout Int) {
 
   inoutTests((&x, 24).0) // expected-error {{use of extraneous '&'}}
 
-  inoutTests((&x)) // expected-error {{use of extraneous '&'}}
+  inoutTests((&x)) // expected-error {{use of extraneous '&'}} {{15-16=(}} {{14-15=&}}
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator

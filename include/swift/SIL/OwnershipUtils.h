@@ -32,32 +32,21 @@ class DeadEndBlocks;
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
 
-/// These operations forward both owned and guaranteed ownership.
-bool isOwnershipForwardingValueKind(SILNodeKind kind);
-
-/// Is this an operand that can forward both owned and guaranteed ownership
-/// kinds.
+/// Is this an operand that can forward both owned and guaranteed ownership into
+/// one of the operand's owner instruction's result.
 bool isOwnershipForwardingUse(Operand *op);
 
-/// Is this an operand that forwards guaranteed ownership from its value to a
-/// result of the using instruction.
+/// Is this an operand that can forward guaranteed ownership into one of the
+/// operand's owner instruction's result.
 bool isGuaranteedForwardingUse(Operand *op);
 
-/// These operations forward guaranteed ownership, but don't necessarily forward
-/// owned values.
-bool isGuaranteedForwardingValueKind(SILNodeKind kind);
-
-/// Is this a value that is the result of an operation that forwards owned
-/// ownership.
-bool isGuaranteedForwardingValue(SILValue value);
-
-/// Is this a node kind that can forward owned ownership, but may not be able to
-/// forward guaranteed ownership.
-bool isOwnedForwardingValueKind(SILNodeKind kind);
-
-/// Does this operand 'forward' owned ownership, but may not be able to forward
-/// guaranteed ownership.
+/// Is this an operand that can forward owned ownership into one of the
+/// operand's owner instruction's result.
 bool isOwnedForwardingUse(Operand *use);
+
+/// Is this a value that is the result of an instruction that forwards
+/// guaranteed ownership from one of its operands.
+bool isGuaranteedForwardingValue(SILValue value);
 
 /// Is this value the result of an instruction that 'forward's owned ownership,
 /// but may not be able to forward guaranteed ownership.
@@ -75,14 +64,39 @@ class ForwardingOperand {
 public:
   static Optional<ForwardingOperand> get(Operand *use);
 
+  Operand *getUse() const { return use; }
+  OwnershipConstraint getOwnershipConstraint() const {
+    // We use a force unwrap since a ForwardingOperand should always have an
+    // ownership constraint.
+    return *use->getOwnershipConstraint();
+  }
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
-  OwnershipForwardingInst *getUser() const {
+  const OwnershipForwardingInst *operator->() const {
     return cast<OwnershipForwardingInst>(use->getUser());
   }
+  OwnershipForwardingInst *operator->() {
+    return cast<OwnershipForwardingInst>(use->getUser());
+  }
+  const OwnershipForwardingInst &operator*() const {
+    return *cast<OwnershipForwardingInst>(use->getUser());
+  }
+  OwnershipForwardingInst &operator*() {
+    return *cast<OwnershipForwardingInst>(use->getUser());
+  }
+
+  /// Call \p visitor with each value that contains the final forwarded
+  /// ownership of. E.x.: result of a unchecked_ref_cast, phi arguments of a
+  /// switch_enum.
+  bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
+
+  /// If statically this forwarded operand has a single forwarded value that the
+  /// operand forwards ownership into, return that value. Return false
+  /// otherwise.
+  SILValue getSingleForwardedValue() const;
 };
 
 /// Returns true if the instruction is a 'reborrow'.
@@ -156,6 +170,15 @@ struct BorrowingOperand {
     return *this;
   }
 
+  // A set of operators so that a BorrowingOperand can be used like a normal
+  // operand in a light weight way.
+  operator const Operand *() const { return op; }
+  operator Operand *() { return op; }
+  const Operand *operator*() const { return op; }
+  Operand *operator*() { return op; }
+  const Operand *operator->() const { return op; }
+  Operand *operator->() { return op; }
+
   /// If \p op is a borrow introducing operand return it after doing some
   /// checks.
   static Optional<BorrowingOperand> get(Operand *op) {
@@ -179,7 +202,10 @@ struct BorrowingOperand {
   /// Example: An apply performs an instantaneous recursive borrow of a
   /// guaranteed value but a begin_apply borrows the value over the entire
   /// region of code corresponding to the coroutine.
-  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  ///
+  /// NOTE: Return false from func to stop iterating. Returns false if the
+  /// closure requested to stop early.
+  bool visitLocalEndScopeUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
@@ -408,7 +434,7 @@ struct BorrowedValue {
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool areUsesWithinScope(ArrayRef<Operand *> instructions,
+  bool areUsesWithinScope(ArrayRef<Operand *> uses,
                           SmallVectorImpl<Operand *> &scratchSpace,
                           SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                           DeadEndBlocks &deadEndBlocks) const;
@@ -429,6 +455,24 @@ struct BorrowedValue {
   /// interior pointer uses. Returns false otherwise.
   bool visitInteriorPointerOperands(
       function_ref<void(const InteriorPointerOperand &)> func) const;
+
+  /// Visit all immediate uses of this borrowed value and if any of them are
+  /// reborrows, place them in BorrowingOperand form into \p
+  /// foundReborrows. Returns true if we appended any such reborrows to
+  /// foundReborrows... false otherwise.
+  bool
+  gatherReborrows(SmallVectorImpl<BorrowingOperand> &foundReborrows) const {
+    bool foundAnyReborrows = false;
+    for (auto *op : value->getUses()) {
+      if (auto borrowingOperand = BorrowingOperand::get(op)) {
+        if (borrowingOperand->isReborrow()) {
+          foundReborrows.push_back(*borrowingOperand);
+          foundAnyReborrows = true;
+        }
+      }
+    }
+    return foundAnyReborrows;
+  }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand

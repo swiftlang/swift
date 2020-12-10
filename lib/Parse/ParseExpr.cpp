@@ -436,6 +436,13 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       : parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
+    // "await" must precede "try".
+    if (auto await = dyn_cast<AwaitExpr>(sub.get())) {
+      diagnose(await->getLoc(), diag::try_before_await)
+        .fixItRemove(await->getLoc())
+        .fixItInsert(tryLoc, "await ");
+    }
+
     ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
     switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
     case tok::exclaim_postfix:
@@ -1500,7 +1507,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       DeferringContextRAII Deferring(*SyntaxContext);
       Identifier name;
-      SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
+      SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
       auto introducer = (InVarOrLetPattern != IVOLP_InVar
                          ? VarDecl::Introducer::Let
                          : VarDecl::Introducer::Var);
@@ -2114,8 +2121,7 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
   SourceLoc baseNameLoc;
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
     Identifier baseNameId;
-    baseNameLoc = consumeIdentifier(
-        &baseNameId, /*allowDollarIdentifier=*/true);
+    baseNameLoc = consumeIdentifier(baseNameId, /*diagnoseDollarPrefix=*/false);
     baseName = baseNameId;
   } else if (flags.contains(DeclNameFlag::AllowOperators) &&
              Tok.isAnyOperator()) {
@@ -2490,7 +2496,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       } else {
         // Otherwise, the name is a new declaration.
-        consumeIdentifier(&name);
+        consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
         equalLoc = consumeToken(tok::equal);
 
         auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
@@ -2569,7 +2575,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         Identifier name;
         SourceLoc nameLoc;
         if (Tok.is(tok::identifier)) {
-          nameLoc = consumeIdentifier(&name);
+          nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
         } else {
           nameLoc = consumeToken(tok::kw__);
         }
@@ -3233,7 +3239,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
          PoundLoc.getAdvancedLoc(1) == Tok.getLoc());
 
   Identifier Name;
-  SourceLoc NameLoc = consumeIdentifier(&Name);
+  SourceLoc NameLoc = consumeIdentifier(Name, /*diagnoseDollarPrefix=*/false);
 
   // Parse arguments if exist.
   SourceLoc LParenLoc, RParenLoc;
@@ -3670,6 +3676,7 @@ Parser::parsePlatformVersionConstraintSpec() {
   }
 
   if (parseIdentifier(PlatformIdentifier, PlatformLoc,
+                      /*diagnoseDollarPrefix=*/false,
                       diag::avail_query_expected_platform_name)) {
     return nullptr;
   }

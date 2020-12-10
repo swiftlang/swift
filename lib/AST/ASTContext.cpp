@@ -227,6 +227,12 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
 
+  /// The declaration of _Concurrency.DefaultActor.
+  ClassDecl *DefaultActorDecl = nullptr;
+
+  /// The declaration of _Concurrency.NSObjectDefaultActor.
+  ClassDecl *NSObjectDefaultActorDecl = nullptr;
+
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
@@ -589,18 +595,10 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
                                             /*HasExplicitAnyObject=*/false)),
-    TheNativeObjectType(new (*this, AllocationArena::Permanent)
-                           BuiltinNativeObjectType(*this)),
-    TheBridgeObjectType(new (*this, AllocationArena::Permanent)
-                           BuiltinBridgeObjectType(*this)),
-    TheRawPointerType(new (*this, AllocationArena::Permanent)
-                        BuiltinRawPointerType(*this)),
-    TheUnsafeValueBufferType(new (*this, AllocationArena::Permanent)
-                               BuiltinUnsafeValueBufferType(*this)),
-    TheSILTokenType(new (*this, AllocationArena::Permanent)
-                      SILTokenType(*this)),
-    TheIntegerLiteralType(new (*this, AllocationArena::Permanent)
-                               BuiltinIntegerLiteralType(*this)),
+#define SINGLETON_TYPE(SHORT_ID, ID) \
+    The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
+                          ID##Type(*this)),
+#include "swift/AST/TypeNodes.def"
     TheIEEE32Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this, AllocationArena::Permanent)
@@ -1921,6 +1919,11 @@ ASTContext::getModule(ImportPath::Module ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath)) {
+      if (LangOpts.EnableModuleLoadingRemarks) {
+        Diags.diagnose(ModulePath.getSourceRange().Start,
+                       diag::module_loaded,
+                       M->getModuleFilename());
+      }
       return M;
     }
   }

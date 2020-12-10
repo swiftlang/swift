@@ -229,7 +229,7 @@ class Verifier : public ASTWalker {
   typedef llvm::PointerIntPair<DeclContext *, 1, bool> ClosureDiscriminatorKey;
   llvm::DenseMap<ClosureDiscriminatorKey, SmallBitVector>
       ClosureDiscriminators;
-  DeclContext *CanonicalTopLevelContext = nullptr;
+  DeclContext *CanonicalTopLevelSubcontext = nullptr;
 
   Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
@@ -898,9 +898,9 @@ public:
     DeclContext *getCanonicalDeclContext(DeclContext *DC) {
       // All we really need to do is use a single TopLevelCodeDecl.
       if (auto topLevel = dyn_cast<TopLevelCodeDecl>(DC)) {
-        if (!CanonicalTopLevelContext)
-          CanonicalTopLevelContext = topLevel;
-        return CanonicalTopLevelContext;
+        if (!CanonicalTopLevelSubcontext)
+          CanonicalTopLevelSubcontext = topLevel;
+        return CanonicalTopLevelSubcontext;
       }
 
       // TODO: check for uniqueness of initializer contexts?

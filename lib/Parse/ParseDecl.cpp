@@ -644,6 +644,14 @@ bool Parser::parseSpecializeAttributeArguments(
         if (ParamLabel == "exported") {
           Exported = isTrue;
         }
+        if (Exported == true) {
+          const LangOptions &LangOpts = Context.LangOpts;
+          if (!LangOpts.EnableExperimentalPrespecialization) {
+            diagnose(Tok.getLoc(),
+                     diag::attr_specialize_unsupported_exported_true,
+                     ParamLabel);
+          }
+        }
       }
       if (ParamLabel == "kind") {
         SourceLoc paramValueLoc;
@@ -930,9 +938,7 @@ bool Parser::parseDifferentiabilityParametersClause(
         return true;
       }
       Identifier paramName;
-      if (parseIdentifier(paramName, paramLoc,
-                          diag::diff_params_clause_expected_parameter))
-        return true;
+      paramLoc = consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
       parameters.push_back(
           ParsedAutoDiffParameter::getNamedParameter(paramLoc, paramName));
       break;
@@ -1966,8 +1972,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
     
     Identifier name;
-    consumeIdentifier(&name);
-    
+    consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+
     auto range = SourceRange(Loc, Tok.getRange().getStart());
 
     if (!consumeIf(tok::r_paren)) {
@@ -2545,7 +2551,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     Identifier name;
-    consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
+    consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
 
     auto range = SourceRange(Loc, Tok.getRange().getStart());
 
@@ -4418,6 +4424,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     }
     importPath.push_back(Identifier(), Tok.getLoc());
     if (parseAnyIdentifier(importPath.back().Item,
+                           /*diagnoseDollarPrefix=*/false,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
     HasNext = consumeIf(tok::period);
@@ -4543,7 +4550,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
                         StringRef DeclKindName,
                         llvm::function_ref<bool(const Token &)> canRecover) {
   if (P.Tok.is(tok::identifier)) {
-    Loc = P.consumeIdentifier(&Result);
+    Loc = P.consumeIdentifier(Result, /*diagnoseDollarPrefix=*/true);
 
     // We parsed an identifier for the declaration. If we see another
     // identifier, it might've been a single identifier that got broken by a
@@ -5457,7 +5464,7 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
         EndLoc = StartLoc;
     } else {
       // We have a name.
-      NameLoc = P.consumeIdentifier(&Name);
+      NameLoc = P.consumeIdentifier(Name, /*diagnoseDollarPrefix=*/true);
 
       auto DiagID =
          Kind == AccessorKind::Set ? diag::expected_rparen_set_name :
@@ -7737,7 +7744,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                        SyntaxKind::IdentifierList);
 
         Identifier name;
-        auto loc = consumeIdentifier(&name);
+        auto loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
         identifiers.emplace_back(name, loc);
 
         while (Tok.is(tok::comma)) {
@@ -7745,7 +7752,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
 
           if (Tok.is(tok::identifier)) {
             Identifier name;
-            auto loc = consumeIdentifier(&name);
+            auto loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
             identifiers.emplace_back(name, loc);
           } else {
             if (Tok.isNot(tok::eof)) {
@@ -7762,7 +7769,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                      SyntaxKind::IdentifierList);
 
       Identifier name;
-      auto nameLoc = consumeIdentifier(&name);
+      auto nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
       identifiers.emplace_back(name, nameLoc);
 
       if (isPrefix || isPostfix) {
@@ -7833,7 +7840,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
 
   Identifier name;
   SourceLoc nameLoc;
-  if (parseIdentifier(name, nameLoc, diag::expected_precedencegroup_name)) {
+  if (parseIdentifier(name, nameLoc, /*diagnoseDollarPrefix=*/true,
+                      diag::expected_precedencegroup_name)) {
     // If the identifier is missing or a keyword or something, try to
     // skip the entire body.
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof) &&
@@ -8039,7 +8047,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
           return abortBody();
         }
         Identifier name;
-        SourceLoc nameLoc = consumeIdentifier(&name);
+        SourceLoc nameLoc = consumeIdentifier(name,
+                                              /*diagnoseDollarPrefix=*/false);
         relations.push_back({nameLoc, name, nullptr});
 
         if (skipUnspacedCodeCompleteToken())

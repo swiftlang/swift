@@ -11,9 +11,12 @@ import Swift
 // CHECK-LABEL: define hidden swiftcc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* %2)
 sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
 bb0:
-  // CHECK: [[TASK:%.*]] = bitcast %swift.task* %0 to %swift.refcounted*
+  // CHECK: [[TASKLOC:%.*]] = alloca %swift.task*
+  // CHECK: store %swift.task* %0, %swift.task** [[TASKLOC]]
+  // CHECK: [[TASK:%.*]] = load %swift.task*, %swift.task** [[TASKLOC]]
+  // CHECK: [[TASKRC:%.*]] = bitcast %swift.task* [[TASK]] to %swift.refcounted*
   %0 = builtin "getCurrentAsyncTask"() : $Builtin.NativeObject
-  // CHECK-NEXT: [[TASK_COPY:%.*]] = call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TASK]])
+  // CHECK-NEXT: [[TASK_COPY:%.*]] = call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TASKRC]])
   %1 = copy_value %0 : $Builtin.NativeObject
   end_lifetime %0 : $Builtin.NativeObject
   return %1 : $Builtin.NativeObject

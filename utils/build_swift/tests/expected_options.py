@@ -140,6 +140,7 @@ EXPECTED_DEFAULTS = {
     'distcc': False,
     'sccache': False,
     'dry_run': False,
+    'dsymutil_jobs': defaults.DSYMUTIL_JOBS,
     'enable_asan': False,
     'enable_experimental_differentiable_programming': True,
     'enable_experimental_concurrency': True,
@@ -662,6 +663,7 @@ EXPECTED_OPTIONS = [
     IntOption('--llvm-max-parallel-lto-link-jobs'),
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
     IntOption('-j', dest='build_jobs'),
+    IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 
     AppendOption('--cross-compile-hosts'),
     AppendOption('--extra-cmake-options'),

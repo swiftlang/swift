@@ -129,6 +129,24 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   return true;
 }
 
+static bool shouldDisallowNewDriver(StringRef ExecName,
+                                    const ArrayRef<const char *> argv) {
+  // We are not invoking the driver, so don't forward.
+  if (ExecName != "swift" && ExecName != "swiftc") {
+    return true;
+  }
+  // If user specified using the old driver, don't forward.
+  if (llvm::find_if(argv, [](const char* arg) {
+    return StringRef(arg) == "-disallow-use-new-driver";
+  }) != argv.end()) {
+    return true;
+  }
+  if (llvm::sys::Process::GetEnv("SWIFT_USE_OLD_DRIVER").hasValue()) {
+    return true;
+  }
+  return false;
+}
+
 static int run_driver(StringRef ExecName,
                        const ArrayRef<const char *> argv) {
   // Handle integrated tools.
@@ -169,23 +187,16 @@ static int run_driver(StringRef ExecName,
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::string newDriverName;
+  std::string newDriverName = "swift-driver-new";
   if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER")) {
     newDriverName = driverNameOp.getValue();
   }
-  auto disallowForwarding = llvm::find_if(argv, [](const char* arg) {
-    return StringRef(arg) == "-disallow-use-new-driver";
-  }) != argv.end();
   // Forwarding calls to the swift driver if the C++ driver is invoked as `swift`
   // or `swiftc`, and an environment variable SWIFT_USE_NEW_DRIVER is defined.
-  if (!newDriverName.empty() && !disallowForwarding &&
-      (ExecName == "swift" || ExecName == "swiftc")) {
+  if (!shouldDisallowNewDriver(ExecName, argv)) {
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
     llvm::sys::path::append(NewDriverPath, newDriverName);
-    if (!llvm::sys::fs::exists(NewDriverPath)) {
-      Diags.diagnose(SourceLoc(), diag::remark_forwarding_driver_not_there,
-                     NewDriverPath);
-    } else {
+    if (llvm::sys::fs::exists(NewDriverPath)) {
       SmallVector<const char *, 256> subCommandArgs;
       // Rewrite the program argument.
       subCommandArgs.push_back(NewDriverPath.c_str());
@@ -246,7 +257,7 @@ static int run_driver(StringRef ExecName,
     std::unique_ptr<sys::TaskQueue> TQ = TheDriver.buildTaskQueue(*C);
     if (!TQ)
         return 1;
-    return C->performJobs(std::move(TQ));
+    return C->performJobs(std::move(TQ)).exitCode;
   }
 
   return 0;

@@ -142,6 +142,13 @@ enum class ImportTypeKind {
   /// Parameters are always considered CF-audited.
   Parameter,
 
+  /// Import the type of a parameter to a completion handler that can indicate
+  /// a thrown error.
+  ///
+  /// Special handling:
+  /// * _Nullable_result is treated as _Nonnull rather than _Nullable_result.
+  CompletionHandlerResultParameter,
+
   /// Import the type of a parameter declared with
   /// \c CF_RETURNS_RETAINED.
   ///
@@ -1036,7 +1043,8 @@ public:
   importType(clang::QualType type, ImportTypeKind kind,
              bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
              OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-             bool resugarNSErrorPointer = true);
+             bool resugarNSErrorPointer = true,
+             Optional<unsigned> completionHandlerErrorParamIndex = None);
 
   /// Import the given Clang type into Swift.
   ///

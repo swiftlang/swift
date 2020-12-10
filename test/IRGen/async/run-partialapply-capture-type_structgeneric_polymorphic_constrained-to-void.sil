@@ -10,7 +10,6 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift

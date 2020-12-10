@@ -40,7 +40,7 @@ TestSuiteCrashes.test("crashesUnexpectedly1") {
   fatalErrorWithDelayIfNeeded("This should crash")
 }
 // CHECK: stdout>>> crashesUnexpectedly1
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: [     FAIL ] TestSuiteCrashes.crashesUnexpectedly1
 
@@ -64,7 +64,7 @@ TestSuiteCrashes.test("crashesUnexpectedly2") {
   fatalErrorWithDelayIfNeeded("This should crash")
 }
 // CHECK: stdout>>> crashesUnexpectedly2
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: [     FAIL ] TestSuiteCrashes.crashesUnexpectedly2
 
@@ -89,7 +89,7 @@ TestSuiteCrashes.test("crashesAsExpected1") {
   fatalErrorWithDelayIfNeeded("This should crash")
 }
 // CHECK: stdout>>> crashesAsExpected1
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [       OK ] TestSuiteCrashes.crashesAsExpected1
 
@@ -114,7 +114,7 @@ TestSuiteCrashes.test("crashesUnexpectedlyXfail")
   fatalErrorWithDelayIfNeeded("This should crash")
 }
 // CHECK: stdout>>> crashesUnexpectedlyXfail
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: [    XFAIL ] TestSuiteCrashes.crashesUnexpectedlyXfail
 
@@ -125,7 +125,7 @@ TestSuiteCrashes.test("crashesAsExpectedXfail")
   fatalErrorWithDelayIfNeeded("This should crash")
 }
 // CHECK: stdout>>> crashesAsExpectedXfail
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [   UXPASS ] TestSuiteCrashes.crashesAsExpectedXfail
 
@@ -136,7 +136,7 @@ TestSuiteCrashes.test("crashesWithMessagePasses")
   fatalErrorWithDelayIfNeeded("This should crash")
 }
 // CHECK: stdout>>> abcd
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [       OK ] TestSuiteCrashes.crashesWithMessagePasses
 
@@ -147,7 +147,7 @@ TestSuiteCrashes.test("crashesWithMessageFails")
   fatalErrorWithDelayIfNeeded("unexpected message")
 }
 // CHECK: stdout>>> This should crash
-// CHECK: stderr>>> Fatal error: unexpected message:
+// CHECK: stderr>>> {{.*}}Fatal error: unexpected message
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: did not find expected string after crash: "This should crash"
 // CHECK: [     FAIL ] TestSuiteCrashes.crashesWithMessageFails
@@ -162,7 +162,7 @@ TestSuiteCrashes.test("crashesWithMultipleMessagesPasses")
   fatalErrorWithDelayIfNeeded("This should crash and your little dog too")
 }
 // CHECK: stdout>>> abcd
-// CHECK: stderr>>> Fatal error: This should crash and your little dog too:
+// CHECK: stderr>>> {{.*}}Fatal error: This should crash and your little dog too
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [       OK ] TestSuiteCrashes.crashesWithMultipleMessagesPasses
 
@@ -177,7 +177,7 @@ TestSuiteCrashes.test("crashesWithMultipleMessagesFails")
   fatalErrorWithDelayIfNeeded("unexpected message and your little dog too")
 }
 // CHECK: stdout>>> This should crash
-// CHECK: stderr>>> Fatal error: unexpected message and your little dog too:
+// CHECK: stderr>>> {{.*}}Fatal error: unexpected message and your little dog too
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: did not find expected string after crash: "This should crash"
 // CHECK: did not find expected string after crash: "big dog"

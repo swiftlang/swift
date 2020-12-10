@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
@@ -18,6 +19,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/TerminatorUtils.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -377,4 +379,114 @@ void DeadEndBlocks::compute() {
     for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
       ReachableBlocks.insert(Pred);
   }
+}
+
+//===----------------------------------------------------------------------===//
+//                  Post Dominance Set Completion Utilities
+//===----------------------------------------------------------------------===//
+
+void JointPostDominanceSetComputer::findJointPostDominatingSet(
+    SILBasicBlock *dominatingBlock, ArrayRef<SILBasicBlock *> dominatedBlockSet,
+    function_ref<void(SILBasicBlock *)> inputBlocksFoundDuringWalk,
+    function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
+    function_ref<void(SILBasicBlock *)> inputBlocksInJointPostDomSet) {
+  // If our reachable block set is empty, assert. This is most likely programmer
+  // error.
+  assert(dominatedBlockSet.size() != 0);
+
+  // If we have a reachable block set with a single block and that block is
+  // dominatingBlock, then we return success since a block post-doms its self so
+  // it is already complete.
+  //
+  // NOTE: We do not consider this a visiteed
+  if (dominatedBlockSet.size() == 1) {
+    if (dominatingBlock == dominatedBlockSet[0]) {
+      if (inputBlocksInJointPostDomSet)
+        inputBlocksInJointPostDomSet(dominatingBlock);
+      return;
+    }
+  }
+
+  // At the top of where we for sure are going to use state... make sure we
+  // always clean up any resources that we use!
+  SWIFT_DEFER { clear(); };
+
+  // Otherwise, we need to compute our joint post dominating set. We do this by
+  // performing a backwards walk up the CFG tracking back liveness until we find
+  // our dominating block. As we walk up, we keep track of any successor blocks
+  // that we need to visit before the walk completes lest we leak. After we
+  // finish the walk, these leaking blocks are a valid (albeit not unique)
+  // completion of the post dom set.
+  for (auto *block : dominatedBlockSet) {
+    // Skip dead end blocks.
+    if (deadEndBlocks.isDeadEnd(block))
+      continue;
+
+    // We require dominatedBlockSet to be a set and thus assert if we hit it to
+    // flag user error to our caller.
+    bool succeededInserting = visitedBlocks.insert(block).second;
+    (void)succeededInserting;
+    assert(succeededInserting &&
+           "Repeat Elt: dominatedBlockSet should be a set?!");
+    initialBlocks.insert(block);
+    worklist.push_back(block);
+  }
+
+  // Then until we run out of blocks...
+  while (!worklist.empty()) {
+    auto *block = worklist.pop_back_val();
+
+    // First remove block from blocksThatLeakIfNeverVisited if it is there since
+    // we know that it isn't leaking since we are visiting it now.
+    blocksThatLeakIfNeverVisited.remove(block);
+
+    // Then if our block is not one of our initial blocks, add the block's
+    // successors to blocksThatLeakIfNeverVisited.
+    if (!initialBlocks.count(block)) {
+      for (auto *succBlock : block->getSuccessorBlocks()) {
+        if (visitedBlocks.count(succBlock))
+          continue;
+        if (deadEndBlocks.isDeadEnd(succBlock))
+          continue;
+        blocksThatLeakIfNeverVisited.insert(succBlock);
+      }
+    }
+
+    // If we are the dominating block, we are done.
+    if (dominatingBlock == block)
+      continue;
+
+    // Otherwise for each predecessor that we have, first check if it was one of
+    // our initial blocks (signaling a loop) and then add it to the worklist if
+    // we haven't visited it already.
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      if (initialBlocks.count(predBlock)) {
+        reachableInputBlocks.push_back(predBlock);
+      }
+      if (visitedBlocks.insert(predBlock).second)
+        worklist.push_back(predBlock);
+    }
+  }
+
+  // After our worklist has emptied, any blocks left in
+  // blocksThatLeakIfNeverVisited are "leaking blocks".
+  for (auto *leakingBlock : blocksThatLeakIfNeverVisited)
+    foundJointPostDomSetCompletionBlocks(leakingBlock);
+
+  // Then unique our list of reachable input blocks and pass them to our
+  // callback.
+  sortUnique(reachableInputBlocks);
+  for (auto *block : reachableInputBlocks)
+    inputBlocksFoundDuringWalk(block);
+
+  // Then if were asked to find the subset of our input blocks that are in the
+  // joint-postdominance set, compute that.
+  if (!inputBlocksInJointPostDomSet)
+    return;
+
+  // Pass back the reachable input blocks that were not reachable from other
+  // input blocks to.
+  for (auto *block : dominatedBlockSet)
+    if (lower_bound(reachableInputBlocks, block) == reachableInputBlocks.end())
+      inputBlocksInJointPostDomSet(block);
 }

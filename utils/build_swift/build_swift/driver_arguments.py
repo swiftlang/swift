@@ -501,6 +501,13 @@ def create_argument_parser():
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
+    option('--dsymutil-jobs', store_int,
+           default=defaults.DSYMUTIL_JOBS,
+           metavar='COUNT',
+           help='the maximum number of parallel dsymutil jobs to use when '
+                'extracting symbols. Tweak with caution, since dsymutil'
+                'is memory intensive.')
+
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
 

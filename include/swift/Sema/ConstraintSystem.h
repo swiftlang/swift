@@ -785,6 +785,8 @@ enum ScoreKind {
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
   SK_DisfavoredOverload,
+  /// A member for an \c UnresolvedMemberExpr found via unwrapped optional base.
+  SK_UnresolvedMemberViaOptional,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -4706,6 +4708,11 @@ private:
       return {type, kind, BindingSource};
     }
 
+    /// Determine whether this binding could be a viable candidate
+    /// to be "joined" with some other binding. It has to be at least
+    /// a non-default r-value supertype binding with no type variables.
+    bool isViableForJoin() const;
+
     static PotentialBinding forHole(TypeVariableType *typeVar,
                                     ConstraintLocator *locator) {
       return {HoleType::get(typeVar->getASTContext(), typeVar),
@@ -4733,20 +4740,21 @@ private:
     /// The set of constraints which would be used to infer default types.
     llvm::TinyPtrVector<Constraint *> Defaults;
 
-    /// Whether these bindings should be delayed until the rest of the
-    /// constraint system is considered "fully bound".
-    bool FullyBound = false;
+    /// The set of constraints which delay attempting this type variable.
+    llvm::TinyPtrVector<Constraint *> DelayedBy;
 
-    /// Whether the bindings of this type involve other type variables.
-    bool InvolvesTypeVariables = false;
+    /// The set of type variables adjacent to the current one.
+    ///
+    /// Type variables contained here are either related through the
+    /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
+    /// reachable through subtype/conversion  relationship e.g.
+    /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
+    llvm::SmallPtrSet<TypeVariableType *, 2> AdjacentVars;
 
     ASTNode AssociatedCodeCompletionToken = ASTNode();
 
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
-
-    /// Tracks the position of the last known supertype in the group.
-    Optional<unsigned> lastSupertypeIndex;
 
     /// A set of all not-yet-resolved type variables this type variable
     /// is a subtype of, supertype of or is equivalent to. This is used
@@ -4760,6 +4768,22 @@ private:
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
+
+    /// Determine whether attempting this type variable should be
+    /// delayed until the rest of the constraint system is considered
+    /// "fully bound" meaning constraints, which affect completeness
+    /// of the binding set, for this type variable such as - member
+    /// constraint, disjunction, function application etc. - are simplified.
+    ///
+    /// Note that in some situations i.e. when there are no more
+    /// disjunctions or type variables left to attempt, it's still
+    /// okay to attempt "delayed" type variable to make forward progress.
+    bool isDelayed() const;
+
+    /// Whether the bindings of this type involve other type variables,
+    /// or the type variable itself is adjacent to other type variables
+    /// that could become valid bindings in the future.
+    bool involvesTypeVariables() const;
 
     /// Whether the bindings represent (potentially) incomplete set,
     /// there is no way to say with absolute certainty if that's the
@@ -4803,9 +4827,9 @@ private:
 
       return std::make_tuple(b.isHole(),
                              !hasNoDefaultableBindings,
-                             b.FullyBound,
+                             b.isDelayed(),
                              b.isSubtypeOfExistentialType(),
-                             b.InvolvesTypeVariables,
+                             b.involvesTypeVariables(),
                              static_cast<unsigned char>(b.LiteralBinding),
                              -(b.Bindings.size() - numDefaults));
     }
@@ -4950,13 +4974,13 @@ public:
       out.indent(indent);
       if (isPotentiallyIncomplete())
         out << "potentially_incomplete ";
-      if (FullyBound)
-        out << "fully_bound ";
+      if (isDelayed())
+        out << "delayed ";
       if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
       if (LiteralBinding != LiteralBindingKind::None)
         out << "literal=" << static_cast<int>(LiteralBinding) << " ";
-      if (InvolvesTypeVariables)
+      if (involvesTypeVariables())
         out << "involves_type_vars ";
 
       auto numDefaultable = getNumDefaultableBindings();

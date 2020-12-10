@@ -71,6 +71,7 @@ KNOWN_SETTINGS=(
     swift-tools-num-parallel-lto-link-jobs        ""                "The number of parallel link jobs to use when compiling swift tools"
     use-gold-linker                               ""                "Enable using the gold linker"
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
+    dsymutil-jobs                                 "1"               "number of parallel invocations of dsymutil"
 
     ## Build Tools
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -484,8 +485,8 @@ function set_build_options_for_host() {
         watchos-*           | \
         watchsimulator-*)
             swift_cmake_options+=(
-              -DPython2_EXECUTABLE=$(xcrun -f python2.7)
-              -DPython3_EXECUTABLE=$(xcrun -f python3)
+              -DPython2_EXECUTABLE="$(xcrun -f python2.7)"
+              -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
             case ${host} in
                 macosx-x86_64)
@@ -3043,6 +3044,25 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 
+function printJSONTimestamp() {
+    local command=$1
+    local kind=$2
+
+    echo "{ \"command\": \"${command}\", \"${kind}\": \"$(date "+%Y-%m-%dT%H:%M:%S")\" }"
+}
+
+function printJSONStartTimestamp() {
+    local command=$1
+
+    printJSONTimestamp ${command} "start"
+}
+
+function printJSONEndTimestamp() {
+    local command=$1
+
+    printJSONTimestamp ${command} "end"
+}
+
 for host in "${ALL_HOSTS[@]}"; do
     # Check if we should perform this action.
     if ! [[ $(should_execute_action "${host}-extractsymbols") ]]; then
@@ -3075,6 +3095,9 @@ for host in "${ALL_HOSTS[@]}"; do
         #        Instead, just echo we do "darwin_intall_extract_symbols".
         if [[ "${DRY_RUN}" ]]; then
             call darwin_install_extract_symbols
+            printJSONStartTimestamp dsymutil
+            echo xargs -n 1 -P ${DSYMUTIL_JOBS} dsymutil
+            printJSONEndTimestamp dsymutil
         else
             set -x
 
@@ -3097,13 +3120,16 @@ for host in "${ALL_HOSTS[@]}"; do
             #
             # Exclude shell scripts and static archives.
             # Exclude swift-api-digester dSYM to reduce debug toolchain size.
-            # Run sequentially -- dsymutil is multithreaded and can be memory intensive
+            # Tweak carefully the amount of parallelism -- dsymutil can be memory intensive and
+            # as such too many instance can exhaust the memory and slow down/panic the machine
+            printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
                grep -v 'swift-api-digester' | \
-               xargs -P 1 ${dsymutil_path})
+               xargs -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
+            printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.

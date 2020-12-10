@@ -759,9 +759,10 @@ func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteed_test
-// CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
+// CHECK:  [[LOCAL1:%.*]] = alloca %swift.refcounted*
+// CHECK:  [[LOCAL2:%.*]] = alloca %swift.refcounted*
 // CHECK:  call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
-// CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
+// CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL2]]
 // CHECK-NOT:  call void @swift_release(%swift.refcounted* %0)
 // CHECK:  ret %swift.refcounted* %0
 func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {

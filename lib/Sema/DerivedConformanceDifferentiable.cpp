@@ -17,6 +17,8 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -627,6 +629,49 @@ deriveDifferentiable_zeroTangentVectorInitializer(DerivedConformance &derived) {
   return propDecl;
 }
 
+/// Pushes all the protocols inherited, directly or transitively, by `decl` to `protos`.
+///
+/// Precondition: `decl` is a nominal type decl or an extension decl.
+void getInheritedProtocols(Decl *decl, SmallPtrSetImpl<ProtocolDecl *> &protos) {
+  ArrayRef<TypeLoc> inheritedTypeLocs;
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
+    inheritedTypeLocs = nominalDecl->getInherited();
+  else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
+    inheritedTypeLocs = extDecl->getInherited();
+  else
+    llvm_unreachable("conformance is not a nominal or an extension");
+
+  std::function<void(Type)> handleInheritedType;
+
+  auto handleProto = [&](ProtocolType *proto) -> void {
+    proto->getDecl()->walkInheritedProtocols([&](ProtocolDecl *p) -> TypeWalker::Action {
+      protos.insert(p);
+      return TypeWalker::Action::Continue;
+    });
+  };
+
+  auto handleProtoComp = [&](ProtocolCompositionType *comp) -> void {
+    for (auto ty : comp->getMembers())
+      handleInheritedType(ty);
+  };
+
+  handleInheritedType = [&](Type ty) -> void {
+    if (auto *proto = ty->getAs<ProtocolType>())
+      handleProto(proto);
+    else if (auto *comp = ty->getAs<ProtocolCompositionType>())
+      handleProtoComp(comp);
+  };
+
+  for (auto loc : inheritedTypeLocs) {
+    if (loc.getTypeRepr())
+      handleInheritedType(TypeResolution::forStructural(
+          cast<DeclContext>(decl), None, /*unboundTyOpener*/ nullptr)
+        .resolveType(loc.getTypeRepr()));
+    else
+      handleInheritedType(loc.getType());
+  }
+}
+
 /// Return associated `TangentVector` struct for a nominal type, if it exists.
 /// If not, synthesize the struct.
 static StructDecl *
@@ -646,23 +691,46 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   }
 
   // Otherwise, synthesize a new struct.
-  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredInterfaceType());
-  auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredInterfaceType());
 
-  // By definition, `TangentVector` must conform to `Differentiable` and
-  // `AdditiveArithmetic`.
-  SmallVector<TypeLoc, 4> inherited{diffableType, addArithType};
+  // Compute `tvDesiredProtos`, the set of protocols that the new `TangentVector` struct must
+  // inherit, by collecting all the `TangentVector` conformance requirements imposed by the
+  // protocols that `derived.ConformanceDecl` inherits.
+  //
+  // Note that, for example, this will always find `AdditiveArithmetic` and `Differentiable` because
+  // the `Differentiable` protocol itself requires that its `TangentVector` conforms to
+  // `AdditiveArithmetic` and `Differentiable`.
+  llvm::SmallPtrSet<ProtocolType *, 4> tvDesiredProtos;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> conformanceInheritedProtos;
+  getInheritedProtocols(derived.ConformanceDecl, conformanceInheritedProtos);
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
+  auto *tvAssocType = diffableProto->getAssociatedType(C.Id_TangentVector);
+  for (auto proto : conformanceInheritedProtos) {
+    for (auto req : proto->getRequirementSignature()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+      auto *firstType = req.getFirstType()->getAs<DependentMemberType>();
+      if (!firstType || firstType->getAssocType() != tvAssocType)
+        continue;
+      auto tvRequiredProto = req.getSecondType()->getAs<ProtocolType>();
+      if (!tvRequiredProto)
+        continue;
+      tvDesiredProtos.insert(tvRequiredProto);
+    }
+  }
+  SmallVector<TypeLoc, 4> tvDesiredProtoTypeLocs;
+  for (auto *p : tvDesiredProtos)
+    tvDesiredProtoTypeLocs.push_back(TypeLoc::withoutLoc(p));
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
+  auto synthesizedLoc = derived.ConformanceDecl->getEndLoc();
   auto *structDecl =
-      new (C) StructDecl(SourceLoc(), C.Id_TangentVector, SourceLoc(),
-                         /*Inherited*/ C.AllocateCopy(inherited),
+      new (C) StructDecl(synthesizedLoc, C.Id_TangentVector, synthesizedLoc,
+                         /*Inherited*/ C.AllocateCopy(tvDesiredProtoTypeLocs),
                          /*GenericParams*/ {}, parentDC);
+  structDecl->setBraces({synthesizedLoc, synthesizedLoc});
   structDecl->setImplicit();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 

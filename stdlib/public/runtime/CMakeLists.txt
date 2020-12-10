@@ -28,6 +28,7 @@ set(swift_runtime_objc_sources
 set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
+    AutoDiffSupport.cpp
     BackDeployment.cpp
     Casting.cpp
     CompatibilityOverride.cpp

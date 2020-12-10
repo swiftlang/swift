@@ -1,9 +1,15 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s --dump-input always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: OS=macosx
+// REQUIRES: libdispatch
 
 import Dispatch
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 // ==== ------------------------------------------------------------------------
 // MARK: "Infrastructure" for the tests

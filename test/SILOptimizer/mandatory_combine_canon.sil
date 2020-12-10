@@ -1,0 +1,106 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Trivial declarations
+
+struct MyInt {
+  var value: Builtin.Int64
+}
+
+// Generic declarations
+
+protocol Addable {
+  static var an: Self { get }
+}
+
+// Class declarations
+
+class Klass {
+  init()
+  deinit
+}
+
+class SubKlass : Klass {}
+
+sil @use_klass_unowned : $@convention(thin) (Klass) -> ()
+
+// Existential declarations
+
+protocol Proto {
+  static var an: Proto { get }
+}
+
+// Trivial support
+
+sil @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+
+sil @constant_zero : $@convention(thin) () -> MyInt 
+
+sil @identity_int : $@convention(thin) (MyInt) -> MyInt 
+
+// Generic support
+
+sil @first_of_three_addables : $@convention(thin) <A where A : Addable> (@in_guaranteed A, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>) -> @
+out A
+
+// Class support
+
+sil [exact_self_class] @klass_alloc_init : $@convention(method) (@thick Klass.Type) -> @owned Klass
+
+// Klass.init()
+sil @klass_init : $@convention(method) (@owned Klass) -> @owned Klass
+// Klass.deinit
+sil @klass_deinit : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject
+
+// Klass.__deallocating_deinit
+sil @klass_dealloc_deinit : $@convention(method) (@owned Klass) -> ()
+
+sil_vtable Klass {
+  #Klass.init!allocator: (Klass.Type) -> () -> Klass : @klass_alloc_init
+  #Klass.deinit!deallocator: @klass_dealloc_deinit
+}
+
+sil @first_of_three_klasses : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+
+sil @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+
+// Existential support
+
+sil @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+
+sil @get_proto : $@convention(thin) () -> @out Proto
+
+// Mixed support
+
+sil @proto_from_proto_and_myint : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+
+sil @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+
+sil @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+
+// Enum support
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil @use_fakeoptional_klass_guaranteed : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @testUnneededDestroyOfForwardingInst : $@convention(thin) (@owned Klass) -> () {
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'testUnneededDestroyOfForwardingInst'
+sil [ossa] @testUnneededDestroyOfForwardingInst : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_ref_cast %0 : $Klass to $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

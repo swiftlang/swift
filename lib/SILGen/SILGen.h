@@ -119,9 +119,15 @@ public:
 
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
+  Optional<FuncDecl*> RunChildTask;
+  Optional<FuncDecl*> TaskFutureGet;
+  Optional<FuncDecl*> TaskFutureGetThrowing;
+
+  Optional<FuncDecl*> RunTaskForBridgedAsyncMethod;
   Optional<FuncDecl*> ResumeUnsafeContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
+  Optional<FuncDecl*> RunAsyncHandler;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -317,7 +323,7 @@ public:
 
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
-
+  
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
@@ -473,12 +479,25 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
+  /// Retrieve the _Concurrency._runChildTask intrinsic.
+  FuncDecl *getRunChildTask();
+
+  /// Retrieve the _Concurrency._taskFutureGet intrinsic.
+  FuncDecl *getTaskFutureGet();
+
+  /// Retrieve the _Concurrency._taskFutureGetThrowing intrinsic.
+  FuncDecl *getTaskFutureGetThrowing();
+
   /// Retrieve the _Concurrency._resumeUnsafeContinuation intrinsic.
   FuncDecl *getResumeUnsafeContinuation();
   /// Retrieve the _Concurrency._resumeUnsafeThrowingContinuation intrinsic.
   FuncDecl *getResumeUnsafeThrowingContinuation();
   /// Retrieve the _Concurrency._resumeUnsafeThrowingContinuationWithError intrinsic.
   FuncDecl *getResumeUnsafeThrowingContinuationWithError();
+  /// Retrieve the _Concurrency._runAsyncHandler intrinsic.
+  FuncDecl *getRunAsyncHandler();
+  /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
+  FuncDecl *getRunTaskForBridgedAsyncMethod();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

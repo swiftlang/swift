@@ -2271,7 +2271,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                captures);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, captures, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, captures, calleeTypeInfo, ApplyOptions::None, C, None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2294,7 +2294,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, {}, calleeTypeInfo, ApplyOptions::None, C, None);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -3232,7 +3232,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                      loc, ManagedValue::forUnmanaged(equalsWitness),
                      equatableSub,
                      {lhsArg, rhsArg, metatyValue},
-                     equalsInfo, ApplyOptions::None, SGFContext())
+                     equalsInfo, ApplyOptions::None, SGFContext(), None)
           .getUnmanagedSingleValue(subSGF, loc);
       }
       
@@ -4478,7 +4478,7 @@ namespace {
 
     /// Top-level entrypoint.
     void emit(CanType destType, RValue &&src) {
-      visitTupleType(cast<TupleType>(destType), std::move(src));
+      visit(destType, std::move(src));
       assert(DestLVQueue.empty() && "didn't consume all l-values!");
     }
 
@@ -4586,6 +4586,87 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   FullExpr scope(SGF.Cleanups, CleanupLocation(E));
   emitSimpleAssignment(SGF, E, E->getDest(), E->getSrc());
   return SGF.emitEmptyTupleRValue(E, C);
+}
+
+namespace {
+  /// A visitor for creating a flattened list of LValues from a
+  /// pattern.
+  class PatternLValueEmitter
+      : public PatternVisitor<PatternLValueEmitter, Type> {
+
+    SILGenFunction &SGF;
+
+    SGFAccessKind TheAccessKind;
+
+    /// A flattened list of l-values.
+    SmallVectorImpl<Optional<LValue>> &Results;
+
+  public:
+    PatternLValueEmitter(SILGenFunction &SGF, SGFAccessKind accessKind,
+                         SmallVectorImpl<Optional<LValue>> &results)
+      : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
+
+#define USE_SUBPATTERN(Kind) \
+    Type visit##Kind##Pattern(Kind##Pattern *pattern) { \
+      return visit(pattern->getSubPattern());            \
+    }
+
+    USE_SUBPATTERN(Paren)
+    USE_SUBPATTERN(Typed)
+    USE_SUBPATTERN(Binding)
+#undef USE_SUBPATTERN
+
+#define PATTERN(Kind, Parent)
+#define REFUTABLE_PATTERN(Kind, Parent) \
+    Type visit##Kind##Pattern(Kind##Pattern *pattern) { \
+      llvm_unreachable("No refutable patterns here");    \
+    }
+#include "swift/AST/PatternNodes.def"
+
+    Type visitTuplePattern(TuplePattern *pattern) {
+      SmallVector<TupleTypeElt, 4> tupleElts;
+      for (auto &element : pattern->getElements()) {
+        Type elementType = visit(element.getPattern());
+        tupleElts.push_back(
+            TupleTypeElt(elementType, element.getLabel()));
+      }
+
+      return TupleType::get(tupleElts, SGF.getASTContext());
+    }
+
+    Type visitNamedPattern(NamedPattern *pattern) {
+      Type type = LValueType::get(pattern->getDecl()->getType());
+      auto declRef = new (SGF.getASTContext()) DeclRefExpr(
+          pattern->getDecl(), DeclNameLoc(), /*Implicit=*/true,
+          AccessSemantics::Ordinary, type);
+
+      Results.push_back(SGF.emitLValue(declRef, TheAccessKind));
+
+      return type;
+    }
+
+    Type visitAnyPattern(AnyPattern *pattern) {
+      // Discard the value at this position.
+      Results.push_back(None);
+
+      return LValueType::get(pattern->getType());
+    }
+  };
+}
+
+void SILGenFunction::emitAssignToPatternVars(
+    SILLocation loc, Pattern *destPattern, RValue &&src) {
+  FormalEvaluationScope writeback(*this);
+
+  // Produce a flattened queue of LValues.
+  SmallVector<Optional<LValue>, 4> destLVs;
+  CanType destType = PatternLValueEmitter(
+      *this, SGFAccessKind::Write, destLVs).visit(destPattern)
+    ->getCanonicalType();
+
+  // Recurse on the type of the destination, pulling LValues as
+  // needed from the queue we built up before.
+  TupleLValueAssigner(*this, loc, destLVs).emit(destType, std::move(src));
 }
 
 void SILGenFunction::emitBindOptionalAddress(SILLocation loc,

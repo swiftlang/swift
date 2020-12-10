@@ -681,7 +681,7 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 }
 
 public // SPI(Foundation)
-protocol _NSSwiftValue: class {
+protocol _NSSwiftValue: AnyObject {
   init(_ value: Any)
   var value: Any { get }
   static var null: AnyObject { get }

@@ -1,0 +1,24 @@
+module UserA {
+    header "user-a.h"
+    export *
+}
+
+module UserB {
+    header "user-b.h"
+    export *
+}
+
+module UserC {
+    header "user-c.h"
+    export *
+}
+
+module DeclA {
+    header "decl-a.h"
+    export *
+}
+
+module DeclB {
+    header "decl-b.h"
+    export *
+}

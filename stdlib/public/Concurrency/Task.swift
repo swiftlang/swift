@@ -123,16 +123,7 @@ extension Task {
     /// and throwing a specific error or using `checkCancellation` the error
     /// thrown out of the task will be re-thrown here.
     public func get() async throws -> Success {
-      let rawResult = await taskFutureWait(on: task)
-      if rawResult.hadErrorResult {
-        // Throw the result on error.
-        throw unsafeBitCast(rawResult.storage, to: Error.self)
-      }
-
-      // Take the value on success
-      let storagePtr =
-        rawResult.storage.bindMemory(to: Success.self, capacity: 1)
-      return UnsafeMutablePointer<Success>(mutating: storagePtr).pointee
+      return await try _taskFutureGetThrowing(task)
     }
 
     /// Attempt to cancel the task.
@@ -319,6 +310,11 @@ extension Task {
 
     return Handle<T>(task: task)
   }
+
+}
+
+public func _runAsyncHandler(operation: @escaping () async -> ()) {
+  _ = Task.runDetached(operation: operation)
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -349,43 +345,6 @@ extension Task {
 // ==== UnsafeContinuation -----------------------------------------------------
 
 extension Task {
-  public struct UnsafeContinuation<T> {
-    /// Return a value into the continuation and make the task schedulable.
-    ///
-    /// The task will never run synchronously, even if the task does not
-    /// need to be resumed on a specific executor.
-    ///
-    /// This is appropriate when the caller is something "busy", like an event
-    /// loop, and doesn't want to be potentially delayed by arbitrary work.
-    public func resume(returning: T) {
-      fatalError("\(#function) not implemented yet.")
-    }
-  }
-
-  public struct UnsafeThrowingContinuation<T, E: Error> {
-    /// Return a value into the continuation and make the task schedulable.
-    ///
-    /// The task will never run synchronously, even if the task does not
-    /// need to be resumed on a specific executor.
-    ///
-    /// This is appropriate when the caller is something "busy", like an event
-    /// loop, and doesn't want to be potentially delayed by arbitrary work.
-    public func resume(returning: T) {
-      fatalError("\(#function) not implemented yet.")
-    }
-
-    /// Resume the continuation with an error and make the task schedulable.
-    ///
-    /// The task will never run synchronously, even if the task does not
-    /// need to be resumed on a specific executor.
-    ///
-    /// This is appropriate when the caller is something "busy", like an event
-    /// loop, and doesn't want to be potentially delayed by arbitrary work.
-    public func resume(throwing: E) {
-      fatalError("\(#function) not implemented yet.")
-    }
-  }
-
   /// The operation functions must resume the continuation *exactly once*.
   ///
   /// The continuation will not begin executing until the operation function returns.
@@ -407,7 +366,7 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func withUnsafeThrowingContinuation<T>(
-    operation: (UnsafeThrowingContinuation<T, Error>) -> Void
+    operation: (UnsafeThrowingContinuation<T>) -> Void
   ) async throws -> T {
     fatalError("\(#function) not implemented yet.")
   }
@@ -424,12 +383,66 @@ public func runAsync(_ asyncFun: @escaping () async -> ()) {
   runTask(childTask.0)
 }
 
-struct RawTaskFutureWaitResult {
-  let hadErrorResult: Bool
-  let storage: UnsafeRawPointer
+@_silgen_name("swift_task_future_wait")
+func _taskFutureWait(
+  on task: Builtin.NativeObject
+) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer)
+
+public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
+  let rawResult = await _taskFutureWait(on: task)
+  assert(!rawResult.hadErrorResult)
+
+  // Take the value.
+  let storagePtr =
+    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
-@_silgen_name("swift_task_future_wait")
-func taskFutureWait(
-  on task: Builtin.NativeObject
-) async -> RawTaskFutureWaitResult
+public func _taskFutureGetThrowing<T>(
+    _ task: Builtin.NativeObject
+) async throws -> T {
+  let rawResult = await _taskFutureWait(on: task)
+  if rawResult.hadErrorResult {
+    // Throw the result on error.
+    throw unsafeBitCast(rawResult.storage, to: Error.self)
+  }
+
+  // Take the value on success
+  let storagePtr =
+    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
+}
+
+public func _runChildTask<T>(operation: @escaping () async throws -> T) async
+    -> Builtin.NativeObject
+{
+  let currentTask = Builtin.getCurrentAsyncTask()
+
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = getJobFlags(currentTask).priority
+  flags.isFuture = true
+  flags.isChildTask = true
+
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(
+      flags.bits, currentTask, operation)
+  return task
+}
+
+#if _runtime(_ObjC)
+
+/// Intrinsic used by SILGen to launch a task for bridging a Swift async method
+/// which was called through its ObjC-exported completion-handler-based API.
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
+  // TODO: As a start, we should invoke Task.runDetached here, but we
+  // can probably do better if we're already running on behalf of a task,
+  // if the receiver of the method invocation is itself an Actor, or in other
+  // situations.
+  fatalError("not implemented")
+}
+
+#endif
