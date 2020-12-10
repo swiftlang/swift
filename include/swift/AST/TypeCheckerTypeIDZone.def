@@ -41,7 +41,7 @@ SWIFT_REQUEST(TypeChecker, CodeCompletionFileRequest,
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsDeclSubstitutableRequest,
+SWIFT_REQUEST(TypeChecker, IsDeclRefinementOfRequest,
               bool (ValueDecl *, ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CustomAttrTypeRequest,

@@ -906,7 +906,7 @@ Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
 /// Checks whether the first decl is a refinement of the second
 /// decl, meaning that the second decl can always be used in place
 /// of the first one and the expression will still type check.
-bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB);
+bool isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB);
 
 /// Build a type-checked reference to the given value.
 Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC, DeclNameLoc nameLoc,

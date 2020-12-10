@@ -530,7 +530,7 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   return take(prevFailed);
 }
 
-bool IsDeclSubstitutableRequest::evaluate(Evaluator &evaluator,
+bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
                                           ValueDecl *declA,
                                           ValueDecl *declB) const {
   auto *typeA = declA->getInterfaceType()->getAs<GenericFunctionType>();
@@ -574,9 +574,9 @@ bool IsDeclSubstitutableRequest::evaluate(Evaluator &evaluator,
   return substTypeA->isEqual(substTypeB);
 }
 
-bool TypeChecker::isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
+bool TypeChecker::isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB) {
   return evaluateOrDefault(declA->getASTContext().evaluator,
-                           IsDeclSubstitutableRequest{ declA, declB },
+                           IsDeclRefinementOfRequest{ declA, declB },
                            false);
 }
 
@@ -616,7 +616,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (TypeChecker::isDeclSubstitutable(declA, declB))
+    if (TypeChecker::isDeclRefinementOf(declA, declB))
       return skip("subtype");
   }
 

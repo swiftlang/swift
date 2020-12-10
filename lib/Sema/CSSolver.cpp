@@ -2197,7 +2197,7 @@ void ConstraintSystem::partitionDisjunction(
     auto *declA = dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
     auto *declB = dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
 
-    return TypeChecker::isDeclSubstitutable(declA, declB);
+    return TypeChecker::isDeclRefinementOf(declA, declB);
   });
 
   everythingElse.append(genericOverloads.begin(), genericOverloads.end());

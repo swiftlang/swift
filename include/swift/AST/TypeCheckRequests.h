@@ -1883,11 +1883,11 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks whether substituting the first generic function decl with the
-/// second generic function decl will satisfy all requirements and produce
-/// the same function type.
-class IsDeclSubstitutableRequest
-    : public SimpleRequest<IsDeclSubstitutableRequest,
+/// Checks whether the first function decl is a refinement of the second,
+/// meaning the two functions have the same structure, and the requirements
+/// of the first are refining the requirements of the second.
+class IsDeclRefinementOfRequest
+    : public SimpleRequest<IsDeclRefinementOfRequest,
                            bool(ValueDecl *, ValueDecl *),
                            RequestFlags::Cached> {
 public:
