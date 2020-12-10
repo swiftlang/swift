@@ -1673,3 +1673,100 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
   return new (cs.getAllocator())
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
 }
+
+bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
+    const Solution &solution, bool asNote) const {
+  MemberMissingExplicitBaseTypeFailure failure(solution, MemberName,
+                                               getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyBaseTypeForOptionalUnresolvedMember *
+SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
+    ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
+    DeclNameRef memberName, FunctionRefKind functionRefKind,
+    MemberLookupResult result, ConstraintLocator *locator) {
+
+  if (kind != ConstraintKind::UnresolvedValueMember)
+    return nullptr;
+
+  // None or only one viable candidate, there is no ambiguity.
+  if (result.ViableCandidates.size() <= 1)
+    return nullptr;
+
+  // Only diagnose those situations for static members.
+  if (!baseTy->is<MetatypeType>())
+    return nullptr;
+
+  // Don't diagnose for function members e.g. Foo? = .none(0).
+  if (functionRefKind != FunctionRefKind::Unapplied)
+    return nullptr;
+
+  Type underlyingBaseType = baseTy->getMetatypeInstanceType();
+  if (!underlyingBaseType->getNominalOrBoundGenericNominal())
+    return nullptr;
+
+  if (!underlyingBaseType->getOptionalObjectType())
+    return nullptr;
+
+  auto unwrappedType = underlyingBaseType->lookThroughAllOptionalTypes();
+  bool allOptionalBaseCandidates = true;
+  auto filterViableCandidates =
+      [&](SmallVector<OverloadChoice, 4> &candidates,
+          SmallVector<OverloadChoice, 4> &viableCandidates,
+          bool &allOptionalBase) {
+        for (OverloadChoice choice : candidates) {
+          if (!choice.isDecl())
+            continue;
+
+          auto memberDecl = choice.getDecl();
+          if (isa<FuncDecl>(memberDecl))
+            continue;
+          if (memberDecl->isInstanceMember())
+            continue;
+
+          allOptionalBase &= bool(choice.getBaseType()
+                                      ->getMetatypeInstanceType()
+                                      ->getOptionalObjectType());
+
+          if (auto EED = dyn_cast<EnumElementDecl>(memberDecl)) {
+            if (!EED->hasAssociatedValues())
+              viableCandidates.push_back(choice);
+          } else if (auto VD = dyn_cast<VarDecl>(memberDecl)) {
+            if (unwrappedType->hasTypeVariable() ||
+                VD->getInterfaceType()->isEqual(unwrappedType))
+              viableCandidates.push_back(choice);
+          }
+        }
+      };
+
+  SmallVector<OverloadChoice, 4> viableCandidates;
+  filterViableCandidates(result.ViableCandidates, viableCandidates,
+                         allOptionalBaseCandidates);
+
+  // Also none or only one viable candidate after filtering candidates, there is
+  // no ambiguity.
+  if (viableCandidates.size() <= 1)
+    return nullptr;
+
+  // Right now, name lookup only unwraps a single layer of optionality, which
+  // for cases where base type is a multi-optional type e.g. Foo?? it only
+  // finds optional base candidates. To produce the correct warning we perform
+  // an extra lookup on unwrapped type.
+  if (!allOptionalBaseCandidates)
+    return new (cs.getAllocator())
+        SpecifyBaseTypeForOptionalUnresolvedMember(cs, memberName, locator);
+
+  MemberLookupResult unwrappedResult =
+      cs.performMemberLookup(kind, memberName, MetatypeType::get(unwrappedType),
+                             functionRefKind, locator,
+                             /*includeInaccessibleMembers*/ false);
+  SmallVector<OverloadChoice, 4> unwrappedViableCandidates;
+  filterViableCandidates(unwrappedResult.ViableCandidates,
+                         unwrappedViableCandidates, allOptionalBaseCandidates);
+  if (unwrappedViableCandidates.empty())
+    return nullptr;
+
+  return new (cs.getAllocator())
+      SpecifyBaseTypeForOptionalUnresolvedMember(cs, memberName, locator);
+}

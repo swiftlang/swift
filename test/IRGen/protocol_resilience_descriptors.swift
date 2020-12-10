@@ -46,7 +46,7 @@ import resilient_protocol
 // Resilient witness tables
 // ----------------------------------------------------------------------------
 // CHECK-USAGE-LABEL: $s31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AAMc" =
-// CHECK-USAGE-SAME: {{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl
+// CHECK-USAGE-SAME: {{got.|\\01__imp__?}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl
 // CHECK-USAGE-SAME: @"symbolic x"
 public struct ConformsToProtocolWithRequirements<Element>
     : ProtocolWithRequirements {

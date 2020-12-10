@@ -388,6 +388,7 @@ private:
     case Node::Kind::GenericPartialSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
+    case Node::Kind::GenericSpecializationInResilienceDomain:
     case Node::Kind::GenericSpecializationParam:
     case Node::Kind::GenericSpecializationPrespecialized:
     case Node::Kind::InlinedGenericFunction:
@@ -1415,6 +1416,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
             "generic not-reabstracted partial specialization", "Signature = ");
     return nullptr;
   case Node::Kind::GenericSpecialization:
+  case Node::Kind::GenericSpecializationInResilienceDomain:
     printSpecializationPrefix(Node, "generic specialization");
     return nullptr;
   case Node::Kind::GenericSpecializationPrespecialized:

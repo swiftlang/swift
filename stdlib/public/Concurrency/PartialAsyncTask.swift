@@ -14,8 +14,9 @@ import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// A partial task is a unit of scheduleable work.
+@frozen
 public struct PartialAsyncTask {
-  private var context: UnsafeMutablePointer<_SwiftContext>
+  private var context: Builtin.Job
 
   public func run() { }
 }
@@ -24,25 +25,28 @@ public struct PartialAsyncTask {
 public struct UnsafeContinuation<T> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
-  public func resume(returning: __owned T) { }
-
   @_alwaysEmitIntoClient
   internal init(_ context: Builtin.RawUnsafeContinuation) {
     self.context = context
   }
+
+  @_silgen_name("swift_continuation_resume")
+  public func resume(returning value: __owned T)
 }
 
 @frozen
 public struct UnsafeThrowingContinuation<T> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
-  public func resume(returning: __owned T) { }
-  public func resume(throwing: __owned Error) { }
-
   @_alwaysEmitIntoClient
   internal init(_ context: Builtin.RawUnsafeContinuation) {
     self.context = context
   }
+
+  @_silgen_name("swift_continuation_throwingResume")
+  public func resume(returning: __owned T)
+  @_silgen_name("swift_continuation_throwingResumeWithError")
+  public func resume(throwing: __owned Error)
 }
 
 #if _runtime(_ObjC)
@@ -89,7 +93,7 @@ public func withUnsafeContinuation<T>(
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeThrowingContinuation<T>) -> Void
 ) async throws -> T {
-  return try await Builtin.withUnsafeThrowingContinuation {
+  return await try Builtin.withUnsafeThrowingContinuation {
     fn(UnsafeThrowingContinuation<T>($0))
   }
 }

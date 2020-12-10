@@ -46,6 +46,9 @@ class FrontendInputsAndOutputs {
   /// Punt where needed to enable batch mode experiments.
   bool AreBatchModeChecksBypassed = false;
 
+  /// Recover missing inputs. Note that recovery itself is users responsibility.
+  bool ShouldRecoverMissingInputs = false;
+
 public:
   bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
   void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }
@@ -65,6 +68,9 @@ public:
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 
   bool isWholeModule() const { return !hasPrimaryInputs(); }
+
+  bool shouldRecoverMissingInputs() { return ShouldRecoverMissingInputs; }
+  void setShouldRecoverMissingInputs() { ShouldRecoverMissingInputs = true; }
 
   // Readers:
 

@@ -484,7 +484,7 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
   
   auto vwtable = emitValueWitnessTableRef(type, &metadataSlot);
   auto witness = emitLoadOfValueWitnessFunction(*this, vwtable, index);
-  setScopedLocalTypeDataForLayout(type, key, witness.getPointer(*this));
+  setScopedLocalTypeDataForLayout(type, key, witness.getRawPointer());
   if (auto &authInfo = witness.getAuthInfo()) {
     setScopedLocalTypeDataForLayout(type,
                         LocalTypeDataKind::forValueWitnessDiscriminator(index),

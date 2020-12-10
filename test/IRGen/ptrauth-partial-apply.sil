@@ -30,9 +30,9 @@ bb0(%0 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> (), %1 : $Builtin.
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* %0 to [[CTXT_TY:<{ %swift.refcounted, i32, i32, i8\* }>]]*
 // CHECK:       [[SLOT:%.*]] = getelementptr inbounds [[CTXT_TY]], [[CTXT_TY]]* [[T0]], i32 0, i32 3
 // CHECK:       [[T0:%.*]] = load i8*, i8** [[SLOT]], align 8
+// CHECK:       [[T1:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK:       [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T1]], i64 7185)
 // CHECK:       [[FN:%.*]] = bitcast i8* [[T0]] to void (i32, i32)*
-// CHECK:       [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK:       [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 7185)
 // CHECK:       call swiftcc void [[FN]](i32 {{.*}}, i32 {{.*}}) [ "ptrauth"(i32 1, i64 [[DISC]]) ]
 
 sil @test_thick_indirect : $@convention(thin) (@callee_owned (Builtin.Int32, Builtin.Int32) -> (), Builtin.Int32) -> @owned @callee_owned () -> () {
@@ -58,7 +58,7 @@ bb0(%0 : $@callee_owned (Builtin.Int32, Builtin.Int32) -> (), %1 : $Builtin.Int3
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* %0 to <{ %swift.refcounted, i32, i32, %swift.refcounted*, i8* }>*
 // CHECK:       [[SLOT:%.*]] = getelementptr inbounds <{ %swift.refcounted, i32, i32, %swift.refcounted*, i8* }>, <{ %swift.refcounted, i32, i32, %swift.refcounted*, i8* }>* [[T0]], i32 0, i32 4
 // CHECK:       [[T0:%.*]] = load i8*, i8** [[SLOT]], align 8
+// CHECK:       [[T1:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK:       [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T1]], i64 7185)
 // CHECK:       [[FN:%.*]] = bitcast i8* [[T0]] to void (i32, i32, %swift.refcounted*)*
-// CHECK:       [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK:       [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 7185)
 // CHECK:       call swiftcc void [[FN]](i32 {{.*}}, i32 {{.*}}, %swift.refcounted* {{.*}}) [ "ptrauth"(i32 1, i64 [[DISC]]) ]

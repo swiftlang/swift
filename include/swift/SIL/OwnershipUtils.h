@@ -170,6 +170,15 @@ struct BorrowingOperand {
     return *this;
   }
 
+  // A set of operators so that a BorrowingOperand can be used like a normal
+  // operand in a light weight way.
+  operator const Operand *() const { return op; }
+  operator Operand *() { return op; }
+  const Operand *operator*() const { return op; }
+  Operand *operator*() { return op; }
+  const Operand *operator->() const { return op; }
+  Operand *operator->() { return op; }
+
   /// If \p op is a borrow introducing operand return it after doing some
   /// checks.
   static Optional<BorrowingOperand> get(Operand *op) {
@@ -425,7 +434,7 @@ struct BorrowedValue {
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool areUsesWithinScope(ArrayRef<Operand *> instructions,
+  bool areUsesWithinScope(ArrayRef<Operand *> uses,
                           SmallVectorImpl<Operand *> &scratchSpace,
                           SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                           DeadEndBlocks &deadEndBlocks) const;
@@ -446,6 +455,24 @@ struct BorrowedValue {
   /// interior pointer uses. Returns false otherwise.
   bool visitInteriorPointerOperands(
       function_ref<void(const InteriorPointerOperand &)> func) const;
+
+  /// Visit all immediate uses of this borrowed value and if any of them are
+  /// reborrows, place them in BorrowingOperand form into \p
+  /// foundReborrows. Returns true if we appended any such reborrows to
+  /// foundReborrows... false otherwise.
+  bool
+  gatherReborrows(SmallVectorImpl<BorrowingOperand> &foundReborrows) const {
+    bool foundAnyReborrows = false;
+    for (auto *op : value->getUses()) {
+      if (auto borrowingOperand = BorrowingOperand::get(op)) {
+        if (borrowingOperand->isReborrow()) {
+          foundReborrows.push_back(*borrowingOperand);
+          foundAnyReborrows = true;
+        }
+      }
+    }
+    return foundAnyReborrows;
+  }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand

@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency | %target-FileCheck %s
 // REQUIRES: concurrency
 
+// rdar_72047158
+// XFAIL: CPU=arm64e
+
 // CHECK: %T11actor_class7MyClassC = type <{ %swift.refcounted, [10 x i8*], %TSi }>
 
 // CHECK-objc-LABEL: @"$s11actor_class7MyClassCMm" = global
@@ -28,7 +31,7 @@ public actor class MyClass {
 // CHECK-LABEL: define {{.*}}void @"$s11actor_class7MyClassC7enqueue11partialTasky12_Concurrency012PartialAsyncG0V_tF"
 // CHECK:      swift_retain
 // CHECK:      [[T0:%.*]] = bitcast %T11actor_class7MyClassC* %1 to {{.*}}*
-// CHECK-NEXT: call swiftcc void @swift_defaultActor_enqueue(%swift.opaque* noalias nocapture %0, {{.*}}* [[T0]])
+// CHECK-NEXT: call swiftcc void @swift_defaultActor_enqueue(%swift.job* %0, {{.*}}* [[T0]])
 
 // CHECK-LABEL: define {{.*}}@"$s11actor_class7MyClassC1xSivg"
 // CHECK: [[T0:%.*]] = getelementptr inbounds %T11actor_class7MyClassC, %T11actor_class7MyClassC* %0, i32 0, i32 2

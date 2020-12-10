@@ -155,6 +155,39 @@ bb0(%0 : $*X1):
   return %result : $(Int, Builtin.NativeObject, Builtin.NativeObject)
 }
 
+// CHECK-LABEL: sil private [ossa] @testLoadBorrowNontrivial : $@convention(thin) (@in_guaranteed X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
+// CHECK: bb0([[ADDRESS:%.*]] : $*X1):
+// CHECK: [[AA:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.a
+// CHECK: load [trivial] [[AA]] : $*Int
+// CHECK: [[OA1:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.obj1
+// CHECK: [[OV1:%.*]] = load_borrow [[OA1]] : $*Builtin.NativeObject
+// CHECK: [[OA2:%.*]] = struct_element_addr [[ADDRESS]] : $*X1, #X1.obj2
+// CHECK: [[OV2:%.*]] = load_borrow [[OA2]] : $*Builtin.NativeObject
+// CHECK: copy_value [[OV1]] : $Builtin.NativeObject
+// CHECK: copy_value [[OV2]] : $Builtin.NativeObject
+// CHECK: end_borrow [[OV1]]
+// CHECK: end_borrow [[OV2]]
+// CHECK: return
+// CHECK-LABEL: } // end sil function 'testLoadBorrowNontrivial'
+sil private [ossa] @testLoadBorrowNontrivial : $@convention(thin) (@in_guaranteed X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
+bb0(%0 : $*X1):
+  %load = load_borrow %0 : $*X1
+
+  %a = struct_extract %load : $X1, #X1.a
+
+  %o1 = struct_extract %load : $X1, #X1.obj1
+  %copy1 = copy_value %o1 : $Builtin.NativeObject
+
+  %o2 = struct_extract %load : $X1, #X1.obj2
+  %copy2 = copy_value %o2 : $Builtin.NativeObject
+
+  end_borrow %load : $X1
+
+  %result = tuple (%a : $Int, %copy1 : $Builtin.NativeObject, %copy2 : $Builtin.NativeObject)
+  return %result : $(Int, Builtin.NativeObject, Builtin.NativeObject)
+}
+
+
 struct X2 {
   @_hasStorage @_hasInitialValue var obj: Builtin.NativeObject { get set }
 }

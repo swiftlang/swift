@@ -293,7 +293,7 @@ internal struct _Buffer72 {
   }
 }
 
-#if !(os(macOS) && arch(x86_64))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 // Note that this takes a Float32 argument instead of Float16, because clang
 // doesn't have _Float16 on all platforms yet.
 @_silgen_name("swift_float16ToString")

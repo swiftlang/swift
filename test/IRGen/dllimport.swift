@@ -46,7 +46,7 @@ public func g() {
 // CHECK-NO-OPT-DAG: declare dllimport void @swift_deallocClassInstance(%swift.refcounted*, i32, i32)
 
 // CHECK-OPT-DAG: declare dllimport %swift.refcounted* @swift_retain(%swift.refcounted* returned) local_unnamed_addr
-// CHECK-OPT-DAG: @"__imp_$s9dllexport1pMp" = external externally_initialized constant %swift.protocol*
+// CHECK-OPT-DAG: @"\01__imp_{{_?}}$s9dllexport1pMp" = external externally_initialized constant %swift.protocol*
 // CHECK-OPT-DAG: declare dllimport swiftcc i8* @"$s9dllexport2ciAA1cCvau"()
 // CHECK-OPT-DAG: declare dllimport void @swift_deallocClassInstance(%swift.refcounted*, i32, i32)
 // CHECK-OPT-DAG: declare dllimport swiftcc %swift.refcounted* @"$s9dllexport1cCfd"(%T9dllexport1cC* swiftself)

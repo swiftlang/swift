@@ -33,6 +33,41 @@ bool ConstraintSystem::PotentialBinding::isViableForJoin() const {
          !isDefaultableBinding();
 }
 
+bool ConstraintSystem::PotentialBindings::isDelayed() const {
+  if (!DelayedBy.empty())
+    return true;
+
+  if (isHole()) {
+    auto *locator = TypeVar->getImpl().getLocator();
+    assert(locator && "a hole without locator?");
+
+    // Delay resolution of the code completion expression until
+    // the very end to give it a chance to be bound to some
+    // contextual type even if it's a hole.
+    if (locator->directlyAt<CodeCompletionExpr>())
+      return true;
+
+    // Delay resolution of the `nil` literal to a hole until
+    // the very end to give it a change to be bound to some
+    // other type, just like code completion expression which
+    // relies solely on contextual information.
+    if (locator->directlyAt<NilLiteralExpr>())
+      return true;
+  }
+
+  return false;
+}
+
+bool ConstraintSystem::PotentialBindings::involvesTypeVariables() const {
+  // This is effectively O(1) right now since bindings are re-computed
+  // on each step of the solver, but once bindings are computed
+  // incrementally it becomes more important to double-check that
+  // any adjacent type variables found previously are still unresolved.
+  return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
+    return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
+  });
+}
+
 bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
   if (isGenericParameter())
@@ -555,19 +590,6 @@ void ConstraintSystem::PotentialBindings::finalize(
     // very last moment possible, just like generic parameters.
     auto *locator = TypeVar->getImpl().getLocator();
 
-    // Delay resolution of the code completion expression until
-    // the very end to give it a chance to be bound to some
-    // contextual type even if it's a hole.
-    if (locator->directlyAt<CodeCompletionExpr>())
-      FullyBound = true;
-
-    // Delay resolution of the `nil` literal to a hole until
-    // the very end to give it a change to be bound to some
-    // other type, just like code completion expression which
-    // relies solely on contextual information.
-    if (locator->directlyAt<NilLiteralExpr>())
-      FullyBound = true;
-
     // If this type variable is associated with a code completion token
     // and it failed to infer any bindings let's adjust hole's locator
     // to point to a code completion token to avoid attempting to "fix"
@@ -776,7 +798,7 @@ bool ConstraintSystem::PotentialBindings::isViable(
 
 bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     Constraint *disjunction) const {
-  if (isHole() || FullyBound)
+  if (isHole() || isDelayed())
     return false;
 
   // If this bindings are for a closure and there are no holes,
@@ -802,7 +824,7 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
-  return !InvolvesTypeVariables;
+  return !involvesTypeVariables();
 }
 
 ConstraintSystem::PotentialBindings
@@ -871,23 +893,21 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // of bindings for them until closure's body is opened.
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
-        result.InvolvesTypeVariables = true;
-        result.FullyBound = true;
+        result.DelayedBy.push_back(constraint);
         return None;
       }
     }
-
-    // Can't infer anything.
-    if (result.InvolvesTypeVariables)
-      return None;
 
     // Check whether both this type and another type variable are
     // inferable.
     SmallPtrSet<TypeVariableType *, 4> typeVars;
     findInferableTypeVars(first, typeVars);
     findInferableTypeVars(second, typeVars);
-    if (typeVars.size() > 1 && typeVars.count(typeVar))
-      result.InvolvesTypeVariables = true;
+
+    if (typeVars.erase(typeVar)) {
+      result.AdjacentVars.insert(typeVars.begin(), typeVars.end());
+    }
+
     return None;
   }
 
@@ -916,10 +936,26 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // If the type we'd be binding to is a dependent member, don't try to
   // resolve this type variable yet.
   if (type->is<DependentMemberType>()) {
-    if (!ConstraintSystem::typeVarOccursInType(typeVar, type,
-                                               &result.InvolvesTypeVariables)) {
-      result.FullyBound = true;
+    SmallVector<TypeVariableType *, 4> referencedVars;
+    type->getTypeVariables(referencedVars);
+
+    bool containsSelf = false;
+    for (auto *var : referencedVars) {
+      // Add all type variables encountered in the type except
+      // to the current type variable.
+      if (var != typeVar) {
+        result.AdjacentVars.insert(var);
+        continue;
+      }
+
+      containsSelf = true;
     }
+
+    // If inferred type doesn't contain the current type variable,
+    // let's mark bindings as delayed until dependent member type
+    // is resolved.
+    if (!containsSelf)
+      result.DelayedBy.push_back(constraint);
 
     return None;
   }
@@ -940,15 +976,18 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
   if (auto boundType = checkTypeOfBinding(typeVar, type)) {
     type = *boundType;
-    if (type->hasTypeVariable())
-      result.InvolvesTypeVariables = true;
+    if (type->hasTypeVariable()) {
+      SmallVector<TypeVariableType *, 4> referencedVars;
+      type->getTypeVariables(referencedVars);
+      result.AdjacentVars.insert(referencedVars.begin(), referencedVars.end());
+    }
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
     if (!bindingTypeVar)
       return None;
 
-    result.InvolvesTypeVariables = true;
+    result.AdjacentVars.insert(bindingTypeVar);
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
@@ -1056,7 +1095,7 @@ bool ConstraintSystem::PotentialBindings::infer(
         // delaying bindings for as long as possible.
         if (isExpr<ForceValueExpr>(anchor) && !type->is<LValueType>()) {
           addPotentialBinding(binding->withType(LValueType::get(type)));
-          FullyBound = true;
+          DelayedBy.push_back(constraint);
         }
 
         // If this is a type variable representing closure result,
@@ -1076,9 +1115,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     break;
   }
   case ConstraintKind::KeyPathApplication: {
-    if (FullyBound)
-      return false;
-
     // If this variable is in the application projected result type, mark the
     // result as `FullyBound` to ensure we delay binding until we've bound
     // other type variables in the KeyPathApplication constraint. This ensures
@@ -1087,8 +1123,9 @@ bool ConstraintSystem::PotentialBindings::infer(
     SmallPtrSet<TypeVariableType *, 4> typeVars;
     findInferableTypeVars(cs.simplifyType(constraint->getThirdType()),
                           typeVars);
-    if (typeVars.count(TypeVar))
-      FullyBound = true;
+    if (typeVars.count(TypeVar)) {
+      DelayedBy.push_back(constraint);
+    }
 
     break;
   }
@@ -1130,10 +1167,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     break;
 
   case ConstraintKind::Disjunction:
-    // FIXME: Recurse into these constraints to see whether this
-    // type variable is fully bound by any of them.
-    InvolvesTypeVariables = true;
-
     // If there is additional context available via disjunction
     // associated with closure literal (e.g. coercion to some other
     // type) let's delay resolving the closure until the disjunction
@@ -1141,6 +1174,7 @@ bool ConstraintSystem::PotentialBindings::infer(
     if (TypeVar->getImpl().isClosureType())
       return true;
 
+    DelayedBy.push_back(constraint);
     break;
 
   case ConstraintKind::ConformsTo:
@@ -1162,50 +1196,46 @@ bool ConstraintSystem::PotentialBindings::infer(
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload: {
-    if (FullyBound && InvolvesTypeVariables)
-      return false;
+    // It's possible that type of member couldn't be determined,
+    // and if so it would be beneficial to bind member to a hole
+    // early to propagate that information down to arguments,
+    // result type of a call that references such a member.
+    if (cs.shouldAttemptFixes() && TypeVar->getImpl().canBindToHole()) {
+      if (ConstraintSystem::typeVarOccursInType(
+              TypeVar, cs.simplifyType(constraint->getSecondType())))
+        break;
+    }
 
-    // If this variable is in the left-hand side, it is fully bound.
-    SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(cs.simplifyType(constraint->getFirstType()),
-                          typeVars);
-    if (typeVars.count(TypeVar))
-      FullyBound = true;
-
-    if (InvolvesTypeVariables)
-      return false;
-
-    // If this and another type variable occur, this result involves
-    // type variables.
-    findInferableTypeVars(cs.simplifyType(constraint->getSecondType()),
-                          typeVars);
-    if (typeVars.size() > 1 && typeVars.count(TypeVar))
-      InvolvesTypeVariables = true;
-
+    DelayedBy.push_back(constraint);
     break;
   }
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
-    // If our type variable shows up in the base type, there's
-    // nothing to do.
-    // FIXME: Can we avoid simplification here?
-    if (ConstraintSystem::typeVarOccursInType(
-            TypeVar, cs.simplifyType(constraint->getFirstType()),
-            &InvolvesTypeVariables)) {
-      return false;
+  case ConstraintKind::ValueWitness: {
+    // If current type variable represents a member type of some reference,
+    // it would be bound once member is resolved either to a actual member
+    // type or to a hole if member couldn't be found.
+    auto memberTy = constraint->getSecondType()->castTo<TypeVariableType>();
+
+    if (memberTy->getImpl().hasRepresentativeOrFixed()) {
+      if (auto type = memberTy->getImpl().getFixedType(/*record=*/nullptr)) {
+        // It's possible that member has been bound to some other type variable
+        // instead of merged with it because it's wrapped in an l-value type.
+        if (type->getWithoutSpecifierType()->isEqual(TypeVar)) {
+          DelayedBy.push_back(constraint);
+          break;
+        }
+      } else {
+        memberTy = memberTy->getImpl().getRepresentative(/*record=*/nullptr);
+      }
     }
 
-    // If the type variable is in the list of member type
-    // variables, it is fully bound.
-    // FIXME: Can we avoid simplification here?
-    if (ConstraintSystem::typeVarOccursInType(
-            TypeVar, cs.simplifyType(constraint->getSecondType()),
-            &InvolvesTypeVariables)) {
-      FullyBound = true;
-    }
+    if (memberTy == TypeVar)
+      DelayedBy.push_back(constraint);
+
     break;
+  }
 
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam: {

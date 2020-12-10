@@ -746,7 +746,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->getAttachedResultBuilder() == this) {
         if (!isa<ParamDecl>(D) &&
-            !(isa<VarDecl>(D) && isa<ProtocolDecl>(D->getDeclContext())))
+            !((isa<VarDecl>(D) || isa<FuncDecl>(D)) &&
+               isa<ProtocolDecl>(D->getDeclContext())))
           return false;
       }
     }

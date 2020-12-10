@@ -140,6 +140,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// The parent async context stored within a child async context.
   PointerAuthSchema AsyncContextParent;
+
+  /// The function to call to resume running in the parent context.
+  PointerAuthSchema AsyncContextResume;
 };
 
 enum class JITDebugArtifact : unsigned {
