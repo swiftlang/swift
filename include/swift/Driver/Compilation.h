@@ -80,6 +80,8 @@ using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 class Compilation {
 public:
   struct Result {
+    /// Set to true if any job exits abnormally (i.e. crashes).
+    bool hadAbnormalExit;
     int exitCode;
     fine_grained_dependencies::ModuleDepGraph depGraph;
   };
@@ -540,14 +542,11 @@ private:
 private:
   /// Perform all jobs.
   ///
-  /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
-  /// crashes).
   /// \param TQ The task queue on which jobs will be scheduled.
   ///
   /// \returns exit code of the first failed Job, or 0 on success. If a Job
   /// crashes during execution, a negative value will be returned.
-  Compilation::Result performJobsImpl(bool &abnormalExit,
-                                      std::unique_ptr<sys::TaskQueue> &&TQ);
+  Compilation::Result performJobsImpl(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Performs a single Job by executing in place, if possible.
   ///

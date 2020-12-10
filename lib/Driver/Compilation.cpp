@@ -1945,8 +1945,7 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
 }
 
 Compilation::Result
-Compilation::performJobsImpl(bool &abnormalExit,
-                             std::unique_ptr<TaskQueue> &&TQ) {
+Compilation::performJobsImpl(std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
   State.runJobs();
@@ -1956,13 +1955,11 @@ Compilation::performJobsImpl(bool &abnormalExit,
     State.populateInputInfoMap(InputInfo);
     checkForOutOfDateInputs(Diags, InputInfo);
 
-    abnormalExit = State.hadAnyAbnormalExit();
     auto result = std::move(State).takeResult();
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
     return result;
   } else {
-    abnormalExit = State.hadAnyAbnormalExit();
     return std::move(State).takeResult();
   }
 }
@@ -2062,15 +2059,14 @@ Compilation::Result Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
 
-  bool abnormalExit;
-  auto result = performJobsImpl(abnormalExit, std::move(TQ));
+  auto result = performJobsImpl(std::move(TQ));
 
   if (IncrementalComparator)
     IncrementalComparator->outputComparison();
 
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
-      if (!abnormalExit || pathPair.getValue() == PreserveOnSignal::No)
+      if (!result.hadAbnormalExit || pathPair.getValue() == PreserveOnSignal::No)
         (void)llvm::sys::fs::remove(pathPair.getKey());
     }
   }
