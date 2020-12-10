@@ -877,11 +877,11 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
 }
 
 ParserResult<TypeRepr> Parser::parseAnyType() {
-  SyntaxParsingContext IdentTypeCtxt(SyntaxContext,
-                                     SyntaxKind::SimpleTypeIdentifier);
-  auto Loc = consumeToken(tok::kw_Any);
-  auto TyR = CompositionTypeRepr::createEmptyComposition(Context, Loc);
-  return makeParserResult(TyR);
+  auto AnyLoc = leadingTriviaLoc();
+  auto ParsedAny = parseTypeAnySyntax().get();
+  SyntaxContext->addSyntax(std::move(ParsedAny));
+  auto Any = SyntaxContext->topNode<SimpleTypeIdentifierSyntax>();
+  return makeParserResult(ASTGenerator.generate(Any, AnyLoc));
 }
 
 /// parseOldStyleProtocolComposition
@@ -1661,3 +1661,14 @@ bool Parser::canParseTypeTupleBody() {
   
   return consumeIf(tok::r_paren);
 }
+
+//===--------------------------------------------------------------------===//
+// MARK: - Type Parsing using libSyntax
+
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeAnySyntax() {
+  auto Any = consumeTokenSyntax(tok::kw_Any);
+  auto Type = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
+      std::move(Any), llvm::None, *SyntaxContext);
+  return makeParsedResult(std::move(Type));
+}
+

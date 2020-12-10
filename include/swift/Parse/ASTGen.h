@@ -45,6 +45,12 @@ public:
   Expr *generate(const syntax::UnknownExprSyntax &Expr, const SourceLoc &Loc);
 
   //===--------------------------------------------------------------------===//
+  // MARK: - Types.
+public:
+  TypeRepr *generate(const syntax::SimpleTypeIdentifierSyntax &Type,
+                     const SourceLoc Loc);
+
+  //===--------------------------------------------------------------------===//
   // MARK: Other
 public:
   /// Copy a numeric literal value into AST-owned memory, stripping underscores

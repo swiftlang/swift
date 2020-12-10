@@ -29,6 +29,7 @@
 #include "swift/Parse/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Parse/ParsedSyntaxResult.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParsedSyntaxNodes.h"
@@ -1228,6 +1229,11 @@ public:
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
                                  SourceLoc SpecifierLoc);
+
+  //===--------------------------------------------------------------------===//
+  // MARK: - Type Parsing using libSyntax
+  
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeAnySyntax();
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
