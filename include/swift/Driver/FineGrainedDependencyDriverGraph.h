@@ -188,8 +188,8 @@ class ModuleDepGraph {
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
 public:
-  const bool verifyFineGrainedDependencyGraphAfterEveryImport;
-  const bool emitFineGrainedDependencyDotFileAfterEveryImport;
+  bool verifyFineGrainedDependencyGraphAfterEveryImport;
+  bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
 private:
   /// If tracing dependencies, holds a vector used to hold the current path
@@ -203,7 +203,7 @@ private:
       dependencyPathsToJobs;
 
   /// For helping with performance tuning, may be null:
-  UnifiedStatsReporter *const stats;
+  UnifiedStatsReporter *stats;
 
   //==============================================================================
   // MARK: ModuleDepGraph - mutating dependencies

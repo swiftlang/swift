@@ -244,7 +244,7 @@ namespace driver {
     std::unique_ptr<TaskQueue> TQ;
 
     /// Cumulative result of PerformJobs(), accumulated from subprocesses.
-    int Result = EXIT_SUCCESS;
+    int ResultCode = EXIT_SUCCESS;
 
     /// True if any Job crashed.
     bool AnyAbnormalExit = false;
@@ -719,8 +719,8 @@ namespace driver {
       // Store this task's ReturnCode as our Result if we haven't stored
       // anything yet.
 
-      if (Result == EXIT_SUCCESS)
-        Result = ReturnCode;
+      if (ResultCode == EXIT_SUCCESS)
+        ResultCode = ReturnCode;
 
       if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
           ReturnCode != EXIT_FAILURE) {
@@ -825,7 +825,7 @@ namespace driver {
       }
 
       // Since the task signalled, unconditionally set result to -2.
-      Result = -2;
+      ResultCode = -2;
       AnyAbnormalExit = true;
 
       return TaskFinishedResponse::StopExecution;
@@ -1536,7 +1536,7 @@ namespace driver {
                                   _3, _4, _5, _6),
                         std::bind(&PerformJobsState::taskSignalled, this, _1,
                                   _2, _3, _4, _5, _6, _7))) {
-          if (Result == EXIT_SUCCESS) {
+          if (ResultCode == EXIT_SUCCESS) {
             // FIXME: Error from task queue while Result == EXIT_SUCCESS most
             // likely means some fork/exec or posix_spawn failed; TaskQueue saw
             // "an error" at some stage before even calling us with a process
@@ -1546,7 +1546,7 @@ namespace driver {
             Comp.getDiags().diagnose(SourceLoc(),
                                      diag::error_unable_to_execute_command,
                                      "<unknown>");
-            Result = -2;
+            ResultCode = -2;
             AnyAbnormalExit = true;
             return;
           }
@@ -1554,13 +1554,13 @@ namespace driver {
 
         // Returning without error from TaskQueue::execute should mean either an
         // empty TaskQueue or a failed subprocess.
-        assert(!(Result == 0 && TQ->hasRemainingTasks()));
+        assert(!(ResultCode == 0 && TQ->hasRemainingTasks()));
 
         // Task-exit callbacks from TaskQueue::execute may have unblocked jobs,
         // which means there might be PendingExecution jobs to enqueue here. If
         // there are, we need to continue trying to make progress on the
         // TaskQueue before we start marking deferred jobs as skipped, below.
-        if (!PendingExecution.empty() && Result == 0) {
+        if (!PendingExecution.empty() && ResultCode == 0) {
           formBatchJobsAndAddPendingJobsToTaskQueue();
           continue;
         }
@@ -1585,11 +1585,11 @@ namespace driver {
 
         // If we added jobs to the TaskQueue, and we are not in an error state,
         // we want to give the TaskQueue another run.
-      } while (Result == 0 && TQ->hasRemainingTasks());
+      } while (ResultCode == 0 && TQ->hasRemainingTasks());
     }
 
     void checkUnfinishedJobs() {
-      if (Result == 0) {
+      if (ResultCode == 0) {
         assert(BlockingCommands.empty() &&
                "some blocking commands never finished properly");
       } else {
@@ -1693,10 +1693,14 @@ namespace driver {
                            });
     }
 
-    int getResult() {
-      if (Result == 0)
-        Result = Comp.getDiags().hadAnyError();
-      return Result;
+    Compilation::Result takeResult() && {
+      if (ResultCode == 0)
+        ResultCode = Comp.getDiags().hadAnyError();
+      const bool forRanges = Comp.getEnableSourceRangeDependencies();
+      const bool hadAbnormalExit = hadAnyAbnormalExit();
+      const auto resultCode = ResultCode;
+      auto &&graph = std::move(*this).takeFineGrainedDepGraph(forRanges);
+      return Compilation::Result{hadAbnormalExit, resultCode, std::move(graph)};
     }
 
     bool hadAnyAbnormalExit() {
@@ -1755,6 +1759,12 @@ namespace driver {
     const fine_grained_dependencies::ModuleDepGraph &
     getFineGrainedDepGraph(const bool forRanges) const {
       return forRanges ? FineGrainedDepGraphForRanges : FineGrainedDepGraph;
+    }
+
+    fine_grained_dependencies::ModuleDepGraph &&
+    takeFineGrainedDepGraph(const bool forRanges) && {
+      return forRanges ? std::move(FineGrainedDepGraphForRanges)
+                       : std::move(FineGrainedDepGraph);
     }
   };
 } // namespace driver
@@ -1936,8 +1946,8 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
   return ok;
 }
 
-int Compilation::performJobsImpl(bool &abnormalExit,
-                                 std::unique_ptr<TaskQueue> &&TQ) {
+Compilation::Result
+Compilation::performJobsImpl(std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
   State.runJobs();
@@ -1946,20 +1956,23 @@ int Compilation::performJobsImpl(bool &abnormalExit,
     InputInfoMap InputInfo;
     State.populateInputInfoMap(InputInfo);
     checkForOutOfDateInputs(Diags, InputInfo);
+
+    auto result = std::move(State).takeResult();
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+    return result;
+  } else {
+    return std::move(State).takeResult();
   }
-  abnormalExit = State.hadAnyAbnormalExit();
-  return State.getResult();
 }
 
-int Compilation::performSingleCommand(const Job *Cmd) {
+Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
   assert(Cmd->getInputs().empty() &&
          "This can only be used to run a single command with no inputs");
 
   switch (Cmd->getCondition()) {
   case Job::Condition::CheckDependencies:
-    return 0;
+    return Compilation::Result::code(0);
   case Job::Condition::RunWithoutCascading:
   case Job::Condition::Always:
   case Job::Condition::NewlyAdded:
@@ -1967,7 +1980,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   }
 
   if (!writeFilelistIfNecessary(Cmd, *TranslatedArgs.get(), Diags))
-    return 1;
+    return Compilation::Result::code(1);
 
   switch (Level) {
   case OutputLevel::Normal:
@@ -1975,7 +1988,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     break;
   case OutputLevel::PrintJobs:
     Cmd->printCommandLineAndEnvironment(llvm::outs());
-    return 0;
+    return Compilation::Result::code(0);
   case OutputLevel::Verbose:
     Cmd->printCommandLine(llvm::errs());
     break;
@@ -1999,11 +2012,12 @@ int Compilation::performSingleCommand(const Job *Cmd) {
           "expected environment variable to be set successfully");
     // Bail out early in release builds.
     if (envResult != 0) {
-      return envResult;
+      return Compilation::Result::code(envResult);
     }
   }
 
-  return ExecuteInPlace(ExecPath, argv);
+  const auto returnCode = ExecuteInPlace(ExecPath, argv);
+  return Compilation::Result::code(returnCode);
 }
 
 static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
@@ -2026,10 +2040,10 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
   return true;
 }
 
-int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
+Compilation::Result Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   if (AllSourceFilesPath)
     if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
-      return EXIT_FAILURE;
+      return Compilation::Result::code(EXIT_FAILURE);
 
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
@@ -2044,20 +2058,19 @@ int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
 
-  bool abnormalExit;
-  int result = performJobsImpl(abnormalExit, std::move(TQ));
+  auto result = performJobsImpl(std::move(TQ));
 
   if (IncrementalComparator)
     IncrementalComparator->outputComparison();
 
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
-      if (!abnormalExit || pathPair.getValue() == PreserveOnSignal::No)
+      if (!result.hadAbnormalExit || pathPair.getValue() == PreserveOnSignal::No)
         (void)llvm::sys::fs::remove(pathPair.getKey());
     }
   }
   if (Stats)
-    Stats->noteCurrentProcessExitStatus(result);
+    Stats->noteCurrentProcessExitStatus(result.exitCode);
   return result;
 }
 
