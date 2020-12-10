@@ -5340,6 +5340,21 @@ TypeVarBindingProducer::TypeVarBindingProducer(
         return protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByNilLiteral);
       })) {
+  if (bindings.isDirectHole()) {
+    auto *locator = getLocator();
+    // If this type variable is associated with a code completion token
+    // and it failed to infer any bindings let's adjust hole's locator
+    // to point to a code completion token to avoid attempting to "fix"
+    // this problem since its rooted in the fact that constraint system
+    // is under-constrained.
+    if (bindings.AssociatedCodeCompletionToken) {
+      locator = cs.getConstraintLocator(bindings.AssociatedCodeCompletionToken);
+    }
+
+    Bindings.push_back(Binding::forHole(TypeVar, locator));
+    return;
+  }
+
   // A binding to `Any` which should always be considered as a last resort.
   Optional<Binding> Any;
 
