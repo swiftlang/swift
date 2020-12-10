@@ -1,1 +1,1 @@
-typedef struct {} ForeignStruct;
+struct ForeignStruct {};
