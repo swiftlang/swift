@@ -123,6 +123,7 @@ public:
   Optional<FuncDecl*> TaskFutureGet;
   Optional<FuncDecl*> TaskFutureGetThrowing;
 
+  Optional<FuncDecl*> RunTaskForBridgedAsyncMethod;
   Optional<FuncDecl*> ResumeUnsafeContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
@@ -322,7 +323,7 @@ public:
 
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
-
+  
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
@@ -495,6 +496,8 @@ public:
   FuncDecl *getResumeUnsafeThrowingContinuationWithError();
   /// Retrieve the _Concurrency._runAsyncHandler intrinsic.
   FuncDecl *getRunAsyncHandler();
+  /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
+  FuncDecl *getRunTaskForBridgedAsyncMethod();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);
