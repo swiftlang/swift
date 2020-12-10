@@ -580,18 +580,6 @@ static bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
                            false);
 }
 
-static bool isGenericDisjunctionChoice(Constraint *constraint) {
-  if (constraint->getKind() != ConstraintKind::BindOverload)
-    return false;
-
-  auto choice = constraint->getOverloadChoice();
-  if (!choice.isDecl())
-    return false;
-
-  auto *funcDecl = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
-  return funcDecl && funcDecl->isGeneric();
-}
-
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
@@ -624,7 +612,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   // can be unconditionally substituted by the current choice, skip the current
   // choice.
   if (LastSolvedChoice && LastSolvedChoice->second == getCurrentScore() &&
-      isGenericDisjunctionChoice(choice)) {
+      choice.isGenericOperator()) {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 

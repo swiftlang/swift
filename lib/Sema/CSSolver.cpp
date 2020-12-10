@@ -2178,17 +2178,14 @@ void ConstraintSystem::partitionDisjunction(
   SmallVector<unsigned, 4> genericOverloads;
 
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-    if (!isForCodeCompletion()) {
+    if (!isForCodeCompletion() && isOperatorBindOverload(constraint)) {
       // Collect generic overload choices separately, and sort these choices
       // by specificity in order to try the most specific choice first.
-      if (constraint->getKind() == ConstraintKind::BindOverload) {
-        if (auto *decl = constraint->getOverloadChoice().getDeclOrNull()) {
-          auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl);
-          if (fnDecl && fnDecl->isGeneric()) {
-            genericOverloads.push_back(index);
-            return true;
-          }
-        }
+      auto *decl = constraint->getOverloadChoice().getDecl();
+      auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl);
+      if (fnDecl && fnDecl->isGeneric()) {
+        genericOverloads.push_back(index);
+        return true;
       }
     }
 
