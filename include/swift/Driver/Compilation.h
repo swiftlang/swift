@@ -82,15 +82,20 @@ public:
   struct Result {
     /// Set to true if any job exits abnormally (i.e. crashes).
     bool hadAbnormalExit;
+    /// The exit code of this driver process.
     int exitCode;
+    /// The dependency graph built up during the compilation of this module.
+    ///
+    /// This data is used for cross-module module dependencies.
     fine_grained_dependencies::ModuleDepGraph depGraph;
 
     Result(const Result &) = delete;
-    Result(Result &&) = default;
-
     Result &operator=(const Result &) = delete;
+
+    Result(Result &&) = default;
     Result &operator=(Result &&) = default;
 
+    /// Construct a \c Compilation::Result from just an exit code.
     static Result code(int code) {
       return Compilation::Result{false, code,
                                  fine_grained_dependencies::ModuleDepGraph()};
