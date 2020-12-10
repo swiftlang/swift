@@ -84,6 +84,12 @@ public:
     bool hadAbnormalExit;
     int exitCode;
     fine_grained_dependencies::ModuleDepGraph depGraph;
+
+    Result(const Result &) = delete;
+    Result(Result &&) = default;
+
+    Result &operator=(const Result &) = delete;
+    Result &operator=(Result &&) = default;
   };
 
   class IncrementalSchemeComparator {
