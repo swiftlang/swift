@@ -908,6 +908,19 @@ public:
     return consumeTokenSyntax();
   }
 
+  /// The parser expects that \p K is next token in the input.  If so,
+  /// it is consumed and the corresponding \c ParsedTokenSyntax returned.
+  ///
+  /// If the input is malformed, this emits the specified error diagnostic and
+  /// \c None is returned.
+  Optional<ParsedTokenSyntax> parseTokenSyntax(tok K, const Diagnostic &D);
+
+  /// Parse the specified expected token and return the corresponding \c
+  /// ParsedTokenSyntax on success. On failure, emit the specified error
+  /// diagnostic, a note at \c OtherLoc, and return \c None.
+  Optional<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc);
+
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
@@ -1235,6 +1248,15 @@ public:
   
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeAnySyntax();
 
+  /// Parse a collection type.
+  ///   type-simple:
+  ///     '[' type ']'
+  ///     '[' type ':' type ']'
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeCollectionSyntax();
+
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
+                                                       bool IsSILFuncDecl = false);
+  
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 

@@ -40,6 +40,8 @@ public:
     assert(Status.isError());
   }
 
+  ParsedSyntaxResult(ParsedSyntaxNode &&Node, ParserStatus Status) : Raw(Node.takeRaw()), Status(Status) {}
+
   explicit ParsedSyntaxResult(ParsedRawSyntaxNode &&Raw)
       : Raw(std::move(Raw)), Status() {}
 
@@ -60,6 +62,9 @@ public:
   void setIsError() { Status.setIsParseError(); }
 
   bool hasCodeCompletion() const { return Status.hasCodeCompletion(); }
+  void setHasCodeCompletionAndIsError() {
+    Status.setHasCodeCompletionAndIsError();
+  }
 
   ParsedSyntaxNode get() {
     assert(!isNull());
@@ -114,12 +119,7 @@ makeParsedCodeCompletion(ParsedSyntaxNode node) {
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
 makeParsedResult(ParsedSyntaxNode node, ParserStatus Status) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node));
-  if (Status.hasCodeCompletion())
-    result.setHasCodeCompletion();
-  else if (Status.isError())
-    result.setIsError();
-  return result;
+  return ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node), Status);
 }
 
 } // namespace swift

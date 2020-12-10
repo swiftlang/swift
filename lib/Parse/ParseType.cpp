@@ -1230,60 +1230,19 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
 }
 
 ParserResult<TypeRepr> Parser::parseTypeCollection() {
-  SyntaxParsingContext CollectionCtx(SyntaxContext, SyntaxContextKind::Type);
-  ParserStatus Status;
-  // Parse the leading '['.
-  assert(Tok.is(tok::l_square));
-  Parser::StructureMarkerRAII parsingCollection(*this, Tok);
-  SourceLoc lsquareLoc = consumeToken();
-
-  // Parse the element type.
-  ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
-  Status |= firstTy;
-
-  // If there is a ':', this is a dictionary type.
-  SourceLoc colonLoc;
-  ParserResult<TypeRepr> secondTy;
-  if (Tok.is(tok::colon)) {
-    colonLoc = consumeToken();
-
-    // Parse the second type.
-    secondTy = parseType(diag::expected_dictionary_value_type);
-    Status |= secondTy;
+  auto typeLoc = leadingTriviaLoc();
+  auto result = parseTypeCollectionSyntax();
+  auto status = result.getStatus();
+  if (result.isNull()) {
+    return status;
   }
-
-  // Parse the closing ']'.
-  SourceLoc rsquareLoc;
-  if (parseMatchingToken(tok::r_square, rsquareLoc,
-                         colonLoc.isValid()
-                             ? diag::expected_rbracket_dictionary_type
-                             : diag::expected_rbracket_array_type,
-                         lsquareLoc))
-    Status.setIsParseError();
-
-  if (Status.hasCodeCompletion())
-    return Status;
-
-  // If we couldn't parse anything for one of the types, propagate the error.
-  if (Status.isErrorOrHasCompletion())
-    return makeParserError();
-
-  TypeRepr *TyR;
-  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
-
-  SourceRange brackets(lsquareLoc, rsquareLoc);
-  if (colonLoc.isValid()) {
-    // Form the dictionary type.
-    TyR = new (Context)
-        DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
-    SyntaxContext->setCreateSyntax(SyntaxKind::DictionaryType);
-  } else {
-    // Form the array type.
-    TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
-    SyntaxContext->setCreateSyntax(SyntaxKind::ArrayType);
+  SyntaxContext->addSyntax(std::move(result.get()));
+  auto collectionType = SyntaxContext->topNode<TypeSyntax>();
+  auto typeRepr = ASTGenerator.generate(collectionType, typeLoc);
+  if (!typeRepr) {
+    status.setIsParseError();
   }
-    
-  return makeParserResult(Status, TyR);
+  return makeParserResult(status, typeRepr);
 }
 
 bool Parser::isOptionalToken(const Token &T) const {
@@ -1670,5 +1629,98 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeAnySyntax() {
   auto Type = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
       std::move(Any), llvm::None, *SyntaxContext);
   return makeParsedResult(std::move(Type));
+}
+
+/// Parse a collection type.
+///   type-simple:
+///     '[' type ']'
+///     '[' type ':' type ']'
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollectionSyntax() {
+  assert(Tok.is(tok::l_square));
+  Parser::StructureMarkerRAII parsingCollection(*this, Tok);
+
+  ParserStatus Status;
+
+  // Parse the leading '['.
+  SourceLoc lsquareLoc = Tok.getLoc();
+  ParsedTokenSyntax lsquare = consumeTokenSyntax(tok::l_square);
+
+  // Parse the element type.
+  ParsedSyntaxResult<ParsedTypeSyntax> firstTypeResult =
+      parseTypeSyntax(diag::expected_element_type);
+  Status |= firstTypeResult.getStatus();
+  Optional<ParsedTypeSyntax> firstType = firstTypeResult.getOrNull();
+  if (!firstType) {
+    // If parsing of the type failed, add an unknown type to the libSyntax
+    // tree to keep its layout valid.
+    firstType = ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext);
+  }
+
+  // If there is a ':', this is a dictionary type.
+  Optional<ParsedTokenSyntax> colon;
+  Optional<ParsedTypeSyntax> secondType;
+  if (Tok.is(tok::colon)) {
+    colon = consumeTokenSyntax(tok::colon);
+
+    // Parse the second type.
+    ParsedSyntaxResult<ParsedTypeSyntax> secondTypeResult =
+        parseTypeSyntax(diag::expected_dictionary_value_type);
+    Status |= secondTypeResult.getStatus();
+    secondType = secondTypeResult.getOrNull();
+    if (!secondType) {
+      secondType = ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext);
+    }
+  }
+
+  // Parse the closing ']'.
+  Optional<ParsedTokenSyntax> rsquare = parseMatchingTokenSyntax(
+      tok::r_square,
+      colon.hasValue() ? diag::expected_rbracket_dictionary_type
+                       : diag::expected_rbracket_array_type,
+      lsquareLoc);
+  if (!rsquare) {
+    Status.setIsParseError();
+  }
+
+  if (colon) {
+    ParsedDictionaryTypeSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftSquareBracket(std::move(lsquare));
+    builder.useKeyType(std::move(*firstType));
+    builder.useColon(std::move(*colon));
+    builder.useValueType(std::move(*secondType));
+    if (rsquare) {
+      builder.useRightSquareBracket(std::move(*rsquare));
+    }
+    return makeParsedResult(builder.build(), Status);
+  } else {
+    ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftSquareBracket(std::move(lsquare));
+    builder.useElementType(std::move(*firstType));
+    if (rsquare) {
+      builder.useRightSquareBracket(std::move(*rsquare));
+    }
+    return makeParsedResult(builder.build(), Status);
+  }
+}
+
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSyntax(Diag<> MessageID, bool IsSILFuncDecl) {
+  SourceLoc TypeLoc = Tok.getLoc();
+
+  // Set up a SyntaxParsingContext that captures the libSyntax nodes generated
+  // by the legacy AST parser.
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
+  TypeParsingContext.setTransparent();
+  ParserResult<TypeRepr> Result = parseType(MessageID, IsSILFuncDecl);
+
+  // If parsing succeeded, we have a ParsedTypeSyntax in the TypeParsingContext.
+  // Pop it and return it. The caller of this method will add it to its
+  // SyntaxParsingContext manually.
+  if (auto ParsedType = TypeParsingContext.popIf<ParsedTypeSyntax>()) {
+    ASTGenerator.addType(Result.getPtrOrNull(), TypeLoc);
+    return makeParsedResult(std::move(*ParsedType), Result.getStatus());
+  }
+  // Otherwise parsing failed. Return the parser status.
+  return Result.getStatus();
 }
 

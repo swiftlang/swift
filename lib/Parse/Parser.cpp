@@ -1515,3 +1515,31 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
   consumeTokenWithoutFeedingReceiver();
   return ParsedToken;
 }
+
+Optional<ParsedTokenSyntax>
+Parser::parseTokenSyntax(tok K, const Diagnostic &D) {
+  if (Tok.is(K)) {
+    return consumeTokenSyntax(K);
+  }
+
+  checkForInputIncomplete();
+  diagnose(Tok.getLoc(), D);
+  return None;
+}
+
+Optional<ParsedTokenSyntax>
+Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc) {
+  if (auto Token = parseTokenSyntax(K, ErrorDiag)) {
+    return Token;
+  } else {
+    Diag<> OtherNote;
+    switch (K) {
+    case tok::r_paren:  OtherNote = diag::opening_paren;    break;
+    case tok::r_square: OtherNote = diag::opening_bracket;  break;
+    case tok::r_brace:  OtherNote = diag::opening_brace;    break;
+    default:            llvm_unreachable("unknown matching token!"); break;
+    }
+    diagnose(OtherLoc, OtherNote);
+    return None;
+  }
+}
