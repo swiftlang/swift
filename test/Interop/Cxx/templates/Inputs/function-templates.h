@@ -34,10 +34,10 @@ template<class... Ts>
 void testPackExpansion(Ts...) { }
 
 template<class T>
-void testTypeOfExpr(T a, typedef(a + 1) b) { }
+void testTypeOfExpr(T a, typeof(a + 1) b) { }
 
 template<class T>
-void testTypeOf(T a, typedef a b) { }
+void testTypeOf(T a, typeof a b) { }
 
 template<class T>
 decltype(auto) testAuto(T arg) {
