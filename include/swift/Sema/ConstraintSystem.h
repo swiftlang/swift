@@ -5817,14 +5817,20 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   llvm::SmallPtrSet<CanType, 4> ExploredTypes;
   llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
 
+  /// Determines whether this type variable has a
+  /// `ExpressibleByNilLiteral` requirement which
+  /// means that bindings have to either conform
+  /// to that protocol or be wrapped in an optional.
+  bool CanBeNil;
+
 public:
   using Element = TypeVariableBinding;
 
   TypeVarBindingProducer(ConstraintSystem &cs,
-                         ConstraintSystem::PotentialBindings &bindings)
-      : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
-        TypeVar(bindings.TypeVar),
-        Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
+                         ConstraintSystem::PotentialBindings &bindings);
+
+  /// Retrieve a set of bindings available in the current state.
+  ArrayRef<Binding> getCurrentBindings() const { return Bindings; }
 
   Optional<Element> operator()() override {
     // Once we reach the end of the current bindings
@@ -5846,6 +5852,10 @@ private:
   /// \returns true if some new bindings were sucessfully computed,
   /// false otherwise.
   bool computeNext();
+
+  /// Check whether binding type is required to either conform to
+  /// `ExpressibleByNilLiteral` protocol or be wrapped into an optional type.
+  bool requiresOptionalAdjustment(const Binding &binding) const;
 };
 
 /// Iterator over disjunction choices, makes it
