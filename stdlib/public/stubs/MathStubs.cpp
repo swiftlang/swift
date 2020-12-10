@@ -420,6 +420,36 @@ __modti3(ti_int a, ti_int b)
     return ((ti_int)r ^ s) - s;        /* negate if s == -1 */
 }
 
+#if defined(_M_IX86)
+
+/*
+ * ucrt does not provide a definition for `sqrtf` in the runtime.  It is
+ * expected to be provided at compile time via the inline definition in
+ * `corecrt_math.h`.  However, `SwiftShims` cannot depend on `ucrt`, and so
+ * cannot include `corecrt_math.h`.  Instead, we provide the inline definition
+ * for `sqrtf` to satisfy the link time dependency due to the incorrect lowering
+ * of `__builtin_sqrtf` on Windows x86.  clang will treat `__builtin_sqrtf` as a
+ * libm builtin and lower it to the call `sqrtf` instead of lowering it as a
+ * builtin intrinsic which would allow the backend to widen the argument and
+ * narrow the result.
+ *
+ * Because `math.h` is included in the context of this
+ * translation unit, we must resort to some clever alasing techniques to provide
+ * the definition of `sqrtf` which shadows the version from the headers.  We use
+ * the SUN ProCC derived `redefine_extname` pragma to have the compiler redefine
+ * the symbol avoiding the clashing definition of the existing function.
+ */
+#define CONCAT_EXPANDED(a,b) a ## b
+#define CONCAT(a,b) CONCAT_EXPANDED(a,b)
+
+#pragma redefine_extname __swift_sqrtf CONCAT(__USER_LABEL_PREFIX__, sqrtf)
+
+SWIFT_RUNTIME_STDLIB_API
+float __swift_sqrtf(float f) {
+  return (float)sqrt((double)f);
+}
+#endif
+
 #endif
 
 }
