@@ -34,3 +34,5 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 5 %t/main_module/MainModule.swiftinterface -I %t/helper_module -I %S/Inputs
 
 // CHECK: public func funcTakingForeignStruct(_ param: ForeignB.ForeignStruct)
+
+// REQUIRES: SR-13032
