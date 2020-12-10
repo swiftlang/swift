@@ -924,9 +924,17 @@ namespace {
       case ActorIsolationRestriction::Unrestricted:
       case ActorIsolationRestriction::LocalCapture:
       case ActorIsolationRestriction::Unsafe:
-      case ActorIsolationRestriction::GlobalActor: // TODO: handle global
-                                                   // actors
         break;
+      case ActorIsolationRestriction::GlobalActor: {
+        ctx.Diags.diagnose(call->getLoc(),
+                           diag::actor_isolated_inout_state,
+                           valueDecl->getDescriptiveKind(),
+                           valueDecl->getName(),
+                           call->implicitlyAsync());
+        valueDecl->diagnose(diag::kind_declared_here,
+                            valueDecl->getDescriptiveKind());
+        return true;
+      }
       case ActorIsolationRestriction::ActorSelf: {
         if (isPartialApply) {
           // The partially applied InoutArg is a property of actor. This can
