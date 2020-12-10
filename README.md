@@ -7,6 +7,11 @@ SwiftWasm book](https://swiftwasm.github.io/swiftwasm-book/) to get started, and
 the [`awesome-swiftwasm`](https://github.com/swiftwasm/awesome-swiftwasm) list for
 more links in the SwiftWasm ecosystem.
 
+
+If you'd like to participate in the growing [SwiftWasm](https://swiftwasm.org) community, you're
+very welcome to join [our Discord server](https://discord.gg/ashJW8T8yp), or the `#webassembly`
+channel in [the SwiftPM Slack](https://swift-package-manager.herokuapp.com/).
+
 <hr>
 <br/>
 <img src="https://swift.org/assets/images/swift.svg" alt="Swift logo" height="70" >
