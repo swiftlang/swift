@@ -1041,7 +1041,26 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
 
 static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
                                  const clang::NamedDecl *decl,
-                                 ImportNameVersion version) {
+                                 ImportNameVersion version,
+                                 bool isAsyncImport) {
+  // For an async import, check whether there is a swift_async attribute
+  // that specifies whether this should be considered swift_private or not.
+  if (isAsyncImport) {
+    if (auto *asyncAttr = decl->getAttr<clang::SwiftAsyncAttr>()) {
+      switch (asyncAttr->getKind()) {
+      case clang::SwiftAsyncAttr::None:
+        // Fall through to let us decide based on swift_private.
+        break;
+
+      case clang::SwiftAsyncAttr::SwiftPrivate:
+        return true;
+
+      case clang::SwiftAsyncAttr::NotSwiftPrivate:
+        return false;
+      }
+    }
+  }
+
   // Decl with the attribute are obviously private
   if (decl->hasAttr<clang::SwiftPrivateAttr>())
     return true;
@@ -1213,7 +1232,9 @@ NameImporter::considerAsyncImport(
     StringRef baseName,
     SmallVectorImpl<StringRef> &paramNames,
     ArrayRef<const clang::ParmVarDecl *> params,
-    bool isInitializer, CustomAsyncName customName,
+    bool isInitializer,
+    Optional<unsigned> explicitCompletionHandlerParamIndex,
+    CustomAsyncName customName,
     Optional<ForeignErrorConvention::Info> errorInfo) {
   // If there are no unclaimed parameters, there's no .
   unsigned errorParamAdjust = errorInfo ? 1 : 0;
@@ -1232,43 +1253,50 @@ NameImporter::considerAsyncImport(
           paramNames.size() + errorParamAdjust + customAsyncNameAdjust)
     return None;
 
-  // The last parameter will be the completion handler for an async function.
-  unsigned completionHandlerParamIndex = params.size() - 1;
-  unsigned completionHandlerParamNameIndex = paramNames.size() - 1;
+  // If we don't already know the completion handler parameter index, go
+  // try to figure it out.
+  unsigned completionHandlerParamIndex;
+  unsigned completionHandlerParamNameIndex;
+  if (!explicitCompletionHandlerParamIndex) {
+    // Determine whether the naming indicates that this is a completion
+    // handler.
+    completionHandlerParamIndex = params.size() - 1;
+    completionHandlerParamNameIndex = paramNames.size() - 1;
+    switch (customName) {
+    case CustomAsyncName::None:
+      // Check whether the first parameter is the completion handler and the
+      // base name has a suitable completion-handler suffix.
+      if (completionHandlerParamIndex == 0 &&
+          stripWithCompletionHandlerSuffix(baseName))
+        break;
 
-  // Determine whether the naming indicates that this is a completion
-  // handler.
-  switch (customName) {
-  case CustomAsyncName::None:
-    // Check whether the first parameter is the completion handler and the
-    // base name has a suitable completion-handler suffix.
-    if (completionHandlerParamIndex == 0 &&
-        stripWithCompletionHandlerSuffix(baseName))
-      break;
+      LLVM_FALLTHROUGH;
 
-    LLVM_FALLTHROUGH;
+    case CustomAsyncName::SwiftName:
+      // Check whether the argument label itself has an appropriate name.
+      if (isCompletionHandlerParamName(
+              paramNames[completionHandlerParamNameIndex]) ||
+          (completionHandlerParamNameIndex > 0 &&
+           stripWithCompletionHandlerSuffix(
+               paramNames[completionHandlerParamNameIndex]))) {
+        break;
+      }
 
-  case CustomAsyncName::SwiftName:
-    // Check whether the argument label itself has an appropriate name.
-    if (isCompletionHandlerParamName(
-            paramNames[completionHandlerParamNameIndex]) ||
-        (completionHandlerParamNameIndex > 0 &&
-         stripWithCompletionHandlerSuffix(
-             paramNames[completionHandlerParamNameIndex]))) {
+      // Check whether the parameter itself has a name that indicates that
+      // it is a completion handelr.
+      if (isCompletionHandlerParamName(
+              params[completionHandlerParamIndex]->getName()))
+        break;
+
+      return None;
+
+    case CustomAsyncName::SwiftAsyncName:
+      // Having a custom async name implies that this is a completion handler.
       break;
     }
-
-    // Check whether the parameter itself has a name that indicates that
-    // it is a completion handelr.
-    if (isCompletionHandlerParamName(
-            params[completionHandlerParamIndex]->getName()))
-      break;
-
-    return None;
-
-  case CustomAsyncName::SwiftAsyncName:
-    // Having a custom async name implies that this is a completion handler.
-    break;
+  } else {
+    completionHandlerParamIndex = *explicitCompletionHandlerParamIndex;
+    completionHandlerParamNameIndex = *explicitCompletionHandlerParamIndex;
   }
 
   // Used for returns once we've determined that the method cannot be
@@ -1452,6 +1480,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
   result.effectiveContext = effectiveCtx;
 
+  // Gather information from the swift_async attribute, if there is one.
+  Optional<unsigned> completionHandlerParamIndex;
+  if (version.supportsConcurrency()) {
+    if (const auto *swiftAsyncAttr = D->getAttr<clang::SwiftAsyncAttr>()) {
+      // If this is swift_async(none), don't import as async at all.
+      if (swiftAsyncAttr->getKind() == clang::SwiftAsyncAttr::None)
+        return ImportedName();
+
+      // Get the completion handler parameter index, if there is one.
+      completionHandlerParamIndex =
+          swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
+    }
+  }
+
   // FIXME: ugly to check here, instead perform unified check up front in
   // containing struct...
   if (findSwiftNewtype(D, clangSema, version))
@@ -1601,6 +1643,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           if (auto asyncInfo = considerAsyncImport(
                   method, parsedName.BaseName, parsedName.ArgumentLabels,
                   params, isInitializer,
+                  completionHandlerParamIndex,
                   nameAttr->isAsync ? CustomAsyncName::SwiftAsyncName
                                     : CustomAsyncName::SwiftName,
                   result.getErrorInfo())) {
@@ -1890,7 +1933,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.accessorKind == ImportedAccessorKind::None) {
       if (auto asyncInfo = considerAsyncImport(
               objcMethod, baseName, argumentNames, params, isInitializer,
-              CustomAsyncName::None, result.getErrorInfo())) {
+              completionHandlerParamIndex, CustomAsyncName::None,
+              result.getErrorInfo())) {
         result.info.hasAsyncInfo = true;
         result.info.asyncInfo = *asyncInfo;
       }
@@ -2065,7 +2109,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
   SmallString<16> swiftPrivateScratch;
-  if (shouldBeSwiftPrivate(*this, D, version)) {
+  if (shouldBeSwiftPrivate(*this, D, version, result.info.hasAsyncInfo)) {
     // Special case: empty arg factory, "for historical reasons", is not private
     if (isInitializer && argumentNames.empty() &&
         (result.getInitKind() == CtorInitializerKind::Factory ||

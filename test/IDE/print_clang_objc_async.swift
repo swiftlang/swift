@@ -23,6 +23,8 @@
 // CHECK-DAG:     func findQAndA() async throws -> (String?, String)
 // CHECK-DAG:     func findQuestionableAnswers() async throws -> (String, String?)
 // CHECK-DAG:     func doSomethingFun(_ operation: String) async
+// CHECK-DAG:     func dance(_ step: String) async -> String
+// CHECK-DAG:     func __leap(_ height: Int) async -> String
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: protocol RefrigeratorDelegate
