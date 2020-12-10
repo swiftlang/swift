@@ -38,6 +38,20 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Actor.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
+  AllSatisfy.swift
+  AsyncCompactMapSequence.swift
+  AsyncDropWhileSequence.swift
+  AsyncFilterSequence.swift
+  AsyncFlatMapSequence.swift
+  AsyncIteratorProtocol.swift
+  AsyncMapSequence.swift
+  AsyncPrefixWhileSequence.swift
+  AsyncSequence.swift
+  Contains.swift
+  Count.swift
+  First.swift
+  MinMax.Swift
+  Reduce.swift
   PartialAsyncTask.swift
   Task.cpp
   Task.swift
