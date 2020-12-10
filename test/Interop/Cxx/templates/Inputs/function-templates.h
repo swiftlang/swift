@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
+#define TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
+
 template <class T> T add(T a, T b) { return a + b; }
 
 template <class A, class B> A addTwoTemplates(A a, B b) { return a + b; }
@@ -31,10 +34,10 @@ template<class... Ts>
 void testPackExpansion(Ts...) { }
 
 template<class T>
-void testTypeOfExpr(T a, typeof(a + 1) b) { }
+void testTypeOfExpr(T a, typedef(a + 1) b) { }
 
 template<class T>
-void testTypeOf(T a, typeof a b) { }
+void testTypeOf(T a, typedef a b) { }
 
 template<class T>
 decltype(auto) testAuto(T arg) {
@@ -85,3 +88,5 @@ struct HasImposibleMember {
 };
 
 } // namespace Unimportable
+
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
