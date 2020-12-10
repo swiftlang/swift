@@ -1130,7 +1130,7 @@ public struct ${Self}
 %     if FloatType == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %     elif FloatType == 'Float16':
-#if !(os(macOS) && arch(x86_64))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 %     end
 
   /// Creates an integer from the given floating-point value, rounding toward
