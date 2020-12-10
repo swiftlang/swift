@@ -574,7 +574,7 @@ bool IsDeclSubstitutableRequest::evaluate(Evaluator &evaluator,
   return substTypeA->isEqual(substTypeB);
 }
 
-static bool isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
+bool TypeChecker::isDeclSubstitutable(ValueDecl *declA, ValueDecl *declB) {
   return evaluateOrDefault(declA->getASTContext().evaluator,
                            IsDeclSubstitutableRequest{ declA, declB },
                            false);
@@ -616,10 +616,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (TypeChecker::compareDeclarations(CS.DC, declA, declB) == Comparison::Better) {
-      if (isDeclSubstitutable(declA, /*by=*/declB))
-        return skip("subtype");
-    }
+    if (TypeChecker::isDeclSubstitutable(declA, declB))
+      return skip("subtype");
   }
 
   // If the solver already found a solution with a choice that did not
