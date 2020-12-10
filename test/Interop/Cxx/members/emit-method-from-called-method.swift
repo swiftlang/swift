@@ -2,13 +2,13 @@
 //
 // REQUIRES: executable_test
 
-import CallConstructor
+import MethodCallsMethod
 import StdlibUnittest
 
 var MembersTestSuite = TestSuite("MembersTestSuite")
 
-MembersTestSuite.test("emit-from-called-constructor") {
-  expectEqual(42, useIncrementor())
+MembersTestSuite.test("emit-method-from-called-method") {
+  expectEqual(42, callMethod(41))
 }
 
 runAllTests()

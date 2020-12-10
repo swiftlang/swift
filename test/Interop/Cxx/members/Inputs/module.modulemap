@@ -1,7 +1,15 @@
-module CallConstructor {
-  header "call-constructor.h"
+module ConstructorCallsFunction {
+  header "constructor-calls-function.h"
 }
 
-module  CallMethod {
-  header "call-method.h"
+module ConstructorCalls {
+  header "constructor-calls-method.h"
+}
+
+module MethodCallsFunction {
+  header "method-calls-function.h"
+}
+
+module MethodCallsMethod {
+  header "method-calls-method.h"
 }

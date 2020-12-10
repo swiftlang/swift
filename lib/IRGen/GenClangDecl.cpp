@@ -65,7 +65,6 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
       return rd->getDefinition();
     }
   }
-
   return nullptr;
 }
 
@@ -98,6 +97,9 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       if (DC->isFileContext())
         break;
       D = cast<const clang::Decl>(DC);
+      if (DC->isRecord()) {
+        break;
+      }
     }
     if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second)
       return;

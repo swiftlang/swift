@@ -1,9 +1,9 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
-import CallMethod
+import ConstructorCallsFunction
 
-public func getValueFromMethod() -> CInt {
-  return callMethod()
+public func getIncrementorValue() -> CInt {
+  return callConstructor(41)
 }
 
 // CHECK: define linkonce_odr i32 @_Z9incrementi(i32 %t)

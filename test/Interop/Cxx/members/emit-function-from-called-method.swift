@@ -2,13 +2,13 @@
 //
 // REQUIRES: executable_test
 
-import CallMethod
+import MethodCallsFunction
 import StdlibUnittest
 
 var MembersTestSuite = TestSuite("MembersTestSuite")
 
-MembersTestSuite.test("emit-from-called-method") {
-  expectEqual(42, callMethod())
+MembersTestSuite.test("emit-function-from-called-method") {
+  expectEqual(42, callMethod(41))
 }
 
 runAllTests()
