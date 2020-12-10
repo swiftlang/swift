@@ -24,6 +24,7 @@
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
+#include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/StringRef.h"
@@ -78,6 +79,11 @@ using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
 class Compilation {
 public:
+  struct Result {
+    int exitCode;
+    fine_grained_dependencies::ModuleDepGraph depGraph;
+  };
+
   class IncrementalSchemeComparator {
     const bool EnableIncrementalBuildWhenConstructed;
     const bool &EnableIncrementalBuild;
@@ -490,7 +496,7 @@ public:
   ///
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
-  int performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
+  Compilation::Result performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
   /// to a frontend job.
@@ -540,7 +546,8 @@ private:
   ///
   /// \returns exit code of the first failed Job, or 0 on success. If a Job
   /// crashes during execution, a negative value will be returned.
-  int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
+  Compilation::Result performJobsImpl(bool &abnormalExit,
+                                      std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Performs a single Job by executing in place, if possible.
   ///
@@ -550,7 +557,7 @@ private:
   /// will no longer exist, or it will call exit() if the program was
   /// successfully executed. In the event of an error, this function will return
   /// a negative value indicating a failure to execute.
-  int performSingleCommand(const Job *Cmd);
+  Compilation::Result performSingleCommand(const Job *Cmd);
 };
 
 } // end namespace driver
