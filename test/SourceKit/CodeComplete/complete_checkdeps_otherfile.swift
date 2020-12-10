@@ -20,27 +20,26 @@ func foo() {
 // RUN:   %s \
 // RUN: )
 // RUN: INPUT_DIR=%S/Inputs/checkdeps
-// RUN: DEPCHECK_INTERVAL=1
-// RUN: SLEEP_TIME=2
 
 // RUN: cp -R $INPUT_DIR/MyProject %t/
+// RUN: touch -t 202001010101 %t/MyProject/Library.swift
 // RUN: cp -R $INPUT_DIR/ClangFW.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule)
 // RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src/Funcs.swift
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=${DEPCHECK_INTERVAL} == \
+// RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 
 // RUN:   -shell -- echo "### Initial" == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo "### Modify local library file" == \
-// RUN:   -shell -- sleep $SLEEP_TIME == \
 // RUN:   -shell -- cp -R $INPUT_DIR/MyProject_mod/Library.swift %t/MyProject/ == \
+// RUN:   -shell -- touch -t 210001010101 %t/MyProject/Library.swift == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Fast completion' == \
-// RUN:   -shell -- sleep $SLEEP_TIME == \
+// RUN:   -shell -- touch -t 202001010101 %t/MyProject/Library.swift == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} \
 
 // RUN:   | %FileCheck %s
