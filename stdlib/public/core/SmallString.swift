@@ -208,7 +208,7 @@ extension _SmallString {
         // Restore the memory type of self._storage
         _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
       }
-      return try f(UnsafeBufferPointer(start: ptr, count: count))
+      return try f(UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
     }
   }
 

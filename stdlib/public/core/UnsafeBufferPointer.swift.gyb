@@ -394,6 +394,15 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 }
 
 extension Unsafe${Mutable}BufferPointer {
+  @_alwaysEmitIntoClient
+  internal init(
+    @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
+    count: Int
+  ) {
+    _position = start
+    self.count = count
+  }
+
   /// Creates a new buffer pointer over the specified number of contiguous
   /// instances beginning at the given pointer.
   ///
@@ -413,8 +422,7 @@ extension Unsafe${Mutable}BufferPointer {
     _debugPrecondition(
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
-    _position = start
-    self.count = _assumeNonNegative(count)
+    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
   }
 
   @inlinable // unsafe-performance

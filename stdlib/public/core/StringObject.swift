@@ -902,7 +902,7 @@ extension _StringObject {
       return sharedUTF8
     }
     return UnsafeBufferPointer(
-      start: self.nativeUTF8Start, count: self.largeCount)
+      _uncheckedStart: self.nativeUTF8Start, count: self.largeCount)
   }
 
   // Whether the object stored can be bridged directly as a NSString
