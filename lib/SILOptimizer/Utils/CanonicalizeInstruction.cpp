@@ -522,6 +522,35 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   return killInstruction(bbi, next, pass);
 }
 
+/// Delete any result having forwarding instruction that only has destroy_value
+/// and debug_value uses.
+static SILBasicBlock::iterator
+eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
+                                                CanonicalizeInstruction &pass) {
+  auto next = std::next(inst->getIterator());
+
+  for (auto *use : getNonDebugUses(inst))
+    if (!isa<DestroyValueInst>(use->getUser()))
+      return next;
+  deleteAllDebugUses(inst);
+  SILValue op = inst->getOperand(0);
+  inst->replaceAllUsesWith(op);
+  pass.notifyHasNewUsers(op);
+  return killInstruction(inst, next, pass);
+}
+
+static Optional<SILBasicBlock::iterator>
+tryEliminateUnneededForwardingInst(SILInstruction *i,
+                                   CanonicalizeInstruction &pass) {
+  assert(isa<OwnershipForwardingInst>(i) &&
+         "Must be an ownership forwarding inst");
+  if (auto *svi = dyn_cast<SingleValueInstruction>(i))
+    if (svi->getNumOperands() == 1)
+      return eliminateUnneededForwardingUnarySingleValueInst(svi, pass);
+
+  return None;
+}
+
 //===----------------------------------------------------------------------===//
 //                            Top-Level Entry Point
 //===----------------------------------------------------------------------===//
@@ -544,6 +573,16 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
 
   if (auto *bbi = dyn_cast<BeginBorrowInst>(inst))
     return eliminateSimpleBorrows(bbi, *this);
+
+  // If we have ownership and are not in raw SIL, eliminate unneeded forwarding
+  // insts. We don't do this in raw SIL as not to disturb the codegen read by
+  // diagnostics.
+  auto *fn = inst->getFunction();
+  if (fn->hasOwnership() && fn->getModule().getStage() != SILStage::Raw) {
+    if (isa<OwnershipForwardingInst>(inst))
+      if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
+        return *newNext;
+  }
 
   // Skip ahead.
   return std::next(inst->getIterator());
