@@ -21,6 +21,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
@@ -59,6 +60,8 @@ class SILCombiner :
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+  DeadEndBlocks deadEndBlocks;
+
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
 
@@ -83,19 +86,21 @@ public:
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
-      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"), MadeChange(false),
+      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"),
+        deadEndBlocks(&B.getFunction()), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
-                /* ReplaceValueUsesAction */
-                [&](SILValue Original, SILValue Replacement) {
-                  replaceValueUsesWith(Original, Replacement);
-                },
-                /* ReplaceInstUsesAction */
-                [&](SingleValueInstruction *I, ValueBase *V) {
-                  replaceInstUsesWith(*I, V);
-                },
-                /* EraseAction */
-                [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
+        CastOpt(
+            FuncBuilder, nullptr /*SILBuilderContext*/,
+            /* ReplaceValueUsesAction */
+            [&](SILValue Original, SILValue Replacement) {
+              replaceValueUsesWith(Original, Replacement);
+            },
+            /* ReplaceInstUsesAction */
+            [&](SingleValueInstruction *I, ValueBase *V) {
+              replaceInstUsesWith(*I, V);
+            },
+            /* EraseAction */
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
 
   bool runOnFunction(SILFunction &F);
 

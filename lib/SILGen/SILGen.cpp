@@ -391,7 +391,13 @@ FuncDecl *
 SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
   return lookupConcurrencyIntrinsic(getASTContext(),
                                     ResumeUnsafeThrowingContinuationWithError,
-                                 "_resumeUnsafeThrowingContinuationWithError");
+                                  "_resumeUnsafeThrowingContinuationWithError");
+}
+FuncDecl *
+SILGenModule::getRunTaskForBridgedAsyncMethod() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunTaskForBridgedAsyncMethod,
+                                    "_runTaskForBridgedAsyncMethod");
 }
 FuncDecl *
 SILGenModule::getRunAsyncHandler() {
@@ -776,7 +782,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
+    // If the native function is async, then the foreign entry point is not,
+    // so it needs to spawn a detached task in which to run the native
+    // implementation, so the actual thunk logic needs to go into a closure
+    // implementation function.
+    if (constant.hasAsync()) {
+      f = SILGenFunction(*this, *f, dc).emitNativeAsyncToForeignThunk(constant);
+    }
+
     SILGenFunction(*this, *f, dc).emitNativeToForeignThunk(constant);
+
     postEmitFunction(constant, f);
     return;
   }

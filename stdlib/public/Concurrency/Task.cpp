@@ -20,6 +20,11 @@
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
 
+#if defined(__APPLE__)
+// TODO: We shouldn't need this
+#include <dispatch/dispatch.h>
+#endif
+
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 
@@ -308,6 +313,8 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
   // Initialize the task-local allocator.
+  // TODO: consider providing an initial pre-allocated first slab to the
+  //       allocator.
   _swift_task_alloc_initialize(task);
 
   return {task, initialContext};
@@ -354,4 +361,71 @@ void swift::swift_task_run(AsyncTask *taskToRun) {
 
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
+}
+
+namespace {
+  
+/// Structure that gets filled in when a task is suspended by `withUnsafeContinuation`.
+struct AsyncContinuationContext {
+  // These fields are unnecessary for resuming a continuation.
+  void *Unused1;
+  void *Unused2;
+  // Storage slot for the error result, if any.
+  SwiftError *ErrorResult;
+  // Pointer to where to store a normal result.
+  OpaqueValue *NormalResult;
+  
+  // Executor on which to resume execution.
+  ExecutorRef ResumeExecutor;
+};
+
+static void resumeTaskAfterContinuation(AsyncTask *task,
+                                        AsyncContinuationContext *context) {
+#if __APPLE__
+  // TODO: Enqueue the task on the specific executor in the continuation
+  // context.
+  //
+  // For now, just enqueue the task resumption on the global concurrent queue
+  // so that we're able to return back to the caller of resume.
+  
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                 ^{
+                  task->run(context->ResumeExecutor);
+                 });
+#else
+  swift_unreachable("not implemented");
+#endif
+}
+
+
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_resume(/* +1 */ OpaqueValue *result,
+                                      void *continuation,
+                                      const Metadata *resumeType) {
+  auto task = reinterpret_cast<AsyncTask*>(continuation);
+  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
+  resumeType->vw_initializeWithTake(context->NormalResult, result);
+  
+  resumeTaskAfterContinuation(task, context);
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
+                                              void *continuation,
+                                              const Metadata *resumeType) {
+  return swift_continuation_resume(result, continuation, resumeType);
+}
+
+
+SWIFT_CC(swift)
+void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
+                                                       void *continuation,
+                                                       const Metadata *resumeType) {
+  auto task = reinterpret_cast<AsyncTask*>(continuation);
+  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
+  context->ErrorResult = error;
+  
+  resumeTaskAfterContinuation(task, context);
 }

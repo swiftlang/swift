@@ -462,7 +462,6 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
-    case SILArgumentConvention::Direct_Deallocating:
       assert(conv.isIndirectConvention() && "Expect an indirect convention");
       return true; // return something "conservative".
     }
@@ -494,7 +493,7 @@ struct ImmutableAddressUseVerifier {
     return false;
   }
 
-  bool isCastToNonConsuming(UncheckedAddrCastInst *i) {
+  bool isAddrCastToNonConsuming(SingleValueInstruction *i) {
     // Check if any of our uses are consuming. If none of them are consuming, we
     // are good to go.
     return llvm::none_of(i->getUses(), [&](Operand *use) -> bool {
@@ -589,8 +588,9 @@ struct ImmutableAddressUseVerifier {
           break;
       case SILInstructionKind::DestroyAddrInst:
         return true;
+      case SILInstructionKind::UpcastInst:
       case SILInstructionKind::UncheckedAddrCastInst: {
-        if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
+        if (isAddrCastToNonConsuming(cast<SingleValueInstruction>(inst))) {
           break;
         }
         return true;

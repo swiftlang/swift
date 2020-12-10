@@ -607,16 +607,25 @@ bool importer::hasNativeSwiftDecl(const clang::Decl *decl) {
 
 /// Translate the "nullability" notion from API notes into an optional type
 /// kind.
-OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
+OptionalTypeKind importer::translateNullability(
+    clang::NullabilityKind kind, bool stripNonResultOptionality) {
+  if (stripNonResultOptionality &&
+      kind != clang::NullabilityKind::NullableResult)
+    return OptionalTypeKind::OTK_None;
+
   switch (kind) {
   case clang::NullabilityKind::NonNull:
     return OptionalTypeKind::OTK_None;
 
   case clang::NullabilityKind::Nullable:
+  case clang::NullabilityKind::NullableResult:
     return OptionalTypeKind::OTK_Optional;
 
   case clang::NullabilityKind::Unspecified:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
+
+  default:
+    return OptionalTypeKind::OTK_Optional;
   }
 
   llvm_unreachable("Invalid NullabilityKind.");

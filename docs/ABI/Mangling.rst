@@ -1008,6 +1008,8 @@ Function Specializations
 ::
 
   specialization ::= type '_' type* 'Tg' SPEC-INFO     // Generic re-abstracted specialization
+  specialization ::= type '_' type* 'TB' SPEC-INFO     // Alternative mangling for generic re-abstracted specializations,
+                                                       // used for functions with re-abstracted resilient parameter types.
   specialization ::= type '_' type* 'Ts' SPEC-INFO     // Generic re-abstracted prespecialization
   specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.

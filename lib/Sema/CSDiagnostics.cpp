@@ -7095,3 +7095,55 @@ bool InvalidReturnInResultBuilderBody::diagnoseAsError() {
 
   return true;
 }
+
+bool MemberMissingExplicitBaseTypeFailure::diagnoseAsError() {
+  auto UME = castToExpr<UnresolvedMemberExpr>(getAnchor());
+  auto memberName = UME->getName().getBaseIdentifier().str();
+  auto &DE = getASTContext().Diags;
+  auto &solution = getSolution();
+
+  auto selected = solution.getOverloadChoice(getLocator());
+  auto baseType =
+      resolveType(selected.choice.getBaseType()->getMetatypeInstanceType());
+
+  SmallVector<Type, 4> optionals;
+  auto baseTyUnwrapped = baseType->lookThroughAllOptionalTypes(optionals);
+
+  if (!optionals.empty()) {
+    auto baseTyName = baseType->getCanonicalType().getString();
+    auto baseTyUnwrappedName = baseTyUnwrapped->getString();
+    auto loc = UME->getLoc();
+    auto startLoc = UME->getStartLoc();
+
+    DE.diagnoseWithNotes(
+        DE.diagnose(loc, diag::optional_ambiguous_case_ref, baseTyName,
+                    baseTyUnwrappedName, memberName),
+        [&]() {
+          DE.diagnose(UME->getDotLoc(), diag::optional_fixit_ambiguous_case_ref)
+              .fixItInsert(startLoc, "Optional");
+          DE.diagnose(UME->getDotLoc(),
+                      diag::type_fixit_optional_ambiguous_case_ref,
+                      baseTyUnwrappedName, memberName)
+              .fixItInsert(startLoc, baseTyUnwrappedName);
+        });
+  } else {
+    auto baseTypeName = baseType->getCanonicalType().getString();
+    auto baseOptionalTypeName =
+        OptionalType::get(baseType)->getCanonicalType().getString();
+
+    DE.diagnoseWithNotes(
+        DE.diagnose(UME->getLoc(), diag::optional_ambiguous_case_ref,
+                    baseTypeName, baseOptionalTypeName, memberName),
+        [&]() {
+          DE.diagnose(UME->getDotLoc(),
+                      diag::type_fixit_optional_ambiguous_case_ref,
+                      baseOptionalTypeName, memberName)
+              .fixItInsert(UME->getDotLoc(), baseOptionalTypeName);
+          DE.diagnose(UME->getDotLoc(),
+                      diag::type_fixit_optional_ambiguous_case_ref,
+                      baseTypeName, memberName)
+              .fixItInsert(UME->getDotLoc(), baseTypeName);
+        });
+  }
+  return true;
+}

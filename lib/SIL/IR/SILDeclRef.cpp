@@ -1230,3 +1230,13 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
   // enabled.
   return decl->shouldUseNativeMethodReplacement();
 }
+
+bool SILDeclRef::hasAsync() const {
+  if (hasDecl()) {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {
+      return afd->hasAsync();
+    }
+    return false;
+  }
+  return getAbstractClosureExpr()->isBodyAsync();
+}

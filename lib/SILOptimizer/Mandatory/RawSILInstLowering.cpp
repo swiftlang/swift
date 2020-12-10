@@ -148,7 +148,6 @@ static void getAssignByWrapperArgsRecursively(SmallVectorImpl<SILValue> &args,
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
-    case SILArgumentConvention::Direct_Deallocating:
       llvm_unreachable("wrong convention for setter/initializer src argument");
   }
   args.push_back(src);

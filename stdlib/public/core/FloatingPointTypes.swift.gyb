@@ -66,7 +66,7 @@ else:
 % if bits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % elif bits == 16:
-#if !(os(macOS) && arch(x86_64))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 % end
 
 ${SelfDocComment}
@@ -1111,7 +1111,7 @@ extension ${Self} {
 %   if srcBits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %   elif srcBits == 16:
-#if !(os(macOS) && arch(x86_64))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 %   end
 
 %   if srcBits == bits:

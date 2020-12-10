@@ -1894,9 +1894,9 @@ extension BinaryFloatingPoint {
     // count and significand bit count, then they must share the same encoding
     // for finite and infinite values.
     switch (Source.exponentBitCount, Source.significandBitCount) {
-#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
     case (5, 10):
-      guard #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
         // Convert signaling NaN to quiet NaN by multiplying by 1.
         self = Self._convert(from: value).value * 1
         break

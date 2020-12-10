@@ -10,6 +10,15 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Bool = await slowServer.checkAvailability()
   let _: String = await try slowServer.findAnswer()
   let _: String = await try slowServer.findAnswerFailingly()
+
+  let (aOpt, b) = await try slowServer.findQAndA()
+  if let a = aOpt { // make sure aOpt is optional
+    print(a)
+  }
+  let _: String = b // make sure b is non-optional
+
+  let _: String = await try slowServer.findAnswer()
+
   let _: Void = await slowServer.doSomethingFun("jump")
   let _: (Int) -> Void = slowServer.completionHandler
 
@@ -24,14 +33,19 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await try slowServer.magicNumber(withSeed: 42)
 
   await slowServer.serverRestart("localhost")
-  await slowServer.server("localhost", atPriorityRestart: 0.8)
+  await slowServer.serverRestart("localhost", atPriority: 0.8)
 
   _ = await slowServer.allOperations()
+
+  let _: Int = await slowServer.bestName("hello")
+  let _: Int = await slowServer.customize("hello")
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
   // synchronous version
   let _: Int = slowServer.doSomethingConflicted("thinking")
+  slowServer.poorlyNamed("hello") { (i: Int) in print(i) }
+  slowServer.customize(with: "hello") { (i: Int) in print(i) }
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {

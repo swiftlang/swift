@@ -195,13 +195,18 @@ namespace {
     ClangImporter::Implementation &Impl;
     bool AllowNSUIntegerAsInt;
     Bridgeability Bridging;
+    const clang::FunctionType *CompletionHandlerType;
+    Optional<unsigned> CompletionHandlerErrorParamIndex;
 
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
                        bool allowNSUIntegerAsInt,
-                       Bridgeability bridging)
+                       Bridgeability bridging,
+                       const clang::FunctionType *completionHandlerType,
+                       Optional<unsigned> completionHandlerErrorParamIndex)
       : Impl(impl), AllowNSUIntegerAsInt(allowNSUIntegerAsInt),
-        Bridging(bridging) {}
+        Bridging(bridging), CompletionHandlerType(completionHandlerType),
+        CompletionHandlerErrorParamIndex(completionHandlerErrorParamIndex) {}
 
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
@@ -612,8 +617,19 @@ namespace {
       for (auto param = type->param_type_begin(),
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
+        // Determine whether we have a result parameter of a completion
+        // handler that can also express a thrown error.
+        ImportTypeKind paramImportKind = ImportTypeKind::Parameter;
+        unsigned paramIdx = param - type->param_type_begin();
+        if (CompletionHandlerType &&
+            Impl.getClangASTContext().hasSameType(
+                CompletionHandlerType, type) &&
+            paramIdx != CompletionHandlerErrorParamIndex) {
+          paramImportKind = ImportTypeKind::CompletionHandlerResultParameter;
+        }
+
         auto swiftParamTy = Impl.importTypeIgnoreIUO(
-            *param, ImportTypeKind::Parameter, AllowNSUIntegerAsInt, Bridging,
+            *param, paramImportKind, AllowNSUIntegerAsInt, Bridging,
             OTK_Optional);
         if (!swiftParamTy)
           return Type();
@@ -1191,6 +1207,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
+  case ImportTypeKind::CompletionHandlerResultParameter:
   case ImportTypeKind::CFRetainedOutParameter:
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
@@ -1218,6 +1235,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
+  case ImportTypeKind::CompletionHandlerResultParameter:
   case ImportTypeKind::CFRetainedOutParameter:
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
@@ -1520,7 +1538,8 @@ static ImportedType adjustTypeForConcreteImport(
 ImportedType ClangImporter::Implementation::importType(
     clang::QualType type, ImportTypeKind importKind, bool allowNSUIntegerAsInt,
     Bridgeability bridging, OptionalTypeKind optionality,
-    bool resugarNSErrorPointer) {
+    bool resugarNSErrorPointer,
+    Optional<unsigned> completionHandlerErrorParamIndex) {
   if (type.isNull())
     return {Type(), false};
 
@@ -1555,11 +1574,28 @@ ImportedType ClangImporter::Implementation::importType(
   // If nullability is provided as part of the type, that overrides
   // optionality provided externally.
   if (auto nullability = type->getNullability(clangContext)) {
-    optionality = translateNullability(*nullability);
+    bool stripNonResultOptionality =
+        importKind == ImportTypeKind::CompletionHandlerResultParameter;
+    
+    optionality = translateNullability(*nullability, stripNonResultOptionality);
+  }
+
+  // If this is a completion handler parameter, record the function type whose
+  // parameters will act as the results of the completion handler.
+  const clang::FunctionType *completionHandlerType = nullptr;
+  if (completionHandlerErrorParamIndex) {
+    if (auto blockPtrType = type->getAs<clang::BlockPointerType>()) {
+      completionHandlerType =
+          blockPtrType->getPointeeType()->castAs<clang::FunctionType>();
+
+      type = clang::QualType(blockPtrType, 0);
+    }
   }
 
   // Perform abstract conversion, ignoring how the type is actually used.
-  SwiftTypeConverter converter(*this, allowNSUIntegerAsInt, bridging);
+  SwiftTypeConverter converter(
+      *this, allowNSUIntegerAsInt, bridging,
+      completionHandlerType, completionHandlerErrorParamIndex);
   auto importResult = converter.Visit(type);
 
   // Now fix up the type based on how we're concretely using it.
@@ -2085,13 +2121,7 @@ static Type decomposeCompletionHandlerType(
         paramIdx == *info.completionHandlerErrorParamIndex())
       continue;
 
-    // If there is an error parameter, remove nullability.
-    Type paramType = param.getPlainType();
-    // TODO: Clang should gain a nullability form that overrides this.
-    if (info.completionHandlerErrorParamIndex())
-      paramType = paramType->lookThroughAllOptionalTypes();
-
-    resultTypeElts.push_back(paramType);
+    resultTypeElts.push_back(param.getPlainType());
   }
 
   switch (resultTypeElts.size()) {
@@ -2266,6 +2296,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     // Special case for NSDictionary's subscript.
+    ImportTypeKind importKind = ImportTypeKind::Parameter;
     Type swiftParamTy;
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
@@ -2276,11 +2307,18 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
       paramIsIUO = optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
     } else {
-      ImportTypeKind importKind = ImportTypeKind::Parameter;
       if (param->hasAttr<clang::CFReturnsRetainedAttr>())
         importKind = ImportTypeKind::CFRetainedOutParameter;
       else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
         importKind = ImportTypeKind::CFUnretainedOutParameter;
+
+      // Figure out if this is a completion handler parameter whose error
+      // parameter is used to indicate throwing.
+      Optional<unsigned> completionHandlerErrorParamIndex;
+      if (paramIsCompletionHandler) {
+        completionHandlerErrorParamIndex =
+            asyncInfo->completionHandlerErrorParamIndex();
+      }
 
       // If this is the throws error parameter, we don't need to convert any
       // NSError** arguments to the sugared NSErrorPointer typealias form,
@@ -2293,7 +2331,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       auto importedParamType =
           importType(paramTy, importKind, allowNSUIntegerAsIntInParam,
                      Bridgeability::Full, optionalityOfParam,
-                     /*resugarNSErrorPointer=*/!paramIsError);
+                     /*resugarNSErrorPointer=*/!paramIsError,
+                     completionHandlerErrorParamIndex);
       paramIsIUO = importedParamType.isImplicitlyUnwrapped();
       swiftParamTy = importedParamType.getType();
     }
@@ -2321,7 +2360,14 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       if (Type replacedSwiftResultTy =
               decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
         swiftResultTy = replacedSwiftResultTy;
-        completionHandlerType = swiftParamTy->getCanonicalType();
+
+        // Import the original completion handler type without adjustments.
+        Type origSwiftParamTy =  importType(
+            paramTy, importKind, allowNSUIntegerAsIntInParam,
+            Bridgeability::Full, optionalityOfParam,
+            /*resugarNSErrorPointer=*/!paramIsError, None).getType();
+        completionHandlerType = mapGenericArgs(origDC, dc, origSwiftParamTy)
+            ->getCanonicalType();
         continue;
       }
 

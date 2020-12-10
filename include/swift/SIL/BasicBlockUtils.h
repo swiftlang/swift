@@ -89,6 +89,8 @@ public:
     }
     return ReachableBlocks.empty();
   }
+
+  const SILFunction *getFunction() const { return F; }
 };
 
 /// A struct that contains the intermediate state used in computing
