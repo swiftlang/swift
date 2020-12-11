@@ -2,7 +2,7 @@ module ConstructorCallsFunction {
   header "constructor-calls-function.h"
 }
 
-module ConstructorCalls {
+module ConstructorCallsMethod {
   header "constructor-calls-method.h"
 }
 
@@ -12,4 +12,8 @@ module MethodCallsFunction {
 
 module MethodCallsMethod {
   header "method-calls-method.h"
+}
+
+module MethodCallsMethodFromNestedStruct {
+  header "method-calls-method-from-nested-struct.h"
 }
