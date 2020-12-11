@@ -20,10 +20,12 @@ using namespace swift::syntax;
 
 TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
                            const SourceLoc Loc) {
+  auto typeLoc = advanceLocBegin(Loc, Type);
+
   // Check if we have recorded a type that hasn't been migrated to
   // libSyntax-parsing yet at this location
-  if (hasType(Loc)) {
-    return takeType(Loc);
+  if (hasType(typeLoc)) {
+    return takeType(typeLoc);
   }
 
   // Otherwise, generate the AST node for the type.
@@ -43,10 +45,9 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
 TypeRepr *ASTGen::generate(const syntax::ArrayTypeSyntax &Type,
                            const SourceLoc Loc) {
   SourceLoc LBracketLoc = advanceLocBegin(Loc, Type);
-  SourceLoc ElementLoc = advanceLocBegin(Loc, Type.getElementType());
   SourceLoc RBracketLoc = advanceLocEnd(Loc, Type);
 
-  TypeRepr *ElementType = generate(Type.getElementType(), ElementLoc);
+  TypeRepr *ElementType = generate(Type.getElementType(), Loc);
   if (!ElementType) {
     return nullptr;
   }
@@ -56,13 +57,11 @@ TypeRepr *ASTGen::generate(const syntax::ArrayTypeSyntax &Type,
 TypeRepr *ASTGen::generate(const syntax::DictionaryTypeSyntax &Type,
                            const SourceLoc Loc) {
   SourceLoc LBracketLoc = advanceLocBegin(Loc, Type);
-  SourceLoc KeyLoc = advanceLocBegin(Loc, Type.getKeyType());
   SourceLoc ColonLoc = advanceLocBegin(Loc, Type.getColon());
-  SourceLoc ValueLoc = advanceLocBegin(Loc, Type.getValueType());
   SourceLoc RBracketLoc = advanceLocEnd(Loc, Type);
 
-  TypeRepr *KeyType = generate(Type.getKeyType(), KeyLoc);
-  TypeRepr *ValueType = generate(Type.getValueType(), ValueLoc);
+  TypeRepr *KeyType = generate(Type.getKeyType(), Loc);
+  TypeRepr *ValueType = generate(Type.getValueType(), Loc);
   if (!KeyType || !ValueType) {
     return nullptr;
   }
