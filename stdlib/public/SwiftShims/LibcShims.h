@@ -129,7 +129,14 @@ float _stdlib_remainderf(float _self, float _other) {
   
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_squareRootf(float _self) {
+#if defined _WIN32 && defined __i386__
+  // LLVM doesn't know that 32b Windows doesn't have a _sqrtf symbol,
+  // and generates a call to it when lowering __builtin_sqrtf. Use
+  // __builtin_sqrt instead.
+  return (float)__builtin_sqrt((double)_self);
+#else
   return __builtin_sqrtf(_self);
+#endif
 }
 
 static inline SWIFT_ALWAYS_INLINE
