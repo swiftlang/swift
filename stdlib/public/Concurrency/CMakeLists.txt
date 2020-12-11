@@ -16,9 +16,27 @@ set(swift_concurrency_objc_sources
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
+set(swift_concurrency_link_libraries
+  swiftCore)
+
+if(SWIFT_CONCURRENCY_USES_DISPATCH)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    include_directories(AFTER
+                          ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+
+    # FIXME: we can't rely on libdispatch having been built for the
+    # target at this point in the process.  Currently, we're relying
+    # on soft-linking.
+    #list(APPEND swift_concurrency_link_libraries
+    #  dispatch)
+  endif()
+endif()
+
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Actor.cpp
   Actor.swift
+  GlobalExecutor.cpp
   PartialAsyncTask.swift
   Task.cpp
   Task.swift
@@ -41,7 +59,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
-  LINK_LIBRARIES swiftCore
+  LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
     -Dswift_Concurrency_EXPORTS

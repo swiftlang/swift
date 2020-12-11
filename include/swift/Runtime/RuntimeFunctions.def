@@ -1528,6 +1528,22 @@ FUNCTION(TaskSwitchFunc,
          ARGS(SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftExecutorPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_defaultActor_initialize(DefaultActor *actor);
+FUNCTION(DefaultActorInitialize,
+         swift_defaultActor_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_destroy(DefaultActor *actor);
+FUNCTION(DefaultActorDestroy,
+         swift_defaultActor_destroy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,
          swift_autoDiffCreateLinearMapContext, SwiftCC,

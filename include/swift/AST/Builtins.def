@@ -621,6 +621,11 @@ BUILTIN_MISC_OPERATION(AtomicStore, "atomicstore", "", Special)
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T.
 BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", "", IntegerOrRawPointer)
 
+/// convertTaskToJob : (Builtin.NativePointer) -> Builtin.Job
+///
+/// Convert a task pointer into a job pointer.
+BUILTIN_MISC_OPERATION(ConvertTaskToJob, "convertTaskToJob", "n", Special)
+
 /// ExtractElement has type (Vector<N, T>, Int32) -> T
 BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 
@@ -717,6 +722,12 @@ BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n"
 
 //  int_instrprof_increment has type (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ().
 BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Special)
+
+/// Initialize the default-actor instance in a default actor object.
+BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Special)
+
+/// Destroy the default-actor instance in a default actor object.
+BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
