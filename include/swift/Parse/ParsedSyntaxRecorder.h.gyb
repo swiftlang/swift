@@ -31,7 +31,7 @@ class SyntaxParsingContext;
 
 struct ParsedSyntaxRecorder {
 
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if node.children:
 %     child_params = []
 %     for child in node.children:

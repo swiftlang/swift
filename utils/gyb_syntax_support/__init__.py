@@ -5,6 +5,7 @@ from . import Token
 from .AttributeNodes import ATTRIBUTE_NODES  # noqa: I201
 from .AvailabilityNodes import AVAILABILITY_NODES  # noqa: I201
 from .CommonNodes import COMMON_NODES  # noqa: I201
+from .CompletionOnlyNodes import COMPLETIONONLY_NODES
 from .DeclNodes import DECL_NODES  # noqa: I201
 from .ExprNodes import EXPR_NODES  # noqa: I201
 from .GenericNodes import GENERIC_NODES  # noqa: I201
@@ -24,6 +25,8 @@ SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
 SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
+
+PARSEONLY_NODES = COMPLETIONONLY_NODES
 
 verify_syntax_node_serialization_codes(SYNTAX_NODES,
                                        SYNTAX_NODE_SERIALIZATION_CODES)
