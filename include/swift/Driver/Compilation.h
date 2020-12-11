@@ -508,6 +508,17 @@ public:
   /// \sa types::isPartOfSwiftCompilation
   const char *getAllSourcesPath() const;
 
+  /// Retrieve the path to the external swift deps file.
+  ///
+  /// For cross-module incremental builds, this file contains the dependencies
+  /// from all the modules integrated over the prior build.
+  ///
+  /// Currently this patch is relative to the build record, but we may want
+  /// to allow the output file map to customize this at some point.
+  std::string getExternalSwiftDepsFilePath() const {
+    return CompilationRecordPath + ".external";
+  }
+
   /// Asks the Compilation to perform the Jobs which it knows about.
   ///
   /// \param TQ The TaskQueue used to schedule jobs for execution.

@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
@@ -1185,6 +1186,30 @@ namespace driver {
       return ExternallyDependentJobs;
     }
 
+    using ChangeSet = fine_grained_dependencies::ModuleDepGraph::Changes::value_type;
+    static void
+    pruneChangeSetFromExternalDependency(ChangeSet &changes) {
+      // The changeset includes detritus from the graph that gets consed up
+      // in \c writePriorDependencyGraph. We need to ignore the fake
+      // source file provides nodes and the fake incremental external
+      // dependencies linked to them.
+      swift::erase_if(
+          changes, [&](fine_grained_dependencies::ModuleDepGraphNode *node) {
+            if (node->getKey().getKind() ==
+                    fine_grained_dependencies::NodeKind::sourceFileProvide ||
+                node->getKey().getKind() ==
+                    fine_grained_dependencies::NodeKind::
+                        incrementalExternalDepend) {
+              return true;
+            }
+            if (node->getKey().getAspect() ==
+                fine_grained_dependencies::DeclAspect::implementation) {
+              return true;
+            }
+            return !node->getIsProvides();
+          });
+    }
+  
     SmallVector<const Job *, 16>
     collectIncrementalExternallyDependentJobsFromDependencyGraph(
         const bool forRanges) {
@@ -1195,6 +1220,17 @@ namespace driver {
           ExternallyDependentJobs.push_back(cmd);
         }
       };
+
+      // Load our priors, which are always adjacent to the build record. We
+      // don't care if this load succeeds or not. If it fails, and we succeed at
+      // integrating one of the external files below, the changeset will be the
+      // entire module!
+      const auto *externalPriorJob = Comp.addExternalJob(
+          std::make_unique<Job>(Comp.getDerivedOutputFileMap(),
+                                Comp.getExternalSwiftDepsFilePath()));
+      getFineGrainedDepGraph(forRanges).loadFromPath(
+          externalPriorJob, Comp.getExternalSwiftDepsFilePath(),
+          Comp.getDiags());
 
       for (auto external : getFineGrainedDepGraph(forRanges)
                                .getIncrementalExternalDependencies()) {
@@ -1231,20 +1267,23 @@ namespace driver {
         // code's internal invariants.
         const auto *externalJob = Comp.addExternalJob(
             std::make_unique<Job>(Comp.getDerivedOutputFileMap(), external));
-        auto subChanges =
+        auto maybeChanges =
             getFineGrainedDepGraph(forRanges).loadFromSwiftModuleBuffer(
                 externalJob, *buffer.get(), Comp.getDiags());
 
         // If the incremental dependency graph failed to load, fall back to
         // treating this as plain external job.
-        if (!subChanges.hasValue()) {
+        if (!maybeChanges.hasValue()) {
           fallbackToExternalBehavior(external);
           continue;
         }
 
-        for (auto *CMD :
-             getFineGrainedDepGraph(forRanges)
-                 .findJobsToRecompileWhenNodesChange(subChanges.getValue())) {
+        // Prune away the detritus from the build record.
+        auto &changes = maybeChanges.getValue();
+        pruneChangeSetFromExternalDependency(changes);
+
+        for (auto *CMD : getFineGrainedDepGraph(forRanges)
+                             .findJobsToRecompileWhenNodesChange(changes)) {
           if (CMD == externalJob) {
             continue;
           }
@@ -1861,6 +1900,76 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
+using SourceFileDepGraph = swift::fine_grained_dependencies::SourceFileDepGraph;
+
+/// Render out the unified module dependency graph to the given \p path, which
+/// is expected to be a path relative to the build record.
+static void withPriorDependencyGraph(StringRef path,
+                                     const Compilation::Result &result,
+                                     llvm::function_ref<void(SourceFileDepGraph &&)> cont) {
+  // Building a source file dependency graph from the module dependency graph
+  // is a strange task on its face because a source file dependency graph is
+  // usually built for exactly one file. However, the driver is going to use
+  // some encoding tricks to get the dependencies for each incremental external
+  // dependency into one big file. Note that these tricks
+  // are undone in \c pruneChangeSetFromExternalDependency, so if you modify
+  // this you need to go fix that algorithm up as well. This is a diagrammatic
+  // view of the structure of the dependencies this function builds:
+  //
+  // SourceFile => interface <BUILD_RECORD>.external
+  // | - Incremetal External Dependency => interface <MODULE_1>.swiftmodule
+  // | | - <dependency> ...
+  // | | - <dependency> ...
+  // | | - <dependency> ...
+  // | - Incremetal External Dependency => interface <MODULE_2>.swiftmodule
+  // | | - <dependency> ...
+  // | | - <dependency> ...
+  // | - Incremetal External Dependency => interface <MODULE_3>.swiftmodule
+  // | - ...
+  //
+  // Where each <dependency> node has an arc back to its parent swiftmodule.
+  // That swiftmodule, in turn, takes the form of as an incremental external
+  // dependency. This formulation allows us to easily discern the original
+  // swiftmodule that a <dependency> came from just by examining that arc. This
+  // is used in integrate to "move" the <dependency> from the build record to
+  // the swiftmodule by swapping the key it uses.
+  using namespace swift::fine_grained_dependencies;
+  SourceFileDepGraph g;
+  const auto &resultModuleGraph = result.depGraph;
+  // Create the key for the entire external build record.
+  auto fileKey =
+      DependencyKey::createKeyForWholeSourceFile(DeclAspect::interface, path);
+  auto fileNodePair = g.findExistingNodePairOrCreateAndAddIfNew(fileKey, None);
+  for (StringRef incrExternalDep :
+       resultModuleGraph.getIncrementalExternalDependencies()) {
+    // Now make a node for each incremental external dependency.
+    auto interfaceKey =
+        DependencyKey(NodeKind::incrementalExternalDepend,
+                      DeclAspect::interface, "", incrExternalDep.str());
+    auto ifaceNode = g.findExistingNodeOrCreateIfNew(interfaceKey, None,
+                                                     false /* = !isProvides */);
+    resultModuleGraph.forEachNodeInJob(incrExternalDep, [&](const auto *node) {
+      // Reject
+      // 1) Implementation nodes: We don't care about the interface nodes
+      //    for cross-module dependencies because the client cannot observe it
+      //    by definition.
+      // 2) Source file nodes: we're about to define our own.
+      if (!node->getKey().isInterface() ||
+          node->getKey().getKind() == NodeKind::sourceFileProvide) {
+        return;
+      }
+      assert(node->getIsProvides() &&
+             "Found a node in module depdendencies that is not a provides!");
+      auto *newNode = new SourceFileDepGraphNode(
+          node->getKey(), node->getFingerprint(), /*isProvides*/ true);
+      g.addNode(newNode);
+      g.addArc(ifaceNode, newNode);
+    });
+    g.addArc(fileNodePair.getInterface(), ifaceNode);
+  }
+  return cont(std::move(g));
+}
+
 static void writeInputJobsToFilelist(llvm::raw_fd_ostream &out, const Job *job,
                                      const file_types::ID infoType) {
   // FIXME: Duplicated from ToolChains.cpp.
@@ -1960,6 +2069,15 @@ Compilation::performJobsImpl(std::unique_ptr<TaskQueue> &&TQ) {
     auto result = std::move(State).takeResult();
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+    if (EnableCrossModuleIncrementalBuild) {
+      // Write out our priors adjacent to the build record so we can pick
+      // the up in a subsequent build.
+      withPriorDependencyGraph(getExternalSwiftDepsFilePath(), result,
+                               [&](SourceFileDepGraph &&g) {
+        writeFineGrainedDependencyGraphToPath(
+            Diags, getExternalSwiftDepsFilePath(), g);
+      });
+    }
     return result;
   } else {
     return std::move(State).takeResult();
