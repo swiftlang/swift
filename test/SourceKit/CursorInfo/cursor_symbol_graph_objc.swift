@@ -4,6 +4,7 @@ func callObjC() {
   fooFuncWithComment5()
 }
 
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=cursor -pos=4:3 -req-opts=retrieve_symbol_graph=1 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp -target %target-triple %s | %FileCheck %s
 // CHECK: SYMBOL GRAPH BEGIN
 // CHECK: {
