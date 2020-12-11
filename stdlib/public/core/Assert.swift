@@ -43,13 +43,6 @@ public func assert(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only assert in debug mode.
-  if _isDebugAssertConfiguration() {
-    if !_fastPath(condition()) {
-      _assertionFailure("Assertion failed", message(), file: file, line: line,
-        flags: _fatalErrorFlags())
-    }
-  }
 }
 
 /// Checks a necessary condition for making forward progress.
@@ -261,13 +254,6 @@ internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug mode.
-  if _slowPath(_isDebugAssertConfiguration()) {
-    if !_fastPath(condition()) {
-      _fatalErrorMessage("Fatal error", message, file: file, line: line,
-        flags: _fatalErrorFlags())
-    }
-  }
 }
 
 @usableFromInline @_transparent
