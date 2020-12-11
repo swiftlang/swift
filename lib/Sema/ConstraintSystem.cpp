@@ -5330,3 +5330,67 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
 
   return false;
 }
+
+TypeVarBindingProducer::TypeVarBindingProducer(
+    ConstraintSystem &cs, ConstraintSystem::PotentialBindings &bindings)
+    : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
+      TypeVar(bindings.TypeVar),
+      CanBeNil(llvm::any_of(bindings.Protocols, [](Constraint *constraint) {
+        auto *protocol = constraint->getProtocol();
+        return protocol->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByNilLiteral);
+      })) {
+  // A binding to `Any` which should always be considered as a last resort.
+  Optional<Binding> Any;
+
+  for (const auto &binding : bindings.Bindings) {
+    auto type = binding.BindingType;
+
+    // Adjust optionality of existing bindings based on presence of
+    // `ExpressibleByNilLiteral` requirement.
+    if (requiresOptionalAdjustment(binding)) {
+      Bindings.push_back(binding.withType(OptionalType::get(type)));
+    } else if (type->isAny()) {
+      Any.emplace(binding);
+    } else {
+      Bindings.push_back(binding);
+    }
+  }
+
+  // Let's always consider `Any` to be a last resort binding because
+  // it's always better to infer concrete type and erase it if required
+  // by the context.
+  if (Any) {
+    Bindings.push_back(*Any);
+  }
+}
+
+bool TypeVarBindingProducer::requiresOptionalAdjustment(
+    const Binding &binding) const {
+  // If type variable can't be `nil` then adjustment is
+  // not required.
+  if (!CanBeNil)
+    return false;
+
+  if (binding.Kind == BindingKind::Supertypes) {
+    auto type = binding.BindingType->getRValueType();
+    // If the type doesn't conform to ExpressibleByNilLiteral,
+    // produce an optional of that type as a potential binding. We
+    // overwrite the binding in place because the non-optional type
+    // will fail to type-check against the nil-literal conformance.
+    bool conformsToExprByNilLiteral = false;
+    if (auto *nominalBindingDecl = type->getAnyNominal()) {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
+          CS.DC->getParentModule(),
+          CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral),
+          conformances);
+    }
+    return !conformsToExprByNilLiteral;
+  } else if (binding.isDefaultableBinding() && binding.BindingType->isAny()) {
+    return true;
+  }
+
+  return false;
+}

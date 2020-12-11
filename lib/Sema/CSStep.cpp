@@ -446,13 +446,15 @@ void TypeVariableStep::setup() {
     PO.PrintTypesForDebugging = true;
     auto &log = getDebugLogger();
 
+    auto initialBindings = Producer.getCurrentBindings();
     log << "Initial bindings: ";
-    interleave(InitialBindings.begin(), InitialBindings.end(),
-               [&](const Binding &binding) {
-                 log << TypeVar->getString(PO)
-                     << " := " << binding.BindingType->getString(PO);
-               },
-               [&log] { log << ", "; });
+    interleave(
+        initialBindings.begin(), initialBindings.end(),
+        [&](const Binding &binding) {
+          log << TypeVar->getString(PO)
+              << " := " << binding.BindingType->getString(PO);
+        },
+        [&log] { log << ", "; });
 
     log << '\n';
   }
