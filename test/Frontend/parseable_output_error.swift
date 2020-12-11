@@ -42,10 +42,10 @@ func foo() {
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
+// CHECK-NEXT:   "pid": [[PID]],
 // CHECK-NEXT:   "output": "{{.*[\\/]}}parseable_output_error.swift:4:12: error: unexpected non-void return value in void function{{.*}}return 11;{{.*[\\/]}}parseable_output_error.swift:4:12: note: did you mean to add a return type?{{.*}}return 11;
 // CHECK-NEXT:   "process": {
 // CHECK-NEXT:     "real_pid": [[PID]]
 // CHECK-NEXT:   },
-// CHECK-NEXT:   "pid": [[PID]],
 // CHECK-NEXT:   "exit-status": 1
 // CHECK-NEXT: }

@@ -101,19 +101,19 @@
 // CHECK-NEXT:{
 // CHECK-NEXT:  "kind": "finished",
 // CHECK-NEXT:  "name": "compile",
+// CHECK-NEXT:  "pid": -1000,
 // CHECK-NEXT:  "process": {
 // CHECK-NEXT:    "real_pid": [[REALPID]]
 // CHECK-NEXT:  },
-// CHECK-NEXT:  "pid": -1000,
 // CHECK-NEXT:  "exit-status": 0
 // CHECK-NEXT:}
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT:{
 // CHECK-NEXT:  "kind": "finished",
 // CHECK-NEXT:  "name": "compile",
+// CHECK-NEXT:  "pid": -1001,
 // CHECK-NEXT:  "process": {
 // CHECK-NEXT:    "real_pid": [[REALPID]]
 // CHECK-NEXT:  },
-// CHECK-NEXT:  "pid": -1001,
 // CHECK-NEXT:  "exit-status": 0
 // CHECK-NEXT:}

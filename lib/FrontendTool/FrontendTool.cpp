@@ -90,6 +90,7 @@
 #include <utility>
 
 using namespace swift;
+using namespace swift::parseable_output;
 
 static std::string displayName(StringRef MainExecutablePath) {
   std::string Name = llvm::sys::path::stem(MainExecutablePath).str();
@@ -541,6 +542,78 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
           g.emitDotFile(outputPath, Instance.getDiags());
         return hadError;
       });
+}
+
+static const char *
+mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
+  FrontendOptions::ActionType ActionType =
+  Invocation.getFrontendOptions().RequestedAction;
+  switch (ActionType) {
+    case FrontendOptions::ActionType::REPL:
+      return "repl";
+    case FrontendOptions::ActionType::MergeModules:
+      return "merge-module";
+    case FrontendOptions::ActionType::Immediate:
+      return "interpret";
+    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+      return "verify-module-interface";
+    case FrontendOptions::ActionType::EmitPCH:
+      return "generate-pch";
+    case FrontendOptions::ActionType::EmitIR:
+    case FrontendOptions::ActionType::EmitBC:
+    case FrontendOptions::ActionType::EmitAssembly:
+    case FrontendOptions::ActionType::EmitObject:
+      // Whether or not these actions correspond to a "compile" job or a
+      // "backend" job, depends on the input kind.
+      if (Invocation.getFrontendOptions().InputsAndOutputs.shouldTreatAsLLVM())
+        return "backend";
+      else
+        return "compile";
+    default:
+      return "compile";
+  }
+  // The following Driver/Parseable-output actions do not correspond to
+  // possible Frontend invocations:
+  // ModuleWrapJob, AutolinkExtractJob, GenerateDSYMJob, VerifyDebugInfoJob,
+  // StaticLinkJob, DynamicLinkJob
+}
+
+static DetailedTaskDescription
+constructDetailedTaskDescription(const CompilerInvocation &Invocation,
+                                 const InputFile &PrimaryInput,
+                                 ArrayRef<const char *> Args) {
+  // Command line and arguments
+  std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
+  SmallVector<std::string, 16> Arguments;
+  std::string CommandLine;
+  SmallVector<CommandInput, 4> Inputs;
+  SmallVector<OutputPair, 8> Outputs;
+  CommandLine += Executable;
+  for (const auto &A : Args) {
+    Arguments.push_back(A);
+    CommandLine += std::string(" ") + A;
+  }
+
+  // Primary Input only
+  Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
+
+  // Output for this Primary
+  auto OutputFile = PrimaryInput.outputFilename();
+  Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                   llvm::sys::path::extension(OutputFile)),
+                               OutputFile));
+
+  // Supplementary outputs
+  const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
+  const auto &supplementaryOutputPaths =
+      primarySpecificFiles.SupplementaryOutputs;
+  supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
+    Outputs.push_back(OutputPair(
+        file_types::lookupTypeForExtension(llvm::sys::path::extension(output)),
+        output));
+  });
+  return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
+                                 Outputs};
 }
 
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
@@ -2085,8 +2158,24 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    parseable_output::emitBeganMessage(llvm::errs(), Invocation, Args,
-                                       getpid());
+   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    const auto OSPid = getpid();
+    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+    // Parseable output clients may not understand the idea of a batch
+    // compilation. We assign each primary in a batch job a quasi process id,
+    // making sure it cannot collide with a real PID (always positive). Non-batch
+    // compilation gets a real OS PID.
+    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                        unsigned idx) -> bool {
+      emitBeganMessage(
+          llvm::errs(),
+          mapFrontendInvocationToAction(Invocation),
+          constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
+          ProcInfo);
+      return false;
+    });
   }
 
   int ReturnValue = 0;
@@ -2108,8 +2197,32 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     StatsReporter->noteCurrentProcessExitStatus(r);
 
   if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    parseable_output::emitFinishedMessage(llvm::errs(), Invocation, r,
-                                          FileSpecificDiagnostics, getpid());
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    const auto OSPid = getpid();
+    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+    // Parseable output clients may not understand the idea of a batch
+    // compilation. We assign each primary in a batch job a quasi process id,
+    // making sure it cannot collide with a real PID (always positive). Non-batch
+    // compilation gets a real OS PID.
+    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                        unsigned idx) -> bool {
+      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+             "Expected diagnostic collection for input.");
+
+      // Join all diagnostics produced for this file into a single output.
+      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+      const char *const Delim = "";
+      std::ostringstream JoinedDiags;
+      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+                std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+      emitFinishedMessage(llvm::errs(),
+                          mapFrontendInvocationToAction(Invocation),
+                          JoinedDiags.str(), r, Pid - idx, ProcInfo);
+      return false;
+    });
   }
 
   return r;

@@ -27,16 +27,6 @@ using namespace swift::driver;
 using namespace swift::sys;
 using namespace swift;
 
-namespace {
-struct CommandInput {
-  std::string Path;
-  CommandInput() {}
-  CommandInput(StringRef Path) : Path(Path) {}
-};
-
-using OutputPair = std::pair<file_types::ID, std::string>;
-} // end anonymous namespace
-
 namespace swift {
 namespace json {
 template <> struct ScalarTraits<CommandInput> {
@@ -77,49 +67,6 @@ template <typename T, unsigned N> struct ArrayTraits<SmallVector<T, N>> {
 
 namespace {
 
-Action::Kind
-mapFrontendInvocationToActionKind(const CompilerInvocation &Invocation) {
-  Action::Kind ActionKind;
-  FrontendOptions::ActionType ActionType =
-      Invocation.getFrontendOptions().RequestedAction;
-  switch (ActionType) {
-  case FrontendOptions::ActionType::REPL:
-    ActionKind = Action::Kind::REPLJob;
-    break;
-  case FrontendOptions::ActionType::MergeModules:
-    ActionKind = Action::Kind::MergeModuleJob;
-    break;
-  case FrontendOptions::ActionType::Immediate:
-    ActionKind = Action::Kind::InterpretJob;
-    break;
-  case FrontendOptions::ActionType::TypecheckModuleFromInterface:
-    ActionKind = Action::Kind::VerifyModuleInterfaceJob;
-    break;
-  case FrontendOptions::ActionType::EmitPCH:
-    ActionKind = Action::Kind::GeneratePCHJob;
-    break;
-  case FrontendOptions::ActionType::EmitIR:
-  case FrontendOptions::ActionType::EmitBC:
-  case FrontendOptions::ActionType::EmitAssembly:
-  case FrontendOptions::ActionType::EmitObject: {
-    // Whether or not these actions correspond to a "compile" job or a
-    // "backend" job, depends on the input kind.
-    if (Invocation.getFrontendOptions().InputsAndOutputs.shouldTreatAsLLVM())
-      ActionKind = Action::Kind::BackendJob;
-    else
-      ActionKind = Action::Kind::CompileJob;
-  } break;
-  default:
-    ActionKind = Action::Kind::CompileJob;
-    break;
-  }
-  // The following Driver actions do not correspond to possible Frontend
-  // invocations:
-  // ModuleWrapJob, AutolinkExtractJob, GenerateDSYMJob, VerifyDebugInfoJob,
-  // StaticLinkJob, DynamicLinkJob
-  return ActionKind;
-}
-
 class Message {
   std::string Kind;
   std::string Name;
@@ -134,240 +81,76 @@ public:
   }
 };
 
-class CommandBasedMessage : public Message {
-public:
-  CommandBasedMessage(StringRef Kind, const driver::Job &Cmd)
-      : Message(Kind, Cmd.getSource().getClassName()) {}
-};
-
-class InvocationBasedMessage : public Message {
-public:
-  InvocationBasedMessage(StringRef Kind, const CompilerInvocation &Invocation)
-      : Message(Kind, Action::getClassName(
-                          mapFrontendInvocationToActionKind(Invocation))) {}
-};
-
-class DetailedCommandBasedMessage : public CommandBasedMessage {
-  std::string Executable;
-  SmallVector<std::string, 16> Arguments;
-  std::string CommandLine;
-  SmallVector<CommandInput, 4> Inputs;
-  SmallVector<OutputPair, 8> Outputs;
+class DetailedMessage : public Message {
+  DetailedTaskDescription TascDesc;
 
 public:
-  DetailedCommandBasedMessage(StringRef Kind, const driver::Job &Cmd)
-      : CommandBasedMessage(Kind, Cmd) {
-    Executable = Cmd.getExecutable();
-    for (const auto &A : Cmd.getArguments()) {
-      Arguments.push_back(A);
-    }
-    llvm::raw_string_ostream wrapper(CommandLine);
-    Cmd.printCommandLine(wrapper, "");
-    wrapper.flush();
-
-    for (const Action *A : Cmd.getSource().getInputs()) {
-      if (const auto *IA = dyn_cast<InputAction>(A))
-        Inputs.push_back(CommandInput(IA->getInputArg().getValue()));
-    }
-
-    for (const driver::Job *J : Cmd.getInputs()) {
-      auto OutFiles = J->getOutput().getPrimaryOutputFilenames();
-      if (const auto *BJAction = dyn_cast<BackendJobAction>(&Cmd.getSource())) {
-        Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
-      } else {
-        for (llvm::StringRef FileName : OutFiles) {
-          Inputs.push_back(CommandInput(FileName));
-        }
-      }
-    }
-
-    // TODO: set up Outputs appropriately.
-    file_types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
-    if (PrimaryOutputType != file_types::TY_Nothing) {
-      for (llvm::StringRef OutputFileName :
-           Cmd.getOutput().getPrimaryOutputFilenames()) {
-        Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName.str()));
-      }
-    }
-    file_types::forAllTypes([&](file_types::ID Ty) {
-      for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
-        Outputs.push_back(OutputPair(Ty, Output.str()));
-      }
-    });
-  }
+  DetailedMessage(StringRef Kind, StringRef Name,
+                  DetailedTaskDescription TascDesc)
+      : Message(Kind, Name), TascDesc(TascDesc) {}
 
   void provideMapping(swift::json::Output &out) override {
     Message::provideMapping(out);
-    out.mapRequired("command", CommandLine); // Deprecated, do not document
-    out.mapRequired("command_executable", Executable);
-    out.mapRequired("command_arguments", Arguments);
-    out.mapOptional("inputs", Inputs);
-    out.mapOptional("outputs", Outputs);
+    out.mapRequired("command",
+                    TascDesc.CommandLine); // Deprecated, do not document
+    out.mapRequired("command_executable", TascDesc.Executable);
+    out.mapRequired("command_arguments", TascDesc.Arguments);
+    out.mapOptional("inputs", TascDesc.Inputs);
+    out.mapOptional("outputs", TascDesc.Outputs);
   }
 };
 
-class DetailedInvocationBasedMessage : public InvocationBasedMessage {
-  ArrayRef<const char *> Args;
-  std::string Executable;
-  SmallVector<std::string, 16> Arguments;
-  std::string CommandLine;
-  SmallVector<CommandInput, 4> Inputs;
-  SmallVector<OutputPair, 8> Outputs;
 
-public:
-  DetailedInvocationBasedMessage(StringRef Kind,
-                                 const CompilerInvocation &Invocation,
-                                 const InputFile &PrimaryInput,
-                                 ArrayRef<const char *> Args)
-      : InvocationBasedMessage(Kind, Invocation), Args(Args) {
-    // Command line and arguments
-    Executable = Invocation.getFrontendOptions().MainExecutablePath;
-    CommandLine += Executable;
-    for (const auto &A : Args) {
-      Arguments.push_back(A);
-      CommandLine += std::string(" ") + A;
-    }
-
-    // Primary Input only
-    Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
-
-    // Output for this Primary
-    auto OutputFile = PrimaryInput.outputFilename();
-    Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                     llvm::sys::path::extension(OutputFile)),
-                                 OutputFile));
-
-    // Supplementary outputs
-    const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
-    const auto &supplementaryOutputPaths =
-        primarySpecificFiles.SupplementaryOutputs;
-    supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-      Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
-                                       llvm::sys::path::extension(output)),
-                                   output));
-    });
-  }
-
-  void provideMapping(swift::json::Output &out) override {
-    Message::provideMapping(out);
-    out.mapRequired("command", CommandLine); // Deprecated, do not document
-    out.mapRequired("command_executable", Executable);
-    out.mapRequired("command_arguments", Arguments);
-    out.mapOptional("inputs", Inputs);
-    out.mapOptional("outputs", Outputs);
-  }
-};
-
-class TaskBasedMessage : public CommandBasedMessage {
+class BeganMessage : public DetailedMessage {
   int64_t Pid;
+  sys::TaskProcessInformation ProcInfo;
 
 public:
-  TaskBasedMessage(StringRef Kind, const driver::Job &Cmd, int64_t Pid)
-      : CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
-
-  void provideMapping(swift::json::Output &out) override {
-    CommandBasedMessage::provideMapping(out);
-    out.mapRequired("pid", Pid);
-  }
-};
-
-class BeganCommandMessage : public DetailedCommandBasedMessage {
-  int64_t Pid;
-  TaskProcessInformation ProcInfo;
-
-public:
-  BeganCommandMessage(const driver::Job &Cmd, int64_t Pid,
-                      TaskProcessInformation ProcInfo)
-      : DetailedCommandBasedMessage("began", Cmd), Pid(Pid),
-        ProcInfo(ProcInfo) {}
-
-  void provideMapping(swift::json::Output &out) override {
-    DetailedCommandBasedMessage::provideMapping(out);
-    out.mapRequired("pid", Pid);
-    out.mapRequired("process", ProcInfo);
-  }
-};
-
-class BeganInvocationMessage : public DetailedInvocationBasedMessage {
-  int64_t Pid;
-  TaskProcessInformation ProcInfo;
-
-public:
-  BeganInvocationMessage(const CompilerInvocation &Invocation,
-                         const InputFile &PrimaryInput,
-                         ArrayRef<const char *> Args, int64_t Pid,
-                         TaskProcessInformation ProcInfo)
-      : DetailedInvocationBasedMessage("began", Invocation, PrimaryInput, Args),
+  BeganMessage(StringRef Name, DetailedTaskDescription TascDesc,
+               int64_t Pid, sys::TaskProcessInformation ProcInfo)
+      : DetailedMessage("began", Name, TascDesc),
         Pid(Pid), ProcInfo(ProcInfo) {}
 
   void provideMapping(swift::json::Output &out) override {
-    DetailedInvocationBasedMessage::provideMapping(out);
+    DetailedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
     out.mapRequired("process", ProcInfo);
   }
 };
 
-class FinishedInvocationMessage : public InvocationBasedMessage {
+class SkippedMessage : public DetailedMessage {
+public:
+  SkippedMessage(StringRef Name, DetailedTaskDescription TascDesc)
+      : DetailedMessage("skipped", Name, TascDesc) {}
+};
+
+class TaskOutputMessage : public Message {
+  std::string Output;
   int64_t Pid;
-  int ExitStatus;
-  std::string Output;
-  TaskProcessInformation ProcInfo;
+  sys::TaskProcessInformation ProcInfo;
 
 public:
-  FinishedInvocationMessage(const CompilerInvocation &Invocation, int64_t Pid,
-                            StringRef Output, int ExitStatus,
-                            TaskProcessInformation ProcInfo)
-      : InvocationBasedMessage("finished", Invocation), Pid(Pid),
-        ExitStatus(ExitStatus), Output(Output), ProcInfo(ProcInfo) {}
+  TaskOutputMessage(StringRef Kind, StringRef Name, std::string Output,
+                    int64_t Pid, sys::TaskProcessInformation ProcInfo)
+      : Message(Kind, Name),
+        Output(Output), Pid(Pid), ProcInfo(ProcInfo) {}
+
   void provideMapping(swift::json::Output &out) override {
-    InvocationBasedMessage::provideMapping(out);
-    out.mapOptional("output", Output, std::string());
-    out.mapRequired("process", ProcInfo);
+    Message::provideMapping(out);
     out.mapRequired("pid", Pid);
-    out.mapRequired("exit-status", ExitStatus);
-  }
-};
-
-class TaskOutputMessage : public TaskBasedMessage {
-  std::string Output;
-  TaskProcessInformation ProcInfo;
-
-public:
-  TaskOutputMessage(StringRef Kind, const driver::Job &Cmd, int64_t Pid,
-                    StringRef Output, TaskProcessInformation ProcInfo)
-      : TaskBasedMessage(Kind, Cmd, Pid), Output(Output), ProcInfo(ProcInfo) {}
-
-  void provideMapping(swift::json::Output &out) override {
-    TaskBasedMessage::provideMapping(out);
     out.mapOptional("output", Output, std::string());
     out.mapRequired("process", ProcInfo);
-  }
-};
-
-class FinishedCommandMessage : public TaskOutputMessage {
-  int ExitStatus;
-
-public:
-  FinishedCommandMessage(const driver::Job &Cmd, int64_t Pid, StringRef Output,
-                         TaskProcessInformation ProcInfo, int ExitStatus)
-      : TaskOutputMessage("finished", Cmd, Pid, Output, ProcInfo),
-        ExitStatus(ExitStatus) {}
-
-  void provideMapping(swift::json::Output &out) override {
-    TaskOutputMessage::provideMapping(out);
-    out.mapRequired("exit-status", ExitStatus);
   }
 };
 
 class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
   Optional<int> Signal;
-
 public:
-  SignalledMessage(const driver::Job &Cmd, int64_t Pid, StringRef Output,
-                   StringRef ErrorMsg, Optional<int> Signal,
-                   TaskProcessInformation ProcInfo)
-      : TaskOutputMessage("signalled", Cmd, Pid, Output, ProcInfo),
+  SignalledMessage(StringRef Name, std::string Output,
+                   int64_t Pid, sys::TaskProcessInformation ProcInfo,
+                   StringRef ErrorMsg, Optional<int> Signal)
+      : TaskOutputMessage("signalled", Name, Output, Pid, ProcInfo),
         ErrorMsg(ErrorMsg), Signal(Signal) {}
 
   void provideMapping(swift::json::Output &out) override {
@@ -377,10 +160,19 @@ public:
   }
 };
 
-class SkippedMessage : public DetailedCommandBasedMessage {
+class FinishedMessage : public TaskOutputMessage {
+  int ExitStatus;
 public:
-  SkippedMessage(const driver::Job &Cmd)
-      : DetailedCommandBasedMessage("skipped", Cmd) {}
+  FinishedMessage(StringRef Name, std::string Output,
+                  int64_t Pid, sys::TaskProcessInformation ProcInfo,
+                  int ExitStatus)
+      : TaskOutputMessage("finished", Name, Output, Pid, ProcInfo),
+        ExitStatus(ExitStatus) {}
+
+  void provideMapping(swift::json::Output &out) override {
+    TaskOutputMessage::provideMapping(out);
+    out.mapRequired("exit-status", ExitStatus);
+  }
 };
 
 } // end anonymous namespace
@@ -405,80 +197,34 @@ static void emitMessage(raw_ostream &os, Message &msg) {
   os << JSONString << '\n';
 }
 
-void parseable_output::emitBeganMessage(raw_ostream &os, const driver::Job &Cmd,
+/// Emits a "began" message to the given stream.
+void parseable_output::emitBeganMessage(raw_ostream &os, StringRef Name,
+                                        DetailedTaskDescription TascDesc,
                                         int64_t Pid,
-                                        TaskProcessInformation ProcInfo) {
-  BeganCommandMessage msg(Cmd, Pid, ProcInfo);
-  emitMessage(os, msg);
-}
-
-void parseable_output::emitBeganMessage(raw_ostream &os,
-                                        const CompilerInvocation &Invocation,
-                                        ArrayRef<const char *> Args,
-                                        int64_t OSPid) {
-  const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-  // Parseable output clients may not understand the idea of a batch
-  // compilation. We assign each primary in a batch job a quasi process id,
-  // making sure it cannot collide with a real PID (always positive). Non-batch
-  // compilation gets a real OS PID.
-  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                      unsigned idx) -> bool {
-    BeganInvocationMessage msg(Invocation, Input, Args, Pid - idx, ProcInfo);
-    emitMessage(os, msg);
-    return false;
-  });
-}
-
-void parseable_output::emitFinishedMessage(raw_ostream &os,
-                                           const driver::Job &Cmd, int64_t Pid,
-                                           int ExitStatus, StringRef Output,
-                                           TaskProcessInformation ProcInfo) {
-  FinishedCommandMessage msg(Cmd, Pid, Output, ProcInfo, ExitStatus);
+                                        sys::TaskProcessInformation ProcInfo) {
+  BeganMessage msg(Name, TascDesc, Pid, ProcInfo);
   emitMessage(os, msg);
 }
 
 void parseable_output::emitFinishedMessage(
-    raw_ostream &os, const CompilerInvocation &Invocation, int ExitStatus,
-    const llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
-    int64_t OSPid) {
-  const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-  // Parseable output clients may not understand the idea of a batch
-  // compilation. We assign each primary in a batch job a quasi process id,
-  // making sure it cannot collide with a real PID (always positive). Non-batch
-  // compilation gets a real OS PID.
-  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-  IO.forEachPrimaryInputWithIndex(
-      [&](const InputFile &Input, unsigned idx) -> bool {
-        assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-               "Expected diagnostic collection for input.");
-
-        // Join all diagnostics produced for this file into a single output.
-        auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-        const char *const Delim = "";
-        std::ostringstream JoinedDiags;
-        std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
-                  std::ostream_iterator<std::string>(JoinedDiags, Delim));
-        FinishedInvocationMessage msg(Invocation, Pid - idx, JoinedDiags.str(),
-                                      ExitStatus, ProcInfo);
-        emitMessage(os, msg);
-        return false;
-      });
-}
-
-void parseable_output::emitSignalledMessage(
-    raw_ostream &os, const driver::Job &Cmd, int64_t Pid, StringRef ErrorMsg,
-    StringRef Output, Optional<int> Signal, TaskProcessInformation ProcInfo) {
-  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal, ProcInfo);
+    raw_ostream &os, StringRef Name, std::string Output, int ExitStatus,
+    int64_t Pid, sys::TaskProcessInformation ProcInfo) {
+  FinishedMessage msg(Name, Output, Pid, ProcInfo, ExitStatus);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitSkippedMessage(raw_ostream &os,
-                                          const driver::Job &Cmd) {
-  SkippedMessage msg(Cmd);
+void parseable_output::emitSignalledMessage(raw_ostream &os, StringRef Name,
+                                            StringRef ErrorMsg,
+                                            StringRef Output,
+                                            Optional<int> Signal, int64_t Pid,
+                                            TaskProcessInformation ProcInfo) {
+  SignalledMessage msg(Name, Output.str(), Pid, ProcInfo, ErrorMsg, Signal);
   emitMessage(os, msg);
 }
+
+void parseable_output::emitSkippedMessage(raw_ostream &os, StringRef Name,
+                                          DetailedTaskDescription TascDesc) {
+  SkippedMessage msg(Name, TascDesc);
+  emitMessage(os, msg);
+}
+

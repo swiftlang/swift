@@ -20,8 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
-#include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
+#include "swift/Basic/FileTypes.h"
 
 namespace swift {
 
@@ -36,35 +35,42 @@ namespace parseable_output {
 /// into the stream of real PIDs (say, due to a TaskQueue bug).
 const int QUASI_PID_START = -1000;
 
-/// Emits a "began" message to the given stream, corresponding to a Driver Job.
-void emitBeganMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
-                      sys::TaskProcessInformation ProcInfo);
+struct CommandInput {
+  std::string Path;
+  CommandInput() {}
+  CommandInput(StringRef Path) : Path(Path) {}
+};
 
-/// Emits a "began" message to the given stream, corresponding to a given
-/// Frontend Compiler Invocation.
-void emitBeganMessage(raw_ostream &os, const CompilerInvocation &Invocation,
-                      ArrayRef<const char *> Args, int64_t OSPid);
+using OutputPair = std::pair<file_types::ID, std::string>;
+
+/// A client-agnostic (e.g. either the compiler driver or `swift-frontend`)
+/// description of a task that is the subject of a parseable-output message.
+struct DetailedTaskDescription {
+  std::string Executable;
+  SmallVector<std::string, 16> Arguments;
+  std::string CommandLine;
+  SmallVector<CommandInput, 4> Inputs;
+  SmallVector<OutputPair, 8> Outputs;
+};
+
+/// Emits a "began" message to the given stream.
+void emitBeganMessage(raw_ostream &os, StringRef Name,
+                      DetailedTaskDescription TascDesc,
+                      int64_t Pid, sys::TaskProcessInformation ProcInfo);
 
 /// Emits a "finished" message to the given stream.
-void emitFinishedMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
-                         int ExitStatus, StringRef Output,
-                         sys::TaskProcessInformation ProcInfo);
-
-/// Emits a "finished" message to the given stream corresponding to a given
-/// Frontend Compiler Invocation.
-void emitFinishedMessage(
-    raw_ostream &os, const CompilerInvocation &Invocation, int ExitStatus,
-    const llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
-    int64_t OSPid);
+void emitFinishedMessage(raw_ostream &os, StringRef Name,
+                         std::string Output, int ExitStatus,
+                         int64_t Pid, sys::TaskProcessInformation ProcInfo);
 
 /// Emits a "signalled" message to the given stream.
-void emitSignalledMessage(raw_ostream &os, const driver::Job &Cmd, int64_t Pid,
-                          StringRef ErrorMsg, StringRef Output,
-                          Optional<int> Signal,
-                          sys::TaskProcessInformation ProcInfo);
+void emitSignalledMessage(raw_ostream &os, StringRef Name, StringRef ErrorMsg,
+                          StringRef Output, Optional<int> Signal,
+                          int64_t Pid, sys::TaskProcessInformation ProcInfo);
 
 /// Emits a "skipped" message to the given stream.
-void emitSkippedMessage(raw_ostream &os, const driver::Job &Cmd);
+void emitSkippedMessage(raw_ostream &os, StringRef Name,
+                        DetailedTaskDescription TascDesc);
 
 } // end namespace parseable_output
 } // end namespace swift

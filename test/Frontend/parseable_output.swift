@@ -39,9 +39,9 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
+// CHECK-NEXT:   "pid": [[PID]],
 // CHECK-NEXT:   "process": {
 // CHECK-NEXT:     "real_pid": [[PID]]
 // CHECK-NEXT:   },
-// CHECK-NEXT:   "pid": [[PID]],
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
