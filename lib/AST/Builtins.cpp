@@ -16,6 +16,7 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -176,6 +177,28 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
       Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false, /*Throws=*/false,
       /*GenericParams=*/nullptr, paramList, ResType, DC);
+  FD->setAccess(AccessLevel::Public);
+  return FD;
+}
+
+template <class ExtInfoS, class ParamsS, class ResultS>
+static FuncDecl *
+getBuiltinFunction(ASTContext &ctx, Identifier id,
+                   const ExtInfoS &extInfoS, const ParamsS &paramsS,
+                   const ResultS &resultS) {
+  ModuleDecl *M = ctx.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+
+  SynthesisContext SC(ctx, DC);
+  auto params = synthesizeParameterList(SC, paramsS);
+  auto extInfo = synthesizeExtInfo(SC, extInfoS);
+  auto resultType = synthesizeType(SC, resultS);
+
+  DeclName name(ctx, id, params);
+  auto *FD = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
+      extInfo.isAsync(), extInfo.isThrowing(),
+      /*GenericParams=*/nullptr, params, resultType, DC);
   FD->setAccess(AccessLevel::Public);
   return FD;
 }
@@ -1409,6 +1432,20 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id,
+                            _thin,
+                            _parameters(_owned(_nativeObject)),
+                            _job);
+}
+
+static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
+                                             Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_nativeObject),
+                            _void);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -2589,6 +2626,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTaskFuture(Context, Id);
 
+  case BuiltinValueKind::ConvertTaskToJob:
+    return getConvertTaskToJob(Context, Id);
+
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 
@@ -2617,6 +2657,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TriggerFallbackDiagnostic:
     return getTriggerFallbackDiagnosticOperation(Context, Id);
+
+  case BuiltinValueKind::InitializeDefaultActor:
+  case BuiltinValueKind::DestroyDefaultActor:
+    return getDefaultActorInitDestroy(Context, Id);
 
   case BuiltinValueKind::WithUnsafeContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/false);

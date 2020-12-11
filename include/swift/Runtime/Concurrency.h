@@ -42,15 +42,20 @@ struct AsyncTaskAndContext {
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create(JobFlags flags,
                                       AsyncTask *parent,
-                                const AsyncFunctionPointer<void()> *function);
+                const ThinNullaryAsyncSignature::FunctionPointer *function);
 
 /// Create a task object with no future which will run the given
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_f(JobFlags flags,
                                         AsyncTask *parent,
-                                        AsyncFunctionType<void()> *function,
+                             ThinNullaryAsyncSignature::FunctionType *function,
                                         size_t initialContextSize);
+
+/// Caution: not all future-initializing functions actually throw, so
+/// this signature may be incorrect.
+using FutureAsyncSignature =
+  AsyncSignature<void(void*), /*throws*/ true>;
 
 /// Create a task object with a future which will run the given
 /// function.
@@ -68,14 +73,15 @@ AsyncTaskAndContext swift_task_create_f(JobFlags flags,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    const AsyncFunctionPointer<void()> *function);
+    const FutureAsyncSignature::FunctionPointer *function);
 
 /// Create a task object with a future which will run the given
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    AsyncFunctionType<void()> *function, size_t initialContextSize);
+    FutureAsyncSignature::FunctionType *function,
+    size_t initialContextSize);
 
 /// Allocate memory in a task.
 ///
@@ -127,6 +133,9 @@ struct TaskFutureWaitResult {
   OpaqueValue *storage;
 };
 
+using TaskFutureWaitSignature =
+  AsyncSignature<TaskFutureWaitResult(AsyncTask *), /*throws*/ false>;
+
 /// Wait for a future task to complete.
 ///
 /// This can be called from any thread. Its Swift signature is
@@ -135,8 +144,8 @@ struct TaskFutureWaitResult {
 /// func swift_task_future_wait(on task: Builtin.NativeObject) async
 ///     -> TaskFutureWaitResult
 /// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncFunctionType<TaskFutureWaitResult(AsyncTask *task)>
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+TaskFutureWaitSignature::FunctionType
 swift_task_future_wait;
 
 /// Add a status record to a task.  The record should not be
@@ -204,9 +213,18 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 NearestTaskDeadline
 swift_task_getNearestDeadline(AsyncTask *task);
 
-// TODO: Remove this hack.
+/// Run the given async function and block the current thread until
+/// it returns.  This is a hack added for testing purposes; eventually
+/// top-level code will be an async context, and the need for this in
+/// tests should go away.  We *definitely* do not want this to be part
+/// of the standard feature set.
+///
+/// The argument is a `() async -> ()` function, whose ABI is currently
+/// quite complex.  Eventually this should use a different convention;
+/// that's rdar://72105841.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_run(AsyncTask *taskToRun);
+void swift_task_runAndBlockThread(const void *function,
+                                  HeapObject *functionContext);
 
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.

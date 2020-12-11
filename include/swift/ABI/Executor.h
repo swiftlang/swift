@@ -18,6 +18,7 @@
 #define SWIFT_ABI_EXECUTOR_H
 
 #include <inttypes.h>
+#include "swift/ABI/HeapObject.h"
 
 namespace swift {
 class AsyncContext;
@@ -65,6 +66,10 @@ public:
     return reinterpret_cast<DefaultActor*>(Value & ~PointerMask);
   }
 
+  uintptr_t getRawValue() const {
+    return Value;
+  }
+
   /// Do we have to do any work to start running as the requested
   /// executor?
   bool mustSwitchToRun(ExecutorRef newExecutor) const {
@@ -87,10 +92,53 @@ using TaskContinuationFunction =
   SWIFT_CC(swiftasync)
   void (AsyncTask *, ExecutorRef, AsyncContext *);
 
-template <class Fn>
+template <class AsyncSignature>
+class AsyncFunctionPointer;
+template <class AsyncSignature>
 struct AsyncFunctionTypeImpl;
-template <class Result, class... Params>
-struct AsyncFunctionTypeImpl<Result(Params...)> {
+
+/// The abstract signature for an asynchronous function.
+template <class Sig, bool HasErrorResult>
+struct AsyncSignature;
+
+template <class DirectResultTy, class... ArgTys, bool HasErrorResult>
+struct AsyncSignature<DirectResultTy(ArgTys...), HasErrorResult> {
+  bool hasDirectResult = !std::is_same<DirectResultTy, void>::value;
+  using DirectResultType = DirectResultTy;
+
+  bool hasErrorResult = HasErrorResult;
+
+  using FunctionPointer = AsyncFunctionPointer<AsyncSignature>;
+  using FunctionType = typename AsyncFunctionTypeImpl<AsyncSignature>::type;
+};
+
+/// A signature for a thin async function that takes no arguments
+/// and returns no results.
+using ThinNullaryAsyncSignature =
+  AsyncSignature<void(), false>;
+
+/// A signature for a thick async function that takes no formal
+/// arguments and returns no results.
+using ThickNullaryAsyncSignature =
+  AsyncSignature<void(HeapObject*), false>;
+
+/// A class which can be used to statically query whether a type
+/// is a specialization of AsyncSignature.
+template <class T>
+struct IsAsyncSignature {
+  static const bool value = false;
+};
+template <class DirectResultTy, class... ArgTys, bool HasErrorResult>
+struct IsAsyncSignature<AsyncSignature<DirectResultTy(ArgTys...),
+                                       HasErrorResult>> {
+  static const bool value = true;
+};
+
+template <class Signature>
+struct AsyncFunctionTypeImpl {
+  static_assert(IsAsyncSignature<Signature>::value,
+                "template argument is not an AsyncSignature");
+
   // TODO: expand and include the arguments in the parameters.
   using type = TaskContinuationFunction;
 };
@@ -102,11 +150,11 @@ using AsyncFunctionType = typename AsyncFunctionTypeImpl<Fn>::type;
 ///
 /// Eventually, this will always be signed with the data key
 /// using a type-specific discriminator.
-template <class FnType>
+template <class AsyncSignature>
 class AsyncFunctionPointer {
 public:
   /// The function to run.
-  RelativeDirectPointer<AsyncFunctionType<FnType>,
+  RelativeDirectPointer<AsyncFunctionType<AsyncSignature>,
                         /*nullable*/ false,
                         int32_t> Function;
 

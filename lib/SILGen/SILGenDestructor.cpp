@@ -193,6 +193,15 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
       B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
     }
   }
+
+  if (cd->isRootDefaultActor()) {
+    auto builtinName = getASTContext().getIdentifier(
+      getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
+    auto resultTy = SGM.Types.getEmptyTupleType();
+
+    B.createBuiltin(cleanupLoc, builtinName, resultTy, /*subs*/{},
+                    { selfValue.getValue() });
+  }
 }
 
 

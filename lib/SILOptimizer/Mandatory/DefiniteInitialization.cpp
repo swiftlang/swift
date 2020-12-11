@@ -2026,6 +2026,18 @@ void LifetimeChecker::processUninitializedReleaseOfBox(
   Destroys.push_back(B.createDeallocBox(Release->getLoc(), MUI));
 }
 
+static void emitDefaultActorDestroy(SILBuilder &B, SILLocation loc,
+                                    SILValue self) {
+  auto builtinName = B.getASTContext().getIdentifier(
+    getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
+  auto resultTy = B.getModule().Types.getEmptyTupleType();
+
+  self = B.createBeginBorrow(loc, self);
+  B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
+                  { self });
+  B.createEndBorrow(loc, self);
+}
+
 void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
                                                   bool consumed,
                                              SILBasicBlock::iterator InsertPt) {
@@ -2075,6 +2087,15 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
     else
       Metatype = B.createMetatype(Loc, SILMetatypeTy);
+
+    // If this is a root default actor, destroy the default-actor state.
+    // SILGen ensures that this is unconditionally initialized, so we
+    // don't need to track it specially.
+    if (!TheMemory.isDelegatingInit()) {
+      auto classDecl = TheMemory.getASTType().getClassOrBoundGenericClass();
+      if (classDecl && classDecl->isRootDefaultActor())
+        emitDefaultActorDestroy(B, Loc, Pointer);
+    }
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass
