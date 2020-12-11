@@ -113,8 +113,12 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
   return false;
 }
 
-void swift::addAsyncNotes(FuncDecl *func) {
-  func->diagnose(diag::note_add_async_to_function, func->getName());
+void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
+  assert(func);
+  if (!isa<DestructorDecl>(func))
+    func->diagnose(diag::note_add_async_to_function, func->getName());
+    // TODO: we need a source location for effects attributes so that we 
+    // can emit a fix-it.
 
   if (func->canBeAsyncHandler()) {
     func->diagnose(
@@ -942,8 +946,9 @@ namespace {
         return false;
       };
 
+      auto declContext = getDeclContext();
       switch (auto contextIsolation =
-                  getInnermostIsolatedContext(getDeclContext())) {
+                  getInnermostIsolatedContext(declContext)) {
       case ActorIsolation::ActorInstance:
         if (inspectForImplicitlyAsync())
           return false;
@@ -980,16 +985,66 @@ namespace {
           return false;
 
         ctx.Diags.diagnose(
-            loc, diag::global_actor_from_independent_context,
-            value->getDescriptiveKind(), value->getName(), globalActor);
+            loc, diag::global_actor_from_nonactor_context,
+            value->getDescriptiveKind(), value->getName(), globalActor,
+            /*actorIndependent=*/true);
         noteIsolatedActorMember(value);
         return true;
 
-      case ActorIsolation::Unspecified:
-        // Okay no matter what, but still must inspect for implicitly async.
-        inspectForImplicitlyAsync();
-        return false;
-      }
+      case ActorIsolation::Unspecified: {
+        // NOTE: we must always inspect for implicitlyAsync
+        bool implicitlyAsyncCall = inspectForImplicitlyAsync();
+        bool didEmitDiagnostic = false;
+
+        auto emitError = [&](bool justNote = false) {
+          didEmitDiagnostic = true;
+          if (!justNote) {
+            ctx.Diags.diagnose(
+              loc, diag::global_actor_from_nonactor_context,
+              value->getDescriptiveKind(), value->getName(), globalActor,
+              /*actorIndependent=*/false);
+          }
+          noteIsolatedActorMember(value);
+        };
+        
+        if (AbstractFunctionDecl const* fn = 
+            dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
+          bool isAsyncContext = fn->isAsyncContext();
+
+          if (implicitlyAsyncCall && isAsyncContext)
+            return didEmitDiagnostic; // definitely an OK reference.
+
+          // otherwise, there's something wrong.
+          
+          // if it's an implicitly-async call in a non-async context,
+          // then we know later type-checking will raise an error,
+          // so we just emit a note pointing out that callee of the call is
+          // implicitly async.
+          emitError(/*justNote=*/implicitlyAsyncCall);
+
+          // otherwise, if it's any kind of global-actor reference within
+          // this synchronous function, we'll additionally suggest becoming
+          // part of the global actor associated with the reference,
+          // since this function is not associated with an actor.
+          if (isa<FuncDecl>(fn) && !isAsyncContext) {
+            didEmitDiagnostic = true;
+            fn->diagnose(diag::note_add_globalactor_to_function, 
+                globalActor->getWithoutParens().getString(),
+                fn->getDescriptiveKind(),
+                fn->getName(),
+                globalActor)
+              .fixItInsert(fn->getAttributeInsertionLoc(false), 
+                diag::insert_globalactor_attr, globalActor);
+          }
+
+        } else {
+          // just the generic error with note.
+          emitError();
+        }
+
+        return didEmitDiagnostic;
+      } // end Unspecified case
+      } // end switch
       llvm_unreachable("unhandled actor isolation kind!");
     }
 

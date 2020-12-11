@@ -181,6 +181,7 @@ struct OtherContainer<U> {
 // Global actor inference for unspecified contexts
 // ----------------------------------------------------------------------
 
+// expected-note@+1 {{calls to global function 'foo()' from outside of its actor context are implicitly asynchronous}}
 @SomeGlobalActor func foo() { sibling() }
 
 @SomeGlobalActor func sibling() { foo() }
@@ -189,8 +190,9 @@ func bar() async {
   foo() // expected-error{{call is 'async' but is not marked with 'await'}}
 }
 
+// expected-note@+3 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}}
 // expected-note@+2 {{add '@asyncHandler' to function 'barSync()' to create an implicit asynchronous context}}
 // expected-note@+1 {{add 'async' to function 'barSync()' to make it asynchronous}}
 func barSync() {
-  foo() // expected-error{{'async' in a function that does not support concurrency}}
+  foo() // expected-error {{'async' in a function that does not support concurrency}}
 }

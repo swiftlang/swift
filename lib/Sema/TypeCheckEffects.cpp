@@ -1382,11 +1382,8 @@ public:
     if (!Function)
       return;
 
-    auto func = dyn_cast_or_null<FuncDecl>(Function->getAbstractFunctionDecl());
-    if (!func)
-      return;
-
-    addAsyncNotes(func);
+    if (auto func = Function->getAbstractFunctionDecl())
+      addAsyncNotes(func);
   }
 
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {
