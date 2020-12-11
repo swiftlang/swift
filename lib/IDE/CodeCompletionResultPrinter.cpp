@@ -102,6 +102,7 @@ class AnnotatingResultPrinter {
     case ChunkKind::AccessControlKeyword:
     case ChunkKind::ThrowsKeyword:
     case ChunkKind::RethrowsKeyword:
+    case ChunkKind::AsyncKeyword:
     case ChunkKind::DeclIntroducer:
       printWithTag("keyword", C.getText());
       break;

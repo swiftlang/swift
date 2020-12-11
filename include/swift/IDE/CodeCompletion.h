@@ -95,6 +95,9 @@ public:
     /// The "rethrows" keyword.
     RethrowsKeyword,
 
+    /// The "async" keyword.
+    AsyncKeyword,
+
     /// The keyword part of a declaration before the name, like "func".
     DeclIntroducer,
 
@@ -222,6 +225,7 @@ public:
            Kind == ChunkKind::OverrideKeyword ||
            Kind == ChunkKind::ThrowsKeyword ||
            Kind == ChunkKind::RethrowsKeyword ||
+           Kind == ChunkKind::AsyncKeyword ||
            Kind == ChunkKind::DeclAttrKeyword ||
            Kind == ChunkKind::DeclIntroducer ||
            Kind == ChunkKind::Keyword ||

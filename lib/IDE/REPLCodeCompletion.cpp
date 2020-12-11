@@ -40,6 +40,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword:
     case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::AsyncKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::Keyword:

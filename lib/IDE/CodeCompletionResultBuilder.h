@@ -230,6 +230,17 @@ public:
        " throws");
   }
 
+  void addAnnotatedAsync() {
+    addAsync();
+    getLastChunk().setIsAnnotation();
+  }
+
+  void addAsync() {
+    addChunkWithTextNoCopy(
+       CodeCompletionString::Chunk::ChunkKind::AsyncKeyword,
+       " async");
+  }
+
   void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
     assert(Kind == CodeCompletionResult::ResultKind::Declaration);
     CommentWords = Pairs;

@@ -387,6 +387,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::OverrideKeyword:
     case ChunkKind::ThrowsKeyword:
     case ChunkKind::RethrowsKeyword:
+    case ChunkKind::AsyncKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::Text:
     case ChunkKind::LeftParen:
@@ -1378,6 +1379,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::OverrideKeyword:
     case ChunkKind::ThrowsKeyword:
     case ChunkKind::RethrowsKeyword:
+    case ChunkKind::AsyncKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::CallParameterColon:
     case ChunkKind::CallParameterTypeBegin:
@@ -1433,6 +1435,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       }
       case ChunkKind::ThrowsKeyword:
       case ChunkKind::RethrowsKeyword:
+      case ChunkKind::AsyncKeyword:
         shouldPrint = true; // Even when they're annotations.
         break;
       default:
@@ -2639,9 +2642,16 @@ public:
                                    genericSig, includeDefaultArgs);
   }
 
-  static void addThrows(CodeCompletionResultBuilder &Builder,
-                        const AnyFunctionType *AFT,
-                        const AbstractFunctionDecl *AFD) {
+  static void addAsyncThrows(CodeCompletionResultBuilder &Builder,
+                             const AnyFunctionType *AFT,
+                             const AbstractFunctionDecl *AFD) {
+    assert(AFT != nullptr);
+
+    // 'async'.
+    if ((AFD && AFD->hasAsync()) || AFT->isAsync())
+      Builder.addAnnotatedAsync();
+
+    // 'throws' or 'rethrows'.
     if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Builder.addAnnotatedRethrows();
     else if (AFT->isThrowing())
@@ -2799,7 +2809,7 @@ public:
       else
         Builder.addAnnotatedRightParen();
 
-      addThrows(Builder, AFT, AFD);
+      addAsyncThrows(Builder, AFT, AFD);
 
       if (AFD &&
           AFD->isImplicitlyUnwrappedOptional())
@@ -2946,14 +2956,14 @@ public:
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
-        addThrows(Builder, AFT, FD);
+        addAsyncThrows(Builder, AFT, FD);
       } else {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
                                 FD->getGenericSignatureOfContext(),
                                 includeDefaultArgs);
         Builder.addRightParen();
-        addThrows(Builder, AFT, FD);
+        addAsyncThrows(Builder, AFT, FD);
       }
 
       // Build type annotation.
@@ -3094,7 +3104,7 @@ public:
       else
         Builder.addAnnotatedRightParen();
 
-      addThrows(Builder, ConstructorType, CD);
+      addAsyncThrows(Builder, ConstructorType, CD);
 
       if (!Result.hasValue())
         Result = ConstructorType->getResult();
