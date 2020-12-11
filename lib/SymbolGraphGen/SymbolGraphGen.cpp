@@ -24,12 +24,18 @@ int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
   SmallString<256> FileName;
   if (SG.DeclaringModule.hasValue()) {
-    // Save a cross-import overlay symbol graph as `MainModule@BystandingModule[@BystandingModule...].symbols.json`
+    // Save a cross-import overlay symbol graph as `MainModule@BystandingModule[@BystandingModule...]@OverlayModule.symbols.json`
+    //
+    // The overlay module's name is added as a disambiguator in case an overlay
+    // declares multiple modules for the same set of imports.
     FileName.append(SG.DeclaringModule.getValue()->getNameStr());
     for (auto BystanderModule : SG.BystanderModules) {
       FileName.push_back('@');
       FileName.append(BystanderModule.str());
     }
+    
+    FileName.push_back('@');
+    FileName.append(SG.M.getNameStr());
   } else {
     FileName.append(SG.M.getNameStr());
     
