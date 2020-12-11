@@ -126,8 +126,14 @@ ParserResult<Expr> Parser::parseExprAs() {
 ///     'async'? 'throws'? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
   SourceLoc asyncLoc, throwsLoc, arrowLoc;
+  ParserStatus status;
 
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                                   /*rethrows=*/nullptr);
+  if (status.hasCodeCompletion() && !CodeCompletion) {
+    // Trigger delayed parsing, no need to continue.
+    return status;
+  }
 
   if (Tok.isNot(tok::arrow)) {
     assert(throwsLoc.isValid() || asyncLoc.isValid());
@@ -139,7 +145,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
 
   arrowLoc = consumeToken(tok::arrow);
 
-  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
 
   auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
   return makeParserResult(arrow);
@@ -2592,12 +2598,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       params = ParameterList::create(Context, elements);
     }
 
-    bool rethrows = false;
-    parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
-    if (rethrows) {
-      diagnose(throwsLoc, diag::rethrowing_function_type)
-        .fixItReplace(throwsLoc, "throws");
-    }
+    parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                           /*rethrows*/nullptr);
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {

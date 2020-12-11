@@ -12,20 +12,15 @@ func asyncGlobal3(fn: () throws -> Int) rethrows async { } // expected-error{{'a
 
 func asyncGlobal4() -> Int async { } // expected-error{{'async' may only occur before '->'}}{{28-34=}}{{21-21=async }}
 
-// If both async and throws follow the return type in the correct order,
-// throws will get the error and fix-it first. Applying the fix-it will cause
-// the async error and fix-it to be emitted. Applying that will place the async
-// in the appropriate place.
-
-// expected-error@+1{{'throws' may only occur before '->'}}{{34-41=}}{{21-21=throws }}
 func asyncGlobal5() -> Int async throws { }
+// expected-error@-1{{'async' may only occur before '->'}}{{28-34=}}{{21-21=async }}
+// expected-error@-2{{'throws' may only occur before '->'}}{{34-41=}}{{21-21=throws }}
 
-// If they are in the wrong order, the first fix-it will put them in the right
-// order and will be the same as the above case
-// expected-error@+1{{'async' must precede 'throws'}}{{35-41=}}{{28-28=async }}
 func asyncGlobal6() -> Int throws async { }
+// expected-error@-1{{'throws' may only occur before '->'}}{{28-35=}}{{21-21=throws }}
+// expected-error@-2{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }}
 
-func asyncGlobal7() throws -> Int async { } // expected-error{{'async' may only occur before '->'}}{{35-41=}}{{28-28=async }}
+func asyncGlobal7() throws -> Int async { } // expected-error{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }}
 
 class X {
   init() async { } // expected-error{{initializer cannot be marked 'async'}}

@@ -549,6 +549,7 @@ enum class CompletionKind {
   AccessorBeginning,
   AttributeBegin,
   AttributeDeclParen,
+  EffectsSpecifier,
   PoundAvailablePlatform,
   CallArg,
   LabeledTrailingClosure,

@@ -748,6 +748,9 @@ ERROR(expected_dynamic_func_attr,none,
 ERROR(async_after_throws,none,
       "'async' must precede %select{'throws'|'rethrows'}0", (bool))
 ERROR(async_init,none, "initializer cannot be marked 'async'", ())
+ERROR(duplicate_effect_specifier,none,
+      "unexpected %select{'throws'|'rethrows'|'async'}0",
+      (unsigned))
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,

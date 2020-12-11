@@ -1353,9 +1353,9 @@ public:
   ///
   /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
   /// lieu of 'throws'.
-  void parseAsyncThrows(
-      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-      bool *rethrows);
+  ParserStatus parseEffectsSpecifiers(SourceLoc existingArrowLoc,
+                                      SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+                                      bool *rethrows);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1432,6 +1432,15 @@ public:
   ///   qualified-decl-name-base-type: simple-type-identifier '.'
   /// \endverbatim
   bool canParseBaseTypeForQualifiedDeclName();
+
+  /// Returns true if the current token is '->' or effects specifiers followed
+  /// by '->'.
+  ///
+  /// e.g.
+  ///  throws ->       // true
+  ///  async throws -> // true
+  ///  throws {        // false
+  bool isAtFunctionTypeArrow();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
