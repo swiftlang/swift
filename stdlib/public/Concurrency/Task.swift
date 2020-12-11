@@ -438,11 +438,11 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-  // TODO: As a start, we should invoke Task.runDetached here, but we
-  // can probably do better if we're already running on behalf of a task,
+  // TODO: We can probably do better than Task.runDetached
+  // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
-  fatalError("not implemented")
+  _ = Task.runDetached { await body() }
 }
 
 #endif
