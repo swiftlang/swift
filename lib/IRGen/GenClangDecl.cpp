@@ -20,7 +20,6 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
@@ -115,7 +114,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
 
     if (auto var = dyn_cast<clang::VarDecl>(next))
       if (!var->isFileVarDecl())
-	      continue;
+        continue;
 
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
