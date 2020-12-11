@@ -32,23 +32,23 @@ TEST(MultiMapCache, powersTest) {
   for (unsigned index : range(1, 256)) {
     auto array = *cache.get(index);
     for (unsigned power : array) {
-      EXPECT_EQ(power % index, 0);
+      EXPECT_EQ(power % index, 0u);
     }
   }
   EXPECT_FALSE(cache.empty());
-  EXPECT_EQ(cache.size(), 255);
+  EXPECT_EQ(cache.size(), 255u);
   for (unsigned index : range(1, 256)) {
     auto array = *cache.get(index);
     for (unsigned power : array) {
-      EXPECT_EQ(power % index, 0);
+      EXPECT_EQ(power % index, 0u);
     }
   }
   EXPECT_FALSE(cache.empty());
-  EXPECT_EQ(cache.size(), 255);
+  EXPECT_EQ(cache.size(), 255u);
 
   cache.clear();
   EXPECT_TRUE(cache.empty());
-  EXPECT_EQ(cache.size(), 0);
+  EXPECT_EQ(cache.size(), 0u);
 }
 
 TEST(MultiMapCache, smallTest) {
@@ -66,21 +66,21 @@ TEST(MultiMapCache, smallTest) {
   for (unsigned index : range(1, 256)) {
     auto array = *cache.get(index);
     for (unsigned power : array) {
-      EXPECT_EQ(power % index, 0);
+      EXPECT_EQ(power % index, 0u);
     }
   }
   EXPECT_FALSE(cache.empty());
-  EXPECT_EQ(cache.size(), 255);
+  EXPECT_EQ(cache.size(), 255u);
   for (unsigned index : range(1, 256)) {
     auto array = *cache.get(index);
     for (unsigned power : array) {
-      EXPECT_EQ(power % index, 0);
+      EXPECT_EQ(power % index, 0u);
     }
   }
   EXPECT_FALSE(cache.empty());
-  EXPECT_EQ(cache.size(), 255);
+  EXPECT_EQ(cache.size(), 255u);
 
   cache.clear();
   EXPECT_TRUE(cache.empty());
-  EXPECT_EQ(cache.size(), 0);
+  EXPECT_EQ(cache.size(), 0u);
 }
