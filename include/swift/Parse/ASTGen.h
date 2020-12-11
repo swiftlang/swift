@@ -56,6 +56,15 @@ public:
   Expr *generate(const syntax::PoundFunctionExprSyntax &Expr, const SourceLoc &Loc);
   Expr *generate(const syntax::UnknownExprSyntax &Expr, const SourceLoc &Loc);
 
+private:
+  Expr *
+  generateMagicIdentifierLiteralExpr(const syntax::TokenSyntax &PoundToken,
+                                     const SourceLoc &Loc);
+
+  /// Map magic literal tokens such as #file to their MagicIdentifierLiteralExpr
+  /// kind.
+  MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind);
+
   //===--------------------------------------------------------------------===//
   // MARK: - Types.
 public:
@@ -132,14 +141,6 @@ private:
   /// \p Node resides
   static SourceLoc advanceLocEnd(const SourceLoc &Loc,
                                  const syntax::Syntax &Node);
-
-  Expr *
-  generateMagicIdentifierLiteralExpr(const syntax::TokenSyntax &PoundToken,
-                                     const SourceLoc &Loc);
-
-  /// Map magic literal tokens such as #file to their MagicIdentifierLiteralExpr
-  /// kind.
-  MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind);
 };
 } // namespace swift
 

@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/ASTGen.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/SourceManager.h"
+#include "swift/Parse/ASTGen.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 
@@ -43,6 +42,30 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
   } else if (auto unknown = Type.getAs<UnknownTypeSyntax>()) {
     return generate(*unknown, Loc);
   }
+//  else if (auto Composition = Type.getAs<CompositionTypeSyntax>())
+//    return generate(*Composition, Loc);
+//  else if (auto Function = Type.getAs<FunctionTypeSyntax>())
+//    return generate(*Function, Loc);
+//  else if (auto Metatype = Type.getAs<MetatypeTypeSyntax>())
+//    return generate(*Metatype, Loc);
+//  else if (auto Tuple = Type.getAs<TupleTypeSyntax>())
+//    return generate(*Tuple, Loc);
+//  else if (auto Some = Type.getAs<SomeTypeSyntax>())
+//    return generate(*Some, Loc);
+//  else if (auto Optional = Type.getAs<OptionalTypeSyntax>())
+//    return generate(*Optional, Loc);
+//  else if (auto Unwrapped = Type.getAs<ImplicitlyUnwrappedOptionalTypeSyntax>())
+//    return generate(*Unwrapped, Loc);
+//  else if (auto Attributed = Type.getAs<AttributedTypeSyntax>())
+//    return generate(*Attributed, Loc);
+//  else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>())
+//    return generate(*ClassRestriction, Loc);
+//  else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>())
+//    return generate(*SILBoxType, Loc, IsSILFuncDecl);
+//  else if (auto SILFunctionType = Type.getAs<SILFunctionTypeSyntax>())
+//    return generate(*SILFunctionType, Loc, IsSILFuncDecl);
+//  else if (auto Unknown = Type.getAs<UnknownTypeSyntax>())
+//    return generate(*Unknown, Loc);
 
   llvm_unreachable("ASTGen hasn't been tought how to generate this type");
 }

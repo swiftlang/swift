@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ASTGen.h"
-#include "swift/AST/TypeRepr.h"
-#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -93,4 +91,33 @@ Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc &Loc) {
     }
   }
   return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Private
+
+Expr *ASTGen::generateMagicIdentifierLiteralExpr(const TokenSyntax &PoundToken,
+                                                 const SourceLoc &Loc) {
+  auto Kind = getMagicIdentifierLiteralKind(PoundToken.getTokenKind());
+  SourceLoc TokenLoc = advanceLocBegin(Loc, PoundToken);
+  return new (Context) MagicIdentifierLiteralExpr(Kind, TokenLoc);
+}
+
+/// Map magic literal tokens such as #file to their
+/// MagicIdentifierLiteralExpr kind.
+MagicIdentifierLiteralExpr::Kind
+ASTGen::getMagicIdentifierLiteralKind(tok Kind) {
+  switch (Kind) {
+  case tok::pound_file:
+    // TODO: Enable by default at the next source break. (SR-13199)
+    return Context.LangOpts.EnableConcisePoundFile
+               ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
+               : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN)                                    \
+  case tok::TOKEN:                                                             \
+    return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
+  default:
+    llvm_unreachable("not a magic literal");
+  }
 }
