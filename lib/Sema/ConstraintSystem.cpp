@@ -5332,8 +5332,8 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(
-    ConstraintSystem &cs, ConstraintSystem::PotentialBindings &bindings)
-    : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
+    ConstraintSystem::PotentialBindings &bindings)
+    : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
       TypeVar(bindings.TypeVar),
       CanBeNil(llvm::any_of(bindings.Protocols, [](Constraint *constraint) {
         auto *protocol = constraint->getProtocol();
@@ -5348,7 +5348,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     // this problem since its rooted in the fact that constraint system
     // is under-constrained.
     if (bindings.AssociatedCodeCompletionToken) {
-      locator = cs.getConstraintLocator(bindings.AssociatedCodeCompletionToken);
+      locator = CS.getConstraintLocator(bindings.AssociatedCodeCompletionToken);
     }
 
     Bindings.push_back(Binding::forHole(TypeVar, locator));
