@@ -102,14 +102,10 @@ class TypeMatcher {
 
     TRIVIAL_CASE(ErrorType)
     TRIVIAL_CASE(BuiltinIntegerType)
-    TRIVIAL_CASE(BuiltinIntegerLiteralType)
     TRIVIAL_CASE(BuiltinFloatType)
-    TRIVIAL_CASE(BuiltinRawPointerType)
-    TRIVIAL_CASE(BuiltinNativeObjectType)
-    TRIVIAL_CASE(BuiltinBridgeObjectType)
-    TRIVIAL_CASE(BuiltinUnsafeValueBufferType)
     TRIVIAL_CASE(BuiltinVectorType)
-    TRIVIAL_CASE(SILTokenType)
+#define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
+#include "swift/AST/TypeNodes.def"
 
     bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
                              Type sugaredFirstType) {

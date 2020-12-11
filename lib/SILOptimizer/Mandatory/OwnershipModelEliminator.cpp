@@ -23,6 +23,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
+
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -45,153 +47,223 @@ DumpBefore("sil-dump-before-ome-to-path", llvm::cl::Hidden);
 
 namespace {
 
+/// A high level SILInstruction visitor that lowers Ownership SSA from SIL.
+///
+/// NOTE: Erasing instructions must always be done by the method
+/// eraseInstruction /and/ any instructions that are created in one visit must
+/// not be deleted in the same visit since after each visit, we empty the
+/// tracking list into the instructionsToSimplify array. We do this in order to
+/// ensure that when we use inst-simplify on these instructions, we have
+/// consistent non-ossa vs ossa code rather than an intermediate state.
 struct OwnershipModelEliminatorVisitor
     : SILInstructionVisitor<OwnershipModelEliminatorVisitor, bool> {
-  SILBuilder &B;
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+  SmallVector<SILInstruction *, 8> trackingList;
+  SmallBlotSetVector<SILInstruction *, 8> instructionsToSimplify;
 
-  OwnershipModelEliminatorVisitor(SILBuilder &B)
-      : B(B), OpenedArchetypesTracker(&B.getFunction()) {
-    B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  /// Points at either a user passed in SILBuilderContext or points at
+  /// builderCtxStorage.
+  SILBuilderContext builderCtx;
+
+  SILOpenedArchetypesTracker openedArchetypesTracker;
+
+  /// Construct an OME visitor for eliminating ownership from \p fn.
+  OwnershipModelEliminatorVisitor(SILFunction &fn)
+      : trackingList(), instructionsToSimplify(),
+        builderCtx(fn.getModule(), &trackingList),
+        openedArchetypesTracker(&fn) {
+    builderCtx.setOpenedArchetypesTracker(&openedArchetypesTracker);
   }
 
-  void beforeVisit(SILInstruction *I) {
-    B.setInsertionPoint(I);
-    B.setCurrentDebugScope(I->getDebugScope());
+  /// A "syntactic" high level function that combines our insertPt with a
+  /// builder ctx.
+  ///
+  /// Since this is syntactic and we assume that our caller is passing in a
+  /// lambda that if we inline will be eliminated, we mark this function always
+  /// inline.
+  template <typename ResultTy>
+  ResultTy LLVM_ATTRIBUTE_ALWAYS_INLINE
+  withBuilder(SILInstruction *insertPt,
+              llvm::function_ref<ResultTy(SILBuilder &, SILLocation)> visitor) {
+    SILBuilderWithScope builder(insertPt, builderCtx);
+    return visitor(builder, insertPt->getLoc());
   }
 
-  bool visitSILInstruction(SILInstruction *I) { return false; }
-  bool visitLoadInst(LoadInst *LI);
-  bool visitStoreInst(StoreInst *SI);
-  bool visitStoreBorrowInst(StoreBorrowInst *SI);
-  bool visitCopyValueInst(CopyValueInst *CVI);
-  bool visitDestroyValueInst(DestroyValueInst *DVI);
-  bool visitLoadBorrowInst(LoadBorrowInst *LBI);
-  bool visitBeginBorrowInst(BeginBorrowInst *BBI) {
-    BBI->replaceAllUsesWith(BBI->getOperand());
-    BBI->eraseFromParent();
+  void drainTrackingList() {
+    // Called before we visit a new instruction and before we ever erase an
+    // instruction. This ensures that we can post-process instructions that need
+    // simplification in a purely non-ossa world instead of an indeterminate
+    // state mid elimination.
+    while (!trackingList.empty()) {
+      instructionsToSimplify.insert(trackingList.pop_back_val());
+    }
+  }
+
+  void beforeVisit(SILInstruction *instToVisit) {
+    // Add any elements to the tracking list that we currently have in the
+    // tracking list that we haven't added yet.
+    drainTrackingList();
+  }
+
+  void eraseInstruction(SILInstruction *i) {
+    // Before we erase anything, drain the tracking list.
+    drainTrackingList();
+
+    // Make sure to blot our instruction.
+    instructionsToSimplify.erase(i);
+    i->eraseFromParent();
+  }
+
+  void eraseInstructionAndRAUW(SingleValueInstruction *i, SILValue newValue) {
+    // Make sure to blot our instruction.
+    i->replaceAllUsesWith(newValue);
+    eraseInstruction(i);
+  }
+
+  bool visitSILInstruction(SILInstruction *) { return false; }
+  bool visitLoadInst(LoadInst *li);
+  bool visitStoreInst(StoreInst *si);
+  bool visitStoreBorrowInst(StoreBorrowInst *si);
+  bool visitCopyValueInst(CopyValueInst *cvi);
+  bool visitDestroyValueInst(DestroyValueInst *dvi);
+  bool visitLoadBorrowInst(LoadBorrowInst *lbi);
+  bool visitBeginBorrowInst(BeginBorrowInst *bbi) {
+    eraseInstructionAndRAUW(bbi, bbi->getOperand());
     return true;
   }
-  bool visitEndBorrowInst(EndBorrowInst *EBI) {
-    EBI->eraseFromParent();
+  bool visitEndBorrowInst(EndBorrowInst *ebi) {
+    eraseInstruction(ebi);
     return true;
   }
-  bool visitEndLifetimeInst(EndLifetimeInst *ELI) {
-    ELI->eraseFromParent();
+  bool visitEndLifetimeInst(EndLifetimeInst *eli) {
+    eraseInstruction(eli);
     return true;
   }
   bool visitUncheckedOwnershipConversionInst(
-      UncheckedOwnershipConversionInst *UOCI) {
-    UOCI->replaceAllUsesWith(UOCI->getOperand());
-    UOCI->eraseFromParent();
+      UncheckedOwnershipConversionInst *uoci) {
+    eraseInstructionAndRAUW(uoci, uoci->getOperand());
     return true;
   }
-  bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *URVI);
-  bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
-  bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
-  bool visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
-  bool visitSwitchEnumInst(SwitchEnumInst *SWI);
-  bool visitDestructureStructInst(DestructureStructInst *DSI);
-  bool visitDestructureTupleInst(DestructureTupleInst *DTI);
+  bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
+  bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
+  bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);
+  bool visitCheckedCastBranchInst(CheckedCastBranchInst *cbi);
+  bool visitSwitchEnumInst(SwitchEnumInst *swi);
+  bool visitDestructureStructInst(DestructureStructInst *dsi);
+  bool visitDestructureTupleInst(DestructureTupleInst *dti);
 
   // We lower this to unchecked_bitwise_cast losing our assumption of layout
   // compatibility.
-  bool visitUncheckedValueCastInst(UncheckedValueCastInst *UVCI) {
-    auto *NewVal = B.createUncheckedBitwiseCast(
-        UVCI->getLoc(), UVCI->getOperand(), UVCI->getType());
-    UVCI->replaceAllUsesWith(NewVal);
-    UVCI->eraseFromParent();
-    return true;
+  bool visitUncheckedValueCastInst(UncheckedValueCastInst *uvci) {
+    return withBuilder<bool>(uvci, [&](SILBuilder &b, SILLocation loc) {
+      auto *newVal = b.createUncheckedBitwiseCast(loc, uvci->getOperand(),
+                                                  uvci->getType());
+      eraseInstructionAndRAUW(uvci, newVal);
+      return true;
+    });
   }
+
+  void splitDestructure(SILInstruction *destructure,
+                        SILValue destructureOperand);
 };
 
 } // end anonymous namespace
 
-bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *LI) {
-  auto Qualifier = LI->getOwnershipQualifier();
+bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *li) {
+  auto qualifier = li->getOwnershipQualifier();
 
   // If the qualifier is unqualified, there is nothing further to do
   // here. Just return.
-  if (Qualifier == LoadOwnershipQualifier::Unqualified)
+  if (qualifier == LoadOwnershipQualifier::Unqualified)
     return false;
 
-  SILValue Result = B.emitLoadValueOperation(LI->getLoc(), LI->getOperand(),
-                                             LI->getOwnershipQualifier());
+  auto result = withBuilder<SILValue>(li, [&](SILBuilder &b, SILLocation loc) {
+    return b.emitLoadValueOperation(loc, li->getOperand(),
+                                    li->getOwnershipQualifier());
+  });
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  LI->replaceAllUsesWith(Result);
-  LI->eraseFromParent();
+  eraseInstructionAndRAUW(li, result);
   return true;
 }
 
-bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
-  auto Qualifier = SI->getOwnershipQualifier();
+bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *si) {
+  auto qualifier = si->getOwnershipQualifier();
 
   // If the qualifier is unqualified, there is nothing further to do
   // here. Just return.
-  if (Qualifier == StoreOwnershipQualifier::Unqualified)
+  if (qualifier == StoreOwnershipQualifier::Unqualified)
     return false;
 
-  B.emitStoreValueOperation(SI->getLoc(), SI->getSrc(), SI->getDest(),
-                            SI->getOwnershipQualifier());
+  withBuilder<void>(si, [&](SILBuilder &b, SILLocation loc) {
+    b.emitStoreValueOperation(loc, si->getSrc(), si->getDest(),
+                              si->getOwnershipQualifier());
+  });
 
   // Then remove the qualified store.
-  SI->eraseFromParent();
+  eraseInstruction(si);
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
-    StoreBorrowInst *SI) {
-  B.emitStoreValueOperation(SI->getLoc(), SI->getSrc(), SI->getDest(),
-                            StoreOwnershipQualifier::Init);
+    StoreBorrowInst *si) {
+  withBuilder<void>(si, [&](SILBuilder &b, SILLocation loc) {
+    b.emitStoreValueOperation(loc, si->getSrc(), si->getDest(),
+                              StoreOwnershipQualifier::Unqualified);
+  });
 
   // Then remove the qualified store.
-  SI->eraseFromParent();
+  eraseInstruction(si);
   return true;
 }
 
-bool
-OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
+bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
   // Break down the load borrow into an unqualified load.
-  auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand(),
-                                       LoadOwnershipQualifier::Unqualified);
+  auto newLoad =
+      withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
+        return b.createLoad(loc, lbi->getOperand(),
+                            LoadOwnershipQualifier::Unqualified);
+      });
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  LBI->replaceAllUsesWith(UnqualifiedLoad);
-  LBI->eraseFromParent();
+  eraseInstructionAndRAUW(lbi, newLoad);
   return true;
 }
 
-bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
+bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // A copy_value of an address-only type cannot be replaced.
-  if (CVI->getType().isAddressOnly(B.getFunction()))
+  if (cvi->getType().isAddressOnly(*cvi->getFunction()))
     return false;
 
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  B.emitCopyValueOperation(CVI->getLoc(), CVI->getOperand());
-  CVI->replaceAllUsesWith(CVI->getOperand());
-  CVI->eraseFromParent();
+  withBuilder<void>(cvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitCopyValueOperation(loc, cvi->getOperand());
+  });
+  eraseInstructionAndRAUW(cvi, cvi->getOperand());
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
-    UnmanagedRetainValueInst *URVI) {
+    UnmanagedRetainValueInst *urvi) {
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  B.emitCopyValueOperation(URVI->getLoc(), URVI->getOperand());
-  URVI->eraseFromParent();
+  withBuilder<void>(urvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitCopyValueOperation(loc, urvi->getOperand());
+  });
+  eraseInstruction(urvi);
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitUnmanagedReleaseValueInst(
-    UnmanagedReleaseValueInst *URVI) {
+    UnmanagedReleaseValueInst *urvi) {
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  B.emitDestroyValueOperation(URVI->getLoc(), URVI->getOperand());
-  URVI->eraseFromParent();
+  withBuilder<void>(urvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitDestroyValueOperation(loc, urvi->getOperand());
+  });
+  eraseInstruction(urvi);
   return true;
 }
 
@@ -199,26 +271,30 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
     UnmanagedAutoreleaseValueInst *UAVI) {
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  B.createAutoreleaseValue(UAVI->getLoc(), UAVI->getOperand(),
-                           UAVI->getAtomicity());
-  UAVI->eraseFromParent();
+  withBuilder<void>(UAVI, [&](SILBuilder &b, SILLocation loc) {
+    b.createAutoreleaseValue(loc, UAVI->getOperand(), UAVI->getAtomicity());
+  });
+  eraseInstruction(UAVI);
   return true;
 }
 
-bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
+bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
+    DestroyValueInst *dvi) {
   // A destroy_value of an address-only type cannot be replaced.
-  if (DVI->getOperand()->getType().isAddressOnly(B.getFunction()))
+  if (dvi->getOperand()->getType().isAddressOnly(*dvi->getFunction()))
     return false;
 
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
-  B.emitDestroyValueOperation(DVI->getLoc(), DVI->getOperand());
-  DVI->eraseFromParent();
+  withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitDestroyValueOperation(loc, dvi->getOperand());
+  });
+  eraseInstruction(dvi);
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
-    CheckedCastBranchInst *CBI) {
+    CheckedCastBranchInst *cbi) {
   // In ownership qualified SIL, checked_cast_br must pass its argument to the
   // fail case so we can clean it up. In non-ownership qualified SIL, we expect
   // no argument from the checked_cast_br in the default case. The way that we
@@ -227,16 +303,16 @@ bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
   // 1. We replace all uses of the argument to the false block with a use of the
   // checked cast branch's operand.
   // 2. We delete the argument from the false block.
-  SILBasicBlock *FailureBlock = CBI->getFailureBB();
-  if (FailureBlock->getNumArguments() == 0)
+  SILBasicBlock *failureBlock = cbi->getFailureBB();
+  if (failureBlock->getNumArguments() == 0)
     return false;
-  FailureBlock->getArgument(0)->replaceAllUsesWith(CBI->getOperand());
-  FailureBlock->eraseArgument(0);
+  failureBlock->getArgument(0)->replaceAllUsesWith(cbi->getOperand());
+  failureBlock->eraseArgument(0);
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
-    SwitchEnumInst *SWEI) {
+    SwitchEnumInst *swei) {
   // In ownership qualified SIL, switch_enum must pass its argument to the fail
   // case so we can clean it up. In non-ownership qualified SIL, we expect no
   // argument from the switch_enum in the default case. The way that we handle
@@ -245,70 +321,69 @@ bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
   // 1. We replace all uses of the argument to the false block with a use of the
   // checked cast branch's operand.
   // 2. We delete the argument from the false block.
-  if (!SWEI->hasDefault())
+  if (!swei->hasDefault())
     return false;
 
-  SILBasicBlock *DefaultBlock = SWEI->getDefaultBB();
-  if (DefaultBlock->getNumArguments() == 0)
+  SILBasicBlock *defaultBlock = swei->getDefaultBB();
+  if (defaultBlock->getNumArguments() == 0)
     return false;
-  DefaultBlock->getArgument(0)->replaceAllUsesWith(SWEI->getOperand());
-  DefaultBlock->eraseArgument(0);
+  defaultBlock->getArgument(0)->replaceAllUsesWith(swei->getOperand());
+  defaultBlock->eraseArgument(0);
   return true;
 }
 
-static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
-  assert((isa<DestructureStructInst>(I) || isa<DestructureTupleInst>(I)) &&
+void OwnershipModelEliminatorVisitor::splitDestructure(
+    SILInstruction *destructureInst, SILValue destructureOperand) {
+  assert((isa<DestructureStructInst>(destructureInst) ||
+          isa<DestructureTupleInst>(destructureInst)) &&
          "Only destructure operations can be passed to splitDestructure");
 
   // First before we destructure anything, see if we can simplify any of our
   // instruction operands.
 
-  SILModule &M = I->getModule();
-  SILLocation Loc = I->getLoc();
-  SILType OpType = Op->getType();
+  SILModule &M = destructureInst->getModule();
+  SILType opType = destructureOperand->getType();
 
-  llvm::SmallVector<Projection, 8> Projections;
-  Projection::getFirstLevelProjections(OpType, M, B.getTypeExpansionContext(),
-                                       Projections);
-  assert(Projections.size() == I->getNumResults());
+  llvm::SmallVector<Projection, 8> projections;
+  Projection::getFirstLevelProjections(
+      opType, M, TypeExpansionContext(*destructureInst->getFunction()),
+      projections);
+  assert(projections.size() == destructureInst->getNumResults());
 
-  auto Results = I->getResults();
-  for (unsigned Index : indices(Results)) {
-    SILValue Result = Results[Index];
+  auto destructureResults = destructureInst->getResults();
+  for (unsigned index : indices(destructureResults)) {
+    SILValue result = destructureResults[index];
 
     // If our result doesnt have any uses, do not emit instructions, just skip
     // it.
-    if (Result->use_empty())
+    if (result->use_empty())
       continue;
 
     // Otherwise, create a projection.
-    const auto &Proj = Projections[Index];
-    SingleValueInstruction *ProjInst =
-        Proj.createObjectProjection(B, Loc, Op).get();
+    const auto &proj = projections[index];
+    auto *projInst = withBuilder<SingleValueInstruction *>(
+        destructureInst, [&](SILBuilder &b, SILLocation loc) {
+          return proj.createObjectProjection(b, loc, destructureOperand).get();
+        });
 
-    // If we can simplify, do so.
-    if (SILValue NewV = simplifyInstruction(ProjInst)) {
-      Result->replaceAllUsesWith(NewV);
-      ProjInst->eraseFromParent();
-      continue;
-    }
-
-    Result->replaceAllUsesWith(ProjInst);
+    // First RAUW Result with ProjInst. This ensures that we have a complete IR
+    // before we perform any simplifications.
+    result->replaceAllUsesWith(projInst);
   }
 
   // Now that all of its uses have been eliminated, erase the destructure.
-  I->eraseFromParent();
+  eraseInstruction(destructureInst);
 }
 
 bool OwnershipModelEliminatorVisitor::visitDestructureStructInst(
-    DestructureStructInst *DSI) {
-  splitDestructure(B, DSI, DSI->getOperand());
+    DestructureStructInst *dsi) {
+  splitDestructure(dsi, dsi->getOperand());
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
-    DestructureTupleInst *DTI) {
-  splitDestructure(B, DTI, DTI->getOperand());
+    DestructureTupleInst *dti) {
+  splitDestructure(dti, dti->getOperand());
   return true;
 }
 
@@ -316,87 +391,111 @@ bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
-static bool stripOwnership(SILFunction &F) {
+static bool stripOwnership(SILFunction &func) {
   // If F is an external declaration, do not process it.
-  if (F.isExternalDeclaration())
+  if (func.isExternalDeclaration())
     return false;
 
   // Set F to have unqualified ownership.
-  F.setOwnershipEliminated();
+  func.setOwnershipEliminated();
 
-  bool MadeChange = false;
-  SILBuilder B(F);
-  OwnershipModelEliminatorVisitor Visitor(B);
+  bool madeChange = false;
+  SmallVector<SILInstruction *, 32> createdInsts;
+  OwnershipModelEliminatorVisitor visitor(func);
 
-  for (auto &BB : F) {
+  for (auto &block : func) {
     // Change all arguments to have OwnershipKind::None.
-    for (auto *Arg : BB.getArguments()) {
-      Arg->setOwnershipKind(OwnershipKind::None);
+    for (auto *arg : block.getArguments()) {
+      arg->setOwnershipKind(OwnershipKind::None);
     }
 
-    for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
       // Since we are going to be potentially removing instructions, we need
       // to make sure to increment our iterator before we perform any
       // visits.
-      SILInstruction *I = &*II;
-      ++II;
+      SILInstruction *inst = &*ii;
+      ++ii;
 
-      MadeChange |= Visitor.visit(I);
+      madeChange |= visitor.visit(inst);
     }
   }
-  return MadeChange;
+
+  // Once we have finished processing all instructions, we should be
+  // consistently in non-ossa form meaning that it is now safe for us to invoke
+  // utilities that assume that they are in a consistent ossa or non-ossa form
+  // such as inst simplify. Now go through any instructions and simplify using
+  // inst simplify!
+  //
+  // DISCUSSION: We want our utilities to be able to assume if f.hasOwnership()
+  // is false then the utility is allowed to assume the function the utility is
+  // invoked within is in non-ossa form structurally (e.x.: non-ossa does not
+  // have arguments on the default result of checked_cast_br).
+  while (!visitor.instructionsToSimplify.empty()) {
+    auto value = visitor.instructionsToSimplify.pop_back_val();
+    if (!value.hasValue())
+      continue;
+    if (SILValue newValue = simplifyInstruction(*value)) {
+      replaceAllSimplifiedUsesAndErase(*value, newValue,
+                                       [&](SILInstruction *instToErase) {
+                                         visitor.eraseInstruction(instToErase);
+                                       });
+      madeChange = true;
+    }
+  }
+
+  return madeChange;
 }
 
 static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
-                                                            SILFunction *F) {
-  if (!F->hasOwnership() || F->isTransparent())
+                                                            SILFunction *f) {
+  if (!f->hasOwnership() || f->isTransparent())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
-                          << F->getName() << "\n");
+                          << f->getName() << "\n");
 
-  stripOwnership(*F);
+  stripOwnership(*f);
 }
 
-static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
-  if (!F->hasOwnership())
+static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
+  if (!f->hasOwnership())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
-                          << F->getName() << "\n");
+                          << f->getName() << "\n");
 
-  stripOwnership(*F);
+  stripOwnership(*f);
 }
 
 namespace {
 
 struct OwnershipModelEliminator : SILFunctionTransform {
-  bool SkipTransparent;
-  bool SkipStdlibModule;
+  bool skipTransparent;
+  bool skipStdlibModule;
 
-  OwnershipModelEliminator(bool SkipTransparent, bool SkipStdlibModule)
-      : SkipTransparent(SkipTransparent), SkipStdlibModule(SkipStdlibModule) {}
+  OwnershipModelEliminator(bool skipTransparent, bool skipStdlibModule)
+      : skipTransparent(skipTransparent), skipStdlibModule(skipStdlibModule) {}
 
   void run() override {
     if (DumpBefore.size()) {
       getFunction()->dump(DumpBefore.c_str());
     }
 
-    auto *F = getFunction();
-    auto &Mod = getFunction()->getModule();
+    auto *f = getFunction();
+    auto &mod = getFunction()->getModule();
 
     // If we are supposed to skip the stdlib module and we are in the stdlib
     // module bail.
-    if (SkipStdlibModule && Mod.isStdlibModule()) {
+    if (skipStdlibModule && mod.isStdlibModule()) {
       return;
     }
 
-    if (!F->hasOwnership())
+    if (!f->hasOwnership())
       return;
 
     // If we were asked to not strip ownership from transparent functions in
     // /our/ module, return.
-    if (SkipTransparent && F->isTransparent())
+    if (skipTransparent && f->isTransparent())
       return;
 
     // Verify here to make sure ownership is correct before we strip.
@@ -417,10 +516,10 @@ struct OwnershipModelEliminator : SILFunctionTransform {
           "Found verification error when verifying before lowering "
           "ownership. Please re-run with -sil-verify-all to identify the "
           "actual pass that introduced the verification error.");
-      F->verify();
+      f->verify();
     }
 
-    if (stripOwnership(*F)) {
+    if (stripOwnership(*f)) {
       auto InvalidKind = SILAnalysis::InvalidationKind::BranchesAndInstructions;
       invalidateAnalysis(InvalidKind);
     }
@@ -431,18 +530,18 @@ struct OwnershipModelEliminator : SILFunctionTransform {
     using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
-    if (SkipTransparent) {
-      if (!Mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
+    if (skipTransparent) {
+      if (!mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
         ptr.reset(new NotificationHandlerTy(
             prepareNonTransparentSILFunctionForOptimization));
-        Mod.registerDeserializationNotificationHandler(std::move(ptr));
-        Mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
+        mod.registerDeserializationNotificationHandler(std::move(ptr));
+        mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
       }
     } else {
-      if (!Mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+      if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
         ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
-        Mod.registerDeserializationNotificationHandler(std::move(ptr));
-        Mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
+        mod.registerDeserializationNotificationHandler(std::move(ptr));
+        mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
       }
     }
   }

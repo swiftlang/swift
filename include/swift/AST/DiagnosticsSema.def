@@ -551,6 +551,10 @@ ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
 
+ERROR(async_functiontype_mismatch,none,
+      "invalid conversion from 'async' function of type %0 to "
+      "synchronous function type %1", (Type, Type))
+
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
       "'#keyPath' can only be used with the Objective-C runtime", ())
@@ -908,6 +912,10 @@ REMARK(cross_import_added,none,
        "import of %0 and %1 triggered a cross-import of %2",
        (Identifier, Identifier, Identifier))
 
+REMARK(module_loaded,none,
+       "loaded module at %0",
+       (StringRef))
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
@@ -995,7 +1003,7 @@ ERROR(did_not_call_method,none,
 
 ERROR(init_not_instance_member_use_assignment,none,
       "'init' is a member of the type; use assignment "
-      "to initalize the value instead", ())
+      "to initialize the value instead", ())
 
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
@@ -1108,9 +1116,13 @@ ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
      (Type))
-ERROR(missing_forced_downcast,none,
-      "%0 is not convertible to %1; "
-      "did you mean to use 'as!' to force downcast?", (Type, Type))
+ERROR(cannot_coerce_to_type, none,
+      "%0 is not convertible to %1", (Type, Type))
+NOTE(missing_forced_downcast, none,
+     "did you mean to use 'as!' to force downcast?", ())
+NOTE(missing_optional_downcast, none,
+     "did you mean to use 'as?' to conditionally downcast?", ())
+     
 WARNING(coercion_may_fail_warning,none,
         "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
         (Type, Type))
@@ -1785,6 +1797,10 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+WARNING(spi_attribute_on_import_of_public_module,none,
+        "'@_spi' import of %0 will not include any SPI symbols; "
+        "%0 was built from the public interface at %1",
+        (DeclName, StringRef))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2612,6 +2628,9 @@ WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
+WARNING(anyobject_class_inheritance_deprecated,none,
+  "using 'class' keyword for protocol inheritance is deprecated; "
+  "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
@@ -4529,7 +4548,7 @@ ERROR(differentiable_function_type_invalid_parameter,none,
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(linear)}1'"
       "%select{|; did you want to add '@noDerivative' to this parameter?}2",
-      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+      (StringRef, /*isLinear*/ bool,
        /*hasValidDifferentiabilityParameter*/ bool))
 ERROR(differentiable_function_type_invalid_result,none,
       "result type '%0' does not conform to 'Differentiable'"
@@ -4539,6 +4558,12 @@ ERROR(differentiable_function_type_invalid_result,none,
 ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())
+ERROR(differentiable_function_type_no_differentiability_parameters, 
+      none,
+      "'@differentiable' function type requires at least one differentiability "
+      "parameter, i.e. a non-'@noDerivative' parameter whose type conforms to "
+      "'Differentiable'%select{| with its 'TangentVector' equal to itself}0",
+      (/*isLinear*/ bool))
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -5520,7 +5545,10 @@ NOTE(previous_result_builder_here, none,
      "previous result builder specified here", ())
 ERROR(result_builder_arguments, none,
       "result builder attributes cannot have arguments", ())
-WARNING(result_builder_disabled_by_return, none,
+ERROR(result_builder_disabled_by_return, none,
+      "cannot use explicit 'return' statement in the body of result builder %0",
+      (Type))
+WARNING(result_builder_disabled_by_return_warn, none,
         "application of result builder %0 disabled by explicit 'return' "
         "statement", (Type))
 NOTE(result_builder_remove_attr, none,

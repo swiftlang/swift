@@ -1,4 +1,3 @@
-
 // RUN: %target-sil-opt -ownership-model-eliminator -enable-library-evolution %s | %FileCheck %s
 
 // copy_value and destroy_value operations are lowered away, except for
@@ -36,7 +35,9 @@ bb0(%0 : @guaranteed $Saddle):
 // CHECK:       bb0(%0 : $Saddle):
 // CHECK:         strong_retain %0 : $Saddle
 // CHECK:         %2 = enum $Animal, #Animal.horse!enumelt, %0 : $Saddle
-// CHECK:         release_value %2 : $Animal
-// CHECK:         %4 = tuple ()
-// CHECK:         return %4 : $()
+// CHECK:         retain_value %2
+// CHECK:         release_value %2
+// CHECK:         release_value %2
+// CHECK:         %6 = tuple ()
+// CHECK:         return %6 : $()
 // CHECK:       }

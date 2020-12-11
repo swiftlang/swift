@@ -55,6 +55,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND PLATFORM_SOURCES
+      Actor.cpp
       TaskStatus.cpp
       )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
@@ -66,6 +67,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   set(LLVM_OPTIONAL_SOURCES
     weak.mm
     Refcounting.mm
+    Actor.cpp
     TaskStatus.cpp)
 
   add_swift_unittest(SwiftRuntimeTests

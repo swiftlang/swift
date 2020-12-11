@@ -19,6 +19,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/ABI/MetadataValues.h"
 
 #include "BitPatternBuilder.h"
 #include "FixedTypeInfo.h"
@@ -196,6 +197,27 @@ void StructLayoutBuilder::addNSObjectHeader() {
   CurSize = IGM.getPointerSize();
   CurAlignment = IGM.getPointerAlignment();
   StructFields.push_back(IGM.ObjCClassPtrTy);
+  headerSize = CurSize;
+}
+
+void StructLayoutBuilder::addDefaultActorHeader() {
+  assert(StructFields.size() == 1 &&
+         StructFields[0] == IGM.RefCountedStructTy &&
+         "adding default actor header at wrong offset");
+
+  // These must match the DefaultActor class in Actor.h.
+  auto size = NumWords_DefaultActor * IGM.getPointerSize();
+  auto align = Alignment(Alignment_DefaultActor);
+  auto ty = llvm::ArrayType::get(IGM.Int8PtrTy, NumWords_DefaultActor);
+
+  // Note that we align the *entire structure* to the new alignment,
+  // not the storage we're adding.  Otherwise we would potentially
+  // get internal padding.
+  assert(CurSize.isMultipleOf(IGM.getPointerSize()));
+  assert(align >= CurAlignment);
+  CurSize += size;
+  CurAlignment = align;
+  StructFields.push_back(ty);
   headerSize = CurSize;
 }
 

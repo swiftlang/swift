@@ -25,6 +25,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -219,7 +220,9 @@ namespace {
         return;
       }
 
-      if (theClass->hasSuperclass()) {
+      if (theClass->isNativeNSObjectSubclass()) {
+        // For layout purposes, we don't have ObjC ancestry.
+      } else if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
@@ -274,6 +277,9 @@ namespace {
     void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
                                   ClassDecl *theClass, SILType classType,
                                   bool superclass) {
+      if (theClass->isRootDefaultActor())
+        addDefaultActorHeader();
+
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule(),
                                               TypeExpansionContext::minimal());
@@ -1158,15 +1164,15 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      auto specializedGenericType = getSpecializedGenericType().map(
-          [](auto canType) { return (Type)canType; });
+      Optional<CanType> specializedGenericType = getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, getClass());
       Type rootType;
       if (specializedGenericType && rootClass->isGenericContext()) {
         rootType =
-            (*specializedGenericType)->getRootClass(/*useArchetypes=*/false);
+            (*specializedGenericType)->getRootClass(
+               /*useArchetypes=*/false);
       } else {
         rootType = Type();
       }
@@ -1179,11 +1185,11 @@ namespace {
       // If this class has no formal superclass, then its actual
       // superclass is SwiftObject, i.e. the root class.
       llvm::Constant *superPtr;
-      if (getClass()->hasSuperclass()) {
-        auto base = getClass()->getSuperclassDecl();
+      if (auto base = getSuperclassDeclForMetadata(IGM, getClass())) {
         if (specializedGenericType && base->isGenericContext()) {
           superPtr = getMetaclassRefOrNull(
-              (*specializedGenericType)->getSuperclass(/*useArchetypes=*/false),
+              getSuperclassForMetadata(IGM, *specializedGenericType,
+                                       /*useArchetypes=*/false),
               base);
         } else {
           superPtr = getMetaclassRefOrNull(Type(), base);
@@ -1206,10 +1212,10 @@ namespace {
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             makeArrayRef(fields));
       llvm::Constant *uncastMetaclass;
-      if (auto theType = getSpecializedGenericType()) {
+      if (specializedGenericType) {
         uncastMetaclass =
             IGM.getAddrOfCanonicalSpecializedGenericMetaclassObject(
-                *theType, ForDefinition);
+                *specializedGenericType, ForDefinition);
       } else {
         uncastMetaclass =
             IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
@@ -1443,6 +1449,32 @@ namespace {
     }
 
   private:
+    /// If we should set the forbids associated objects on instances metadata
+    /// flag.
+    ///
+    /// We currently do this on:
+    ///
+    /// * Actor classes.
+    /// * classes marked with @_semantics("objc.forbidAssociatedObjects")
+    ///   (for testing purposes)
+    ///
+    /// TODO: Expand this as appropriate over time.
+    bool doesClassForbidAssociatedObjectsOnInstances() const {
+      auto *clsDecl = getClass();
+
+      // We ban this on actors without objc ancestry.
+      if (clsDecl->isActor() && !clsDecl->checkAncestry(AncestryFlags::ObjC))
+        return true;
+
+      // Otherwise, we only do it if our special semantics attribute is on the
+      // relevant class. This is for testing purposes.
+      if (clsDecl->hasSemanticsAttr(semantics::OBJC_FORBID_ASSOCIATED_OBJECTS))
+        return true;
+
+      // TODO: Add new cases here as appropriate over time.
+      return false;
+    }
+
     ObjCClassFlags buildFlags(ForMetaClass_t forMeta,
                               HasUpdateCallback_t hasUpdater) {
       ObjCClassFlags flags = ObjCClassFlags::CompiledByARC;
@@ -1462,6 +1494,11 @@ namespace {
 
       if (hasUpdater)
         flags |= ObjCClassFlags::HasMetadataUpdateCallback;
+
+      // If we know that our class does not support having associated objects
+      // placed upon instances, set the forbid associated object flag.
+      if (doesClassForbidAssociatedObjectsOnInstances())
+        flags |= ObjCClassFlags::ForbidsAssociatedObjects;
 
       // FIXME: set ObjCClassFlags::Hidden when appropriate
       return flags;
@@ -2039,6 +2076,15 @@ namespace {
     /// Get the name of the class or protocol to mangle into the ObjC symbol
     /// name.
     StringRef getEntityName(llvm::SmallVectorImpl<char> &buffer) const {
+      if (auto prespecialization = getSpecializedGenericType()) {
+        buffer.clear();
+        llvm::raw_svector_ostream os(buffer);
+        os << LinkEntity::forTypeMetadata(*prespecialization,
+                                          TypeMetadataAddress::FullMetadata)
+                  .mangleAsString();
+        return os.str();
+      }
+
       if (auto theClass = getClass()) {
         return theClass->getObjCRuntimeName(buffer);
       }
@@ -2378,6 +2424,13 @@ IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
   return getObjCRuntimeBaseClass(name, name);
 }
 
+/// Lazily declare the base class for a Swift class that inherits from
+/// NSObject but uses native reference-counting.
+ClassDecl *IRGenModule::getSwiftNativeNSObjectDecl() {
+  Identifier name = Context.Id_SwiftNativeNSObject;
+  return getObjCRuntimeBaseClass(name, name);
+}
+
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
   while (auto superclass = C->getSuperclassDecl())
     C = superclass;
@@ -2402,6 +2455,33 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
 
   return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject,
                                      IGM.Context.Id_SwiftObject);
+}
+
+ClassDecl *
+irgen::getSuperclassDeclForMetadata(IRGenModule &IGM, ClassDecl *C) {
+  if (C->isNativeNSObjectSubclass())
+    return IGM.getSwiftNativeNSObjectDecl();
+  return C->getSuperclassDecl();
+}
+
+CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *C) {
+  if (C->isNativeNSObjectSubclass())
+    return IGM.getSwiftNativeNSObjectDecl()->getDeclaredInterfaceType()
+                                           ->getCanonicalType();
+  if (auto superclass = C->getSuperclass())
+    return superclass->getCanonicalType();
+  return CanType();
+}
+
+CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, CanType type,
+                                        bool useArchetypes) {
+  auto cls = type->getClassOrBoundGenericClass();
+  if (cls->isNativeNSObjectSubclass())
+    return IGM.getSwiftNativeNSObjectDecl()->getDeclaredInterfaceType()
+                                           ->getCanonicalType();
+  if (auto superclass = type->getSuperclass(useArchetypes))
+    return superclass->getCanonicalType();
+  return CanType();
 }
 
 ClassMetadataStrategy
@@ -2483,6 +2563,13 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
 
 /// Is the given class known to have Swift-compatible metadata?
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
+  // Make sure that the fake declarations we make in getObjcRuntimeBaseClass
+  // are treated this way.
+  if (theClass->getModuleContext()->isBuiltinModule()) {
+    assert(IGM.ObjCInterop);
+    return false;
+  }
+
   // For now, the fact that a declaration was not implemented in Swift
   // is enough to conclusively force us into a slower path.
   // Eventually we might have an attribute here or something based on

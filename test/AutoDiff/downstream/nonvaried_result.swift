@@ -126,9 +126,8 @@ NonVariedResultTests.testWithLeakChecking("Complex") {
   expectEqual((3, 0), gradient(at: 3, 4, in: complex))
 }
 
-// CHECK-LABEL: sil private [ossa] @AD__${{.*}}complex{{.*}}pullback_src_0_wrt_1 : $@convention(thin) (@guaranteed Tracked<Float>, @owned _AD__$s4nullyycfU3_7complexL_y23DifferentiationUnittest7TrackedVySfGAF_AFtF_bb15__PB__src_0_wrt_1) -> @owned Tracked<Float> {
-// CHECK: bb0([[SEED:%.*]] : @guaranteed $Tracked<Float>, [[PB_STRUCT:%.*]] : @owned [[PB_STRUCT_TYPE:.*]]):
-// CHECK:   destroy_value [[PB_STRUCT]] : [[PB_STRUCT_TYPE]]
+// CHECK-LABEL: sil private [ossa] @AD__${{.*}}complex{{.*}}pullback_src_0_wrt_1 : $@convention(thin) (@guaranteed Tracked<Float>, @guaranteed Builtin.NativeObject) -> @owned Tracked<Float> {
+// CHECK: bb0([[SEED:%.*]] : @guaranteed $Tracked<Float>, [[PB_STRUCT:%.*]] : @guaranteed [[PB_STRUCT_TYPE:.*]]):
 // CHECK:   [[BUF:%.*]] = alloc_stack $Tracked<Float>
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $Tracked<Float>, #AdditiveArithmetic.zero!getter : <Self where Self : AdditiveArithmetic> (Self.Type) -> () -> Self : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   [[METATYPE:%.*]] = metatype $@thick Tracked<Float>.Type
@@ -150,9 +149,8 @@ NonVariedResultTests.testWithLeakChecking("ComplexGeneric") {
   expectEqual(0, pullback(at: Tracked<Float>(3)) { complexGeneric(10, $0) }(1))
 }
 
-// CHECK-LABEL: sil private [ossa] @AD__${{.*}}complexGeneric{{.*}}pullback_src_0_wrt_1{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned _AD__$s4nullyycfU4_14complexGenericL_yxx_xts14DifferentiableRzlF_bb9__PB__src_0_wrt_1_s14DifferentiableRzl<τ_0_0>) -> @out τ_0_0.TangentVector {
-// CHECK: bb0([[DY:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, [[PB_STRUCT:%.*]] : @owned [[PB_STRUCT_TYPE:.*]]):
-// CHECK:   destroy_value [[PB_STRUCT]] : [[PB_STRUCT_TYPE]]
+// CHECK-LABEL: sil private [ossa] @AD__${{.*}}complexGeneric{{.*}}pullback_src_0_wrt_1{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @guaranteed Builtin.NativeObject) -> @out τ_0_0.TangentVector {
+// CHECK: bb0([[DY:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, [[PB_STRUCT:%.*]] : @guaranteed [[PB_STRUCT_TYPE:.*]]):
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter : <Self where Self : AdditiveArithmetic> (Self.Type) -> () -> Self : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   [[METATYPE:%.*]] = metatype $@thick τ_0_0.TangentVector.Type
 // CHECK:   {{%.*}} = apply [[ZERO_FN]]<τ_0_0.TangentVector>([[DY]], [[METATYPE]]) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@thick τ_0_0.Type) -> @out τ_0_0

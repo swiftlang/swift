@@ -1105,6 +1105,11 @@ bool SILInstruction::mayRelease() const {
   default:
     llvm_unreachable("Unhandled releasing instruction!");
 
+  case SILInstructionKind::GetAsyncContinuationInst:
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+  case SILInstructionKind::AwaitAsyncContinuationInst:
+    return false;
+
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst:
@@ -1304,6 +1309,12 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // dynamic_method_br is not duplicatable because IRGen does not support phi
   // nodes of objc_method type.
   if (isa<DynamicMethodBranchInst>(this))
+    return false;
+
+  // Can't duplicate get/await_async_continuation.
+  if (isa<AwaitAsyncContinuationInst>(this) ||
+      isa<GetAsyncContinuationAddrInst>(this) ||
+      isa<GetAsyncContinuationInst>(this))
     return false;
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.

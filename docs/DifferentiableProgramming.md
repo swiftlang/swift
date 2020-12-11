@@ -1,7 +1,9 @@
 # Differentiable Programming Manifesto
 
 *   Authors: [Richard Wei], [Dan Zheng], [Marc Rasi], [Bart Chrzaszcz]
-*   Status: Partially implemented on master, feature gated under `import _Differentiation`
+*   Status:
+    * Partially implemented on main, feature gated under `import _Differentiation`
+    * Initial proposal [pitched](https://forums.swift.org/t/differentiable-programming-for-gradient-based-machine-learning/42147) with a significantly scoped-down subset of features. Please refer to the linked pitch thread for the latest design discussions and changes.
 
 ## Table of contents
 
@@ -1271,6 +1273,12 @@ The synthesized `TangentVector` has the same effective access level as the
 original type declaration. Properties in the synthesized `TangentVector` have
 the same effective access level as their corresponding original properties.
 
+The synthesized `TangentVector` adopts protocols from all `TangentVector`
+conformance constraints implied by the declaration that triggers synthesis. For
+example, synthesized `TangentVector`s always adopt the `AdditiveArithmetic` and
+`Differentiable` protocols because the `Differentiable` protocol requires that
+`TangentVector` conforms to `AdditiveArithmetic` and `Differentiable`.
+
 The synthesized `move(along:)` method calls `move(along:)` for each pair of a
 differentiable variable and its corresponding property in `TangentVector`.
 
@@ -1877,7 +1885,7 @@ Since complex numbers are not yet defined in the standard library, we extended
 the complex number type defined in the
 [NumericAnnex](https://github.com/xwu/NumericAnnex) library to be
 differentiable.
-[The full implementation is here](https://github.com/tensorflow/swift-apis/blob/master/Sources/third_party/Experimental/Complex.swift).
+[The full implementation is here](https://github.com/tensorflow/swift-apis/blob/main/Sources/third_party/Experimental/Complex.swift).
 The implementation adopts the
 [Autograd convention](https://github.com/HIPS/autograd/blob/master/docs/tutorial.md#complex-numbers)
 for derivatives of functions with complex arguments or results, so that we can

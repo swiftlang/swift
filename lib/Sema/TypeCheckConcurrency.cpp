@@ -215,10 +215,7 @@ bool IsActorRequest::evaluate(
 
     // The superclass is 'NSObject', which is known to have no state and no
     // superclass.
-    if (superclassDecl->hasClangNode() &&
-        superclassDecl->getName().is("NSObject") &&
-        superclassDecl->getModuleContext()->getName().is("ObjectiveC") &&
-        actorAttr != nullptr)
+    if (superclassDecl->isNSObject() && actorAttr != nullptr)
       return true;
 
     // This class cannot be an actor; complain if the 'actor' modifier was
@@ -233,6 +230,35 @@ bool IsActorRequest::evaluate(
   }
 
   return actorAttr != nullptr;
+}
+
+bool IsDefaultActorRequest::evaluate(
+    Evaluator &evaluator, ClassDecl *classDecl) const {
+  // If the class isn't an actor class, it's not a default actor.
+  if (!classDecl->isActor())
+    return false;
+
+  // If there is a superclass, and it's an actor class, we defer
+  // the decision to it.
+  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+    // If the superclass is an actor, we inherit its default-actor-ness.
+    if (superclassDecl->isActor())
+      return superclassDecl->isDefaultActor();
+
+    // If the superclass is not an actor class, it can only be
+    // a default actor if it's NSObject.  (For now, other classes simply
+    // can't be actors at all.)  We don't need to diagnose this; we
+    // should've done that already in isActor().
+    if (!superclassDecl->isNSObject())
+      return false;
+  }
+
+  // If the class has explicit custom-actor methods, it's not
+  // a default actor.
+  if (classDecl->hasExplicitCustomActorMethods())
+    return false;
+
+  return true;
 }
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
@@ -595,6 +621,38 @@ namespace {
       contextStack.push_back(dc);
     }
 
+    /// Searches the applyStack from back to front for the inner-most CallExpr
+    /// and marks that CallExpr as implicitly async. 
+    ///
+    /// NOTE: Crashes if no CallExpr was found.
+    /// 
+    /// For example, for global actor function `curryAdd`, if we have:
+    ///     ((curryAdd 1) 2)
+    /// then we want to mark the inner-most CallExpr, `(curryAdd 1)`.
+    ///
+    /// The same goes for calls to member functions, such as calc.add(1, 2),
+    /// aka ((add calc) 1 2), looks like this:
+    /// 
+    ///  (call_expr
+    ///    (dot_syntax_call_expr
+    ///      (declref_expr add)
+    ///      (declref_expr calc))
+    ///    (tuple_expr 
+    ///      ...))
+    ///
+    /// and we reach up to mark the CallExpr.
+    void markNearestCallAsImplicitlyAsync() {
+      assert(applyStack.size() > 0 && "not contained within an Apply?");
+
+      const auto End = applyStack.rend();
+      for (auto I = applyStack.rbegin(); I != End; ++I)
+        if (auto call = dyn_cast<CallExpr>(*I)) {
+          call->setImplicitlyAsync(true);
+          return;
+        }
+      llvm_unreachable("expected a CallExpr in applyStack!");
+    }
+
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -635,10 +693,9 @@ namespace {
           if (auto memberRef = findMemberReference(partialApply->fn)) {
             // NOTE: partially-applied thunks are never annotated as 
             // implicitly async, regardless of whether they are escaping.
-            // So, we do not pass the ApplyExpr along to checkMemberReference.
             checkMemberReference(
                 partialApply->base, memberRef->first, memberRef->second,
-                partialApply->isEscaping);
+                partialApply->isEscaping, /*maybeImplicitAsync=*/false);
 
             partialApply->base->walk(*this);
 
@@ -657,7 +714,7 @@ namespace {
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
               call->getArg(), memberRef->first, memberRef->second, 
-              /*isEscapingPartialApply=*/false, call);
+              /*isEscapingPartialApply=*/false, /*maybeImplicitAsync=*/true);
 
           call->getArg()->walk(*this);
 
@@ -877,7 +934,7 @@ namespace {
           auto concDecl = memberRef->first;
           if (value == concDecl.getDecl() && !apply->implicitlyAsync()) {
             // then this ValueDecl appears as the called value of the ApplyExpr.
-            apply->setImplicitlyAsync(true);
+            markNearestCallAsImplicitlyAsync();
             return true;
           }
         }
@@ -986,7 +1043,7 @@ namespace {
     bool checkMemberReference(
         Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
         bool isEscapingPartialApply = false, 
-        ApplyExpr *maybeImplicitAsync = nullptr) {
+        bool maybeImplicitAsync = false) {
       if (!base || !memberRef)
         return false;
 
@@ -1002,7 +1059,7 @@ namespace {
         if (!selfVar) {
           // actor-isolated non-self calls are implicitly async and thus OK.
           if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
-            maybeImplicitAsync->setImplicitlyAsync(true);
+            markNearestCallAsImplicitlyAsync();
             return false;
           }
           ctx.Diags.diagnose(

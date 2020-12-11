@@ -903,12 +903,12 @@ bool Parser::StructureMarkerRAII::pushStructureMarker(
 //===----------------------------------------------------------------------===//
 
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
-                             const Diagnostic &D) {
+                             const Diagnostic &D, bool diagnoseDollarPrefix) {
   switch (Tok.getKind()) {
   case tok::kw_self:
   case tok::kw_Self:
   case tok::identifier:
-    Loc = consumeIdentifier(&Result);
+    Loc = consumeIdentifier(Result, diagnoseDollarPrefix);
     return false;
   default:
     checkForInputIncomplete();
@@ -930,9 +930,10 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
-                                const Diagnostic &D) {
+                                const Diagnostic &D,
+                                bool diagnoseDollarPrefix) {
   if (Tok.is(tok::identifier)) {
-    Loc = consumeIdentifier(&Result);
+    Loc = consumeIdentifier(Result, diagnoseDollarPrefix);
     return false;
   }
 

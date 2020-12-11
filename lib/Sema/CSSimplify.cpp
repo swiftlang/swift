@@ -1873,9 +1873,19 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
-  // 'async' and non-'async' function types are not compatible.
-  if (func1->isAsync() != func2->isAsync())
-    return getTypeMatchFailure(locator);
+  // A synchronous function can be a subtype of an 'async' function.
+  if (func1->isAsync() != func2->isAsync()) {
+    // Cannot drop 'async'.
+    if (func1->isAsync() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = DropAsyncAttribute::create(*this, func1, func2,
+                                             getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+  }
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
@@ -3551,9 +3561,26 @@ bool ConstraintSystem::repairFailures(
                                   getConstraintLocator(coercion->getSubExpr())))
         return true;
 
-      // Repair a coercion ('as') with a forced checked cast ('as!').
-      if (auto *coerceToCheckCastFix = CoerceToCheckedCast::attempt(
-              *this, lhs, rhs, getConstraintLocator(locator))) {
+      // If the result type of the coercion has an value to optional conversion
+      // we can instead suggest the conditional downcast as it is safer in
+      // situations like conditional binding.
+      auto useConditionalCast = llvm::any_of(
+          ConstraintRestrictions,
+          [&](std::tuple<Type, Type, ConversionRestrictionKind> restriction) {
+            ConversionRestrictionKind restrictionKind;
+            Type type1, type2;
+            std::tie(type1, type2, restrictionKind) = restriction;
+
+            if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
+              return false;
+
+            return rhs->isEqual(type1);
+          });
+
+      // Repair a coercion ('as') with a runtime checked cast ('as!' or 'as?').
+      if (auto *coerceToCheckCastFix =
+              CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
+                                           getConstraintLocator(locator))) {
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
@@ -6750,13 +6777,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // through optional types.
   //
   // FIXME: Unify with the above code path.
-  if (result.ViableCandidates.empty() &&
-      baseObjTy->is<AnyMetatypeType>() &&
+  if (baseObjTy->is<AnyMetatypeType>() &&
       constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getOptionalObjectType()) {
       // If we don't have a wrapped type yet, we can't look through the optional
       // type.
-      if (objectType->getAs<TypeVariableType>()) {
+      if (objectType->getAs<TypeVariableType>() && result.ViableCandidates.empty()) {
         MemberLookupResult result;
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
@@ -9560,8 +9586,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
-        if (auto *fix =
-                CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
+        if (auto *fix = CoerceToCheckedCast::attempt(
+                *this, fromType, toType, /*useConditionalCast*/ false, loc))
           return !recordFix(fix, impact);
       }
       

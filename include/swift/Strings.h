@@ -110,9 +110,15 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BRIDGEOBJECT = {
 /// The name of the Builtin type for RawPointer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
     "Builtin.RawPointer"};
+/// The name of the Builtin type for RawUnsafeContinuation
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION = {
+    "Builtin.RawUnsafeContinuation"};
 /// The name of the Builtin type for UnsafeValueBuffer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
     {"Builtin.UnsafeValueBuffer"};
+/// The name of the Builtin type for Job
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
+    "Builtin.Job"};
 /// The name of the Builtin type for UnknownObject
 ///
 /// This no longer exists as an AST-accessible type, but it's still used for

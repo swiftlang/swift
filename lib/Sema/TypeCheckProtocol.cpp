@@ -713,8 +713,8 @@ swift::matchWitness(
     }
 
     // If the witness is 'async', the requirement must be.
-    if (witnessFnType->getExtInfo().isAsync() !=
-          reqFnType->getExtInfo().isAsync()) {
+    if (witnessFnType->getExtInfo().isAsync() &&
+          !reqFnType->getExtInfo().isAsync()) {
       return RequirementMatch(witness, MatchKind::AsyncConflict);
     }
 
@@ -4849,15 +4849,11 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 }
 
 ProtocolConformanceRef
-TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
-                                SourceLoc ComplainLoc) {
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC) {
   // Look up conformance in the module.
   ModuleDecl *M = DC->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto);
   if (lookupResult.isInvalid()) {
-    if (ComplainLoc.isValid()) {
-      diagnoseConformanceFailure(T, Proto, DC, ComplainLoc);
-    }
     return ProtocolConformanceRef::forInvalid();
   }
 
@@ -4869,16 +4865,8 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   // If we have a conditional requirements that
   // we need to check, do so now.
   if (!condReqs->empty()) {
-    // Figure out the location of the conditional conformance.
-    auto conformanceDC = lookupResult.getConcrete()->getDeclContext();
-    SourceLoc noteLoc;
-    if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC))
-      noteLoc = ext->getLoc();
-    else
-      noteLoc = cast<NominalTypeDecl>(conformanceDC)->getLoc();
-
     auto conditionalCheckResult = checkGenericArguments(
-        DC, ComplainLoc, noteLoc, T,
+        DC, SourceLoc(), SourceLoc(), T,
         {lookupResult.getRequirement()->getSelfInterfaceType()}, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); });
     switch (conditionalCheckResult) {

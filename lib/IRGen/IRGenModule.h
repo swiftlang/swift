@@ -734,6 +734,8 @@ public:
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
+  llvm::StructType *AsyncContinuationContextTy;
+  llvm::PointerType *AsyncContinuationContextPtrTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
@@ -906,6 +908,7 @@ public:
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
+  const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
   llvm::Type *getStorageTypeForUnlowered(Type T);
   llvm::Type *getStorageTypeForLowered(CanType T);
   llvm::Type *getStorageType(SILType T);
@@ -1280,6 +1283,7 @@ public:
   llvm::InlineAsm *getObjCRetainAutoreleasedReturnValueMarker();
   ClassDecl *getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass);
   ClassDecl *getObjCRuntimeBaseClass(Identifier name, Identifier objcName);
+  ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
 

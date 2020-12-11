@@ -22,7 +22,7 @@ from .versions import Version
 
 
 __all__ = [
-    # Command line configuarable
+    # Command line configurable
     'BUILD_VARIANT',
     'CMAKE_GENERATOR',
     'COMPILER_VENDOR',
@@ -38,6 +38,7 @@ __all__ = [
     'DARWIN_INSTALL_PREFIX',
     'LLVM_MAX_PARALLEL_LTO_LINK_JOBS',
     'SWIFT_MAX_PARALLEL_LTO_LINK_JOBS',
+    'DSYMUTIL_JOBS'
 
     # Constants
 ]
@@ -61,6 +62,8 @@ DARWIN_DEPLOYMENT_VERSION_WATCHOS = '2.0'
 UNIX_INSTALL_PREFIX = '/usr'
 DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
                          'Toolchains/XcodeDefault.xctoolchain/usr')
+
+DSYMUTIL_JOBS = 1
 
 
 def _system_memory():

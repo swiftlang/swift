@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 // REQUIRES: objc_interop
+// REQUIRES: optimized_stdlib
 
 import Foundation
 
@@ -67,5 +68,5 @@ import Foundation
 // CHECK-NEXT: %[[T12:.+]] = phi i{{32|64}} [ 0, %[[L7]] ], [ %[[T5]], %[[L2]] ]
 // CHECK-NEXT: %[[T13:.+]] = bitcast %T25unmanaged_objc_throw_func9SR_9035_CC* %{{.+}} to i8*
 // CHECK-NEXT: call void @llvm.objc.release(i8* %[[T13]])
-// CHECK-NEXT: %[[T14:.+]] = inttoptr i{{32|64}} %[[T12]] to %struct.__CFArray**
-// CHECK-NEXT: ret %struct.__CFArray** %[[T14]]
+// CHECK-NEXT: %[[T14:.+]] = inttoptr i{{32|64}} %[[T12]] to %struct.__CFArray*
+// CHECK-NEXT: ret %struct.__CFArray* %[[T14]]

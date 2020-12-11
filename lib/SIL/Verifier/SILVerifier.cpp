@@ -30,6 +30,7 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/MemoryLifetime.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1149,8 +1150,29 @@ public:
       }
     }
 
-    // TODO: There should be a use of an opened archetype inside the instruction for
-    // each opened archetype operand of the instruction.
+    if (isa<OwnershipForwardingInst>(I)) {
+      checkOwnershipForwardingInst(I);
+    }
+  }
+
+  /// We are given an instruction \p fInst that forwards ownership from \p
+  /// operand to one of \p fInst's results, make sure that if we have a
+  /// forwarding instruction that can only accept owned or guaranteed ownership
+  /// that we are following that invariant.
+  void checkOwnershipForwardingInst(SILInstruction *i) {
+    if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
+      ValueOwnershipKind kind = OwnershipKind::Owned;
+      require(kind.isCompatibleWith(o->getOwnershipKind()),
+              "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
+              "compatible with owned");
+    }
+
+    if (auto *o = dyn_cast<GuaranteedFirstArgForwardingSingleValueInst>(i)) {
+      ValueOwnershipKind kind = OwnershipKind::Guaranteed;
+      require(kind.isCompatibleWith(o->getOwnershipKind()),
+              "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
+              "must be compatible with guaranteed");
+    }
   }
 
   void checkInstructionsSILLocation(SILInstruction *I) {
@@ -4906,12 +4928,7 @@ public:
   
   void checkGetAsyncContinuationInstBase(GetAsyncContinuationInstBase *GACI) {
     auto resultTy = GACI->getType();
-    auto &C = resultTy.getASTContext();
-    auto resultBGT = resultTy.getAs<BoundGenericType>();
-    require(resultBGT, "Instruction type must be a continuation type");
-    auto resultDecl = resultBGT->getDecl();
-    require(resultDecl == C.getUnsafeContinuationDecl()
-             || resultDecl == C.getUnsafeThrowingContinuationDecl(),
+    require(resultTy.is<BuiltinRawUnsafeContinuationType>(),
             "Instruction type must be a continuation type");
   }
   
@@ -5463,6 +5480,16 @@ public:
 
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
+
+    // Don't verify functions that were skipped. We are likely to see them in
+    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+    auto Ctx = F->getDeclContext();
+    if (Ctx) {
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+        if (AFD->isBodySkipped())
+          return;
+      }
+    }
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

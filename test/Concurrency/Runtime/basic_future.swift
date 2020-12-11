@@ -1,11 +1,16 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: OS=macosx
-// XFAIL: CPU=arm64e
+// REQUIRES: libdispatch
 
 import Dispatch
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 extension DispatchQueue {
   func async<R>(execute: @escaping () async throws -> R) -> Task.Handle<R> {

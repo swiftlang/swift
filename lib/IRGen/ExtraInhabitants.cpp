@@ -61,6 +61,16 @@ unsigned irgen::getFunctionPointerExtraInhabitantCount(IRGenModule &IGM) {
   return getPointerExtraInhabitantCount(IGM, 0);
 }
 
+unsigned irgen::getAlignedPointerExtraInhabitantCount(IRGenModule &IGM,
+                                                      Alignment align) {
+  // For all of the operations on current platforms, we totally ignore
+  // alignment because we assume we can get what we consider to be an
+  // adequate number of extra inhabitants from LeastValidPointerValue.
+  // If we have to revisit that for a future ABI, we can take advantage
+  // of alignment bits.
+  return getPointerExtraInhabitantCount(IGM, 0);
+}
+
 /*****************************************************************************/
 
 static APInt
@@ -96,6 +106,14 @@ APInt irgen::getFunctionPointerFixedExtraInhabitantValue(IRGenModule &IGM,
                                                          unsigned bits,
                                                          unsigned index,
                                                          unsigned offset) {
+  return getPointerFixedExtraInhabitantValue(IGM, bits, index, offset, 0);
+}
+
+APInt irgen::getAlignedPointerExtraInhabitantValue(IRGenModule &IGM,
+                                                   Alignment align,
+                                                   unsigned bits,
+                                                   unsigned index,
+                                                   unsigned offset) {
   return getPointerFixedExtraInhabitantValue(IGM, bits, index, offset, 0);
 }
 
@@ -180,6 +198,12 @@ llvm::Value *irgen::getFunctionPointerExtraInhabitantIndex(IRGenFunction &IGF,
   return getPointerExtraInhabitantIndex(IGF, src, 0);
 }
 
+llvm::Value *irgen::getAlignedPointerExtraInhabitantIndex(IRGenFunction &IGF,
+                                                          Alignment align,
+                                                          Address src) {
+  return getPointerExtraInhabitantIndex(IGF, src, 0);
+}
+
 /*****************************************************************************/
 
 static void storePointerExtraInhabitant(IRGenFunction &IGF,
@@ -212,5 +236,12 @@ void irgen::storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
 void irgen::storeFunctionPointerExtraInhabitant(IRGenFunction &IGF,
                                                 llvm::Value *index,
                                                 Address dest) {
+  storePointerExtraInhabitant(IGF, index, dest, 0);
+}
+
+void irgen::storeAlignedPointerExtraInhabitant(IRGenFunction &IGF,
+                                               Alignment align,
+                                               llvm::Value *index,
+                                               Address dest) {
   storePointerExtraInhabitant(IGF, index, dest, 0);
 }

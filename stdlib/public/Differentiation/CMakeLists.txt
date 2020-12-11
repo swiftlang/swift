@@ -22,6 +22,7 @@
 
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Empty.swift
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin
   SWIFT_MODULE_DEPENDS_IOS Darwin
@@ -34,6 +35,8 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
+  C_COMPILE_FLAGS
+    -Dswift_Differentiation_EXPORTS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib

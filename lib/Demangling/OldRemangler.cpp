@@ -369,6 +369,9 @@ void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::mangleGenericSpecializationInResilienceDomain(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleInlinedGenericFunction(Node *node) {
   unreachable("unsupported");

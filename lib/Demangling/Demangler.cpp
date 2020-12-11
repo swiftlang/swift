@@ -108,6 +108,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericPartialSpecialization:
     case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+    case Node::Kind::GenericSpecializationInResilienceDomain:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::DynamicAttribute:
@@ -1178,6 +1179,14 @@ NodePointer Demangler::demangleBuiltinType() {
     case 'p':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_RAWPOINTER);
+      break;
+    case 'j':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_JOB);
+      break;
+    case 'c':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION);
       break;
     case 't':
       Ty = createNode(Node::Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN);
@@ -2309,6 +2318,9 @@ NodePointer Demangler::popProtocolConformance() {
     case 'G':
       return demangleGenericSpecialization(Node::Kind::
                                           GenericSpecializationNotReAbstracted);
+    case 'B':
+      return demangleGenericSpecialization(Node::Kind::
+                                      GenericSpecializationInResilienceDomain);
     case 's':
       return demangleGenericSpecialization(
           Node::Kind::GenericSpecializationPrespecialized);

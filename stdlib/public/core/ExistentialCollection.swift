@@ -1641,7 +1641,7 @@ extension AnyRandomAccessCollection {
 //===----------------------------------------------------------------------===//
 
 @usableFromInline
-internal protocol _AnyIndexBox: class {
+internal protocol _AnyIndexBox: AnyObject {
   var _typeID: ObjectIdentifier { get }
 
   func _unbox<T: Comparable>() -> T?

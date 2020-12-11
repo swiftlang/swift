@@ -192,7 +192,7 @@ static bool isAtStartOfSwitchCase(Parser &parser,
       backtrack.emplace(parser);
 
     parser.consumeToken(tok::at_sign);
-    parser.consumeIdentifier();
+    parser.consumeToken(tok::identifier);
     if (parser.Tok.is(tok::l_paren))
       parser.skipSingle();
   }
@@ -536,7 +536,8 @@ ParserResult<Stmt> Parser::parseStmt() {
   // If this is a label on a loop/switch statement, consume it and pass it into
   // parsing logic below.
   if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelInfo.Loc = consumeIdentifier(&LabelInfo.Name);
+    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
+                                      /*diagnoseDollarPrefix=*/true);
     consumeToken(tok::colon);
   }
 
@@ -687,7 +688,7 @@ static ParserStatus parseOptionalControlTransferTarget(Parser &P,
   if (!P.Tok.isAtStartOfLine()) {
     if (P.Tok.is(tok::identifier) && !P.isStartOfStmt() &&
         !P.isStartOfSwiftDecl()) {
-      TargetLoc = P.consumeIdentifier(&Target);
+      TargetLoc = P.consumeIdentifier(Target, /*diagnoseDollarPrefix=*/false);
       return makeParserSuccess();
     } else if (P.Tok.is(tok::code_complete)) {
       if (P.CodeCompletion)
@@ -2486,7 +2487,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
         diagnose(UnknownAttrLoc, diag::previous_attribute, false);
         consumeToken(tok::at_sign);
       }
-      consumeIdentifier();
+      consumeToken(tok::identifier);
 
       SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
       if (Tok.is(tok::l_paren)) {
@@ -2494,9 +2495,11 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
         skipSingle();
       }
     } else {
+      assert(peekToken().is(tok::identifier) && "isAtStartOfSwitchCase() lied");
+
       consumeToken(tok::at_sign);
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
-      consumeIdentifier();
+      consumeToken(tok::identifier);
 
       SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
       if (Tok.is(tok::l_paren))

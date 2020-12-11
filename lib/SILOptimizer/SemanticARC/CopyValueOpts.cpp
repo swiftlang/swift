@@ -19,6 +19,8 @@
 #include "OwnershipPhiOperand.h"
 #include "SemanticARCOptVisitor.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/Projection.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -222,9 +224,9 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     });
 
     if (canOptimizePhi) {
+      Context::ConsumingOperandState state(opPhi);
       opPhi.visitResults([&](SILValue value) {
-        ctx.joinedOwnedIntroducerToConsumedOperands.insert(value,
-                                                           opPhi.getOperand());
+        ctx.joinedOwnedIntroducerToConsumedOperands.insert(value, state);
         return true;
       });
     }
@@ -285,51 +287,21 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
 //                             Live Range Joining
 //===----------------------------------------------------------------------===//
 
-// Handle simple checking where we do not need to form live ranges and visit a
-// bunch of instructions.
-static bool canSafelyJoinSimpleRange(SILValue cviOperand,
-                                     DestroyValueInst *cviOperandDestroy,
-                                     CopyValueInst *cvi) {
-  // We only handle cases where our copy_value has a single lifetime ending
-  // use. We are not working with live ranges here so we do can treat forwarding
-  // insts like any other value.
-  auto *cviConsumer = cvi->getSingleConsumingUse();
-  if (!cviConsumer) {
-    return false;
-  }
-
-  // Ok, we may be able to eliminate this. The main thing we need to be careful
-  // of here is that if the lifetime of %0 ends /after/ the lifetime of
-  // %1. Otherwise we would be shrinking the lifetime of the object
-  // potentially. Consider the following SIL that we would miscompile in such a
-  // case.
+/// Given that our copy_value and destroy_value are in different blocks
+/// determine if we can eliminate the copy/destroy.
+///
+/// We assume that our copy_value \p cvi has a single consuming use
+/// (\p cviConsumingUse) and that the destroy_value \p cviOperandDestroy is the
+/// only destroy of the copy_value's operand.
+static bool canJoinIfCopyDiesInFunctionExitingBlock(
+    SILValue cviOperand, DestroyValueInst *cviOperandDestroy,
+    CopyValueInst *cvi, Operand *cviConsumingUse) {
+  // This is a simple optimization, so at least handle hand-offs at returns.
   //
-  //   // potential_miscompile.sil
-  //   %0 = ...
-  //   %1 = copy_value %0
-  //   apply %cviConsumer(%1)
-  //   apply %guaranteedUser(%0)
-  //   destroy_value %0
-  //
-  // Easily, if we were to eliminate the copy_value, destroy_value, the object's
-  // lifetime could potentially be shrunk before guaranteedUser is executed,
-  // causing guaranteedUser to be a use-after-free.
-  //
-  // As an extra wrinkle, until all interior pointer constructs (e.x.:
-  // project_box) are guaranteed to be guaranted by a begin_borrow, we can not
-  // in general safely shrink lifetimes. So even if we think we can prove that
-  // all non-consuming uses of %0 are before apply %cviConsumer, we may miss
-  // implicit uses that are not guarded yet by a begin_borrow, resulting in
-  // use-after-frees.
-  //
-  // With that in mind, we only handle cases today where we can prove that
-  // destroy_value is strictly before the consuming use of the operand. This
-  // guarantees that we are not shrinking the lifetime of the underlying object.
-  //
-  // First we handle the simple case: where the cviConsumer is a return inst. In
-  // such a case, we know for sure that cviConsumer post-dominates the
-  // destroy_value.
-  auto cviConsumerIter = cviConsumer->getUser()->getIterator();
+  // First if our copy_value's consuming use is a return inst, then we know that
+  // the copy_value is live over the destroy_value \p cviOperandDestroy so we
+  // can eliminate the two safely.
+  auto cviConsumerIter = cviConsumingUse->getUser()->getIterator();
   if (isa<ReturnInst>(cviConsumerIter)) {
     return true;
   }
@@ -343,23 +315,251 @@ static bool canSafelyJoinSimpleRange(SILValue cviOperand,
     return true;
   }
 
-  // Otherwise, we only support joining live ranges where the cvi and the cvi's
-  // operand's destroy are in the same block with the destroy_value of cvi
-  // operand needing to be strictly after the copy_value. This analysis can be
-  // made significantly stronger by using LiveRanges, but this is simple for
-  // now.
-  auto cviOperandDestroyIter = cviOperandDestroy->getIterator();
-  if (cviConsumingBlock != cviOperandDestroyIter->getParent()) {
-    return false;
+  return false;
+}
+
+static Operand *lookThroughSingleForwardingUse(Operand *use) {
+  auto forwardingOperand = ForwardingOperand::get(use);
+  if (!forwardingOperand)
+    return nullptr;
+  auto forwardedValue = (*forwardingOperand).getSingleForwardedValue();
+  if (!forwardedValue)
+    return nullptr;
+  auto *singleConsumingUse = forwardedValue->getSingleConsumingUse();
+  if (!singleConsumingUse)
+    return nullptr;
+  return singleConsumingUse;
+}
+
+/// Walk from inst to the end of the inst->getParent() looking for \p use's
+/// user. Every instruction that we visit that is not said user is added to
+/// foundInsts if foundInsts is not nullptr. We do not include \p inst in \p
+/// foundInsts.
+static bool isUseBetweenInstAndBlockEnd(
+    SILInstruction *inst, Operand *use,
+    SmallPtrSetImpl<SILInstruction *> *foundInsts = nullptr) {
+  auto userOfUse = use->getUser();
+  auto instRegion = llvm::make_range(std::next(inst->getIterator()),
+                                     inst->getParent()->end());
+  for (auto &i : instRegion) {
+    if (&i == userOfUse)
+      return true;
+    if (foundInsts)
+      foundInsts->insert(&i);
+  }
+  return false;
+}
+
+/// Optimize assuming that \p singleCVIConsumingUse and \p dvi are in the same
+/// block.
+///
+/// Importantly since \p singleCVIConsumingUse and \p dvi are in the same block,
+/// we know that \p cvi must be post-dominated by dvi since its only consuming
+/// use is single cvi consuming use by assumption.
+static bool tryJoinIfDestroyConsumingUseInSameBlock(
+    SemanticARCOptVisitor &ctx, CopyValueInst *cvi, DestroyValueInst *dvi,
+    SILValue operand, Operand *singleCVIConsumingUse) {
+  // First see if our destroy_value is in between singleCVIConsumingUse and the
+  // end of block. If this is not true, then we know the destroy_value must be
+  // /before/ our singleCVIConsumingUse meaning that by joining the lifetimes,
+  // we are not going to shrink the overall composite lifetime.
+  SmallPtrSet<SILInstruction *, 8> visitedInsts;
+  if (!isUseBetweenInstAndBlockEnd(singleCVIConsumingUse->getUser(),
+                                   &dvi->getAllOperands()[0], &visitedInsts)) {
+    ctx.eraseInstruction(dvi);
+    ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
+    return true;
   }
 
-  // TODO: This should really be llvm::find, but for some reason, the templates
-  // do not match up given the current state of the iterators. This impl works
-  // in a pinch though.
-  return llvm::any_of(
-      llvm::make_range(cviOperandDestroyIter,
-                       cviOperandDestroyIter->getParent()->end()),
-      [&](const SILInstruction &val) { return &*cviConsumerIter == &val; });
+  // If we reached this point, isUseBetweenInstAndBlockEnd succeeded implying
+  // that we found destroy_value to be after our consuming use. Noting that
+  // additionally, the routine places all instructions in between consuming use
+  // and destroy_value into visitedInsts for our use, we may still be able to
+  // optimize if:
+  //
+  // 1. singleCVIConsumingUse is actually a forwarding user and forms the head
+  //    of a chain of same-block forwarding uses the last of which is /after/
+  //    the destroy_value.
+  //
+  // 2. Our copy_value's operand does not have any direct uses or live dependent
+  //    borrow scopes in between the first forwarding use and the
+  //    destroy_value. This ensures that we do not need to deal with splitting
+  //    borrow scopes or having to deal with "shape"-mismatches in between uses
+  //    of the copy_value's operand and the current running forwarded value.
+  //
+  // This choice of optimization was just an attempt to be pragmatic given we
+  // want to be able to run this optimization at -Onone.
+  //
+  // With that in mind, lets first check 1.
+  Operand *currentForwardingUse = singleCVIConsumingUse;
+  while (auto *op = lookThroughSingleForwardingUse(currentForwardingUse)) {
+    // Visited insts contain all instructions in between singleCVIConsumingUse
+    // and the destroy_value, so if our forwarding inst is not in VisitedInsts,
+    // it must not be in the region and currentForwardingUse must be the last
+    // use.
+    if (!visitedInsts.count(op->getUser()))
+      break;
+    currentForwardingUse = op;
+  }
+
+  // Ok now see if we were able to find a forwarding inst that was later than
+  // destroy_value...
+  if (currentForwardingUse == singleCVIConsumingUse ||
+      visitedInsts.count(currentForwardingUse->getUser())) {
+    // If not, see if this use did have a forwardedValue but that forwardedValue
+    // has multiple end lifetime uses. In that case, we can optimize if there
+    // aren't any uses/etc
+    auto forwardingOperand = ForwardingOperand::get(currentForwardingUse);
+    if (!forwardingOperand)
+      return false;
+    auto forwardedValue = (*forwardingOperand).getSingleForwardedValue();
+    if (!forwardedValue)
+      return false;
+
+    // If our forwarding value has a single consuming use and that use is in the
+    // same block as our destroy_value, bail if the single consuming use is
+    // before our destroy_value.
+    if (auto *singleConsumingUse = forwardedValue->getSingleConsumingUse()) {
+      if (singleConsumingUse->getParentBlock() == dvi->getParentBlock() &&
+          !isUseBetweenInstAndBlockEnd(dvi, singleConsumingUse)) {
+        return false;
+      }
+    }
+
+    // If our forwarded value has multiple lifetime ending uses or a single
+    // consuming use that is after the destroy_value, we still need to perform
+    // our safety check below to know if we can optimized.
+  }
+
+  // Otherwise, we looked through at least one forwarded use and our final use
+  // was past dvi in the current block! So we can optimize!
+  //
+  // As one last safety check, make sure that our copy_value operand does not
+  // have any uses in our code region. If it does, we would need to rewrite
+  // forwarded values so that the types match up, which is more than this humble
+  // optimization is trying to do here given we want to run this at -Onone.
+  //
+  // TODO: Can we make this more aggressive and by how much? E.x.: Can we allow
+  // debug_value users but move them to before our singleCVIConsumingUse?
+  for (auto *use : operand->getUses()) {
+    auto *user = use->getUser();
+
+    // First if our user is dvi, just continue.
+    if (user == dvi)
+      continue;
+
+    // Then see if the user itself is a visitedInst. If so, we have a use that
+    // may require us to do some sort of transform, we can't optimize.
+    if (visitedInsts.count(use->getUser()))
+      return false;
+
+    // Ok, we have a use that isn't in our visitedInsts region. That being said,
+    // we may still have a use that introduces a new BorrowScope onto our
+    // copy_value's operand that overlaps with our forwarding value region. In
+    // such a case, we can not optimize.
+    //
+    // To prove this since we know that any such scope must end at our
+    // destroy_value (since that is when the copy_value's operand is destroyed),
+    // we need to only find scopes that end within the region in between the
+    // singleConsumingUse (the original forwarded use) and the destroy_value. In
+    // such a case, we must bail!
+    if (auto operand = BorrowingOperand::get(use))
+      if (!operand->visitLocalEndScopeUses([&](Operand *endScopeUse) {
+            // Return false if we did see the relevant end scope instruction
+            // in the block. That means that we are going to exit early and
+            // return false.
+            return !visitedInsts.count(endScopeUse->getUser());
+          }))
+        return false;
+  }
+
+  // Ok, we now know that we can eliminate this value.
+  ctx.eraseInstruction(dvi);
+  ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
+  return true;
+}
+
+/// Given that:
+///
+/// 1. Our copy_value's operand has a single consuming use (and that use is a
+///    destroy_value).
+/// 2. Our copy_value has a single consuming use.
+///
+/// try and perform various optimizations to eliminate our copy_value,
+/// destroy_value. Example:
+///
+/// ```
+/// %1 = copy_value %0 // in some block
+/// ...
+///
+/// bbN:
+///   destroy_value %0
+///   br bbFunctionExistingBlock
+///
+/// bbFunctionExistingBlock:
+///   consumingUse %1
+///   return
+/// ```
+///
+/// will be optimized to:
+///
+/// ```
+/// ...
+///
+/// bbN:
+///   br bbFunctionExistingBlock
+///
+/// bbFunctionExistingBlock:
+///   consumingUse %0
+///   return
+/// ```
+static bool tryJoiningIfCopyOperandHasSingleDestroyValue(
+    SemanticARCOptVisitor &ctx, CopyValueInst *cvi, SILValue operand) {
+  // First perform our quick checks to see if our operand has a single
+  // destroy_value and our copy_value has a single consuming use. If either are
+  // false, we can not optimize so bail early.
+  auto *dvi = operand->getSingleConsumingUserOfType<DestroyValueInst>();
+  if (!dvi)
+    return false;
+
+  auto *singleCVIConsumingUse = cvi->getSingleConsumingUse();
+  if (!singleCVIConsumingUse)
+    return false;
+
+  // Otherwise, first check to see if our operand's consuming use is a return
+  // inst or is in a function exiting block and dvi is not. With this
+  // information, we can conclude in both cases that singleCviConsumingUse must
+  // post-dominate destroy_value and can eliminate the hand off traffic.
+  if (canJoinIfCopyDiesInFunctionExitingBlock(operand, dvi, cvi,
+                                              singleCVIConsumingUse)) {
+    ctx.eraseInstruction(dvi);
+    ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
+    return true;
+  }
+
+  // Otherwise, try to prove that dvi and singleCVIConsumingUse are not in the same block.
+  // block with dvi being strictly before singleCVIConsumingUse, that is:
+  //
+  // %operand = ...
+  // ...
+  // %copiedOperand = cvi %operand
+  // ...
+  // dvi %operand
+  // cviConsumer %copiedOperand
+  //
+  // In such a case, all we know is that dvi and cviConsumer are in the same
+  // block. Since dvi is the only destroy of %operand, we know that dvi must
+  // post-dominate %copiedOperand and %operand.
+  if (dvi->getParent() != singleCVIConsumingUse->getParentBlock())
+    return false;
+
+  // First see if our initial use is after dvi. Then we do not need to do any
+  // more complex work. We actually check here if we find our destroy_value in
+  // between our consuming use and the end block. The reason why we do this is
+  // so that if we fail, visitedInsts will contain all instructions in between
+  // the consuming use and the destroy_value.
+  return tryJoinIfDestroyConsumingUseInSameBlock(ctx, cvi, dvi, operand,
+                                                 singleCVIConsumingUse);
 }
 
 // # The Problem We Are Solving
@@ -411,36 +611,81 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     return false;
   }
 
-  // Then check if our operand has a single destroy_value. If it does and that
-  // destroy_value is strictly before the consumer of our copy_value in the same
-  // block as the consumer of said copy_value then we can always join the live
-  // ranges.
+  // Then we handle two different use cases:
   //
-  // Example:
+  // 1. First we optimize a special case where our copy_value has a single
+  //    consuming use and our copy_value's operand has a single consuming use
+  //    and that single use is a destroy_value.
   //
-  //   ```
-  //   %1 = copy_value %0
-  //   ...
-  //   destroy_value %0
-  //   apply %consumingUser(%1)
-  //   ```
-  // ->
+  // 2. The second is a more general optimization where our copy_value has
+  //    multiple destroy_value, but we know that our copy_value is in the same
+  //    block as one of those destroy_value.
+  if (tryJoiningIfCopyOperandHasSingleDestroyValue(*this, cvi, operand))
+    return true;
+
+  // Otherwise, use a more conservative analysis that requires our copy_value
+  // and destroy_value, but is looser about how we handle the consuming use:
   //
-  //   ```
-  //   apply %consumingUser(%0)
-  //   ```
+  // 1. Since our copy_value and destroy_value are in the same block, if our
+  //    copy_value has multiple consuming uses, we know those consuming uses
+  //    must be outside of our current block and must be dominated by the
+  //    copy_value, destroy_value. So we can immediately optimize.
   //
-  // DISCUSSION: We need to ensure that the consuming use of the copy_value is
-  // strictly after the destroy_value to ensure that we do not shrink the live
-  // range of the operand if the operand has any normal uses beyond our copy
-  // value. Otherwise, we could have normal uses /after/ the consuming use of
-  // our copy_value.
-  if (auto *dvi = operand->getSingleConsumingUserOfType<DestroyValueInst>()) {
-    if (canSafelyJoinSimpleRange(operand, dvi, cvi)) {
+  // 2. Otherwise, if we have a single consuming use and it is in the same block
+  //    as our copy_value, destroy_value, we attempt to prove that the consuming
+  //    use (after looking through a forwarding use chain) is later in the
+  //    current block than the destroy_value. We use the last forwarding
+  //    instruction in a chain of SIL instructions that end in the current
+  //    block. Since we are looking through forwarding uses, we need to create
+  //    new-borrow scopes at each forwarding instruction as we clone if we have
+  //    any guaranteed elements in between our destroy_value and final
+  //    forwarding use.
+  auto *singleCVIConsumingUse = cvi->getSingleConsumingUse();
+  for (auto *use : operand->getConsumingUses()) {
+    auto *dvi = dyn_cast<DestroyValueInst>(use->getUser());
+    if (!dvi)
+      continue;
+
+    // First setup our condition... We only optimize if our copy_value and
+    // destroy_value are in the same block. Additionally since our destroy_value
+    // is destroying the operand of the copy_value, we must have that cvi is
+    // strictly before dvi in the block.
+    if (dvi->getParent() != cvi->getParent()) {
+      continue;
+    }
+
+    // If we had multiple consuming uses of our copy_value, then we know that
+    // the copy_value must be live out of the current block implying that we
+    // can optimize without any further analysis since we know we will not be
+    // shrinking lifetimes of owned values.
+    if (singleCVIConsumingUse == nullptr) {
       eraseInstruction(dvi);
       eraseAndRAUWSingleValueInstruction(cvi, operand);
       return true;
     }
+
+    // Then note that if our copy_value has a single consuming use, if that use
+    // is not in the same block as our copy_value/destroy_value, it must be live
+    // out of the block and thus we are not shrinking any lifetimes.
+    if (singleCVIConsumingUse->getParentBlock() != cvi->getParent()) {
+      eraseInstruction(dvi);
+      eraseAndRAUWSingleValueInstruction(cvi, operand);
+      return true;
+    }
+
+    // Ok, we know that all of the following instructions are in the same block
+    // together:
+    //
+    // 1. our copy_value (cvi).
+    // 2. The consumer of our copy_value (singleCVIConsumingUse).
+    // 3. A destroy_value of the copy_value's operand (dvi).
+    //
+    // So call our subroutine that optimizes given the destroy_value, consume
+    // are in the same block and that the copy_value is post-dominated by the
+    // destroy_value.
+    if (tryJoinIfDestroyConsumingUseInSameBlock(*this, cvi, dvi, operand,
+                                                singleCVIConsumingUse))
+      return true;
   }
 
   // Otherwise, we couldn't handle this case, so return false.
@@ -450,6 +695,10 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
   // until we investigate/measure.
   return false;
 }
+
+//===----------------------------------------------------------------------===//
+//                       Owned Copy Value Optimizations
+//===----------------------------------------------------------------------===//
 
 /// Given an owned value that is completely enclosed within its parent owned
 /// value and is not consumed, eliminate the copy.
@@ -517,22 +766,26 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
 bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
-  if (eliminateDeadLiveRangeCopyValue(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
+      eliminateDeadLiveRangeCopyValue(cvi)) {
     return true;
   }
 
   // Then see if copy_value operand's lifetime ends after our copy_value via a
   // destroy_value. If so, we can join their lifetimes.
-  if (tryJoiningCopyValueLiveRangeWithOperand(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::LifetimeJoiningPeephole) &&
+      tryJoiningCopyValueLiveRangeWithOperand(cvi)) {
     return true;
   }
 
   // Then try to perform the guaranteed copy value optimization.
-  if (performGuaranteedCopyValueOptimization(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
+      performGuaranteedCopyValueOptimization(cvi)) {
     return true;
   }
 
-  if (tryPerformOwnedCopyValueOptimization(cvi)) {
+  if (ctx.shouldPerform(ARCTransformKind::RedundantCopyValueElimPeephole) &&
+      tryPerformOwnedCopyValueOptimization(cvi)) {
     return true;
   }
 
