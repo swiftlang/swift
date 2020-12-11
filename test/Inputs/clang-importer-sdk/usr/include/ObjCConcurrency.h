@@ -44,6 +44,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 -(void)repeatTrick:(NSString *)trick completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
+-(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
