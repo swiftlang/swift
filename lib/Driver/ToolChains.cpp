@@ -621,6 +621,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_SwiftRanges:
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
@@ -883,6 +884,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
+    case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_SwiftRanges:
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:

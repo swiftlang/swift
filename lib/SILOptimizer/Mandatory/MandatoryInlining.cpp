@@ -473,6 +473,19 @@ public:
   /// This regular instruction deletion callback checks for any function-type
   /// values that may be unused after deleting the given instruction.
   void recordDeadFunction(SILInstruction *deletedInst) {
+    // If it is a debug instruction, return.
+    // In this function, we look at operands of an instruction to be
+    // deleted, and add back the defining instruction of the operands to the
+    // worklist if it has a function type. This works in general when we are
+    // deleting dead instructions recursively.
+    // But we also consider, an instruction with only debug uses as dead.
+    // And with eraseFromParentWithDebugInsts, we will be deleting a dead
+    // instruction with its debug instructions. So when we are deleting a debug
+    // instruction, we may have already deleted its operand's defining
+    // instruction. So it would be incorrect to add back its operand's defining
+    // instruction.
+    if (deletedInst->isDebugInstruction())
+      return;
     // If the deleted instruction was already recorded as a function producer,
     // delete it from the map and record its operands instead.
     deadFunctionVals.erase(deletedInst);

@@ -287,15 +287,29 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
-
-    auto preexistingMatch = findPreexistingMatch(swiftDepsOfJob, integrand);
+    StringRef realSwiftDepsPath = swiftDepsOfJob;
+    // If we're doing a cross-module incremental build, we'll see these
+    // `.external` "swiftdeps" files. See \c writePriorDependencyGraph for
+    // the structure of the graph we're traversing here. Essentially, follow
+    // the arc laid down there to discover the file path for the swiftmodule
+    // where this dependency node originally came from.
+    if (swiftDepsOfJob.endswith(file_types::getExtension(file_types::TY_ExternalSwiftDeps)) &&
+        integrand->getKey().getKind() != NodeKind::sourceFileProvide) {
+      integrand->forEachDefIDependUpon([&](size_t seqNum) {
+        auto &external = g.getNode(seqNum)->getKey();
+        if (external.getKind() == NodeKind::incrementalExternalDepend) {
+          realSwiftDepsPath = external.getName();
+        }
+      });
+    }
+    auto preexistingMatch = findPreexistingMatch(realSwiftDepsPath, integrand);
     if (preexistingMatch.hasValue() &&
         preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key); // Node was and still is. Do not erase it.
 
     Optional<NullablePtr<ModuleDepGraphNode>> newNodeOrChangedNode =
         integrateSourceFileDepGraphNode(g, integrand, preexistingMatch,
-                                        swiftDepsOfJob);
+                                        realSwiftDepsPath);
 
     if (!newNodeOrChangedNode)
       changedNodes = None;

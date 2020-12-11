@@ -137,11 +137,6 @@ extension Task {
     public func cancel() {
       Builtin.cancelAsyncTask(task)
     }
-
-    @available(*, deprecated, message: "This is a temporary hack")
-    public func run() {
-      runTask(task)
-    }
   }
 }
 
@@ -262,6 +257,9 @@ extension Task {
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
 
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
     return Handle<T>(task: task)
   }
 
@@ -307,6 +305,9 @@ extension Task {
 
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
     return Handle<T>(task: task)
   }
@@ -372,16 +373,15 @@ extension Task {
   }
 }
 
-@_silgen_name("swift_task_run")
-public func runTask(_ task: __owned Builtin.NativeObject)
-
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
-public func runAsync(_ asyncFun: @escaping () async -> ()) {
-  let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
-  runTask(childTask.0)
-}
+@_silgen_name("swift_task_enqueueGlobal")
+@usableFromInline
+func _enqueueJobGlobal(_ task: Builtin.Job)
+
+@_silgen_name("swift_task_runAndBlockThread")
+public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(

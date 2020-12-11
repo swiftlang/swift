@@ -469,7 +469,9 @@ private:
                       StringRef baseName,
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
-                      bool isInitializer, CustomAsyncName customName,
+                      bool isInitializer,
+                      Optional<unsigned> explicitCompletionHandlerParamIndex,
+                      CustomAsyncName customName,
                       Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,

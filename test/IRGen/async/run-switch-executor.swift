@@ -6,7 +6,10 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+
+// FIXME: both of these should work, need to figure out why
 // UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: OS=windows-msvc
 
 // Currently this test just checks if nothing crashes.
 // TODO: also check if the current executor is the correct one.
@@ -45,8 +48,10 @@ final actor class MyActor {
 // CHECK: switch back
 // CHECK: 66
 
-runAsync {
-  let a = MyActor(p: 27)
+// FIXME: this breaks if we release the actor during the runAsyncAndBlock
+// because we don't switch off it before dropping the actor reference.
+let a = MyActor(p: 27)
+runAsyncAndBlock {
   print("run")
   await print(a.testit())
 }

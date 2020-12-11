@@ -23,7 +23,7 @@ import ResilientClass
 sil public_external [exact_self_class] @$s14ResilientClass5ClazzCACycfC : $@convention(method) (@thick Clazz.Type) -> @owned Clazz
 
 // Defined in _Concurrency
-sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_case(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil @test_case : $@convention(thin) @async () -> () {
@@ -44,7 +44,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
 
   %2 = function_ref @test_case : $@convention(thin) @async () -> ()
   %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
-  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
   %6 = integer_literal $Builtin.Int32, 0

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -11,17 +11,6 @@ import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #endif
-
-extension DispatchQueue {
-  func async<R>(execute: @escaping () async throws -> R) -> Task.Handle<R> {
-    let handle = Task.runDetached(operation: execute)
-
-    // Run the task
-    _ = { self.async { handle.run() } }()
-
-    return handle
-  }
-}
 
 enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
@@ -36,16 +25,9 @@ func testSimple(
 ) {
   print("Testing name: \(name), dog: \(dogName), shouldThrow: \(shouldThrow) doSuspend: \(doSuspend)")
 
-  let queue = DispatchQueue(label: "concurrent", attributes: .concurrent)
-  let group = DispatchGroup()
   var completed = false
 
-  group.enter()
-  let taskHandle = queue.async { () async throws -> String in
-    defer {
-      group.leave()
-    }
-
+  let taskHandle = Task.runDetached { () async throws -> String in
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task
@@ -64,12 +46,7 @@ func testSimple(
     return greeting + "!"
   }
 
-  group.enter()
-  _ = queue.async { () async in
-    defer {
-      group.leave()
-    }
-
+  runAsyncAndBlock {
     // If the intent is not to test suspending, wait a bit so the first task
     // can complete.
     if !doSuspend {
@@ -92,7 +69,6 @@ func testSimple(
     }
   }
 
-  group.wait()
   assert(completed)
   print("Finished test")
 }
