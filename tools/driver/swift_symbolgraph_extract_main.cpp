@@ -250,7 +250,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   // since some SDK modules can cause errors in the getModuleByName() call. The call
   // itself will properly return nullptr after this failure, so for our purposes we
   // don't need to print these errors.
-  CI.getDiags().removeConsumer(DiagPrinter);
+  CI.removeDiagnosticConsumer(&DiagPrinter);
   
   for (const auto &ModuleName : VisibleModuleNames) {
     if (ModuleName.str().startswith("_")) {
