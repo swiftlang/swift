@@ -1106,7 +1106,7 @@ public:
   /// NOTE: The ownership verifier is always run when performing normal IR
   /// verification, so this verification can be viewed as a subset of
   /// SILFunction::verify.
-  void verifyOwnership(DeadEndBlocks *deadEndBlocks = nullptr) const;
+  void verifyOwnership(DeadEndBlocks *deadEndBlocks) const;
 
   /// Verify that all non-cond-br critical edges have been split.
   ///
