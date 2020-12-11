@@ -85,8 +85,7 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   //      retain_value %value    // must insert the release after this retain
   //      strong_release %box
   Builder.setInsertionPoint(singleRelease);
-  Builder.createReleaseValue(AEBI->getLoc(), boxedValue,
-                             singleRelease->getAtomicity());
+  Builder.emitDestroyValueOperation(AEBI->getLoc(), boxedValue);
 
   eraseInstIncludingUsers(AEBI);
   return nullptr;
