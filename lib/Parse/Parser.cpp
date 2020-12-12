@@ -524,7 +524,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
       TokReceiver(SF.shouldCollectTokens()
                       ? new TokenRecorder(SF.getASTContext(), L->getBufferID())
                       : new ConsumeTokenReceiver()),
-      ASTGenerator(SF.getASTContext()) {
+      ASTGenerator(SF.getASTContext(), *this) {
   // If no syntax parsing actions were provided, generate a hidden syntax
   // parsing action that only generates the libSyntax tree. This makes sure
   // that the libSyntax tree is always generated.
@@ -1508,12 +1508,147 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
 //===----------------------------------------------------------------------===//
 // MARK: - Primitive Parsing using libSyntax
 
+ParsedTokenSyntax
+Parser::consumeStartingCharacterOfCurrentTokenSyntax(tok Kind, size_t Len) {
+  // Consumes prefix of token and returns its location.
+  // (like '?', '<', '>' or '!' immediately followed by '<')
+  assert(Len >= 1);
+
+  // Current token can be either one-character token we want to consume...
+  if (Tok.getLength() == Len) {
+    Tok.setKind(Kind);
+    return consumeTokenSyntax();
+  }
+
+  auto Loc = Tok.getLoc();
+
+  // ... or a multi-character token with the first N characters being the one
+  // that we want to consume as a separate token.
+  assert(Tok.getLength() > Len);
+  auto Token = markSplitTokenSyntax(Kind, Tok.getText().substr(0, Len));
+
+  auto NewState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(Len));
+  restoreParserPosition(ParserPosition(NewState, Loc),
+                        /*enableDiagnostics=*/true);
+  return Token;
+}
+
+ParsedTokenSyntax Parser::consumeStartingGreaterSyntax() {
+  assert(startsWithGreater(Tok) && "Token does not start with '>'");
+  return consumeStartingCharacterOfCurrentTokenSyntax(tok::r_angle);
+}
+
+ParsedTokenSyntax Parser::consumeStartingLessSyntax() {
+  assert(startsWithLess(Tok) && "Token does not start with '<'");
+  return consumeStartingCharacterOfCurrentTokenSyntax(tok::l_angle);
+}
+
 ParsedTokenSyntax Parser::consumeTokenSyntax() {
   TokReceiver->receive(Tok);
   ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
       Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
   consumeTokenWithoutFeedingReceiver();
   return ParsedToken;
+}
+
+void Parser::ignoreSingle() {
+  switch (Tok.getKind()) {
+  case tok::l_paren:
+    ignoreToken();
+    ignoreUntil(tok::r_paren);
+    ignoreIf(tok::r_paren);
+    break;
+  case tok::l_brace:
+    ignoreToken();
+    ignoreUntil(tok::r_brace);
+    ignoreIf(tok::r_brace);
+    break;
+  case tok::l_square:
+    ignoreToken();
+    ignoreUntil(tok::r_square);
+    ignoreIf(tok::r_square);
+    break;
+  case tok::pound_if:
+  case tok::pound_else:
+  case tok::pound_elseif:
+    ignoreToken();
+    ignoreUntil(tok::pound_endif);
+    ignoreIf(tok::pound_endif);
+    break;
+  default:
+    ignoreToken();
+    break;
+  }
+}
+
+void Parser::ignoreToken() {
+  assert(!Tok.is(tok::eof) && "Lexing eof token");
+  ParsedTriviaList skipped;
+  skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
+  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+            std::back_inserter(skipped));
+  skipped.emplace_back(TriviaKind::GarbageText, Tok.getText().size());
+  std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
+            std::back_inserter(skipped));
+
+  TokReceiver->receive(Tok);
+  L->lex(Tok, LeadingTrivia, TrailingTrivia);
+
+  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+            std::back_inserter(skipped));
+  LeadingTrivia = {std::move(skipped)};
+}
+
+
+void Parser::ignoreUntil(tok Kind) {
+  while (Tok.isNot(Kind, tok::eof, tok::pound_endif, tok::code_complete))
+    ignoreSingle();
+}
+
+bool Parser::ignoreUntilGreaterInTypeList() {
+  while (true) {
+    switch (Tok.getKind()) {
+    case tok::eof:
+    case tok::l_brace:
+    case tok::r_brace:
+    case tok::code_complete:
+      return false;
+
+#define KEYWORD(X) case tok::kw_##X:
+#define POUND_KEYWORD(X) case tok::pound_##X:
+#include "swift/Syntax/TokenKinds.def"
+      if (isStartOfStmt() || isStartOfSwiftDecl() || Tok.is(tok::pound_endif))
+        return false;
+      break;
+    default:
+      if (startsWithGreater(Tok))
+        return true;
+      break;
+    }
+    ignoreSingle();
+  }
+}
+
+ParsedTokenSyntax Parser::markSplitTokenSyntax(tok Kind, StringRef Txt) {
+  SplitTokens.emplace_back();
+  SplitTokens.back().setToken(Kind, Txt);
+  TokReceiver->receive(SplitTokens.back());
+  return ParsedSyntaxRecorder::makeToken(SplitTokens.back(), LeadingTrivia,
+                                         ParsedTrivia(), *SyntaxContext);
+}
+
+Optional<ParsedTokenSyntax>
+Parser::parseIdentifierSyntax(const Diagnostic &D, bool diagnoseDollarPrefix) {
+  switch (Tok.getKind()) {
+  case tok::kw_self:
+  case tok::kw_Self:
+  case tok::identifier:
+    return consumeIdentifierSyntax(diagnoseDollarPrefix);
+  default:
+    checkForInputIncomplete();
+    diagnose(Tok, D);
+    return None;
+  }
 }
 
 Optional<ParsedTokenSyntax>

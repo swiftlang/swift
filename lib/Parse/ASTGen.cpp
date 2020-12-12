@@ -33,7 +33,7 @@ StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Other.
+// MARK: - Private
 
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);

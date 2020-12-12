@@ -21,10 +21,16 @@
 namespace swift {
 class ComponentIdentTypeRepr;
 class TupleTypeRepr;
+class Parser;
 
 /// Generates AST nodes from Syntax nodes.
 class ASTGen {
   ASTContext &Context;
+
+  // TODO: (syntax-parse) ASTGen should not have a refernce to the parser.
+  /// The parser from which the ASTGen is being invoked. Used to inform the
+  /// parser about encountered code completion tokens.
+  Parser &P;
 
   // TODO: (syntax-parse) Remove when parsing of all types has been migrated to
   // libSyntax.
@@ -32,7 +38,7 @@ class ASTGen {
   llvm::DenseMap<SourceLoc, TypeRepr *> Types;
 
 public:
-  explicit ASTGen(ASTContext &Context) : Context(Context) {}
+  ASTGen(ASTContext &Context, Parser &P) : Context(Context), P(P) {}
 
   //===--------------------------------------------------------------------===//
   // MARK: - Expressions
@@ -56,7 +62,11 @@ public:
   TypeRepr *generate(const syntax::TypeSyntax &Type, const SourceLoc Loc);
 
   TypeRepr *generate(const syntax::ArrayTypeSyntax &Type, const SourceLoc Loc);
+  TypeRepr *generate(const syntax::CodeCompletionTypeSyntax &Type,
+                     const SourceLoc Loc);
   TypeRepr *generate(const syntax::DictionaryTypeSyntax &Type,
+                     const SourceLoc Loc);
+  TypeRepr *generate(const syntax::MemberTypeIdentifierSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::SimpleTypeIdentifierSyntax &Type,
                      const SourceLoc Loc);
@@ -76,6 +86,30 @@ public:
   /// libSyntax yet, at the given \c Loc.
   TypeRepr *takeType(const SourceLoc Loc);
 
+private:
+  /// Generate the \c TypeReprs specified in the \c clauseSyntax and write them
+  /// to \c args. Also write the position of the left and right angle brackets
+  /// to \c lAngleLoc and \c rAngleLoc.
+  void
+  generateGenericArgs(const syntax::GenericArgumentClauseSyntax &ClauseSyntax,
+                      const SourceLoc Loc, SourceLoc &LAngleLoc,
+                      SourceLoc &RAngleLoc, SmallVectorImpl<TypeRepr *> &Args);
+
+  /// Generate a \c ComponentIdentTypeRepr from a \c SimpleTypeIdentifierSyntax
+  /// or \c MemberTypeIdentifierSyntax. If \c TypeSyntax is a \c
+  /// MemberTypeIdentifierSyntax this will *not* walk its children. Use \c
+  /// gatherTypeIdentifierComponents to gather all components.
+  template <typename T>
+  ComponentIdentTypeRepr *generateTypeIdentifier(const T &TypeSyntax,
+                                                 const SourceLoc Loc);
+
+  /// Recursively walk the \c Component type syntax and gather all type
+  /// components as \c TypeReprs in \c Components.
+  void gatherTypeIdentifierComponents(
+      const syntax::TypeSyntax &Component, const SourceLoc Loc,
+      llvm::SmallVectorImpl<ComponentIdentTypeRepr *> &Components);
+
+public:
   //===--------------------------------------------------------------------===//
   // MARK: Other
 public:

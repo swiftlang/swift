@@ -901,12 +901,80 @@ public:
   //===--------------------------------------------------------------------===//
   // MARK: - Primitive Parsing using libSyntax
 
+  /// Assuming that the current token is an identifier (or self or Self), 
+  /// consume and return it. If \p diagnoseDollarPrefix is \c true, complain
+  /// if the identifier starts with a '$'.
+  ParsedTokenSyntax consumeIdentifierSyntax(bool diagnoseDollarPrefix) {
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+
+    if (Tok.getText()[0] == '$') {
+      diagnoseDollarIdentifier(Tok, diagnoseDollarPrefix);
+    }
+
+    return consumeTokenSyntax();
+  }
+
+  /// Consume the starting character of the current token, and split the
+  /// remainder of the token into a new token (or tokens).
+  ParsedTokenSyntax
+  consumeStartingCharacterOfCurrentTokenSyntax(tok Kind, size_t Len = 1);
+
+  /// Consume the starting '>' of the current token, which may either
+  /// be a complete '>' token or some kind of operator token starting with '>',
+  /// e.g., '>>'.
+  ParsedTokenSyntax consumeStartingGreaterSyntax();
+
+  /// Consume the starting '<' of the current token, which may either
+  /// be a complete '<' token or some kind of operator token starting with '<',
+  /// e.g., '<>'.
+  ParsedTokenSyntax consumeStartingLessSyntax();
+  
   /// Consume a token and return the corresponding \c ParsedTokenSyntax.
   ParsedTokenSyntax consumeTokenSyntax();
   ParsedTokenSyntax consumeTokenSyntax(tok K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
     return consumeTokenSyntax();
   }
+
+  /// Conditionally ignore the current single token if it matches with the \p
+  /// Kind.
+  bool ignoreIf(tok Kind) {
+    if (!Tok.is(Kind))
+      return false;
+    ignoreToken();
+    return true;
+  }
+
+  /// Ignore one bracketed context. E.g. if the current token is a '(' ignore
+  /// until (and including) the next ')'. Similarly for '{', '[', '#if',
+  /// '#else', '#elseif'. If the current token does not start a bracketed
+  /// context, only ignore the current token.
+  void ignoreSingle();
+
+  /// Ignore the current single token by moving it and its trivia to the leading
+  /// trivia of the next token.
+  void ignoreToken();
+  void ignoreToken(tok Kind) {
+    /// Ignore the current single token asserting its kind.
+    assert(Tok.is(Kind));
+    ignoreToken();
+  }
+
+  /// Ignore tokens until a token of type \p Kind is found.
+  void ignoreUntil(tok Kind);
+
+  /// Ignore tokens until a token that starts with '>', and return true it if
+  /// found. Applies heuristics that are suitable when trying to find the end
+  /// of a list of generic parameters, generic arguments.
+  bool ignoreUntilGreaterInTypeList();
+
+  ParsedTokenSyntax markSplitTokenSyntax(tok Kind, StringRef Txt);
+  
+  /// Consume an identifier (but not an operator) if present and return
+  /// its \c TokenSyntax.  Otherwise, emit the diagnostic \p D and return \c
+  /// None.
+  llvm::Optional<ParsedTokenSyntax>
+  parseIdentifierSyntax(const Diagnostic &D, bool diagnoseDollarPrefix);
 
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and the corresponding \c ParsedTokenSyntax returned.
@@ -1253,6 +1321,23 @@ public:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeCollectionSyntax();
+
+  ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
+  parseTypeGenericArgumentClauseSyntax();
+
+  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  ///
+  /// When `isParsingQualifiedDeclBaseType` is true:
+  /// - Parses and returns the base type for a qualified declaration name,
+  ///   positioning the parser at the '.' before the final declaration name.
+  //    This position is important for parsing final declaration names like
+  //    '.init' via `parseUnqualifiedDeclName`.
+  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser is
+  ///   positioned at '.f'.
+  /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
+  ///   an empty parser error.
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeIdentifierSyntax(bool isParsingQualifiedDeclBaseType = false);
 
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
                                                        bool IsSILFuncDecl = false);

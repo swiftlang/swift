@@ -112,7 +112,7 @@ template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
 makeParsedCodeCompletion(ParsedSyntaxNode node) {
   auto result = ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node));
-  result.setHasCodeCompletion();
+  result.setHasCodeCompletionAndIsError();
   return result;
 }
 

@@ -40,6 +40,8 @@ protected:
   /// completion. This declaration contained the code completion token.
   Decl *ParsedDecl = nullptr;
 
+  TypeLoc ParsedTypeLoc;
+
   /// True if code completion is done inside a raw value expression of an enum
   /// case.
   bool InEnumElementRawValue = false;
@@ -75,6 +77,8 @@ public:
   void setParsedDecl(Decl *D) {
     ParsedDecl = D;
   }
+
+  void setParsedTypeLoc(TypeLoc TyLoc) { ParsedTypeLoc = TyLoc; }
 
   void setLeadingSequenceExprs(ArrayRef<Expr *> exprs) {
     leadingSequenceExprs.assign(exprs.begin(), exprs.end());
@@ -155,10 +159,10 @@ public:
   virtual void completeTypeSimpleBeginning() {};
 
   /// Complete a given type-identifier after we have consumed the dot.
-  virtual void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) {};
+  virtual void completeTypeIdentifierWithDot(){};
 
   /// Complete a given type-identifier when there is no trailing dot.
-  virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) {};
+  virtual void completeTypeIdentifierWithoutDot(){};
 
   /// Complete the beginning of a case statement at the top of switch stmt.
   virtual void completeCaseStmtKeyword() {};
