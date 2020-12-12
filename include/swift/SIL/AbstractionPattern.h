@@ -1024,6 +1024,14 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  /// Normalize a pattern storing a @convention(c|block) function type.
+  ///
+  /// Without normalization, abstraction patterns which store a
+  /// @convention(c|block) function type (which carry a Clang type), may
+  /// be used incorrectly, in contrast to the same abstraction pattern
+  /// which stores the Clang type directly (i.e. hasClangType() is true).
+  void normalizeClangType();
+
   /// Return whether this abstraction pattern contains foreign type
   /// information.
   ///

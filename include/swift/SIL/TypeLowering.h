@@ -1005,7 +1005,7 @@ public:
                                            CanAnyFunctionType formalType);
 
   /// Given a function type, yield its bridged formal type.
-  CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
+  CanAnyFunctionType getBridgedFunctionType(AbstractionPattern &fnPattern,
                                             CanAnyFunctionType fnType,
                                             Bridgeability bridging,
                                             SILFunctionTypeRepresentation rep);

@@ -4076,7 +4076,7 @@ SILFunctionType::substituteOpaqueArchetypes(TypeConverter &TC,
 
 /// Fast path for bridging types in a function type without uncurrying.
 CanAnyFunctionType TypeConverter::getBridgedFunctionType(
-    AbstractionPattern pattern, CanAnyFunctionType t, Bridgeability bridging,
+    AbstractionPattern &pattern, CanAnyFunctionType t, Bridgeability bridging,
     SILFunctionTypeRepresentation rep) {
   // Pull out the generic signature.
   CanGenericSignature genericSig = t.getOptGenericSignature();
@@ -4087,6 +4087,7 @@ CanAnyFunctionType TypeConverter::getBridgedFunctionType(
     return t;
   }
   case SILFunctionLanguage::C: {
+    pattern.normalizeClangType();
     SmallVector<AnyFunctionType::Param, 8> params;
     getBridgedParams(rep, pattern, t->getParams(), params, bridging);
 
@@ -4235,6 +4236,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer: {
+    bridgingFnPattern.normalizeClangType();
+
     if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
       // The "self" parameter should not get bridged unless it's a metatype.
       if (selfParam.getPlainType()->is<AnyMetatypeType>()) {
