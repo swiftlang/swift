@@ -1228,6 +1228,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                                        /*emitWarnings=*/true);
   }
 
+  if (const Arg *A =
+          Args.getLastArg(options::OPT_sanitize_address_use_odr_indicator)) {
+    IRGenOpts.SanitizeAddressUseODRIndicator =
+        parseSanitizerAddressUseODRIndicator(A, Opts.Sanitizers, Diags);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
                                OPT_disable_verify_exclusivity)) {
     Opts.VerifyExclusivity

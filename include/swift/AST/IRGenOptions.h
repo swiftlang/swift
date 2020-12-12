@@ -190,6 +190,9 @@ public:
   /// Which sanitizer(s) have recovery instrumentation enabled.
   OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
 
+  /// Whether to enable ODR indicators when building with ASan.
+  unsigned SanitizeAddressUseODRIndicator : 1;
+
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
@@ -345,6 +348,7 @@ public:
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
+        SanitizeAddressUseODRIndicator(false),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),

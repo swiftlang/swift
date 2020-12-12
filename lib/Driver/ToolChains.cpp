@@ -246,6 +246,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
