@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name objc_ownership_conventions -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
+// RUN: not --crash %target-swift-emit-silgen -module-name objc_ownership_conventions -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop
 
 import gizmo
 
@@ -223,3 +223,37 @@ func innerPointerMethod(_ g: Gizmo) {
 func innerPointerProperty(_ g: Gizmo) {
   useInnerPointer(g.innerProperty)
 }
+
+// Check that attributes are respected for function pointers too.
+
+// CHECK-LABEL: sil hidden [ossa] @$s26objc_ownership_conventions20testFunctionPointersyyF : $@convention(thin) () -> () {
+func testFunctionPointers() {
+  do {
+    var fn = getMyNonConsumingFn()
+    fn(NSObject())
+    // CHECK-LABEL: function_ref @getMyNonConsumingFn : $@convention(c) () -> @convention(c) (AnyObject) -> ()
+    // CHECK: destroy_value {{%.*}} : $AnyObject
+  }
+  do {
+    var fn = getMyConsumingFn()
+    fn(NSObject())
+    // CHECK-LABEL: function_ref @getMyConsumingFn : $@convention(c) () -> @convention(c) (@owned AnyObject) -> ()
+    // CHECK-NOT: destroy_value {{%.*}} : $AnyObject
+  }
+  do {
+    var fn = getMyReturnsNormallyFn()
+    var x = fn()
+    // CHECK-LABEL: function_ref @getMyReturnsNormallyFn : $@convention(c) () -> @convention(c) () -> @autoreleased AnyObject
+    // CHECK: [[RETURN_VALUE:%.*]] = apply {{%.*}}() : $@convention(c) () -> @autoreleased AnyObject
+    // CHECK: [[CAST_RETURN_VALUE:%.*]] = unchecked_ref_cast [[RETURN_VALUE]] : $AnyObject to $Optional<AnyObject>
+    // CHECK: destroy_value [[CAST_RETURN_VALUE]] : $Optional<AnyObject>
+  }
+  do {
+    var fn = getMyReturnsRetainedFn()
+    var x = fn()
+    // CHECK-LABEL: function_ref @getMyReturnsRetainedFn : $@convention(c) () -> @convention(c, cType: "id (*)(void) __attribute__((ns_returns_retained))") () -> @owned AnyObject
+    // CHECK: [[RETURN_VALUE:%.*]] = apply {{%.*}}() : $@convention(c, cType: "id (*)(void) __attribute__((ns_returns_retained))") () -> @owned AnyObject
+    // CHECK: [[CAST_RETURN_VALUE:%.*]] = unchecked_ref_cast [[RETURN_VALUE]] : $AnyObject to $Optional<AnyObject>
+    // CHECK: destroy_value [[CAST_RETURN_VALUE]] : $Optional<AnyObject>
+  }
+} // CHECK: end sil function '$s26objc_ownership_conventions20testFunctionPointersyyF'

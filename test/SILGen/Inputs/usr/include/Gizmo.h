@@ -116,3 +116,12 @@ typedef NS_OPTIONS(NSInteger, NSFungingMask) {
   NSFungingLiability = 2,
   NSFungingToTheMax = (NSInteger)1U << 31
 };
+
+typedef void MyConsumingFnType(id _Nonnull __attribute__((ns_consumed)));
+MyConsumingFnType *_Nonnull getMyConsumingFn(void);
+typedef void MyNonConsumingFnType(id _Nonnull);
+MyNonConsumingFnType *_Nonnull getMyNonConsumingFn(void);
+typedef id _Nonnull MyReturnsNormallyFnType(void);
+MyReturnsNormallyFnType *_Nonnull getMyReturnsNormallyFn(void);
+typedef NS_RETURNS_RETAINED id _Nonnull MyReturnsRetainedFnType(void);
+MyReturnsRetainedFnType *_Nonnull getMyReturnsRetainedFn(void);
