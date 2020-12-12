@@ -848,7 +848,7 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
         Tok.isContextualKeyword("async")) {
 
       if (asyncLoc.isValid()) {
-        diagnose(Tok, diag::duplicate_effect_specifier, 2)
+        diagnose(Tok, diag::duplicate_effect_specifier, Tok.getText())
             .fixItRemove(Tok.getLoc());
       } else if (existingArrowLoc.isValid()) {
         SourceLoc insertLoc = existingArrowLoc;
@@ -876,7 +876,10 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
         (Tok.isAny(tok::kw_throw, tok::kw_try) && !Tok.isAtStartOfLine())) {
       bool isRethrows = Tok.is(tok::kw_rethrows);
 
-      if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
+      if (throwsLoc.isValid()) {
+        diagnose(Tok, diag::duplicate_effect_specifier, Tok.getText())
+            .fixItRemove(Tok.getLoc());
+      } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
         // Replace 'throw' or 'try' with 'throws'.
         diagnose(Tok, diag::throw_in_function_type)
             .fixItReplace(Tok.getLoc(), "throws");
@@ -884,10 +887,6 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
         // Replace 'rethrows' with 'throws' unless it's allowed.
         diagnose(Tok, diag::rethrowing_function_type)
             .fixItReplace(Tok.getLoc(), "throws");
-      } else if (throwsLoc.isValid()) {
-        diagnose(Tok, diag::duplicate_effect_specifier,
-                 rethrows ? (isRethrows ? 1 : 0) : 0)
-            .fixItRemove(Tok.getLoc());
       } else if (existingArrowLoc.isValid()) {
         diagnose(Tok, diag::async_or_throws_in_wrong_position,
                  rethrows ? (isRethrows ? 1 : 0) : 0)

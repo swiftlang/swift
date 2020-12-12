@@ -2374,6 +2374,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
             return makeParserSuccess();
+
+          consumeEffectsSpecifiers();
         }
       }
 
@@ -2396,6 +2398,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       if (consumeIf(tok::arrow)) {
         if (!canParseType())
           return makeParserSuccess();
+
+        consumeEffectsSpecifiers();
       }
     }
     
@@ -2606,6 +2610,10 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         status.setIsParseError();
       } else {
         explicitResultType = new (Context) TypeExpr(explicitResultTypeRepr);
+
+        // Check for 'throws' and 'rethrows' after the type and correct it.
+        parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc,
+                               /*rethrows*/nullptr);
       }
     }
   }

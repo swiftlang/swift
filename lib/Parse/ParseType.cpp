@@ -1462,39 +1462,18 @@ bool Parser::canParseType() {
     break;
   }
 
-  // Handle type-function if we have an 'async'.
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
+  if (!isAtFunctionTypeArrow())
+    return true;
+
+  // Handle type-function if we have an '->' with optional
+  // 'async' and/or 'throws'.
+  while (isEffectsSpecifier(Tok))
     consumeToken();
 
-    // 'async' isn't a valid type without being followed by throws/rethrows
-    // or a return.
-    if (!Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::arrow))
-      return false;
-  }
-
-  // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
-    consumeToken();
-
-    // Allow 'async' here even though it is ill-formed, so we can provide
-    // a better error.
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async"))
-      consumeToken();
-
-    // "throws" or "rethrows" isn't a valid type without being followed by
-    // a return. We also accept 'async' here so we can provide a better
-    // error.
-    if (!Tok.is(tok::arrow))
-      return false;
-  }
+  if (!consumeIf(tok::arrow))
+    return false;
   
-  if (consumeIf(tok::arrow)) {
-    return canParseType();
-  }
-
-  return true;
+  return canParseType();
 }
 
 bool Parser::canParseTypeIdentifierOrTypeComposition() {
