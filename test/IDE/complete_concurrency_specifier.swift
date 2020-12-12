@@ -32,3 +32,12 @@ func testTypeSpecifierWithArrow(_: () #^TYPE_SPECIFICER_WITHARROW?check=SPECIFIE
 func testTypeSpecifierWithAsyncArrow(_: () async #^TYPE_SPECIFICER_WITHASYNCARROW?check=SPECIFIER_WITHASYNC^# -> Void) {}
 func testTypeSpecifierWithThrowsArrow(_: () throws #^TYPE_SPECIFICER_WITHTHROWSARROW?check=SPECIFIER_WITHTHROWS^# -> Void
 func testTypeSpecifierWithAsyncThrowsArrow(_: () async throws #^TYPE_SPECIFICER_WITHASYNCTHROWSARROW?check=SPECIFIER_WITHASYNCTHROWS^# -> Void) {}
+
+_ = { () #^CLOSURE?check=SPECIFIER^# in }
+_ = { () async #^CLOSURE_WITHASYNC?check=SPECIFIER_WITHASYNC^# in }
+_ = { () throws #^CLOSURE_WITHTHROWS?check=SPECIFIER_WITHTHROWS^# in }
+_ = { () async throws #^CLOSURE_WITHAASYNCTHROWS?check=SPECIFIER_WITHASYNCTHROWS^# in }
+_ = { () #^CLOSURE_WITHARROW?check=SPECIFIER^# -> Void in }
+_ = { () async #^CLOSURE_WITHASYNCARROW?check=SPECIFIER_WITHASYNC^# -> Void in }
+_ = { () throws #^CLOSURE_WITHTHROWSARROW?check=SPECIFIER_WITHTHROWS^# -> Void in }
+_ = { () async throws #^CLOSURE_WITHASYNCTHROWSARROW?check=SPECIFIER_WITHASYNCTHROWS^# -> Void in }

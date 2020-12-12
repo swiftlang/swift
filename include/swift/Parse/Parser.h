@@ -1563,8 +1563,9 @@ public:
   /// \param explicitResultType The explicit result type, if specified.
   /// \param inLoc The location of the 'in' keyword, if present.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool parseClosureSignatureIfPresent(
+  /// \returns ParserStatus error if an error occurred. Success if no signature
+  /// is present or succssfully parsed.
+  ParserStatus parseClosureSignatureIfPresent(
           SourceRange &bracketRange,
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,

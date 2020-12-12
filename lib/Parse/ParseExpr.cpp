@@ -2323,14 +2323,14 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
   OS << ")";
 }
 
-bool Parser::
-parseClosureSignatureIfPresent(SourceRange &bracketRange,
-                               SmallVectorImpl<CaptureListEntry> &captureList,
-                               VarDecl *&capturedSelfDecl,
-                               ParameterList *&params,
-                               SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-                               SourceLoc &arrowLoc,
-                               TypeExpr *&explicitResultType, SourceLoc &inLoc){
+ParserStatus Parser::parseClosureSignatureIfPresent(
+    SourceRange &bracketRange,
+    SmallVectorImpl<CaptureListEntry> &captureList,
+    VarDecl *&capturedSelfDecl,
+    ParameterList *&params,
+    SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+    SourceLoc &arrowLoc,
+    TypeExpr *&explicitResultType, SourceLoc &inLoc) {
   // Clear out result parameters.
   bracketRange = SourceRange();
   capturedSelfDecl = nullptr;
@@ -2342,19 +2342,21 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
   // Consume 'async', 'throws', and 'rethrows', but in any order.
   auto consumeAsyncThrows = [&] {
-    bool hadAsync = false;
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async")) {
-      consumeToken();
-      hadAsync = true;
-    }
+    while (true) {
+      if (shouldParseExperimentalConcurrency() &&
+          Tok.isContextualKeyword("async")) {
+        consumeToken();
+        continue;
+      }
+      if (consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows))
+        continue;
 
-    if (!consumeIf(tok::kw_throws) && !consumeIf(tok::kw_rethrows))
-      return;
+      if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
+        consumeToken();
+        continue;
+      }
 
-    if (shouldParseExperimentalConcurrency() && !hadAsync &&
-        Tok.isContextualKeyword("async")) {
-      consumeToken();
+      break;
     }
   };
 
@@ -2367,7 +2369,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
     if (consumeIf(tok::l_square)) {
       skipUntil(tok::r_square);
       if (!consumeIf(tok::r_square))
-        return false;
+        return makeParserSuccess();
     }
 
     // Parse pattern-tuple func-signature-result? 'in'.
@@ -2384,7 +2386,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
-            return false;
+            return makeParserSuccess();
         }
       }
 
@@ -2398,7 +2400,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
           continue;
         }
 
-        return false;
+        return makeParserSuccess();
       }
 
       consumeAsyncThrows();
@@ -2406,19 +2408,20 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
         if (!canParseType())
-          return false;
+          return makeParserSuccess();
       }
     }
     
     // Parse the 'in' at the end.
     if (Tok.isNot(tok::kw_in))
-      return false;
+      return makeParserSuccess();
 
     // Okay, we have a closure signature.
   } else {
     // No closure signature.
-    return false;
+    return makeParserSuccess();
   }
+  ParserStatus status;
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     
@@ -2563,7 +2566,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       if (pattern.isNonNull())
         params = pattern.get();
       else
-        invalid = true;
+        status.setIsParseError();
     } else {
       SyntaxParsingContext ClParamListCtx(SyntaxContext,
                                           SyntaxKind::ClosureParamList);
@@ -2574,7 +2577,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
         if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
-          invalid = true;
+          status.setIsParseError();
           break;
         }
 
@@ -2598,8 +2601,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       params = ParameterList::create(Context, elements);
     }
 
-    parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
-                           /*rethrows*/nullptr);
+    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                                     /*rethrows*/nullptr);
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
@@ -2613,7 +2616,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       if (!explicitResultTypeRepr) {
         // If we couldn't parse the result type, clear out the arrow location.
         arrowLoc = SourceLoc();
-        invalid = true;
+        status.setIsParseError();
       } else {
         explicitResultType = new (Context) TypeExpr(explicitResultTypeRepr);
       }
@@ -2653,7 +2656,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   }
 
   if (!params)
-    return invalid;
+    return status;
 
   // If this was a closure declaration (maybe even trailing)
   // tuple parameter destructuring is one of the common
@@ -2691,14 +2694,15 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         .fixItReplace(param->getSourceRange(), argName)
         .fixItInsert(Tok.getLoc(), OS.str());
 
-    invalid = true;
+    status.setIsParseError();
   }
 
-  return invalid;
+  return status;
 }
 
 ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
+  ParserStatus Status;
   SyntaxParsingContext ClosureContext(SyntaxContext, SyntaxKind::ClosureExpr);
   // We may be parsing this closure expr in a matching pattern context.  If so,
   // reset our state to not be in a pattern for any recursive pattern parses.
@@ -2718,7 +2722,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
-  parseClosureSignatureIfPresent(
+  Status |= parseClosureSignatureIfPresent(
       bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc,
       arrowLoc, explicitResultType, inLoc);
 
@@ -2753,7 +2757,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
-  ParserStatus Status;
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
   if (SourceMgr.rangeContainsCodeCompletionLoc({leftBrace, PreviousLoc})) {
