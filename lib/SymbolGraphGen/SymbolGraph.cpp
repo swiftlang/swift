@@ -39,7 +39,15 @@ SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker,
   M(M),
   ExtendedModule(ExtendedModule),
   Ctx(Ctx),
-  ModuleVersion(ModuleVersion) {}
+  ModuleVersion(ModuleVersion) {
+    if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
+      DeclaringModule = DM;
+      SmallVector<Identifier, 1> Bystanders;
+      if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
+        BystanderModules = Bystanders;
+      }
+    }
+  }
 
 // MARK: - Utilities
 
@@ -499,7 +507,17 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     }); // end metadata:
 
     OS.attributeObject("module", [&](){
-      OS.attribute("name", M.getNameStr());
+      if (DeclaringModule) {
+        // A cross-import overlay can be considered part of its declaring module
+        OS.attribute("name", (*DeclaringModule)->getNameStr());
+        std::vector<StringRef> B;
+        for (auto BModule : BystanderModules) {
+          B.push_back(BModule.str());
+        }
+        OS.attribute("bystanders", B);
+      } else {
+        OS.attribute("name", M.getNameStr());
+      }
       AttributeRAII Platform("platform", OS);
 
       auto *MainFile = M.getFiles().front();

@@ -42,6 +42,16 @@ struct SymbolGraph {
    The module whose types were extended in `M`.
    */
   Optional<ModuleDecl *> ExtendedModule;
+  
+  /**
+   The module declaring `M`, if `M` is a cross-import overlay.
+   */
+  Optional<ModuleDecl *> DeclaringModule;
+  
+  /**
+   The modules that must be imported alongside `DeclaringModule` for `M` to be imported, if `M` is a cross-import overlay.
+   */
+  SmallVector<Identifier, 1> BystanderModules;
 
   /**
    A context for allocations.
