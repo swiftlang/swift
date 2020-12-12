@@ -1373,6 +1373,8 @@ public:
     return consumeTokenSyntax();
   }
 
+  ParsedSyntaxResult<ParsedTypeSyntax> parseOldStyleProtocolCompositionSyntax();
+  
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeAnySyntax();
 
   /// Parse a collection type.

@@ -183,7 +183,13 @@ TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,
 TypeRepr *ASTGen::generate(const syntax::UnknownTypeSyntax &Type,
                            const SourceLoc Loc) {
   auto ChildrenCount = Type.getNumChildren();
-  // generate child 'TypeSyntax' anyway to trigger the side effects e.g.
+
+  if (auto recovered = recoverOldStyleProtocolComposition(Type, Loc)) {
+    return recovered;
+  }
+
+  // Recovery failed.
+  // Generate child 'TypeSyntax' anyway to trigger the side effects e.g.
   // code-completion.
   for (size_t i = 0; i != ChildrenCount; ++i) {
     auto elem = *Type.getChild(i);
@@ -345,4 +351,39 @@ void ASTGen::gatherTypeIdentifierComponents(
   } else {
     llvm_unreachable("unexpected type identifier component");
   }
+}
+
+TypeRepr *ASTGen::recoverOldStyleProtocolComposition(
+    const syntax::UnknownTypeSyntax &Type, const SourceLoc Loc) {
+  auto ChildrenCount = Type.getNumChildren();
+
+  // Can't be old-style protocol composition because we need at least
+  // 'protocol' '<'
+  if (ChildrenCount < 2) {
+    return nullptr;
+  }
+
+  auto keyword = Type.getChild(0)->getAs<TokenSyntax>();
+  if (!keyword || keyword->getText() != "protocol") {
+    return nullptr;
+  }
+  auto lAngle = Type.getChild(1)->getAs<TokenSyntax>();
+  if (!lAngle || lAngle->getTokenKind() != tok::l_angle) {
+    return nullptr;
+  }
+
+  SmallVector<TypeRepr *, 4> protocols;
+  for (unsigned i = 2; i < Type.getNumChildren(); i++) {
+    if (auto elem = Type.getChild(i)->getAs<TypeSyntax>()) {
+      if (auto proto = generate(*elem, Loc)) {
+        protocols.push_back(proto);
+      }
+    }
+  }
+
+  auto keywordLoc = advanceLocBegin(Loc, *keyword);
+  auto lAngleLoc = advanceLocBegin(Loc, *lAngle);
+  auto endLoc = advanceLocBegin(Loc, *Type.getChild(ChildrenCount - 1));
+  return CompositionTypeRepr::create(Context, protocols, keywordLoc,
+                                     {lAngleLoc, endLoc});
 }

@@ -127,6 +127,14 @@ private:
       const syntax::TypeSyntax &Component, const SourceLoc Loc,
       llvm::SmallVectorImpl<ComponentIdentTypeRepr *> &Components);
 
+  /// Recover from old-style protocol composition:
+  ///   `protocol` `<` protocols `>`
+  /// Returns the recovered \c TypeRepr if recovery succeeded. Otherwise returns
+  /// \c nullptr;
+  TypeRepr *
+  recoverOldStyleProtocolComposition(const syntax::UnknownTypeSyntax &Type,
+                                     const SourceLoc Loc);
+
 public:
   //===--------------------------------------------------------------------===//
   // MARK: Other
