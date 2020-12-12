@@ -343,36 +343,6 @@ extension Task {
   }
 }
 
-// ==== UnsafeContinuation -----------------------------------------------------
-
-extension Task {
-  /// The operation functions must resume the continuation *exactly once*.
-  ///
-  /// The continuation will not begin executing until the operation function returns.
-  ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
-  /* @instantaneous */
-  public static func withUnsafeContinuation<T>(
-    operation: (UnsafeContinuation<T>) -> Void
-  ) async -> T {
-    fatalError("\(#function) not implemented yet.")
-  }
-
-  /// The operation functions must resume the continuation *exactly once*.
-  ///
-  /// The continuation will not begin executing until the operation function returns.
-  ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
-  /* @instantaneous */
-  public static func withUnsafeThrowingContinuation<T>(
-    operation: (UnsafeThrowingContinuation<T>) -> Void
-  ) async throws -> T {
-    fatalError("\(#function) not implemented yet.")
-  }
-}
-
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
