@@ -127,7 +127,6 @@ internal var _orphanedFoundationSubclassesReparented: Bool = false
 /// in order to bridge Swift Strings, Arrays, Dictionarys, Sets, or Enumerators to ObjC.
  internal func _connectOrphanedFoundationSubclassesIfNeeded() -> Void {
   let bridgeWorks = _bridgeInitializedSuccessfully
-  _debugPrecondition(bridgeWorks)
   _orphanedFoundationSubclassesReparented = true
 }
 

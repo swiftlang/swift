@@ -351,10 +351,6 @@ public struct UnsafeRawPointer: _Pointer {
   ///   with the value in the memory referenced by this pointer.
   @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
-    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(MemoryLayout<T>.alignment) - 1)),
-      "load from misaligned raw pointer")
-
     return Builtin.loadRaw((self + offset)._rawValue)
   }
 
@@ -738,9 +734,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public func initializeMemory<T>(
     as type: T.Type, repeating repeatedValue: T, count: Int
   ) -> UnsafeMutablePointer<T> {
-    _debugPrecondition(count >= 0,
-      "UnsafeMutableRawPointer.initializeMemory: negative count")
-
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
     var nextPtr = self
     for _ in 0..<count {
@@ -798,15 +791,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public func initializeMemory<T>(
     as type: T.Type, from source: UnsafePointer<T>, count: Int
   ) -> UnsafeMutablePointer<T> {
-    _debugPrecondition(
-      count >= 0,
-      "UnsafeMutableRawPointer.initializeMemory with negative count")
-    _debugPrecondition(
-      (UnsafeRawPointer(self + count * MemoryLayout<T>.stride)
-        <= UnsafeRawPointer(source))
-      || UnsafeRawPointer(source + count) <= UnsafeRawPointer(self),
-      "UnsafeMutableRawPointer.initializeMemory overlapping range")
-
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
     Builtin.copyArray(
       T.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -851,10 +835,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public func moveInitializeMemory<T>(
     as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
   ) -> UnsafeMutablePointer<T> {
-    _debugPrecondition(
-      count >= 0,
-      "UnsafeMutableRawPointer.moveInitializeMemory with negative count")
-
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
     if self < UnsafeMutableRawPointer(source)
        || self >= UnsafeMutableRawPointer(source + count) {
@@ -897,10 +877,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   with the value in the memory referenced by this pointer.
   @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
-    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(MemoryLayout<T>.alignment) - 1)),
-      "load from misaligned raw pointer")
-
     return Builtin.loadRaw((self + offset)._rawValue)
   }
 
@@ -944,10 +920,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(MemoryLayout<T>.alignment) - 1)),
-      "storeBytes to misaligned raw pointer")
-
     var temp = value
     withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
@@ -980,9 +952,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   - byteCount: The number of bytes to copy. `byteCount` must not be negative.
   @inlinable
   public func copyMemory(from source: UnsafeRawPointer, byteCount: Int) {
-    _debugPrecondition(
-      byteCount >= 0, "UnsafeMutableRawPointer.copyMemory with negative count")
-
     _memmove(dest: self, src: source, size: UInt(byteCount))
   }
 }

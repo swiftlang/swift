@@ -64,12 +64,6 @@ public struct RangeSet<Bound: Comparable> {
   /// ranges share an upper and lower bound — `[0..<5, 5..<10]` is ill-formed,
   /// and would instead be represented as `[0..<10]`.
   internal func _checkInvariants() {
-    for (a, b) in zip(ranges, ranges.dropFirst()) {
-      _debugPrecondition(!a.isEmpty && !b.isEmpty, "Empty range in range set")
-      _debugPrecondition(
-        a.upperBound < b.lowerBound,
-        "Out of order/overlapping ranges in range set")
-    }
   }
   
   /// Creates a new range set from `ranges`, which satisfies the range set

@@ -154,9 +154,6 @@ extension _ArrayBufferProtocol {
 /// always guaranteed by measuring `s` once and re-using that value.
 @inlinable
 internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
-  _debugPrecondition(
-    i == s.endIndex,
-    "invalid Collection: count differed in successive traversals")
 }
 
 @inlinable

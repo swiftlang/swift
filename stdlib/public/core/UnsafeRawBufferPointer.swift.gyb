@@ -183,14 +183,10 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public subscript(i: Int) -> Element {
     get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
       return _position._unsafelyUnwrappedUnchecked.load(fromByteOffset: i, as: UInt8.self)
     }
 %  if mutable:
     nonmutating set {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
       _position._unsafelyUnwrappedUnchecked.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
     }
 %  end # mutable
@@ -203,16 +199,10 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public subscript(bounds: Range<Int>) -> SubSequence {
     get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
       return Slice(base: self, bounds: bounds)
     }
 %  if mutable:
     nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
-      _debugPrecondition(bounds.count == newValue.count)
-
       if !newValue.isEmpty {
         (baseAddress! + bounds.lowerBound).copyMemory(
           from: newValue.base.baseAddress! + newValue.startIndex,
@@ -236,8 +226,6 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public func swapAt(_ i: Int, _ j: Int) {
     guard i != j else { return }
-    _debugPrecondition(i >= 0 && j >= 0)
-    _debugPrecondition(i < endIndex && j < endIndex)
     let pi = (_position! + i)
     let pj = (_position! + j)
     let tmp = pi.load(fromByteOffset: 0, as: UInt8.self)
@@ -325,9 +313,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   memory.
   @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
-    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
-    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.load out of bounds")
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
@@ -361,10 +346,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as: T.Type
   ) {
-    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
-    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.storeBytes out of bounds")
-
     baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 
@@ -386,8 +367,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   `source.count` must be less than or equal to this buffer's `count`.
   @inlinable
   public func copyMemory(from source: UnsafeRawBufferPointer) {
-    _debugPrecondition(source.count <= self.count,
-      "${Self}.copyMemory source has too many elements")
     baseAddress?.copyMemory(from: source.baseAddress!, byteCount: source.count)
   }
 
@@ -407,8 +386,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   @inlinable
   public func copyBytes<C: Collection>(from source: C
   ) where C.Element == UInt8 {
-    _debugPrecondition(source.count <= self.count,
-      "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
       return
     }
@@ -624,8 +601,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     let elementStride = MemoryLayout<S.Element>.stride
     
     // This has to be a debug precondition due to the cost of walking over some collections.
-    _debugPrecondition(source.underestimatedCount <= (count / elementStride),
-      "insufficient space to accommodate source.underestimatedCount elements")
     guard let base = baseAddress else {
       // this can be a precondition since only an invalid argument should be costly
       _precondition(source.underestimatedCount == 0, 

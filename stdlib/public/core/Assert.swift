@@ -242,20 +242,6 @@ public func _overflowChecked<T>(
 }
 
 
-/// Debug library precondition checks.
-///
-/// Debug library precondition checks are only on in debug mode. In release and
-/// in fast mode they are disabled. In debug mode they print an error message
-/// and abort.
-/// They are meant to be used when the check is not comprehensively checking for
-/// all possible errors.
-@usableFromInline @_transparent
-internal func _debugPrecondition(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = #file, line: UInt = #line
-) {
-}
-
 @usableFromInline @_transparent
 internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),

@@ -404,9 +404,6 @@ extension MutableCollection {
   internal mutating func _swapNonemptySubrangePrefixes(
     _ lhs: Range<Index>, _ rhs: Range<Index>
   ) -> (Index, Index) {
-    assert(!lhs.isEmpty)
-    assert(!rhs.isEmpty)
-    
     var p = lhs.lowerBound
     var q = rhs.lowerBound
     repeat {
@@ -435,9 +432,6 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)
   let p2 = Builtin.addressof(&b)
-  _debugPrecondition(
-    p1 != p2,
-    "swapping a location with itself is not supported")
 
   // Take from P1.
   let tmp: T = Builtin.take(p1)

@@ -353,8 +353,6 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
-
   return _convertConstArrayToPointerArgument(a)
 }
 

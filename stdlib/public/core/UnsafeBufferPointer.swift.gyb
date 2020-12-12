@@ -213,15 +213,11 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable // unsafe-performance
   public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
     // NOTE: In release mode, this method is a no-op for performance reasons.
-    _debugPrecondition(index >= bounds.lowerBound)
-    _debugPrecondition(index < bounds.upperBound)
   }
 
   @inlinable // unsafe-performance
   public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
     // NOTE: In release mode, this method is a no-op for performance reasons.
-    _debugPrecondition(range.lowerBound >= bounds.lowerBound)
-    _debugPrecondition(range.upperBound <= bounds.upperBound)
   }
 
   @inlinable // unsafe-performance
@@ -268,14 +264,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Element {
     get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
       return _position._unsafelyUnwrappedUnchecked[i]
     }
 %if Mutable:
     nonmutating _modify {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
       yield &_position._unsafelyUnwrappedUnchecked[i]
     }
 %end
@@ -341,17 +333,11 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     -> Slice<Unsafe${Mutable}BufferPointer<Element>>
   {
     get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
       return Slice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
     nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
-      _debugPrecondition(bounds.count == newValue.count)
-
       // FIXME: swift-3-indexing-model: tests.
       if !newValue.isEmpty {
         (_position! + bounds.lowerBound).assign(
@@ -375,8 +361,6 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable // unsafe-performance
   public func swapAt(_ i: Int, _ j: Int) {
     guard i != j else { return }
-    _debugPrecondition(i >= 0 && j >= 0)
-    _debugPrecondition(i < endIndex && j < endIndex)
     let pi = (_position! + i)
     let pj = (_position! + j)
     let tmp = pi.move()
@@ -440,10 +424,6 @@ extension Unsafe${Mutable}BufferPointer {
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     let (oldBase, oldCount) = (self.baseAddress, self.count)
-    defer { 
-      _debugPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
-      "UnsafeMutableBufferPointer.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
-    } 
     return try body(&self)
   }
 
@@ -674,7 +654,6 @@ extension Unsafe${Mutable}BufferPointer {
     to type: T.Type, _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
     if let base = _position {
-      _debugPrecondition(MemoryLayout<Element>.stride == MemoryLayout<T>.stride)
       Builtin.bindMemory(base._rawValue, count._builtinWordValue, T.self)
       defer {
         Builtin.bindMemory(base._rawValue, count._builtinWordValue, Element.self)

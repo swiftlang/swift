@@ -101,7 +101,6 @@ extension _ValidUTF8Buffer: Collection {
 
   @inlinable
   public func index(after i: Index) -> Index {
-    _debugPrecondition(i._biasedBits != 0)
     return Index(_biasedBits: i._biasedBits >> 8)
   }
 
@@ -115,7 +114,6 @@ extension _ValidUTF8Buffer: BidirectionalCollection {
   @inlinable
   public func index(before i: Index) -> Index {
     let offset = _ValidUTF8Buffer(_biasedBits: i._biasedBits).count
-    _debugPrecondition(offset != 0)
     return Index(_biasedBits: _biasedBits &>> (offset &<< 3 - 8))
   }
 }
@@ -126,8 +124,6 @@ extension _ValidUTF8Buffer: RandomAccessCollection {
   @inlinable
   @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
-    _debugPrecondition(_isValid(i))
-    _debugPrecondition(_isValid(j))
     return (
       i._biasedBits.leadingZeroBitCount - j._biasedBits.leadingZeroBitCount
     ) &>> 3
@@ -138,8 +134,6 @@ extension _ValidUTF8Buffer: RandomAccessCollection {
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     let startOffset = distance(from: startIndex, to: i)
     let newOffset = startOffset + n
-    _debugPrecondition(newOffset >= 0)
-    _debugPrecondition(newOffset <= count)
     return Index(_biasedBits: _biasedBits._fullShiftRight(newOffset &<< 3))
   }
 }
@@ -163,7 +157,6 @@ extension _ValidUTF8Buffer: RangeReplaceableCollection {
   @inlinable
   @inline(__always)
   public mutating func append(_ e: Element) {
-    _debugPrecondition(count + 1 <= capacity)
     _internalInvariant(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
     _biasedBits |= UInt32(e &+ 1) &<< (count &<< 3)
@@ -173,7 +166,6 @@ extension _ValidUTF8Buffer: RangeReplaceableCollection {
   @inline(__always)
   @discardableResult
   public mutating func removeFirst() -> Element {
-    _debugPrecondition(!isEmpty)
     let result = Element(truncatingIfNeeded: _biasedBits) &- 1
     _biasedBits = _biasedBits._fullShiftRight(8)
     return result
@@ -189,8 +181,6 @@ extension _ValidUTF8Buffer: RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Element == Element {
-    _debugPrecondition(_isValid(target.lowerBound))
-    _debugPrecondition(_isValid(target.upperBound))
     var r = _ValidUTF8Buffer()
     for x in self[..<target.lowerBound] { r.append(x) }
     for x in replacement                { r.append(x) }
@@ -203,7 +193,6 @@ extension _ValidUTF8Buffer {
   @inlinable
   @inline(__always)
   public mutating func append(contentsOf other: _ValidUTF8Buffer) {
-    _debugPrecondition(count + other.count <= capacity)
     _biasedBits |= UInt32(
       truncatingIfNeeded: other._biasedBits) &<< (count &<< 3)
   }

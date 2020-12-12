@@ -183,7 +183,6 @@ extension _UIntBuffer: RangeReplaceableCollection {
   @inlinable
   @inline(__always)
   public mutating func append(_ newElement: Element) {
-    _debugPrecondition(count + 1 <= capacity)
     _storage &= ~(Storage(Element.max) &<< _bitCount)
     _storage |= Storage(newElement) &<< _bitCount
     _bitCount = _bitCount &+ _elementWidth
@@ -193,7 +192,6 @@ extension _UIntBuffer: RangeReplaceableCollection {
   @inline(__always)
   @discardableResult
   public mutating func removeFirst() -> Element {
-    _debugPrecondition(!isEmpty)
     let result = Element(truncatingIfNeeded: _storage)
     _bitCount = _bitCount &- _elementWidth
     _storage = _storage._fullShiftRight(_elementWidth)
@@ -205,16 +203,11 @@ extension _UIntBuffer: RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Element == Element {
-    _debugPrecondition(
-      (0..<_bitCount)._contains_(
-        target.lowerBound.bitOffset..<target.upperBound.bitOffset))
-    
     let replacement1 = _UIntBuffer(replacement)
 
     let targetCount = distance(
       from: target.lowerBound, to: target.upperBound)
     let growth = replacement1.count &- targetCount
-    _debugPrecondition(count + growth <= capacity)
 
     let headCount = distance(from: startIndex, to: target.lowerBound)
     let tailOffset = distance(from: startIndex, to: target.upperBound)

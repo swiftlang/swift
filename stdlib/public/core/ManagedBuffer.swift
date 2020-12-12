@@ -390,18 +390,6 @@ extension ManagedBufferPointer {
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
-    _debugPrecondition(
-      _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
-      || (
-        (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
-        && _class_getInstancePositiveExtentSize(bufferClass)
-          == _headerOffset + MemoryLayout<Header>.size),
-      "ManagedBufferPointer buffer class has illegal stored properties"
-    )
-    _debugPrecondition(
-      _usesNativeSwiftReferenceCounting(bufferClass),
-      "ManagedBufferPointer buffer class must be non-@objc"
-    )
   }
 
   @inlinable

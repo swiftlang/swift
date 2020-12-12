@@ -987,8 +987,6 @@ internal func _copyCollectionToContiguousArray<
     count: count)
   var (itr, end) = source._copyContents(initializing: p)
 
-  _debugPrecondition(itr.next() == nil,
-    "invalid Collection: more than 'count' elements in collection")
   // We also have to check the evil shrink case in release builds, because
   // it can result in uninitialized array elements and therefore undefined
   // behavior.

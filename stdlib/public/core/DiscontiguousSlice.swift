@@ -170,8 +170,6 @@ extension MutableCollection {
     set {
       var indexOfReplacement = newValue.startIndex
       for range in subranges.ranges {
-        _debugPrecondition(!range.isEmpty, "Empty range in a range set")
-        
         var indexToReplace = range.lowerBound
         repeat {
           _precondition(

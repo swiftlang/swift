@@ -232,7 +232,6 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 /// - Returns: The instance `x`, cast to type `T`.
 @_transparent
 public func unsafeDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
-  _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 

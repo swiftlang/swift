@@ -660,8 +660,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   public func initialize(repeating repeatedValue: Pointee, count: Int) {
     // FIXME: add tests (since the `count` has been added)
-    _debugPrecondition(count >= 0,
-      "UnsafeMutablePointer.initialize(repeating:count:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
@@ -719,7 +717,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///     `count` must not be negative. 
   @inlinable
   public func assign(repeating repeatedValue: Pointee, count: Int) {
-    _debugPrecondition(count >= 0, "UnsafeMutablePointer.assign(repeating:count:) with negative count")
     for i in 0..<count {
       self[i] = repeatedValue
     }
@@ -743,8 +740,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///     `source` to this pointer's memory. `count` must not be negative.
   @inlinable
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.assign with negative count")
     if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
       // assign forward from a disjoint or following overlapping range.
       Builtin.assignCopyArrayFrontToBack(
@@ -787,8 +782,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   public func moveInitialize(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
       // initialize forward from a disjoint or following overlapping range.
       Builtin.takeArrayFrontToBack(
@@ -827,12 +820,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///     pointer's memory. `count` must not be negative.
   @inlinable
   public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.initialize with negative count")
-    _debugPrecondition(
-      UnsafePointer(self) + count <= source ||
-      source + count <= UnsafePointer(self),
-      "UnsafeMutablePointer.initialize overlapping range")
     Builtin.copyArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
@@ -860,11 +847,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   public func moveAssign(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
-    _debugPrecondition(
-      self + count <= source || source + count <= self,
-      "moveAssign overlapping range")
     Builtin.assignTakeArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
@@ -887,7 +869,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   @discardableResult
   public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
-    _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
