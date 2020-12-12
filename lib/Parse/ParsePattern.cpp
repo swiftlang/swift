@@ -821,6 +821,21 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   return Status;
 }
 
+bool Parser::isEffectsSpecifier(const Token &T) {
+  // NOTE: If this returns 'true', that token must be handled in
+  //       'parseEffectsSpecifiers()'.
+
+  if (shouldParseExperimentalConcurrency() &&
+      T.isContextualKeyword("async"))
+    return true;
+
+  if (T.isAny(tok::kw_throws, tok::kw_rethrows) ||
+      (T.isAny(tok::kw_throw, tok::kw_try) && !T.isAtStartOfLine()))
+    return true;
+
+  return false;
+}
+
 ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
                                             SourceLoc &asyncLoc,
                                             SourceLoc &throwsLoc,

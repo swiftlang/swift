@@ -1357,6 +1357,9 @@ public:
                                       SourceLoc &asyncLoc, SourceLoc &throwsLoc,
                                       bool *rethrows);
 
+  /// Returns 'true' if \p T is considered effects specifier.
+  bool isEffectsSpecifier(const Token &T);
+
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 

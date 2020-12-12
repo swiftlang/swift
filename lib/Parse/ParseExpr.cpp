@@ -2341,23 +2341,10 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
   inLoc = SourceLoc();
 
   // Consume 'async', 'throws', and 'rethrows', but in any order.
-  auto consumeAsyncThrows = [&] {
-    while (true) {
-      if (shouldParseExperimentalConcurrency() &&
-          Tok.isContextualKeyword("async")) {
-        consumeToken();
-        continue;
-      }
-      if (consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows))
-        continue;
-
-      if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
-        consumeToken();
-        continue;
-      }
-
-      break;
-    }
+  auto consumeEffectsSpecifiers = [&] {
+    while (isEffectsSpecifier(Tok) ||
+           (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()))
+      consumeToken();
   };
 
   // If we have a leading token that may be part of the closure signature, do a
@@ -2381,7 +2368,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
-        consumeAsyncThrows();
+        consumeEffectsSpecifiers();
 
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
@@ -2403,7 +2390,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         return makeParserSuccess();
       }
 
-      consumeAsyncThrows();
+      consumeEffectsSpecifiers();
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {

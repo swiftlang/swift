@@ -1639,17 +1639,6 @@ bool Parser::isAtFunctionTypeArrow() {
   if (Tok.is(tok::arrow))
     return true;
 
-  auto isEffectsSpecifier = [this](const Token &T) -> bool {
-    if (shouldParseExperimentalConcurrency() &&
-        T.isContextualKeyword("async"))
-      return true;
-    if (T.isAny(tok::kw_throws, tok::kw_rethrows))
-      return true;
-    if (T.isAny(tok::kw_throw, tok::kw_try) && !T.isAtStartOfLine())
-      return true;
-    return false;
-  };
-
   if (isEffectsSpecifier(Tok)) {
     if (peekToken().is(tok::arrow))
       return true;
