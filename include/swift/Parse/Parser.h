@@ -946,10 +946,13 @@ public:
 
   /// Conditionally ignore the current single token if it matches with the \p
   /// Kind.
-  bool ignoreIf(tok Kind) {
+  /// If \p Collect is \c nullptr, moving the ignored tokens and its trivia to
+  /// the leading trivia of the next token. Otherwise add the skipped tokens to
+  /// \p Collect.
+  bool ignoreIf(tok Kind, SmallVectorImpl<ParsedSyntax> *Collect) {
     if (!Tok.is(Kind))
       return false;
-    ignoreToken();
+    ignoreToken(Collect);
     return true;
   }
 
@@ -957,24 +960,29 @@ public:
   /// until (and including) the next ')'. Similarly for '{', '[', '#if',
   /// '#else', '#elseif'. If the current token does not start a bracketed
   /// context, only ignore the current token.
-  void ignoreSingle();
+  /// If \p Collect is \c nullptr, moving the ignored tokens and its trivia to
+  /// the leading trivia of the next token. Otherwise add the skipped tokens to
+  /// \p Collect.
+  void ignoreSingle(SmallVectorImpl<ParsedSyntax> *Collect);
 
-  /// Ignore the current single token by moving it and its trivia to the leading
-  /// trivia of the next token.
-  void ignoreToken();
-  void ignoreToken(tok Kind) {
+  /// Ignore the current token.
+  /// If \p Collect is \c nullptr, moving the ignored token and its trivia to
+  /// the leading trivia of the next token. Otherwise add it to \p Collect.
+  void ignoreToken(SmallVectorImpl<ParsedSyntax> *Collect);
+  void ignoreToken(tok Kind, SmallVectorImpl<ParsedSyntax> *Collect) {
     /// Ignore the current single token asserting its kind.
     assert(Tok.is(Kind));
-    ignoreToken();
+    ignoreToken(Collect);
   }
 
   /// Ignore tokens until a token of type \p Kind is found.
-  void ignoreUntil(tok Kind);
+  void ignoreUntil(tok Kind, SmallVectorImpl<ParsedSyntax> *Collect);
 
   /// Ignore tokens until a token that starts with '>', and return true it if
   /// found. Applies heuristics that are suitable when trying to find the end
   /// of a list of generic parameters, generic arguments.
-  bool ignoreUntilGreaterInTypeList();
+  bool ignoreUntilGreaterInTypeList(bool ProtocolComposition,
+                                    SmallVectorImpl<ParsedSyntax> *Collect);
 
   ParsedTokenSyntax markSplitTokenSyntax(tok Kind, StringRef Txt);
   

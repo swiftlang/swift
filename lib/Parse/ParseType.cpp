@@ -1492,7 +1492,8 @@ Parser::parseTypeGenericArgumentClauseSyntax() {
     }
     checkForInputIncomplete();
     status.setIsParseError();
-    if (ignoreUntilGreaterInTypeList()) {
+    if (ignoreUntilGreaterInTypeList(/*ProtocolComposition=*/false,
+                                     /*Collect=*/nullptr)) {
       builder.useRightAngleBracket(consumeStartingGreaterSyntax());
     }
   }

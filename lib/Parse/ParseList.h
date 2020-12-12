@@ -45,7 +45,7 @@ inline ParserStatus Parser::parseListSyntax(
     if (status.isError()) {
       // Recover by skipping to ',' or close bracket.
       while (!Tok.is(tok::comma) && !IsAtCloseTok() && !isAtTerminator()) {
-        ignoreSingle();
+        ignoreSingle(/*Collect=*/nullptr);
       }
     }
 

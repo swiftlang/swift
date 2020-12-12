@@ -1551,61 +1551,66 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
   return ParsedToken;
 }
 
-void Parser::ignoreSingle() {
+void Parser::ignoreSingle(SmallVectorImpl<ParsedSyntax> *Collect) {
   switch (Tok.getKind()) {
   case tok::l_paren:
-    ignoreToken();
-    ignoreUntil(tok::r_paren);
-    ignoreIf(tok::r_paren);
+    ignoreToken(Collect);
+    ignoreUntil(tok::r_paren, Collect);
+    ignoreIf(tok::r_paren, Collect);
     break;
   case tok::l_brace:
-    ignoreToken();
-    ignoreUntil(tok::r_brace);
-    ignoreIf(tok::r_brace);
+    ignoreToken(Collect);
+    ignoreUntil(tok::r_brace, Collect);
+    ignoreIf(tok::r_brace, Collect);
     break;
   case tok::l_square:
-    ignoreToken();
-    ignoreUntil(tok::r_square);
-    ignoreIf(tok::r_square);
+    ignoreToken(Collect);
+    ignoreUntil(tok::r_square, Collect);
+    ignoreIf(tok::r_square, Collect);
     break;
   case tok::pound_if:
   case tok::pound_else:
   case tok::pound_elseif:
-    ignoreToken();
-    ignoreUntil(tok::pound_endif);
-    ignoreIf(tok::pound_endif);
+    ignoreToken(Collect);
+    ignoreUntil(tok::pound_endif, Collect);
+    ignoreIf(tok::pound_endif, Collect);
     break;
   default:
-    ignoreToken();
+    ignoreToken(Collect);
     break;
   }
 }
 
-void Parser::ignoreToken() {
+
+void Parser::ignoreToken(SmallVectorImpl<ParsedSyntax> *Collect) {
   assert(!Tok.is(tok::eof) && "Lexing eof token");
-  ParsedTriviaList skipped;
-  skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
-  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
-            std::back_inserter(skipped));
-  skipped.emplace_back(TriviaKind::GarbageText, Tok.getText().size());
-  std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
-            std::back_inserter(skipped));
+  if (Collect) {
+    Collect->push_back(consumeTokenSyntax());
+  } else {
+    ParsedTriviaList skipped;
+    skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
+    std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+              std::back_inserter(skipped));
+    skipped.emplace_back(TriviaKind::GarbageText, Tok.getText().size());
+    std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
+              std::back_inserter(skipped));
 
-  TokReceiver->receive(Tok);
-  L->lex(Tok, LeadingTrivia, TrailingTrivia);
+    TokReceiver->receive(Tok);
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
 
-  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
-            std::back_inserter(skipped));
-  LeadingTrivia = {std::move(skipped)};
+    std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+              std::back_inserter(skipped));
+    LeadingTrivia = {std::move(skipped)};
+  }
 }
 
-
-void Parser::ignoreUntil(tok Kind) {
+void Parser::ignoreUntil(tok Kind, SmallVectorImpl<ParsedSyntax> *Collect) {
   while (Tok.isNot(Kind, tok::eof, tok::pound_endif, tok::code_complete))
-    ignoreSingle();
+    ignoreSingle(Collect);
 }
 
-bool Parser::ignoreUntilGreaterInTypeList() {
+bool Parser::ignoreUntilGreaterInTypeList(
+    bool ProtocolComposition, SmallVectorImpl<ParsedSyntax> *Collect) {
   while (true) {
     switch (Tok.getKind()) {
     case tok::eof:
@@ -1617,17 +1622,28 @@ bool Parser::ignoreUntilGreaterInTypeList() {
 #define KEYWORD(X) case tok::kw_##X:
 #define POUND_KEYWORD(X) case tok::pound_##X:
 #include "swift/Syntax/TokenKinds.def"
-      if (isStartOfStmt() || isStartOfSwiftDecl() || Tok.is(tok::pound_endif))
+      if (isStartOfStmt() || isStartOfSwiftDecl() || Tok.is(tok::pound_endif)) {
         return false;
+      }
+      break;
+    case tok::l_paren:
+    case tok::r_paren:
+    case tok::l_square:
+    case tok::r_square:
+      if (ProtocolComposition) {
+        // In protocol composition, '[' ']' '(' ')' cannot appear in types.
+        return false;
+      }
       break;
     default:
       if (startsWithGreater(Tok))
         return true;
       break;
     }
-    ignoreSingle();
+    ignoreSingle(Collect);
   }
 }
+
 
 ParsedTokenSyntax Parser::markSplitTokenSyntax(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
