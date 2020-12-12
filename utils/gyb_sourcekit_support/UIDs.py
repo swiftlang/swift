@@ -161,6 +161,8 @@ UID_KEYS = [
     KEY('IsNonProtocolType', 'key.is_non_protocol_type'),
     KEY('RefactorActions', 'key.refactor_actions'),
     KEY('RetrieveRefactorActions', 'key.retrieve_refactor_actions'),
+    KEY('SymbolGraph', 'key.symbol_graph'),
+    KEY('RetrieveSymbolGraph', 'key.retrieve_symbol_graph'),
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),

@@ -13,7 +13,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Type.h"
 #include "JSON.h"
 
 void swift::symbolgraphgen::serialize(const llvm::VersionTuple &VT,
@@ -115,10 +117,75 @@ void swift::symbolgraphgen::serialize(const swift::GenericTypeParamType *Param,
   });
 }
 
+void
+swift::symbolgraphgen::filterGenericParams(
+    TypeArrayView<GenericTypeParamType> GenericParams,
+    SmallVectorImpl<const GenericTypeParamType*> &FilteredParams,
+    SubstitutionMap SubMap) {
+
+  for (auto Param : GenericParams) {
+    if (const auto *GPD = Param->getDecl()) {
+
+      // Ignore the implicit Self param
+      if (GPD->isImplicit()) {
+        if (!isa<ExtensionDecl>(GPD->getDeclContext()))
+          continue;
+
+        // Extension decls (and their children) refer to implicit copies of the
+        // explicit params of the nominal they extend. Don't filter those out.
+        auto *ED = cast<ExtensionDecl>(GPD->getDeclContext());
+        if (auto *NTD = ED->getExtendedNominal()) {
+          if (auto *GPL = NTD->getGenericParams()) {
+            auto ImplicitAndSameName = [&](GenericTypeParamDecl *NominalGPD) {
+              return NominalGPD->isImplicit() &&
+                  GPD->getName() == NominalGPD->getName();
+            };
+            if (llvm::any_of(GPL->getParams(), ImplicitAndSameName))
+              continue;
+          }
+        }
+      }
+
+      // Ignore parameters that have been substituted.
+      if (!SubMap.empty()) {
+        Type SubTy = Type(Param).subst(SubMap);
+        if (!SubTy->hasError() && SubTy.getPointer() != Param) {
+          if (!SubTy->is<ArchetypeType>()) {
+            continue;
+          }
+          auto AT = SubTy->castTo<ArchetypeType>();
+          if (!AT->getInterfaceType()->isEqual(Param)) {
+            continue;
+          }
+        }
+      }
+
+      FilteredParams.push_back(Param);
+    }
+  }
+}
+
+static bool containsParams(swift::Type Ty, llvm::ArrayRef<const swift::GenericTypeParamType*> Others) {
+  return Ty.findIf([&](swift::Type T) -> bool {
+    if (auto AT = T->getAs<swift::ArchetypeType>()) {
+      T = AT->getInterfaceType();
+    }
+
+    for (auto *Param: Others) {
+      if (T->isEqual(const_cast<swift::GenericTypeParamType*>(Param)))
+        return true;
+    }
+    return false;
+  });
+}
+
 void swift::symbolgraphgen::filterGenericRequirements(
     ArrayRef<Requirement> Requirements,
     const NominalTypeDecl *Self,
-    SmallVectorImpl<Requirement> &FilteredRequirements) {
+    SmallVectorImpl<Requirement> &FilteredRequirements,
+    SubstitutionMap SubMap,
+    ArrayRef<const GenericTypeParamType *> FilteredParams) {
+
   for (const auto &Req : Requirements) {
     if (Req.getKind() == RequirementKind::Layout) {
       continue;
@@ -130,10 +197,29 @@ void swift::symbolgraphgen::filterGenericRequirements(
     if (Req.getSecondType()->getAnyNominal() == Self) {
       continue;
     }
-    FilteredRequirements.push_back(Req);
+
+    // Ignore requirements that don't involve the filtered set of generic
+    // parameters after substitution.
+    if (!SubMap.empty()) {
+      Type SubFirst = Req.getFirstType().subst(SubMap);
+      if (SubFirst->hasError())
+        SubFirst = Req.getFirstType();
+      Type SubSecond = Req.getSecondType().subst(SubMap);
+      if (SubSecond->hasError())
+        SubSecond = Req.getSecondType();
+
+      if (!containsParams(SubFirst, FilteredParams) &&
+          !containsParams(SubSecond, FilteredParams))
+        continue;
+
+      // Use the same requirement kind with the substituted types.
+      FilteredRequirements.emplace_back(Req.getKind(), SubFirst, SubSecond);
+    } else {
+      // Use the original requirement.
+      FilteredRequirements.push_back(Req);
+    }
   }
 }
-
 void
 swift::symbolgraphgen::filterGenericRequirements(const ExtensionDecl *Extension,
     SmallVectorImpl<Requirement> &FilteredRequirements) {

@@ -750,8 +750,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
       else if (auto *ED = dyn_cast<ExtensionDecl>(Current))
         subMap = CurrentType->getContextSubstitutionMap(M, ED);
       else {
+        Decl *subTarget = Current;
+        if (isa<ParamDecl>(Current)) {
+          auto *DC = Current->getDeclContext();
+          if (auto *FD = dyn_cast<AbstractFunctionDecl>(DC))
+            subTarget = FD;
+        }
         subMap = CurrentType->getMemberSubstitutionMap(
-          M, cast<ValueDecl>(Current));
+          M, cast<ValueDecl>(subTarget));
       }
 
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
