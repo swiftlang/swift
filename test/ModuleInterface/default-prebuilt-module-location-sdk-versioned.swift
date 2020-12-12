@@ -24,6 +24,18 @@
 // 6. Make sure we installed a forwarding module in the module cache.
 // RUN: %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
 
+// 5.1. Import this prebuilt module, but DON'T pass in -prebuilt-module-cache-path, it should use the implicit one from the SDK-versioned prebuilt module cache dir.
+// RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t -target-sdk-version 10.15.0
+
+// 6.1. Make sure we installed a forwarding module in the module cache.
+// RUN: %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
+
+// 5.2. Import this prebuilt module, but DON'T pass in -prebuilt-module-cache-path, it should use the implicit one from the SDK-versioned prebuilt module cache dir.
+// RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t -target-sdk-version 10.15.0.0
+
+// 6.2. Make sure we installed a forwarding module in the module cache.
+// RUN: %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
+
 // 7. Remove the prebuilt module from the SDK-versioned prebuilt module cache dir.
 // RUN: %empty-directory(%t/ResourceDir/%target-sdk-name/prebuilt-modules/10.15)
 
@@ -31,6 +43,18 @@
 // RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t -target-sdk-version 10.15
 
 // 9. Make sure we built a binary module in the module cache.
+// RUN: not %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
+
+// 8.1. Import this prebuilt module, it should not find the prebuilt module cache.
+// RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t -target-sdk-version 10.15.0
+
+// 9.1. Make sure we built a binary module in the module cache.
+// RUN: not %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
+
+// 8.2. Import this prebuilt module, it should not find the prebuilt module cache.
+// RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t -target-sdk-version 10.15.0.0
+
+// 9.2. Make sure we built a binary module in the module cache.
 // RUN: not %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
 
 import PrebuiltModule
