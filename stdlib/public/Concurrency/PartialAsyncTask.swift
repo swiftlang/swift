@@ -79,7 +79,9 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 
 #endif
 
-// Wrappers around unsafe continuation builtins
+/// The operation functions must resume the continuation *exactly once*.
+///
+/// The continuation will not begin executing until the operation function returns.
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T>) -> Void
@@ -89,6 +91,9 @@ public func withUnsafeContinuation<T>(
   }
 }
 
+/// The operation functions must resume the continuation *exactly once*.
+///
+/// The continuation will not begin executing until the operation function returns.
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeThrowingContinuation<T>) -> Void

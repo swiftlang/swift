@@ -26,7 +26,7 @@ func buyVegetables(
 
 // returns 1 or more vegetables or throws an error
 func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
-  await try Task.withUnsafeThrowingContinuation { continuation in
+  await try withUnsafeThrowingContinuation { continuation in
     var veggies: [Vegetable] = []
 
     buyVegetables(
@@ -43,22 +43,22 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
-  let _: String = Task.withUnsafeContinuation { continuation in // expected-error{{invalid conversion from 'async' function of type '(UnsafeContinuation<String>) async -> Void' to synchronous function type '(UnsafeContinuation<String>) -> Void'}}
+  let _: String = withUnsafeContinuation { continuation in // expected-error{{invalid conversion from 'async' function of type '(UnsafeContinuation<String>) async -> Void' to synchronous function type '(UnsafeContinuation<String>) -> Void'}}
     let s = await someAsyncFunc() // rdar://70610141 for getting a better error message here
     continuation.resume(returning: s)
   }
 
-  let _: String = await Task.withUnsafeContinuation { continuation in
+  let _: String = await withUnsafeContinuation { continuation in
     continuation.resume(returning: "")
   }
 }
 
 func test_unsafeThrowingContinuations() async {
-  let _: String = await try Task.withUnsafeThrowingContinuation { continuation in
+  let _: String = await try withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
   }
 
-  let _: String = await try Task.withUnsafeThrowingContinuation { continuation in
+  let _: String = await try withUnsafeThrowingContinuation { continuation in
     continuation.resume(throwing: MyError())
   }
 
