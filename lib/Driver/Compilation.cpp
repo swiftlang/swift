@@ -1802,8 +1802,11 @@ namespace driver {
 
     fine_grained_dependencies::ModuleDepGraph &&
     takeFineGrainedDepGraph(const bool forRanges) && {
-      return forRanges ? std::move(FineGrainedDepGraphForRanges)
-                       : std::move(FineGrainedDepGraph);
+      if (forRanges) {
+        return std::move(FineGrainedDepGraphForRanges);
+      } else {
+        return std::move(FineGrainedDepGraph);
+      }
     }
   };
 } // namespace driver
