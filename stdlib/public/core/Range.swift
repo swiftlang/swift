@@ -157,6 +157,8 @@ public struct Range<Bound: Comparable> {
   /// instance does not contain its upper bound.
   public let upperBound: Bound
 
+  // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
   @_alwaysEmitIntoClient @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower

@@ -394,6 +394,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 }
 
 extension Unsafe${Mutable}BufferPointer {
+  // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
   @_alwaysEmitIntoClient
   internal init(
     @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
