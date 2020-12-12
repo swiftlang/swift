@@ -71,6 +71,8 @@ public:
   TypeRepr *generate(const syntax::TypeSyntax &Type, const SourceLoc Loc);
 
   TypeRepr *generate(const syntax::ArrayTypeSyntax &Type, const SourceLoc Loc);
+  TypeRepr *generate(const syntax::AttributedTypeSyntax &Type,
+                     const SourceLoc Loc);
   TypeRepr *generate(const syntax::CodeCompletionTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::DictionaryTypeSyntax &Type,
@@ -79,6 +81,7 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::SimpleTypeIdentifierSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::TupleTypeSyntax &Type, const SourceLoc Loc);
   TypeRepr *generate(const syntax::UnknownTypeSyntax &Type,
                      const SourceLoc Loc);
 
@@ -103,6 +106,12 @@ private:
   generateGenericArgs(const syntax::GenericArgumentClauseSyntax &ClauseSyntax,
                       const SourceLoc Loc, SourceLoc &LAngleLoc,
                       SourceLoc &RAngleLoc, SmallVectorImpl<TypeRepr *> &Args);
+
+  /// Generate a \c TupleTypeRepr for the given tuple \p Elements and parens.
+  TupleTypeRepr *
+  generateTuple(const syntax::TokenSyntax &LParen,
+                const syntax::TupleTypeElementListSyntax &Elements,
+                const syntax::TokenSyntax &RParen, const SourceLoc Loc);
 
   /// Generate a \c ComponentIdentTypeRepr from a \c SimpleTypeIdentifierSyntax
   /// or \c MemberTypeIdentifierSyntax. If \c TypeSyntax is a \c

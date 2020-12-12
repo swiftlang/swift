@@ -31,6 +31,8 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
   // Otherwise, generate the AST node for the type.
   if (auto array = Type.getAs<ArrayTypeSyntax>()) {
     return generate(*array, Loc);
+  } else if (auto Attributed = Type.getAs<AttributedTypeSyntax>()) {
+    return generate(*Attributed, Loc);
   } else if (auto completionTy = Type.getAs<CodeCompletionTypeSyntax>()) {
     return generate(*completionTy, Loc);
   } else if (auto dictionary = Type.getAs<DictionaryTypeSyntax>()) {
@@ -39,35 +41,36 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*memberIdentifier, Loc);
   } else if (auto simpleIdentifier = Type.getAs<SimpleTypeIdentifierSyntax>()) {
     return generate(*simpleIdentifier, Loc);
+  } else if (auto Tuple = Type.getAs<TupleTypeSyntax>()) {
+    return generate(*Tuple, Loc);
+  } else if (auto Tuple = Type.getAs<TupleTypeElementSyntax>()) {
+    llvm_unreachable("Tuple type elements are being generated from within the "
+                     "TupleTypeSyntax generate function.");
   } else if (auto unknown = Type.getAs<UnknownTypeSyntax>()) {
     return generate(*unknown, Loc);
+  } else {
+    llvm_unreachable("ASTGen hasn't been tought how to generate this type");
   }
-//  else if (auto Composition = Type.getAs<CompositionTypeSyntax>())
+//  } else if (auto Composition = Type.getAs<CompositionTypeSyntax>()) {
 //    return generate(*Composition, Loc);
-//  else if (auto Function = Type.getAs<FunctionTypeSyntax>())
+//  } else if (auto Function = Type.getAs<FunctionTypeSyntax>()) {
 //    return generate(*Function, Loc);
-//  else if (auto Metatype = Type.getAs<MetatypeTypeSyntax>())
+//  } else if (auto Metatype = Type.getAs<MetatypeTypeSyntax>()) {
 //    return generate(*Metatype, Loc);
-//  else if (auto Tuple = Type.getAs<TupleTypeSyntax>())
-//    return generate(*Tuple, Loc);
-//  else if (auto Some = Type.getAs<SomeTypeSyntax>())
+//  } else if (auto Some = Type.getAs<SomeTypeSyntax>()) {
 //    return generate(*Some, Loc);
-//  else if (auto Optional = Type.getAs<OptionalTypeSyntax>())
+//  } else if (auto Optional = Type.getAs<OptionalTypeSyntax>()) {
 //    return generate(*Optional, Loc);
-//  else if (auto Unwrapped = Type.getAs<ImplicitlyUnwrappedOptionalTypeSyntax>())
+//  } else if (auto Unwrapped = Type.getAs<ImplicitlyUnwrappedOptionalTypeSyntax>()) {
 //    return generate(*Unwrapped, Loc);
-//  else if (auto Attributed = Type.getAs<AttributedTypeSyntax>())
-//    return generate(*Attributed, Loc);
-//  else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>())
+//  } else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>()) {
 //    return generate(*ClassRestriction, Loc);
-//  else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>())
+//  } else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>()) {
 //    return generate(*SILBoxType, Loc, IsSILFuncDecl);
-//  else if (auto SILFunctionType = Type.getAs<SILFunctionTypeSyntax>())
+//  } else if (auto SILFunctionType = Type.getAs<SILFunctionTypeSyntax>()) {
 //    return generate(*SILFunctionType, Loc, IsSILFuncDecl);
-//  else if (auto Unknown = Type.getAs<UnknownTypeSyntax>())
+//  } else if (auto Unknown = Type.getAs<UnknownTypeSyntax>()) {
 //    return generate(*Unknown, Loc);
-
-  llvm_unreachable("ASTGen hasn't been tought how to generate this type");
 }
 
 TypeRepr *ASTGen::generate(const syntax::ArrayTypeSyntax &Type,
@@ -80,6 +83,37 @@ TypeRepr *ASTGen::generate(const syntax::ArrayTypeSyntax &Type,
     return nullptr;
   }
   return new (Context) ArrayTypeRepr(ElementType, {LBracketLoc, RBracketLoc});
+}
+
+TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto typeAST = generate(Type.getBaseType(), Loc);
+  if (!typeAST) {
+    return nullptr;
+  }
+
+  if (auto attributes = Type.getAttributes()) {
+    llvm_unreachable("ASTG of proper attributes has not been implemented yet");
+  }
+
+  if (auto specifier = Type.getSpecifier()) {
+    auto specifierLoc = advanceLocBegin(Loc, *specifier);
+    auto specifierText = specifier->getText();
+
+    // don't apply multiple specifiers to a type: that's invalid and was already
+    // reported in the parser, handle gracefully
+    if (!isa<SpecifierTypeRepr>(typeAST)) {
+      if (specifierText == "inout") {
+        typeAST = new (Context) InOutTypeRepr(typeAST, specifierLoc);
+      } else if (specifierText == "__owned") {
+        typeAST = new (Context) OwnedTypeRepr(typeAST, specifierLoc);
+      } else if (specifierText == "__shared") {
+        typeAST = new (Context) SharedTypeRepr(typeAST, specifierLoc);
+      }
+    }
+  }
+
+  return typeAST;
 }
 
 TypeRepr *ASTGen::generate(const syntax::CodeCompletionTypeSyntax &Type,
@@ -128,6 +162,11 @@ TypeRepr *ASTGen::generate(const syntax::MemberTypeIdentifierSyntax &Type,
   SmallVector<ComponentIdentTypeRepr *, 4> components;
   gatherTypeIdentifierComponents(Type, Loc, components);
   return IdentTypeRepr::create(Context, components);
+}
+
+TypeRepr *ASTGen::generate(const TupleTypeSyntax &Type, const SourceLoc Loc) {
+  return generateTuple(Type.getLeftParen(), Type.getElements(),
+                       Type.getRightParen(), Loc);
 }
 
 TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,
@@ -190,6 +229,87 @@ void ASTGen::generateGenericArgs(
     }
     Args.push_back(typeRepr);
   }
+}
+
+TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
+                                     const TupleTypeElementListSyntax &Elements,
+                                     const TokenSyntax &RParen,
+                                     const SourceLoc Loc) {
+  auto leftParenLoc = advanceLocBegin(Loc, LParen);
+  auto rightParenLoc = advanceLocEnd(Loc, RParen);
+
+  SmallVector<TupleTypeReprElement, 4> tupleElements;
+
+  SourceLoc ellipsisLoc;
+  unsigned ellipsisIdx;
+
+  for (unsigned i = 0; i < Elements.size(); i++) {
+    auto element = Elements[i];
+    TupleTypeReprElement elementAST;
+    elementAST.Type = generate(element.getType(), Loc);
+    if (!elementAST.Type) {
+      // If the type cannot be parsed, we cannot form a meaningful tuple element
+      // Continue and don't add it to Elements.
+      continue;
+    }
+
+    if (auto name = element.getName()) {
+      elementAST.NameLoc = advanceLocBegin(Loc, *name);
+      elementAST.Name = name->getText() == "_"
+                            ? Identifier()
+                            : Context.getIdentifier(name->getIdentifierText());
+    }
+    if (auto colon = element.getColon()) {
+      elementAST.ColonLoc = advanceLocBegin(Loc, *colon);
+    }
+    if (auto secondName = element.getSecondName()) {
+      elementAST.SecondNameLoc = advanceLocBegin(Loc, *secondName);
+      elementAST.SecondName =
+          secondName->getText() == "_"
+              ? Identifier()
+              : Context.getIdentifier(secondName->getIdentifierText());
+      if (elementAST.Name.empty()) {
+        // If the first name is empty (i.e. was an underscore), use it as the
+        // underscore location and use the second (non-underscore) name as the
+        // first name.
+        elementAST.UnderscoreLoc = elementAST.NameLoc;
+        elementAST.Name = elementAST.SecondName;
+        elementAST.NameLoc = elementAST.SecondNameLoc;
+      }
+    }
+
+    if (auto inOut = element.getInOut()) {
+      // don't apply multiple inout specifiers to a type: that's invalid and was
+      // already reported in the parser, handle gracefully
+      if (!isa<InOutTypeRepr>(elementAST.Type)) {
+        auto inOutLoc = advanceLocBegin(Loc, *inOut);
+        elementAST.Type =
+            new (Context) InOutTypeRepr(elementAST.Type, inOutLoc);
+      }
+    }
+    if (auto comma = element.getTrailingComma()) {
+      elementAST.TrailingCommaLoc = advanceLocBegin(Loc, *comma);
+    }
+
+    if (auto ellipsis = element.getEllipsis()) {
+      // If we have multiple ellipsis, they have already been diagnosed in the
+      // parser. Just consider the first one.
+      if (ellipsisLoc.isInvalid()) {
+        ellipsisLoc = advanceLocBegin(Loc, *ellipsis);
+        ellipsisIdx = i;
+      }
+    }
+    tupleElements.push_back(elementAST);
+  }
+  if (ellipsisLoc.isInvalid()) {
+    // If we don't have an ellipsis the ellipsis index must point after the last
+    // element for TupleTypeRepr to be valid.
+    ellipsisIdx = tupleElements.size();
+  }
+
+  return TupleTypeRepr::create(Context, tupleElements,
+                               {leftParenLoc, rightParenLoc}, ellipsisLoc,
+                               ellipsisIdx);
 }
 
 template <typename T>

@@ -936,6 +936,14 @@ public:
     return consumeTokenSyntax();
   }
 
+  /// If the current token is the specified kind, consume it and
+  /// return it. Otherwise, return \c None without consuming it.
+  Optional<ParsedTokenSyntax> consumeTokenSyntaxIf(tok K) {
+    if (Tok.isNot(K))
+      return None;
+    return consumeTokenSyntax();
+  }
+
   /// Conditionally ignore the current single token if it matches with the \p
   /// Kind.
   bool ignoreIf(tok Kind) {
@@ -976,6 +984,14 @@ public:
   llvm::Optional<ParsedTokenSyntax>
   parseIdentifierSyntax(const Diagnostic &D, bool diagnoseDollarPrefix);
 
+  /// Parse the specified expected token and return a \c ParsedSyntaxResult that
+  /// is either an error or contains the corresponding \c ParsedTokenSyntax on
+  /// success. On failure if \p SilenceDiag is \c false, emit the specified error
+  /// diagnostic, a note at \p OtherLoc, and return an error.
+  ParsedSyntaxResult<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                           bool SilenceDiag = false);
+
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and the corresponding \c ParsedTokenSyntax returned.
   ///
@@ -983,11 +999,23 @@ public:
   /// \c None is returned.
   Optional<ParsedTokenSyntax> parseTokenSyntax(tok K, const Diagnostic &D);
 
-  /// Parse the specified expected token and return the corresponding \c
-  /// ParsedTokenSyntax on success. On failure, emit the specified error
-  /// diagnostic, a note at \c OtherLoc, and return \c None.
-  Optional<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc);
+  //===--------------------------------------------------------------------===//
+  // MARK: - Utility functions for libSyntax
+
+  /// Parse a comma separated list of syntax elements with the TrailingComma
+  /// trait until a position is reach for which \p IsAtCloseTok returns \c true.
+  /// For each element, the \p Callback is invoked which should construct the
+  /// element of the comma-sparated list. The constructed element is then added
+  /// to \p Elements. \p AllowEmpty determines if an empty list should be
+  /// allowed and \p AllowSepAfterLast determines if trailing commas should be
+  /// allowed. The closing token of this list, e.g. the closing ')', is *not*
+  /// consumed by this function.
+  template <typename ParsedNode>
+  ParserStatus parseListSyntax(
+      SmallVectorImpl<ParsedNode> &Elements, bool AllowEmpty,
+      bool AllowSepAfterLast, llvm::function_ref<bool()> IsAtCloseTok,
+      llvm::function_ref<ParserStatus(typename ParsedNode::Builder &)>
+          Callback);
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
@@ -1314,6 +1342,29 @@ public:
   //===--------------------------------------------------------------------===//
   // MARK: - Type Parsing using libSyntax
   
+  /// If \p Specifier and \p Attrs are not \c None, wrap the \p Type in an \c
+  /// AttributedTypeSyntax, applying the \p Specifier and \p Attrs. \p Type, \p
+  /// Specifier and \p Attrs are being moved to the newly created \c
+  /// AttributedTypeSyntax.
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&Type,
+                             Optional<ParsedTokenSyntax> Specifier,
+                             Optional<ParsedAttributeListSyntax> Attrs);
+
+  /// Consume the current token as an argument label, making '_' an identifier.
+  /// Assumes that the current token can be an argument label.
+  ParsedTokenSyntax consumeArgumentLabelSyntax() {
+    assert(Tok.canBeArgumentLabel());
+    if (!Tok.is(tok::kw__)) {
+      Tok.setKind(tok::identifier);
+
+      if (Tok.getText()[0] == '$') {
+        diagnoseDollarIdentifier(Tok, /*diagnoseDollarPrefix=*/true);
+      }
+    }
+    return consumeTokenSyntax();
+  }
+
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeAnySyntax();
 
   /// Parse a collection type.
@@ -1342,6 +1393,8 @@ public:
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
                                                        bool IsSILFuncDecl = false);
   
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeTupleBodySyntax();
+
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 

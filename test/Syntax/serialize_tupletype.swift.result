@@ -1,23 +1,23 @@
 {
-  "id": 26,
+  "id": 32,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 25,
+      "id": 31,
       "kind": "CodeBlockItemList",
       "layout": [
         {
-          "id": 23,
+          "id": 29,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 22,
+              "id": 28,
               "kind": "TypealiasDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 20,
+                  "id": 26,
                   "tokenKind": {
                     "kind": "kw_typealias"
                   },
@@ -48,7 +48,7 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 21,
+                  "id": 27,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "x"
@@ -64,7 +64,7 @@
                 },
                 null,
                 {
-                  "id": 19,
+                  "id": 25,
                   "kind": "TypeInitializerClause",
                   "layout": [
                     {
@@ -82,7 +82,7 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 18,
+                      "id": 24,
                       "kind": "TupleType",
                       "layout": [
                         {
@@ -95,11 +95,11 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 16,
+                          "id": 23,
                           "kind": "TupleTypeElementList",
                           "layout": [
                             {
-                              "id": 12,
+                              "id": 20,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
@@ -142,7 +142,7 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 10,
+                                  "id": 19,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
@@ -179,7 +179,7 @@
                               "presence": "Present"
                             },
                             {
-                              "id": 15,
+                              "id": 22,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
@@ -208,7 +208,7 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 14,
+                                  "id": 21,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
@@ -262,7 +262,7 @@
       "presence": "Present"
     },
     {
-      "id": 24,
+      "id": 30,
       "tokenKind": {
         "kind": "eof",
         "text": ""

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ParseList.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
@@ -894,194 +895,19 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     identifier? identifier ':' type
 ///     type
 ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
-  // Force the context to create deferred nodes, as we might need to
-  // de-structure the tuple type to create a function type.
-  DeferringContextRAII Deferring(*SyntaxContext);
-  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
-  TypeContext.setCreateSyntax(SyntaxKind::TupleType);
-  Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
-
-  if (ParsingTypeTuple.isFailed()) {
-    return makeParserError();
+  auto typeLoc = leadingTriviaLoc();
+  auto result = parseTypeTupleBodySyntax();
+  auto status = result.getStatus();
+  if (result.isNull()) {
+    return status;
   }
-
-  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
-  SourceLoc EllipsisLoc;
-  unsigned EllipsisIdx;
-  SmallVector<TupleTypeReprElement, 8> ElementsR;
-
-  ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
-                                  /*AllowSepAfterLast=*/false,
-                                  diag::expected_rparen_tuple_type_list,
-                                  SyntaxKind::TupleTypeElementList,
-                                  [&] () -> ParserStatus {
-    TupleTypeReprElement element;
-
-    // 'inout' here can be a obsoleted use of the marker in an argument list,
-    // consume it in backtracking context so we can determine it's really a
-    // deprecated use of it.
-    llvm::Optional<BacktrackingScope> Backtracking;
-    SourceLoc ObsoletedInOutLoc;
-    if (Tok.is(tok::kw_inout)) {
-      Backtracking.emplace(*this);
-      ObsoletedInOutLoc = consumeToken(tok::kw_inout);
-    }
-                                    
-    // If the label is "some", this could end up being an opaque type
-    // description if there's `some <identifier>` without a following colon,
-    // so we may need to backtrack as well.
-    if (Tok.isContextualKeyword("some")) {
-      Backtracking.emplace(*this);
-    }
-
-    // If the tuple element starts with a potential argument label followed by a
-    // ':' or another potential argument label, then the identifier is an
-    // element tag, and it is followed by a type annotation.
-    if (Tok.canBeArgumentLabel()
-        && (peekToken().is(tok::colon)
-            || peekToken().canBeArgumentLabel())) {
-      // Consume a name.
-      element.NameLoc = consumeArgumentLabel(element.Name);
-
-      // If there is a second name, consume it as well.
-      if (Tok.canBeArgumentLabel())
-        element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
-
-      // Consume the ':'.
-      if (consumeIf(tok::colon, element.ColonLoc)) {
-        // If we succeed, then we successfully parsed a label.
-        if (Backtracking)
-          Backtracking->cancelBacktrack();
-      // Otherwise, if we can't backtrack to parse this as a type,
-      // this is a syntax error.
-      } else {
-        if (!Backtracking) {
-          diagnose(Tok, diag::expected_parameter_colon);
-        }
-        element.NameLoc = SourceLoc();
-        element.SecondNameLoc = SourceLoc();
-      }
-
-    } else if (Backtracking) {
-      // If we don't have labels, 'inout' is not a obsoleted use.
-      ObsoletedInOutLoc = SourceLoc();
-    }
-    Backtracking.reset();
-
-    // Parse the type annotation.
-    auto type = parseType(diag::expected_type);
-    if (type.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    if (type.isNull())
-      return makeParserError();
-    element.Type = type.get();
-
-    // Complain obsoleted 'inout' etc. position; (inout name: Ty)
-    if (ObsoletedInOutLoc.isValid()) {
-      if (isa<SpecifierTypeRepr>(element.Type)) {
-        // If the parsed type is already a inout type et al, just remove it.
-        diagnose(Tok, diag::parameter_specifier_repeated)
-            .fixItRemove(ObsoletedInOutLoc);
-      } else {
-        diagnose(ObsoletedInOutLoc,
-                 diag::parameter_specifier_as_attr_disallowed, "inout")
-            .fixItRemove(ObsoletedInOutLoc)
-            .fixItInsert(element.Type->getStartLoc(), "inout ");
-        // Build inout type. Note that we bury the inout locator within the
-        // named locator. This is weird but required by Sema apparently.
-        element.Type =
-            new (Context) InOutTypeRepr(element.Type, ObsoletedInOutLoc);
-      }
-    }
-
-    // Parse optional '...'.
-    if (Tok.isEllipsis()) {
-      Tok.setKind(tok::ellipsis);
-      auto ElementEllipsisLoc = consumeToken();
-      if (EllipsisLoc.isInvalid()) {
-        EllipsisLoc = ElementEllipsisLoc;
-        EllipsisIdx = ElementsR.size();
-      } else {
-        diagnose(ElementEllipsisLoc, diag::multiple_ellipsis_in_tuple)
-          .highlight(EllipsisLoc)
-          .fixItRemove(ElementEllipsisLoc);
-      }
-    }
-
-    // Parse '= expr' here so we can complain about it directly, rather
-    // than dying when we see it.
-    if (Tok.is(tok::equal)) {
-      SyntaxParsingContext InitContext(SyntaxContext,
-                                       SyntaxKind::InitializerClause);
-      SourceLoc equalLoc = consumeToken(tok::equal);
-      auto init = parseExpr(diag::expected_init_value);
-      auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
-      if (init.isNonNull())
-        inFlight.fixItRemove(SourceRange(equalLoc, init.get()->getEndLoc()));
-    }
-
-    // Record the ',' location.
-    if (Tok.is(tok::comma))
-      element.TrailingCommaLoc = Tok.getLoc();
-
-    ElementsR.push_back(element);
-    return makeParserSuccess();
-  });
-
-  if (EllipsisLoc.isInvalid())
-    EllipsisIdx = ElementsR.size();
-
-  bool isFunctionType =
-      Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows) ||
-      (shouldParseExperimentalConcurrency() &&
-       Tok.isContextualKeyword("async"));
-
-  // If there were any labels, figure out which labels should go into the type
-  // representation.
-  for (auto &element : ElementsR) {
-    // True tuples have labels.
-    if (!isFunctionType) {
-      // If there were two names, complain.
-      if (element.NameLoc.isValid() && element.SecondNameLoc.isValid()) {
-        auto diag = diagnose(element.NameLoc, diag::tuple_type_multiple_labels);
-        if (element.Name.empty()) {
-          diag.fixItRemoveChars(element.NameLoc,
-                                element.Type->getStartLoc());
-        } else {
-          diag.fixItRemove(
-            SourceRange(Lexer::getLocForEndOfToken(SourceMgr, element.NameLoc),
-                        element.SecondNameLoc));
-        }
-      }
-      continue;
-    }
-
-    // If there was a first name, complain; arguments in function types are
-    // always unlabeled.
-    if (element.NameLoc.isValid() && !element.Name.empty()) {
-      auto diag = diagnose(element.NameLoc, diag::function_type_argument_label,
-                           element.Name);
-      if (element.SecondNameLoc.isInvalid())
-        diag.fixItInsert(element.NameLoc, "_ ");
-      else if (element.SecondName.empty())
-        diag.fixItRemoveChars(element.NameLoc,
-                              element.Type->getStartLoc());
-      else
-        diag.fixItReplace(SourceRange(element.NameLoc), "_");
-    }
-
-    if (element.SecondNameLoc.isValid()) {
-      // Form the named parameter type representation.
-      element.UnderscoreLoc = element.NameLoc;
-      element.Name = element.SecondName;
-      element.NameLoc = element.SecondNameLoc;
-    }
+  SyntaxContext->addSyntax(std::move(result.get()));
+  auto type = SyntaxContext->topNode<TypeSyntax>();
+  auto typeRepr = ASTGenerator.generate(type, typeLoc);
+  if (!typeRepr) {
+    status.setIsParseError();
   }
-
-  return makeParserResult(Status,
-                          TupleTypeRepr::create(Context, ElementsR,
-                                                SourceRange(LPLoc, RPLoc),
-                                                EllipsisLoc, EllipsisIdx));
+  return makeParserResult(status, typeRepr);
 }
 
 
@@ -1522,6 +1348,34 @@ bool Parser::canParseTypeTupleBody() {
 //===--------------------------------------------------------------------===//
 // MARK: - Type Parsing using libSyntax
 
+ParsedSyntaxResult<ParsedTypeSyntax>
+Parser::applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&Type,
+                                   Optional<ParsedTokenSyntax> Specifier,
+                                   Optional<ParsedAttributeListSyntax> Attrs) {
+  if (!Attrs && !Specifier) {
+    return std::move(Type);
+  }
+
+  if (Type.isNull()) {
+    SmallVector<ParsedSyntax, 2> junk;
+    if (Specifier) {
+      junk.emplace_back(std::move(*Specifier));
+    }
+    if (Attrs) {
+      junk.emplace_back(std::move(*Attrs));
+    }
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeUnknownType(junk, *SyntaxContext),
+        Type.getStatus());
+  }
+
+  return makeParsedResult(
+      ParsedSyntaxRecorder::makeAttributedType(
+          std::move(Specifier), std::move(Attrs), Type.get(), *SyntaxContext),
+      Type.getStatus());
+}
+
+
 ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeAnySyntax() {
   auto Any = consumeTokenSyntax(tok::kw_Any);
   auto Type = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
@@ -1571,14 +1425,12 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollectionSyntax() {
   }
 
   // Parse the closing ']'.
-  Optional<ParsedTokenSyntax> rsquare = parseMatchingTokenSyntax(
+  auto rsquare = parseMatchingTokenSyntax(
       tok::r_square,
       colon.hasValue() ? diag::expected_rbracket_dictionary_type
                        : diag::expected_rbracket_array_type,
       lsquareLoc);
-  if (!rsquare) {
-    Status.setIsParseError();
-  }
+  Status |= rsquare.getStatus();
 
   if (colon) {
     ParsedDictionaryTypeSyntaxBuilder builder(*SyntaxContext);
@@ -1586,21 +1438,20 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollectionSyntax() {
     builder.useKeyType(std::move(*firstType));
     builder.useColon(std::move(*colon));
     builder.useValueType(std::move(*secondType));
-    if (rsquare) {
-      builder.useRightSquareBracket(std::move(*rsquare));
+    if (!rsquare.isNull()) {
+      builder.useRightSquareBracket(rsquare.get());
     }
     return makeParsedResult(builder.build(), Status);
   } else {
     ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
     builder.useLeftSquareBracket(std::move(lsquare));
     builder.useElementType(std::move(*firstType));
-    if (rsquare) {
-      builder.useRightSquareBracket(std::move(*rsquare));
+    if (!rsquare.isNull()) {
+      builder.useRightSquareBracket(rsquare.get());
     }
     return makeParsedResult(builder.build(), Status);
   }
 }
-
 
 ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
 Parser::parseTypeGenericArgumentClauseSyntax() {
@@ -1782,8 +1633,8 @@ Parser::parseTypeIdentifierSyntax(bool isParsingQualifiedDeclBaseType) {
 
     if (Tok.is(tok::code_complete)) {
       auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
-          result.get(), std::move(period),
-          consumeTokenSyntax(), *SyntaxContext);
+          result.get(), std::move(period), consumeTokenSyntax(),
+          *SyntaxContext);
       return makeParsedCodeCompletion(std::move(ty));
     }
 
@@ -1796,8 +1647,7 @@ Parser::parseTypeIdentifierSyntax(bool isParsingQualifiedDeclBaseType) {
   if (result.isSuccess() && Tok.is(tok::code_complete) &&
       !Tok.isAtStartOfLine()) {
     auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
-        result.get(), None, consumeTokenSyntax(),
-        *SyntaxContext);
+        result.get(), None, consumeTokenSyntax(), *SyntaxContext);
     return makeParsedCodeCompletion(std::move(ty));
   }
 
@@ -1833,3 +1683,288 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSyntax(Diag<> MessageID, b
   return Result.getStatus();
 }
 
+/// parseTypeTupleBodySyntax
+///   type-tuple:
+///     '(' type-tuple-body? ')'
+///   type-tuple-body:
+///     type-tuple-element (',' type-tuple-element)* '...'?
+///   type-tuple-element:
+///     identifier? identifier ':' type
+///     type
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeTupleBodySyntax() {
+  // Force the context to create deferred nodes, as we might need to
+  // de-structure the tuple type to create a function type.
+  DeferringContextRAII Deferring(*SyntaxContext);
+  Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
+
+  if (ParsingTypeTuple.isFailed()) {
+    return makeParsedError<ParsedTypeSyntax>();
+  }
+
+  ParsedTupleTypeSyntaxBuilder builder(*SyntaxContext);
+
+  // Parse '('.
+  auto LParenLoc = Tok.getLoc();
+  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
+
+  // Parse the elements.
+  SmallVector<ParsedTupleTypeElementSyntax, 4> elements;
+  SmallVector<std::tuple<SourceLoc, SourceLoc, SourceLoc>, 4> elementsLoc;
+  SourceLoc FirstEllipsisLoc;
+  auto Status = parseListSyntax(
+      elements, /*AllowEmpty=*/true, /*AllowSepAfterLast=*/false,
+      [&] { return Tok.is(tok::r_paren); },
+      [&](ParsedTupleTypeElementSyntaxBuilder &ElemBuilder) {
+        Optional<BacktrackingScope> backtracking;
+
+        // 'inout' here can be beither obsoleted use of the marker in front of
+        // an argument label or a valid type annotation in case there are no
+        // argument labels. Until we are convinced of the opposite, we must
+        // assume the former. IsInOutObsoleted keeps track of which case we are
+        // in.
+        SourceLoc inOutLoc;
+        Optional<ParsedTokenSyntax> inOut;
+        bool hasArgumentLabel = false;
+        if (Tok.is(tok::kw_inout)) {
+          inOutLoc = Tok.getLoc();
+          inOut = consumeTokenSyntax(tok::kw_inout);
+        }
+
+        // If the label is "some", this could end up being an opaque type
+        // description if there's `some <identifier>` without a following colon,
+        // so we may need to be able to backtrack.
+        if (Tok.getText().equals("some")) {
+          backtracking.emplace(*this);
+        }
+
+        // If the tuple element starts with a potential argument label followed
+        // by a ':' or another potential argument label, then the identifier is
+        // an element tag, and it is followed by a type annotation.
+        Optional<ParsedTokenSyntax> name;
+        Optional<ParsedTokenSyntax> secondName;
+        Optional<ParsedTokenSyntax> colon;
+        SourceLoc nameLoc;
+        SourceLoc secondNameLoc;
+        // Argument labels can be either
+        // name ':' or
+        // name secondName ':'
+        // Check if we are in either of these cases
+        if (Tok.canBeArgumentLabel() &&
+            (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
+          hasArgumentLabel = true;
+          // Consume a name.
+          nameLoc = Tok.getLoc();
+          name = consumeArgumentLabelSyntax();
+
+          // If there is a second name, consume it as well.
+          if (Tok.canBeArgumentLabel()) {
+            secondNameLoc = Tok.getLoc();
+            secondName = consumeArgumentLabelSyntax();
+          }
+
+          // Consume the ':'.
+          colon = consumeTokenSyntaxIf(tok::colon);
+          if (colon) {
+            // If we succeed, then we successfully parsed a label and there's
+            // no need to backtrack.
+            if (backtracking) {
+              backtracking->cancelBacktrack();
+            }
+          } else {
+            // Otherwise, try backtracking and parse 'some' as a type attribute.
+            // If that's not possible, this is a syntax error.
+            if (!backtracking) {
+              diagnose(Tok, diag::expected_parameter_colon);
+            }
+            nameLoc = SourceLoc();
+            secondNameLoc = SourceLoc();
+          }
+        }
+
+        if (!backtracking || !backtracking->willBacktrack()) {
+          if (name) {
+            ElemBuilder.useName(std::move(*name));
+          }
+          if (secondName) {
+            ElemBuilder.useSecondName(std::move(*secondName));
+          }
+          if (colon) {
+            ElemBuilder.useColon(std::move(*colon));
+          }
+        } else if (backtracking && backtracking->willBacktrack()) {
+          nameLoc = SourceLoc();
+          secondNameLoc = SourceLoc();
+          name.reset();
+          secondName.reset();
+          assert(!colon.hasValue());
+        }
+        backtracking.reset();
+
+        // Parse the type.
+        auto typeLoc = Tok.getLoc();
+        auto ty = parseTypeSyntax(diag::expected_type);
+        if (ty.isNull()) {
+          ty = makeParsedResult(
+              ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext),
+              ty.getStatus());
+        }
+        assert(!ty.isNull() && "We should always have a type by now");
+
+        // Handle pre-parsed 'inout'.
+        if (inOut) {
+          if (hasArgumentLabel) {
+            ElemBuilder.useInOut(std::move(*inOut));
+            bool isTypeAlreadyAttributed = false;
+            if (auto AttributedType = ty.getAs<ParsedAttributedTypeSyntax>()) {
+              isTypeAlreadyAttributed =
+                  AttributedType->getDeferredSpecifier().hasValue();
+            }
+            if (isTypeAlreadyAttributed) {
+              // If the parsed type is already attributed, suggest removing
+              // `inout`.
+              diagnose(Tok, diag::parameter_specifier_repeated)
+                  .fixItRemove(inOutLoc);
+            } else {
+              diagnose(inOutLoc, diag::parameter_specifier_as_attr_disallowed,
+                       "inout")
+                  .fixItRemove(inOutLoc)
+                  .fixItInsert(typeLoc, "inout ");
+            }
+          } else {
+            // Apply 'inout' to the parsed type.
+            ParsedAttributedTypeSyntaxBuilder builder(*SyntaxContext);
+            ty = applyAttributeToTypeSyntax(std::move(ty), std::move(inOut),
+                                            None);
+            typeLoc = inOutLoc;
+            inOutLoc = SourceLoc();
+            inOut.reset();
+          }
+        }
+        assert(!ty.isNull() && "We should not have replaced the type by null");
+        ElemBuilder.useType(ty.get());
+        elementsLoc.emplace_back(nameLoc, secondNameLoc, typeLoc);
+        if (ty.isError()) {
+          return ty.getStatus();
+        }
+
+        // Parse '...'.
+        if (Tok.isEllipsis()) {
+          auto ElementEllipsisLoc = Tok.getLoc();
+          Tok.setKind(tok::ellipsis);
+          ElemBuilder.useEllipsis(consumeTokenSyntax(tok::ellipsis));
+          if (!FirstEllipsisLoc.isValid()) {
+            FirstEllipsisLoc = ElementEllipsisLoc;
+          } else {
+            diagnose(ElementEllipsisLoc, diag::multiple_ellipsis_in_tuple)
+                .highlight(FirstEllipsisLoc)
+                .fixItRemove(ElementEllipsisLoc);
+          }
+        }
+
+        // If we find an initializer ('=' expr), this is not valid inside a type
+        // tuple. Parse it into the libSyntax tree for better diagnostics. It
+        // will be ignored in terms of the AST.
+        if (Tok.is(tok::equal)) {
+          ParsedInitializerClauseSyntaxBuilder initBuilder(*SyntaxContext);
+          auto equalLoc = Tok.getLoc();
+          initBuilder.useEqual(consumeTokenSyntax(tok::equal));
+
+          // The context into which the expression will be parsed until
+          // expression parsing has been migrated to libSyntax. We don't need to
+          // worry about feeding the expression to ASTGen since it is ignored by
+          // the AST.
+          SyntaxParsingContext tmpCtxt(SyntaxContext);
+          tmpCtxt.setTransparent();
+
+          auto init = parseExpr(diag::expected_init_value);
+          auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
+          if (init.isNonNull()) {
+            inFlight.fixItRemove(SourceRange(equalLoc, PreviousLoc));
+          }
+          if (auto expr = SyntaxContext->popIf<ParsedExprSyntax>()) {
+            initBuilder.useValue(std::move(*expr));
+          } else {
+            initBuilder.useValue(
+                ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
+          }
+          ElemBuilder.useInitializer(initBuilder.build());
+        }
+
+        return makeParserSuccess();
+      });
+
+  // Parse ')'.
+  auto rParen = parseMatchingTokenSyntax(
+      tok::r_paren, diag::expected_rparen_tuple_type_list, LParenLoc,
+      /*SilenceDiag=*/Status.isError());
+  Status |= rParen.getStatus();
+
+  bool isFunctionType =
+      Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows) ||
+      (shouldParseExperimentalConcurrency() &&
+       Tok.isContextualKeyword("async"));
+
+  auto getTokenText = [this](Optional<ParsedTokenSyntax> Name) -> StringRef {
+    return !Name ? StringRef()
+                 : SourceMgr.extractText(Name->getRaw().getDeferredTokenRange(),
+                                         L->getBufferID());
+  };
+
+  if (isFunctionType) {
+    for (unsigned i = 0; i < elements.size(); i++) {
+      auto &element = elements[i];
+      SourceLoc nameLoc, secondNameLoc, typeLoc;
+      std::tie(nameLoc, secondNameLoc, typeLoc) = elementsLoc[i];
+      if (nameLoc.isValid()) {
+        auto nameText = getTokenText(element.getDeferredName());
+        if (nameText != "_") {
+          // If there was a first name, complain; arguments in function types
+          // are always unlabeled.
+          auto nameIdentifier = Context.getIdentifier(nameText);
+          auto diag = diagnose(nameLoc, diag::function_type_argument_label,
+                               nameIdentifier);
+          auto secondNameText = getTokenText(element.getDeferredSecondName());
+          if (secondNameLoc.isInvalid()) {
+            // If we only have a first name (i.e. name ':' type) suggest
+            // changing it to '_' name ':' type.
+            diag.fixItInsert(nameLoc, "_ ");
+          } else if (secondNameText == "_") {
+            // If the second name is '_' just remove the first name.
+            diag.fixItRemoveChars(nameLoc, typeLoc);
+          } else {
+            // Otherwiese we have a first and second name. The first name is
+            // invalid. Replace it by '_'.
+            diag.fixItReplace(SourceRange(nameLoc), "_");
+          }
+        }
+      }
+    }
+  } else {
+    for (unsigned i = 0; i < elements.size(); i++) {
+      auto &element = elements[i];
+      SourceLoc nameLoc, secondNameLoc, typeLoc;
+      std::tie(nameLoc, secondNameLoc, typeLoc) = elementsLoc[i];
+      if (nameLoc.isValid() && secondNameLoc.isValid()) {
+        // True tuples can't have two labels
+        auto diag = diagnose(nameLoc, diag::tuple_type_multiple_labels);
+        auto name = element.getDeferredName();
+        auto nameText = SourceMgr.extractText(
+            name->getRaw().getDeferredTokenRange(), L->getBufferID());
+        if (nameText == "_") {
+          diag.fixItRemoveChars(nameLoc, typeLoc);
+        } else {
+          diag.fixItRemove(SourceRange(
+              Lexer::getLocForEndOfToken(SourceMgr, nameLoc), secondNameLoc));
+        }
+      }
+    }
+  }
+  for (auto &elem : elements) {
+    builder.addElementsMember(std::move(elem));
+  }
+  if (!rParen.isNull()) {
+    builder.useRightParen(rParen.get());
+  }
+
+  return makeParsedResult(builder.build(), Status);
+}
