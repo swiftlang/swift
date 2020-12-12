@@ -74,11 +74,17 @@ struct SymbolGraph {
    */
   llvm::DenseSet<Edge> Edges;
 
+  /**
+   True if this graph is for a single symbol, rather than an entire module.
+   */
+  bool IsForSingleNode;
+
   SymbolGraph(SymbolGraphASTWalker &Walker,
               ModuleDecl &M,
               Optional<ModuleDecl *> ExtendedModule,
               markup::MarkupContext &Ctx,
-              Optional<llvm::VersionTuple> ModuleVersion = None);
+              Optional<llvm::VersionTuple> ModuleVersion = None,
+              bool IsForSingleNode = false);
 
   // MARK: - Utilities
 
@@ -217,7 +223,7 @@ struct SymbolGraph {
 
   /// Get the overall declaration for a symbol.
   void
-  serializeDeclarationFragments(StringRef Key, Type T,
+  serializeDeclarationFragments(StringRef Key, Type T, Type BaseTy,
                                 llvm::json::OStream &OS);
 
   /// Returns `true` if the declaration has a name that makes it

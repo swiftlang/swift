@@ -140,9 +140,11 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
   USR.clear();
 
   auto ShouldLink = Name.str() != "Self";
-  if (const auto *TD = T->getAnyNominal()) {
-    if (SG->isImplicitlyPrivate(TD)) {
-      ShouldLink = false;
+  if (T) {
+    if (const auto *TD = T->getAnyNominal()) {
+      if (SG->isImplicitlyPrivate(TD)) {
+        ShouldLink = false;
+      }
     }
   }
 
