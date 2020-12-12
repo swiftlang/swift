@@ -419,12 +419,12 @@ extension Unsafe${Mutable}BufferPointer {
   public init(
     @_nonEphemeral start: Unsafe${Mutable}Pointer<Element>?, count: Int
   ) {
-    _debugPrecondition(
+    _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
     _debugPrecondition(
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
-    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
+    self.init(_uncheckedStart: start, count: count)
   }
 
   @inlinable // unsafe-performance
