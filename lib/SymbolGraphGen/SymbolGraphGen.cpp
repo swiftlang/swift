@@ -100,13 +100,13 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   return Success;
 }
 
-bool symbolgraphgen::
+int symbolgraphgen::
 printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
                         bool InSynthesizedExtension,
                         const SymbolGraphOptions &Options,
                         llvm::raw_ostream &OS) {
   if (!Symbol::supportsKind(D->getKind()))
-    return true;
+    return EXIT_FAILURE;
 
   llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
   ModuleDecl *MD = D->getModuleContext();
@@ -121,5 +121,5 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
   Symbol MySym(&Graph, D, NTD, BaseTy);
   Graph.recordNode(MySym);
   Graph.serialize(JOS);
-  return false;
+  return EXIT_SUCCESS;
 }
