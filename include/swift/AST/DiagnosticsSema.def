@@ -784,9 +784,10 @@ ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
 
-ERROR(invalid_redecl_by_optionality,none,
-      "invalid redeclaration of %0 which differs only by the kind of optional passed as an inout argument (%1 vs. %2)",
-      (DeclName, Type, Type))
+NOTE(invalid_redecl_by_optionality_note,none,
+      "parameter with %select{implicitly unwrapped |}0optional type is not different "
+      "from original parameter with %select{implicitly unwrapped |}1optional type",
+      (bool, bool))
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 ERROR(invalid_redecl_init,none,
       "invalid redeclaration of synthesized %select{|memberwise }1%0",

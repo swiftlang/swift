@@ -637,9 +637,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
 
       // Signatures are the same, but interface types are not. We must
       // have a type that we've massaged as part of signature
-      // interface type generation. If it's a result of remapping a
-      // function parameter from 'inout T!' to 'inout T?'
-      if (!current->getInterfaceType()->isEqual(other->getInterfaceType())) {
+      // interface type generation.
+      if (current->getInterfaceType()->isEqual(other->getInterfaceType())) {
         if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
           auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
           auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
@@ -647,38 +646,45 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
             otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
           }
-
+          
           if (currFnTy && otherFnTy) {
             ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
             ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-
+            
             if (currParams.size() == otherParams.size()) {
               auto diagnosed = false;
               for (unsigned i : indices(currParams)) {
-                if (currParams[i].isInOut() && otherParams[i].isInOut()) {
-                  auto currParamTy = currParams[i]
-                    .getType()
-                    ->getAs<InOutType>()
-                    ->getObjectType();
-                  auto otherParamTy = otherParams[i]
-                    .getType()
-                    ->getAs<InOutType>()
-                    ->getObjectType();
-                  OptionalTypeKind currOTK;
-                  OptionalTypeKind otherOTK;
-                  (void)currParamTy->getAnyOptionalObjectType(currOTK);
-                  (void)otherParamTy->getAnyOptionalObjectType(otherOTK);
-                  if (currOTK != OTK_None && otherOTK != OTK_None &&
-                      currOTK != otherOTK) {
-                    tc.diagnose(current, diag::invalid_redecl_by_optionality,
-                                current->getName(), currParamTy,
-                                otherParamTy);
-                    tc.diagnose(other, diag::invalid_redecl_prev,
-                                other->getName());
-
-                    diagnosed = true;
-                    break;
-                  }
+                  
+                bool currIsIUO = false;
+                bool otherIsIUO = false;
+                bool optionalRedecl = false;
+                
+                if (currParams[i].getPlainType()->getOptionalObjectType()) {
+                  optionalRedecl = true;
+                  if (swift::getParameterAt(current, i)->isImplicitlyUnwrappedOptional())
+                    currIsIUO = true;
+                }
+                
+                if (otherParams[i].getPlainType()->getOptionalObjectType()) {
+                  if (swift::getParameterAt(other, i)->isImplicitlyUnwrappedOptional())
+                    otherIsIUO = true;
+                }
+                else {
+                  optionalRedecl = false;
+                }
+                
+                if (optionalRedecl && currIsIUO != otherIsIUO) {
+                  ctx.Diags.diagnoseWithNotes(
+                    current->diagnose(diag::invalid_redecl,
+                                      current->getName()), [&]() {
+                    other->diagnose(diag::invalid_redecl_prev, other->getName());
+                  });
+                  current->diagnose(diag::invalid_redecl_by_optionality_note,
+                                    otherIsIUO, currIsIUO);
+                  
+                  current->setInvalid();
+                  diagnosed = true;
+                  break;
                 }
               }
 

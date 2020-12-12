@@ -210,7 +210,8 @@ let w1: Int = (x as? Int!)!! // expected-warning {{conditional cast from 'Int?' 
 func overloadedByOptionality(_ a: inout Int!) {}
 // expected-note@-1 {{'overloadedByOptionality' previously declared here}}
 func overloadedByOptionality(_ a: inout Int?) {}
-// expected-error@-1 {{invalid redeclaration of 'overloadedByOptionality' which differs only by the kind of optional passed as an inout argument ('Int?' vs. 'Int!')}}
+// expected-error@-1 {{invalid redeclaration of 'overloadedByOptionality'}}
+// expected-note@-2 {{parameter with optional type is not different from original parameter with implicitly unwrapped optional type}}
 
 struct T {
   let i: Int!

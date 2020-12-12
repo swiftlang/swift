@@ -379,17 +379,25 @@ func inout2(x: inout Int) { }
 
 // optionals
 func optional(x: Int?) { } // expected-note{{previously declared}}
-func optional(x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
+func optional(x: Int!) { } 
+// expected-error@-1{{invalid redeclaration of 'optional(x:)'}}
+// expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
 
 func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+func optionalInOut(x: inout Int!) { } 
+// expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
+// expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
 
 class optionalOverloads {
   class func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-  class func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  class func optionalInOut(x: inout Int!) { } 
+  // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
+  // expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
 
   func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-  func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)' which differs only by the kind of optional passed as an inout argument ('Int!' vs. 'Int?')}}
+  func optionalInOut(x: inout Int!) { } 
+  // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
+  // expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
 }
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}
