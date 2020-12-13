@@ -579,8 +579,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     return status;
   }
   SyntaxContext->addSyntax(std::move(result.get()));
-  auto collectionType = SyntaxContext->topNode<TypeSyntax>();
-  auto typeRepr = ASTGenerator.generate(collectionType, typeLoc);
+  auto type = SyntaxContext->topNode<TypeSyntax>();
+  auto typeRepr = ASTGenerator.generate(type, typeLoc);
   if (!typeRepr) {
     status.setIsParseError();
   }
@@ -592,107 +592,20 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///   type-composition:
 ///     'some'? type-simple
 ///     type-composition '&' type-simple
-ParserResult<TypeRepr>
-Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
-  SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
-  // Check for the opaque modifier.
-  // This is only semantically allowed in certain contexts, but we parse it
-  // generally for diagnostics and recovery.
-  SourceLoc opaqueLoc;
-  if (Tok.isContextualKeyword("some")) {
-    // Treat some as a keyword.
-    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
-    opaqueLoc = consumeToken();
-  } else {
-    // This isn't a some type.
-    SomeTypeContext.setTransparent();
+ParserResult<TypeRepr> Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
+  auto typeLoc = leadingTriviaLoc();
+  auto result = parseTypeSimpleOrCompositionSyntax(MessageID);
+  auto status = result.getStatus();
+  if (result.isNull()) {
+    return status;
   }
-  
-  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
-    if (opaqueLoc.isValid()) {
-      type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
-    }
-    return type;
-  };
-  
-  SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
-  // Parse the first type
-  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID);
-  if (FirstType.isNull())
-    return FirstType;
-  if (!Tok.isContextualPunctuator("&")) {
-    return makeParserResult(ParserStatus(FirstType),
-                            applyOpaque(FirstType.get()));
+  SyntaxContext->addSyntax(std::move(result.get()));
+  auto type = SyntaxContext->topNode<TypeSyntax>();
+  auto typeRepr = ASTGenerator.generate(type, typeLoc);
+  if (!typeRepr) {
+    status.setIsParseError();
   }
-
-  SmallVector<TypeRepr *, 4> Types;
-  ParserStatus Status(FirstType);
-  SourceLoc FirstTypeLoc = FirstType.get()->getStartLoc();
-  SourceLoc FirstAmpersandLoc = Tok.getLoc();
-
-  auto addType = [&](TypeRepr *T) {
-    if (!T) return;
-    if (auto Comp = dyn_cast<CompositionTypeRepr>(T)) {
-      // Accept protocol<P1, P2> & P3; explode it.
-      auto TyRs = Comp->getTypes();
-      if (!TyRs.empty()) // If empty, is 'Any'; ignore.
-        Types.append(TyRs.begin(), TyRs.end());
-      return;
-    }
-    Types.push_back(T);
-  };
-
-  addType(FirstType.get());
-  SyntaxContext->setCreateSyntax(SyntaxKind::CompositionType);
-  assert(Tok.isContextualPunctuator("&"));
-  do {
-    if (SyntaxContext->isEnabled()) {
-      auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
-      consumeToken(); // consume '&'
-      if (Type) {
-        ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
-        auto Ampersand = SyntaxContext->popToken();
-        Builder
-          .useAmpersand(std::move(Ampersand))
-          .useType(std::move(*Type));
-        SyntaxContext->addSyntax(Builder.build());
-      }
-    } else {
-      consumeToken(); // consume '&'
-    }
-    
-    // Diagnose invalid `some` after an ampersand.
-    if (Tok.isContextualKeyword("some")) {
-      auto badLoc = consumeToken();
-
-      diagnose(badLoc, diag::opaque_mid_composition)
-          .fixItRemove(badLoc)
-          .fixItInsert(FirstTypeLoc, "some ");
-
-      if (opaqueLoc.isInvalid())
-        opaqueLoc = badLoc;
-    }
-
-    // Parse next type.
-    ParserResult<TypeRepr> ty =
-      parseTypeSimple(diag::expected_identifier_for_type);
-    if (ty.hasCodeCompletion())
-      return makeParserCodeCompletionResult<TypeRepr>();
-    Status |= ty;
-    addType(ty.getPtrOrNull());
-  } while (Tok.isContextualPunctuator("&"));
-
-  if (SyntaxContext->isEnabled()) {
-    if (auto synType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
-      auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
-          std::move(*synType), None, *SyntaxContext);
-      SyntaxContext->addSyntax(std::move(LastNode));
-    }
-  }
-  SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
-  
-  return makeParserResult(Status, applyOpaque(CompositionTypeRepr::create(
-    Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc})));
+  return makeParserResult(status, typeRepr);
 }
 
 ParserResult<TypeRepr> Parser::parseAnyType() {
@@ -1752,6 +1665,127 @@ Parser::parseTypeSimpleSyntax(Diag<> MessageID) {
   }
 
   return result;
+}
+
+
+/// parseTypeSimpleOrCompositionSyntax
+///
+///   type-composition:
+///     'some'? type-simple
+///     type-composition '&' type-simple
+ParsedSyntaxResult<ParsedTypeSyntax>
+Parser::parseTypeSimpleOrCompositionSyntax(Diag<> MessageID) {
+  // Check for the 'some' modifier.
+  Optional<ParsedTokenSyntax> someSpecifier;
+  if (Tok.isContextualKeyword("some")) {
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
+    someSpecifier = consumeTokenSyntax();
+  }
+
+  // Parse the first type specifically so we can return a simple type if there
+  // is no composition
+  SourceLoc firstTypeLoc = Tok.getLoc();
+  auto firstTypeResult = parseTypeSimpleSyntax(MessageID);
+  if (firstTypeResult.isError()) {
+    return firstTypeResult;
+  }
+
+  if (!Tok.isContextualPunctuator("&")) {
+    // We don't have a type composition
+    if (someSpecifier) {
+      auto someType = ParsedSyntaxRecorder::makeSomeType(
+          std::move(*someSpecifier), firstTypeResult.get(), *SyntaxContext);
+      return makeParsedResult(std::move(someType));
+    } else {
+      return firstTypeResult;
+    }
+  }
+
+  // We have a type composition
+  assert(Tok.isContextualPunctuator("&"));
+
+  SmallVector<ParsedCompositionTypeElementSyntax, 4> elements;
+  // Add the first type to elements
+  {
+    auto ampersand = consumeTokenSyntax();
+    auto firstCompositionElement =
+        ParsedSyntaxRecorder::makeCompositionTypeElement(
+            firstTypeResult.get(), std::move(ampersand), *SyntaxContext);
+    elements.push_back(std::move(firstCompositionElement));
+  }
+
+  // Parse for more elements in the composition
+  ParserStatus status;
+  while (true) {
+    Optional<ParsedTokenSyntax> nextSome;
+    // Diagnose invalid `some` after an ampersand.
+    if (Tok.isContextualKeyword("some")) {
+      SourceLoc someLoc = Tok.getLoc();
+      // Consume the `some` keyword
+      consumeTokenSyntax();
+
+      diagnose(someLoc, diag::opaque_mid_composition)
+          .fixItRemove(someLoc)
+          .fixItInsert(firstTypeLoc, "some ");
+    }
+
+    ParsedSyntaxResult<ParsedTypeSyntax> nextTypeResult =
+        parseTypeSimpleSyntax(diag::expected_identifier_for_type);
+    status |= nextTypeResult.getStatus();
+    if (nextTypeResult.isError()) {
+      // Parsing the composition failed. Make an unknown type from all the
+      // parsed syntax elements.
+      SmallVector<ParsedSyntax, 4> junk;
+      if (someSpecifier) {
+        junk.push_back(std::move(*someSpecifier));
+      }
+      std::move(elements.begin(), elements.end(), std::back_inserter(junk));
+      if (nextSome) {
+        junk.push_back(std::move(*nextSome));
+      }
+      if (!nextTypeResult.isNull()) {
+        junk.push_back(nextTypeResult.get());
+      }
+      auto unknownType =
+          ParsedSyntaxRecorder::makeUnknownType(junk, *SyntaxContext);
+      return makeParsedResult(std::move(unknownType), status);
+    }
+
+    // Otherwise we can form another element for our type composition
+    auto nextType = nextTypeResult.get();
+    if (nextSome) {
+      nextType = ParsedSyntaxRecorder::makeSomeType(
+          std::move(*nextSome), std::move(nextType), *SyntaxContext);
+    }
+
+    bool hasAmpersand = false;
+
+    ParsedCompositionTypeElementSyntaxBuilder builder(*SyntaxContext);
+    builder.useType(std::move(nextType));
+    Optional<ParsedTokenSyntax> ampersand = None;
+    if (Tok.isContextualPunctuator("&")) {
+      builder.useAmpersand(consumeTokenSyntax());
+      hasAmpersand = true;
+    }
+    elements.push_back(builder.build());
+    if (!hasAmpersand) {
+      break;
+    }
+  }
+
+  // Build the final composition
+  auto elementsList = ParsedSyntaxRecorder::makeCompositionTypeElementList(
+      elements, *SyntaxContext);
+  ParsedTypeSyntax resultSyntax = ParsedSyntaxRecorder::makeCompositionType(
+      std::move(elementsList), *SyntaxContext);
+
+  // If we saw a 'some' specifier in the beginning, apply it to the type.
+  if (someSpecifier) {
+    resultSyntax = ParsedSyntaxRecorder::makeSomeType(
+        std::move(*someSpecifier), std::move(resultSyntax), *SyntaxContext);
+  }
+
+  return makeParsedResult(std::move(resultSyntax), status);
 }
 
 ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSyntax(Diag<> MessageID, bool IsSILFuncDecl) {

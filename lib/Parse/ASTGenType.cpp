@@ -35,6 +35,16 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*Attributed, Loc);
   } else if (auto completionTy = Type.getAs<CodeCompletionTypeSyntax>()) {
     return generate(*completionTy, Loc);
+  } else if (auto CompositionList =
+                 Type.getAs<CompositionTypeElementListSyntax>()) {
+    llvm_unreachable("Composition elements list is being generated from "
+                     "within the CompositionType generate function.");
+  } else if (auto CompositionElement =
+                 Type.getAs<CompositionTypeElementSyntax>()) {
+    llvm_unreachable("Composition type elements are being generated from "
+                     "within the CompositionType generate function.");
+  } else if (auto Composition = Type.getAs<CompositionTypeSyntax>()) {
+    return generate(*Composition, Loc);
   } else if (auto dictionary = Type.getAs<DictionaryTypeSyntax>()) {
     return generate(*dictionary, Loc);
   } else if (auto Unwrapped =
@@ -48,6 +58,8 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*Optional, Loc);
   } else if (auto simpleIdentifier = Type.getAs<SimpleTypeIdentifierSyntax>()) {
     return generate(*simpleIdentifier, Loc);
+  } else if (auto Some = Type.getAs<SomeTypeSyntax>()) {
+    return generate(*Some, Loc);
   } else if (auto Tuple = Type.getAs<TupleTypeSyntax>()) {
     return generate(*Tuple, Loc);
   } else if (auto Tuple = Type.getAs<TupleTypeElementSyntax>()) {
@@ -62,8 +74,6 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
 //    return generate(*Composition, Loc);
 //  } else if (auto Function = Type.getAs<FunctionTypeSyntax>()) {
 //    return generate(*Function, Loc);
-//  } else if (auto Some = Type.getAs<SomeTypeSyntax>()) {
-//    return generate(*Some, Loc);
 //  } else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>()) {
 //    return generate(*ClassRestriction, Loc);
 //  } else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>()) {
@@ -142,6 +152,34 @@ TypeRepr *ASTGen::generate(const syntax::CodeCompletionTypeSyntax &Type,
   return nullptr;
 }
 
+TypeRepr *ASTGen::generate(const syntax::CompositionTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto elements = Type.getElements();
+  assert(!elements.empty());
+
+  SmallVector<TypeRepr *, 4> elementTypeReprs;
+  for (auto element = elements.begin(); element != elements.end(); ++element) {
+    auto elementType = (*element).getType();
+    TypeRepr *elementTypeRepr;
+    if (auto someSyntax = elementType.getAs<SomeTypeSyntax>()) {
+      // the invalid `some` after an ampersand was already diagnosed by the
+      // parser, handle it gracefully
+      elementTypeRepr = generate(someSyntax->getBaseType(), Loc);
+    } else {
+      elementTypeRepr = generate(elementType, Loc);
+    }
+
+    if (elementTypeRepr) {
+      elementTypeReprs.push_back(elementTypeRepr);
+    }
+  }
+
+  auto firstTypeLoc = advanceLocBegin(Loc, elements[0]);
+  auto lastTypeLoc = advanceLocBegin(Loc, elements[elements.size() - 1]);
+  return CompositionTypeRepr::create(Context, elementTypeReprs, firstTypeLoc,
+                                     {firstTypeLoc, lastTypeLoc});
+}
+
 TypeRepr *ASTGen::generate(const syntax::DictionaryTypeSyntax &Type,
                            const SourceLoc Loc) {
   SourceLoc LBracketLoc = advanceLocBegin(Loc, Type);
@@ -174,11 +212,6 @@ TypeRepr *ASTGen::generate(const syntax::MemberTypeIdentifierSyntax &Type,
   return IdentTypeRepr::create(Context, components);
 }
 
-TypeRepr *ASTGen::generate(const TupleTypeSyntax &Type, const SourceLoc Loc) {
-  return generateTuple(Type.getLeftParen(), Type.getElements(),
-                       Type.getRightParen(), Loc);
-}
-
 TypeRepr *ASTGen::generate(const syntax::MetatypeTypeSyntax &Type,
                            const SourceLoc Loc) {
   auto baseTypeRepr = generate(Type.getBaseType(), Loc);
@@ -209,6 +242,18 @@ TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,
 
   auto typeRepr = generateTypeIdentifier(Type, Loc);
   return IdentTypeRepr::create(Context, {typeRepr});
+}
+
+TypeRepr *ASTGen::generate(const syntax::SomeTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto someLoc = advanceLocBegin(Loc, Type.getSomeSpecifier());
+  auto baseTypeRepr = generate(Type.getBaseType(), Loc);
+  return new (Context) OpaqueReturnTypeRepr(someLoc, baseTypeRepr);
+}
+
+TypeRepr *ASTGen::generate(const TupleTypeSyntax &Type, const SourceLoc Loc) {
+  return generateTuple(Type.getLeftParen(), Type.getElements(),
+                       Type.getRightParen(), Loc);
 }
 
 TypeRepr *ASTGen::generate(const syntax::UnknownTypeSyntax &Type,

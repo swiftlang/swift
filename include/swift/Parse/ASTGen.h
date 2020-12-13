@@ -75,6 +75,8 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::CodeCompletionTypeSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::CompositionTypeSyntax &Type,
+                     const SourceLoc Loc);
   TypeRepr *generate(const syntax::DictionaryTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::ImplicitlyUnwrappedOptionalTypeSyntax &Type,
@@ -87,6 +89,7 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::SimpleTypeIdentifierSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::SomeTypeSyntax &Type, const SourceLoc Loc);
   TypeRepr *generate(const syntax::TupleTypeSyntax &Type, const SourceLoc Loc);
   TypeRepr *generate(const syntax::UnknownTypeSyntax &Type,
                      const SourceLoc Loc);

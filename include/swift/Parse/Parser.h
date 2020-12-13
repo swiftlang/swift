@@ -1405,6 +1405,9 @@ public:
   
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSimpleSyntax(Diag<> MessageID);
 
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSimpleOrCompositionSyntax(Diag<> MessageID);
+
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
                                                        bool IsSILFuncDecl = false);
   

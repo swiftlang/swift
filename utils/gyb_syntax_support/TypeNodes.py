@@ -77,7 +77,7 @@ TYPE_NODES = [
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
-    # some type -> some 'type'
+    # some type -> 'some' type
     Node('SomeType', kind='Type',
          children=[
              Child('SomeSpecifier', kind='IdentifierToken',
