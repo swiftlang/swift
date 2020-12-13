@@ -22,11 +22,6 @@
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
 
-#if defined(__APPLE__)
-// TODO: We shouldn't need this
-#include <dispatch/dispatch.h>
-#endif
-
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 
@@ -509,22 +504,8 @@ struct AsyncContinuationContext {
 
 static void resumeTaskAfterContinuation(AsyncTask *task,
                                         AsyncContinuationContext *context) {
-#if __APPLE__
-  // TODO: Enqueue the task on the specific executor in the continuation
-  // context.
-  //
-  // For now, just enqueue the task resumption on the global concurrent queue
-  // so that we're able to return back to the caller of resume.
-  
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
-                 ^{
-                  task->run(context->ResumeExecutor);
-                 });
-#else
-  swift_unreachable("not implemented");
-#endif
+  swift_task_enqueue(task, context->ResumeExecutor);
 }
-
 
 }
 

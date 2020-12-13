@@ -354,6 +354,15 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
 
   if (paths.size() == N)
     return paths;
+  else if (pathID == options::OPT_emit_loaded_module_trace_path &&
+           paths.size() < N) {
+    // We only need one file to output the module trace file because they
+    // are all equivalent. Add additional empty output paths for module trace to
+    // make sure the compiler won't panic for diag::error_wrong_number_of_arguments.
+    for(unsigned I = paths.size(); I != N; I ++)
+      paths.emplace_back();
+    return paths;
+  }
 
   if (paths.empty())
     return std::vector<std::string>(N, std::string());
