@@ -14,7 +14,11 @@ class TrivialDestructor {
   deinit { }
 }
 
+class Kl {}
+
 class NontrivialDestructor {
+  @_hasStorage var p : Kl 
+  @_hasStorage var i : Int 
   init()
 }
 
@@ -78,6 +82,53 @@ sil @devirtualized_destructor : $@convention(thin) () -> () {
   %1 = tuple()
   return %1 : $()
 }
+
+// In non-OSSA we cannot remove alloc_refs with stores to non-trivial properties.
+//
+// CHECK-LABEL: sil @store_to_non_trivial_property1
+// CHECK:   alloc_ref [stack] $NontrivialDestructor
+// CHECK: } // end sil function 'store_to_non_trivial_property1'
+sil @store_to_non_trivial_property1 : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %20 = alloc_ref [stack] $NontrivialDestructor
+  %21 = ref_element_addr %20 : $NontrivialDestructor, #NontrivialDestructor.p
+  store %0 to %21 : $*Kl
+  set_deallocating %20 : $NontrivialDestructor
+  destroy_addr %21 : $*Kl
+  dealloc_ref [stack] %20 : $NontrivialDestructor
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @store_to_non_trivial_property2
+// CHECK:   alloc_ref [stack] $NontrivialDestructor
+// CHECK: } // end sil function 'store_to_non_trivial_property2'
+sil @store_to_non_trivial_property2 : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %20 = alloc_ref [stack] $NontrivialDestructor
+  %21 = ref_element_addr %20 : $NontrivialDestructor, #NontrivialDestructor.p
+  store %0 to %21 : $*Kl
+  strong_release %20 : $NontrivialDestructor
+  dealloc_ref [stack] %20 : $NontrivialDestructor
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @store_to_trivial_property
+// CHECK-NOT: alloc_ref
+// CHECK: } // end sil function 'store_to_trivial_property'
+sil @store_to_trivial_property : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %20 = alloc_ref [stack] $NontrivialDestructor
+  %21 = ref_element_addr %20 : $NontrivialDestructor, #NontrivialDestructor.i
+  store %0 to %21 : $*Int
+  set_deallocating %20 : $NontrivialDestructor
+  dealloc_ref %20 : $NontrivialDestructor
+  dealloc_ref [stack] %20 : $NontrivialDestructor
+  %r = tuple ()
+  return %r : $()
+}
+
 
 // We load/use a pointer from the alloc_ref, do nothing.
 //

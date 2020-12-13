@@ -251,12 +251,15 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
+hasUnremovableUsers(SILInstruction *AllocRef, UserList *Users,
                     bool acceptRefCountInsts, bool onlyAcceptTrivialStores) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
+
+  SmallVector<RefElementAddrInst *, 8> refElementAddrs;
+  bool deallocationMaybeInlined = false;
 
   while (!Worklist.empty()) {
     SILInstruction *I = Worklist.pop_back_val();
@@ -265,7 +268,7 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
 
     // Insert the instruction into our InvolvedInstructions set.  If we have
     // already seen it, then don't reprocess all of the uses.
-    if (!Users.insert(I)) {
+    if (Users && !Users->insert(I)) {
       LLVM_DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
       continue;
     }
@@ -274,6 +277,13 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
     if (!canZapInstruction(I, acceptRefCountInsts, onlyAcceptTrivialStores)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
+    }
+
+    if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
+      if (!rea->getType().isTrivial(*rea->getFunction()))
+        refElementAddrs.push_back(rea);
+    } else if (isa<SetDeallocatingInst>(I)) {
+      deallocationMaybeInlined = true;
     }
 
     // At this point, we can remove the instruction as long as all of its users
@@ -296,6 +306,20 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
         // Otherwise, add normal instructions to the worklist for processing.
         Worklist.push_back(User);
       }
+    }
+  }
+
+  if (deallocationMaybeInlined) {
+    // The alloc_ref is not destructed by a strong_release which is calling the
+    // deallocator (destroying all stored properties).
+    // In non-OSSA we cannot reliably track the lifetime of non-trivial stored
+    // properties. Removing the dead alloc_ref might leak a property value.
+    // TODO: in OSSA we can replace stores to properties with a destroy_value.
+    for (RefElementAddrInst *rea : refElementAddrs) {
+      // Re-run the check with not accepting non-trivial stores.
+      if (hasUnremovableUsers(rea, nullptr, acceptRefCountInsts,
+                              /*onlyAcceptTrivialStores*/ true))
+        return true;
     }
   }
 
@@ -736,7 +760,7 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ARI, UsersToRemove,
+  if (hasUnremovableUsers(ARI, &UsersToRemove,
                           /*acceptRefCountInsts=*/ !HasSideEffects,
                           /*onlyAcceptTrivialStores*/false)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
@@ -756,7 +780,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors.
   bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
       /*onlyAcceptTrivialStores*/!isTrivialType)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
@@ -773,7 +797,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
 
 bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
   UserList UsersToRemove;
-  if (hasUnremovableUsers(KPI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+  if (hasUnremovableUsers(KPI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
       /*onlyAcceptTrivialStores*/ false)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
