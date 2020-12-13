@@ -6,45 +6,30 @@
 
 import Dispatch
 
-// ==== ------------------------------------------------------------------------
-// MARK: "Infrastructure" for the tests
-
-extension DispatchQueue {
-  func async<R>(operation: @escaping () async throws -> R) -> Task.Handle<R> {
-    let handle = Task.runDetached(operation: operation)
-
-    // Run the task
-    _ = { self.async { handle.run() } }() // force invoking the non-async version
-
-    return handle
-  }
+struct Boom: Error {
 }
 
-@available(*, deprecated, message: "This is a temporary hack")
-@discardableResult
-func launch<R>(operation: @escaping () async throws -> R) -> Task.Handle<R> {
-  let handle = Task.runDetached(operation: operation)
-
-  // Run the task
-  DispatchQueue.global(priority: .default).async { handle.run() }
-
-  return handle
+struct IgnoredBoom: Error {
 }
 
-struct Boom: Error {}
-struct IgnoredBoom: Error {}
+func one()
 
-func one() async -> Int { 1 }
-func boom() async throws -> Int { throw Boom() }
+async -> Int {
+  1
+}
 
-// ==== ------------------------------------------------------------------------
-// MARK: Tests
+func boom()
 
-func test_taskGroup_throws() {
-  let taskHandle = launch { () async throws -> Int in
-    return await try Task.withGroup(resultType: Int.self) { group async throws -> Int in
+async throws -> Int {
+  throw Boom()
+}
+
+func test_taskGroup_throws() async {
+  do {
+    let got = await try Task.withGroup(resultType: Int.self) {
+      group async throws -> Int in
       await group.add { await one() }
-      await group.add { await try boom() }
+      await group.add { await try boom()  }
 
       do {
         while let r = await try group.next() {
@@ -83,30 +68,19 @@ func test_taskGroup_throws() {
 
       fatalError("Should have thrown and handled inside the catch block")
     }
+
+    // Optionally, we may get the first result back before the failure:
+    // COM: next: 1
+    // CHECK: error caught in group: Boom()
+    // CHECK: task 3 (cancelled: false)
+    // CHECK: task group returning normally: 3
+    // CHECK: got: 3
+
+    print("got: \(got)")
+  } catch {
+    print("rethrown: \(error)")
+    fatalError("Expected recovered result, but got error: \(error)")
   }
-
-  // CHECK: main task
-  // Optionally, we may get the first result back before the failure:
-  // COM: next: 1
-  // CHECK: error caught in group: Boom()
-  // CHECK: task 3 (cancelled: false)
-  // CHECK: task group returning normally: 3
-  // CHECK: got: 3
-
-  launch {
-    do {
-      let got = await try taskHandle.get()
-      print("got: \(got)")
-      exit(0)
-    } catch {
-      print("rethrown: \(error)")
-      exit(1)
-    }
-  }
-
-  print("main task")
 }
 
-test_taskGroup_throws()
-
-dispatchMain()
+runAsyncAndBlock(test_taskGroup_throws)

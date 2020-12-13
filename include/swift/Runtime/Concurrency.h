@@ -133,6 +133,9 @@ struct TaskFutureWaitResult {
   OpaqueValue *storage;
 };
 
+using TaskFutureWaitSignature =
+  AsyncSignature<TaskFutureWaitResult(AsyncTask *), /*throws*/ false>;
+
 /// Wait for a future task to complete.
 ///
 /// This can be called from any thread. Its Swift signature is
@@ -151,10 +154,10 @@ swift_task_future_wait;
 ///
 /// \code
 /// func swift_task_group_wait_next(on groupTask: Builtin.NativeObject) async
-///     -> RawGroupPollResult?
+///     -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
 /// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncFunctionType<TaskFutureWaitResult(AsyncTask *task)>
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+TaskFutureWaitSignature::FunctionType
 swift_task_group_wait_next;
 
 /// This can be called from any thread. Its Swift signature is

@@ -43,11 +43,6 @@ protected:
   enum {
     /// The next waiting task link, an AsyncTask that is waiting on a future.
     NextWaitingTaskIndex = 0,
-//    /// The next completed task link, an AsyncTask that is completed however
-//    /// has not been polled yet (by `group.next()`), so the channel task keeps
-//    /// the list in completion order, such that they can be polled out one by
-//    /// one.
-//    NextChannelCompletedTaskIndex = 1,
   };
 
 public:
@@ -218,7 +213,7 @@ public:
     return reinterpret_cast<ChildFragment*>(this + 1);
   }
 
-  // ==== TaskGroup Channel ----------------------------------------------------
+  // ==== TaskGroup ------------------------------------------------------------
 
   class GroupFragment {
   public:
@@ -450,11 +445,6 @@ public:
     NaiveQueue<ReadyQueueItem> readyQueue;
 //     mpsc_queue_t<ReadyQueueItem> readyQueue; // TODO: can we get away with an MPSC queue here once actor executors land?
 
-// NOTE: this style of "queue" is not very nice for the group,
-//        because it acts more like a stack, and we really want completion order
-//        for the task group, thus not using this style (which the wait queue does)
-//    std::atomic<ReadyQueueItem> readyQueue;
-
     /// Queue containing all of the tasks that are waiting in `get()`.
     ///
     /// A task group is also a future, and awaits on the group's result *itself*
@@ -479,13 +469,6 @@ public:
     bool isEmpty() {
       auto oldStatus = GroupStatus { status.load(std::memory_order_relaxed) };
       return oldStatus.pendingTasks() == 0;
-    }
-
-    GroupStatus statusLoad() {
-      return GroupStatus {
-          // status.load(std::memory_order_acquire)
-           status.load(std::memory_order_seq_cst) // TODO: acquire instead
-      };
     }
 
     /// Returns *assumed* new status, including the just performed +1.
@@ -706,12 +689,6 @@ private:
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
 
-//  /// Access the next completed task, which establishes a singly linked list of
-//  /// tasks that are waiting to be polled from a task group channel.
-//  AsyncTask *&getNextChannelReadyTask() {
-//    return reinterpret_cast<AsyncTask *&>(
-//        SchedulerPrivate[NextChannelCompletedTaskIndex]);
-//  }
 };
 
 // The compiler will eventually assume these.

@@ -6,43 +6,15 @@
 
 import Dispatch
 
-// ==== ------------------------------------------------------------------------
-// MARK: "Infrastructure" for the tests
-
-extension DispatchQueue {
-  func async<R>(operation: @escaping () async throws -> R) -> Task.Handle<R> {
-    let handle = Task.runDetached(operation: operation)
-
-    // Run the task
-    _ = { self.async { handle.run() } }() // force invoking the non-async version
-
-    return handle
-  }
-}
-
-@available(*, deprecated, message: "This is a temporary hack")
-@discardableResult
-func launch<R>(operation: @escaping () async throws -> R) -> Task.Handle<R> {
-  let handle = Task.runDetached(operation: operation)
-
-  // Run the task
-  DispatchQueue.global(priority: .default).async { handle.run() }
-
-  return handle
-}
-
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
 
 func echo(_ i: Int) async -> Int { i }
 func boom() async throws -> Int { throw Boom() }
 
-// ==== ------------------------------------------------------------------------
-// MARK: Tests
-
-func test_taskGroup_throws_rethrows() {
-  let taskHandle = launch {
-    return await try Task.withGroup(resultType: Int.self) { (group) async throws -> Int in
+func test_taskGroup_throws_rethrows() async {
+  do {
+    let got = await try Task.withGroup(resultType: Int.self) { (group) async throws -> Int in
       await group.add { await echo(1) }
       await group.add { await echo(2) }
       await group.add { await try boom() }
@@ -58,26 +30,15 @@ func test_taskGroup_throws_rethrows() {
 
       fatalError("should have thrown")
     }
-  }
 
-  launch { () async in
-    do {
-      let got = await try taskHandle.get()
       print("got: \(got)")
-      exit(1)
-    } catch {
-      print("rethrown: \(error)")
-      exit(0)
-    }
+      fatalError("Expected error to be thrown, but got: \(got)")
+  } catch {
+    print("rethrown: \(error)")
   }
-
-  print("main task")
 }
 
 
-// CHECK: main task
 // CHECK: error caught and rethrown in group: Boom()
 // CHECK: rethrown: Boom()
-test_taskGroup_throws_rethrows()
-
-dispatchMain()
+runAsyncAndBlock(test_taskGroup_throws_rethrows)

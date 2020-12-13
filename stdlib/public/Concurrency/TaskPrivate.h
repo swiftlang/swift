@@ -21,8 +21,6 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
-#include <pthread.h>
-#include <stdio.h>
 
 namespace swift {
 
@@ -134,10 +132,11 @@ static void runTaskWithGroupPollResult(
   // TODO: schedule this task on the executor rather than running it directly.
   waitingTask->run(executor);
 
+  // TODO: Not entirely sure when to release; we synchronously run the code above so we can't before
   // if we need to, release the now completed task so it can be destroyed
-  if (result.retainedTask) {
-    swift_release(result.retainedTask);
-  }
+//  if (result.retainedTask) {
+//    swift_release(result.retainedTask);
+//  }
 }
 
 } // end namespace swift

@@ -11,10 +11,7 @@
 ////===----------------------------------------------------------------------===//
 
 import Swift
-import Dispatch
 @_implementationOnly import _SwiftConcurrencyShims
-import Darwin
-import Foundation
 
 // ==== Task Group -------------------------------------------------------------
 
@@ -78,7 +75,6 @@ extension Task {
     groupFlags.isTaskGroup = true
     groupFlags.isFuture = true
 
-    // 1. Prepare the Group task
     let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
         let task = Builtin.getCurrentAsyncTask()
@@ -98,15 +94,11 @@ extension Task {
 
         return result
       }
-    let groupHandle = Handle<BodyResult>(task: groupTask)
 
-    // 2.0) Run the task!
-    DispatchQueue.global(priority: .default).async { // FIXME: use executors when they land
-      groupHandle.run()
-    }
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(groupTask))
 
-    // 2.2) Await the group completing
-    return await try groupHandle.get()
+    return await try Handle<BodyResult>(task: groupTask).get()
   }
 
   /// A task group serves as storage for dynamically started tasks.
@@ -121,6 +113,7 @@ extension Task {
     /// No public initializers
     init(task: Builtin.NativeObject) {
       self.task = task
+      _swiftRetain(task)
     }
 
     // Swift will statically prevent this type from being copied or moved.
@@ -143,25 +136,15 @@ extension Task {
       overridingPriority priorityOverride: Priority? = nil,
       operation: @escaping () async throws -> TaskResult
     ) async -> Task.Handle<TaskResult> {
-      // 1) Increment the number of pending tasks immediately;
+      // Increment the number of pending tasks immediately;
       // We don't need to know which specific task is pending, just that pending
       // ones exist, so that next() can know if to wait or return nil.
-      let groupTask = Builtin.getCurrentAsyncTask()
-      _taskGroupAddPendingTask(groupTask)
+      _taskGroupAddPendingTask(self.task)
 
-      // 2) Create and run the child task
       let childTask =
-        await _runChildTask(overridingPriority: priorityOverride, operation: operation)
+        await _runGroupChildTask(overridingPriority: priorityOverride, operation: operation)
 
-      let handle = Handle<TaskResult>(task: childTask)
-
-      // FIXME: use executors or something else to launch the task
-      DispatchQueue.global(priority: .default).async {
-        // print(">>> run (task added at \(file):\(line))")
-        handle.run()
-      }
-
-      return handle
+      return Handle<TaskResult>(task: childTask)
     }
 
     /// Wait for the a child task that was added to the group to complete,
@@ -208,13 +191,11 @@ extension Task {
       if rawResult.hadErrorResult {
         // Throw the result on error.
         let error = unsafeBitCast(rawResult.storage, to: Error.self)
-        fputs("error: next[\(#file):\(#line)]: after await, error: \(rawResult) -> \(error)\n", stderr)
         throw error
       }
 
       guard let storage = rawResult.storage else {
         // The group was empty, return nil
-        fputs("error: next[\(#file):\(#line)]: after await, result: \(rawResult) -> nil\n", stderr)
         return nil
       }
 
@@ -222,7 +203,6 @@ extension Task {
       let storagePtr =
         storage.bindMemory(to: TaskResult.self, capacity: 1)
       let value = UnsafeMutablePointer<TaskResult>(mutating: storagePtr).pointee
-      fputs("error: next[\(pthread_self()) \(#file):\(#line)]: after await, result: \(rawResult) -> \(value)\n", stderr)
       return value
     }
 
@@ -273,7 +253,6 @@ extension Task.Group {
     //
     // Failures of tasks are ignored.
     while !self.isEmpty {
-      print("[\(#function)] self.isEmpty == \(self.isEmpty)")
       _ = await try? self.next()
       // TODO: Should a failure cause a cancellation of the task group?
       //       This looks very much like supervision trees,
@@ -284,6 +263,16 @@ extension Task.Group {
 }
 
 /// ==== -----------------------------------------------------------------------
+
+@_silgen_name("swift_retain")
+func _swiftRetain(
+  _ task: Builtin.NativeObject
+)
+
+@_silgen_name("swift_task_group_add_pending")
+func _taskGroupAddPendingTask(
+  _ groupTask: Builtin.NativeObject
+)
 
 @_silgen_name("swift_task_group_offer")
 func taskGroupOffer(
@@ -296,12 +285,6 @@ func _taskGroupWaitNext(
   on groupTask: Builtin.NativeObject
 ) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
 
-/// SeeAlso: GroupPollResult
-struct RawGroupPollResult {
-  let status: GroupPollStatus
-  let storage: UnsafeRawPointer
-}
-
 enum GroupPollStatus: Int {
   case empty   = 0
   case waiting = 1
@@ -313,8 +296,3 @@ enum GroupPollStatus: Int {
 func _taskGroupIsEmpty(
   _ groupTask: Builtin.NativeObject
 ) -> Bool
-
-@_silgen_name("swift_task_group_add_pending")
-func _taskGroupAddPendingTask(
-  _ groupTask: Builtin.NativeObject
-)

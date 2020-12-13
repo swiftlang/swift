@@ -19,9 +19,6 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
-#include <iostream>
-#include <pthread.h>
-#include <stdio.h>
 
 using namespace swift;
 using GroupFragment = AsyncTask::GroupFragment;
@@ -34,52 +31,24 @@ using GroupPollResult = GroupFragment::GroupPollResult;
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
-// FIXME: implement this properly, unsure if this is correct
 void GroupFragment::destroy() {
   // TODO: need to release all waiters as well
 //  auto waitHead = waitQueue.load(std::memory_order_acquire);
 //  switch (waitHead.getStatus()) {
 //    case GroupFragment::WaitStatus::Waiting:
-//      assert(false && "destroying a task that never completed");
-//
-//    case GroupFragment::WaitStatus::Success:
-//      resultType->vw_destroy(getStoragePtr());
-//      break;
-//
-//    case GroupFragment::WaitStatus::Error:
-//      swift_unknownObjectRelease(reinterpret_cast<OpaqueValue *>(getError()));
-//      break;
+//      assert(false && "destroying a task group that still has waiting tasks");
 //  }
-//
-//  // FIXME: all tasks still in the readyQueue must be: swift_release(...)
-//  auto readyHead = readyQueue.load(std::memory_order_acquire);
-//  while (auto readyTask = readyHead.getTask()) {
-//    // Find the next waiting task.
-//    auto newReadyTask = readyTask->getNextChannelReadyTask();
-//    auto nextReadyQueueItem = GroupFragment::ReadyQueueItem::get(
-//        GroupFragment::ReadyStatus::Executing,
-//        newReadyTask
-//    );
-//
-//    // Attempt to claim it, we are the future that is going to complete it.
-//    // TODO: there may be other futures trying to do the same right now? FIXME: not really because the status right?
-//    if (fragment->waitQueue.compare_exchange_weak(readyHead, nextReadyQueueItem,
-//        /*success*/ std::memory_order_release,
-//        /*failure*/ std::memory_order_acquire)) {
-//      switch (readyHead.getStatus()) {
-//        case GroupFragment::ReadyStatus::Empty:
-//          return;
-//
-//        case GroupFragment::WaitStatus::Success:
-//          swift_unknownObjectRelease(reinterpret_cast<OpaqueValue *>(getError()));
-//          break;
-//
-//        case GroupFragment::WaitStatus::Error:
-//          swift_unknownObjectRelease(reinterpret_cast<OpaqueValue *>(getError()));
-//          break;
-//      }
-//    }
-//  }
+
+  mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
+  // Release all ready tasks which are kept retained, the group destroyed,
+  // so no other task will ever await on them anymore;
+  ReadyQueueItem item;
+  bool taskDequeued = readyQueue.dequeue(item);
+  while (taskDequeued) {
+    swift_release(item.getTask());
+    bool taskDequeued = readyQueue.dequeue(item);
+  }
+  mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
 }
 
 // =============================================================================
@@ -209,7 +178,7 @@ void swift::swift_task_group_wait_next(
 GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
   assert(isTaskGroup());
   auto fragment = groupFragment();
-  fragment->mutex.lock();
+  fragment->mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // immediately update the status counter
   auto assumed = fragment->statusAddWaitingTaskAcquire();

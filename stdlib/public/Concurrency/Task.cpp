@@ -182,7 +182,6 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 
   // Release the task, balancing the retain that a running task has on itself.
   // If it was a group child task, it will remain until the group returns it.
-  assert(task && "task to be released MUST NOT BE NULL");
   swift_release(task);
 }
 
