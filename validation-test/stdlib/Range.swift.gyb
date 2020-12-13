@@ -335,15 +335,29 @@ extension ${Self} where Bound : TestProtocol1 {
 var ${TestSuite} = TestSuite("${Self}")
 
 ${TestSuite}.test("init(uncheckedBounds:)")
-  .forEach(in: [(1, 2), (1, 1), (2, 1)]) {
+  .forEach(in: [(1, 2), (1, 1)]) {
   (lowerInt, upperInt) in
 
-  // Check that 'init(uncheckedBounds:)' does not perform precondition checks,
-  // allowing to create ranges that break invariants.
   let r = ${Self}(
     uncheckedBounds: (lower: ${Bound}(lowerInt), upper: ${Bound}(upperInt)))
   expectEqual(lowerInt, r.lowerBound.value)
   expectEqual(upperInt, r.upperBound.value)
+}
+
+${TestSuite}.test("init(uncheckedBounds:) with invalid values")
+  .xfail(
+    .custom(
+      { _isDebugAssertConfiguration() },
+      reason: "unchecked initializer still checks its input in Debug mode"))
+  .code {
+  let low = 2
+  let up = 1
+  // Check that 'init(uncheckedBounds:)' does not perform precondition checks,
+  // allowing to create ranges that break invariants.
+  let r = ${Self}(
+    uncheckedBounds: (lower: ${Bound}(low), upper: ${Bound}(up)))
+  expectEqual(low, r.lowerBound.value)
+  expectEqual(up, r.upperBound.value)
 }
 
 %   for (DestinationSelf, _, _, _) in all_range_types:
