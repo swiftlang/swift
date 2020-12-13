@@ -253,7 +253,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   @inlinable
   public var count: Int {
     if let pos = _position {
-      return _end! - pos
+      return _assumeNonNegative(_end! - pos)
     }
     return 0
   }
@@ -432,11 +432,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   public init(
     @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
   ) {
-    _precondition(count >= 0, "${Self} with negative count")
-    _precondition(count == 0 || start != nil,
+    _debugPrecondition(count >= 0, "${Self} with negative count")
+    _debugPrecondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
     _position = start
-    _end = start.map { $0 + count }
+    _end = start.map { $0 + _assumeNonNegative(count) }
   }
 
   /// Creates a new buffer over the same memory as the given buffer.
@@ -511,6 +511,17 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter slice: The raw buffer slice to rebase.
   @inlinable
   public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
+      "Invalid slice")
     let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = slice.endIndex &- slice.startIndex
     self.init(start: base, count: count)

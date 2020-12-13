@@ -207,7 +207,14 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return end - start
+    // NOTE: We allow the subtraction to silently overflow in release builds
+    // to eliminate a superflous check when `start` and `end` are both valid
+    // indices. (The operation can only overflow if `start` is negative, which
+    // implies it's an invalid index.) `Collection` does not specify what
+    // `distance` should return when given an invalid index pair.
+    let result = end.subtractingReportingOverflow(start)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -387,6 +394,17 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 }
 
 extension Unsafe${Mutable}BufferPointer {
+  // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
+  @_alwaysEmitIntoClient
+  internal init(
+    @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
+    count: Int
+  ) {
+    _position = start
+    self.count = count
+  }
+
   /// Creates a new buffer pointer over the specified number of contiguous
   /// instances beginning at the given pointer.
   ///
@@ -401,13 +419,12 @@ extension Unsafe${Mutable}BufferPointer {
   public init(
     @_nonEphemeral start: Unsafe${Mutable}Pointer<Element>?, count: Int
   ) {
-    _precondition(
+    _debugPrecondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
-    _precondition(
+    _debugPrecondition(
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
-    _position = start
-    self.count = count
+    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
   }
 
   @inlinable // unsafe-performance
@@ -498,6 +515,17 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter slice: The buffer slice to rebase.
   @inlinable // unsafe-performance
   public init(rebasing slice: Slice<UnsafeBufferPointer<Element>>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
+      "Invalid slice")
     let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = slice.endIndex &- slice.startIndex
     self.init(start: base, count: count)
