@@ -1989,7 +1989,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   doSomething(x: 0, y: 0)     // argument labels are required
   ```
 
- Unapplied references to functions or initializers no longer carry argument labels. For example:
+  Unapplied references to functions or initializers no longer carry argument labels. For example:
 
   ```swift
   let f = doSomething(x:y:)     // inferred type is now (Int, Int) -> Void
