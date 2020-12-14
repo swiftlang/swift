@@ -66,6 +66,10 @@ ATTRIBUTE_NODES = [
                              kind='DerivativeRegistrationAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
+                       Child('OpaqueReturnTypeOfArguments',
+                             kind='OpaqueReturnTypeOfAttributeArguments'),
+                       Child('ConventionArguments',
+                             kind='CTypeConventionAttributeArguments'),
                    ], description='''
                    The arguments of the attribute. In case the attribute
                    takes multiple arguments, they are gather in the
@@ -167,13 +171,9 @@ ATTRIBUTE_NODES = [
              ]),
          ]),
     Node('DeclName', kind='Syntax', children=[
-         Child('DeclBaseName', kind='Syntax', description='''
+         Child('DeclBaseName', kind='Token', description='''
                The base name of the protocol\'s requirement.
-               ''',
-               node_choices=[
-                   Child('Identifier', kind='IdentifierToken'),
-                   Child('Operator', kind='PrefixOperatorToken'),
-               ]),
+               '''),
          Child('DeclNameArguments', kind='DeclNameArguments',
                is_optional=True, description='''
                The argument labels of the protocol\'s requirement if it
@@ -388,5 +388,45 @@ ATTRIBUTE_NODES = [
                    The argument labels of the referenced function, optionally
                    specified.
                    '''),
+         ]),
+
+    # opaque-return-type-of-attr-arguments -> string-literal ','
+    # integer-literal
+    Node('OpaqueReturnTypeOfAttributeArguments', kind='Syntax',
+         description='''
+         The argument for the `@_opaqueReturnTypeOf` type attribute of the \
+         form `<mangled name>, <index number>`.
+         ''',
+         children=[
+             Child('MangledName', kind='StringLiteralToken', description='''
+                   The mangled name of the opaque function/property which the
+                   the type represents.
+                   '''),
+             Child('Comma', kind='CommaToken'),
+             Child('Index', kind='IntegerLiteralToken', description='''
+                   The index of the return type.
+                   '''),
+         ]),
+    # The argument of '@convention(...)'.
+    # convention-attr-arguments ->
+    #     convention ','? 'cType'? ':'? string-literal?
+    Node('CTypeConventionAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the `@convention`.
+         ''',
+         children=[
+             Child('Convention', kind='IdentifierToken'),
+             Child('Comma', kind='CommaToken', description='''
+                   The comma separating the converntion from the cType.
+                   ''', is_optional=True),
+             Child('CTypeLabel', kind='IdentifierToken', description='''
+                   The cType label
+                   ''', is_optional=True),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating the cType from the string literal
+                   ''', is_optional=True),
+             Child('CType', kind='StringLiteralToken', description='''
+                   The C type of the function attributed with this convention.
+                   ''', is_optional=True),
          ]),
 ]

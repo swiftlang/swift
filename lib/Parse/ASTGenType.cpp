@@ -47,6 +47,8 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*Composition, Loc);
   } else if (auto dictionary = Type.getAs<DictionaryTypeSyntax>()) {
     return generate(*dictionary, Loc);
+  } else if (auto Function = Type.getAs<FunctionTypeSyntax>()) {
+    return generate(*Function, Loc);
   } else if (auto Unwrapped =
                  Type.getAs<ImplicitlyUnwrappedOptionalTypeSyntax>()) {
     return generate(*Unwrapped, Loc);
@@ -72,8 +74,6 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
   }
 //  } else if (auto Composition = Type.getAs<CompositionTypeSyntax>()) {
 //    return generate(*Composition, Loc);
-//  } else if (auto Function = Type.getAs<FunctionTypeSyntax>()) {
-//    return generate(*Function, Loc);
 //  } else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>()) {
 //    return generate(*ClassRestriction, Loc);
 //  } else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>()) {
@@ -82,6 +82,32 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
 //    return generate(*SILFunctionType, Loc, IsSILFuncDecl);
 //  } else if (auto Unknown = Type.getAs<UnknownTypeSyntax>()) {
 //    return generate(*Unknown, Loc);
+
+// FIXME: (syntax-parse) Erase generic type parameters
+//  if (Tok.is(tok::arrow)) {
+//  } else if (auto firstGenerics = generics ? generics : patternGenerics) {
+//    // Only function types may be generic.
+//    auto brackets = firstGenerics->getSourceRange();
+//    diagnose(brackets.Start, diag::generic_non_function);
+//
+//    // Forget any generic parameters we saw in the type.
+//    class EraseTypeParamWalker : public ASTWalker {
+//    public:
+//      bool walkToTypeReprPre(TypeRepr *T) override {
+//        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+//          if (auto decl = ident->getBoundDecl()) {
+//            if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
+//              ident->overwriteNameRef(genericParam->createNameRef());
+//          }
+//        }
+//        return true;
+//      }
+//
+//    } walker;
+//
+//    if (tyR)
+//      tyR->walk(walker);
+//  }
 }
 
 TypeRepr *ASTGen::generate(const syntax::ArrayTypeSyntax &Type,
@@ -104,7 +130,10 @@ TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
   }
 
   if (auto attributes = Type.getAttributes()) {
-    llvm_unreachable("ASTG of proper attributes has not been implemented yet");
+    TypeAttributes attrs = generateTypeAttributes(*attributes, Loc);
+    if (!attrs.empty()) {
+      typeAST = new (Context) AttributedTypeRepr(attrs, typeAST);
+    }
   }
 
   if (auto specifier = Type.getSpecifier()) {
@@ -194,6 +223,33 @@ TypeRepr *ASTGen::generate(const syntax::DictionaryTypeSyntax &Type,
 
   SourceRange Range{LBracketLoc, RBracketLoc};
   return new (Context) DictionaryTypeRepr(KeyType, ValueType, ColonLoc, Range);
+}
+
+TypeRepr *ASTGen::generate(const syntax::FunctionTypeSyntax &FuncSyntax,
+                           const SourceLoc Loc) {
+  TupleTypeRepr *argumentTypes = argumentTypes = generateTuple(FuncSyntax.getLeftParen(), FuncSyntax.getArguments(), FuncSyntax.getRightParen(), Loc);
+
+  if (!argumentTypes) {
+    return nullptr;
+  }
+
+  SourceLoc asyncLoc;
+  if (FuncSyntax.getAsyncKeyword()) {
+    asyncLoc = advanceLocBegin(Loc, *FuncSyntax.getAsyncKeyword());
+  }
+  SourceLoc throwsLoc;
+  if (FuncSyntax.getThrowsOrRethrowsKeyword()) {
+    throwsLoc = advanceLocBegin(Loc, *FuncSyntax.getThrowsOrRethrowsKeyword());
+  }
+
+  auto arrowLoc = advanceLocBegin(Loc, FuncSyntax.getArrow());
+  auto returnType = generate(FuncSyntax.getReturnType(), Loc);
+  if (!returnType) {
+    return nullptr;
+  }
+
+  return new (Context) FunctionTypeRepr(nullptr, argumentTypes, asyncLoc,
+                                        throwsLoc, arrowLoc, returnType);
 }
 
 TypeRepr *
@@ -392,6 +448,161 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
   return TupleTypeRepr::create(Context, tupleElements,
                                {leftParenLoc, rightParenLoc}, ellipsisLoc,
                                ellipsisIdx);
+}
+
+TypeAttributes ASTGen::generateTypeAttributes(const AttributeListSyntax &Syntax,
+                                              const SourceLoc Loc) {
+  TypeAttributes attrs;
+
+  for (auto elem : Syntax) {
+    // We don't have custom type attributes, only custom decl attributes.
+    auto attrSyntax = elem.castTo<AttributeSyntax>();
+
+    auto attrName = attrSyntax.getAttributeName().getText();
+
+    // If we haven't recorded the location of the first '@' yet, do so now.
+    auto atLoc = advanceLocBegin(Loc, attrSyntax.getAtSignToken());
+    if (attrs.AtLoc.isInvalid()) {
+      attrs.AtLoc = atLoc;
+    }
+
+    auto attr = TypeAttributes::getAttrKindFromString(attrName);
+    if (attr == TAK_Count) {
+      continue;
+    }
+
+    if (attrs.has(attr)) {
+      P.diagnose(atLoc, diag::duplicate_attribute, /*isModifier=*/false);
+      continue;
+    }
+
+    // In the following we have two methods of ignoring an attribute:
+    // Either 'continue' to continue the loop and don't add the attribute to
+    // attrs or 'break' to break the switch (possibly skipping custom handling
+    // logic) but still adding it to attrs afterwards.
+    switch (attr) {
+    case TAK_sil_weak:
+    case TAK_sil_unowned:
+      if (attrs.hasOwnership()) {
+        P.diagnose(atLoc, diag::duplicate_attribute, /*isModifier=*/false);
+      }
+      break;
+    case TAK_opened: {
+      // @opened("01234567-89ab-cdef-0123-111111111111")
+      auto arg = attrSyntax.getArgument();
+      if (!arg) {
+        continue;
+      }
+
+      assert(arg->castTo<TokenSyntax>().getTokenKind() == tok::string_literal);
+      auto tokText = arg->castTo<TokenSyntax>().getText();
+      // Remove quotes from the string literal.
+      auto literalText = tokText.slice(1, tokText.size() - 1);
+      if (auto openedID = UUID::fromString(literalText.str().c_str())) {
+        attrs.OpenedID = openedID;
+      } else {
+        auto argLoc = advanceLocBegin(Loc, *arg);
+        P.diagnose(argLoc, diag::opened_attribute_id_value);
+      }
+      break;
+    }
+    case TAK_differentiable: {
+      auto arg = attrSyntax.getArgument();
+      if (!arg) {
+        // We don't have an argument. Since an argument is optional for
+        // @differentiable, add it anyway, just don't set attrs.linear
+        break;
+      }
+      auto argText = arg->castTo<TokenSyntax>().getIdentifierText();
+      if (argText == "linear") {
+        attrs.linear = true;
+      } else {
+        auto argLoc = advanceLocBegin(Loc, *arg);
+        P.diagnose(argLoc, diag::attr_differentiable_unexpected_argument,
+                   argText);
+      }
+      break;
+    }
+    case TAK_convention: {
+      // @convention(block)
+      // @convention(witness_method: ProtocolName)
+      // @convention(c, cType: "void *(void)")
+      TypeAttributes::Convention convention;
+
+      auto arg = attrSyntax.getArgument();
+      if (!arg) {
+        continue;
+      }
+
+      if (auto conventionNameTok = arg->getAs<TokenSyntax>()) {
+        auto conventionName = conventionNameTok->getIdentifierText();
+        // Make an identifier for the convention name and use its string so the
+        // name stays alive even after the syntax tree has been destructed.
+        convention.Name = Context.getIdentifier(conventionName).str();
+      } else if (auto conventionAttributeArgs =
+                     arg->getAs<CTypeConventionAttributeArgumentsSyntax>()) {
+        auto conventionName = conventionAttributeArgs->getConvention().getIdentifierText();
+        conventionName = Context.getIdentifier(conventionName).str();
+        convention.Name = conventionName;
+        if (auto cType = conventionAttributeArgs->getCType()) {
+          // If the attribute doesn't have a cType, this has already been
+          // diagnosed in the parser
+          auto cTypeToken = *cType;
+          assert(cTypeToken.getTokenKind() == tok::string_literal);
+          auto cTypeTokenText = cTypeToken.getText();
+          auto cTypeString = cTypeTokenText.slice(1, cTypeTokenText.size() - 1);
+          cTypeString = Context.getIdentifier(cTypeString).str();
+          auto cTypeStringLoc = advanceLocBegin(Loc, cTypeToken);
+          convention.ClangType = {cTypeString, cTypeStringLoc};
+        }
+      } else if (auto witness =
+                     arg->getAs<NamedAttributeStringArgumentSyntax>()) {
+        assert(witness->getNameTok().getIdentifierText() == "witness_method");
+        if (witness->getStringOrDeclname().isMissing()) {
+          continue;
+        }
+        auto protocolName =
+            witness->getStringOrDeclname().castTo<DeclNameSyntax>();
+        convention.Name = "witness_method";
+        convention.WitnessMethodProtocol = generateDeclNameRef(protocolName, Loc);
+      } else {
+        // Unknown attribute. Ignore.
+        continue;
+      }
+      attrs.ConventionArguments = convention;
+      break;
+    }
+    case TAK__opaqueReturnTypeOf: {
+      auto arg = attrSyntax.getArgument();
+      // @_opaqueReturnTypeOf("$sMangledName", 0)
+      if (!arg) {
+        continue;
+      }
+
+      auto opaqueArg =
+          arg->castTo<OpaqueReturnTypeOfAttributeArgumentsSyntax>();
+
+      auto manglingTok = opaqueArg.getMangledName();
+      auto indexTok = opaqueArg.getIndex();
+
+      auto tokText = manglingTok.getText();
+      auto mangling = tokText.slice(1, tokText.size() - 1);
+      mangling = Context.getIdentifier(mangling).str();
+      unsigned index;
+      if (indexTok.getText().getAsInteger(10, index)) {
+        continue;
+      }
+      attrs.setOpaqueReturnTypeOf(mangling, index);
+      break;
+    }
+    default: // No special handling for this attribute
+      break;
+    }
+
+    attrs.setAttr(attr, atLoc);
+  }
+
+  return attrs;
 }
 
 template <typename T>

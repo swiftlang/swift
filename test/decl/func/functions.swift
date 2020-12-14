@@ -129,7 +129,7 @@ func rdar16786220(inout let c: Int) -> () { // expected-warning {{'let' in this 
   c = 42
 }
 
-func multipleSpecifiers(a: inout __owned Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{28-34=}}
+func multipleSpecifiers(a: inout __owned Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{34-42=}}
 
 // <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
 infix operator !!!

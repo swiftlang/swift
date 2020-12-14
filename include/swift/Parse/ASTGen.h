@@ -79,6 +79,8 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::DictionaryTypeSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::FunctionTypeSyntax &Type,
+                     const SourceLoc Loc);
   TypeRepr *generate(const syntax::ImplicitlyUnwrappedOptionalTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::MemberTypeIdentifierSyntax &Type,
@@ -122,6 +124,10 @@ private:
                 const syntax::TupleTypeElementListSyntax &Elements,
                 const syntax::TokenSyntax &RParen, const SourceLoc Loc);
 
+  TypeAttributes
+  generateTypeAttributes(const syntax::AttributeListSyntax &syntax,
+                         const SourceLoc Loc);
+
   /// Generate a \c ComponentIdentTypeRepr from a \c SimpleTypeIdentifierSyntax
   /// or \c MemberTypeIdentifierSyntax. If \c TypeSyntax is a \c
   /// MemberTypeIdentifierSyntax this will *not* walk its children. Use \c
@@ -153,6 +159,9 @@ public:
   static StringRef copyAndStripUnderscores(StringRef Orig, ASTContext &Context);
 
 private:
+  DeclNameRef generateDeclNameRef(const syntax::DeclNameSyntax &DeclName,
+                                  const SourceLoc &Loc);
+
   StringRef copyAndStripUnderscores(StringRef Orig);
 
   /// Advance \p Loc to the first token of the \p Node.

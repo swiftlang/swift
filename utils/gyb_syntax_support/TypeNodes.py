@@ -62,7 +62,11 @@ TYPE_NODES = [
     Node('MetatypeType', kind='Type',
          children=[
              Child('BaseType', kind='Type'),
-             Child('Period', kind='PeriodToken'),
+             Child('Period', kind='Token',
+                   token_choices=[
+                       'PeriodToken',
+                       'PrefixPeriodToken',
+                   ]),
              Child('TypeOrProtocol', kind='IdentifierToken',
                    text_choices=[
                        'Type',

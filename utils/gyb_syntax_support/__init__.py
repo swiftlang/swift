@@ -13,6 +13,7 @@ from .NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
     get_serialization_code, \
     verify_syntax_node_serialization_codes
 from .PatternNodes import PATTERN_NODES  # noqa: I201
+from .SILOnlyNodes import SILONLY_NODES  # noqa: I201
 from .StmtNodes import STMT_NODES  # noqa: I201
 from .Trivia import TRIVIAS  # noqa: I201
 from .TypeNodes import TYPE_NODES  # noqa: I201
@@ -26,7 +27,7 @@ SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
 
-PARSEONLY_NODES = COMPLETIONONLY_NODES
+PARSEONLY_NODES = SILONLY_NODES + COMPLETIONONLY_NODES
 
 verify_syntax_node_serialization_codes(SYNTAX_NODES,
                                        SYNTAX_NODE_SERIALIZATION_CODES)

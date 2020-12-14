@@ -900,6 +900,27 @@ public:
   
   //===--------------------------------------------------------------------===//
   // MARK: - Primitive Parsing using libSyntax
+  
+  enum class DeclNameFlag : uint8_t {
+    /// If passed, operator basenames are allowed.
+    AllowOperators = 1 << 0,
+
+    /// If passed, names that coincide with keywords are allowed. Used after a
+    /// dot to enable things like '.init' and '.default'.
+    AllowKeywords = 1 << 1,
+
+    /// If passed, 'deinit' and 'subscript' should be parsed as special names,
+    /// not ordinary identifiers.
+    AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
+
+    /// If passed, compound names with argument lists are allowed, unless they
+    /// have empty argument lists.
+    AllowCompoundNames = 1 << 4,
+
+    /// If passed, compound names with empty argument lists are allowed.
+    AllowZeroArgCompoundNames = AllowCompoundNames | 1 << 5,
+  };
+  using DeclNameOptions = OptionSet<DeclNameFlag>;
 
   /// Assuming that the current token is an identifier (or self or Self), 
   /// consume and return it. If \p diagnoseDollarPrefix is \c true, complain
@@ -985,6 +1006,10 @@ public:
                                     SmallVectorImpl<ParsedSyntax> *Collect);
 
   ParsedTokenSyntax markSplitTokenSyntax(tok Kind, StringRef Txt);
+  
+  /// Parse a DeclName that references a declaration.
+  ParsedSyntaxResult<ParsedDeclNameSyntax>
+  parseDeclNameRefSyntax(const Diagnostic &Diag, DeclNameOptions Flags);
   
   /// Consume an identifier (but not an operator) if present and return
   /// its \c TokenSyntax.  Otherwise, emit the diagnostic \p D and return \c
@@ -1293,6 +1318,8 @@ public:
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
                                    bool IsSILFuncDecl = false);
+  ParserResult<TypeRepr> parseTypeSIL(Diag<> MessageID,
+                                      bool IsSILFuncDecl = false);
 
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID);
@@ -1373,9 +1400,23 @@ public:
     return consumeTokenSyntax();
   }
 
+  /// Ignore 'async' 'throws' et al. after an '->', if present, emitting
+  /// diagnostics to move them before the '->'
+  ///
+  /// \param ArrowLoc The location of the '->'. Must be valid.
+  void ignoreAsyncThrowsAfterArrowSyntax(SourceLoc ArrowLoc);
+
   ParsedSyntaxResult<ParsedTypeSyntax> parseOldStyleProtocolCompositionSyntax();
   
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeAnySyntax();
+
+  /// Parse specifier and attributes for types into the \p Specifier and \p Attrs
+  /// output parameters.
+  ParserStatus
+  parseTypeAttributeListSyntax(Optional<ParsedTokenSyntax> &Specifier,
+                               Optional<ParsedAttributeListSyntax> &Attrs);
+
+  ParsedSyntaxResult<ParsedAttributeSyntax> parseTypeAttributeSyntax();
 
   /// Parse a collection type.
   ///   type-simple:
@@ -1403,13 +1444,15 @@ public:
   ParsedSyntaxResult<ParsedTypeSyntax>
   parseTypeOldStyleArraySyntax(ParsedTypeSyntax, SourceLoc BaseLoc);
   
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSimpleSyntax(Diag<> MessageID);
-
   ParsedSyntaxResult<ParsedTypeSyntax>
   parseTypeSimpleOrCompositionSyntax(Diag<> MessageID);
 
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSimpleSyntax(Diag<> MessageID);
+
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
                                                        bool IsSILFuncDecl = false);
+
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntaxNonSIL(Diag<> MessageID);
   
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeTupleBodySyntax();
 
@@ -1677,27 +1720,6 @@ public:
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
-
-  enum class DeclNameFlag : uint8_t {
-    /// If passed, operator basenames are allowed.
-    AllowOperators = 1 << 0,
-
-    /// If passed, names that coincide with keywords are allowed. Used after a
-    /// dot to enable things like '.init' and '.default'.
-    AllowKeywords = 1 << 1,
-
-    /// If passed, 'deinit' and 'subscript' should be parsed as special names,
-    /// not ordinary identifiers.
-    AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
-
-    /// If passed, compound names with argument lists are allowed, unless they
-    /// have empty argument lists.
-    AllowCompoundNames = 1 << 4,
-
-    /// If passed, compound names with empty argument lists are allowed.
-    AllowZeroArgCompoundNames = AllowCompoundNames | 1 << 5,
-  };
-  using DeclNameOptions = OptionSet<DeclNameFlag>;
 
   friend DeclNameOptions operator|(DeclNameFlag flag1, DeclNameFlag flag2) {
     return DeclNameOptions(flag1) | flag2;

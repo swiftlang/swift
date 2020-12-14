@@ -302,6 +302,7 @@ func complexSequence() {
   // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }
 
+// expected-warning@+1 {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}}
 func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
 
 func takesOneArg<T>(_: T.Type) {}

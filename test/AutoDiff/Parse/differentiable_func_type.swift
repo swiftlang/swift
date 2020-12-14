@@ -41,6 +41,7 @@ struct A<T> {
 // expected-error @+1 {{expected ')' in '@differentiable' attribute}}
 let c: @differentiable(linear (Float) -> Float
 
+// expected-error @+2 {{unexpected argument 'notValidArg' in '@differentiable' attribute}}
 // expected-error @+1 {{expected ')' in '@differentiable' attribute}}
 let c: @differentiable(notValidArg (Float) -> Float
 

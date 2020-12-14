@@ -1,23 +1,23 @@
 {
-  "id": 32,
+  "id": 30,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 31,
+      "id": 29,
       "kind": "CodeBlockItemList",
       "layout": [
         {
-          "id": 29,
+          "id": 27,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 28,
+              "id": 26,
               "kind": "TypealiasDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 26,
+                  "id": 24,
                   "tokenKind": {
                     "kind": "kw_typealias"
                   },
@@ -48,7 +48,7 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 27,
+                  "id": 25,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "x"
@@ -64,7 +64,7 @@
                 },
                 null,
                 {
-                  "id": 25,
+                  "id": 23,
                   "kind": "TypeInitializerClause",
                   "layout": [
                     {
@@ -82,11 +82,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 24,
+                      "id": 22,
                       "kind": "TupleType",
                       "layout": [
                         {
-                          "id": 6,
+                          "id": 2,
                           "tokenKind": {
                             "kind": "l_paren"
                           },
@@ -95,16 +95,16 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 23,
+                          "id": 21,
                           "kind": "TupleTypeElementList",
                           "layout": [
                             {
-                              "id": 20,
+                              "id": 18,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 7,
+                                  "id": 3,
                                   "tokenKind": {
                                     "kind": "kw__"
                                   },
@@ -118,7 +118,7 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 8,
+                                  "id": 4,
                                   "tokenKind": {
                                     "kind": "identifier",
                                     "text": "b"
@@ -128,7 +128,73 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 9,
+                                  "id": 5,
+                                  "tokenKind": {
+                                    "kind": "colon"
+                                  },
+                                  "leadingTrivia": [],
+                                  "trailingTrivia": [
+                                    {
+                                      "kind": "Space",
+                                      "value": 1
+                                    }
+                                  ],
+                                  "presence": "Present"
+                                },
+                                {
+                                  "id": 17,
+                                  "kind": "SimpleTypeIdentifier",
+                                  "layout": [
+                                    {
+                                      "id": 6,
+                                      "tokenKind": {
+                                        "kind": "identifier",
+                                        "text": "Int"
+                                      },
+                                      "leadingTrivia": [],
+                                      "trailingTrivia": [],
+                                      "presence": "Present"
+                                    },
+                                    null
+                                  ],
+                                  "presence": "Present"
+                                },
+                                null,
+                                null,
+                                {
+                                  "id": 8,
+                                  "tokenKind": {
+                                    "kind": "comma"
+                                  },
+                                  "leadingTrivia": [],
+                                  "trailingTrivia": [
+                                    {
+                                      "kind": "Space",
+                                      "value": 1
+                                    }
+                                  ],
+                                  "presence": "Present"
+                                }
+                              ],
+                              "presence": "Present"
+                            },
+                            {
+                              "id": 20,
+                              "kind": "TupleTypeElement",
+                              "layout": [
+                                null,
+                                {
+                                  "id": 10,
+                                  "tokenKind": {
+                                    "kind": "kw__"
+                                  },
+                                  "leadingTrivia": [],
+                                  "trailingTrivia": [],
+                                  "presence": "Present"
+                                },
+                                null,
+                                {
+                                  "id": 5,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -146,73 +212,7 @@
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 2,
-                                      "tokenKind": {
-                                        "kind": "identifier",
-                                        "text": "Int"
-                                      },
-                                      "leadingTrivia": [],
-                                      "trailingTrivia": [],
-                                      "presence": "Present"
-                                    },
-                                    null
-                                  ],
-                                  "presence": "Present"
-                                },
-                                null,
-                                null,
-                                {
-                                  "id": 11,
-                                  "tokenKind": {
-                                    "kind": "comma"
-                                  },
-                                  "leadingTrivia": [],
-                                  "trailingTrivia": [
-                                    {
-                                      "kind": "Space",
-                                      "value": 1
-                                    }
-                                  ],
-                                  "presence": "Present"
-                                }
-                              ],
-                              "presence": "Present"
-                            },
-                            {
-                              "id": 22,
-                              "kind": "TupleTypeElement",
-                              "layout": [
-                                null,
-                                {
-                                  "id": 13,
-                                  "tokenKind": {
-                                    "kind": "kw__"
-                                  },
-                                  "leadingTrivia": [],
-                                  "trailingTrivia": [],
-                                  "presence": "Present"
-                                },
-                                null,
-                                {
-                                  "id": 9,
-                                  "tokenKind": {
-                                    "kind": "colon"
-                                  },
-                                  "leadingTrivia": [],
-                                  "trailingTrivia": [
-                                    {
-                                      "kind": "Space",
-                                      "value": 1
-                                    }
-                                  ],
-                                  "presence": "Present"
-                                },
-                                {
-                                  "id": 21,
-                                  "kind": "SimpleTypeIdentifier",
-                                  "layout": [
-                                    {
-                                      "id": 4,
+                                      "id": 11,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "String"
@@ -235,7 +235,7 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 17,
+                          "id": 15,
                           "tokenKind": {
                             "kind": "r_paren"
                           },
@@ -262,7 +262,7 @@
       "presence": "Present"
     },
     {
-      "id": 30,
+      "id": 28,
       "tokenKind": {
         "kind": "eof",
         "text": ""

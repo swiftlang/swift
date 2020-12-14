@@ -123,7 +123,7 @@ func subject_genericFunc<T>(t: T) {
   func subject_instanceFunc() {}
 }
 
-func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
+func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}}
 }
 
 @objc // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}

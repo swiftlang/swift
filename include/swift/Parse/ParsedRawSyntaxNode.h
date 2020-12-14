@@ -212,6 +212,18 @@ public:
     return copy;
   }
 
+  CharSourceRange getRange() const {
+    switch (DK) {
+    case DataKind::Recorded:
+      return getRecordedRange();
+    case DataKind::DeferredLayout:
+    case DataKind::DeferredToken:
+      return getDeferredRange();
+    case DataKind::Null:
+      return CharSourceRange();
+    }
+  }
+
   CharSourceRange getDeferredRange() const {
     switch (DK) {
     case DataKind::DeferredLayout:

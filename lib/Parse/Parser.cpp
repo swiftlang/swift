@@ -26,6 +26,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxBuilders.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
@@ -1581,7 +1582,6 @@ void Parser::ignoreSingle(SmallVectorImpl<ParsedSyntax> *Collect) {
   }
 }
 
-
 void Parser::ignoreToken(SmallVectorImpl<ParsedSyntax> *Collect) {
   assert(!Tok.is(tok::eof) && "Lexing eof token");
   if (Collect) {
@@ -1651,6 +1651,30 @@ ParsedTokenSyntax Parser::markSplitTokenSyntax(tok Kind, StringRef Txt) {
   TokReceiver->receive(SplitTokens.back());
   return ParsedSyntaxRecorder::makeToken(SplitTokens.back(), LeadingTrivia,
                                          ParsedTrivia(), *SyntaxContext);
+}
+
+ParsedSyntaxResult<ParsedDeclNameSyntax>
+Parser::parseDeclNameRefSyntax(const Diagnostic &Diag, DeclNameOptions Flags) {
+  ParsedDeclNameSyntaxBuilder builder(*SyntaxContext);
+  // Consume the base name.
+  if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
+    builder.useDeclBaseName(consumeTokenSyntax());
+  } else if (Flags.contains(DeclNameFlag::AllowOperators) &&
+             Tok.isAnyOperator()) {
+    builder.useDeclBaseName(consumeTokenSyntax());
+  } else if (Flags.contains(DeclNameFlag::AllowKeywords) && Tok.isKeyword()) {
+    builder.useDeclBaseName(consumeTokenSyntax());
+  } else {
+    checkForInputIncomplete();
+    diagnose(Tok, Diag);
+    return makeParsedError(builder.build());
+  }
+
+  if (Flags.contains(DeclNameFlag::AllowCompoundNames)) {
+    // TODO: (syntax-parse) Implement decl name argument parsing
+    llvm_unreachable("Parsing of decl name argument not implemented yet.");
+  }
+  return makeParsedResult(builder.build());
 }
 
 Optional<ParsedTokenSyntax>

@@ -30,7 +30,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'InOutExpr': 25,
     'PoundColumnExpr': 26,
     'TryExpr': 27,
-    'AwaitExpr': 249,
     'IdentifierExpr': 28,
     'SuperRefExpr': 29,
     'NilLiteralExpr': 30,
@@ -251,6 +250,9 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'MultipleTrailingClosureElement': 246,
     'PoundFileIDExpr': 247,
     'TargetFunctionEntry': 248,
+    'AwaitExpr': 249,
+    'OpaqueReturnTypeOfAttributeArguments': 250,
+    'CTypeConventionAttributeArguments': 251,
 }
 
 

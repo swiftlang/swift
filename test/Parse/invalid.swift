@@ -84,7 +84,7 @@ func SR698(_ a: Int, b: Int) {}
 SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 
 // SR-979 - Two inout crash compiler
-func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{17-23=}}
+func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{23-29=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
 // expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
 func SR979d(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
