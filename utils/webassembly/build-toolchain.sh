@@ -75,7 +75,7 @@ build_target_toolchain() {
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0/" \
     -D COMPILER_RT_SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
     -G Ninja \
-    -S ../llvm-project/compiler-rt
+    -S "$SOURCE_PATH/llvm-project/compiler-rt"
 
   ninja install -C "$COMPILER_RT_BUILD_DIR"
 
