@@ -23,9 +23,9 @@ func asyncGlobal6() -> Int throws async { }
 func asyncGlobal7() throws -> Int async { } // expected-error{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }}
 
 func asyncGlobal8() async throws async -> async Int async {}
-// expected-error@-1{{unexpected 'async' specifier}} {{34-40=}}
-// expected-error@-2{{unexpected 'async' specifier}} {{43-49=}}
-// expected-error@-3{{unexpected 'async' specifier}} {{53-59=}}
+// expected-error@-1{{'async' has already been specified}} {{34-40=}}
+// expected-error@-2{{'async' has already been specified}} {{43-49=}}
+// expected-error@-3{{'async' has already been specified}} {{53-59=}}
 
 class X {
   init() async { } // expected-error{{initializer cannot be marked 'async'}}

@@ -121,20 +121,20 @@ func postThrows3() {
 }
 
 func dupThrows1() throws rethrows -> throws Int throw {}
-// expected-error@-1 {{unexpected 'rethrows' specifier}} {{26-35=}}
-// expected-error@-2 {{unexpected 'throws' specifier}} {{38-45=}}
-// expected-error@-3 {{unexpected 'throw' specifier}} {{49-55=}}
+// expected-error@-1 {{'rethrows' has already been specified}} {{26-35=}}
+// expected-error@-2 {{'throws' has already been specified}} {{38-45=}}
+// expected-error@-3 {{'throw' has already been specified}} {{49-55=}}
 
 func dupThrows2(_ f: () throws -> rethrows Int) {}
-// expected-error@-1 {{unexpected 'rethrows' specifier}} {{35-44=}}
+// expected-error@-1 {{'rethrows' has already been specified}} {{35-44=}}
 
 func dupThrows3() {
   _ = { () try throws in }
 // expected-error@-1 {{expected throwing specifier; did you mean 'throws'?}} {{12-15=throws}}
-// expected-error@-2 {{unexpected 'throws' specifier}} {{16-23=}}
+// expected-error@-2 {{'throws' has already been specified}} {{16-23=}}
 
   _ = { () throws -> Int throws in }
-// expected-error@-1 {{unexpected 'throws' specifier}} {{26-33=}}
+// expected-error@-1 {{'throws' has already been specified}} {{26-33=}}
 }
 
 func incompleteThrowType() {

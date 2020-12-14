@@ -139,7 +139,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
     assert(throwsLoc.isValid() || asyncLoc.isValid());
     diagnose(throwsLoc.isValid() ? throwsLoc : asyncLoc,
              diag::async_or_throws_in_wrong_position,
-             throwsLoc.isValid() ? 0 : 2);
+             throwsLoc.isValid() ? "throws" : "async");
     return nullptr;
   }
 
