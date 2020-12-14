@@ -44,8 +44,8 @@ BUNDLE_IDENTIFIER="swiftwasm.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
+HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
 DIST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/dist-toolchain-sdk
-
 DIST_TOOLCHAIN_SDK=$DIST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
 
 
@@ -60,12 +60,14 @@ build_host_toolchain() {
     --preset-file="$UTILS_PATH/build-presets.ini" \
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
-    INSTALL_DESTDIR="$DIST_TOOLCHAIN_DESTDIR" \
+    INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
     TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
     C_CXX_LAUNCHER="$(which sccache)"
 }
 
 build_target_toolchain() {
+  rm -rf "$DIST_TOOLCHAIN_DESTDIR"
+  cp -r "$HOST_TOOLCHAIN_DESTDIR" "$DIST_TOOLCHAIN_DESTDIR"
 
   COMPILER_RT_BUILD_DIR="$TARGET_BUILD_ROOT/compiler-rt-wasi-wasm32"
   cmake -B "$COMPILER_RT_BUILD_DIR" \
@@ -73,9 +75,11 @@ build_target_toolchain() {
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_C_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang" \
     -D CMAKE_CXX_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang++" \
-    -D CMAKE_C_COMPILER_LAUNCHER=sccache \
-    -D CMAKE_CXX_COMPILER_LAUNCHER=sccache \
-    -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
+    -D CMAKE_RANLIB="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ranlib" \
+    -D CMAKE_AR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ar" \
+    -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
+    -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
+    -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0/" \
     -D COMPILER_RT_SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
     -G Ninja \
     -S ../llvm-project/compiler-rt
@@ -88,6 +92,8 @@ build_target_toolchain() {
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_C_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang" \
     -D CMAKE_CXX_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang++" \
+    -D CMAKE_RANLIB="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ranlib" \
+    -D CMAKE_AR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ar" \
     -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
@@ -99,12 +105,20 @@ build_target_toolchain() {
 
   ninja install -C "$SWIFT_STDLIB_BUILD_DIR"
 
+  # Copy tool binaries in target build dir to test stdlib
+  rsync -a "$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/" "$SWIFT_STDLIB_BUILD_DIR/bin/"
+  rsync -a "$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin/" "$SWIFT_STDLIB_BUILD_DIR/bin/"
+
+  # Link compiler-rt libs to stdlib build dir
+  mkdir -p "$SWIFT_STDLIB_BUILD_DIR/lib/clang/10.0.0/"
+  ln -fs "$COMPILER_RT_BUILD_DIR/lib" "$SWIFT_STDLIB_BUILD_DIR/lib/clang/10.0.0/lib"
+
   "$UTILS_PATH/build-foundation.sh" "$DIST_TOOLCHAIN_SDK"
   "$UTILS_PATH/build-xctest.sh" "$DIST_TOOLCHAIN_SDK"
 
 }
 
-merge_toolchains() {
+embed_wasi_sysroot() {
   # Merge wasi-sdk and the toolchain
   cp -r "$WASI_SDK_PATH/share/wasi-sysroot" "$DIST_TOOLCHAIN_SDK/usr/share"
 
@@ -158,7 +172,7 @@ create_darwin_info_plist() {
 build_host_toolchain
 build_target_toolchain
 
-merge_toolchains
+embed_wasi_sysroot
 
 if [[ "$(uname)" == "Darwin" ]]; then
   create_darwin_info_plist

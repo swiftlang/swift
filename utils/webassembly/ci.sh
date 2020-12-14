@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 set -ex
 
@@ -9,11 +9,9 @@ UTILS_PATH=$SWIFT_PATH/utils/webassembly
 case $(uname -s) in
   Darwin)
     DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
-    HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
     DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
-    HOST_SUFFIX=linux-x86_64
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -23,7 +21,7 @@ esac
 
 BUILD_SCRIPT=$UTILS_PATH/build-toolchain.sh
 RUN_TEST_BIN=$SWIFT_PATH/utils/run-test
-TARGET_BUILD_DIR=$SOURCE_PATH/target-build/Ninja-Release
+TARGET_STDLIB_BUILD_DIR=$SOURCE_PATH/target-build/swift-stdlib-wasi-wasm32
 
 $DEPENDENCIES_SCRIPT
 
@@ -38,26 +36,20 @@ echo "Build script completed, will attempt to run test suites..."
 
 if [[ "$(uname)" == "Darwin" ]]; then
   # workaround: host target test directory is necessary to use run-test
-  mkdir -p $TARGET_BUILD_DIR/swift-macosx-x86_64/test-macosx-x86_64
-  HOST_PLATFORM=macosx
-else
-  HOST_PLATFORM=linux
+  mkdir -p "$TARGET_STDLIB_BUILD_DIR/test-macosx-x86_64"
 fi
 
-if [[ "$(uname)" == "Linux" ]]; then
-  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
-    $TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/stdlib
-  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
-    $TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/LTO
-  echo "Skip running test suites for Linux"
-else
-  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
- 	$TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/stdlib
-  $RUN_TEST_BIN --build-dir $TARGET_BUILD_DIR --target wasi-wasm32 \
-	$TARGET_BUILD_DIR/swift-${HOST_PLATFORM}-x86_64/test-wasi-wasm32/LTO
+# Run tests
+$RUN_TEST_BIN --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
+  "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/stdlib"
+$RUN_TEST_BIN --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
+  "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/LTO"
 
-  # Run test but ignore failure temporarily
-  ninja check-swift-wasi-wasm32 -C $TARGET_BUILD_DIR/swift-$HOST_SUFFIX || true
+if [[ "$(uname)" == "Linux" ]]; then
+  echo "Skip running all test suites for Linux"
+else
+  # Run all tests but ignore failure temporarily
+  ninja check-swift-wasi-wasm32 -C "$TARGET_STDLIB_BUILD_DIR" || true
 fi
 
 echo "The test suite has finished"
