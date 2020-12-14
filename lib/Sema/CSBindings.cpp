@@ -546,26 +546,6 @@ void ConstraintSystem::PotentialBindings::finalize(
   inferTransitiveProtocolRequirements(cs, inferredBindings);
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
   inferDefaultTypes(cs, existingTypes);
-
-  // If there are no bindings, typeVar may be a hole.
-  if (cs.shouldAttemptFixes() && Bindings.empty() &&
-      TypeVar->getImpl().canBindToHole()) {
-    // If the base of the unresolved member reference like `.foo`
-    // couldn't be resolved we'd want to bind it to a hole at the
-    // very last moment possible, just like generic parameters.
-    auto *locator = TypeVar->getImpl().getLocator();
-
-    // If this type variable is associated with a code completion token
-    // and it failed to infer any bindings let's adjust hole's locator
-    // to point to a code completion token to avoid attempting to "fix"
-    // this problem since its rooted in the fact that constraint system
-    // is under-constrained.
-    if (AssociatedCodeCompletionToken) {
-      locator = cs.getConstraintLocator(AssociatedCodeCompletionToken);
-    }
-
-    addPotentialBinding(PotentialBinding::forHole(TypeVar, locator));
-  }
 }
 
 Optional<ConstraintSystem::PotentialBindings>
@@ -595,7 +575,7 @@ ConstraintSystem::determineBestBindings() {
     if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
       return true;
 
-    return !bindings.Bindings.empty() || !bindings.Defaults.empty() ||
+    return bindings || !bindings.Defaults.empty() ||
            llvm::any_of(bindings.Protocols, [&](Constraint *constraint) {
              return bool(
                  TypeChecker::getDefaultType(constraint->getProtocol(), DC));
@@ -635,7 +615,7 @@ ConstraintSystem::determineBestBindings() {
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
     if (!bestBindings || bindings < *bestBindings)
-      bestBindings = bindings;
+      bestBindings.emplace(bindings);
   }
 
   return bestBindings;
@@ -783,7 +763,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
-  PotentialBindings bindings(typeVar);
+  PotentialBindings bindings(*this, typeVar);
 
   // Gather the constraints associated with this type variable.
   auto constraints = CG.gatherConstraints(
@@ -796,7 +776,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
 
     // Upon inference failure let's produce an empty set of bindings.
     if (failed)
-      return {typeVar};
+      return {*this, typeVar};
   }
 
   if (finalize) {
