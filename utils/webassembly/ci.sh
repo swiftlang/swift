@@ -9,9 +9,11 @@ UTILS_PATH=$SWIFT_PATH/utils/webassembly
 case $(uname -s) in
   Darwin)
     DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
+    HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
     DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
+    HOST_SUFFIX=linux-x86_64
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -34,10 +36,8 @@ $BUILD_SCRIPT
 
 echo "Build script completed, will attempt to run test suites..."
 
-if [[ "$(uname)" == "Darwin" ]]; then
-  # workaround: host target test directory is necessary to use run-test
-  mkdir -p "$TARGET_STDLIB_BUILD_DIR/test-macosx-x86_64"
-fi
+# workaround: host target test directory is necessary to use run-test
+mkdir -p "$TARGET_STDLIB_BUILD_DIR/test-$HOST_SUFFIX"
 
 # Run tests
 $RUN_TEST_BIN --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
