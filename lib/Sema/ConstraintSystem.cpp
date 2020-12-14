@@ -5332,14 +5332,29 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(
-    ConstraintSystem &cs, ConstraintSystem::PotentialBindings &bindings)
-    : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
+    ConstraintSystem::PotentialBindings &bindings)
+    : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
       TypeVar(bindings.TypeVar),
       CanBeNil(llvm::any_of(bindings.Protocols, [](Constraint *constraint) {
         auto *protocol = constraint->getProtocol();
         return protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByNilLiteral);
       })) {
+  if (bindings.isDirectHole()) {
+    auto *locator = getLocator();
+    // If this type variable is associated with a code completion token
+    // and it failed to infer any bindings let's adjust hole's locator
+    // to point to a code completion token to avoid attempting to "fix"
+    // this problem since its rooted in the fact that constraint system
+    // is under-constrained.
+    if (bindings.AssociatedCodeCompletionToken) {
+      locator = CS.getConstraintLocator(bindings.AssociatedCodeCompletionToken);
+    }
+
+    Bindings.push_back(Binding::forHole(TypeVar, locator));
+    return;
+  }
+
   // A binding to `Any` which should always be considered as a last resort.
   Optional<Binding> Any;
 
