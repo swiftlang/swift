@@ -21,6 +21,8 @@
 
 #include <swift/SwiftDemangle/Platform.h>
 
+#include "stddef.h"
+
 /// @{
 /// Version constants for libswiftDemangle library.
 

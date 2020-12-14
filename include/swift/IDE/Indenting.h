@@ -13,6 +13,11 @@
 #ifndef SWIFT_INDENTING_H
 #define SWIFT_INDENTING_H
 
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/StringRef.h"
+
 namespace swift {
 namespace ide {
 

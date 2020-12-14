@@ -17,6 +17,7 @@
 #ifndef SWIFT_ABI_OBJCBRIDGE_H
 #define SWIFT_ABI_OBJCBRIDGE_H
 
+#include "swift/ABI/Metadata.h"
 #include "swift/Runtime/Config.h"
 #include <cstdint>
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 

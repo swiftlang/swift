@@ -17,6 +17,9 @@
 #ifndef SWIFT_AST_PROPERTY_WRAPPERS_H
 #define SWIFT_AST_PROPERTY_WRAPPERS_H
 
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+
 namespace llvm {
   class raw_ostream;
 }

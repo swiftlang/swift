@@ -14,6 +14,9 @@
 #define SWIFT_BASIC_OPTIONALENUM_H
 
 #include "swift/Basic/type_traits.h"
+#include "llvm/ADT/None.h"
+#include <cassert>
+#include <cstdint>
 #include <type_traits>
 
 namespace swift {

@@ -18,6 +18,7 @@
 #ifndef SWIFT_STORAGEIMPL_H
 #define SWIFT_STORAGEIMPL_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 
 namespace swift {

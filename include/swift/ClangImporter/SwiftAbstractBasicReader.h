@@ -21,6 +21,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/AbstractTypeReader.h"
+#include "llvm/ADT/SmallVector.h"
 
 // This include is required to instantiate the template code in
 // AbstractBasicReader.h, i.e. it's a workaround to an include-what-you-use
@@ -72,7 +73,7 @@ public:
       return clang::Selector();
 
     unsigned numArgs = unsigned(numArgsPlusOne - 1);
-    SmallVector<clang::IdentifierInfo *, 4> chunks;
+    llvm::SmallVector<clang::IdentifierInfo *, 4> chunks;
     for (unsigned i = 0, e = std::max(numArgs, 1U); i != e; ++i)
       chunks.push_back(asImpl().readIdentifier());
 

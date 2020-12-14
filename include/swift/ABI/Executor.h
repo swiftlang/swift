@@ -17,6 +17,9 @@
 #ifndef SWIFT_ABI_EXECUTOR_H
 #define SWIFT_ABI_EXECUTOR_H
 
+#include "swift/Basic/RelativePointer.h"
+#include "swift/Runtime/Config.h"
+#include <cassert>
 #include <inttypes.h>
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Casting.h"

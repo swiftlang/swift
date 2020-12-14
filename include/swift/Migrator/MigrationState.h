@@ -18,6 +18,7 @@
 #ifndef SWIFT_MIGRATOR_MIGRATIONSTATE_H
 #define SWIFT_MIGRATOR_MIGRATIONSTATE_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Syntax/References.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"

@@ -24,6 +24,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"

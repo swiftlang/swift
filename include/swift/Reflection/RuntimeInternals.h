@@ -21,6 +21,8 @@
 #ifndef SWIFT_REFLECTION_RUNTIME_INTERNALS_H
 #define SWIFT_REFLECTION_RUNTIME_INTERNALS_H
 
+#include <cstdint>
+
 namespace swift {
 
 namespace reflection {

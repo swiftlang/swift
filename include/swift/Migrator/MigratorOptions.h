@@ -17,6 +17,9 @@
 #ifndef SWIFT_MIGRATOR_MIGRATOROPTIONS_H
 #define SWIFT_MIGRATOR_MIGRATOROPTIONS_H
 
+#include <string>
+#include <vector>
+
 namespace swift {
 
 struct MigratorOptions {

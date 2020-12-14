@@ -14,6 +14,7 @@
 #ifndef SWIFT_MARKUP_SOURCELOC_H
 #define SWIFT_MARKUP_SOURCELOC_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include <algorithm>
 #include <cassert>

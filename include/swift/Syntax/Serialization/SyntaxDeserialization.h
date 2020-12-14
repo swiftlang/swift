@@ -29,10 +29,10 @@ namespace llvm {
 namespace yaml {
 
 /// Deserialization traits for SourcePresence.
-template <> struct ScalarEnumerationTraits<swift::SourcePresence> {
-  static void enumeration(IO &in, swift::SourcePresence &value) {
-    in.enumCase(value, "Present", swift::SourcePresence::Present);
-    in.enumCase(value, "Missing", swift::SourcePresence::Missing);
+template <> struct ScalarEnumerationTraits<swift::syntax::SourcePresence> {
+  static void enumeration(IO &in, swift::syntax::SourcePresence &value) {
+    in.enumCase(value, "Present", swift::syntax::SourcePresence::Present);
+    in.enumCase(value, "Missing", swift::syntax::SourcePresence::Missing);
   }
 };
 
@@ -46,15 +46,17 @@ template <> struct ScalarEnumerationTraits<swift::tok> {
 
 /// Deserialization traits for Trivia.
 /// An array of the underlying TriviaPieces will be deserialized as Trivia.
-template <typename Context> swift::TriviaPiece yamlize(IO &io, Context &Ctx) {
+template <typename Context>
+swift::syntax::TriviaPiece yamlize(IO &io, Context &Ctx) {
   io.beginMapping();
-  auto ret = MappingTraits<swift::TriviaPiece>::mapping(io);
+  auto ret = MappingTraits<swift::syntax::TriviaPiece>::mapping(io);
   io.endMapping();
   return ret;
 }
 
 template <typename Context>
-void yamlize(IO &io, std::vector<swift::TriviaPiece> &Seq, bool, Context &Ctx) {
+void yamlize(IO &io, std::vector<swift::syntax::TriviaPiece> &Seq, bool,
+             Context &Ctx) {
   unsigned incnt = io.beginSequence();
   for (unsigned i = 0; i < incnt; ++i) {
     void *SaveInfo;
@@ -66,23 +68,26 @@ void yamlize(IO &io, std::vector<swift::TriviaPiece> &Seq, bool, Context &Ctx) {
   io.endSequence();
 }
 
-template <> struct SequenceTraits<std::vector<swift::TriviaPiece>> {
-  static size_t size(IO &in, std::vector<swift::TriviaPiece> &seq) {
+template <> struct SequenceTraits<std::vector<swift::syntax::TriviaPiece>> {
+  static size_t size(IO &in, std::vector<swift::syntax::TriviaPiece> &seq) {
     return seq.size();
   }
 };
 
 /// Deserialization traits for RawSyntax list.
-template <> struct SequenceTraits<std::vector<swift::RC<swift::RawSyntax>>> {
-  static size_t size(IO &in, std::vector<swift::RC<swift::RawSyntax>> &seq) {
+template <>
+struct SequenceTraits<std::vector<swift::RC<swift::syntax::RawSyntax>>> {
+  static size_t size(IO &in,
+                     std::vector<swift::RC<swift::syntax::RawSyntax>> &seq) {
     return seq.size();
   }
-  static swift::RC<swift::RawSyntax> &
-  element(IO &in, std::vector<swift::RC<swift::RawSyntax>> &seq, size_t index) {
+  static swift::RC<swift::syntax::RawSyntax> &
+  element(IO &in, std::vector<swift::RC<swift::syntax::RawSyntax>> &seq,
+          size_t index) {
     if (seq.size() <= index) {
       seq.resize(index + 1);
     }
-    return const_cast<swift::RC<swift::RawSyntax> &>(seq[index]);
+    return const_cast<swift::RC<swift::syntax::RawSyntax> &>(seq[index]);
   }
 };
 
@@ -138,8 +143,8 @@ template <> struct MappingTraits<TokenDescription> {
 /// }
 /// ```
 
-template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
-  static void mapping(IO &in, swift::RC<swift::RawSyntax> &value) {
+template <> struct MappingTraits<swift::RC<swift::syntax::RawSyntax>> {
+  static void mapping(IO &in, swift::RC<swift::syntax::RawSyntax> &value) {
     TokenDescription description;
     auto input = static_cast<Input *>(&in);
     /// Check whether this is null
@@ -150,11 +155,11 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
     if (description.hasValue) {
       swift::tok tokenKind = description.Kind;
       StringRef text = description.Text;
-      std::vector<swift::TriviaPiece> leadingTrivia;
+      std::vector<swift::syntax::TriviaPiece> leadingTrivia;
       in.mapRequired("leadingTrivia", leadingTrivia);
-      std::vector<swift::TriviaPiece> trailingTrivia;
+      std::vector<swift::syntax::TriviaPiece> trailingTrivia;
       in.mapRequired("trailingTrivia", trailingTrivia);
-      swift::SourcePresence presence;
+      swift::syntax::SourcePresence presence;
       in.mapRequired("presence", presence);
       /// FIXME: This is a workaround for existing bug from llvm yaml parser
       /// which would raise error when deserializing number with trailing
@@ -162,13 +167,13 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::make(
+      value = swift::syntax::RawSyntax::make(
           tokenKind, swift::OwnedString::makeRefCounted(text), leadingTrivia,
           trailingTrivia, presence, /*Arena=*/nullptr, nodeId);
     } else {
       swift::SyntaxKind kind;
       in.mapRequired("kind", kind);
-      std::vector<swift::RC<swift::RawSyntax>> layout;
+      std::vector<swift::RC<swift::syntax::RawSyntax>> layout;
       in.mapRequired("layout", layout);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);
@@ -178,8 +183,8 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::make(kind, layout, presence, /*Arena=*/nullptr,
-                                     nodeId);
+      value = swift::syntax::RawSyntax::make(kind, layout, presence,
+                                             /*Arena=*/nullptr, nodeId);
     }
   }
 };
@@ -195,10 +200,10 @@ class SyntaxDeserializer {
 public:
   SyntaxDeserializer(llvm::StringRef InputContent) : Input(InputContent) {}
   SyntaxDeserializer(llvm::MemoryBufferRef buffer) : Input(buffer) {}
-  llvm::Optional<swift::SourceFileSyntax> getSourceFileSyntax() {
-    swift::RC<swift::RawSyntax> raw;
+  llvm::Optional<swift::syntax::SourceFileSyntax> getSourceFileSyntax() {
+    swift::RC<swift::syntax::RawSyntax> raw;
     Input >> raw;
-    return swift::make<swift::SourceFileSyntax>(raw);
+    return swift::make<swift::syntax::SourceFileSyntax>(raw);
   }
 };
 } // namespace json

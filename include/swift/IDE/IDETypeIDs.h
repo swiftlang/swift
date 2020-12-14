@@ -18,6 +18,8 @@
 #define SWIFT_IDE_IDETYPEIDS_H
 
 #include "swift/Basic/TypeID.h"
+#include "swift/IDE/Utils.h"
+
 namespace swift {
 
 #define SWIFT_TYPEID_ZONE IDETypes

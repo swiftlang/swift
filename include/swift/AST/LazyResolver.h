@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 

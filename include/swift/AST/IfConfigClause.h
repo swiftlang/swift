@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_IFCONFIGCLAUSE_H
 #define SWIFT_AST_IFCONFIGCLAUSE_H
 
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {

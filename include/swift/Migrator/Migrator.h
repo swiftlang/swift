@@ -17,7 +17,9 @@
 #ifndef SWIFT_MIGRATOR_MIGRATOR_H
 #define SWIFT_MIGRATOR_MIGRATOR_H
 
+#include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/MigrationState.h"
+#include "swift/Migrator/MigratorOptions.h"
 #include "swift/Syntax/References.h"
 
 namespace swift {

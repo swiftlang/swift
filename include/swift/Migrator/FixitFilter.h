@@ -18,6 +18,7 @@
 #define SWIFT_MIGRATOR_FIXITFILTER_H
 
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 
 namespace swift {

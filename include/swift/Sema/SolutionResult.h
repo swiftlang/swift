@@ -17,6 +17,7 @@
 #ifndef SWIFT_TYPECHECK_SOLUTION_RESULT_H
 #define SWIFT_TYPECHECK_SOLUTION_RESULT_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {

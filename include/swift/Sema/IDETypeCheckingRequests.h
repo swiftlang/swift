@@ -18,6 +18,7 @@
 #ifndef SWIFT_IDE_TYPE_CHECKING_REQUESTS_H
 #define SWIFT_IDE_TYPE_CHECKING_REQUESTS_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"

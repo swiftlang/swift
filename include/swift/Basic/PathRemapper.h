@@ -24,6 +24,7 @@
 #ifndef SWIFT_BASIC_PATHREMAPPER_H
 #define SWIFT_BASIC_PATHREMAPPER_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 

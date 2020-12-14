@@ -14,7 +14,9 @@
 #define SWIFT_AST_SEARCHPATHOPTIONS_H
 
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringRef.h"
 
 #include <string>
 #include <vector>

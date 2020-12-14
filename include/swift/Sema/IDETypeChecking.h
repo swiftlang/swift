@@ -21,6 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/DenseMap.h"
 #include <memory>
 #include <tuple>
 

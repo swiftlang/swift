@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_ENUM_H
 #define SWIFT_RUNTIME_ENUM_H
 
+#include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 
 namespace swift {

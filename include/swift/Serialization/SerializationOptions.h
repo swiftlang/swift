@@ -14,6 +14,8 @@
 #define SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

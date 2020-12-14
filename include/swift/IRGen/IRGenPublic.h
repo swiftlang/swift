@@ -12,6 +12,9 @@
 #ifndef SWIFT_IRGEN_IRGENPUBLIC_H
 #define SWIFT_IRGEN_IRGENPUBLIC_H
 
+#include "swift/Basic/LLVM.h"
+#include <utility>
+
 namespace llvm {
   class LLVMContext;
   template<typename T, unsigned N> class SmallVector;

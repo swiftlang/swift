@@ -13,6 +13,7 @@
 #ifndef SWIFT_MARKUP_XML_UTILS_H
 #define SWIFT_MARKUP_XML_UTILS_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 

@@ -12,6 +12,8 @@
 #ifndef SWIFT_AST_TYPE_RESOLUTION_STAGE_H
 #define SWIFT_AST_TYPE_RESOLUTION_STAGE_H
 
+#include <cstdint>
+
 namespace llvm {
 class raw_ostream;
 }

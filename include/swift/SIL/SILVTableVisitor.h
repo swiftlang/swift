@@ -20,6 +20,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
 

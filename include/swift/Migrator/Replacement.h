@@ -12,6 +12,9 @@
 
 #ifndef SWIFT_MIGRATOR_REPLACEMENT_H
 #define SWIFT_MIGRATOR_REPLACEMENT_H
+
+#include <string>
+
 namespace swift {
 namespace migrator {
 

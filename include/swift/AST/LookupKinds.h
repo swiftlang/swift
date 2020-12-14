@@ -17,6 +17,8 @@
 #ifndef SWIFT_LOOKUPKINDS_H
 #define SWIFT_LOOKUPKINDS_H
 
+#include "llvm/Support/raw_ostream.h"
+
 namespace swift {
 
 /// NLKind - This is a specifier for the kind of name lookup being performed

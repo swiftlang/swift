@@ -17,6 +17,8 @@
 #ifndef SWIFT_REMOTE_TYPEINFOPROVIDER_H
 #define SWIFT_REMOTE_TYPEINFOPROVIDER_H
 
+#include "llvm/ADT/StringRef.h"
+
 namespace swift {
 namespace reflection {
 class TypeInfo;

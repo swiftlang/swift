@@ -20,6 +20,8 @@
 #ifndef SWIFT_MIGRATOR_EDITORADAPTER_H
 #define SWIFT_MIGRATOR_EDITORADAPTER_H
 
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Migrator/Replacement.h"
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/SourceLocation.h"

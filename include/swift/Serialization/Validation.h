@@ -13,6 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_VALIDATION_H
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
