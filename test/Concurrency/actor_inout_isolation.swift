@@ -108,3 +108,26 @@ extension TestActor {
     await position.setComponents(x: &value1, y: &value2)
   }
 }
+
+// Check implicit async testing
+actor class DifferentActor {
+  func modify(_ state: inout Int) {}
+}
+
+extension TestActor {
+  func modify(_ state: inout Int) {}
+
+  // Actor state passed inout to implicitly async function on an actor of the
+  // same type
+  func modifiedByOtherTestActor(_ other: TestActor) async {
+    //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to asynchronous function}}
+    await other.modify(&value2)
+  }
+
+  // Actor state passed inout to an implicitly async function on an actor of a
+  // different type
+  func modifiedByOther(_ other: DifferentActor) async {
+    //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to asynchronous function}}
+    await other.modify(&value2)
+  }
+}
