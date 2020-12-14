@@ -10,7 +10,6 @@ case $(uname -s) in
   Darwin)
     OS_SUFFIX=macos_x86_64
     HOST_PRESET=webassembly-host-install
-    TARGET_PRESET=webassembly-macos-target-install
     HOST_SUFFIX=macosx-x86_64
   ;;
   Linux)
@@ -23,7 +22,6 @@ case $(uname -s) in
       exit 1
     fi
     HOST_PRESET=webassembly-linux-host-install
-    TARGET_PRESET=webassembly-linux-target-install
     HOST_SUFFIX=linux-x86_64
   ;;
   *)
@@ -35,14 +33,9 @@ esac
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
-TOOLCHAIN_VERSION="${YEAR}${MONTH}${DAY}"
 TOOLCHAIN_NAME="swift-wasm-DEVELOPMENT-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
 
 PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
-
-BUNDLE_IDENTIFIER="swiftwasm.${YEAR}${MONTH}${DAY}"
-DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
-DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
 HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
 DIST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/dist-toolchain-sdk
