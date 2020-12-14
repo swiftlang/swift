@@ -157,8 +157,14 @@ foreach(sdk ${SWIFT_SDKS})
     swift_install_in_component(FILES "${glibc_modulemap_out}"
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
+    swift_install_in_component(FILES "${glibc_header_out}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
 
     if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${glibc_modulemap_out}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
       swift_install_in_component(FILES "${glibc_header_out}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
