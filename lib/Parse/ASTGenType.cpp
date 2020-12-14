@@ -37,8 +37,15 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*completionTy, Loc);
   } else if (auto dictionary = Type.getAs<DictionaryTypeSyntax>()) {
     return generate(*dictionary, Loc);
+  } else if (auto Unwrapped =
+                 Type.getAs<ImplicitlyUnwrappedOptionalTypeSyntax>()) {
+    return generate(*Unwrapped, Loc);
   } else if (auto memberIdentifier = Type.getAs<MemberTypeIdentifierSyntax>()) {
     return generate(*memberIdentifier, Loc);
+  } else if (auto Metatype = Type.getAs<MetatypeTypeSyntax>()) {
+    return generate(*Metatype, Loc);
+  } else if (auto Optional = Type.getAs<OptionalTypeSyntax>()) {
+    return generate(*Optional, Loc);
   } else if (auto simpleIdentifier = Type.getAs<SimpleTypeIdentifierSyntax>()) {
     return generate(*simpleIdentifier, Loc);
   } else if (auto Tuple = Type.getAs<TupleTypeSyntax>()) {
@@ -55,14 +62,8 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
 //    return generate(*Composition, Loc);
 //  } else if (auto Function = Type.getAs<FunctionTypeSyntax>()) {
 //    return generate(*Function, Loc);
-//  } else if (auto Metatype = Type.getAs<MetatypeTypeSyntax>()) {
-//    return generate(*Metatype, Loc);
 //  } else if (auto Some = Type.getAs<SomeTypeSyntax>()) {
 //    return generate(*Some, Loc);
-//  } else if (auto Optional = Type.getAs<OptionalTypeSyntax>()) {
-//    return generate(*Optional, Loc);
-//  } else if (auto Unwrapped = Type.getAs<ImplicitlyUnwrappedOptionalTypeSyntax>()) {
-//    return generate(*Unwrapped, Loc);
 //  } else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>()) {
 //    return generate(*ClassRestriction, Loc);
 //  } else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>()) {
@@ -157,6 +158,15 @@ TypeRepr *ASTGen::generate(const syntax::DictionaryTypeSyntax &Type,
   return new (Context) DictionaryTypeRepr(KeyType, ValueType, ColonLoc, Range);
 }
 
+TypeRepr *
+ASTGen::generate(const syntax::ImplicitlyUnwrappedOptionalTypeSyntax &Type,
+                 const SourceLoc Loc) {
+  auto baseTypeRepr = generate(Type.getWrappedType(), Loc);
+  auto exclamationLoc = advanceLocBegin(Loc, Type.getExclamationMark());
+  return new (Context)
+      ImplicitlyUnwrappedOptionalTypeRepr(baseTypeRepr, exclamationLoc);
+}
+
 TypeRepr *ASTGen::generate(const syntax::MemberTypeIdentifierSyntax &Type,
                            const SourceLoc Loc) {
   SmallVector<ComponentIdentTypeRepr *, 4> components;
@@ -167,6 +177,27 @@ TypeRepr *ASTGen::generate(const syntax::MemberTypeIdentifierSyntax &Type,
 TypeRepr *ASTGen::generate(const TupleTypeSyntax &Type, const SourceLoc Loc) {
   return generateTuple(Type.getLeftParen(), Type.getElements(),
                        Type.getRightParen(), Loc);
+}
+
+TypeRepr *ASTGen::generate(const syntax::MetatypeTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto baseTypeRepr = generate(Type.getBaseType(), Loc);
+  auto metaLoc = advanceLocBegin(Loc, Type.getTypeOrProtocol());
+  auto metaText = Type.getTypeOrProtocol().getText();
+  if (metaText == "Type") {
+    return new (Context) MetatypeTypeRepr(baseTypeRepr, metaLoc);
+  } else if (metaText == "Protocol") {
+    return new (Context) ProtocolTypeRepr(baseTypeRepr, metaLoc);
+  } else {
+    llvm_unreachable("Meta part must be 'Type' or 'Protocol'");
+  }
+}
+
+TypeRepr *ASTGen::generate(const syntax::OptionalTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto baseTypeRepr = generate(Type.getWrappedType(), Loc);
+  auto questionLoc = advanceLocBegin(Loc, Type.getQuestionMark());
+  return new (Context) OptionalTypeRepr(baseTypeRepr, questionLoc);
 }
 
 TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,

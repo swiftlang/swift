@@ -1400,6 +1400,11 @@ public:
   ParsedSyntaxResult<ParsedTypeSyntax>
   parseTypeIdentifierSyntax(bool isParsingQualifiedDeclBaseType = false);
 
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeOldStyleArraySyntax(ParsedTypeSyntax, SourceLoc BaseLoc);
+  
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSimpleSyntax(Diag<> MessageID);
+
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
                                                        bool IsSILFuncDecl = false);
   

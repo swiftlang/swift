@@ -438,23 +438,17 @@ struct ErrorTypeInVarDeclFunctionType1 {
 }
 
 struct ErrorTypeInVarDeclArrayType1 {
-  var v1 : Int[+] // expected-error {{array types are now written with the brackets around the element type}}
-  // expected-error @-1 {{expected expression after unary operator}}
-  // expected-error @-2 {{expected expression}}
+  var v1 : Int[2] // expected-error {{array types are now written with the brackets around the element type}}
   var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType2 {
-  var v1 : Int[+ // expected-error {{unary operator cannot be separated from its operand}}
-                 // expected-error@-1 {{expected ']' in array type}}
-                 // expected-note@-2 {{to match this opening '['}}
-  var v2 : Int // expected-error {{expected expression}}
+  var v1 : Int[4 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+  var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType3 {
-  var v1 : Int[ // expected-error {{expected ']' in array type}}
-                // expected-note@-1 {{to match this opening '['}}
-  ;  // expected-error {{expected expression}}
+  var v1 : Int[ // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
   var v2 : Int
 }
 
@@ -484,10 +478,9 @@ struct ErrorTypeInVarDeclDictionaryType {
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
-  func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
-                       // expected-note@-1 {{to match this opening '['}}
+  func foo() -> Int[ { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
     return [0]
-  }  // expected-error {{expected ']' in array type}}
+  }
   func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
     return [0]
   }
@@ -495,32 +488,32 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0]  // expected-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0]
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType3 {
-  func foo() -> Int[0] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
+  func foo() -> Int[0] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-22=}}
     return [0]
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType4 {
-  func foo() -> Int[0_1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
+  func foo() -> Int[0_1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-24=}}
     return [0]
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType5 {
-  func foo() -> Int[0b1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
+  func foo() -> Int[0b1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-24=}}
     return [0]
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11'}}
-  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{cannot find operator '++' in scope; did you mean '+= 1'?}} expected-error {{cannot find 'a' in scope}} expected-error {{expected declaration}}
+  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{20-20=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{expected '{' in body of function declaration}} expected-error {{expected declaration}}
   }
 }
 
@@ -675,8 +668,8 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{cannot find type 'S' in scope}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {} // expected-note {{to match this opening '['}}
-}}} // expected-error {{expected ']' in array type}}
+func a(s: S[{{g) -> Int {} // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+}}}
 #endif
   
 // rdar://19605567
@@ -686,7 +679,7 @@ func a(s: S[{{g) -> Int {} // expected-note {{to match this opening '['}}
 // expected-error@+3{{consecutive statements on a line must be separated by ';'}}
 // expected-error@+2{{expected expression}}
 // expected-error@+1{{extraneous '}' at top level}}
-func F() { init<( } )} // expected-note 2{{did you mean 'F'?}}
+func F() { init<( } )} // expected-note {{did you mean 'F'?}}
 
 struct InitializerWithName {
   init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
@@ -848,7 +841,7 @@ func postfixDot(a : String) {
 }
 
 // <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
-func f() { // expected-note 2{{did you mean 'f'?}}
+func f() { // expected-note {{did you mean 'f'?}}
   _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
 

@@ -77,7 +77,13 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::DictionaryTypeSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::ImplicitlyUnwrappedOptionalTypeSyntax &Type,
+                     const SourceLoc Loc);
   TypeRepr *generate(const syntax::MemberTypeIdentifierSyntax &Type,
+                     const SourceLoc Loc);
+  TypeRepr *generate(const syntax::MetatypeTypeSyntax &Type,
+                     const SourceLoc Loc);
+  TypeRepr *generate(const syntax::OptionalTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::SimpleTypeIdentifierSyntax &Type,
                      const SourceLoc Loc);

@@ -153,99 +153,19 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-collection
 ///     type-array
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
-  ParserResult<TypeRepr> ty;
-
-  if (Tok.is(tok::kw_inout) ||
-      (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
-                                   Tok.getRawText().equals("__owned")))) {
-    // Type specifier should already be parsed before here. This only happens
-    // for construct like 'P1 & inout P2'.
-    diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
-    consumeToken();
+  auto typeLoc = leadingTriviaLoc();
+  auto result = parseTypeSimpleSyntax(MessageID);
+  auto status = result.getStatus();
+  if (result.isNull()) {
+    return status;
   }
-
-  switch (Tok.getKind()) {
-  case tok::kw_Self:
-  case tok::kw_Any:
-  case tok::identifier: {
-    ty = parseTypeIdentifier();
-    break;
+  SyntaxContext->addSyntax(std::move(result.get()));
+  auto type = SyntaxContext->topNode<TypeSyntax>();
+  auto typeRepr = ASTGenerator.generate(type, typeLoc);
+  if (!typeRepr) {
+    status.setIsParseError();
   }
-  case tok::l_paren:
-    ty = parseTypeTupleBody();
-    break;
-  case tok::code_complete:
-    if (CodeCompletion)
-      CodeCompletion->completeTypeSimpleBeginning();
-    return makeParserCodeCompletionResult<TypeRepr>(
-        new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
-  case tok::l_square: {
-    ty = parseTypeCollection();
-    break;
-  }
-  case tok::kw_protocol:
-    if (startsWithLess(peekToken())) {
-      ty = parseOldStyleProtocolComposition();
-      break;
-    }
-    LLVM_FALLTHROUGH;
-  default:
-    {
-      auto diag = diagnose(Tok, MessageID);
-      // If the next token is closing or separating, the type was likely forgotten
-      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
-                    tok::equal, tok::comma, tok::semi))
-        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
-    }
-    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
-      consumeToken();
-      return ty;
-    }
-    checkForInputIncomplete();
-    return nullptr;
-  }
-
-  // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
-  while (ty.isNonNull()) {
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
-      if (peekToken().isContextualKeyword("Type")) {
-        consumeToken();
-        SourceLoc metatypeLoc = consumeToken(tok::identifier);
-        ty = makeParserResult(ty,
-          new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
-        SyntaxContext->createNodeInPlace(SyntaxKind::MetatypeType);
-        continue;
-      }
-      if (peekToken().isContextualKeyword("Protocol")) {
-        consumeToken();
-        SourceLoc protocolLoc = consumeToken(tok::identifier);
-        ty = makeParserResult(ty,
-          new (Context) ProtocolTypeRepr(ty.get(), protocolLoc));
-        SyntaxContext->createNodeInPlace(SyntaxKind::MetatypeType);
-        continue;
-      }
-    }
-
-    if (!Tok.isAtStartOfLine()) {
-      if (isOptionalToken(Tok)) {
-        ty = parseTypeOptional(ty.get());
-        continue;
-      }
-      if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
-        continue;
-      }
-      // Parse legacy array types for migration.
-      if (Tok.is(tok::l_square)) {
-        ty = parseTypeArray(ty.get());
-        continue;
-      }
-    }
-    break;
-  }
-
-  return ty;
+  return makeParserResult(status, typeRepr);
 }
 
 ParserResult<TypeRepr> Parser::parseType() {
@@ -1685,6 +1605,150 @@ Parser::parseTypeIdentifierSyntax(bool isParsingQualifiedDeclBaseType) {
     return makeParsedResult(
         ParsedSyntaxRecorder::makeUnknownType({&ty, 1}, *SyntaxContext),
         result.getStatus());
+  }
+
+  return result;
+}
+
+/// parseTypeOldStyleArraySyntax - Parse the old style type-array production,
+/// given that we are looking at the initial l_square.  Note that this index
+/// clause is actually the outermost (first-indexed) clause.
+///
+///   type-array:
+///     type-simple
+///     type-array '[' ']'
+///     type-array '[' int_literal ']'
+///
+ParsedSyntaxResult<ParsedTypeSyntax>
+Parser::parseTypeOldStyleArraySyntax(ParsedTypeSyntax BaseSyntax,
+                                     SourceLoc BaseLoc) {
+  assert(Tok.isFollowingLSquare());
+  Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
+  SourceLoc lsquareLoc = Tok.getLoc();
+  ignoreToken(tok::l_square, /*Collect=*/nullptr);
+
+  // Ignore integer literal between '[' and ']'
+  ignoreIf(tok::integer_literal, /*Collect=*/nullptr);
+
+  ParserStatus status;
+
+  auto rSquareLoc = Tok.getLoc();
+  auto rSquare = parseMatchingTokenSyntax(
+      tok::r_square, diag::expected_rbracket_array_type, lsquareLoc);
+  status |= rSquare.getStatus();
+
+  if (!rSquare.isNull()) {
+    // If we parsed a valid old style array (baseType '[' ']'), diagnose it
+    // with a fixit to rewrite it to new Swift syntax.
+    diagnose(lsquareLoc, diag::new_array_syntax)
+        .fixItInsert(BaseLoc, "[")
+        .fixItRemoveChars(lsquareLoc, rSquareLoc);
+  }
+
+  ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
+  builder.useElementType(std::move(BaseSyntax));
+  if (!rSquare.isNull()) {
+    builder.useRightSquareBracket(rSquare.get());
+  }
+  return makeParsedResult(builder.build(), status);
+}
+
+/// parseTypeSimpleSyntax
+///   type-simple:
+///     type-identifier
+///     type-tuple
+///     type-composition-deprecated
+///     'Any'
+///     type-simple '.Type'
+///     type-simple '.Protocol'
+///     type-simple '?'
+///     type-simple '!'
+///     type-collection
+///     type-array
+ParsedSyntaxResult<ParsedTypeSyntax>
+Parser::parseTypeSimpleSyntax(Diag<> MessageID) {
+  if (Tok.is(tok::kw_inout) ||
+      (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
+                                   Tok.getRawText().equals("__owned")))) {
+    // Type specifier should already be parsed before here. This only happens
+    // for construct like 'P1 & inout P2'.
+    diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
+    ignoreToken(/*Collect=*/nullptr);
+  }
+
+  SourceLoc typeLoc = leadingTriviaLoc();
+
+  ParsedSyntaxResult<ParsedTypeSyntax> result;
+  switch (Tok.getKind()) {
+  case tok::kw_Self:
+  case tok::kw_Any:
+  case tok::identifier:
+    result = parseTypeIdentifierSyntax();
+    break;
+  case tok::l_paren:
+    result = parseTypeTupleBodySyntax();
+    break;
+  case tok::code_complete: {
+    auto ccToken = consumeTokenSyntax(tok::code_complete);
+    auto ccType = ParsedSyntaxRecorder::makeCodeCompletionType(
+        None, None, std::move(ccToken), *SyntaxContext);
+    return makeParsedCodeCompletion(std::move(ccType));
+  }
+  case tok::l_square:
+    result = parseTypeCollectionSyntax();
+    break;
+  case tok::kw_protocol:
+    if (startsWithLess(peekToken())) {
+      result = parseOldStyleProtocolCompositionSyntax();
+      break;
+    }
+    LLVM_FALLTHROUGH;
+  default: {
+    auto diag = diagnose(Tok, MessageID);
+    // If the next token is closing or separating, the type was likely forgotten
+    if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
+                  tok::equal, tok::comma, tok::semi)) {
+      diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
+    }
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
+      auto token = consumeTokenSyntax();
+      ParsedTypeSyntax ty =
+          ParsedSyntaxRecorder::makeUnknownType({&token, 1}, *SyntaxContext);
+      // Return success result because we recovered.
+      return makeParsedResult(std::move(ty));
+    }
+    checkForInputIncomplete();
+    return makeParsedError<ParsedTypeSyntax>();
+  }
+  }
+
+  // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
+  while (result.isSuccess()) {
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
+        (peekToken().isContextualKeyword("Type") ||
+         peekToken().isContextualKeyword("Protocol"))) {
+      auto period = consumeTokenSyntax();
+      auto keyword = consumeTokenSyntax(tok::identifier);
+      auto metatype = ParsedSyntaxRecorder::makeMetatypeType(
+          result.get(), std::move(period), std::move(keyword), *SyntaxContext);
+      result = makeParsedResult(std::move(metatype));
+    } else if (isOptionalToken(Tok) && !Tok.isAtStartOfLine()) {
+      auto questionMark = consumeTokenSyntax();
+      auto optionalType = ParsedSyntaxRecorder::makeOptionalType(
+          result.get(), std::move(questionMark), *SyntaxContext);
+      result = makeParsedResult(std::move(optionalType));
+    } else if (isImplicitlyUnwrappedOptionalToken(Tok) &&
+               !Tok.isAtStartOfLine()) {
+      auto exclamationMark = consumeTokenSyntax();
+      auto optionalType =
+          ParsedSyntaxRecorder::makeImplicitlyUnwrappedOptionalType(
+              result.get(), std::move(exclamationMark), *SyntaxContext);
+      result = makeParsedResult(std::move(optionalType));
+    } else if (Tok.is(tok::l_square) && !Tok.isAtStartOfLine()) {
+      result = parseTypeOldStyleArraySyntax(result.get(), typeLoc);
+    } else {
+      break;
+    }
   }
 
   return result;
