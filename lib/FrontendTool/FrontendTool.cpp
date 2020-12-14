@@ -1,5 +1,5 @@
 //===--- FrontendTool.cpp - Swift Compiler Frontend -----------------------===//
-//
+// 
 // This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
