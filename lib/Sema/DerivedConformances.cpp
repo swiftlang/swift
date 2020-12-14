@@ -43,12 +43,8 @@ DeclContext *DerivedConformance::getConformanceContext() const {
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
-  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
-  for (auto child : children) {
+  for (auto child : children)
     IDC->addMember(child);
-    if (SF)
-      SF->SynthesizedDecls.push_back(child);
-  }
 }
 
 Type DerivedConformance::getProtocolType() const {
