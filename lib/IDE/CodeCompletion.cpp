@@ -2642,7 +2642,7 @@ public:
                                    genericSig, includeDefaultArgs);
   }
 
-  static void addAsyncThrows(CodeCompletionResultBuilder &Builder,
+  static void addEffectsSpecifiers(CodeCompletionResultBuilder &Builder,
                              const AnyFunctionType *AFT,
                              const AbstractFunctionDecl *AFD) {
     assert(AFT != nullptr);
@@ -2809,7 +2809,7 @@ public:
       else
         Builder.addAnnotatedRightParen();
 
-      addAsyncThrows(Builder, AFT, AFD);
+      addEffectsSpecifiers(Builder, AFT, AFD);
 
       if (AFD &&
           AFD->isImplicitlyUnwrappedOptional())
@@ -2956,14 +2956,14 @@ public:
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
-        addAsyncThrows(Builder, AFT, FD);
+        addEffectsSpecifiers(Builder, AFT, FD);
       } else {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
                                 FD->getGenericSignatureOfContext(),
                                 includeDefaultArgs);
         Builder.addRightParen();
-        addAsyncThrows(Builder, AFT, FD);
+        addEffectsSpecifiers(Builder, AFT, FD);
       }
 
       // Build type annotation.
@@ -3104,7 +3104,7 @@ public:
       else
         Builder.addAnnotatedRightParen();
 
-      addAsyncThrows(Builder, ConstructorType, CD);
+      addEffectsSpecifiers(Builder, ConstructorType, CD);
 
       if (!Result.hasValue())
         Result = ConstructorType->getResult();
