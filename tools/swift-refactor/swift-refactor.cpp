@@ -51,11 +51,11 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::ConvertStringsConcatenationToInterpolation,
                       "strings-concatenation-to-interpolation", "Perform strings concatenation to interpolation refactoring"),
            clEnumValN(RefactoringKind::ExpandTernaryExpr,
-                     "expand-ternary-expr", "Perform expand ternary expression"),
+                      "expand-ternary-expr", "Perform expand ternary expression"),
            clEnumValN(RefactoringKind::ConvertToTernaryExpr,
                       "convert-to-ternary-expr", "Perform convert to ternary expression"),
-		   clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
-					   "convert-to-guard", "Perform convert to guard expression"),
+		       clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
+                      "convert-to-guard", "Perform convert to guard expression"),
            clEnumValN(RefactoringKind::ConvertGuardExprToIfLetExpr,
                       "convert-to-iflet", "Perform convert to iflet expression"),
            clEnumValN(RefactoringKind::ExtractFunction,
@@ -75,8 +75,8 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
            clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
-                   "convert-to-computed-property", "Convert from field initialization to computed property"),
-           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement")));
+                      "convert-to-computed-property", "Convert from field initialization to computed property"),
+           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement"),
 
 
 static llvm::cl::opt<std::string>
@@ -113,8 +113,8 @@ IsNonProtocolType("is-non-protocol-type",
                   llvm::cl::desc("The symbol being renamed is a type and not a protocol"));
 
 static llvm::cl::opt<bool>
-DumpInJason("dump-json",
-            llvm::cl::desc("Whether to dump refactoring edits in Json"),
+DumpInJson("dump-json",
+            llvm::cl::desc("Whether to dump refactoring edits in json"),
             llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
@@ -373,7 +373,7 @@ int main(int argc, char *argv[]) {
   RefactoringConfig.PreferredName = options::NewName;
   std::string Error;
   std::unique_ptr<SourceEditConsumer> pConsumer;
-  if (options::DumpInJason)
+  if (options::DumpInJson)
     pConsumer.reset(new SourceEditJsonConsumer(llvm::outs()));
   else
     pConsumer.reset(new SourceEditOutputConsumer(SF->getASTContext().SourceMgr,
