@@ -45,18 +45,13 @@ DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
 DIST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/dist-toolchain-sdk
-HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
-TARGET_TOOLCHAIN_DESTDIR=$SOURCE_PATH/target-toolchain-sdk
 
 DIST_TOOLCHAIN_SDK=$DIST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
-HOST_TOOLCHAIN_SDK=$HOST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
-TARGET_TOOLCHAIN_SDK=$TARGET_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
 
 
 HOST_BUILD_ROOT=$SOURCE_PATH/host-build
 TARGET_BUILD_ROOT=$SOURCE_PATH/target-build
 HOST_BUILD_DIR=$HOST_BUILD_ROOT/Ninja-Release
-TARGET_BUILD_DIR=$TARGET_BUILD_ROOT/Ninja-Release
 
 build_host_toolchain() {
   # Build the host toolchain and SDK first.
@@ -65,54 +60,53 @@ build_host_toolchain() {
     --preset-file="$UTILS_PATH/build-presets.ini" \
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
-    INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
+    INSTALL_DESTDIR="$DIST_TOOLCHAIN_DESTDIR" \
     TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
     C_CXX_LAUNCHER="$(which sccache)"
 }
 
 build_target_toolchain() {
-  mkdir -p "$HOST_BUILD_DIR/"
-  # Copy the host build dir to reuse it.
-  if [[ ! -e "$HOST_BUILD_DIR/llvm-$HOST_SUFFIX" ]]; then
-    cp -r "$HOST_BUILD_DIR/llvm-$HOST_SUFFIX" "$TARGET_BUILD_DIR/llvm-$HOST_SUFFIX"
-    # Clean up compiler-rt dir to cross compile it for host and wasm32
-    (cd "$TARGET_BUILD_DIR/llvm-$HOST_SUFFIX" && ninja compiler-rt-clear)
-  fi
 
-  # build the cross-compilled toolchain
-  env SWIFT_BUILD_ROOT="$TARGET_BUILD_ROOT" \
-    "$SOURCE_PATH/swift/utils/build-script" \
-    --preset-file="$UTILS_PATH/build-presets.ini" \
-    --preset=$TARGET_PRESET \
-    --build-dir="$TARGET_BUILD_DIR" \
-    INSTALL_DESTDIR="$TARGET_TOOLCHAIN_DESTDIR" \
-    SOURCE_PATH="$SOURCE_PATH" \
-    BUNDLE_IDENTIFIER="${BUNDLE_IDENTIFIER}" \
-    DISPLAY_NAME="${DISPLAY_NAME}" \
-    DISPLAY_NAME_SHORT="${DISPLAY_NAME_SHORT}" \
-    TOOLCHAIN_NAME="${TOOLCHAIN_NAME}" \
-    TOOLCHAIN_VERSION="${TOOLCHAIN_VERSION}" \
-    LLVM_BIN_DIR="${HOST_TOOLCHAIN_SDK}/usr/bin" \
-    C_CXX_LAUNCHER="$(which sccache)"
+  COMPILER_RT_BUILD_DIR="$TARGET_BUILD_ROOT/compiler-rt-wasi-wasm32"
+  cmake -B "$COMPILER_RT_BUILD_DIR" \
+    -D CMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/compiler-rt-cache.cmake" \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_C_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang" \
+    -D CMAKE_CXX_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang++" \
+    -D CMAKE_C_COMPILER_LAUNCHER=sccache \
+    -D CMAKE_CXX_COMPILER_LAUNCHER=sccache \
+    -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
+    -D COMPILER_RT_SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
+    -G Ninja \
+    -S ../llvm-project/compiler-rt
 
-  "$UTILS_PATH/build-foundation.sh" "$TARGET_TOOLCHAIN_SDK"
-  "$UTILS_PATH/build-xctest.sh" "$TARGET_TOOLCHAIN_SDK"
+  ninja install -C "$COMPILER_RT_BUILD_DIR"
+
+  SWIFT_STDLIB_BUILD_DIR="$TARGET_BUILD_ROOT/swift-stdlib-wasi-wasm32"
+  cmake -B "$TARGET_BUILD_ROOT/swift-stdlib-wasi-wasm32" \
+    -C "$SOURCE_PATH/swift/cmake/caches/Runtime-WASI-wasm32.cmake" \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_C_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang" \
+    -D CMAKE_CXX_COMPILER="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/clang++" \
+    -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
+    -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
+    -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
+    -D LLVM_DIR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/lib/cmake/llvm/" \
+    -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
+    -D SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
+    -G Ninja \
+    -S "$SOURCE_PATH/swift"
+
+  ninja install -C "$SWIFT_STDLIB_BUILD_DIR"
+
+  "$UTILS_PATH/build-foundation.sh" "$DIST_TOOLCHAIN_SDK"
+  "$UTILS_PATH/build-xctest.sh" "$DIST_TOOLCHAIN_SDK"
 
 }
 
 merge_toolchains() {
-  rm -rf "$DIST_TOOLCHAIN_DESTDIR"
-  # Copy the base host toolchain
-  cp -r "$HOST_TOOLCHAIN_DESTDIR" "$DIST_TOOLCHAIN_DESTDIR"
-
   # Merge wasi-sdk and the toolchain
   cp -r "$WASI_SDK_PATH/share/wasi-sysroot" "$DIST_TOOLCHAIN_SDK/usr/share"
-
-  # Copy the target environment stdlib into the toolchain
-  # Avoid copying usr/lib/swift/clang because our toolchain's one is a directory
-  # but nightly's one is symbolic link. A simple copy fails to merge them.
-  rsync -v -a "$TARGET_TOOLCHAIN_SDK/usr/lib/" "$DIST_TOOLCHAIN_SDK/usr/lib/" --exclude 'swift/clang'
-  rsync -v -a "$TARGET_TOOLCHAIN_SDK/usr/bin/" "$DIST_TOOLCHAIN_SDK/usr/bin/"
 
   # Replace absolute sysroot path with relative path
   sed -i.bak -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap"
