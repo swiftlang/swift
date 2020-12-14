@@ -34,18 +34,16 @@ struct Struct: Differentiable {
 // Check active SIL instructions in representative original functions.
 // This tests SIL instruction coverage of derivative function cloners (e.g. PullbackCloner).
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}Struct{{.*}}method{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}Struct{{.*}}method{{.*}} at parameter indices (0) and result indices (0)
 // CHECK:   [ACTIVE] {{.*}} struct_extract {{%.*}} : $Struct, #Struct.stored
 // CHECK:   [ACTIVE] {{.*}} struct_extract {{%.*}} : $Struct, #Struct.optional
 // CHECK:   [ACTIVE] {{.*}} tuple ({{%.*}} : $Struct, {{%.*}} : $Struct)
 // CHECK:   [ACTIVE] {{.*}} destructure_tuple {{%.*}} : $(Struct, Struct)
 // CHECK:   [ACTIVE] {{.*}} struct_element_addr {{%.*}} : $*Struct, #Struct.optional
 // CHECK:   [ACTIVE] {{.*}} struct_element_addr {{%.*}} : $*Struct, #Struct.stored
-// CHECK-LABEL: End activity info for ${{.*}}Struct{{.*}}method{{.*}} at (parameters=(0) results=(0))
 
-// CHECK-LABEL: [AD] Activity info for $s4null6StructV6stored8optionalACSf_SfSgtcfC at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for $s4null6StructV6stored8optionalACSf_SfSgtcfC at parameter indices (0, 1) and result indices (0)
 // CHECK:   [ACTIVE]   {{%.*}} struct $Struct ({{%.*}} : $Float, {{%.*}} : $Optional<Float>)
-// CHECK-LABEL: End activity info for $s4null6StructV6stored8optionalACSf_SfSgtcfC at (parameters=(0 1) results=(0))
 
 struct StructTracked: Differentiable {
   var stored: NonresilientTracked<Float>
