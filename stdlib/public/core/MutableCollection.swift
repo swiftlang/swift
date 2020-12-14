@@ -268,48 +268,6 @@ extension MutableCollection {
 }
 
 //===----------------------------------------------------------------------===//
-// moveSubranges(_:to:)
-//===----------------------------------------------------------------------===//
-
-extension MutableCollection {
-  /// Moves the elements in the given subranges to just before the element at
-  /// the specified index.
-  ///
-  /// This example finds all the uppercase letters in the array and then
-  /// moves them to between `"i"` and `"j"`.
-  ///
-  ///     var letters = Array("ABCdeFGhijkLMNOp")
-  ///     let uppercaseRanges = letters.subranges(where: { $0.isUppercase })
-  ///     let rangeOfUppercase = letters.moveSubranges(uppercaseRanges, to: 10)
-  ///     // String(letters) == "dehiABCFGLMNOjkp"
-  ///     // rangeOfUppercase == 4..<13
-  ///
-  /// - Parameters:
-  ///   - subranges: The subranges of the elements to move.
-  ///   - insertionPoint: The index to use as the destination of the elements.
-  /// - Returns: The new bounds of the moved elements.
-  ///
-  /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  @discardableResult
-  public mutating func moveSubranges(
-    _ subranges: RangeSet<Index>, to insertionPoint: Index
-  ) -> Range<Index> {
-    let lowerCount = distance(from: startIndex, to: insertionPoint)
-    let upperCount = distance(from: insertionPoint, to: endIndex)
-    let start = _indexedStablePartition(
-      count: lowerCount,
-      range: startIndex..<insertionPoint,
-      by: { subranges.contains($0) })
-    let end = _indexedStablePartition(
-      count: upperCount,
-      range: insertionPoint..<endIndex,
-      by: { !subranges.contains($0) })
-    return start..<end
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // _rotate(in:shiftingToStart:)
 //===----------------------------------------------------------------------===//
 
