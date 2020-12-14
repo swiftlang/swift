@@ -420,7 +420,7 @@ std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     Buffer << "_vjp_";
     break;
   }
-  Buffer << config.getSILAutoDiffIndices().mangle();
+  Buffer << config.mangle();
   if (config.derivativeGenericSignature) {
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);
@@ -445,7 +445,7 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
     Buffer << "_pullback_";
     break;
   }
-  Buffer << config.getSILAutoDiffIndices().mangle();
+  Buffer << config.mangle();
   if (config.derivativeGenericSignature) {
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);
@@ -484,7 +484,7 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
     }
     break;
   }
-  Buffer << config.getSILAutoDiffIndices().mangle();
+  Buffer << config.mangle();
   if (config.derivativeGenericSignature) {
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);

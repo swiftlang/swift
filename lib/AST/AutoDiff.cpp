@@ -97,26 +97,6 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   llvm_unreachable("invalid derivative kind");
 }
 
-void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
-  s << "(parameters=(";
-  interleave(
-      parameters->getIndices(), [&s](unsigned p) { s << p; },
-      [&s] { s << ' '; });
-  s << ") results=(";
-  interleave(
-      results->getIndices(), [&s](unsigned p) { s << p; }, [&s] { s << ' '; });
-  s << "))";
-}
-
-void SILAutoDiffIndices::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
-SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
-  return SILAutoDiffIndices(parameterIndices, resultIndices);
-}
-
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
   parameterIndices->print(s);
