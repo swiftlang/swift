@@ -139,7 +139,7 @@ jobs:
       - name: Pack test results
         working-directory: ${{ github.workspace }}/../
         run: |
-          tar cJf ./swift/swift-test-results.tar.gz target-build/*/swift-macosx-x86_64/swift-test-results
+          tar cJf ./swift/swift-test-results.tar.gz target-build/swift-stdlib-wasi-wasm32/swift-test-results
       - name: Upload test results
         uses: actions/upload-artifact@v1
         with:

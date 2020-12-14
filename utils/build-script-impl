@@ -1702,15 +1702,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 # fi
 
-                # wasm: SWIFT_WASI_SDK_PATH is used to determine wasi-sysroot
-                # to build compiler-rt for wasm32-wasi
-                if [[ ! "${SKIP_BUILD_WASM}" ]]; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DCOMPILER_RT_SWIFT_WASI_SDK_PATH:STRING="${WASI_SDK}"
-                    )
-                fi
-
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
                 )
