@@ -26,4 +26,4 @@ func test_case() async {
   await call(impl) // CHECK: Impl()
 }
 
-_Concurrency.runAsync(test_case)
+_Concurrency.runAsyncAndBlock(test_case)

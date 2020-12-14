@@ -1782,11 +1782,25 @@ public:
       return;
     }
 
+    auto builtinKind = BI->getBuiltinKind();
+
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
-    if (BI->getBuiltinKind() &&
-        *BI->getBuiltinKind() == BuiltinValueKind::GetCurrentAsyncTask) {
+    if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
       require(F.isAsync(),
           "getCurrentAsyncTask builtin can only be used in an async function");
+      return;
+    }
+
+    if (builtinKind == BuiltinValueKind::InitializeDefaultActor ||
+        builtinKind == BuiltinValueKind::DestroyDefaultActor) {
+      auto arguments = BI->getArguments();
+      require(arguments.size() == 1,
+              "default-actor builtin can only operate on a single object");
+      auto argType = arguments[0]->getType().getASTType();
+      auto argClass = argType.getClassOrBoundGenericClass();
+      require((argClass && argClass->isRootDefaultActor()) ||
+              isa<BuiltinNativeObjectType>(argType),
+              "default-actor builtin can only operate on default actors");
       return;
     }
   }

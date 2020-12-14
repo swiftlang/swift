@@ -52,7 +52,7 @@ bb0(%0 : $*τ_0_1):
 }
 
 // Defined in _Concurrency
-sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
 sil @test_case : $@convention(thin) @async () -> () {
   %bind_polymorphic_param_from_context = function_ref @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> ()
@@ -74,7 +74,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
 
   %2 = function_ref @test_case : $@convention(thin) @async () -> ()
   %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
-  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
   %6 = integer_literal $Builtin.Int32, 0

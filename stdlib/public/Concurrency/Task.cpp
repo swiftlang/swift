@@ -17,13 +17,10 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
-
-#if defined(__APPLE__)
-// TODO: We shouldn't need this
-#include <dispatch/dispatch.h>
-#endif
+#include "AsyncCall.h"
 
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
@@ -224,14 +221,14 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 
 AsyncTaskAndContext
 swift::swift_task_create(JobFlags flags, AsyncTask *parent,
-                         const AsyncFunctionPointer<void()> *function) {
+        const ThinNullaryAsyncSignature::FunctionPointer *function) {
   return swift_task_create_f(flags, parent, function->Function.get(),
                              function->ExpectedContextSize);
 }
 
 AsyncTaskAndContext
 swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
-                           AsyncFunctionType<void()> *function,
+                ThinNullaryAsyncSignature::FunctionType *function,
                            size_t initialContextSize) {
   return swift_task_create_future_f(
       flags, parent, nullptr, function, initialContextSize);
@@ -239,7 +236,7 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
 
 AsyncTaskAndContext swift::swift_task_create_future(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    const AsyncFunctionPointer<void()> *function) {
+    const FutureAsyncSignature::FunctionPointer *function) {
   return swift_task_create_future_f(
       flags, parent, futureResultType, function->Function.get(),
       function->ExpectedContextSize);
@@ -247,7 +244,7 @@ AsyncTaskAndContext swift::swift_task_create_future(
 
 AsyncTaskAndContext swift::swift_task_create_future_f(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    AsyncFunctionType<void()> *function, size_t initialContextSize) {
+    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
@@ -354,9 +351,135 @@ void swift::swift_task_future_wait(
   }
 }
 
+namespace {
+/// The header of a function context (closure captures) of
+/// a thick async function with a non-null context.
+struct ThickAsyncFunctionContext: HeapObject {
+  uint32_t ExpectedContextSize;
+};
+
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+
+class RunAndBlockSemaphore {
+  bool Finished = false;
+public:
+  void wait() {
+    donateThreadToGlobalExecutorUntil([](void *context) {
+      return *reinterpret_cast<bool*>(context);
+    }, &Finished);
+
+    assert(Finished && "ran out of tasks before we were signalled");
+  }
+
+  void signal() {
+    Finished = true;
+  }
+};
+
+#else
+
+class RunAndBlockSemaphore {
+  ConditionVariable Queue;
+  ConditionVariable::Mutex Lock;
+  bool Finished = false;
+public:
+  /// Wait for a signal.
+  void wait() {
+    Lock.withLockOrWait(Queue, [&] {
+      return Finished;
+    });
+  }
+
+  void signal() {
+    Lock.withLockThenNotifyAll(Queue, [&]{
+      Finished = true;
+    });
+  }
+};
+
+#endif
+
+using RunAndBlockSignature =
+  AsyncSignature<void(HeapObject*), /*throws*/ false>;
+struct RunAndBlockContext: AsyncContext {
+  const void *Function;
+  HeapObject *FunctionContext;
+  RunAndBlockSemaphore *Semaphore;
+};
+using RunAndBlockCalleeContext =
+  AsyncCalleeContext<RunAndBlockContext, RunAndBlockSignature>;
+
+} // end anonymous namespace
+
+/// Second half of the runAndBlock async function.
+SWIFT_CC(swiftasync)
+static void runAndBlock_finish(AsyncTask *task, ExecutorRef executor,
+                               AsyncContext *_context) {
+  auto calleeContext = static_cast<RunAndBlockCalleeContext*>(_context);
+  auto context = popAsyncContext(task, calleeContext);
+
+  context->Semaphore->signal();
+
+  return context->ResumeParent(task, executor, context);
+}
+
+/// First half of the runAndBlock async function.
+SWIFT_CC(swiftasync)
+static void runAndBlock_start(AsyncTask *task, ExecutorRef executor,
+                              AsyncContext *_context) {
+  auto callerContext = static_cast<RunAndBlockContext*>(_context);
+
+  size_t calleeContextSize;
+  RunAndBlockSignature::FunctionType *function;
+
+  // If the function context is non-null, then the function pointer is
+  // an ordinary function pointer.
+  auto functionContext = callerContext->FunctionContext;
+  if (functionContext) {
+    function = reinterpret_cast<RunAndBlockSignature::FunctionType*>(
+                   const_cast<void*>(callerContext->Function));
+    calleeContextSize =
+      static_cast<ThickAsyncFunctionContext*>(functionContext)
+        ->ExpectedContextSize;
+
+  // Otherwise, the function pointer is an async function pointer.
+  } else {
+    auto fnPtr = reinterpret_cast<const RunAndBlockSignature::FunctionPointer*>(
+                   callerContext->Function);
+    function = fnPtr->Function;
+    calleeContextSize = fnPtr->ExpectedContextSize;
+  }
+
+  auto calleeContext =
+    pushAsyncContext<RunAndBlockSignature>(task, executor, callerContext,
+                                           calleeContextSize,
+                                           &runAndBlock_finish,
+                                           functionContext);
+  return function(task, executor, calleeContext);
+}
+
 // TODO: Remove this hack.
-void swift::swift_task_run(AsyncTask *taskToRun) {
-  taskToRun->run(ExecutorRef::generic());
+void swift::swift_task_runAndBlockThread(const void *function,
+                                         HeapObject *functionContext) {
+  RunAndBlockSemaphore semaphore;
+
+  // Set up a task that runs the runAndBlock async function above.
+  auto pair = swift_task_create_f(JobFlags(JobKind::Task,
+                                           JobPriority::Default),
+                                  /*parent*/ nullptr,
+                                  &runAndBlock_start,
+                                  sizeof(RunAndBlockContext));
+  auto context = static_cast<RunAndBlockContext*>(pair.InitialContext);
+  context->Function = function;
+  context->FunctionContext = functionContext;
+  context->Semaphore = &semaphore;
+
+  // Enqueue the task.
+  swift_task_enqueueGlobal(pair.Task);
+
+  // Wait until the task completes.
+  semaphore.wait();
 }
 
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {
@@ -381,22 +504,8 @@ struct AsyncContinuationContext {
 
 static void resumeTaskAfterContinuation(AsyncTask *task,
                                         AsyncContinuationContext *context) {
-#if __APPLE__
-  // TODO: Enqueue the task on the specific executor in the continuation
-  // context.
-  //
-  // For now, just enqueue the task resumption on the global concurrent queue
-  // so that we're able to return back to the caller of resume.
-  
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
-                 ^{
-                  task->run(context->ResumeExecutor);
-                 });
-#else
-  swift_unreachable("not implemented");
-#endif
+  swift_task_enqueue(task, context->ResumeExecutor);
 }
-
 
 }
 

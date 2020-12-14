@@ -129,7 +129,12 @@ float _stdlib_remainderf(float _self, float _other) {
   
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_squareRootf(float _self) {
+#if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
+  typedef float __m128 __attribute__((__vector_size__(16), __aligned__(16)));
+  return __builtin_ia32_sqrtss(__extension__ (__m128){ _self, 0, 0, 0 })[0];
+#else
   return __builtin_sqrtf(_self);
+#endif
 }
 
 static inline SWIFT_ALWAYS_INLINE

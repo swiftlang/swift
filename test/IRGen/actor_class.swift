@@ -39,11 +39,9 @@ public actor class MyClass {
 // CHECK: load [[INT]], [[INT]]* [[T1]], align 16
 
 // CHECK-LABEL: define {{.*}}swiftcc %T11actor_class7MyClassC* @"$s11actor_class7MyClassCACycfc"
-// FIXME: need to do this initialization!
-// CHECK-NOT: swift_defaultActor_initialize
+// CHECK: swift_defaultActor_initialize
 // CHECK-LABEL: ret %T11actor_class7MyClassC*
 
 // CHECK-LABEL: define {{.*}}swiftcc %swift.refcounted* @"$s11actor_class7MyClassCfd"
-// FIXME: neeed to do this destruction!
-// CHECK-NOT: swift_defaultActor_destroy
+// CHECK: swift_defaultActor_destroy
 // CHECK-LABEL: ret

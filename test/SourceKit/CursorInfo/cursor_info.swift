@@ -742,7 +742,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK88-NEXT: $s
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
-// CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="216" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function
+// CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="216" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function>
 // CHECK88-NEXT: <LocalizationKey>ABC</LocalizationKey>
 
 // RUN: %sourcekitd-test -req=cursor -pos=219:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK89 %s

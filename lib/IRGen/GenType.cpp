@@ -1662,8 +1662,7 @@ const LoadableTypeInfo &TypeConverter::getJobTypeInfo() {
   // they're valid until they are scheduled, and then they're responsible
   // for destroying themselves.  (Jobs are often interior pointers into
   // an AsyncTask*, but that's not guaranteed.)
-  auto ty = llvm::StructType::create(IGM.getLLVMContext(), "swift.job")
-              ->getPointerTo();
+  auto ty = IGM.SwiftJobPtrTy;
   auto pointeeAlign = Alignment(2 * IGM.getPointerAlignment().getValue());
   JobTI = createAlignedPointerTypeInfo(IGM, ty, pointeeAlign);
   JobTI->NextConverted = FirstType;

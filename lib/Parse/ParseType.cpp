@@ -368,7 +368,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Parse an async specifier.
   SourceLoc asyncLoc;
   if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
+      Tok.isContextualKeyword("async") &&
+      peekToken().isAny(tok::arrow, tok::kw_throws)) {
     asyncLoc = consumeToken();
   }
 

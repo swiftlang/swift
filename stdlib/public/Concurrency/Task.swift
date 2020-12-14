@@ -137,11 +137,6 @@ extension Task {
     public func cancel() {
       Builtin.cancelAsyncTask(task)
     }
-
-    @available(*, deprecated, message: "This is a temporary hack")
-    public func run() {
-      runTask(task)
-    }
   }
 }
 
@@ -262,6 +257,9 @@ extension Task {
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
 
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
     return Handle<T>(task: task)
   }
 
@@ -308,6 +306,9 @@ extension Task {
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
 
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
     return Handle<T>(task: task)
   }
 
@@ -342,46 +343,15 @@ extension Task {
   }
 }
 
-// ==== UnsafeContinuation -----------------------------------------------------
-
-extension Task {
-  /// The operation functions must resume the continuation *exactly once*.
-  ///
-  /// The continuation will not begin executing until the operation function returns.
-  ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
-  /* @instantaneous */
-  public static func withUnsafeContinuation<T>(
-    operation: (UnsafeContinuation<T>) -> Void
-  ) async -> T {
-    fatalError("\(#function) not implemented yet.")
-  }
-
-  /// The operation functions must resume the continuation *exactly once*.
-  ///
-  /// The continuation will not begin executing until the operation function returns.
-  ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
-  /* @instantaneous */
-  public static func withUnsafeThrowingContinuation<T>(
-    operation: (UnsafeThrowingContinuation<T>) -> Void
-  ) async throws -> T {
-    fatalError("\(#function) not implemented yet.")
-  }
-}
-
-@_silgen_name("swift_task_run")
-public func runTask(_ task: __owned Builtin.NativeObject)
-
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
-public func runAsync(_ asyncFun: @escaping () async -> ()) {
-  let childTask = Builtin.createAsyncTask(0, nil, asyncFun)
-  runTask(childTask.0)
-}
+@_silgen_name("swift_task_enqueueGlobal")
+@usableFromInline
+func _enqueueJobGlobal(_ task: Builtin.Job)
+
+@_silgen_name("swift_task_runAndBlockThread")
+public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
@@ -428,6 +398,10 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
   // Create the asynchronous task future.
   let (task, _) = Builtin.createAsyncTaskFuture(
       flags.bits, currentTask, operation)
+
+  // Enqueue the resulting job.
+  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
   return task
 }
 
@@ -438,11 +412,11 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-  // TODO: As a start, we should invoke Task.runDetached here, but we
-  // can probably do better if we're already running on behalf of a task,
+  // TODO: We can probably do better than Task.runDetached
+  // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
-  fatalError("not implemented")
+  _ = Task.runDetached { await body() }
 }
 
 #endif

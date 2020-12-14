@@ -41,7 +41,7 @@ TEST_F(SemaTest, TestLookupAlwaysLooksThroughOptionalBase) {
   cs.solve(solutions);
 
   // We should have a solution.
-  ASSERT_EQ(solutions.size(), 1);
+  ASSERT_EQ(solutions.size(), 1u);
 
   auto &solution = solutions[0];
   auto *locator = cs.getConstraintLocator(UME,
@@ -75,7 +75,7 @@ TEST_F(SemaTest, TestLookupPrefersResultsOnOptionalRatherThanBase) {
   cs.solve(solutions);
 
   // We should have a solution.
-  ASSERT_EQ(solutions.size(), 1);
+  ASSERT_EQ(solutions.size(), 1u);
 
   auto &solution = solutions[0];
   auto *locator = cs.getConstraintLocator(UME,
@@ -85,6 +85,6 @@ TEST_F(SemaTest, TestLookupPrefersResultsOnOptionalRatherThanBase) {
 
   // The `test` member on `Optional` should be chosen over the member on `Int`,
   // even though the score is otherwise worse.
-  ASSERT_EQ(score.Data[SK_ValueToOptional], 1);
+  ASSERT_EQ(score.Data[SK_ValueToOptional], 1u);
   ASSERT_EQ(choice.getDecl(), optMember);
 }

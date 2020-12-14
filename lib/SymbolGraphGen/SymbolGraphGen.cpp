@@ -22,10 +22,27 @@ using namespace symbolgraphgen;
 namespace {
 int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
-  SmallString<256> FileName(SG.M.getNameStr());
-  if (SG.ExtendedModule.hasValue()) {
+  SmallString<256> FileName;
+  if (SG.DeclaringModule.hasValue()) {
+    // Save a cross-import overlay symbol graph as `MainModule@BystandingModule[@BystandingModule...]@OverlayModule.symbols.json`
+    //
+    // The overlay module's name is added as a disambiguator in case an overlay
+    // declares multiple modules for the same set of imports.
+    FileName.append(SG.DeclaringModule.getValue()->getNameStr());
+    for (auto BystanderModule : SG.BystanderModules) {
+      FileName.push_back('@');
+      FileName.append(BystanderModule.str());
+    }
+    
     FileName.push_back('@');
-    FileName.append(SG.ExtendedModule.getValue()->getNameStr());
+    FileName.append(SG.M.getNameStr());
+  } else {
+    FileName.append(SG.M.getNameStr());
+    
+    if (SG.ExtendedModule.hasValue()) {
+      FileName.push_back('@');
+      FileName.append(SG.ExtendedModule.getValue()->getNameStr());
+    }
   }
   FileName.append(".symbols.json");
 
@@ -81,4 +98,28 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   }
 
   return Success;
+}
+
+int symbolgraphgen::
+printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
+                        bool InSynthesizedExtension,
+                        const SymbolGraphOptions &Options,
+                        llvm::raw_ostream &OS) {
+  if (!Symbol::supportsKind(D->getKind()))
+    return EXIT_FAILURE;
+
+  llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
+  ModuleDecl *MD = D->getModuleContext();
+  SymbolGraphASTWalker Walker(*MD, Options);
+  markup::MarkupContext MarkupCtx;
+  SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
+                    /*IsForSingleNode=*/true);
+  NominalTypeDecl *NTD = InSynthesizedExtension
+      ? BaseTy->getAnyNominal()
+      : nullptr;
+
+  Symbol MySym(&Graph, D, NTD, BaseTy);
+  Graph.recordNode(MySym);
+  Graph.serialize(JOS);
+  return EXIT_SUCCESS;
 }

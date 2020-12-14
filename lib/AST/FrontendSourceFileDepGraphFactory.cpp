@@ -538,6 +538,4 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
       declFinder.potentialMemberHolders);
   addAllDefinedDeclsOfAGivenType<NodeKind::member>(
       declFinder.valuesInExtensions);
-  addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
-      declFinder.classMembers);
 }

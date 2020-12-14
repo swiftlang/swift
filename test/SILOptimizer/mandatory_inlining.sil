@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: env DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 import Builtin
 import Swift
@@ -960,9 +960,7 @@ bb0(%0 : $Builtin.Int8):
   return %5 : $Builtin.Int8
 }
 
-// We delete this now.
-//
-// CHECK-NOT: sil shared [transparent] @identity_closure
+// This isn't removed in Onone anymore.
 sil shared [transparent] @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 bb0(%0 : $Builtin.Int8):
   return %0 : $Builtin.Int8
@@ -1461,5 +1459,25 @@ bb0(%0 : $*Mystruct, %1 : $Bool):
   dealloc_stack %217 : $*Mystruct
   %19 = tuple ()
   return %19 : $()
+}
+
+sil [transparent] [ossa] @callee : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// This test needs the guard malloc to crash without the fix in #35037
+// Tests there is no use-after-free in ClosureCleanup::recordDeadFunction when deleting debug instructions
+// CHECK-LABEL : sil [ossa] @$test_no_use_after_free :
+// CHECK-LABEL : } // end sil function '$test_no_use_after_free'
+sil [ossa] @$test_no_use_after_free : $@convention(thin) () -> () {
+bb0:
+  %12 = function_ref @callee : $@convention(thin) () -> ()
+  %13 = thin_to_thick_function %12 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+  debug_value %13 : $@callee_guaranteed () -> ()
+  %28 = apply %13() : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
 }
 

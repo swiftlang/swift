@@ -610,6 +610,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+  SwiftJobTy = createStructType(*this, "swift.job", {
+    SizeTy,               // flags
+    Int8PtrTy             // execution function pointer
+  });
+  SwiftJobPtrTy = SwiftJobTy->getPointerTo();
 
   // using TaskContinuationFunction =
   //   SWIFT_CC(swift)
