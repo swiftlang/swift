@@ -169,6 +169,10 @@ public:
   /// Returns true if the node is "present" in the source.
   bool isPresent() const;
 
+  /// Get the node immediately before this current node that does contain a
+  /// non-missing token. Return \c None if we cannot find such node.
+  Optional<Syntax> getPreviousNode() const;
+
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts = SyntaxPrintOptions()) const;
 

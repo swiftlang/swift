@@ -74,6 +74,12 @@ bool Syntax::isMissing() const {
   return getRaw()->isMissing();
 }
 
+Optional<Syntax> Syntax::getPreviousNode() const {
+  if (auto prev = getData().getPreviousNode())
+    return Syntax(Root, prev.get());
+  return None;
+}
+
 llvm::Optional<Syntax> Syntax::getParent() const {
   auto ParentData = getData().getParent();
   if (!ParentData) return llvm::None;

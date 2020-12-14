@@ -43,14 +43,20 @@ SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
   return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
 }
 
-SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc,
-                                const TokenSyntax &Token) {
-  return advanceLocAfter(Loc, Token.withTrailingTrivia({}));
-}
-
-SourceLoc ASTGen::advanceLocAfter(const SourceLoc &Loc, const Syntax &Node) {
-  return Loc.getAdvancedLoc(
-      Node.getAbsoluteEndPositionAfterTrailingTrivia().getOffset());
+SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const Syntax &Node) {
+  if (!Node.isMissing()) {
+    // NOTE: We cannot use 'getLastToken()' because it doesn't take string
+    // literal expressions into account.
+    if (Node.isToken() || Node.is<StringLiteralExprSyntax>())
+      return advanceLocBegin(Loc, Node);
+    for (size_t I = Node.getNumChildren(); I != 0; --I)
+      if (auto Child = Node.getChild(I - 1))
+        return advanceLocEnd(Loc, *Child);
+  }
+  if (auto Prev = Node.getPreviousNode())
+    return advanceLocEnd(Loc, *Prev);
+  assert(false && "No tokens in tree?");
+  return Loc;
 }
 
 Expr *ASTGen::generateMagicIdentifierLiteralExpr(const TokenSyntax &PoundToken,
