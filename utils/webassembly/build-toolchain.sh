@@ -113,6 +113,9 @@ build_target_toolchain() {
   mkdir -p "$SWIFT_STDLIB_BUILD_DIR/lib/clang/10.0.0/"
   ln -fs "$COMPILER_RT_BUILD_DIR/lib" "$SWIFT_STDLIB_BUILD_DIR/lib/clang/10.0.0/lib"
 
+  # Remove host CoreFoundation module directory to avoid module conflict
+  # while building Foundation
+  rm -rf "$DIST_TOOLCHAIN_SDK/usr/lib/swift_static/CoreFoundation"
   "$UTILS_PATH/build-foundation.sh" "$DIST_TOOLCHAIN_SDK"
   "$UTILS_PATH/build-xctest.sh" "$DIST_TOOLCHAIN_SDK"
 
