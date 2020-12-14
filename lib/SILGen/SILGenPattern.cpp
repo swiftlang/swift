@@ -2070,7 +2070,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
                              defaultCaseCount);
 
   // Okay, now emit all the cases.
-  blocks.forEachCase([&](EnumElementDecl *elt, SILBasicBlock *caseBB,
+  blocks.forEachCase([&](EnumElementDecl *eltDecl, SILBasicBlock *caseBB,
                          const CaseInfo &caseInfo) {
     SILLocation loc = caseInfo.FirstMatcher;
     auto &specializedRows = caseInfo.SpecializedRows;
@@ -2085,8 +2085,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
     SILType eltTy;
     bool hasElt = false;
-    if (elt->hasAssociatedValues()) {
-      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
+    if (eltDecl->hasAssociatedValues()) {
+      eltTy = src.getType().getEnumElementType(eltDecl, SGF.SGM.M,
                                                SGF.getTypeExpansionContext());
       hasElt = !eltTy.getASTType()->isVoid();
     }
@@ -2140,7 +2140,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       switch (eltConsumption) {
       case CastConsumptionKind::TakeAlways:
         eltValue =
-            SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue, elt, eltTy);
+            SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue, eltDecl, eltTy);
         break;
       case CastConsumptionKind::BorrowAlways:
         // If we reach this point, we know that we have a loadable
@@ -2154,7 +2154,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
         SGF.B.createCopyAddr(loc, srcValue, copy, IsNotTake, IsInitialization);
         // We can always take from the copy.
         eltConsumption = CastConsumptionKind::TakeAlways;
-        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy, elt, eltTy);
+        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy, eltDecl, eltTy);
         break;
       }
 
@@ -2186,7 +2186,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       eltCMV = origCMV;
 
       // If the payload is boxed, project it.
-      if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
+      if (eltDecl->isIndirect() || eltDecl->getParentEnum()->isIndirect()) {
         ManagedValue boxedValue =
           SGF.B.createProjectBox(loc, origCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
@@ -2202,14 +2202,14 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
-                                    elt->getArgumentInterfaceType())
+        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
+                                    eltDecl->getArgumentInterfaceType())
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
-          (elt->getParentEnum()->isOptionalDecl()
+          (eltDecl->getParentEnum()->isOptionalDecl()
                ? AbstractionPattern(substEltTy)
-               : SGF.SGM.M.Types.getAbstractionPattern(elt));
+               : SGF.SGM.M.Types.getAbstractionPattern(eltDecl));
 
       eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL,
                                          origEltTy, substEltTy);
