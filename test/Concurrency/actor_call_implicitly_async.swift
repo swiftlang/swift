@@ -125,8 +125,8 @@ func anotherAsyncFunc() async {
 
 }
 
-// expected-note@+2 {{add 'async' to function 'regularFunc()' to make it asynchronous}}
-// expected-note@+1 {{add '@asyncHandler' to function 'regularFunc()' to create an implicit asynchronous context}}
+// expected-note@+2 {{add 'async' to function 'regularFunc()' to make it asynchronous}} {{none}}
+// expected-note@+1 {{add '@asyncHandler' to function 'regularFunc()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 

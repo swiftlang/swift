@@ -118,7 +118,10 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   if (!isa<DestructorDecl>(func))
     func->diagnose(diag::note_add_async_to_function, func->getName());
     // TODO: we need a source location for effects attributes so that we 
-    // can emit a fix-it.
+    // can also emit a fix-it that inserts 'async' in the right place for func.
+    // It's possibly a bit tricky to get the right source location from
+    // just the AbstractFunctionDecl, but it's important to circle-back
+    // to this.
 
   if (func->canBeAsyncHandler()) {
     func->diagnose(
