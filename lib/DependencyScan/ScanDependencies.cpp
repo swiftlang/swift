@@ -479,7 +479,7 @@ static void writePrescanJSON(llvm::raw_ostream &out,
   out << "{\n";
   SWIFT_DEFER { out << "}\n"; };
 
-  writeJSONSingleField(out, "imports", importSet, 0, false);
+  writeJSONSingleField(out, "imports", importSet->imports, 0, false);
 }
 
 static void writeJSON(llvm::raw_ostream &out,
@@ -544,11 +544,12 @@ static void writeJSON(llvm::raw_ostream &out,
     out.indent(4 * 2);
     if (swiftTextualDeps) {
       out << "\"swift\": {\n";
-
       /// Swift interface file, if there is one. The main module, for
       /// example, will not have an interface file.
       std::string moduleInterfacePath =
-          get_C_string(swiftTextualDeps->module_interface_path);
+          swiftTextualDeps->module_interface_path.data
+              ? get_C_string(swiftTextualDeps->module_interface_path)
+              : "";
       if (!moduleInterfacePath.empty()) {
         writeJSONSingleField(out, "moduleInterfacePath", moduleInterfacePath, 5,
                              /*trailingComma=*/true);
@@ -585,7 +586,6 @@ static void writeJSON(llvm::raw_ostream &out,
         out.indent(5 * 2);
         out << "],\n";
       }
-
       bool hasBridgingHeaderPath =
           swiftTextualDeps->bridging_header_path.data &&
           get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0';
@@ -594,7 +594,6 @@ static void writeJSON(llvm::raw_ostream &out,
 
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
                            5, commaAfterFramework);
-
       if (swiftTextualDeps->extra_pcm_args->count != 0) {
         out.indent(5 * 2);
         out << "\"extraPcmArgs\": [\n";
