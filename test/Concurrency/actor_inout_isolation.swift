@@ -36,24 +36,24 @@ extension TestActor {
 
   // Can't pass actor-isolated primitive into a function
   func inoutAsyncFunctionCall() async {
-    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&value1)
   }
 
   func inoutAsyncClosureCall() async {
-    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     await { (_ foo: inout Int) async in foo += 1 }(&value1)
   }
 
   // Can't pass actor-isolated primitive into first-class function value
   func inoutAsyncValueCall() async {
-    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     await modifyAsyncValue(&value1)
   }
 
   // Can't pass property of actor-isolated state inout to async function
   func inoutPropertyStateValueCall() async {
-    // expected-error@+1{{actor-isolated property 'position' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'position' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&position.x)
   }
 }
@@ -65,7 +65,7 @@ extension TestActor {
   }
 
   func passStateIntoMethod() async {
-    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     await modifyByValue(&value1)
   }
 }
@@ -88,9 +88,9 @@ extension TestActor {
   func passStateIntoDifferentClassMethod() async {
     let other = NonAsyncClass()
     let otherCurry = other.modifyOtherAsync
-    // expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
     await other.modifyOtherAsync(&value2)
-    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     await otherCurry(&value1)
     other.modifyOtherNotAsync(&value2) // This is okay since it's not async!
 
@@ -98,13 +98,13 @@ extension TestActor {
 
   func callMutatingFunctionOnStruct() async {
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
-    // expected-error@+2:51{{actor-isolated property 'nextPosition' cannot be passed 'inout' to asynchronous function}}
-    // expected-error@+1:71{{actor-isolated property 'nextPosition' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+2:51{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:71{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &nextPosition.x, y: &nextPosition.y)
 
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
-    // expected-error@+2:38{{actor-isolated property 'value1' cannot be passed 'inout' to asynchronous function}}
-    // expected-error@+1:50{{actor-isolated property 'value2' cannot be passed 'inout' to asynchronous function}}
+    // expected-error@+2:38{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:50{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &value1, y: &value2)
   }
 }
@@ -120,14 +120,14 @@ extension TestActor {
   // Actor state passed inout to implicitly async function on an actor of the
   // same type
   func modifiedByOtherTestActor(_ other: TestActor) async {
-    //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to asynchronous function}}
+    //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to implicitly 'async' function call}}
     await other.modify(&value2)
   }
 
   // Actor state passed inout to an implicitly async function on an actor of a
   // different type
   func modifiedByOther(_ other: DifferentActor) async {
-    //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to asynchronous function}}
+    //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to implicitly 'async' function call}}
     await other.modify(&value2)
   }
 }

@@ -930,7 +930,8 @@ namespace {
           } else {
             ctx.Diags.diagnose(
                 subArg->getLoc(), diag::actor_isolated_inout_state,
-                memberDecl->getDescriptiveKind(), memberDecl->getName());
+                memberDecl->getDescriptiveKind(), memberDecl->getName(),
+                call->implicitlyAsync());
             return true;
           }
         }
