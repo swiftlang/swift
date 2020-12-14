@@ -120,7 +120,6 @@ struct CodeCompletionInfo {
   struct DescriptionStructure {
     IndexRange baseName;
     IndexRange parameterRange;
-    IndexRange throwsRange;
   };
 
   Optional<DescriptionStructure> descriptionStructure;

@@ -226,7 +226,7 @@ public:
 
   void addThrows() {
     addChunkWithTextNoCopy(
-       CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword,
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " throws");
   }
 
@@ -237,7 +237,7 @@ public:
 
   void addAsync() {
     addChunkWithTextNoCopy(
-       CodeCompletionString::Chunk::ChunkKind::AsyncKeyword,
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " async");
   }
 
@@ -253,7 +253,8 @@ public:
 
   void addRethrows() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword, " rethrows");
+        CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+        " rethrows");
   }
 
   void addAnnotatedLeftParen() {

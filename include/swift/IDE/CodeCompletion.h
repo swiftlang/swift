@@ -89,14 +89,8 @@ public:
     /// The "override" keyword.
     OverrideKeyword,
 
-    /// The "throws" keyword.
-    ThrowsKeyword,
-
-    /// The "rethrows" keyword.
-    RethrowsKeyword,
-
-    /// The "async" keyword.
-    AsyncKeyword,
+    /// The "throws", "rethrows" and "async" keyword.
+    EffectsSpecifierKeyword,
 
     /// The keyword part of a declaration before the name, like "func".
     DeclIntroducer,
@@ -223,9 +217,7 @@ public:
   static bool chunkHasText(ChunkKind Kind) {
     return Kind == ChunkKind::AccessControlKeyword ||
            Kind == ChunkKind::OverrideKeyword ||
-           Kind == ChunkKind::ThrowsKeyword ||
-           Kind == ChunkKind::RethrowsKeyword ||
-           Kind == ChunkKind::AsyncKeyword ||
+           Kind == ChunkKind::EffectsSpecifierKeyword ||
            Kind == ChunkKind::DeclAttrKeyword ||
            Kind == ChunkKind::DeclIntroducer ||
            Kind == ChunkKind::Keyword ||

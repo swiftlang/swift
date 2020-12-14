@@ -385,9 +385,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::DeclAttrKeyword:
     case ChunkKind::DeclAttrParamKeyword:
     case ChunkKind::OverrideKeyword:
-    case ChunkKind::ThrowsKeyword:
-    case ChunkKind::RethrowsKeyword:
-    case ChunkKind::AsyncKeyword:
+    case ChunkKind::EffectsSpecifierKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::Text:
     case ChunkKind::LeftParen:
@@ -1377,9 +1375,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::Whitespace:
     case ChunkKind::AccessControlKeyword:
     case ChunkKind::OverrideKeyword:
-    case ChunkKind::ThrowsKeyword:
-    case ChunkKind::RethrowsKeyword:
-    case ChunkKind::AsyncKeyword:
+    case ChunkKind::EffectsSpecifierKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::CallParameterColon:
     case ChunkKind::CallParameterTypeBegin:
@@ -1433,9 +1429,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
         --i;
         continue;
       }
-      case ChunkKind::ThrowsKeyword:
-      case ChunkKind::RethrowsKeyword:
-      case ChunkKind::AsyncKeyword:
+      case ChunkKind::EffectsSpecifierKeyword:
         shouldPrint = true; // Even when they're annotations.
         break;
       default:
