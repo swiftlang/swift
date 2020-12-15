@@ -4132,6 +4132,10 @@ NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
 NOTE(note_add_asynchandler_to_function,none,
      "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
+NOTE(note_add_globalactor_to_function,none,
+     "add '@%0' to make %1 %2 part of global actor %3", 
+     (StringRef, DescriptiveDeclKind, DeclName, Type))
+FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 ERROR(not_objc_function_async,none,
       "'async' function cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_async,none,
@@ -4217,10 +4221,10 @@ ERROR(global_actor_from_other_global_actor_context,none,
       "%0 %1 isolated to global actor %2 can not be referenced from "
       "different global actor %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
-ERROR(global_actor_from_independent_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from an "
-      "'@actorIndependent' context",
-      (DescriptiveDeclKind, DeclName, Type))
+ERROR(global_actor_from_nonactor_context,none,
+      "%0 %1 isolated to global actor %2 can not be referenced from "
+      "%select{this|an '@actorIndependent'}3 context",
+      (DescriptiveDeclKind, DeclName, Type, bool))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
