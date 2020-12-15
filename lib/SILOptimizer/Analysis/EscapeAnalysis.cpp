@@ -870,6 +870,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 #include "swift/AST/ReferenceStorage.def"
         case SILInstructionKind::StrongReleaseInst:
         case SILInstructionKind::ReleaseValueInst:
+        case SILInstructionKind::DestroyValueInst:
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst: {
           /// Actually we only add instructions which may release a reference.
@@ -2589,8 +2590,9 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
                                          SILInstruction *usePoint,
                                          ConnectionGraph *conGraph) {
 
-  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint))
-         && "use points are only created for calls and refcount instructions");
+  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint) ||
+          isa<DestroyValueInst>(usePoint)) &&
+         "use points are only created for calls and refcount instructions");
 
   CGNode *node = conGraph->getValueContent(value);
   if (!node)
@@ -2647,6 +2649,14 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
     return true;
   auto *ConGraph = getConnectionGraph(RI->getFunction());
   return canEscapeToUsePoint(V, RI, ConGraph);
+}
+
+bool EscapeAnalysis::canEscapeTo(SILValue V, DestroyValueInst *DVI) {
+  // If it's not uniquely identified we don't know anything about the value.
+  if (!isUniquelyIdentified(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(DVI->getFunction());
+  return canEscapeToUsePoint(V, DVI, ConGraph);
 }
 
 /// Utility to get the function which contains both values \p V1 and \p V2.
