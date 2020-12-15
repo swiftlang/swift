@@ -265,7 +265,7 @@ function(_add_target_variant_c_compile_flags)
   # uses a spin lock for this, so to get reasonable behavior we have to
   # implement it ourselves using _InterlockedCompareExchange128.
   # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
-  if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
+  if(CFLAGS_ARCH STREQUAL x86_64)
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result /clang:-mcx16)
     else()
