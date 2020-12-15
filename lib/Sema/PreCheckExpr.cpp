@@ -811,6 +811,9 @@ namespace {
     /// The expressions that are direct arguments of call expressions.
     llvm::SmallPtrSet<Expr *, 4> CallArgs;
 
+    /// Keep track of acceptable DiscardAssignmentExpr's.
+    llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
+
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
@@ -933,6 +936,27 @@ namespace {
 
       ISLE->getAppendingExpr()->walk(
           StrangeInterpolationRewriter(getASTContext()));
+    }
+
+    /// Scout out the specified destination of an AssignExpr to recursively
+    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
+    /// in simple pattern-like expressions, so we reject anything complex here.
+    void markAcceptableDiscardExprs(Expr *E) {
+      if (!E) return;
+
+      if (auto *PE = dyn_cast<ParenExpr>(E))
+        return markAcceptableDiscardExprs(PE->getSubExpr());
+      if (auto *TE = dyn_cast<TupleExpr>(E)) {
+        for (auto &elt : TE->getElements())
+          markAcceptableDiscardExprs(elt);
+        return;
+      }
+      if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
+        return markAcceptableDiscardExprs(BOE->getSubExpr());
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+        CorrectDiscardAssignmentExprs.insert(DAE);
+
+      // Otherwise, we can't support this.
     }
 
   public:
@@ -1118,6 +1142,9 @@ namespace {
       if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr))
         correctInterpolationIfStrange(ISLE);
 
+      if (auto *assignment = dyn_cast<AssignExpr>(expr))
+        markAcceptableDiscardExprs(assignment->getDest());
+
       return finish(true, expr);
     }
 
@@ -1244,7 +1271,8 @@ namespace {
       // generating any of the unnecessary constraints.
       if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
-          return DAE;
+          if (CorrectDiscardAssignmentExprs.count(DAE))
+            return DAE;
       }
 
       // If this is a sugared type that needs to be folded into a single
@@ -1423,6 +1451,13 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   // Fold member types.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
+  }
+
+  // Fold '_' into a placeholder type.
+  if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
+    auto *placeholderRepr =
+        new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
+    return new (getASTContext()) TypeExpr(placeholderRepr);
   }
 
   // Fold T? into an optional type when T is a TypeExpr.
@@ -1630,6 +1665,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return nullptr;
       if (auto *TyE = dyn_cast<TypeExpr>(E))
         return TyE->getTypeRepr();
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+        return new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
           return TupleTypeRepr::createEmpty(ctx, TE->getSourceRange());
