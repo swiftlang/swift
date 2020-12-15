@@ -554,8 +554,16 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
   substTypeB = substTypeB->substituteBindingsTo(substTypeA,
       [&](ArchetypeType *origType, CanType substType,
           ArchetypeType *, ArrayRef<ProtocolConformanceRef>) -> CanType {
-    auto interfaceTy = origType->getInterfaceType()->getCanonicalType();
-    substMap[interfaceTy->getAs<SubstitutableType>()] = substType;
+    auto interfaceTy =
+        origType->getInterfaceType()->getCanonicalType()->getAs<SubstitutableType>();
+
+    // Make sure any duplicate bindings are equal to the one already recorded.
+    // Otherwise, the substition has conflicting generic arguments.
+    auto bound = substMap.find(interfaceTy);
+    if (bound != substMap.end() && !bound->second->isEqual(substType))
+      return CanType();
+
+    substMap[interfaceTy] = substType;
     return substType;
   });
 
