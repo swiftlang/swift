@@ -835,6 +835,10 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node) {
   mangleChildNode(node, 1);
 }
 
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
+}
+
 void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
   mangleIdentifier(node->getFirstChild());
   if (node->getNumChildren() > 1)
@@ -1382,6 +1386,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
+      case Node::Kind::AsyncFunctionPointer:
         mangleInReverseOrder = true;
         break;
       default:
