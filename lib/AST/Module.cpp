@@ -792,6 +792,11 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
+void ModuleDecl::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &Results) const {
+  FORWARD(getExportedPrespecializations, (Results));
+}
+
 void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &Results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
