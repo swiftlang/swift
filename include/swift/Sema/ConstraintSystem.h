@@ -2177,6 +2177,11 @@ private:
   std::vector<std::pair<ConstraintLocator*, unsigned>>
       DisjunctionChoices;
 
+  /// A map from applied disjunction constraints to the corresponding
+  /// argument function type.
+  llvm::SmallMapVector<ConstraintLocator *, const FunctionType *, 4>
+      AppliedDisjunctions;
+
   /// For locators associated with call expressions, the trailing closure
   /// matching rule that was applied.
   std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
@@ -2668,6 +2673,9 @@ public:
 
     /// The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
+
+    /// The length of \c AppliedDisjunctions.
+    unsigned numAppliedDisjunctions;
 
     /// The length of \c trailingClosureMatchingChoices;
     unsigned numTrailingClosureMatchingChoices;
@@ -3923,7 +3931,6 @@ private:
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
-public:
   /// Describes a direction of optional wrapping, either increasing optionality
   /// or decreasing optionality.
   enum class OptionalWrappingDirection {
@@ -3951,7 +3958,6 @@ public:
       TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
       llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate);
 
-private:
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
   ///
@@ -5459,6 +5465,13 @@ public:
   void partitionDisjunction(ArrayRef<Constraint *> Choices,
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  // If the given constraint is an applied disjunction, get the argument function
+  // that the disjunction is applied to.
+  const FunctionType *getAppliedDisjunctionArgumentFunction(Constraint *disjunction) {
+    assert(disjunction->getKind() == ConstraintKind::Disjunction);
+    return AppliedDisjunctions[disjunction->getLocator()];
+  }
 
   /// The overload sets that have already been resolved along the current path.
   const llvm::MapVector<ConstraintLocator *, SelectedOverload> &

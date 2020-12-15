@@ -632,6 +632,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   // introduce any conversions (i.e., the score is not worse than the
   // current score), we can skip any generic operators with conformance
   // requirements that are not satisfied by any known argument types.
+  auto argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
   auto bestScore = getBestScore(Solutions);
   auto bestChoiceNeedsConversions = bestScore && (bestScore > getCurrentScore());
   if (bestScore && !bestChoiceNeedsConversions && choice.isGenericOperator() && argFnType) {
