@@ -721,7 +721,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   visitDefaultArguments(AFD, AFD->getParameters());
 
-  if (AFD->isAsyncContext()) {
+  if (AFD->hasAsync()) {
     addSymbol(LinkEntity::forAsyncFunctionPointer(AFD));
   }
 }
