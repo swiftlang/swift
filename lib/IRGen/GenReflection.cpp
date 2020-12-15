@@ -28,10 +28,12 @@
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
+#include "Field.h"
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -672,13 +674,8 @@ public:
 private:
   const NominalTypeDecl *NTD;
 
-  void addFieldDecl(const ValueDecl *value, Type type,
-                    bool indirect=false) {
-    reflection::FieldRecordFlags flags;
-    flags.setIsIndirectCase(indirect);
-    if (auto var = dyn_cast<VarDecl>(value))
-      flags.setIsVar(!var->isLet());
-
+  void addField(reflection::FieldRecordFlags flags,
+                Type type, StringRef name) {
     B.addInt32(flags.getRawValue());
 
     if (!type) {
@@ -693,12 +690,32 @@ private:
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto name = value->getBaseIdentifier().str();
       auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
     }
+  }
+
+  void addField(Field field) {
+    reflection::FieldRecordFlags flags;
+    bool isLet = false;
+
+    switch (field.getKind()) {
+    case Field::Var: {
+      auto var = field.getVarDecl();
+      isLet = var->isLet();
+      break;
+    }
+    case Field::MissingMember:
+      llvm_unreachable("emitting reflection for type with missing member");
+    case Field::DefaultActorStorage:
+      flags.setIsArtificial();
+      break;
+    }
+    flags.setIsVar(!isLet);
+
+    addField(flags, field.getInterfaceType(IGM), field.getName());
   }
 
   void layoutRecord() {
@@ -716,10 +733,20 @@ private:
     B.addInt16(uint16_t(kind));
     B.addInt16(FieldRecordSize);
 
-    auto properties = NTD->getStoredProperties();
-    B.addInt32(properties.size());
-    for (auto property : properties)
-      addFieldDecl(property, property->getInterfaceType());
+    B.addInt32(getNumFields(NTD));
+    forEachField(IGM, NTD, [&](Field field) {
+      addField(field);
+    });
+  }
+
+  void addField(const EnumDecl *enumDecl, const EnumElementDecl *decl,
+                bool hasPayload) {
+    reflection::FieldRecordFlags flags;
+    if (hasPayload && (decl->isIndirect() || enumDecl->isIndirect()))
+      flags.setIsIndirectCase();
+
+    addField(flags, decl->getArgumentInterfaceType(),
+             decl->getBaseIdentifier().str());
   }
 
   void layoutEnum() {
@@ -741,14 +768,11 @@ private:
                + strategy.getElementsWithNoPayload().size());
 
     for (auto enumCase : strategy.getElementsWithPayload()) {
-      bool indirect = (enumCase.decl->isIndirect() ||
-                       enumDecl->isIndirect());
-      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
-                   indirect);
+      addField(enumDecl, enumCase.decl, /*has payload*/ true);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType());
+      addField(enumDecl, enumCase.decl, /*has payload*/ false);
     }
   }
 
