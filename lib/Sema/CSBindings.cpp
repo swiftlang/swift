@@ -57,6 +57,33 @@ bool PotentialBinding::isViableForJoin() const {
 }
 
 bool PotentialBindings::isDelayed() const {
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+      // If first binding is a "fallback" to a protocol type,
+      // it means that this type variable should be delayed
+      // until it either gains more contextual information, or
+      // there are no other type variables to attempt to make
+      // forward progress.
+      if (Bindings.empty())
+        return true;
+
+
+      if (Bindings[0].BindingType->is<ProtocolType>())
+        return true;
+    }
+
+    // Since force unwrap preserves l-valueness, resulting
+    // type variable has to be delayed until either l-value
+    // binding becomes available or there are no other
+    // variables to attempt.
+    if (locator->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue()) {
+      return llvm::none_of(Bindings, [](const PotentialBinding &binding) {
+        return binding.BindingType->is<LValueType>();
+      });
+    }
+  }
+
   if (isHole()) {
     auto *locator = TypeVar->getImpl().getLocator();
     assert(locator && "a hole without locator?");
@@ -96,19 +123,6 @@ bool PotentialBindings::isDelayed() const {
         return true;
       }
     });
-  }
-
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
-    // Since force unwrap preserves l-valueness, resulting
-    // type variable has to be delayed until either l-value
-    // binding becomes available or there are no other
-    // variables to attempt.
-    if (locator->directlyAt<ForceValueExpr>() &&
-        TypeVar->getImpl().canBindToLValue()) {
-      return llvm::none_of(Bindings, [](const PotentialBinding &binding) {
-        return binding.BindingType->is<LValueType>();
-      });
-    }
   }
 
   return !DelayedBy.empty();
@@ -440,8 +454,6 @@ void PotentialBindings::finalize(
           addPotentialBinding(
               {protocolTy, AllowedBindingKind::Exact, constraint});
         }
-
-        FullyBound = true;
       }
     }
 

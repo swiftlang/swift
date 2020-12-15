@@ -2325,6 +2325,10 @@ class AllowInvalidStaticMemberRefOnProtocolMetatype final
     return "allow invalid static member reference on a protocol metatype";
   }
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowInvalidStaticMemberRefOnProtocolMetatype *
