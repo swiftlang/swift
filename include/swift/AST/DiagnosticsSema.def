@@ -4210,6 +4210,13 @@ ERROR(actor_isolated_self_independent_context,none,
         "actor-isolated %0 %1 can not be referenced from an "
         "'@actorIndependent' context",
         (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_inout_state,none,
+      "actor-isolated %0 %1 cannot be passed 'inout' to"
+      "%select{| implicitly}2 'async' function call",
+      (DescriptiveDeclKind, DeclName, bool))
+ERROR(actor_isolated_mutating_func,none,
+      "cannot call mutating async function %0 on actor-isolated %1 %2",
+      (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_global_actor_context,none,
       "actor-isolated %0 %1 can not be referenced from context of global "
       "actor %2",
