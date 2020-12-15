@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
 // RUN:    -module-name M -enable-experimental-concurrency | %FileCheck %s
+// REQUIRES: concurrency
 
 func use<T>(_ t: T) {}
 func forceSplit() async {
