@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_NESTED_RECORDS_H
+#define TEST_INTEROP_CXX_CLASS_INPUTS_NESTED_RECORDS_H
+
 struct S1 {
   struct S2 {
     bool A : 1;
@@ -43,3 +46,5 @@ struct S10 {
 };
 
 // TODO: Nested class templates (SR-13853).
+
+#endif // TEST_INTEROP_CXX_CLASS_INPUTS_NESTED_RECORDS_H
