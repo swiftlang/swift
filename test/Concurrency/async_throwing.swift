@@ -44,8 +44,8 @@ func throwingTask() async throws -> String {
   return "ok!"
 }
 
-// expected-note@+2 7 {{add '@asyncHandler' to function 'syncTest()' to create an implicit asynchronous context}}
-// expected-note@+1 7 {{add 'async' to function 'syncTest()' to make it asynchronous}}
+// expected-note@+2 7 {{add '@asyncHandler' to function 'syncTest()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
+// expected-note@+1 7 {{add 'async' to function 'syncTest()' to make it asynchronous}} {{none}}
 func syncTest() {
   let _ = invoke(fn: normalTask) // expected-error{{'async' in a function that does not support concurrency}}
   let _ = invokeAuto(42) // expected-error{{'async' in a function that does not support concurrency}}

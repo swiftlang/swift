@@ -184,7 +184,7 @@ void collectAllActualResultsInTypeOrder(
 }
 
 void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SILAutoDiffIndices parentIndices,
+    ApplyInst *ai, AutoDiffConfig parentConfig,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -195,7 +195,7 @@ void collectMinimalIndicesForFunctionCall(
   // Record all parameter indices in type order.
   unsigned currentParamIdx = 0;
   for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isActive(applyArg, parentIndices))
+    if (activityInfo.isActive(applyArg, parentConfig))
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
@@ -216,12 +216,12 @@ void collectMinimalIndicesForFunctionCall(
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
       if (auto dirRes = directResults[dirResIdx])
-        if (dirRes && activityInfo.isActive(dirRes, parentIndices))
+        if (dirRes && activityInfo.isActive(dirRes, parentConfig))
           resultIndices.push_back(idx);
       ++dirResIdx;
     } else {
       results.push_back(indirectResults[indResIdx]);
-      if (activityInfo.isActive(indirectResults[indResIdx], parentIndices))
+      if (activityInfo.isActive(indirectResults[indResIdx], parentConfig))
         resultIndices.push_back(idx);
       ++indResIdx;
     }
@@ -243,7 +243,7 @@ void collectMinimalIndicesForFunctionCall(
                     calleeFnTy->getNumIndirectMutatingParameters();
   assert(results.size() == numResults);
   assert(llvm::any_of(results, [&](SILValue result) {
-    return activityInfo.isActive(result, parentIndices);
+    return activityInfo.isActive(result, parentConfig);
   }));
 #endif
 }

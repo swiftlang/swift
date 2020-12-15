@@ -4725,6 +4725,9 @@ private:
     using BindingScore =
         std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
 
+    /// The constraint system this type variable and its bindings belong to.
+    ConstraintSystem &CS;
+
     TypeVariableType *TypeVar;
 
     /// The set of potential bindings.
@@ -4764,10 +4767,13 @@ private:
     llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
     llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
 
-    PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
+    PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
+        : CS(cs), TypeVar(typeVar) {}
 
     /// Determine whether the set of bindings is non-empty.
-    explicit operator bool() const { return !Bindings.empty(); }
+    explicit operator bool() const {
+      return !Bindings.empty() || isDirectHole();
+    }
 
     /// Determine whether attempting this type variable should be
     /// delayed until the rest of the constraint system is considered
@@ -4791,15 +4797,32 @@ private:
     /// `bind param` are present in the system.
     bool isPotentiallyIncomplete() const;
 
-    /// If there is only one binding and it's to a hole type, consider
-    /// this type variable to be a hole in a constraint system regardless
-    /// of where hole type originated.
+    /// If this type variable doesn't have any viable bindings, or
+    /// if there is only one binding and it's a hole type, consider
+    /// this type variable to be a hole in a constraint system
+    /// regardless of where hole type originated.
     bool isHole() const {
+      if (isDirectHole())
+        return true;
+
       if (Bindings.size() != 1)
         return false;
 
-      auto &binding = Bindings.front();
+      const auto &binding = Bindings.front();
       return binding.BindingType->is<HoleType>();
+    }
+
+    /// Determines whether the only possible binding for this type variable
+    /// would be a hole type. This is different from `isHole` method because
+    /// type variable could also acquire a hole type transitively if one
+    /// of the type variables in its subtype/equivalence chain has been
+    /// bound to a hole type.
+    bool isDirectHole() const {
+      // Direct holes are only allowed in "diagnostic mode".
+      if (!CS.shouldAttemptFixes())
+        return false;
+
+      return Bindings.empty() && TypeVar->getImpl().canBindToHole();
     }
 
     /// Determine if the bindings only constrain the type variable from above
@@ -4816,22 +4839,26 @@ private:
     }
 
     unsigned getNumDefaultableBindings() const {
-      return llvm::count_if(Bindings, [](const PotentialBinding &binding) {
-        return binding.isDefaultableBinding();
-      });
+      return isDirectHole()
+                 ? 1
+                 : llvm::count_if(Bindings,
+                                  [](const PotentialBinding &binding) {
+                                    return binding.isDefaultableBinding();
+                                  });
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
       auto numDefaults = b.getNumDefaultableBindings();
-      auto hasNoDefaultableBindings = b.Bindings.size() > numDefaults;
+      auto numNonDefaultableBindings =
+          b.isDirectHole() ? 0 : b.Bindings.size() - numDefaults;
 
       return std::make_tuple(b.isHole(),
-                             !hasNoDefaultableBindings,
+                             numNonDefaultableBindings == 0,
                              b.isDelayed(),
                              b.isSubtypeOfExistentialType(),
                              b.involvesTypeVariables(),
                              static_cast<unsigned char>(b.LiteralBinding),
-                             -(b.Bindings.size() - numDefaults));
+                             -numNonDefaultableBindings);
     }
 
     /// Compare two sets of bindings, where \c x < y indicates that
@@ -4847,8 +4874,10 @@ private:
       if (yScore < xScore)
         return false;
 
-      auto xDefaults = x.Bindings.size() + std::get<6>(xScore);
-      auto yDefaults = y.Bindings.size() + std::get<6>(yScore);
+      auto xDefaults =
+          x.isDirectHole() ? 1 : x.Bindings.size() + std::get<6>(xScore);
+      auto yDefaults =
+          y.isDirectHole() ? 1 : y.Bindings.size() + std::get<6>(yScore);
 
       // If there is a difference in number of default types,
       // prioritize bindings with fewer of them.
@@ -4972,6 +5001,8 @@ public:
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
+      if (isDirectHole())
+        out << "hole ";
       if (isPotentiallyIncomplete())
         out << "potentially_incomplete ";
       if (isDelayed())
@@ -5826,8 +5857,7 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 public:
   using Element = TypeVariableBinding;
 
-  TypeVarBindingProducer(ConstraintSystem &cs,
-                         ConstraintSystem::PotentialBindings &bindings);
+  TypeVarBindingProducer(ConstraintSystem::PotentialBindings &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }

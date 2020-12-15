@@ -35,8 +35,8 @@ protocol P2 {
 class C1: P1 {
   func method() { } // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
-  // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}}
-  // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}}
+  // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
+  // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}} {{none}}
   @OtherGlobalActor func testMethod() {
     method() // expected-error {{'async' in a function that does not support concurrency}}
     _ = method  // expected-error {{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
@@ -47,8 +47,8 @@ class C2: P2 {
   func method1() { }  // expected-note{{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
   func method2() { }
 
-  // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}}
-  // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}}
+  // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
+  // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}} {{none}}
   @OtherGlobalActor func testMethod() {
     method1() // expected-error{{'async' in a function that does not support concurrency}}
     _ = method1 // expected-error{{instance method 'method1()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
@@ -83,8 +83,8 @@ class C5 {
   func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
 }
 
-// expected-note@+2 5 {{add '@asyncHandler' to function 'testGlobalActorInference(c3:c4:c5:)' to create an implicit asynchronous context}}
-// expected-note@+1 5 {{add 'async' to function 'testGlobalActorInference(c3:c4:c5:)' to make it asynchronous}}
+// expected-note@+2 5 {{add '@asyncHandler' to function 'testGlobalActorInference(c3:c4:c5:)' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
+// expected-note@+1 5 {{add 'async' to function 'testGlobalActorInference(c3:c4:c5:)' to make it asynchronous}} {{none}}
 @OtherGlobalActor func testGlobalActorInference(c3: C3, c4: C4, c5: C5) {
   // Propagation via class annotation
   c3.method1() // expected-error{{'async' in a function that does not support concurrency}}
@@ -145,8 +145,8 @@ actor class GenericSub<T> : GenericSuper<[T]> {
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
   @actorIndependent override func method3() { } // expected-error{{actor-independent instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
-  // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}}
-  // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}}
+  // expected-note@+2 {{add '@asyncHandler' to function 'testMethod()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
+  // expected-note@+1 {{add 'async' to function 'testMethod()' to make it asynchronous}} {{none}}
   @OtherGlobalActor func testMethod() {
     method() // expected-error{{'async' in a function that does not support concurrency}}
     _ = method  // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[T]>' can not be referenced from different global actor 'OtherGlobalActor'}}
@@ -181,6 +181,7 @@ struct OtherContainer<U> {
 // Global actor inference for unspecified contexts
 // ----------------------------------------------------------------------
 
+// expected-note@+1 {{calls to global function 'foo()' from outside of its actor context are implicitly asynchronous}}
 @SomeGlobalActor func foo() { sibling() }
 
 @SomeGlobalActor func sibling() { foo() }
@@ -189,8 +190,9 @@ func bar() async {
   foo() // expected-error{{call is 'async' but is not marked with 'await'}}
 }
 
-// expected-note@+2 {{add '@asyncHandler' to function 'barSync()' to create an implicit asynchronous context}}
-// expected-note@+1 {{add 'async' to function 'barSync()' to make it asynchronous}}
+// expected-note@+3 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
+// expected-note@+2 {{add '@asyncHandler' to function 'barSync()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
+// expected-note@+1 {{add 'async' to function 'barSync()' to make it asynchronous}} {{none}}
 func barSync() {
-  foo() // expected-error{{'async' in a function that does not support concurrency}}
+  foo() // expected-error {{'async' in a function that does not support concurrency}}
 }
