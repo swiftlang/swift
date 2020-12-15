@@ -54,6 +54,12 @@ CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initiali
 
 CURSOR_REFACTORING(AddEquatableConformance, "Add Equatable Conformance", add.equatable.conformance)
 
+CURSOR_REFACTORING(ConvertCallToAsyncAlternative, "Convert Call to Async Alternative", convert.call-to-async)
+
+CURSOR_REFACTORING(ConvertToAsync, "Convert Function to Async", convert.func-to-async)
+
+CURSOR_REFACTORING(AddAsyncAlternative, "Add Async Alternative", add.async-alternative)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)

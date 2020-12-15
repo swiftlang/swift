@@ -77,6 +77,12 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
                       "convert-to-computed-property", "Convert from field initialization to computed property"),
            clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement"),
+           clEnumValN(RefactoringKind::ConvertCallToAsyncAlternative,
+                      "convert-call-to-async-alternative", "Convert call to use its async alternative (if any)"),
+           clEnumValN(RefactoringKind::ConvertToAsync,
+                      "convert-to-async", "Convert the entire function to async"),
+           clEnumValN(RefactoringKind::AddAsyncAlternative,
+                      "add-async-alternative", "Add an async alternative of a function taking a callback")));
 
 
 static llvm::cl::opt<std::string>
@@ -266,6 +272,7 @@ int main(int argc, char *argv[]) {
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);

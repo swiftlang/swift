@@ -1032,8 +1032,8 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
     auto End = SM.getLineAndColumnInBuffer(Range.getEnd());
 
     OS << "// " << Path.str() << " ";
-    OS << "[" << Start.first << ":" << Start.second << ", ";
-    OS << End.first << ":" << End.second << ")\n";
+    OS << Start.first << ":" << Start.second << " -> ";
+    OS << End.first << ":" << End.second << "\n";
     OS << Replacement.Text << "\n";
   }
 }

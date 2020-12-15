@@ -559,10 +559,9 @@ public:
 
 /// Outputs replacements to `OS` in the form
 /// ```
-/// // </path/to/file> [startLine:startCol, endLine:endCol)
+/// // </path/to/file> startLine:startCol -> endLine:endCol
+/// replacement
 /// text
-/// to
-/// replace
 ///
 /// ```
 class SourceEditTextConsumer : public SourceEditConsumer {

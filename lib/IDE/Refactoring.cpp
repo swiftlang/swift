@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Refactoring.h"
-#include "swift/IDE/IDERequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -26,13 +26,14 @@
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSet.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -3889,7 +3890,1453 @@ bool RefactoringActionConvertToComputedProperty::performChange() {
   return false; // success
 }
 
-}// end of anonymous namespace
+namespace asyncrefactorings {
+
+// TODO: Should probably split the refactorings into separate files
+
+/// Whether the given parameter name identifies a completion callback
+bool isCompletionHandlerName(StringRef Name) {
+  return Name.startswith("completion") || Name.contains("Completion") ||
+         Name.contains("Complete");
+}
+
+/// Whether the given type is the stdlib Result type
+bool isResultType(Type Ty) {
+  if (!Ty)
+    return false;
+  if (auto *NTD = Ty->getAnyNominal())
+    return NTD == NTD->getASTContext().getResultDecl();
+  return false;
+}
+
+/// Whether the given type is (or conforms to) the stdlib Error type
+bool isErrorType(Type Ty, ModuleDecl *MD) {
+  if (!Ty)
+    return false;
+  return !MD->conformsToProtocol(Ty, Ty->getASTContext().getErrorDecl())
+              .isInvalid();
+}
+
+// The single Decl* subject of a switch statement, or nullptr if none
+Decl *singleSwitchSubject(const SwitchStmt *Switch) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(Switch->getSubjectExpr()))
+    return DRE->getDecl();
+  return nullptr;
+}
+
+// Wrapper to make dealing with single elements easier (ie. for Paren|TupleExpr
+// arguments)
+template <typename T>
+class PtrArrayRef {
+  bool IsSingle = false;
+  union Storage {
+    ArrayRef<T> ManyElements;
+    T SingleElement;
+  } Storage = {ArrayRef<T>()};
+
+public:
+  PtrArrayRef() {}
+  PtrArrayRef(T Element) : IsSingle(true) { Storage.SingleElement = Element; }
+  PtrArrayRef(ArrayRef<T> Ref) : IsSingle(Ref.size() == 1), Storage({Ref}) {
+    if (IsSingle)
+      Storage.SingleElement = Ref[0];
+  }
+
+  ArrayRef<T> ref() {
+    if (IsSingle)
+      return ArrayRef<T>(Storage.SingleElement);
+    return Storage.ManyElements;
+  }
+};
+
+PtrArrayRef<Expr *> callArgs(const ApplyExpr *AE) {
+  if (auto *PE = dyn_cast<ParenExpr>(AE->getArg())) {
+    return PtrArrayRef<Expr *>(PE->getSubExpr());
+  } else if (auto *TE = dyn_cast<TupleExpr>(AE->getArg())) {
+    return PtrArrayRef<Expr *>(TE->getElements());
+  }
+  return PtrArrayRef<Expr *>();
+}
+
+FuncDecl *getUnderlyingFunc(const Expr *Fn) {
+  Fn = Fn->getSemanticsProvidingExpr();
+  if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
+    return dyn_cast_or_null<FuncDecl>(DRE->getDecl());
+  if (auto ApplyE = dyn_cast<SelfApplyExpr>(Fn))
+    return getUnderlyingFunc(ApplyE->getFn());
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
+    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+      return getUnderlyingFunc(Unwrapped);
+  }
+  return nullptr;
+}
+
+/// Find the outermost call of the given location
+CallExpr *findOuterCall(const ResolvedCursorInfo &CursorInfo) {
+  auto IncludeInContext = [](ASTNode N) {
+    if (auto *E = N.dyn_cast<Expr *>())
+      return !E->isImplicit();
+    return false;
+  };
+
+  // TODO: Bit pointless using the "ContextFinder" here. Ideally we would have
+  //       already generated a slice of the AST for anything that contains
+  //       the cursor location
+  ContextFinder Finder(*CursorInfo.SF, CursorInfo.Loc, IncludeInContext);
+  Finder.resolve();
+  auto Contexts = Finder.getContexts();
+  if (Contexts.empty())
+    return nullptr;
+
+  CallExpr *CE = dyn_cast<CallExpr>(Contexts[0].get<Expr *>());
+  if (!CE)
+    return nullptr;
+
+  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
+  if (!SM.rangeContains(CE->getFn()->getSourceRange(), CursorInfo.Loc))
+    return nullptr;
+  return CE;
+}
+
+/// Find the function matching the given location if it is not an accessor and
+/// either has a body or is a member of a protocol
+FuncDecl *findFunction(const ResolvedCursorInfo &CursorInfo) {
+  auto IncludeInContext = [](ASTNode N) {
+    if (auto *D = N.dyn_cast<Decl *>())
+      return !D->isImplicit();
+    return false;
+  };
+
+  ContextFinder Finder(*CursorInfo.SF, CursorInfo.Loc, IncludeInContext);
+  Finder.resolve();
+
+  auto Contexts = Finder.getContexts();
+  if (Contexts.empty())
+    return nullptr;
+
+  if (Contexts.back().isDecl(DeclKind::Param))
+    Contexts = Contexts.drop_back();
+
+  auto *FD = dyn_cast_or_null<FuncDecl>(Contexts.back().get<Decl *>());
+  if (!FD || isa<AccessorDecl>(FD))
+    return nullptr;
+
+  auto *Body = FD->getBody();
+  if (!Body && !isa<ProtocolDecl>(FD->getDeclContext()))
+    return nullptr;
+
+  SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
+  SourceLoc DeclEnd = Body ? Body->getLBraceLoc() : FD->getEndLoc();
+  if (!SM.rangeContains(SourceRange(FD->getStartLoc(), DeclEnd),
+                        CursorInfo.Loc))
+    return nullptr;
+
+  return FD;
+}
+
+FuncDecl *isOperator(const BinaryExpr *BE) {
+  auto *AE = dyn_cast<ApplyExpr>(BE->getFn());
+  if (AE) {
+    auto *Callee = AE->getCalledValue();
+    if (Callee && Callee->isOperator() && isa<FuncDecl>(Callee))
+      return cast<FuncDecl>(Callee);
+  }
+  return nullptr;
+}
+
+/// Describes the expressions to be kept from a call to the handler in a
+/// function that has (or will have ) and async alternative. Eg.
+/// ```
+/// func toBeAsync(completion: (String?, Error?) -> Void) {
+///   ...
+///   completion("something", nil) // Result = ["something"], IsError = false
+///   ...
+///   completion(nil, MyError.Bad) // Result = [MyError.Bad], IsError = true
+/// }
+class HandlerResult {
+  PtrArrayRef<Expr *> Results;
+  bool IsError = false;
+
+public:
+  HandlerResult() {}
+
+  HandlerResult(ArrayRef<Expr *> Results)
+      : Results(PtrArrayRef<Expr *>(Results)) {}
+
+  HandlerResult(Expr *Result, bool IsError)
+      : Results(PtrArrayRef<Expr *>(Result)), IsError(IsError) {}
+
+  bool isError() { return IsError; }
+
+  ArrayRef<Expr *> args() { return Results.ref(); }
+};
+
+/// The type of the handler, ie. whether it takes regular parameters or a
+/// single parameter of `Result` type.
+enum class HandlerType { INVALID, PARAMS, RESULT };
+
+/// Given a function with an async alternative (or one that *could* have an
+/// async alternative), stores information about the handler parameter.
+struct AsyncHandlerDesc {
+  const ParamDecl *Handler = nullptr;
+  int Index = -1;
+  HandlerType Type = HandlerType::INVALID;
+  bool HasError = false;
+
+  static AsyncHandlerDesc find(const FuncDecl *FD, bool ignoreName = false) {
+    if (!FD || FD->hasAsync() || FD->hasThrows())
+      return AsyncHandlerDesc();
+
+    // Require at least one parameter and void return type
+    auto *Params = FD->getParameters();
+    if (Params->size() == 0 || !FD->getResultInterfaceType()->isVoid())
+      return AsyncHandlerDesc();
+
+    AsyncHandlerDesc HandlerDesc;
+
+    // Assume the handler is the last parameter for now
+    HandlerDesc.Index = Params->size() - 1;
+    HandlerDesc.Handler = Params->get(HandlerDesc.Index);
+
+    // Callback must not be attributed with @autoclosure
+    if (HandlerDesc.Handler->isAutoClosure())
+      return AsyncHandlerDesc();
+
+    // Callback must have a completion-like name (if we're not ignoring it)
+    if (!ignoreName &&
+        !isCompletionHandlerName(HandlerDesc.Handler->getNameStr()))
+      return AsyncHandlerDesc();
+
+    // Callback must be a function type and return void. Doesn't need to have
+    // any parameters - may just be a "I'm done" callback
+    auto *HandlerTy = HandlerDesc.Handler->getType()->getAs<AnyFunctionType>();
+    if (!HandlerTy || !HandlerTy->getResult()->isVoid())
+      return AsyncHandlerDesc();
+
+    // Find the type of result in the handler (eg. whether it's a Result<...>,
+    // just parameters, or nothing).
+    auto HandlerParams = HandlerTy->getParams();
+    if (HandlerParams.size() == 1) {
+      auto ParamTy =
+          HandlerParams.back().getPlainType()->getAs<BoundGenericType>();
+      if (isResultType(ParamTy)) {
+        auto GenericArgs = ParamTy->getGenericArgs();
+        assert(GenericArgs.size() == 2 && "Result should have two params");
+        HandlerDesc.Type = HandlerType::RESULT;
+        HandlerDesc.HasError = !GenericArgs.back()->isUninhabited();
+      }
+    }
+
+    if (HandlerDesc.Type != HandlerType::RESULT) {
+      // Only handle non-result parameters
+      for (auto &Param : HandlerParams) {
+        if (isResultType(Param.getPlainType()))
+          return AsyncHandlerDesc();
+      }
+
+      HandlerDesc.Type = HandlerType::PARAMS;
+      if (!HandlerParams.empty()) {
+        auto LastParamTy = HandlerParams.back().getParameterType();
+        HandlerDesc.HasError = isErrorType(LastParamTy->getOptionalObjectType(),
+                                           FD->getModuleContext());
+      }
+    }
+
+    return HandlerDesc;
+  }
+
+  bool isValid() const { return Type != HandlerType::INVALID; }
+
+  ArrayRef<AnyFunctionType::Param> params() const {
+    auto Ty = Handler->getType()->getAs<AnyFunctionType>();
+    assert(Ty && "Type must be a function type");
+    return Ty->getParams();
+  }
+
+  /// The `CallExpr` if the given node is a call to the `Handler`
+  CallExpr *getAsHandlerCall(ASTNode Node) const {
+    if (!isValid())
+      return nullptr;
+
+    if (Node.isExpr(swift::ExprKind::Call)) {
+      CallExpr *CE = cast<CallExpr>(Node.dyn_cast<Expr *>());
+      if (CE->getFn()->getReferencedDecl().getDecl() == Handler)
+        return CE;
+    }
+    return nullptr;
+  }
+
+  /// Given a call to the `Handler`, extract the expressions to be returned or
+  /// thrown, taking care to remove the `.success`/`.failure` if it's a
+  /// `RESULT` handler type.
+  HandlerResult extractResultArgs(const CallExpr *CE) const {
+    auto ArgList = callArgs(CE);
+    auto Args = ArgList.ref();
+
+    if (Type == HandlerType::PARAMS) {
+      if (!HasError)
+        return HandlerResult(Args);
+
+      if (!isa<NilLiteralExpr>(Args.back()))
+        return HandlerResult(Args.back(), true);
+
+      return HandlerResult(Args.drop_back());
+    } else if (Type == HandlerType::RESULT) {
+      if (Args.size() != 1)
+        return HandlerResult(Args);
+
+      auto *ResultCE = dyn_cast<CallExpr>(Args[0]);
+      if (!ResultCE)
+        return HandlerResult(Args);
+
+      auto *DSC = dyn_cast<DotSyntaxCallExpr>(ResultCE->getFn());
+      if (!DSC)
+        return HandlerResult(Args);
+
+      auto *D = dyn_cast<EnumElementDecl>(
+          DSC->getFn()->getReferencedDecl().getDecl());
+      if (!D)
+        return HandlerResult(Args);
+
+      auto ResultArgList = callArgs(ResultCE);
+      return HandlerResult(ResultArgList.ref()[0],
+                           D->getNameStr() == StringRef("failure"));
+    }
+
+    llvm_unreachable("Unhandled result type");
+  }
+};
+
+enum class ConditionType { INVALID, NIL, NOT_NIL };
+
+/// Finds the `Subject` being compared to in various conditions. Also finds any
+/// pattern that may have a bound name.
+struct CallbackCondition {
+  ConditionType Type = ConditionType::INVALID;
+  const Decl *Subject = nullptr;
+  const Pattern *BindPattern = nullptr;
+  // Bit of a hack. When the `Subject` is a `Result` type we use this to
+  // distinguish between the `.success` and `.failure` case (as opposed to just
+  // checking whether `Subject` == `TheErrDecl`)
+  bool ErrorCase = false;
+
+  CallbackCondition() = default;
+
+  /// Initializes a `CallbackCondition` with a `!=` or `==` comparison of
+  /// an `Optional` typed `Subject` to `nil`, ie.
+  ///   - `<Subject> != nil`
+  ///   - `<Subject> == nil`
+  CallbackCondition(const BinaryExpr *BE, const FuncDecl *Operator) {
+    bool FoundNil = false;
+    for (auto *Operand : BE->getArg()->getElements()) {
+      if (isa<NilLiteralExpr>(Operand)) {
+        FoundNil = true;
+      } else if (auto *DRE = dyn_cast<DeclRefExpr>(Operand)) {
+        Subject = DRE->getDecl();
+      }
+    }
+
+    if (Subject && FoundNil) {
+      if (Operator->getBaseName() == "==") {
+        Type = ConditionType::NIL;
+      } else if (Operator->getBaseName() == "!=") {
+        Type = ConditionType::NOT_NIL;
+      }
+    }
+  }
+
+  /// Initializes a `CallbackCondition` with binding of an `Optional` or
+  /// `Result` typed `Subject`, ie.
+  ///   - `let bind = <Subject>`
+  ///   - `case .success(let bind) = <Subject>`
+  ///   - `case .failure(let bind) = <Subject>`
+  ///   - `let bind = try? <Subject>.get()`
+  CallbackCondition(const Pattern *P, const Expr *Init) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(Init)) {
+      if (auto *OSP = dyn_cast<OptionalSomePattern>(P)) {
+        // `let bind = <Subject>`
+        Type = ConditionType::NOT_NIL;
+        Subject = DRE->getDecl();
+        BindPattern = OSP->getSubPattern();
+      } else if (auto *EEP = dyn_cast<EnumElementPattern>(P)) {
+        // `case .<func>(let <bind>) = <Subject>`
+        initFromEnumPattern(DRE->getDecl(), EEP);
+      }
+    } else if (auto *OTE = dyn_cast<OptionalTryExpr>(Init)) {
+      // `let bind = try? <Subject>.get()`
+      if (auto *OSP = dyn_cast<OptionalSomePattern>(P))
+        initFromOptionalTry(OSP->getSubPattern(), OTE);
+    }
+  }
+
+  /// Initializes a `CallbackCondtion` from a case statement inside a switch
+  /// on `Subject` with `Result` type, ie.
+  /// ```
+  /// switch <Subject> {
+  /// case .success(let bind):
+  /// case .failure(let bind):
+  /// }
+  /// ```
+  CallbackCondition(const Decl *Subject, const CaseLabelItem *CaseItem) {
+    if (auto *EEP = dyn_cast<EnumElementPattern>(CaseItem->getPattern())) {
+      // `case .<func>(let <bind>)`
+      initFromEnumPattern(Subject, EEP);
+    }
+  }
+
+  bool isValid() const { return Type != ConditionType::INVALID; }
+
+  /// Given an `if` condition `Cond` and a set of `Decls`, find any
+  /// `CallbackCondition`s in `Cond` that use one of those `Decls` and add them
+  /// to the map `AddTo`. Return `true` if all elements in the condition are
+  /// "handled", ie. every condition can be mapped to a single `Decl` in
+  /// `Decls`.
+  static bool all(StmtCondition Cond, llvm::DenseSet<const Decl *> Decls,
+                  llvm::DenseMap<const Decl *, CallbackCondition> &AddTo) {
+    bool Handled = true;
+    for (auto &CondElement : Cond) {
+      if (auto *BoolExpr = CondElement.getBooleanOrNull()) {
+        SmallVector<Expr *, 1> Exprs;
+        Exprs.push_back(BoolExpr);
+
+        while (!Exprs.empty()) {
+          auto *Next = Exprs.pop_back_val();
+          if (auto *ACE = dyn_cast<AutoClosureExpr>(Next))
+            Next = ACE->getSingleExpressionBody();
+
+          if (auto *BE = dyn_cast_or_null<BinaryExpr>(Next)) {
+            auto *Operator = isOperator(BE);
+            if (Operator) {
+              if (Operator->getBaseName() == "&&") {
+                auto Args = BE->getArg()->getElements();
+                Exprs.insert(Exprs.end(), Args.begin(), Args.end());
+              } else {
+                addCond(CallbackCondition(BE, Operator), Decls, AddTo, Handled);
+              }
+              continue;
+            }
+          }
+
+          Handled = false;
+        }
+      } else if (auto *P = CondElement.getPatternOrNull()) {
+        addCond(CallbackCondition(P, CondElement.getInitializer()), Decls,
+                AddTo, Handled);
+      }
+    }
+    return Handled && !AddTo.empty();
+  }
+
+private:
+  static void addCond(const CallbackCondition &CC,
+                      llvm::DenseSet<const Decl *> Decls,
+                      llvm::DenseMap<const Decl *, CallbackCondition> &AddTo,
+                      bool &Handled) {
+    if (!CC.isValid() || !Decls.count(CC.Subject) ||
+        !AddTo.try_emplace(CC.Subject, CC).second)
+      Handled = false;
+  }
+
+  void initFromEnumPattern(const Decl *D, const EnumElementPattern *EEP) {
+    if (auto *EED = EEP->getElementDecl()) {
+      if (!isResultType(EED->getParentEnum()->getDeclaredType()))
+        return;
+      if (EED->getNameStr() == StringRef("failure"))
+        ErrorCase = true;
+      Type = ConditionType::NOT_NIL;
+      Subject = D;
+      BindPattern = EEP->getSubPattern();
+    }
+  }
+
+  void initFromOptionalTry(const class Pattern *P, const OptionalTryExpr *OTE) {
+    auto *ICE = dyn_cast<ImplicitConversionExpr>(OTE->getSubExpr());
+    if (!ICE)
+      return;
+    auto *CE = dyn_cast<CallExpr>(ICE->getSyntacticSubExpr());
+    if (!CE)
+      return;
+    auto *DSC = dyn_cast<DotSyntaxCallExpr>(CE->getFn());
+    if (!DSC)
+      return;
+
+    auto *BaseDRE = dyn_cast<DeclRefExpr>(DSC->getBase());
+    if (!isResultType(BaseDRE->getType()))
+      return;
+
+    auto *FnDRE = dyn_cast<DeclRefExpr>(DSC->getFn());
+    if (!FnDRE)
+      return;
+    auto *FD = dyn_cast<FuncDecl>(FnDRE->getDecl());
+    if (!FD || FD->getNameStr() != StringRef("get"))
+      return;
+
+    Type = ConditionType::NOT_NIL;
+    Subject = BaseDRE->getDecl();
+    BindPattern = P;
+  }
+};
+
+/// The statements within the closure of call to a function taking a callback
+/// are split into a `SuccessBlock` and `ErrorBlock` (`ClassifiedBlocks`).
+/// This class stores the nodes for each block, as well as a mapping of
+/// decls to any patterns they are used in.
+class ClassifiedBlock {
+  SmallVector<ASTNode, 0> Nodes;
+  // closure param -> name
+  llvm::DenseMap<const Decl *, StringRef> BoundNames;
+  bool AllLet = true;
+
+public:
+  ArrayRef<ASTNode> nodes() const { return llvm::makeArrayRef(Nodes); }
+
+  StringRef boundName(const Decl *D) const { return BoundNames.lookup(D); }
+
+  bool allLet() const { return AllLet; }
+
+  void addAllNodes(ArrayRef<ASTNode> Nodes) {
+    for (auto Node : Nodes) {
+      addNode(Node);
+    }
+  }
+
+  void addNode(const ASTNode Node) {
+    if (!Node.isDecl(DeclKind::Var))
+      Nodes.push_back(Node);
+  }
+
+  void addBinding(const CallbackCondition &FromCondition,
+                  DiagnosticEngine &DiagEngine) {
+    if (!FromCondition.BindPattern)
+      return;
+
+    if (auto *BP =
+            dyn_cast_or_null<BindingPattern>(FromCondition.BindPattern)) {
+      if (!BP->isLet())
+        AllLet = false;
+    }
+
+    StringRef Name = FromCondition.BindPattern->getBoundName().str();
+    if (Name.empty())
+      return;
+
+    auto Res = BoundNames.try_emplace(FromCondition.Subject, Name);
+    if (Res.second)
+      return;
+
+    // Already inserted, only handle cases where the name is the same
+    // TODO: This wouldn't be that hard to handle, just need to keep track
+    //       of the decl and replace its name with the same as the original
+    StringRef OldName = Res.first->second;
+    if (OldName != Name) {
+      DiagEngine.diagnose(FromCondition.BindPattern->getLoc(),
+                          diag::callback_multiple_bound_names,
+                          StringRef(OldName), Name);
+    }
+  }
+
+  void addAllBindings(
+      const llvm::DenseMap<const Decl *, CallbackCondition> &FromConditions,
+      DiagnosticEngine &DiagEngine) {
+    for (auto &Entry : FromConditions) {
+      addBinding(Entry.second, DiagEngine);
+      if (DiagEngine.hadAnyError())
+        return;
+    }
+  }
+};
+
+struct ClassifiedBlocks {
+  ClassifiedBlock SuccessBlock;
+  ClassifiedBlock ErrorBlock;
+};
+
+/// Classifer of callback closure statements that that have either multiple
+/// non-Result parameters or a single Result parameter and return Void.
+///
+/// It performs a (possibly incorrect) best effort and may give up in certain
+/// cases. Aims to cover the idiomatic cases of either having no error
+/// parameter at all, or having success/error code wrapped in ifs/guards/switch
+/// using either pattern binding or nil checks.
+///
+/// Code outside any clear conditions is assumed to be solely part of the
+/// success block for now, though some heuristics could be added to classify
+/// these better in the future.
+struct CallbackClassifier {
+  /// Updates the success and error block of `Blocks` with nodes and bound
+  /// names from `Body`. Errors are added through `DiagEngine`, possibly
+  /// resulting in partially filled out blocks.
+  static void classifyInto(ClassifiedBlocks &Blocks,
+                           DiagnosticEngine &DiagEngine,
+                           ArrayRef<const ParamDecl *> SuccessParams,
+                           const ParamDecl *ErrParam, HandlerType ResultType,
+                           ArrayRef<ASTNode> Body) {
+    assert(!Body.empty() && "Cannot classify empty body");
+
+    auto ParamsSet = llvm::DenseSet<const Decl *>(SuccessParams.begin(),
+                                                  SuccessParams.end());
+    if (ErrParam)
+      ParamsSet.insert(ErrParam);
+
+    CallbackClassifier Classifier(Blocks, DiagEngine, ParamsSet, ErrParam,
+                                  ResultType == HandlerType::RESULT);
+    Classifier.classifyNodes(Body);
+  }
+
+private:
+  ClassifiedBlocks &Blocks;
+  DiagnosticEngine &DiagEngine;
+  ClassifiedBlock *CurrentBlock;
+  llvm::DenseSet<const Decl *> ParamsSet;
+  const ParamDecl *ErrParam;
+  bool IsResultParam;
+
+  CallbackClassifier(ClassifiedBlocks &Blocks, DiagnosticEngine &DiagEngine,
+                     llvm::DenseSet<const Decl *> ParamsSet,
+                     const ParamDecl *ErrParam, bool IsResultParam)
+      : Blocks(Blocks), DiagEngine(DiagEngine),
+        CurrentBlock(&Blocks.SuccessBlock), ParamsSet(ParamsSet),
+        ErrParam(ErrParam), IsResultParam(IsResultParam) {}
+
+  void classifyNodes(ArrayRef<ASTNode> Nodes) {
+    for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
+      auto *Statement = I->dyn_cast<Stmt *>();
+      if (auto *IS = dyn_cast_or_null<IfStmt>(Statement)) {
+        ArrayRef<ASTNode> TempNodes;
+        if (auto *BS = dyn_cast<BraceStmt>(IS->getThenStmt())) {
+          TempNodes = BS->getElements();
+        } else {
+          TempNodes = ArrayRef<ASTNode>(IS->getThenStmt());
+        }
+
+        classifyConditional(IS, IS->getCond(), TempNodes, IS->getElseStmt());
+      } else if (auto *GS = dyn_cast_or_null<GuardStmt>(Statement)) {
+        classifyConditional(GS, GS->getCond(), ArrayRef<ASTNode>(),
+                            GS->getBody());
+      } else if (auto *SS = dyn_cast_or_null<SwitchStmt>(Statement)) {
+        classifySwitch(SS);
+      } else {
+        CurrentBlock->addNode(*I);
+      }
+
+      if (DiagEngine.hadAnyError())
+        return;
+    }
+  }
+
+  void classifyConditional(Stmt *Statement, StmtCondition Condition,
+                           ArrayRef<ASTNode> ThenNodes, Stmt *ElseStmt) {
+    llvm::DenseMap<const Decl *, CallbackCondition> CallbackConditions;
+    bool UnhandledConditions =
+        !CallbackCondition::all(Condition, ParamsSet, CallbackConditions);
+    CallbackCondition ErrCondition = CallbackConditions.lookup(ErrParam);
+
+    if (UnhandledConditions) {
+      // Some unknown conditions. If there's an else, assume we can't handle
+      // and use the fallback case. Otherwise add to either the success or
+      // error block depending on some heuristics, known conditions will have
+      // placeholders added (ideally we'd remove them)
+      // TODO: Remove known conditions and split the `if` statement
+
+      if (CallbackConditions.empty()) {
+        // Technically this has a similar problem, ie. the else could have
+        // conditions that should be in either success/error
+        CurrentBlock->addNode(Statement);
+      } else if (ElseStmt) {
+        DiagEngine.diagnose(Statement->getStartLoc(),
+                            diag::unknown_callback_conditions);
+      } else if (ErrCondition.isValid() &&
+                 ErrCondition.Type == ConditionType::NOT_NIL) {
+        Blocks.ErrorBlock.addNode(Statement);
+      } else {
+        for (auto &Entry : CallbackConditions) {
+          if (Entry.second.Type == ConditionType::NIL) {
+            Blocks.ErrorBlock.addNode(Statement);
+            return;
+          }
+        }
+        Blocks.SuccessBlock.addNode(Statement);
+      }
+      return;
+    }
+
+    ClassifiedBlock *ThenBlock = &Blocks.SuccessBlock;
+    ClassifiedBlock *ElseBlock = &Blocks.ErrorBlock;
+
+    if (ErrCondition.isValid() && (!IsResultParam || ErrCondition.ErrorCase) &&
+        ErrCondition.Type == ConditionType::NOT_NIL) {
+      ClassifiedBlock *TempBlock = ThenBlock;
+      ThenBlock = ElseBlock;
+      ElseBlock = TempBlock;
+    } else {
+      ConditionType CondType = ConditionType::INVALID;
+      for (auto &Entry : CallbackConditions) {
+        if (IsResultParam || Entry.second.Subject != ErrParam) {
+          if (CondType == ConditionType::INVALID) {
+            CondType = Entry.second.Type;
+          } else if (CondType != Entry.second.Type) {
+            // Similar to the unknown conditions case. Add the whole if unless
+            // there's an else, in which case use the fallback instead.
+            // TODO: Split the `if` statement
+
+            if (ElseStmt) {
+              DiagEngine.diagnose(Statement->getStartLoc(),
+                                  diag::mixed_callback_conditions);
+            } else {
+              CurrentBlock->addNode(Statement);
+            }
+            return;
+          }
+        }
+      }
+
+      if (CondType == ConditionType::NIL) {
+        ClassifiedBlock *TempBlock = ThenBlock;
+        ThenBlock = ElseBlock;
+        ElseBlock = TempBlock;
+      }
+    }
+
+    ThenBlock->addAllBindings(CallbackConditions, DiagEngine);
+    if (DiagEngine.hadAnyError())
+      return;
+
+    // TODO: Handle nested ifs
+    setNodes(ThenBlock, ElseBlock, ThenNodes);
+
+    if (ElseStmt) {
+      if (auto *BS = dyn_cast<BraceStmt>(ElseStmt)) {
+        setNodes(ElseBlock, ThenBlock, BS->getElements());
+      } else {
+        classifyNodes(ArrayRef<ASTNode>(ElseStmt));
+      }
+    }
+  }
+
+  void setNodes(ClassifiedBlock *Block, ClassifiedBlock *OtherBlock,
+                ArrayRef<ASTNode> Nodes) {
+    if (Nodes.empty())
+      return;
+    if ((Nodes.back().isStmt(StmtKind::Return) ||
+         Nodes.back().isStmt(StmtKind::Break)) &&
+        !Nodes.back().isImplicit()) {
+      CurrentBlock = OtherBlock;
+      Block->addAllNodes(Nodes.drop_back());
+    } else {
+      Block->addAllNodes(Nodes);
+    }
+  }
+
+  void classifySwitch(SwitchStmt *SS) {
+    if (!IsResultParam || singleSwitchSubject(SS) != ErrParam) {
+      CurrentBlock->addNode(SS);
+    }
+
+    for (auto *CS : SS->getCases()) {
+      if (CS->hasFallthroughDest()) {
+        DiagEngine.diagnose(CS->getLoc(), diag::callback_with_fallthrough);
+        return;
+      }
+
+      if (CS->isDefault()) {
+        DiagEngine.diagnose(CS->getLoc(), diag::callback_with_default);
+        return;
+      }
+
+      auto Items = CS->getCaseLabelItems();
+      if (Items.size() > 1) {
+        DiagEngine.diagnose(CS->getLoc(), diag::callback_multiple_case_items);
+        return;
+      }
+
+      if (Items[0].getWhereLoc().isValid()) {
+        DiagEngine.diagnose(CS->getLoc(), diag::callback_where_case_item);
+        return;
+      }
+
+      CallbackCondition CC(ErrParam, &Items[0]);
+      ClassifiedBlock *Block = &Blocks.SuccessBlock;
+      ClassifiedBlock *OtherBlock = &Blocks.ErrorBlock;
+      if (CC.ErrorCase) {
+        Block = &Blocks.ErrorBlock;
+        OtherBlock = &Blocks.SuccessBlock;
+      }
+
+      setNodes(Block, OtherBlock, CS->getBody()->getElements());
+      Block->addBinding(CC, DiagEngine);
+      if (DiagEngine.hadAnyError())
+        return;
+    }
+  }
+};
+
+/// Builds up async-converted code for any added AST nodes.
+///
+/// Function declarations will have `async` added. If a completion handler is
+/// present, it will be removed and the return type of the function will
+/// reflect the parameters of the handler, including an added `throws` if
+/// necessary.
+///
+/// Calls to the completion handler are replaced with either a `return` or
+/// `throws` depending on the arguments.
+///
+/// Calls to functions with an async alternative will be replaced with a call
+/// to the alternative, possibly wrapped in a do/catch. The do/catch is skipped
+/// if the the closure either:
+///   1. Has no error
+///   2. Has an error but no error handling (eg. just ignores)
+///   3. Has error handling that only calls the containing function's handler
+///      with an error matching the error argument
+///
+/// (2) is technically not the correct translation, but in practice it's likely
+/// the code a user would actually want.
+///
+/// If the success vs error handling split inside the closure cannot be
+/// determined and the closure takes regular parameters (ie. not a Result), a
+/// fallback translation is used that keeps all the same variable names and
+/// simply moves the code within the closure out.
+///
+/// The fallback is generally avoided, however, since it's quite unlikely to be
+/// the code the user intended. In most cases the refactoring will continue,
+/// with any unhandled decls wrapped in placeholders instead.
+class AsyncConversionStringBuilder : private SourceEntityWalker {
+  SourceManager &SM;
+  DiagnosticEngine &DiagEngine;
+  const AsyncHandlerDesc &TopHandler;
+  SmallString<0> Buffer;
+  llvm::raw_svector_ostream OS;
+
+  llvm::DenseSet<const Decl *> Unwraps;
+  llvm::DenseSet<const Decl *> Placeholders;
+  llvm::DenseMap<const Decl *, std::string> Names;
+
+  SourceLoc LastAddedLoc;
+  int NestedExprCount = 0;
+
+public:
+  AsyncConversionStringBuilder(SourceManager &SM, DiagnosticEngine &DiagEngine,
+                               const AsyncHandlerDesc &TopHandler)
+      : SM(SM), DiagEngine(DiagEngine), TopHandler(TopHandler), Buffer(),
+        OS(Buffer) {
+    Placeholders.insert(TopHandler.Handler);
+  }
+
+  void replace(ASTNode Node, SourceEditConsumer &EditConsumer) {
+    CharSourceRange Range =
+        Lexer::getCharSourceRangeFromSourceRange(SM, Node.getSourceRange());
+    EditConsumer.accept(SM, Range, Buffer.str());
+    Buffer.clear();
+  }
+
+  void insertAfter(ASTNode Node, SourceEditConsumer &EditConsumer) {
+    EditConsumer.insertAfter(SM, Node.getEndLoc(), "\n\n");
+    EditConsumer.insertAfter(SM, Node.getEndLoc(), Buffer.str());
+    Buffer.clear();
+  }
+
+  void convertFunction(const FuncDecl *FD) {
+    addFuncDecl(FD);
+    if (FD->getBody()) {
+      convertNode(FD->getBody());
+    }
+  }
+
+  void convertNodes(ArrayRef<ASTNode> Nodes) {
+    for (auto Node : Nodes) {
+      OS << "\n";
+      convertNode(Node);
+    }
+  }
+
+  void convertNode(ASTNode Node, SourceLoc StartOverride = {},
+                   bool ConvertCalls = true) {
+    if (!StartOverride.isValid())
+      StartOverride = Node.getStartLoc();
+
+    llvm::SaveAndRestore<SourceLoc> RestoreLoc(LastAddedLoc, StartOverride);
+    llvm::SaveAndRestore<int> RestoreCount(NestedExprCount,
+                                           ConvertCalls ? 0 : 1);
+    walk(Node);
+    addRange(LastAddedLoc, Node.getEndLoc(), /*ToEndOfToken=*/true);
+  }
+
+private:
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override { return false; }
+
+#define PLACEHOLDER_START "<#"
+#define PLACEHOLDER_END "#>"
+  bool walkToExprPre(Expr *E) override {
+    // TODO: Handle Result.get as well
+    if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+      if (auto *D = DRE->getDecl()) {
+        bool AddPlaceholder = Placeholders.count(D);
+        StringRef Name = newNameFor(D, false);
+        if (AddPlaceholder || !Name.empty())
+          return addCustom(DRE->getStartLoc(),
+                           Lexer::getLocForEndOfToken(SM, DRE->getEndLoc()),
+                           [&]() {
+                             if (AddPlaceholder)
+                               OS << PLACEHOLDER_START;
+                             if (!Name.empty())
+                               OS << Name;
+                             else
+                               D->getName().print(OS);
+                             if (AddPlaceholder)
+                               OS << PLACEHOLDER_END;
+                           });
+      }
+    } else if (auto *FTE = dyn_cast<ForceValueExpr>(E)) {
+      if (auto *D = FTE->getReferencedDecl().getDecl()) {
+        if (Unwraps.count(D))
+          return addCustom(FTE->getStartLoc(),
+                           FTE->getEndLoc().getAdvancedLoc(1),
+                           [&]() { OS << newNameFor(D, true); });
+      }
+    } else if (NestedExprCount == 0) {
+      if (CallExpr *CE = TopHandler.getAsHandlerCall(E))
+        return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
+                         [&]() { addHandlerCall(CE); });
+
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        auto HandlerDesc =
+            AsyncHandlerDesc::find(getUnderlyingFunc(CE->getFn()),
+                                   /*ignoreName=*/true);
+        if (HandlerDesc.isValid())
+          return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
+                           [&]() { addAsyncAlternativeCall(CE, HandlerDesc); });
+      }
+    }
+
+    NestedExprCount++;
+    return true;
+  }
+#undef PLACEHOLDER_START
+#undef PLACEHOLDER_END
+
+  bool walkToExprPost(Expr *E) override {
+    NestedExprCount--;
+    return true;
+  }
+
+  bool addCustom(SourceLoc End, SourceLoc NextAddedLoc,
+                 std::function<void()> Custom = {}) {
+    addRange(LastAddedLoc, End);
+    Custom();
+    LastAddedLoc = NextAddedLoc;
+    return false;
+  }
+
+  void addRange(SourceLoc Start, SourceLoc End, bool ToEndOfToken = false) {
+    if (ToEndOfToken) {
+      OS << Lexer::getCharSourceRangeFromSourceRange(SM,
+                                                     SourceRange(Start, End))
+                .str();
+    } else {
+      OS << CharSourceRange(SM, Start, End).str();
+    }
+  }
+
+  void addRange(SourceRange Range, bool ToEndOfToken = false) {
+    addRange(Range.Start, Range.End, ToEndOfToken);
+  }
+
+  void addFuncDecl(const FuncDecl *FD) {
+    auto *Params = FD->getParameters();
+
+    // First chunk: start -> the parameter to remove (if any)
+    SourceLoc LeftEndLoc = Params->getLParenLoc().getAdvancedLoc(1);
+    if (TopHandler.Index - 1 >= 0) {
+      LeftEndLoc = Lexer::getLocForEndOfToken(
+          SM, Params->get(TopHandler.Index - 1)->getEndLoc());
+    }
+    addRange(FD->getSourceRangeIncludingAttrs().Start, LeftEndLoc);
+
+    // Second chunk: end of the parameter to remove -> right parenthesis
+    SourceLoc MidStartLoc = LeftEndLoc;
+    SourceLoc MidEndLoc = Params->getRParenLoc().getAdvancedLoc(1);
+    if (TopHandler.isValid()) {
+      if ((size_t)(TopHandler.Index + 1) < Params->size()) {
+        MidStartLoc = Params->get(TopHandler.Index + 1)->getStartLoc();
+      } else {
+        MidStartLoc = Params->getRParenLoc();
+      }
+    }
+    addRange(MidStartLoc, MidEndLoc);
+
+    // Third chunk: add in async and throws if necessary
+    OS << " async";
+    if (FD->hasThrows() || TopHandler.HasError)
+      // TODO: Add throws if converting a function and it has a converted call
+      //       without a do/catch
+      OS << " " << tok::kw_throws;
+
+    // Fourth chunk: if no parent handler (ie. not adding an async
+    // alternative), the rest of the decl. Otherwise, add in the new return
+    // type
+    if (!TopHandler.isValid()) {
+      SourceLoc RightStartLoc = MidEndLoc;
+      if (FD->hasThrows()) {
+        RightStartLoc = Lexer::getLocForEndOfToken(SM, FD->getThrowsLoc());
+      }
+      SourceLoc RightEndLoc =
+          FD->getBody() ? FD->getBody()->getLBraceLoc() : FD->getEndLoc();
+      addRange(RightStartLoc, RightEndLoc);
+      return;
+    }
+
+    auto HandlerParams = TopHandler.params();
+    if (TopHandler.Type == HandlerType::PARAMS && TopHandler.HasError) {
+      HandlerParams = HandlerParams.drop_back();
+    }
+
+    if (HandlerParams.empty()) {
+      OS << " ";
+      return;
+    }
+
+    OS << " -> ";
+
+    if (HandlerParams.size() > 1) {
+      OS << "(";
+    }
+    for (size_t I = 0, E = HandlerParams.size(); I < E; ++I) {
+      if (I > 0) {
+        OS << ", ";
+      }
+
+      auto &Param = HandlerParams[I];
+      if (TopHandler.Type == HandlerType::PARAMS) {
+        Type ToPrint = Param.getPlainType();
+        if (TopHandler.HasError)
+          ToPrint = ToPrint->lookThroughSingleOptionalType();
+        ToPrint->print(OS);
+      } else if (TopHandler.Type == HandlerType::RESULT) {
+        auto ResultTy = Param.getPlainType()->getAs<BoundGenericType>();
+        assert(ResultTy && "Result must have generic type");
+        ResultTy->getGenericArgs()[0]->print(OS);
+      } else {
+        llvm_unreachable("Unhandled handler type");
+      }
+    }
+    if (HandlerParams.size() > 1) {
+      OS << ")";
+    }
+
+    if (FD->hasBody())
+      OS << " ";
+
+    // TODO: Should remove the generic param and where clause for the error
+    //       param if it exists (and no other parameter uses that type)
+    TrailingWhereClause *TWC = FD->getTrailingWhereClause();
+    if (TWC && TWC->getWhereLoc().isValid()) {
+      auto Range = TWC->getSourceRange();
+      OS << Lexer::getCharSourceRangeFromSourceRange(SM, Range).str();
+      if (FD->hasBody())
+        OS << " ";
+    }
+  }
+
+  void addFallbackVars(ArrayRef<const ParamDecl *> FallbackParams,
+                       ClassifiedBlocks &Blocks) {
+    for (auto Param : FallbackParams) {
+      OS << tok::kw_var << " " << newNameFor(Param) << ": ";
+      auto Ty = Param->getType();
+      Ty->print(OS);
+      if (!Ty->getOptionalObjectType())
+        OS << "?";
+
+      OS << " = " << tok::kw_nil << "\n";
+    }
+  }
+
+  void addDo() { OS << tok::kw_do << " " << tok::l_brace << "\n"; }
+
+  void addHandlerCall(const CallExpr *CE) {
+    auto Exprs = TopHandler.extractResultArgs(CE);
+
+    if (!Exprs.isError()) {
+      OS << tok::kw_return;
+    } else {
+      OS << tok::kw_throw;
+    }
+
+    ArrayRef<Expr *> Args = Exprs.args();
+    if (!Args.empty()) {
+      OS << " ";
+      if (Args.size() > 1)
+        OS << tok::l_paren;
+      for (size_t I = 0, E = Args.size(); I < E; ++I) {
+        if (I > 0)
+          OS << tok::comma << " ";
+        // Can't just add the range as we need to perform replacements
+        convertNode(Args[I], /*StartOverride=*/CE->getArgumentLabelLoc(I),
+                    /*ConvertCalls=*/false);
+      }
+      if (Args.size() > 1)
+        OS << tok::r_paren;
+    }
+  }
+
+  void addAsyncAlternativeCall(const CallExpr *CE,
+                               const AsyncHandlerDesc &HandlerDesc) {
+    auto ArgList = callArgs(CE);
+    if ((size_t)HandlerDesc.Index >= ArgList.ref().size()) {
+      DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
+      return;
+    }
+    auto Callback = dyn_cast<ClosureExpr>(ArgList.ref()[HandlerDesc.Index]);
+    if (!Callback) {
+      DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
+      return;
+    }
+
+    ParameterList *CallbackParams = Callback->getParameters();
+    ArrayRef<ASTNode> CallbackBody = Callback->getBody()->getElements();
+    if (HandlerDesc.params().size() != CallbackParams->size()) {
+      DiagEngine.diagnose(CE->getStartLoc(), diag::mismatched_callback_args);
+      return;
+    }
+
+    // Note that the `ErrParam` may be a Result (in which case it's also the
+    // only element in `SuccessParams`)
+    ArrayRef<const ParamDecl *> SuccessParams = CallbackParams->getArray();
+    const ParamDecl *ErrParam = nullptr;
+    if (HandlerDesc.HasError) {
+      ErrParam = SuccessParams.back();
+      if (HandlerDesc.Type == HandlerType::PARAMS)
+        SuccessParams = SuccessParams.drop_back();
+    }
+    ArrayRef<const ParamDecl *> ErrParams;
+    if (ErrParam)
+      ErrParams = llvm::makeArrayRef(ErrParam);
+
+    ClassifiedBlocks Blocks;
+    if (!HandlerDesc.HasError) {
+      Blocks.SuccessBlock.addAllNodes(CallbackBody);
+    } else if (!CallbackBody.empty()) {
+      CallbackClassifier::classifyInto(Blocks, DiagEngine, SuccessParams,
+                                       ErrParam, HandlerDesc.Type,
+                                       CallbackBody);
+      if (DiagEngine.hadAnyError()) {
+        // Can only fallback when the results are params, in which case only
+        // the names are used (defaulted to the names of the params if none)
+        if (HandlerDesc.Type != HandlerType::PARAMS)
+          return;
+        DiagEngine.resetHadAnyError();
+
+        setNames(ClassifiedBlock(), CallbackParams->getArray());
+
+        addFallbackVars(CallbackParams->getArray(), Blocks);
+        addDo();
+        addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
+                     /*HasError=*/HandlerDesc.HasError,
+                     /*AddDeclarations=*/!HandlerDesc.HasError);
+        addFallbackCatch(ErrParam);
+        OS << "\n";
+        convertNodes(CallbackBody);
+
+        clearParams(CallbackParams->getArray());
+        return;
+      }
+    }
+
+    bool RequireDo = !Blocks.ErrorBlock.nodes().empty();
+    // Check if we *actually* need a do/catch (see class comment)
+    if (Blocks.ErrorBlock.nodes().size() == 1) {
+      auto Node = Blocks.ErrorBlock.nodes()[0];
+      if (auto *HandlerCall = TopHandler.getAsHandlerCall(Node)) {
+        auto Res = TopHandler.extractResultArgs(HandlerCall);
+        if (Res.args().size() == 1) {
+          // Skip if we have the param itself or the name it's bound to
+          auto *SingleDecl = Res.args()[0]->getReferencedDecl().getDecl();
+          auto ErrName = Blocks.ErrorBlock.boundName(ErrParam);
+          RequireDo = SingleDecl != ErrParam &&
+                      !(Res.isError() && SingleDecl &&
+                        SingleDecl->getName().isSimpleName(ErrName));
+        }
+      }
+    }
+
+    if (RequireDo) {
+      addDo();
+    }
+
+    setNames(Blocks.SuccessBlock, SuccessParams);
+    addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
+                 /*HasError=*/HandlerDesc.HasError,
+                 /*AddDeclarations=*/true);
+
+    prepareNamesForBody(HandlerDesc.Type, SuccessParams, ErrParams);
+    convertNodes(Blocks.SuccessBlock.nodes());
+
+    if (RequireDo) {
+      clearParams(SuccessParams);
+      // Always use the ErrParam name if none is bound
+      setNames(Blocks.ErrorBlock, ErrParams,
+               HandlerDesc.Type != HandlerType::RESULT);
+      addCatch(ErrParam);
+
+      prepareNamesForBody(HandlerDesc.Type, ErrParams, SuccessParams);
+      addCatchBody(ErrParam, Blocks.ErrorBlock);
+    }
+
+    clearParams(CallbackParams->getArray());
+  }
+
+  void addAwaitCall(const CallExpr *CE, ArrayRef<Expr *> Args,
+                    const ClassifiedBlock &SuccessBlock,
+                    ArrayRef<const ParamDecl *> SuccessParams, bool HasError,
+                    bool AddDeclarations) {
+    if (!SuccessParams.empty()) {
+      if (AddDeclarations) {
+        if (SuccessBlock.allLet()) {
+          OS << tok::kw_let;
+        } else {
+          OS << tok::kw_var;
+        }
+        OS << " ";
+      }
+      if (SuccessParams.size() > 1)
+        OS << tok::l_paren;
+      OS << newNameFor(SuccessParams.front());
+      for (const auto Param : SuccessParams.drop_front()) {
+        OS << tok::comma << " ";
+        OS << newNameFor(Param);
+      }
+      if (SuccessParams.size() > 1) {
+        OS << tok::r_paren;
+      }
+      OS << " " << tok::equal << " ";
+    }
+
+    if (HasError) {
+      OS << tok::kw_try << " ";
+    }
+    OS << "await ";
+    addRange(CE->getStartLoc(), CE->getFn()->getEndLoc(),
+             /*ToEndOfToken=*/true);
+
+    OS << tok::l_paren;
+    for (size_t I = 0, E = Args.size() - 1; I < E; ++I) {
+      if (I > 0)
+        OS << tok::comma << " ";
+      // Can't just add the range as we need to perform replacements
+      convertNode(Args[I], /*StartOverride=*/CE->getArgumentLabelLoc(I),
+                  /*ConvertCalls=*/false);
+    }
+    OS << tok::r_paren;
+  }
+
+  void addFallbackCatch(const ParamDecl *ErrParam) {
+    auto ErrName = newNameFor(ErrParam);
+    OS << "\n"
+       << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n"
+       << ErrName << " = error\n"
+       << tok::r_brace;
+  }
+
+  void addCatch(const ParamDecl *ErrParam) {
+    OS << "\n" << tok::r_brace << " " << tok::kw_catch << " ";
+    auto ErrName = newNameFor(ErrParam, false);
+    if (!ErrName.empty()) {
+      OS << tok::kw_let << " " << ErrName << " ";
+    }
+    OS << tok::l_brace;
+  }
+
+  void addCatchBody(const ParamDecl *ErrParam,
+                    const ClassifiedBlock &ErrorBlock) {
+    convertNodes(ErrorBlock.nodes());
+    OS << "\n" << tok::r_brace;
+  }
+
+  void prepareNamesForBody(HandlerType ResultType,
+                           ArrayRef<const ParamDecl *> CurrentParams,
+                           ArrayRef<const ParamDecl *> OtherParams) {
+    switch (ResultType) {
+    case HandlerType::PARAMS:
+      for (auto *Param : CurrentParams) {
+        if (Param->getType()->getOptionalObjectType()) {
+          Unwraps.insert(Param);
+          Placeholders.insert(Param);
+        }
+      }
+      // Use of the other params is invalid within the current body
+      Placeholders.insert(OtherParams.begin(), OtherParams.end());
+      break;
+    case HandlerType::RESULT:
+      // Any uses of the result parameter in the current body (that
+      // isn't replaced) are invalid, so replace them with a placeholder
+      Placeholders.insert(CurrentParams.begin(), CurrentParams.end());
+      break;
+    default:
+      llvm_unreachable("Unhandled handler type");
+    }
+  }
+
+  // TODO: Check for clashes with existing names
+  void setNames(const ClassifiedBlock &Block,
+                ArrayRef<const ParamDecl *> Params, bool AddIfMissing = true) {
+    for (auto *Param : Params) {
+      StringRef Name = Block.boundName(Param);
+      if (!Name.empty()) {
+        Names[Param] = Name.str();
+        continue;
+      }
+
+      if (!AddIfMissing)
+        continue;
+
+      auto ParamName = Param->getNameStr();
+      if (ParamName.startswith("$")) {
+        Names[Param] = "val" + ParamName.drop_front().str();
+      } else {
+        Names[Param] = ParamName.str();
+      }
+    }
+  }
+
+  StringRef newNameFor(const Decl *D, bool Required = true) {
+    auto Res = Names.find(D);
+    if (Res == Names.end()) {
+      assert(!Required && "Missing name for decl when one was required");
+      return StringRef();
+    }
+    return StringRef(Res->second);
+  }
+
+  void clearParams(ArrayRef<const ParamDecl *> Params) {
+    for (auto *Param : Params) {
+      Unwraps.erase(Param);
+      Placeholders.erase(Param);
+      Names.erase(Param);
+    }
+  }
+};
+} // namespace asyncrefactorings
+
+bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
+    const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
+  using namespace asyncrefactorings;
+
+  if (!CursorInfo.SF->getASTContext().LangOpts.EnableExperimentalConcurrency)
+    return false;
+
+  // Currently doesn't check that the call is in an async context. This seems
+  // possibly useful in some situations, so we'll see what the feedback is.
+  // May need to change in the future
+  auto *CE = findOuterCall(CursorInfo);
+  if (!CE)
+    return false;
+
+  auto HandlerDesc = AsyncHandlerDesc::find(getUnderlyingFunc(CE->getFn()),
+                                            /*ignoreName=*/true);
+  return HandlerDesc.isValid();
+}
+
+/// Converts a call of a function with a possible async alternative, to use it
+/// instead. Currently this is any function that
+///   1. has a void return type,
+///   2. has a void returning closure as its last parameter, and
+///   3. is not already async
+///
+/// For now the call need not be in an async context, though this may change
+/// depending on feedback.
+bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
+  using namespace asyncrefactorings;
+
+  auto *CE = findOuterCall(CursorInfo);
+  assert(CE &&
+         "Should not run performChange when refactoring is not applicable");
+
+  AsyncConversionStringBuilder Builder(SM, DiagEngine, AsyncHandlerDesc());
+  Builder.convertNode(CE);
+
+  if (DiagEngine.hadAnyError())
+    return true;
+
+  Builder.replace(CE, EditConsumer);
+  return false;
+}
+
+bool RefactoringActionConvertToAsync::isApplicable(
+    const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
+  using namespace asyncrefactorings;
+
+  if (!CursorInfo.SF->getASTContext().LangOpts.EnableExperimentalConcurrency)
+    return false;
+
+  // As with the call refactoring, should possibly only apply if there's
+  // actually calls to async alternatives. At the moment this will just add
+  // `async` if there are no calls, which is probably fine.
+  return findFunction(CursorInfo);
+}
+
+/// Converts a whole function to async, converting any calls to functions with
+/// async alternatives as above.
+bool RefactoringActionConvertToAsync::performChange() {
+  using namespace asyncrefactorings;
+
+  auto *FD = findFunction(CursorInfo);
+  assert(FD &&
+         "Should not run performChange when refactoring is not applicable");
+
+  AsyncConversionStringBuilder Builder(SM, DiagEngine, AsyncHandlerDesc());
+  Builder.convertFunction(FD);
+
+  if (DiagEngine.hadAnyError())
+    return true;
+
+  Builder.replace(FD, EditConsumer);
+  return false;
+}
+
+bool RefactoringActionAddAsyncAlternative::isApplicable(
+    const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
+  using namespace asyncrefactorings;
+
+  if (!CursorInfo.SF->getASTContext().LangOpts.EnableExperimentalConcurrency)
+    return false;
+
+  auto *FD = findFunction(CursorInfo);
+  if (!FD)
+    return false;
+
+  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  return HandlerDesc.isValid();
+}
+
+/// Adds an async alternative and marks the current function as deprecated.
+/// Equivalent to the conversion but
+///   1. only works on functions that themselves are a possible async
+///      alternative, and
+///   2. has extra handling to convert the completion/handler/callback closure
+///      parameter to either `return`/`throws`
+bool RefactoringActionAddAsyncAlternative::performChange() {
+  using namespace asyncrefactorings;
+
+  auto *FD = findFunction(CursorInfo);
+  assert(FD &&
+         "Should not run performChange when refactoring is not applicable");
+
+  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  assert(HandlerDesc.isValid() &&
+         "Should not run performChange when refactoring is not applicable");
+
+  AsyncConversionStringBuilder Builder(SM, DiagEngine, HandlerDesc);
+  Builder.convertFunction(FD);
+
+  if (DiagEngine.hadAnyError())
+    return true;
+
+  EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
+                      "@available(*, deprecated, message: \"Prefer async "
+                      "alternative instead\")\n");
+  Builder.insertAfter(FD, EditConsumer);
+
+  return false;
+}
+} // end of anonymous namespace
 
 StringRef swift::ide::
 getDescriptiveRefactoringKindName(RefactoringKind Kind) {
