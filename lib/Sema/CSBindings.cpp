@@ -865,7 +865,9 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   // If the type we'd be binding to is a dependent member, don't try to
   // resolve this type variable yet.
-  if (type->is<DependentMemberType>()) {
+  if (type->getWithoutSpecifierType()
+          ->lookThroughAllOptionalTypes()
+          ->is<DependentMemberType>()) {
     SmallVector<TypeVariableType *, 4> referencedVars;
     type->getTypeVariables(referencedVars);
 
@@ -1210,15 +1212,19 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
     }
   }
 
-  // If the type is a type variable itself, don't permit the binding.
-  if (type->getRValueType()->is<TypeVariableType>())
-    return None;
+  {
+    auto objType = type->getWithoutSpecifierType();
 
-  // Don't bind to a dependent member type, even if it's currently
-  // wrapped in any number of optionals, because binding producer
-  // might unwrap and try to attempt it directly later.
-  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
-    return None;
+    // If the type is a type variable itself, don't permit the binding.
+    if (objType->is<TypeVariableType>())
+      return None;
+
+    // Don't bind to a dependent member type, even if it's currently
+    // wrapped in any number of optionals, because binding producer
+    // might unwrap and try to attempt it directly later.
+    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+      return None;
+  }
 
   // Okay, allow the binding (with the simplified type).
   return type;
