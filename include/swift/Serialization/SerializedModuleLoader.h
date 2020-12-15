@@ -398,6 +398,9 @@ public:
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
+  virtual void getExportedPrespecializations(
+      SmallVectorImpl<Decl *> &results) const override;
+
   virtual void
   getTopLevelDeclsWhereAttributesMatch(
       SmallVectorImpl<Decl*> &Results,

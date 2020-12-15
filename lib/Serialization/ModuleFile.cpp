@@ -866,6 +866,20 @@ void ModuleFile::getTopLevelDecls(
   }
 }
 
+void ModuleFile::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &results) {
+  for (DeclID entry : Core->ExportedPrespecializationDecls) {
+    Expected<Decl *> declOrError = getDeclChecked(entry);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      consumeError(declOrError.takeError());
+      continue;
+    }
+    results.push_back(declOrError.get());
+  }
+}
+
 void ModuleFile::getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);
   if (!Core->OperatorDecls)

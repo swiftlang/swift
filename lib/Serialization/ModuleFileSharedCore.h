@@ -263,6 +263,7 @@ private:
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   ArrayRef<serialization::DeclID> OrderedTopLevelDecls;
+  ArrayRef<serialization::DeclID> ExportedPrespecializationDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
