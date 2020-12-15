@@ -4843,21 +4843,28 @@ private:
       if (isDirectHole())
         return 1;
 
-      // We might want to consider adding this as a field to `PotentialBindings`
-      // and collect this information as new bindings become available but,
-      // since we are moving towards incremental model, which implies that
-      // `PotentialBindings` would stay alive for a long time, it's not
-      // immediately clear whether storage overhead of keeping this set just
-      // for ranking is worth it.
-      llvm::SmallPtrSet<CanType, 4> discoveredTypes;
-      for (const auto &binding : Bindings)
-        discoveredTypes.insert(binding.BindingType->getCanonicalType());
-
-      return llvm::count_if(
-          Defaults, [&](const std::pair<CanType, Constraint *> &def) {
-            return def.second->getKind() == ConstraintKind::Defaultable &&
-                   discoveredTypes.count(def.first) == 0;
+      auto numDefaultable = llvm::count_if(
+          Defaults, [](const std::pair<CanType, Constraint *> &entry) {
+            return entry.second->getKind() == ConstraintKind::Defaultable;
           });
+
+      // Short-circuit unviable checks if there are no defaultable bindings.
+      if (numDefaultable == 0)
+        return 0;
+
+      // Defaultable constraint is unviable if its type is covered by
+      // an existing direct or transitive binding.
+      auto unviable =
+          llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+            auto type = binding.BindingType->getCanonicalType();
+            auto def = Defaults.find(type);
+            return def != Defaults.end()
+                       ? def->second->getKind() == ConstraintKind::Defaultable
+                       : false;
+          });
+
+      assert(numDefaultable >= unviable);
+      return numDefaultable - unviable;
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
