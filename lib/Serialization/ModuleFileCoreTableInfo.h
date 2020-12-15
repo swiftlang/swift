@@ -600,9 +600,9 @@ public:
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
     using namespace llvm::support;
-    auto str = std::string{reinterpret_cast<const char *>(data),
-                           Fingerprint::DIGEST_LENGTH};
-    return Fingerprint{str};
+    auto str = llvm::StringRef{reinterpret_cast<const char *>(data),
+                               Fingerprint::DIGEST_LENGTH};
+    return Fingerprint::fromString(str);
   }
 };
 
