@@ -85,6 +85,14 @@ class EscapeAnalysisDumper : public SILModuleTransform {
                              << " to " << ii;
               }
             }
+            if (DestroyValueInst *dvi = dyn_cast<DestroyValueInst>(&ii)) {
+              for (unsigned i = 0, e = Values.size(); i != e; ++i) {
+                SILValue val = Values[i];
+                bool escape = EA->canEscapeTo(val, dvi);
+                llvm::outs() << (escape ? "May" : "No") << "Escape: " << val
+                             << " to " << ii;
+              }
+            }
           }
         }
       }

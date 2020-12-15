@@ -182,6 +182,7 @@ public:
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
+  MemBehavior visitDestroyValueInst(DestroyValueInst *DVI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
   MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -225,6 +226,7 @@ public:
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(CopyValueInst)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   REFCOUNTINC_MEMBEHAVIOR_INST(Name##RetainValueInst)                          \
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongCopy##Name##ValueInst)
@@ -486,6 +488,13 @@ MemoryBehaviorVisitor::visit##Name##ReleaseInst(Name##ReleaseInst *SI) { \
 
 MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   if (!EA->canEscapeTo(V, SI))
+    return MemBehavior::None;
+  return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior
+MemoryBehaviorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
+  if (!EA->canEscapeTo(V, DVI))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
