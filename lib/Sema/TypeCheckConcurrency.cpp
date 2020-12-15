@@ -611,6 +611,24 @@ findMemberReference(Expr *expr) {
   return None;
 }
 
+/// Return true if the callee of an ApplyExpr is async
+///
+/// Note that this must be called after the implicitlyAsync flag has been set,
+/// or implicitly async calls will not return the correct value.
+static bool isAsyncCall(const ApplyExpr *call) {
+  if (call->implicitlyAsync())
+    return true;
+
+  // Effectively the same as doing a
+  // `cast_or_null<FunctionType>(call->getFn()->getType())`, check the
+  // result of that and then checking `isAsync` if it's defined.
+  Type funcTypeType = call->getFn()->getType();
+  if (!funcTypeType)
+    return false;
+  FunctionType *funcType = funcTypeType->castTo<FunctionType>();
+  return funcType->isAsync();
+}
+
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -679,6 +697,11 @@ namespace {
         return { true, expr };
       }
 
+      if (auto inout = dyn_cast<InOutExpr>(expr)) {
+        if (!applyStack.empty())
+          diagnoseInOutArg(applyStack.back(), inout, false);
+      }
+
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
         checkMemberReference(lookup->getBase(), lookup->getMember(),
                              lookup->getLoc());
@@ -720,10 +743,21 @@ namespace {
         Expr *fn = call->getFn()->getValueProvidingExpr();
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
-              call->getArg(), memberRef->first, memberRef->second, 
+              call->getArg(), memberRef->first, memberRef->second,
               /*isEscapingPartialApply=*/false, /*maybeImplicitAsync=*/true);
 
           call->getArg()->walk(*this);
+
+          if (applyStack.size() >= 2) {
+            ApplyExpr *outerCall = applyStack[applyStack.size() - 2];
+            if (isAsyncCall(outerCall)) {
+              // This call is a partial application within an async call.
+              // If the partial application take a value inout, it is bad.
+              if (InOutExpr *inoutArg = dyn_cast<InOutExpr>(
+                      call->getArg()->getSemanticsProvidingExpr()))
+                diagnoseInOutArg(outerCall, inoutArg, true);
+            }
+          }
 
           // manual clean-up since normal traversal is skipped
           assert(applyStack.back() == dyn_cast<ApplyExpr>(expr));
@@ -858,6 +892,59 @@ namespace {
           value->getDescriptiveKind(), value->getName());
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       return true;
+    }
+
+    /// Diagnose an inout argument passed into an async call
+    ///
+    /// \returns true if we diagnosed the entity, \c false otherwise.
+    bool diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
+                          bool isPartialApply) {
+      // check that the call is actually async
+      if (!isAsyncCall(call))
+        return false;
+
+      Expr *subArg = arg->getSubExpr();
+      if (LookupExpr *baseArg = dyn_cast<LookupExpr>(subArg)) {
+        while (LookupExpr *nextLayer = dyn_cast<LookupExpr>(baseArg->getBase()))
+          baseArg = nextLayer;
+        // subArg: the actual property being passed inout
+        // baseArg: the property in the actor who's property is being passed
+        // inout
+
+        auto memberDecl = baseArg->getMember().getDecl();
+        auto isolation = ActorIsolationRestriction::forDeclaration(memberDecl);
+        switch (isolation) {
+        case ActorIsolationRestriction::Unrestricted:
+        case ActorIsolationRestriction::LocalCapture:
+        case ActorIsolationRestriction::Unsafe:
+        case ActorIsolationRestriction::GlobalActor: // TODO: handle global
+                                                     // actors
+          break;
+        case ActorIsolationRestriction::ActorSelf: {
+          if (isPartialApply) {
+            // The partially applied InoutArg is a property of actor. This can
+            // really only happen when the property is a struct with a mutating
+            // async method.
+            if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
+              ValueDecl *fnDecl =
+                  cast<DeclRefExpr>(partialApply->getFn())->getDecl();
+              ctx.Diags.diagnose(
+                  call->getLoc(), diag::actor_isolated_mutating_func,
+                  fnDecl->getName(), memberDecl->getDescriptiveKind(),
+                  memberDecl->getName());
+              return true;
+            }
+          } else {
+            ctx.Diags.diagnose(
+                subArg->getLoc(), diag::actor_isolated_inout_state,
+                memberDecl->getDescriptiveKind(), memberDecl->getName(),
+                call->implicitlyAsync());
+            return true;
+          }
+        }
+        }
+      }
+      return false;
     }
 
     /// Get the actor isolation of the innermost relevant context.
@@ -1196,7 +1283,9 @@ namespace {
         llvm_unreachable("Locals cannot be referenced with member syntax");
 
       case ActorIsolationRestriction::Unsafe:
-        return diagnoseReferenceToUnsafe(member, memberLoc);
+        // This case is hit when passing actor state inout to functions in some
+        // cases. The error is emitted by diagnoseInOutArg.
+        return false;
       }
       llvm_unreachable("unhandled actor isolation kind!");
     }
