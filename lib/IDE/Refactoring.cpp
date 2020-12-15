@@ -39,12 +39,13 @@ using namespace swift::ide;
 using namespace swift::index;
 
 namespace {
+
 class ContextFinder : public SourceEntityWalker {
   SourceFile &SF;
   ASTContext &Ctx;
   SourceManager &SM;
   SourceRange Target;
-  llvm::function_ref<bool(ASTNode)> IsContext;
+  function_ref<bool(ASTNode)> IsContext;
   SmallVector<ASTNode, 4> AllContexts;
   bool contains(ASTNode Enclosing) {
     auto Result = SM.rangeContains(Enclosing.getSourceRange(), Target);
@@ -54,12 +55,12 @@ class ContextFinder : public SourceEntityWalker {
   }
 public:
   ContextFinder(SourceFile &SF, ASTNode TargetNode,
-                llvm::function_ref<bool(ASTNode)> IsContext =
+                function_ref<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetNode.getSourceRange()), IsContext(IsContext) {}
   ContextFinder(SourceFile &SF, SourceLoc TargetLoc,
-                llvm::function_ref<bool(ASTNode)> IsContext =
+                function_ref<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetLoc), IsContext(IsContext) {
@@ -69,7 +70,7 @@ public:
   bool walkToStmtPre(Stmt *S) override { return contains(S); }
   bool walkToExprPre(Expr *E) override { return contains(E); }
   void resolve() { walk(SF); }
-  llvm::ArrayRef<ASTNode> getContexts() const {
+  ArrayRef<ASTNode> getContexts() const {
     return llvm::makeArrayRef(AllContexts);
   }
 };
@@ -509,7 +510,7 @@ private:
     assert(OldArgLabel.empty());
     if (NewArgLabel.empty())
       return "";
-    return registerText((llvm::Twine(NewArgLabel) + ": ").str());
+    return registerText((Twine(NewArgLabel) + ": ").str());
   }
 
   StringRef getParamNameReplacement(StringRef OldParam, StringRef OldArgLabel,
@@ -523,7 +524,7 @@ private:
     // If we're renaming foo(x: Int) to foo(_:), then use the original argument
     // label as the parameter name so as to not break references in the body.
     if (NewArgLabel.empty() && !OldArgLabel.empty() && OldParam.empty())
-      return registerText((llvm::Twine(" ") + OldArgLabel).str());
+      return registerText((Twine(" ") + OldArgLabel).str());
 
     return registerText(OldParam);
   }
@@ -535,7 +536,7 @@ private:
         return OldLabelRange.empty() ? "" : "_";
 
       if (OldLabelRange.empty())
-        return registerText((llvm::Twine(NewArgLabel) + " ").str());
+        return registerText((Twine(NewArgLabel) + " ").str());
       return registerText(NewArgLabel);
   }
 
@@ -713,7 +714,7 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
 }
 
 ArrayRef<SourceFile*>
-collectSourceFiles(ModuleDecl *MD, llvm::SmallVectorImpl<SourceFile*> &Scratch) {
+collectSourceFiles(ModuleDecl *MD, SmallVectorImpl<SourceFile *> &Scratch) {
   for (auto Unit : MD->getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(Unit)) {
       Scratch.push_back(SF);
@@ -724,7 +725,7 @@ collectSourceFiles(ModuleDecl *MD, llvm::SmallVectorImpl<SourceFile*> &Scratch) 
 
 /// Get the source file that contains the given range and belongs to the module.
 SourceFile *getContainingFile(ModuleDecl *M, RangeConfig Range) {
-  llvm::SmallVector<SourceFile*, 4> Files;
+  SmallVector<SourceFile*, 4> Files;
   for (auto File : collectSourceFiles(M, Files)) {
     if (File->getBufferID()) {
       if (File->getBufferID().getValue() == Range.BufferId) {
@@ -843,7 +844,7 @@ isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
 
 static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
                                DiagnosticEngine &Diags,
-                               llvm::SmallVectorImpl<DeclContext *> &Scopes) {
+                               SmallVectorImpl<DeclContext *> &Scopes) {
   Scopes.clear();
   if (!getAvailableRenameForDecl(VD, RefInfo).hasValue()) {
     Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getName());
@@ -878,7 +879,7 @@ bool RefactoringActionLocalRename::performChange() {
                                  ResolvedCursorInfo());
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
     ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
-    llvm::SmallVector<DeclContext *, 8> Scopes;
+    SmallVector<DeclContext *, 8> Scopes;
 
     Optional<RenameRefInfo> RefInfo;
     if (CursorInfo.IsRef)
@@ -925,14 +926,14 @@ enum class CannotExtractReason {
 
 class ExtractCheckResult {
   bool KnownFailure;
-  llvm::SmallVector<CannotExtractReason, 2> AllReasons;
+  SmallVector<CannotExtractReason, 2> AllReasons;
 
 public:
   ExtractCheckResult(): KnownFailure(true) {}
   ExtractCheckResult(ArrayRef<CannotExtractReason> AllReasons):
     KnownFailure(false), AllReasons(AllReasons.begin(), AllReasons.end()) {}
   bool success() { return success({}); }
-  bool success(llvm::ArrayRef<CannotExtractReason> ExpectedReasons) {
+  bool success(ArrayRef<CannotExtractReason> ExpectedReasons) {
     if (KnownFailure)
       return false;
     bool Result = true;
@@ -951,7 +952,7 @@ public:
 /// Return false on failed conditions.
 ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
                                           DiagnosticEngine &DiagEngine) {
-  llvm::SmallVector<CannotExtractReason, 2> AllReasons;
+  SmallVector<CannotExtractReason, 2> AllReasons;
   // If any declared declaration is refered out of the given range, return false.
   auto Declared = RangeInfo.DeclaredDecls;
   auto It = std::find_if(Declared.begin(), Declared.end(),
@@ -1392,7 +1393,7 @@ public:
 
 /// This is to ensure all decl references in two expressions are identical.
 struct ReferenceCollector: public SourceEntityWalker {
-  llvm::SmallVector<ValueDecl*, 4> References;
+  SmallVector<ValueDecl*, 4> References;
 
   ReferenceCollector(Expr *E) { walk(E); }
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
@@ -1414,11 +1415,11 @@ struct SimilarExprCollector: public SourceEntityWalker {
 
   /// The expression under selection.
   Expr *SelectedExpr;
-  llvm::ArrayRef<Token> AllTokens;
+  ArrayRef<Token> AllTokens;
   llvm::SetVector<Expr*> &Bucket;
 
   /// The tokens included in the expression under selection.
-  llvm::ArrayRef<Token> SelectedTokens;
+  ArrayRef<Token> SelectedTokens;
 
   /// The referenced decls in the expression under selection.
   ReferenceCollector SelectedReferences;
@@ -1433,12 +1434,12 @@ struct SimilarExprCollector: public SourceEntityWalker {
   }
 
   /// Find all tokens included by an expression.
-  llvm::ArrayRef<Token> getExprSlice(Expr *E) {
+  ArrayRef<Token> getExprSlice(Expr *E) {
     return slice_token_array(AllTokens, E->getStartLoc(), E->getEndLoc());
   }
 
-  SimilarExprCollector(SourceManager &SM, Expr* SelectedExpr,
-                       llvm::ArrayRef<Token> AllTokens,
+  SimilarExprCollector(SourceManager &SM, Expr *SelectedExpr,
+                       ArrayRef<Token> AllTokens,
     llvm::SetVector<Expr*> &Bucket): SM(SM), SelectedExpr(SelectedExpr),
     AllTokens(AllTokens), Bucket(Bucket),
     SelectedTokens(getExprSlice(SelectedExpr)),
@@ -1532,7 +1533,7 @@ bool RefactoringActionExtractExprBase::performChange() {
                                       AllVisibleDecls.getArrayRef());
 
   // Print the type name of this expression.
-  llvm::SmallString<16> TyBuffer;
+  SmallString<16> TyBuffer;
 
   // We are not sure about the type of repeated expressions.
   if (!ExtractRepeated) {
@@ -1543,7 +1544,7 @@ bool RefactoringActionExtractExprBase::performChange() {
     }
   }
 
-  llvm::SmallString<64> DeclBuffer;
+  SmallString<64> DeclBuffer;
   llvm::raw_svector_ostream OS(DeclBuffer);
   unsigned StartOffset, EndOffset;
   OS << tok::kw_let << " ";
@@ -1706,9 +1707,9 @@ namespace {
 // a var decl has accessors that aren't included. This will find those missing
 // decls.
 class FindAllSubDecls : public SourceEntityWalker {
-  llvm::SmallPtrSetImpl<Decl *> &Found;
+  SmallPtrSetImpl<Decl *> &Found;
   public:
-  FindAllSubDecls(llvm::SmallPtrSetImpl<Decl *> &found)
+  FindAllSubDecls(SmallPtrSetImpl<Decl *> &found)
     : Found(found) {}
 
   bool walkToDeclPre(Decl *D, CharSourceRange range) override {
@@ -1730,7 +1731,7 @@ bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
   switch (Info.Kind) {
   case RangeKind::SingleDecl:
   case RangeKind::MultiTypeMemberDecl: {
-    llvm::SmallPtrSet<Decl *, 16> Found;
+    SmallPtrSet<Decl *, 16> Found;
     for (auto decl : Info.DeclaredDecls) {
       FindAllSubDecls(Found).walk(decl.VD);
     }
@@ -1754,7 +1755,7 @@ bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
 
 bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
   const StringRef replacement = "{\nfatalError()\n}";
-  llvm::SmallPtrSet<Decl *, 16> Found;
+  SmallPtrSet<Decl *, 16> Found;
   for (auto decl : RangeInfo.DeclaredDecls) {
     FindAllSubDecls(Found).walk(decl.VD);
   }
@@ -2125,11 +2126,11 @@ bool RefactoringActionExpandTernaryExpr::performChange() {
   auto ElseRange = Target->getIf()->getElseExpr()->getSourceRange();
   auto ElseCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, ElseRange);
 
-  llvm::SmallString<64> DeclBuffer;
+  SmallString<64> DeclBuffer;
   llvm::raw_svector_ostream OS(DeclBuffer);
 
-  llvm::StringRef Space = " ";
-  llvm::StringRef NewLine = "\n";
+  StringRef Space = " ";
+  StringRef NewLine = "\n";
 
   if (Target->shouldDeclareNameAndType()) {
     //Specifier will not be replaced; append after specifier
@@ -2220,11 +2221,11 @@ bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
   bodyRange.widen(lastElement.getSourceRange());
   auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
   
-  llvm::SmallString<64> DeclBuffer;
+  SmallString<64> DeclBuffer;
   llvm::raw_svector_ostream OS(DeclBuffer);
   
-  llvm::StringRef Space = " ";
-  llvm::StringRef NewLine = "\n";
+  StringRef Space = " ";
+  StringRef NewLine = "\n";
   
   OS << tok::kw_guard << Space;
   OS << CondCharRange.str().str() << Space;
@@ -2298,11 +2299,11 @@ bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
   SourceManager &SM = RangeInfo.RangeContext->getASTContext().SourceMgr;
   auto CondCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
   
-  llvm::SmallString<64> DeclBuffer;
+  SmallString<64> DeclBuffer;
   llvm::raw_svector_ostream OS(DeclBuffer);
   
-  llvm::StringRef Space = " ";
-  llvm::StringRef NewLine = "\n";
+  StringRef Space = " ";
+  StringRef NewLine = "\n";
   
   OS << tok::kw_if << Space;
   OS << CondCharRange.str().str() << Space;
@@ -2755,10 +2756,10 @@ bool RefactoringActionConvertToTernaryExpr::performChange() {
   if (!Target.isValid())
     return true; //abort
 
-  llvm::SmallString<64> DeclBuffer;
+  SmallString<64> DeclBuffer;
   llvm::raw_svector_ostream OS(DeclBuffer);
 
-  llvm::StringRef Space = " ";
+  StringRef Space = " ";
 
   auto IfRange = Target.IfRange;
   auto ReplaceRange = Lexer::getCharSourceRangeFromSourceRange(SM, IfRange);
@@ -2898,7 +2899,7 @@ bool RefactoringActionFillProtocolStub::performChange() {
   assert(Context.canProceed());
   assert(!Context.getFillingContents().empty());
   assert(Context.getFillingContext());
-  llvm::SmallString<128> Text;
+  SmallString<128> Text;
   {
     llvm::raw_svector_ostream SS(Text);
     Type Adopter = Context.getAdopter();
@@ -2916,11 +2917,10 @@ bool RefactoringActionFillProtocolStub::performChange() {
   return false;
 }
 
-ArrayRef<RefactoringKind>
-collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
-                                     unsigned Column,
-                                     std::vector<RefactoringKind> &Scratch,
-                            llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers) {
+ArrayRef<RefactoringKind> collectAvailableRefactoringsAtCursor(
+    SourceFile *SF, unsigned Line, unsigned Column,
+    std::vector<RefactoringKind> &Scratch,
+    ArrayRef<DiagnosticConsumer*> DiagConsumers) {
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
@@ -3134,7 +3134,7 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
 
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
-                            llvm::raw_ostream &OS, bool wantsSeparator) {
+                            raw_ostream &OS, bool wantsSeparator) {
     {
       OS << memberData.Name << ": ";
       // Unconditionally print '@escaping' if we print out a function type -
@@ -3456,7 +3456,7 @@ getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
 
 void AddEquatableContext::
 printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent, ParameterList *Params) {
-  llvm::SmallString<128> Return;
+  SmallString<128> Return;
   llvm::raw_svector_ostream SS(Return);
   SS << tok::kw_return;
   StringRef Space = " ";
@@ -3590,7 +3590,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
 }
 
 static std::string insertUnderscore(StringRef Text) {
-  llvm::SmallString<64> Buffer;
+  SmallString<64> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
   for (auto It = Text.begin(); It != Text.end(); ++It) {
     unsigned Distance = It - Text.begin();
@@ -3602,8 +3602,8 @@ static std::string insertUnderscore(StringRef Text) {
   return OS.str().str();
 }
 
-static void insertUnderscoreInDigits(StringRef Digits,
-                                     llvm::raw_ostream &OS) {
+void insertUnderscoreInDigits(StringRef Digits,
+                              raw_ostream &OS) {
   StringRef BeforePointRef, AfterPointRef;
   std::tie(BeforePointRef, AfterPointRef) = Digits.split('.');
 
@@ -3626,7 +3626,7 @@ static void insertUnderscoreInDigits(StringRef Digits,
 bool RefactoringActionSimplifyNumberLiteral::
 isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   if (auto *Literal = getTrailingNumberLiteral(Tok)) {
-    llvm::SmallString<64> Buffer;
+    SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     StringRef Digits = Literal->getDigitsText();
     insertUnderscoreInDigits(Digits, OS);
@@ -3859,10 +3859,10 @@ bool RefactoringActionConvertToComputedProperty::performChange() {
   auto SVType = SV->getType();
   auto TR = SV->getTypeReprOrParentPatternTypeRepr();
   
-  llvm::SmallString<64> DeclBuffer;
+  SmallString<64> DeclBuffer;
   llvm::raw_svector_ostream OS(DeclBuffer);
-  llvm::StringRef Space = " ";
-  llvm::StringRef NewLine = "\n";
+  StringRef Space = " ";
+  StringRef NewLine = "\n";
   
   OS << tok::kw_var << Space;
   // Add var name
@@ -3887,6 +3887,7 @@ bool RefactoringActionConvertToComputedProperty::performChange() {
   EditConsumer.accept(SM, ReplaceCharSourceRange, DeclBuffer.str());
   return false; // success
 }
+
 }// end of anonymous namespace
 
 StringRef swift::ide::
@@ -3929,7 +3930,7 @@ SourceLoc swift::ide::RangeConfig::getEnd(SourceManager &SM) {
 
 struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
   std::unique_ptr<SourceEditConsumer> pRewriter;
-  Implementation(SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS)
+  Implementation(SourceManager &SM, unsigned BufferId, raw_ostream &OS)
   : pRewriter(new SourceEditOutputConsumer(SM, BufferId, OS)) {}
   static StringRef tag(RefactoringRangeKind Kind) {
     switch (Kind) {
@@ -3968,7 +3969,8 @@ struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
 
 swift::ide::FindRenameRangesAnnotatingConsumer::
 FindRenameRangesAnnotatingConsumer(SourceManager &SM, unsigned BufferId,
-   llvm::raw_ostream &OS): Impl(*new Implementation(SM, BufferId, OS)) {}
+                                   raw_ostream &OS) :
+    Impl(*new Implementation(SM, BufferId, OS)) {}
 
 swift::ide::FindRenameRangesAnnotatingConsumer::~FindRenameRangesAnnotatingConsumer() {
   delete &Impl;
@@ -4060,7 +4062,7 @@ collectAvailableRefactorings(SourceFile *SF,
                              ResolvedCursorInfo CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
                              bool ExcludeRename) {
-  llvm::SmallVector<RefactoringKind, 2> AllKinds;
+  SmallVector<RefactoringKind, 2> AllKinds;
   switch(CursorInfo.Kind) {
   case CursorInfoKind::ModuleRef:
   case CursorInfoKind::Invalid:
@@ -4105,7 +4107,7 @@ ArrayRef<RefactoringKind> swift::ide::
 collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                              bool &RangeStartMayNeedRename,
                              std::vector<RefactoringKind> &Scratch,
-                             llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers) {
+                             ArrayRef<DiagnosticConsumer*> DiagConsumers) {
 
   if (Range.Length == 0) {
     return collectAvailableRefactoringsAtCursor(SF, Range.Line, Range.Column,
@@ -4258,7 +4260,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
 }
 
 int swift::ide::findSyntacticRenameRanges(
-    SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
+    SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
     FindRenameRangesConsumer &RenameConsumer,
     DiagnosticConsumer &DiagConsumer) {
   assert(SF && "null source file");
