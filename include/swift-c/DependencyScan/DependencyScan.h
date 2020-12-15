@@ -41,12 +41,12 @@ SWIFTSCAN_BEGIN_DECLS
  */
 typedef struct {
   const void *data;
-  unsigned length;
+  size_t length;
 } swiftscan_string_ref_t;
 
 typedef struct {
   swiftscan_string_ref_t *strings;
-  unsigned count;
+  size_t count;
 } swiftscan_string_set_t;
 
 typedef enum {
@@ -70,8 +70,8 @@ typedef struct swiftscan_import_set_s *swiftscan_import_set_t;
 
 /// Full Dependency Graph (Result)
 typedef struct {
-  int count;
   swiftscan_dependency_info_t *modules;
+  size_t count;
 } swiftscan_dependency_set_t;
 
 //=== Batch Scan Input Specification --------------------------------------===//
@@ -80,13 +80,13 @@ typedef struct {
 typedef struct swiftscan_batch_scan_entry_s *swiftscan_batch_scan_entry_t;
 
 typedef struct {
-  int count;
   swiftscan_batch_scan_entry_t *modules;
+  size_t count;
 } swiftscan_batch_scan_input_t;
 
 typedef struct {
-  int count;
   swiftscan_dependency_graph_t *results;
+  size_t count;
 } swiftscan_batch_scan_result_t;
 
 //=== Scanner Invocation Specification ------------------------------------===//

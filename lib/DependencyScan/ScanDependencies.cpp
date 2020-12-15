@@ -495,7 +495,7 @@ static void writeJSON(llvm::raw_ostream &out,
   out << "  \"modules\": [\n";
   SWIFT_DEFER { out << "  ]\n"; };
   const auto module_set = fullDependencies->dependencies;
-  for (int mi = 0; mi < module_set->count; ++mi) {
+  for (size_t mi = 0; mi < module_set->count; ++mi) {
     const auto &moduleInfo = *module_set->modules[mi];
     auto &directDependencies = moduleInfo.direct_dependencies;
     // The module we are describing.
@@ -1186,10 +1186,8 @@ llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(CompilerInstance &instance,
                                        ModuleDependenciesCache &cache) {
   ModuleDecl *mainModule = instance.getMainModule();
-
   // First, identify the dependencies of the main module
   auto mainDependencies = identifyMainModuleDependencies(instance);
-
   // Add the main module.
   StringRef mainModuleName = mainModule->getNameStr();
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
@@ -1197,7 +1195,6 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
       allModules;
 
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
-
   cache.recordDependencies(mainModuleName, std::move(mainDependencies));
   auto &ctx = instance.getASTContext();
   auto ModuleCachePath = getModuleCachePathFromClang(

@@ -100,7 +100,7 @@ void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info) {
 }
 
 void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
-  for (int i = 0; i < set->count; ++i) {
+  for (size_t i = 0; i < set->count; ++i) {
     swiftscan_dependency_info_dispose(set->modules[i]);
   }
   delete[] set->modules;
@@ -145,7 +145,7 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
     Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
 
   std::vector<BatchScanInput> BatchInput;
-  for (int i = 0; i < batch_input->count; ++i) {
+  for (size_t i = 0; i < batch_input->count; ++i) {
     swiftscan_batch_scan_entry_s *Entry = batch_input->modules[i];
     BatchInput.push_back({swiftscan_get_C_string(Entry->module_name),
                           swiftscan_get_C_string(Entry->arguments),
@@ -441,7 +441,7 @@ void swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry) {
 }
 
 void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {
-  for (int i = 0; i < input->count; ++i) {
+  for (size_t i = 0; i < input->count; ++i) {
     swiftscan_batch_scan_entry_dispose(input->modules[i]);
   }
   delete[] input->modules;
@@ -450,7 +450,7 @@ void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {
 
 void swiftscan_batch_scan_result_dispose(
     swiftscan_batch_scan_result_t *result) {
-  for (int i = 0; i < result->count; ++i) {
+  for (size_t i = 0; i < result->count; ++i) {
     swiftscan_dependency_graph_dispose(result->results[i]);
   }
   delete[] result->results;
