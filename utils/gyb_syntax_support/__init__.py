@@ -87,6 +87,8 @@ def check_parsed_child_condition_raw(child):
     """
     result = '[](const ParsedRawSyntaxNode &Raw) {\n'
     result += ' // check %s\n' % child.name
+    if child.is_optional:
+        result += 'if (Raw.isNull()) return true;\n'
     if child.token_choices:
         result += 'if (!Raw.isToken()) return false;\n'
         result += 'auto TokKind = Raw.getTokenKind();\n'
