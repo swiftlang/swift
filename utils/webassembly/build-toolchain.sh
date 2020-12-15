@@ -60,7 +60,7 @@ build_host_toolchain() {
 
 build_target_toolchain() {
   rm -rf "$DIST_TOOLCHAIN_DESTDIR"
-  cp -r "$HOST_TOOLCHAIN_DESTDIR" "$DIST_TOOLCHAIN_DESTDIR"
+  rsync -a "$HOST_TOOLCHAIN_DESTDIR/" "$DIST_TOOLCHAIN_DESTDIR"
 
   COMPILER_RT_BUILD_DIR="$TARGET_BUILD_ROOT/compiler-rt-wasi-wasm32"
   cmake -B "$COMPILER_RT_BUILD_DIR" \
