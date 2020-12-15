@@ -2462,7 +2462,16 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
 
 void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
                                         llvm::Value *asyncResume) {
-  // TODO: pointerauth
+                                        
+  llvm::Value *task = getAsyncTask();
+  llvm::Value *callableResume = asyncResume;
+                                        
+  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeFunction) {
+    auto *resumeAddr = Builder.CreateStructGEP(task, 4);
+    auto authInfo = PointerAuthInfo::emit(
+        *this, schema, resumeAddr, PointerAuthEntity());
+    callableResume = emitPointerAuthSign(*this, asyncResume, authInfo);
+  }
 
   // Setup the suspend point.
   SmallVector<llvm::Value *, 8> arguments;
@@ -2474,10 +2483,10 @@ void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
   arguments.push_back(
       Builder.CreateBitOrPointerCast(suspendFn, IGM.Int8PtrTy));
 
-  arguments.push_back(asyncResume);
+  arguments.push_back(callableResume);
   arguments.push_back(
       Builder.CreateBitOrPointerCast(toExecutor, getAsyncExecutor()->getType()));
-  arguments.push_back(getAsyncTask());
+  arguments.push_back(task);
   arguments.push_back(getAsyncExecutor());
   arguments.push_back(getAsyncContext());
 
