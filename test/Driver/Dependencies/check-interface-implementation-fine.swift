@@ -14,9 +14,9 @@
 // CHECK-FIRST: Handled c.swift
 // CHECK-FIRST: Handled bad.swift
 
-// CHECK-RECORD-CLEAN-DAG: "./a.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./bad.swift": [
-// CHECK-RECORD-CLEAN-DAG: "./c.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}a.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}bad.swift": [
+// CHECK-RECORD-CLEAN-DAG: "{{(./)?}}c.swift": [
 
 
 // RUN: touch -t 201401240006 %t/a.swift
@@ -29,9 +29,9 @@
 // CHECK-A: Handled bad.swift
 // NEGATIVE-A-NOT: Handled c.swift
 
-// CHECK-RECORD-A-DAG: "./a.swift": [
-// CHECK-RECORD-A-DAG: "./bad.swift": !private [
-// CHECK-RECORD-A-DAG: "./c.swift": !private [
+// CHECK-RECORD-A-DAG: "{{(./)?}}a.swift": [
+// CHECK-RECORD-A-DAG: "{{(./)?}}bad.swift": !private [
+// CHECK-RECORD-A-DAG: "{{(./)?}}c.swift": !private [
 
 // RUN: cd %t &&   %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./bad.swift ./c.swift  -module-name main -j1 -v  -driver-show-incremental 2>&1 | %FileCheck -check-prefix CHECK-BC %s
 
