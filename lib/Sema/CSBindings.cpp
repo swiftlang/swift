@@ -319,7 +319,8 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
                   });
 
     // Infer transitive defaults.
-    llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
+    for (const auto &def : bindings.Defaults)
+      addDefault(def.second);
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
@@ -513,24 +514,6 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
                              : AllowedBindingKind::Supertypes,
                          constraint});
   }
-
-  /// Add defaultable constraints.
-  for (auto *constraint : Defaults) {
-    Type type = constraint->getSecondType();
-    if (!existingTypes.insert(type->getCanonicalType()).second)
-      continue;
-
-    if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
-      // If there are no other possible bindings for this closure
-      // let's default it to the type inferred from its parameters/body,
-      // otherwise we should only attempt contextual types as a
-      // top-level closure type.
-      if (!Bindings.empty())
-        continue;
-    }
-
-    addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
-  }
 }
 
 void ConstraintSystem::PotentialBindings::finalize(
@@ -575,7 +558,7 @@ ConstraintSystem::determineBestBindings() {
     if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
       return true;
 
-    return bindings || !bindings.Defaults.empty() ||
+    return bindings ||
            llvm::any_of(bindings.Protocols, [&](Constraint *constraint) {
              return bool(
                  TypeChecker::getDefaultType(constraint->getProtocol(), DC));
@@ -652,6 +635,11 @@ findInferableTypeVars(Type type,
   };
 
   type.walk(Walker(typeVars));
+}
+
+void ConstraintSystem::PotentialBindings::addDefault(Constraint *constraint) {
+  auto defaultTy = constraint->getSecondType();
+  Defaults.insert({defaultTy->getCanonicalType(), constraint});
 }
 
 void ConstraintSystem::PotentialBindings::addPotentialBinding(
@@ -1094,7 +1082,7 @@ bool ConstraintSystem::PotentialBindings::infer(
     // Do these in a separate pass.
     if (cs.getFixedTypeRecursive(constraint->getFirstType(), true)
             ->getAs<TypeVariableType>() == TypeVar) {
-      Defaults.push_back(constraint);
+      addDefault(constraint);
     }
     break;
 
@@ -1355,6 +1343,22 @@ bool TypeVarBindingProducer::computeNext() {
         if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
           addNewBinding(binding.withType(*simplifiedSuper));
       }
+    }
+  }
+
+  if (NumTries == 0) {
+    // Add defaultable constraints (if any).
+    for (auto *constraint : DelayedDefaults) {
+      if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
+        // If there are no other possible bindings for this closure
+        // let's default it to the type inferred from its parameters/body,
+        // otherwise we should only attempt contextual types as a
+        // top-level closure type.
+        if (!ExploredTypes.empty())
+          continue;
+      }
+
+      addNewBinding(getDefaultBinding(constraint));
     }
   }
 
