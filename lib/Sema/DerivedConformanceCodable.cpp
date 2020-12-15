@@ -411,37 +411,6 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
 
   bool allConform = true;
   auto *conformanceDC = derived.getConformanceContext();
-
-  auto add = [conformanceDC, &C, &derived](VarDecl *varDecl,
-                                           EnumDecl *enumDecl) {
-    if (!varDecl->isUserAccessible()) {
-      return true;
-    }
-
-    auto target =
-        conformanceDC->mapTypeIntoContext(varDecl->getValueInterfaceType());
-    if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
-            .isInvalid()) {
-      TypeLoc typeLoc = {
-          varDecl->getTypeReprOrParentPatternTypeRepr(),
-          varDecl->getType(),
-      };
-      varDecl->diagnose(diag::codable_non_conforming_property_here,
-                        derived.getProtocolType(), typeLoc);
-
-      return false;
-    } else {
-      // if the type conforms to {En,De}codable, add it to the enum.
-      auto *elt =
-          new (C) EnumElementDecl(SourceLoc(), getVarNameForCoding(varDecl),
-                                  nullptr, SourceLoc(), nullptr, enumDecl);
-      elt->setImplicit();
-      enumDecl->addMember(elt);
-
-      return true;
-    }
-  };
-
   auto *codingKeysEnum = lookupEvaluatedCodingKeysEnum(C, target);
 
   // Only derive CodingKeys enum if it is not already defined
@@ -485,27 +454,49 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
     if (!derived.Nominal->lookupDirect(DeclName(enumIdentifier)).empty())
       continue;
 
+    auto *caseEnum = new (C) EnumDecl(
+        SourceLoc(), enumIdentifier, SourceLoc(), inherited, nullptr, target);
+    caseEnum->setImplicit();
+    caseEnum->setAccess(AccessLevel::Private);
+
+    auto *elementParams = elementDecl->getParameterList();
+    bool conforms = true;
+    if (elementParams) {
+      for (auto *paramDecl : elementParams->getArray()) {
+        auto target =
+                conformanceDC->mapTypeIntoContext(paramDecl->getValueInterfaceType());
+        if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
+                .isInvalid()) {
+          TypeLoc typeLoc = {
+                  paramDecl->getTypeReprOrParentPatternTypeRepr(),
+                  paramDecl->getType(),
+          };
+          paramDecl->diagnose(diag::codable_non_conforming_property_here,
+                            derived.getProtocolType(), typeLoc);
+
+          conforms = false;
+        } else {
+          // if the type conforms to {En,De}codable, add it to the enum.
+          auto *elt =
+                  new (C) EnumElementDecl(SourceLoc(), getVarNameForCoding(paramDecl),
+                                          nullptr, SourceLoc(), nullptr, caseEnum);
+          elt->setImplicit();
+          caseEnum->addMember(elt);
+        }
+      }
+      allConform = allConform && conforms;
+    }
+
     // If there are any unnamed parameters, we can't generate CodingKeys for
     // this element and it will be encoded into an unkeyed container.
     if (elementDecl->hasAnyUnnamedParameters())
       continue;
 
-    auto *nestedEnum = new (C) EnumDecl(
-        SourceLoc(), enumIdentifier, SourceLoc(), inherited, nullptr, target);
-    nestedEnum->setImplicit();
-    nestedEnum->setAccess(AccessLevel::Private);
-
-    auto *elementParams = elementDecl->getParameterList();
-    if (elementParams) {
-      for (auto *paramDecl : elementParams->getArray()) {
-        allConform = allConform && add(paramDecl, nestedEnum);
-      }
+    if (conforms) {
+      // Forcibly derive conformance to CodingKey.
+      TypeChecker::checkConformancesInContext(caseEnum);
+      target->addMember(caseEnum);
     }
-
-    // Forcibly derive conformance to CodingKey.
-    TypeChecker::checkConformancesInContext(nestedEnum);
-
-    target->addMember(nestedEnum);
   }
 
   if (!allConform)
@@ -1464,7 +1455,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
             // Type.self
             auto *parameterTypeExpr =
-                    TypeExpr::createImplicit(paramDecl->getType(), C);
+                    TypeExpr::createImplicit(
+                            funcDC->mapTypeIntoContext(paramDecl->getInterfaceType()), C);
             auto *parameterMetaTypeExpr =
                     new(C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
             // decode(_:)
@@ -1516,7 +1508,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
             // Type.self
             auto *parameterTypeExpr =
-                    TypeExpr::createImplicit(paramDecl->getType(), C);
+                    TypeExpr::createImplicit(
+                            funcDC->mapTypeIntoContext(paramDecl->getInterfaceType()), C);
             auto *parameterMetaTypeExpr =
                     new(C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
             auto *nestedContainerExpr = new(C)
@@ -1604,7 +1597,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
           // Type.self
           auto *parameterTypeExpr =
-              TypeExpr::createImplicit(paramDecl->getType(), C);
+              TypeExpr::createImplicit(
+                      funcDC->mapTypeIntoContext(paramDecl->getInterfaceType()), C);
           auto *parameterMetaTypeExpr =
               new (C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
           // CodingKeys_bar.x
