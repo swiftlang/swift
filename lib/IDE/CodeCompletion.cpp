@@ -1640,6 +1640,7 @@ public:
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
+  void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
@@ -5465,6 +5466,17 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeEffectsSpecifier(bool hasAsync,
+                                                           bool hasThrows) {
+  Kind = CompletionKind::EffectsSpecifier;
+  CurDeclContext = P.CurDeclContext;
+  ParsedKeywords.clear();
+  if (hasAsync)
+    ParsedKeywords.emplace_back("async");
+  if (hasThrows)
+    ParsedKeywords.emplace_back("throws");
+}
+
 void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
     bool Sil, bool isIndependent) {
   Kind = CompletionKind::AttributeBegin;
@@ -5782,6 +5794,15 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PrecedenceGroup:
   case CompletionKind::StmtLabel:
     break;
+
+  case CompletionKind::EffectsSpecifier: {
+    if (!llvm::is_contained(ParsedKeywords, "async") &&
+        Context.LangOpts.EnableExperimentalConcurrency)
+      addKeyword(Sink, "async", CodeCompletionKeywordKind::None);
+    if (!llvm::is_contained(ParsedKeywords, "throws"))
+      addKeyword(Sink, "throws", CodeCompletionKeywordKind::kw_throws);
+    break;
+  }
 
   case CompletionKind::AccessorBeginning: {
     // TODO: Omit already declared or mutally exclusive accessors.
@@ -6760,6 +6781,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
+  case CompletionKind::EffectsSpecifier:
     // Handled earlier by keyword completions.
     break;
   }

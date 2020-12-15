@@ -7511,7 +7511,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   bool rethrows = false;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  Status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
+    // Trigger delayed parsing, no need to continue.
+    return Status;
+  }
 
   if (rethrows) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));

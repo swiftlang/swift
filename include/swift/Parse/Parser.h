@@ -1353,9 +1353,12 @@ public:
   ///
   /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
   /// lieu of 'throws'.
-  void parseAsyncThrows(
-      SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-      bool *rethrows);
+  ParserStatus parseEffectsSpecifiers(SourceLoc existingArrowLoc,
+                                      SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+                                      bool *rethrows);
+
+  /// Returns 'true' if \p T is considered effects specifier.
+  bool isEffectsSpecifier(const Token &T);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1432,6 +1435,15 @@ public:
   ///   qualified-decl-name-base-type: simple-type-identifier '.'
   /// \endverbatim
   bool canParseBaseTypeForQualifiedDeclName();
+
+  /// Returns true if the current token is '->' or effects specifiers followed
+  /// by '->'.
+  ///
+  /// e.g.
+  ///  throws ->       // true
+  ///  async throws -> // true
+  ///  throws {        // false
+  bool isAtFunctionTypeArrow();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
@@ -1554,8 +1566,9 @@ public:
   /// \param explicitResultType The explicit result type, if specified.
   /// \param inLoc The location of the 'in' keyword, if present.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool parseClosureSignatureIfPresent(
+  /// \returns ParserStatus error if an error occurred. Success if no signature
+  /// is present or succssfully parsed.
+  ParserStatus parseClosureSignatureIfPresent(
           SourceRange &bracketRange,
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,
