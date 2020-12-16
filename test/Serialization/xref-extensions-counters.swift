@@ -11,7 +11,7 @@
 // RUN: %target-swift-frontend -I %t -typecheck %s -parse-stdlib -print-stats 2>&1 -D CHECK_NESTED | %FileCheck %s -check-prefix CHECK_NESTED
 // RUN: %target-swift-frontend -I %t -typecheck %s -parse-stdlib -print-stats 2>&1 | %FileCheck %s -check-prefix CHECK_NON_NESTED
 
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // CHECK_NESTED-LABEL: Statistics
 // CHECK_NESTED: 4 Serialization - # of decls deserialized

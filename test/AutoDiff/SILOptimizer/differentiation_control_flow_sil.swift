@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // TODO: Add FileCheck tests.
 

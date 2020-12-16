@@ -7,7 +7,7 @@
 // Switch the order of the files.
 // RUN: %target-swift-frontend -emit-module -module-name Multi %t/multi-file-2.swiftmodule %t/multi-file.swiftmodule -o %t -print-stats 2>&1 | %FileCheck %s
 
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // CHECK: 4 Serialization - # of nested types resolved without full lookup
 

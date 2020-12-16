@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -access-enforcement-opts -debug-only=access-enforcement-opts -verify %s -o /dev/null 2>&1 | %FileCheck %s
 //
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 //
 // This tests four kinds of AccessEnforcementOpts fast paths:
 //

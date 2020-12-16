@@ -104,6 +104,10 @@ def _apply_default_arguments(args):
     if args.swift_assertions is None:
         args.swift_assertions = args.assertions
 
+    if args.swift_assertions and (not args.llvm_assertions):
+        args.extra_cmake_options.append('-DLLVM_ENABLE_DUMP:BOOL=TRUE')
+        args.extra_cmake_options.append('-DLLVM_ENABLE_ABI_BREAKING_CHECKS:BOOL=TRUE')
+
     if args.swift_stdlib_assertions is None:
         args.swift_stdlib_assertions = args.assertions
 

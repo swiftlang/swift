@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -enforce-exclusivity=checked -Onone -emit-sil -parse-as-library %s -Xllvm -debug-only=access-enforcement-selection 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // This is a source-level test because it helps bring up the entire -Onone pipeline with the access markers.
 

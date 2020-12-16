@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -simplify-cfg -debug-only=sil-simplify-cfg %s -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 import Builtin
 import Swift

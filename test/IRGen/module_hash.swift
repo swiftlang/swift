@@ -82,7 +82,7 @@
 
 // RUN: %FileCheck %s < %t/log
 
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 public func test_func1() {
   print("Hello")

@@ -13,6 +13,7 @@ set(LLVM_EXTERNAL_PROJECTS
 # NOTE(compnerd) always enable assertions, the toolchain will not provide enough
 # context to resolve issues otherwise and may silently generate invalid output.
 set(LLVM_ENABLE_ASSERTIONS YES CACHE BOOL "")
+set(SWIFT_ENABLE_ASSERTIONS YES CACHE BOOL "")
 
 set(ENABLE_X86_RELAX_RELOCATIONS YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")

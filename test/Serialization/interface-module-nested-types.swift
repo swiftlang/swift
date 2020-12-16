@@ -1,4 +1,4 @@
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)

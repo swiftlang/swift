@@ -74,6 +74,11 @@ else:
     config.available_features.add('no_lto')
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
+    config.available_features.add('llvm_asserts')
+else:
+    config.available_features.add('no_llvm_asserts')
+
+if "@SWIFT_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
 else:
     config.available_features.add('no_asserts')

@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -sil-partial-specialization=0 -sil-partial-specialization-with-generic-substitutions -debug-only=generic-specializer %s -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // Test the debug messages from Generic Specialization.  It's based on
 // partial_specialization.sil.

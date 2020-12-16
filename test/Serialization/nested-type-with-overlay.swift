@@ -6,7 +6,7 @@
 
 // RUN: %target-swift-frontend -emit-silgen %S/Inputs/nested-type-with-overlay/verify.swift -I %t -I %S/Inputs/nested-type-with-overlay -verify
 
-// REQUIRES: asserts
+// REQUIRES: llvm_asserts
 
 // CHECK: 4 Serialization - # of nested types resolved without full lookup
 // Unfortunately this isn't 5 because of the shadowed nested type from Clang.
