@@ -6,4 +6,4 @@ public func getIncrementorValue() -> CInt {
   return callConstructor(41)
 }
 
-// CHECK: define linkonce_odr i32 @_Z9incrementi(i32 %t)
+// CHECK: define linkonce_odr{{( dso_local)?}} i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 %t)
