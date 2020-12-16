@@ -294,6 +294,15 @@ enum class FixKind : uint8_t {
   /// Explicitly specify the type to disambiguate between possible member base
   /// types.
   SpecifyBaseTypeForOptionalUnresolvedMember,
+
+  /// Allow a runtime checked cast where we statically know the result
+  /// is always succeed.
+  AllowAlwaysSucceedCheckedCast,
+
+  /// Allow a runtime checked cast where at compile time the from is
+  /// convertible, but runtime does not support such convertions. e.g.
+  /// funtion type casts.
+  AllowUnsuportedRuntimeCheckedCast,
 };
 
 class ConstraintFix {
@@ -2194,6 +2203,40 @@ public:
   attempt(ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
           DeclNameRef memberName, FunctionRefKind functionRefKind,
           MemberLookupResult result, ConstraintLocator *locator);
+};
+
+class AllowAlwaysSucceedCheckedCast final : public ContextualMismatch {
+  AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
+                                Type toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowAlwaysSucceedCheckedCast, fromType,
+                           toType, locator,
+                           /*isWarning*/ true) {}
+
+public:
+  std::string getName() const override { return "checked cast always succeed"; }
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowAlwaysSucceedCheckedCast *create(ConstraintSystem &cs,
+                                               Type fromType, Type toType,
+                                               ConstraintLocator *locator);
+};
+
+class AllowUnsuportedRuntimeCheckedCast final : public ContextualMismatch {
+  AllowUnsuportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
+                                    Type toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowUnsuportedRuntimeCheckedCast,
+                           fromType, toType, locator,
+                           /*isWarning*/ true) {}
+
+public:
+  std::string getName() const override {
+    return "runtime unsupported checked cast";
+  }
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowUnsuportedRuntimeCheckedCast *create(ConstraintSystem &cs,
+                                                   Type fromType, Type toType,
+                                                   ConstraintLocator *locator);
 };
 
 } // end namespace constraints

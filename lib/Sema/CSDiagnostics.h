@@ -2391,6 +2391,37 @@ public:
   bool diagnoseAsError() override;
 };
 
+class CheckedCastBaseFailure : public ContextualFailure {
+public:
+  CheckedCastBaseFailure(const Solution &solution, Type fromType, Type toType,
+                         ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+  bool anchorHasForcedOptionalResult() const;
+};
+
+/// Warn situations where the compiler can statically know a runtime
+/// checked cast always succeed.
+class UnnecessaryCheckedCastFailure final : public CheckedCastBaseFailure {
+public:
+  UnnecessaryCheckedCastFailure(const Solution &solution, Type fromType,
+                                Type toType, ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Warn situations where the compiler can statically know a runtime
+/// check is not supported.
+class UnsuportedRuntimeCheckedCastFailure final
+    : public CheckedCastBaseFailure {
+public:
+  UnsuportedRuntimeCheckedCastFailure(const Solution &solution, Type fromType,
+                                      Type toType, ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

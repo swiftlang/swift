@@ -1791,3 +1791,32 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
   return new (cs.getAllocator())
       SpecifyBaseTypeForOptionalUnresolvedMember(cs, memberName, locator);
 }
+
+AllowAlwaysSucceedCheckedCast *
+AllowAlwaysSucceedCheckedCast::create(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowAlwaysSucceedCheckedCast(cs, fromType, toType, locator);
+}
+
+bool AllowAlwaysSucceedCheckedCast::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  UnnecessaryCheckedCastFailure failure(solution, getFromType(), getToType(),
+                                        getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowUnsuportedRuntimeCheckedCast *
+AllowUnsuportedRuntimeCheckedCast::create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowUnsuportedRuntimeCheckedCast(cs, fromType, toType, locator);
+}
+
+bool AllowUnsuportedRuntimeCheckedCast::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  UnsuportedRuntimeCheckedCastFailure failure(solution, getFromType(),
+                                              getToType(), getLocator());
+  return failure.diagnose(asNote);
+}

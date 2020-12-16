@@ -7189,3 +7189,60 @@ bool MemberMissingExplicitBaseTypeFailure::diagnoseAsError() {
   }
   return true;
 }
+
+bool CheckedCastBaseFailure::anchorHasForcedOptionalResult() const {
+  auto *expr = castToExpr<ExplicitCastExpr>(getAnchor());
+  const auto *const TR = expr->getCastTypeRepr();
+  if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+    auto &cs = getConstraintSystem();
+    auto &solution = getSolution();
+    auto *locator = cs.getConstraintLocator(
+        expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+    return solution.getDisjunctionChoice(locator);
+  }
+  return false;
+}
+
+bool UnnecessaryCheckedCastFailure::diagnoseAsError() {
+  auto anchor = getAnchor();
+  if (isExpr<IsExpr>(anchor)) {
+    emitDiagnostic(diag::isa_is_always_true, "is");
+    return true;
+  }
+
+  auto *checkCastExpr = getAsExpr<CheckedCastExpr>(anchor);
+  auto fromType =
+      resolveType(getType(checkCastExpr->getSubExpr()))->getRValueType();
+  auto toType = resolveType(getType(checkCastExpr->getCastTypeRepr()));
+
+  if (auto *expr = getAsExpr<ForcedCheckedCastExpr>(anchor)) {
+    if (anchorHasForcedOptionalResult())
+      toType = toType->getOptionalObjectType();
+
+    if (fromType->isEqual(toType)) {
+      auto castTypeRepr = expr->getCastTypeRepr();
+      emitDiagnostic(diag::forced_downcast_noop, toType)
+          .fixItRemove(
+              SourceRange(expr->getLoc(), castTypeRepr->getSourceRange().End));
+
+    } else {
+      emitDiagnostic(diag::forced_downcast_coercion, fromType, toType)
+          .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
+                        "as");
+    }
+    return true;
+  }
+
+  if (auto *expr = getAsExpr<ConditionalCheckedCastExpr>(anchor)) {
+    emitDiagnostic(diag::conditional_downcast_coercion, fromType, toType);
+    return true;
+  }
+
+  llvm_unreachable("Shouldn't reach here");
+}
+
+bool UnsuportedRuntimeCheckedCastFailure::diagnoseAsError() {
+  emitDiagnostic(diag::checked_cast_ont_supported, getFromType(), getToType(),
+                 isExpr<IsExpr>(getAnchor()) ? 0 : 1);
+  return true;
+}
