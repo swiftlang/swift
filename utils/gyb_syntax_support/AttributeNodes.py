@@ -233,7 +233,7 @@ ATTRIBUTE_NODES = [
          description='''
          The arguments for the `@differentiable` attribute: an optional
          differentiability parameter clause and an optional 'where' clause.
-         ''',
+         ''', 
          children=[
              Child('DiffParams', kind='DifferentiabilityParamsClause',
                    is_optional=True),

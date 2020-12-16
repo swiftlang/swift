@@ -246,9 +246,9 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID, bool IsSILFuncDecl) {
   // Type parsing for SIL hasn't been migrated yet. Use the legacy method
-  if (isInSILMode()) {
-    return parseTypeSIL(MessageID, IsSILFuncDecl);
-  }
+//  if (isInSILMode()) {
+//    return parseTypeSIL(MessageID, IsSILFuncDecl);
+//  }
   // Otherwise use syntax-parse
 
   auto typeLoc = leadingTriviaLoc();
@@ -616,6 +616,72 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
     status.setIsParseError();
   }
   return makeParserResult(status, typeRepr);
+}
+
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSILBoxSyntax(
+    Optional<ParsedGenericParameterClauseListSyntax> generics) {
+  assert(Tok.is(tok::l_brace));
+  ParsedSILBoxTypeSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
+
+  if (generics) {
+    builder.useGenericParameterClauses(std::move(*generics));
+  }
+
+  // Parse '{'.
+  builder.useLeftBrace(consumeTokenSyntax(tok::l_brace));
+
+  // Parse comma separated field list.
+  if (!Tok.is(tok::r_brace)) {
+    bool hasNext = true;
+    while (hasNext) {
+      ParsedSILBoxTypeFieldSyntaxBuilder fieldBuilder(*SyntaxContext);
+
+      // Parse 'let' or 'var'.
+      if (!Tok.isAny(tok::kw_var, tok::kw_let)) {
+        diagnose(Tok, diag::sil_box_expected_var_or_let);
+        break;
+      }
+      fieldBuilder.useSpecifier(consumeTokenSyntax());
+
+      // Parse the type.
+      auto typeResult = parseTypeSyntax();
+      status |= typeResult.getStatus();
+      if (!typeResult.isNull()) {
+        fieldBuilder.useType(typeResult.get());
+      } else {
+        fieldBuilder.useType(
+            ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+      }
+
+      // Parse ','.
+      hasNext = (status.isSuccess() && Tok.is(tok::comma));
+      if (hasNext) {
+        fieldBuilder.useTrailingComma(consumeTokenSyntax());
+      }
+
+      auto field = fieldBuilder.build();
+      builder.addFieldsMember(std::move(field));
+    }
+  }
+
+  // Parse '}'.
+  if (!Tok.is(tok::r_brace)) {
+    diagnose(Tok, diag::sil_box_expected_r_brace);
+    return makeParsedError(builder.build());
+  }
+  builder.useRightBrace(consumeTokenSyntax(tok::r_brace));
+
+  // Parse the generic argument.
+  if (startsWithLess(Tok)) {
+    auto genericArgs = parseTypeGenericArgumentClauseSyntax();
+    status |= genericArgs.getStatus();
+    if (!genericArgs.isNull()) {
+      builder.useGenericArgumentClause(genericArgs.get());
+    }
+  }
+
+  return makeParsedResult(builder.build());
 }
 
 /// parseTypeSimpleOrComposition
@@ -1198,6 +1264,72 @@ void Parser::ignoreAsyncThrowsAfterArrowSyntax(SourceLoc ArrowLoc) {
           .fixItInsert(ArrowLoc, "async ");
     }
   }
+}
+
+/// Parse layout constraint for 'where' clause in '@_specialize' attribute
+/// and in SIL.
+///
+///   layout-constraint:
+///     identifier
+///     identifier '(' integer-literal ')'
+///     identifier '(' integer-literal ',' integer-literal ')'
+ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
+Parser::parseLayoutConstraintSyntax() {
+  assert(Tok.is(tok::identifier));
+  ParsedLayoutConstraintSyntaxBuilder builder(*SyntaxContext);
+
+  builder.useName(consumeTokenSyntax(tok::identifier));
+
+  if (!Tok.isFollowingLParen()) {
+    return makeParsedResult(builder.build());
+  }
+
+  auto lParenLoc = Tok.getLoc();
+  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
+
+  bool hasError = [&]() -> bool {
+    int value;
+
+    if (!Tok.is(tok::integer_literal)) {
+      diagnose(Tok, diag::layout_size_should_be_positive);
+      return true;
+    }
+    if (Tok.getText().getAsInteger(10, value) || value < 0) {
+      // FIXME: (syntax-parse) Move this semantic-ish check to ASTGen?
+      diagnose(Tok, diag::layout_size_should_be_positive);
+    }
+    builder.useSize(consumeTokenSyntax(tok::integer_literal));
+
+    if (!Tok.is(tok::comma)) {
+      // We don't have an alignment to parse
+      return false;
+    }
+    builder.useComma(consumeTokenSyntax(tok::comma));
+
+    if (!Tok.is(tok::integer_literal)) {
+      diagnose(Tok, diag::layout_alignment_should_be_positive);
+      return true;
+    }
+    if (Tok.getText().getAsInteger(10, value) || value < 0) {
+      // FIXME: (syntax-parse) Move this semantic-ish check to ASTGen?
+      diagnose(Tok, diag::layout_alignment_should_be_positive);
+    }
+    builder.useAlignment(consumeTokenSyntax(tok::integer_literal));
+
+    return false;
+  }();
+
+  if (hasError) {
+    ignoreUntil(tok::r_paren, /*Collect=*/nullptr);
+  }
+  auto rParen = parseMatchingTokenSyntax(
+      tok::r_paren, diag::expected_rparen_layout_constraint, lParenLoc,
+      /*silenceDiag=*/hasError);
+  if (!rParen.isNull()) {
+    builder.useRightParen(rParen.get());
+  }
+
+  return makeParsedResult(builder.build());
 }
 
 /// parseOldStyleProtocolCompositionSyntax
@@ -2272,7 +2404,7 @@ Parser::parseTypeSyntaxNonSIL(Diag<> MessageID) {
   // arguments (see below).
   DeferringContextRAII deferring(*SyntaxContext);
   
-  assert(!isInSILMode());
+//  assert(!isInSILMode());
   ParserStatus status;
 
   // Parse attributes.
@@ -2282,29 +2414,57 @@ Parser::parseTypeSyntaxNonSIL(Diag<> MessageID) {
 
   // Parse generic parameters in SIL mode.
   Optional<ParsedGenericParameterClauseListSyntax> genericParams;
-  // FIXME: (syntax-parse) Handling of SIL mode
-  //  SourceLoc genericParamsLoc = Tok.getLoc();
-  //  if (isInSILMode()) {
-  //    (void)parseSILGenericParamsSyntax(genericParams);
-  //    if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
-  //      consumeToken(tok::at_sign);
-  //      substitutedLoc = consumeToken(tok::identifier);
-  //      patternGenerics = maybeParseGenericParams().getPtrOrNull();
-  //      if (!patternGenerics) {
-  //        diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
-  //      }
-  //    }
-  //  }
+  Optional<ParsedTokenSyntax> substitutedAtTok;
+  Optional<ParsedTokenSyntax> substitutedTok;
+  Optional<ParsedGenericParameterClauseListSyntax> patternGenerics;
+  if (isInSILMode()) {
+    if (auto genericParamRes = parseGenericSILParamsSyntax()) {
+      status |= genericParamRes->getStatus();
+      genericParams = genericParamRes->getOrNull();
+    }
+    if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
+      substitutedAtTok = consumeTokenSyntax(tok::at_sign);
+      substitutedTok = consumeTokenSyntax(tok::identifier);
+      if (auto patternGenericsRes = parseGenericSILParamsSyntax()) {
+        status |= patternGenericsRes->getStatus();
+        patternGenerics = patternGenericsRes->getOrNull();
+      } else {
+        diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
+      }
+    }
+  }
 
     // In SIL mode, parse box types { ... }.
-  //  if (isInSILMode() && Tok.is(tok::l_brace)) {
-  //    if (patternGenerics) {
-  //      diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
-  //    }
-  //    auto ty = parseSILBoxTypeSyntax(std::move(genericParams));
-  //    return applyAttributeToTypeSyntax(std::move(ty), std::move(specifier),
-  //                                      std::move(attrs));
-  //  }
+    if (isInSILMode() && Tok.is(tok::l_brace)) {
+      ParsedSyntaxResult<ParsedTypeSyntax> boxTypeRes = parseTypeSILBoxSyntax(std::move(genericParams));
+      status |= boxTypeRes.getStatus();
+      auto boxType = boxTypeRes.getOrNull();
+      if (substitutedAtTok) {
+        // We can't apply @substituted to a box type.
+        // Since we don't have a place to put the tokens, form an UnknownType.
+        diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
+        SmallVector<ParsedSyntax, 8> junk;
+        if (!boxTypeRes.isNull()) {
+          junk.push_back(boxTypeRes.get());
+        }
+        if (substitutedAtTok) {
+          junk.push_back(std::move(*substitutedAtTok));
+        }
+        if (substitutedTok) {
+          junk.push_back(std::move(*substitutedTok));
+        }
+        if (patternGenerics) {
+          junk.push_back(std::move(*patternGenerics));
+        }
+        if (boxType) {
+          junk.push_back(std::move(*boxType));
+        }
+        boxType = ParsedSyntaxRecorder::makeUnknownType(junk, *SyntaxContext);
+      }
+      auto intermediateResult = makeParsedResult(std::move(boxType), status);
+      return applyAttributeToTypeSyntax(std::move(intermediateResult), std::move(specifier),
+                                        std::move(attrs));
+    }
 
   // Parse the function input type. If we later discover, we are not parsing a
   // function this will form the parsed type.
@@ -2361,7 +2521,7 @@ Parser::parseTypeSyntaxNonSIL(Diag<> MessageID) {
     // We aren't parsing a function. Backtrack.
     backtracking.reset();
     auto result = makeParsedResult(std::move(inputType), status);
-    // TODO: (syntax-parse) Apply genericParams
+    // TODO: (syntax-parse) Apply genericParams and patternGenerics
     return applyAttributeToTypeSyntax(std::move(result), std::move(specifier),
                                       std::move(attrs));
   } else {
@@ -2420,71 +2580,98 @@ Parser::parseTypeSyntaxNonSIL(Diag<> MessageID) {
   }
   builder.useArrow(std::move(arrowToken));
   builder.useReturnType(returnTypeResult.get());
-  // FIXME: (syntax-parse) Handling of SIL mode
-  //    if (isInSILMode()) {
-  //      auto parseSubstitutions =
-  //      [&](MutableArrayRef<TypeRepr*> &subs) -> Optional<bool> {
-  //        if (!consumeIf(tok::kw_for)) return None;
-  //
-  //        if (!startsWithLess(Tok)) {
-  //          diagnose(Tok, diag::sil_function_subst_expected_l_angle);
-  //          return false;
-  //        }
-  //
-  //        consumeStartingLess();
-  //
-  //        SmallVector<TypeRepr*, 4> SubsTypesVec;
-  //        for (;;) {
-  //          auto argTy = parseType();
-  //          if (!argTy.getPtrOrNull())
-  //            return false;
-  //          SubsTypesVec.push_back(argTy.get());
-  //          if (!consumeIf(tok::comma))
-  //            break;
-  //        }
-  //        if (!startsWithGreater(Tok)) {
-  //          diagnose(Tok, diag::sil_function_subst_expected_r_angle);
-  //          return false;
-  //        }
-  //        consumeStartingGreater();
-  //
-  //        subs = Context.AllocateCopy(SubsTypesVec);
-  //        return true;
-  //      };
-  //
-  //      // Parse pattern substitutions.  These must exist if we had pattern
-  //      // generics above.
-  //      if (patternGenerics) {
-  //        auto result = parseSubstitutions(patternSubsTypes);
-  //        if (!result || patternSubsTypes.empty()) {
-  //          diagnose(Tok, diag::sil_function_subst_expected_subs);
-  //          patternGenerics = nullptr;
-  //        } else if (!*result) {
-  //          return makeParserError();
-  //        }
-  //      }
-  //
-  //      if (generics) {
-  //        if (auto result = parseSubstitutions(invocationSubsTypes))
-  //          if (!*result) return makeParserError();
-  //      }
-  //
-  //      if (Tok.is(tok::kw_for)) {
-  //        diagnose(Tok, diag::sil_function_subs_without_generics);
-  //        return makeParserError();
-  //      }
-  //    }
-  //
-  //    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-  //                                         arrowLoc, SecondHalf.get(),
-  //                                         patternGenerics, patternSubsTypes,
-  //                                         invocationSubsTypes);
-  //  }
+  auto functionSyntax = builder.build();
+  if (!genericParams && !substitutedAtTok && !substitutedTok && !patternGenerics) {
+    auto result = makeParsedResult(std::move(functionSyntax), status);
+    return applyAttributeToTypeSyntax(std::move(result), std::move(specifier),
+                                      std::move(attrs));
+  } else {
+    assert(isInSILMode() && "Should only parse generic params in SIL mode");
 
-  // FIXME: (syntax-parse) Apply generics
-  auto result = makeParsedResult(builder.build(), status);
-  return applyAttributeToTypeSyntax(std::move(result), std::move(specifier),
-                                    std::move(attrs));
+    auto parseSubstitutionsSyntax =
+    [&]() -> ParsedSyntaxResult<ParsedGenericSubstitutionSyntax> {
+      ParsedGenericSubstitutionSyntaxBuilder builder(*SyntaxContext);
+      ParserStatus status;
+
+      assert(Tok.is(tok::kw_for));
+      builder.useForKeyword(consumeTokenSyntax(tok::kw_for));
+
+      if (startsWithLess(Tok)) {
+        builder.useLeftAngleBracket(consumeStartingLessSyntax());
+      } else {
+        diagnose(Tok, diag::sil_function_subst_expected_l_angle);
+        status.setIsParseError();
+        return makeParsedResult(builder.build(), status);
+      }
+
+      bool hasNext = true;
+      while (hasNext) {
+        ParsedGenericSubstitutionElementSyntaxBuilder elementBuilder(*SyntaxContext);
+        auto substitutionType = parseTypeSyntax();
+        status |= substitutionType.getStatus();
+        if (!substitutionType.isNull()) {
+          elementBuilder.useType(substitutionType.get());
+        }
+        hasNext = Tok.is(tok::comma);
+        if (hasNext) {
+          elementBuilder.useTrailingComma(consumeTokenSyntax(tok::comma));
+        }
+        builder.addSubstitutionsMember(elementBuilder.build());
+      }
+
+      if (startsWithGreater(Tok)) {
+        builder.useRightAngleBracket(consumeStartingGreaterSyntax());
+      } else {
+        diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+        status.setIsParseError();
+      }
+      return makeParsedResult(builder.build(), status);
+    };
+
+    bool hasGenericParams = genericParams.hasValue();
+    bool hasPatternGenericParams = patternGenerics.hasValue();
+
+    ParsedSILFunctionTypeSyntaxBuilder silFuncBuilder(*SyntaxContext);
+    if (genericParams) {
+      silFuncBuilder.useGenericParameterClauses(std::move(*genericParams));
+    }
+    if (substitutedAtTok) {
+      silFuncBuilder.useSubstitutedAttrAtToken(std::move(*substitutedAtTok));
+    }
+    if (substitutedTok) {
+      silFuncBuilder.useSubstitutedAttrName(std::move(*substitutedTok));
+    }
+    if (patternGenerics) {
+      silFuncBuilder.usePatternGenericParameterClauses(std::move(*patternGenerics));
+    }
+    silFuncBuilder.useFunction(std::move(functionSyntax));
+    if (hasPatternGenericParams && Tok.is(tok::kw_for)) {
+      auto genericSubsRes = parseSubstitutionsSyntax();
+      status |= genericSubsRes.getStatus();
+      if (!genericSubsRes.isNull()) {
+        silFuncBuilder.useGenericPatternSubstitution(genericSubsRes.get());
+      } else {
+        diagnose(Tok, diag::sil_function_subst_expected_subs);
+      }
+    }
+
+    if (hasGenericParams && Tok.is(tok::kw_for)) {
+      auto genericSubsRes = parseSubstitutionsSyntax();
+      status |= genericSubsRes.getStatus();
+      if (!genericSubsRes.isNull()) {
+        silFuncBuilder.useGenericSubstitution(genericSubsRes.get());
+      }
+    }
+
+    if (Tok.is(tok::kw_for)) {
+      ignoreToken(/*Collect=*/nullptr);
+      diagnose(Tok, diag::sil_function_subs_without_generics);
+      status.setIsParseError();
+    }
+
+    auto result = makeParsedResult(silFuncBuilder.build(), status);
+    return applyAttributeToTypeSyntax(std::move(result), std::move(specifier), std::move(attrs));
+  }
 }
 
 /// parseTypeTupleBodySyntax

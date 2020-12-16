@@ -89,3 +89,24 @@ SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const Syntax &Node) {
   assert(false && "No tokens in tree?");
   return Loc;
 }
+
+
+// FIXME: MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl, MOVE TO ASTGenDecl
+
+void ASTGen::addDeclAttributes(DeclAttributes attrs, SourceLoc Loc) {
+  assert(!hasDeclAttributes(Loc));
+  ParsedDeclAttrs[Loc] = attrs;
+}
+
+bool ASTGen::hasDeclAttributes(SourceLoc Loc) const {
+  return ParsedDeclAttrs.find(Loc) != ParsedDeclAttrs.end();
+}
+
+DeclAttributes ASTGen::takeDeclAttributes(SourceLoc Loc) {
+  auto I = ParsedDeclAttrs.find(Loc);
+  assert(I != ParsedDeclAttrs.end());
+  auto attrs = I->second;
+  ParsedDeclAttrs.erase(I);
+  return attrs;
+}
+

@@ -80,6 +80,12 @@ Optional<Syntax> Syntax::getPreviousNode() const {
   return None;
 }
 
+Optional<TokenSyntax> Syntax::getFirstToken() const {
+  if (auto tok = getData().getFirstToken())
+    return TokenSyntax(Root, tok.get());
+  return None;
+}
+
 llvm::Optional<Syntax> Syntax::getParent() const {
   auto ParentData = getData().getParent();
   if (!ParentData) return llvm::None;

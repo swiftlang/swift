@@ -1406,6 +1406,9 @@ public:
   /// \param ArrowLoc The location of the '->'. Must be valid.
   void ignoreAsyncThrowsAfterArrowSyntax(SourceLoc ArrowLoc);
 
+  ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
+  parseLayoutConstraintSyntax();
+
   ParsedSyntaxResult<ParsedTypeSyntax> parseOldStyleProtocolCompositionSyntax();
   
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeAnySyntax();
@@ -1443,13 +1446,16 @@ public:
 
   ParsedSyntaxResult<ParsedTypeSyntax>
   parseTypeOldStyleArraySyntax(ParsedTypeSyntax, SourceLoc BaseLoc);
-  
+
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSILBoxSyntax(
+      Optional<ParsedGenericParameterClauseListSyntax> genericParams);
+
   ParsedSyntaxResult<ParsedTypeSyntax>
   parseTypeSimpleOrCompositionSyntax(Diag<> MessageID);
 
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSimpleSyntax(Diag<> MessageID);
 
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID,
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax(Diag<> MessageID = diag::expected_type,
                                                        bool IsSILFuncDecl = false);
 
   ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntaxNonSIL(Diag<> MessageID);
@@ -1896,6 +1902,18 @@ public:
   ParserStatus
   parseProtocolOrAssociatedTypeWhereClause(TrailingWhereClause *&trailingWhere,
                                            bool isProtocol);
+
+  //===--------------------------------------------------------------------===//
+  // MARK: - Generics Parsing using libSyntax
+
+  ParsedSyntaxResult<ParsedGenericParameterClauseSyntax>
+  parseGenericParameterClauseSyntax();
+
+  // FIXME: (syntax-parse) Should return a ParsedSyntaxResult<...>
+  Optional<ParsedSyntaxResult<ParsedGenericParameterClauseListSyntax>> parseGenericSILParamsSyntax();
+
+  ParsedSyntaxResult<ParsedGenericWhereClauseSyntax>
+  parseGenericWhereClauseSyntax(bool AllowLayoutConstraints = false);
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing

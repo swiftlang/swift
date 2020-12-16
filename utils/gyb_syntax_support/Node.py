@@ -29,7 +29,7 @@ class Node(object):
         self.children = children or []
         self.base_kind = kind
         if self.base_kind == 'SyntaxCollection':
-            self.base_type = 'Syntax'
+            self.base_type = 'Syntax' 
         else:
             self.base_type = kind_to_type(self.base_kind)
 

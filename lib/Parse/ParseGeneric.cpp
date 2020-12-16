@@ -19,6 +19,8 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxBuilders.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Syntax/SyntaxBuilders.h"
@@ -419,4 +421,281 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
   }
 
   return ParserStatus();
+}
+
+//===--------------------------------------------------------------------===//
+// MARK: - Generics Parsing using libSyntax
+
+
+/// Parse a sequence of generic parameters, e.g. '<T: Comparable, U: Container>'
+/// along with an optional requires clause.
+///
+///   generic-parameter-clause:
+///     '<' generic-paramter (',' generic-parameter)* where-clause? '>'
+///
+///   generic-parameter:
+///     identifier
+///     identifier ':' type
+ParsedSyntaxResult<ParsedGenericParameterClauseSyntax>
+Parser::parseGenericParameterClauseSyntax() {
+  assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
+  ParsedGenericParameterClauseSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
+
+  // Parse '<'.
+  SourceLoc LAngleLoc = Tok.getLoc();
+  builder.useLeftAngleBracket(consumeStartingLessSyntax());
+
+  // Parse parameters.
+  while (true) {
+    ParsedGenericParameterSyntaxBuilder paramBuilder(*SyntaxContext);
+
+    // Parse attributes.
+    // TODO: (syntax-parse) Migrate parsing of decl attributes
+    Optional<ParsedAttributeListSyntax> attrs;
+    if (Tok.is(tok::at_sign)) {
+      SyntaxParsingContext tmpCtxt(SyntaxContext);
+      tmpCtxt.setTransparent();
+
+      auto attrsLoc = Tok.getLoc();
+      DeclAttributes attrsAST;
+      // FIXME: (syntax-parse) In the origial implementation the check for
+      // comments was not guared by Tok.is(tok::at_sign)
+      if (Tok.hasComment()) {
+        attrsAST.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
+      }
+      parseDeclAttributeList(attrsAST);
+      if (!attrsAST.isEmpty()) {
+        ASTGenerator.addDeclAttributes(attrsAST, attrsLoc);
+      }
+      attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
+    }
+    if (attrs) {
+      paramBuilder.useAttributes(std::move(*attrs));
+    }
+
+    // Parse the name of the parameter.
+    auto nameId = Context.getIdentifier(Tok.getText());
+    auto name = parseIdentifierSyntax(diag::expected_generics_parameter_name, /*DiagnoseDollarPrefix=*/true);
+    if (name) {
+      paramBuilder.useName(std::move(*name));
+    } else {
+      // We didn't find a type. Commit the current paramBuilder and stop looking
+      // for more parameters.
+      builder.addGenericParameterListMember(paramBuilder.build());
+      status.setIsParseError();
+      break;
+    }
+
+    // Parse the ':' followed by a type.
+    if (Tok.is(tok::colon)) {
+      paramBuilder.useColon(consumeTokenSyntax(tok::colon));
+      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol,
+                    tok::kw_Any)) {
+        auto tyResult = parseTypeSyntax();
+        status |= tyResult.getStatus();
+        if (!tyResult.isNull()) {
+          paramBuilder.useInheritedType(tyResult.get());
+        }
+      } else if (Tok.is(tok::kw_class)) {
+        diagnose(Tok, diag::unexpected_class_constraint);
+        diagnose(Tok, diag::suggest_anyobject)
+        .fixItReplace(Tok.getLoc(), "AnyObject");
+        auto ty = ParsedSyntaxRecorder::makeClassRestrictionType(consumeTokenSyntax(tok::kw_class), *SyntaxContext);
+        paramBuilder.useInheritedType(std::move(ty));
+        status.setIsParseError();
+      } else {
+        diagnose(Tok, diag::expected_generics_type_restriction, nameId);
+
+        paramBuilder.useInheritedType(ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+        // Mark as error but continue looking for more parameters.
+        status.setIsParseError();
+      }
+    }
+
+    // Parse ','
+    bool hasNext = Tok.is(tok::comma);
+    if (hasNext) {
+      paramBuilder.useTrailingComma(consumeTokenSyntax(tok::comma));
+    }
+
+    builder.addGenericParameterListMember(paramBuilder.build());
+
+    if (!hasNext) {
+      break;
+    }
+  }
+
+  // Parse optional where clause.
+  if (Tok.is(tok::kw_where)) {
+    bool firstTypeInComplete = false;
+    auto where = parseGenericWhereClauseSyntax(firstTypeInComplete);
+    builder.useObsoletedWhereClause(where.get());
+  }
+
+  // Parse the closing '>'.
+  if (startsWithGreater(Tok)) {
+    builder.useRightAngleBracket(consumeStartingGreaterSyntax());
+  } else {
+    if (!status.isError()) {
+      diagnose(Tok, diag::expected_rangle_generics_param);
+      diagnose(LAngleLoc, diag::opening_angle);
+    }
+
+    // Skip until we hit the '>'.
+    if (ignoreUntilGreaterInTypeList(/*ProtocolComposition=*/false, /*Collect=*/nullptr)) {
+      builder.useRightAngleBracket(consumeStartingGreaterSyntax());
+    }
+    status.setIsParseError();
+  }
+
+  return makeParsedResult(builder.build(), status);
+}
+
+/// Parse a list of generic parameters.
+///
+///   generic-parameter-clause-list:
+///     generic-parameter-clause generic-parameter-clause*
+Optional<ParsedSyntaxResult<ParsedGenericParameterClauseListSyntax>> Parser::parseGenericSILParamsSyntax() {
+  assert(isInSILMode());
+  ParserStatus status;
+  if (!startsWithLess(Tok)) {
+    return None;
+  }
+
+  SmallVector<ParsedGenericParameterClauseSyntax, 1> clauses;
+  do {
+    auto result = parseGenericParameterClauseSyntax();
+    status |= result.getStatus();
+    if (!result.isNull()) {
+      clauses.push_back(result.get());
+    }
+  } while (startsWithLess(Tok));
+
+  auto result = ParsedSyntaxRecorder::makeGenericParameterClauseList(clauses,
+                                                                     *SyntaxContext);
+  return makeParsedResult(std::move(result), status);
+}
+
+/// Parse a 'where' clause, which places additional constraints on generic
+/// parameters or types based on them.
+///
+///   where-clause:
+///     'where' generic-requirement (',' generic-requirement) *
+///
+///   generic-requirement:
+///     conformance-requirement
+///     same-type-requirement
+///     layout-requirement
+///
+///   conformance-requirement:
+///     type ':' type
+///
+///   same-type-requirement:
+///     type '==' type
+///
+///   layout-requirement:
+///     type ':' layout-constraint
+ParsedSyntaxResult<ParsedGenericWhereClauseSyntax>
+Parser::parseGenericWhereClauseSyntax(bool AllowLayoutConstraints) {
+  assert(Tok.is(tok::kw_where));
+  ParsedGenericWhereClauseSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
+
+  // Parse 'where'.
+  builder.useWhereKeyword(consumeTokenSyntax(tok::kw_where));
+
+  bool hasNext = true;
+  while (hasNext && status.isSuccess()) {
+    auto firstType = parseTypeSyntax();
+    status |= firstType.getStatus();
+    if (firstType.isNull()) {
+      // We didn't parse a type. Stop looking for more
+      break;
+    }
+
+    ParsedGenericRequirementSyntaxBuilder elementBuilder(*SyntaxContext);
+
+    if (Tok.is(tok::colon)) {
+      // Conformance or layout constraint.
+      auto colon = consumeTokenSyntax(tok::colon);
+      if (Tok.is(tok::identifier) &&
+          getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
+              ->isKnownLayout()) {
+        // Layout constraint.
+        ParsedLayoutRequirementSyntaxBuilder layoutReqBuilder(*SyntaxContext);
+        layoutReqBuilder.useLeftTypeIdentifier(firstType.get());
+        layoutReqBuilder.useColon(std::move(colon));
+        SourceLoc layoutLoc = Tok.getLoc();
+        auto layout = parseLayoutConstraintSyntax();
+        status |= layout.getStatus();
+
+        if (!AllowLayoutConstraints && !isInSILMode())
+          diagnose(layoutLoc,
+                   diag::layout_constraints_only_inside_specialize_attr);
+        if (!layout.isNull()) {
+          layoutReqBuilder.useLayoutConstraint(layout.get());
+        }
+        elementBuilder.useBody(layoutReqBuilder.build());
+      } else {
+        // Conformance requirement.
+        ParsedConformanceRequirementSyntaxBuilder conformanceReqBuilder(
+            *SyntaxContext);
+        conformanceReqBuilder.useLeftTypeIdentifier(firstType.get());
+        conformanceReqBuilder.useColon(std::move(colon));
+        auto secondType = parseTypeSyntax();
+        status |= secondType.getStatus();
+        if (!secondType.isNull()) {
+          conformanceReqBuilder.useRightTypeIdentifier(secondType.get());
+        } else {
+          conformanceReqBuilder.useRightTypeIdentifier(
+              ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+        }
+        elementBuilder.useBody(conformanceReqBuilder.build());
+      }
+    } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
+               Tok.is(tok::equal)) {
+      // Same type requirement.
+      ParsedSameTypeRequirementSyntaxBuilder sametypeReqBuilder(*SyntaxContext);
+      sametypeReqBuilder.useLeftTypeIdentifier(firstType.get());
+      if (Tok.is(tok::equal)) {
+        diagnose(Tok, diag::requires_single_equal)
+            .fixItReplace(SourceRange(Tok.getLoc()), "==");
+        ignoreToken(/*Collect=*/nullptr);
+      } else {
+        sametypeReqBuilder.useEqualityToken(consumeTokenSyntax());
+      }
+
+      auto secondType = parseTypeSyntax();
+      status |= secondType.getStatus();
+      if (!secondType.isNull()) {
+        sametypeReqBuilder.useRightTypeIdentifier(secondType.get());
+      } else {
+        sametypeReqBuilder.useRightTypeIdentifier(
+            ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+      }
+      elementBuilder.useBody(sametypeReqBuilder.build());
+    } else {
+      diagnose(Tok, diag::expected_requirement_delim);
+      status.setIsParseError();
+
+      // Fallback to conformance requirement with missing right type.
+      ParsedConformanceRequirementSyntaxBuilder conformanceReqBuilder(
+          *SyntaxContext);
+      conformanceReqBuilder.useLeftTypeIdentifier(firstType.get());
+      conformanceReqBuilder.useRightTypeIdentifier(
+          ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+      elementBuilder.useBody(conformanceReqBuilder.build());
+    }
+
+    // Parse ','.
+    hasNext = (status.isSuccess() && Tok.is(tok::comma));
+    if (hasNext) {
+      elementBuilder.useTrailingComma(consumeTokenSyntax());
+    }
+
+    builder.addRequirementListMember(elementBuilder.build());
+  }
+
+  return makeParsedResult(builder.build(), status);
 }

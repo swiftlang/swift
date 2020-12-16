@@ -253,6 +253,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AwaitExpr': 249,
     'OpaqueReturnTypeOfAttributeArguments': 250,
     'CTypeConventionAttributeArguments': 251,
+    'LayoutRequirement': 252,
+    'LayoutConstraint': 253,
 }
 
 

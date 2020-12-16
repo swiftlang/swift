@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/ASTGen.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -33,6 +34,8 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*array, Loc);
   } else if (auto Attributed = Type.getAs<AttributedTypeSyntax>()) {
     return generate(*Attributed, Loc);
+  } else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>()) {
+    return generate(*ClassRestriction, Loc);
   } else if (auto completionTy = Type.getAs<CodeCompletionTypeSyntax>()) {
     return generate(*completionTy, Loc);
   } else if (auto CompositionList =
@@ -58,6 +61,10 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
     return generate(*Metatype, Loc);
   } else if (auto Optional = Type.getAs<OptionalTypeSyntax>()) {
     return generate(*Optional, Loc);
+  } else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>()) {
+    return generate(*SILBoxType, Loc);
+  } else if (auto SILFunctionType = Type.getAs<SILFunctionTypeSyntax>()) {
+    return generate(*SILFunctionType, Loc);
   } else if (auto simpleIdentifier = Type.getAs<SimpleTypeIdentifierSyntax>()) {
     return generate(*simpleIdentifier, Loc);
   } else if (auto Some = Type.getAs<SomeTypeSyntax>()) {
@@ -72,16 +79,6 @@ TypeRepr *ASTGen::generate(const syntax::TypeSyntax &Type,
   } else {
     llvm_unreachable("ASTGen hasn't been tought how to generate this type");
   }
-//  } else if (auto Composition = Type.getAs<CompositionTypeSyntax>()) {
-//    return generate(*Composition, Loc);
-//  } else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>()) {
-//    return generate(*ClassRestriction, Loc);
-//  } else if (auto SILBoxType = Type.getAs<SILBoxTypeSyntax>()) {
-//    return generate(*SILBoxType, Loc, IsSILFuncDecl);
-//  } else if (auto SILFunctionType = Type.getAs<SILFunctionTypeSyntax>()) {
-//    return generate(*SILFunctionType, Loc, IsSILFuncDecl);
-//  } else if (auto Unknown = Type.getAs<UnknownTypeSyntax>()) {
-//    return generate(*Unknown, Loc);
 
 // FIXME: (syntax-parse) Erase generic type parameters
 //  if (Tok.is(tok::arrow)) {
@@ -154,6 +151,13 @@ TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
   }
 
   return typeAST;
+}
+
+TypeRepr *ASTGen::generate(const syntax::ClassRestrictionTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto declNameLoc = DeclNameLoc(advanceLocBegin(Loc, Type.getClassKeyword()));
+  auto declNameRef = DeclNameRef(Context.getIdentifier("AnyObject"));
+  return new (Context) SimpleIdentTypeRepr(declNameLoc, declNameRef);
 }
 
 TypeRepr *ASTGen::generate(const syntax::CodeCompletionTypeSyntax &Type,
@@ -287,6 +291,267 @@ TypeRepr *ASTGen::generate(const syntax::OptionalTypeSyntax &Type,
   auto baseTypeRepr = generate(Type.getWrappedType(), Loc);
   auto questionLoc = advanceLocBegin(Loc, Type.getQuestionMark());
   return new (Context) OptionalTypeRepr(baseTypeRepr, questionLoc);
+}
+
+TypeRepr *ASTGen::generate(const syntax::SILBoxTypeSyntax &Type, const SourceLoc Loc) {
+  GenericParamList *generics = nullptr;
+  if (auto genericParams = Type.getGenericParameterClauses()) {
+    generics = generate(*genericParams, Loc);
+  }
+  auto leftBraceLoc = advanceLocBegin(Loc, Type.getLeftBrace());
+
+  SmallVector<SILBoxTypeRepr::Field, 4> fields;
+  for (auto field : Type.getFields()) {
+    SourceLoc varOrLetLoc = advanceLocBegin(Loc, field.getSpecifier());
+    bool isMutable;
+    switch (field.getSpecifier().getTokenKind()) {
+    case tok::kw_var: isMutable = true; break;
+    case tok::kw_let: isMutable = false; break;
+    default: llvm_unreachable("Specifier must be 'let' or 'var'"); break;
+    }
+    auto fieldType = generate(field.getType(), Loc);
+    fields.push_back({varOrLetLoc, isMutable, fieldType});
+  }
+  auto rightBraceLoc = advanceLocBegin(Loc, Type.getRightBrace());
+
+  SourceLoc genericLeftAngleLoc;
+  SmallVector<TypeRepr *, 4> genericArgs;
+  SourceLoc genericRightAngleLoc;
+
+  if (auto genericArgClause = Type.getGenericArgumentClause()) {
+    generateGenericArgs(*genericArgClause, Loc, genericLeftAngleLoc, genericRightAngleLoc, genericArgs);
+  }
+
+  return SILBoxTypeRepr::create(Context, generics, leftBraceLoc, fields, rightBraceLoc, genericLeftAngleLoc, Context.AllocateCopy(genericArgs), genericRightAngleLoc);
+}
+
+TypeRepr *ASTGen::generate(const syntax::SILFunctionTypeSyntax &Type,
+                   const SourceLoc Loc) {
+  GenericParamList *generics = nullptr;
+  if (auto genericParamsSyntax = Type.getGenericParameterClauses()) {
+    generics = generate(*genericParamsSyntax, Loc);
+  }
+
+  GenericParamList *patternGenerics = nullptr;
+  if (auto patternGenericSyntax = Type.getPatternGenericParameterClauses()) {
+    patternGenerics = generate(*patternGenericSyntax, Loc);
+  }
+
+  auto funcType = cast<FunctionTypeRepr>(generate(Type.getFunction(), Loc));
+
+  SmallVector<TypeRepr *, 2> invocationSubstitutions;
+  if (auto genericSubsSyntax = Type.getGenericSubstitution()) {
+    invocationSubstitutions = generate(*genericSubsSyntax, Loc);
+  }
+
+  SmallVector<TypeRepr *, 2> patternSubstitutions;
+  if (auto patternSubsSyntax = Type.getGenericPatternSubstitution()) {
+    patternSubstitutions = generate(*patternSubsSyntax, Loc);
+  }
+
+  if (Type.getSubstitutedAttrAtToken() && patternSubstitutions.empty()) {
+    auto diagLoc = advanceLocEnd(Loc, Type);
+    P.diagnose(diagLoc, diag::sil_function_subst_expected_subs);
+  }
+
+  return new (Context)
+      FunctionTypeRepr(generics, funcType->getArgsTypeRepr(), funcType->getAsyncLoc(), funcType->getThrowsLoc(), funcType->getArrowLoc(), funcType->getResultTypeRepr(), patternGenerics, Context.AllocateCopy(patternSubstitutions), Context.AllocateCopy(invocationSubstitutions));
+}
+
+DeclAttributes
+ASTGen::generateDeclAttributes(const Syntax &D, SourceLoc Loc,
+                               bool includeComments) {
+  // Find the AST attribute-list from the lookup table.
+  if (auto firstTok = D.getFirstToken()) {
+    auto declLoc = advanceLocBegin(Loc, *firstTok);
+    if (hasDeclAttributes(declLoc))
+      return takeDeclAttributes(declLoc);
+  }
+  return DeclAttributes();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////// Move to ASTGenGeneric
+
+SmallVector<TypeRepr *, 2>
+ASTGen::generate(const GenericSubstitutionSyntax &substitution, const SourceLoc Loc) {
+  SmallVector<TypeRepr *, 2> substitutionTypes;
+  substitutionTypes.reserve(substitution.getSubstitutions().size());
+  for (auto subst : substitution.getSubstitutions()) {
+    auto typeRepr = generate(subst.getType(), Loc);
+    substitutionTypes.push_back(typeRepr);
+  }
+  return substitutionTypes;
+}
+
+GenericParamList *
+ASTGen::generate(const GenericParameterClauseListSyntax &clauses,
+                 const SourceLoc Loc) {
+  GenericParamList *curr = nullptr;
+
+  // The first one is the outmost generic parameter list.
+  for (const auto &clause : clauses) {
+    auto params = generate(clause, Loc);
+    if (!params) {
+      continue;
+    }
+    if (curr) {
+      params->setOuterParameters(curr);
+    }
+    curr = params;
+  }
+
+  return curr;
+}
+
+GenericParamList *ASTGen::generate(const syntax::GenericParameterClauseSyntax &clause, const SourceLoc Loc) {
+  SmallVector<GenericTypeParamDecl *, 4> params;
+  params.reserve(clause.getGenericParameterList().getNumChildren());
+
+  for (auto elem : clause.getGenericParameterList()) {
+    auto nameTok = elem.getName();
+    if (nameTok.isMissing())
+      break;
+
+    DeclAttributes attrs = generateDeclAttributes(elem, Loc, false);
+    Identifier name = Context.getIdentifier(elem.getName().getIdentifierText());
+    SourceLoc nameLoc = advanceLocBegin(Loc, elem.getName());
+
+    // We always create generic type parameters with an invalid depth.
+    // Semantic analysis fills in the depth when it processes the generic
+    // parameter list.
+    // FIXME: (syntax-parse) We shouldn't be accessing the current decl context
+    // of the parser. It might have moved to a different declaration before
+    // ASTGen is being invoked.
+    auto param = new (Context)
+        GenericTypeParamDecl(P.CurDeclContext, name, nameLoc,
+                             GenericTypeParamDecl::InvalidDepth, params.size());
+
+    if (auto inherited = elem.getInheritedType()) {
+      if (auto ty = generate(*inherited, Loc)) {
+        SmallVector<TypeLoc, 1> constraints = {ty};
+        param->setInherited(Context.AllocateCopy(constraints));
+      }
+    }
+
+    // Attach attributes.
+    param->getAttrs() = attrs;
+
+    params.push_back(param);
+  }
+  if (params.empty())
+    return nullptr;
+
+  SourceLoc whereLoc;
+  SmallVector<RequirementRepr, 4> requirements;
+  if (auto whereClause = clause.getObsoletedWhereClause()) {
+    requirements.reserve(whereClause->getRequirementList().size());
+    for (auto elem : whereClause->getRequirementList()) {
+      if (auto req = generate(elem, Loc)) {
+        requirements.push_back(*req);
+      }
+    }
+    // There's an invariant that valid 'where' loc means that there's at
+    // at least one valid requirement.
+    if (!requirements.empty()) {
+      whereLoc = advanceLocBegin(Loc, whereClause->getWhereKeyword());
+    }
+  }
+
+  auto lAngleLoc = advanceLocBegin(Loc, clause);
+  auto rAngleLoc = advanceLocEnd(Loc, clause);
+  return GenericParamList::create(Context, lAngleLoc, params, whereLoc,
+                                  requirements, rAngleLoc);
+}
+
+Optional<RequirementRepr>
+ASTGen::generate(const syntax::GenericRequirementSyntax &req,
+                 const SourceLoc Loc) {
+  if (auto sameTypeReq = req.getBody().getAs<SameTypeRequirementSyntax>()) {
+    auto firstType = generate(sameTypeReq->getLeftTypeIdentifier(), Loc);
+    auto equalLoc = advanceLocBegin(Loc, sameTypeReq->getEqualityToken());
+    auto secondType = generate(sameTypeReq->getRightTypeIdentifier(), Loc);
+    if (!firstType || !secondType) {
+      return None;
+    }
+    return RequirementRepr::getSameType(firstType, equalLoc, secondType);
+  } else if (auto conformanceReq =
+                 req.getBody().getAs<ConformanceRequirementSyntax>()) {
+    auto firstType = generate(conformanceReq->getLeftTypeIdentifier(), Loc);
+    auto secondType = generate(conformanceReq->getRightTypeIdentifier(), Loc);
+    if (!firstType || !secondType) {
+      return None;
+    }
+    return RequirementRepr::getTypeConstraint(
+        firstType, advanceLocBegin(Loc, conformanceReq->getColon()),
+        secondType);
+  } else if (auto layoutReq = req.getBody().getAs<LayoutRequirementSyntax>()) {
+    auto firstType = generate(layoutReq->getLeftTypeIdentifier(), Loc);
+    auto layout = generate(layoutReq->getLayoutConstraint(), Loc);
+    if (!firstType || layout.isNull()) {
+      return None;
+    }
+    auto colonLoc = advanceLocBegin(Loc, layoutReq->getColon());
+    auto layoutLoc = advanceLocBegin(Loc, layoutReq->getLayoutConstraint());
+    return RequirementRepr::getLayoutConstraint(
+        firstType, colonLoc, LayoutConstraintLoc(layout, layoutLoc));
+  } else {
+    llvm_unreachable("invalid syntax kind for requirement body");
+  }
+}
+
+static LayoutConstraintKind getLayoutConstraintKind(Identifier &id,
+                                                    ASTContext &Ctx) {
+  if (id == Ctx.Id_TrivialLayout)
+    return LayoutConstraintKind::TrivialOfExactSize;
+  if (id == Ctx.Id_TrivialAtMostLayout)
+    return LayoutConstraintKind::TrivialOfAtMostSize;
+  if (id == Ctx.Id_RefCountedObjectLayout)
+    return LayoutConstraintKind::RefCountedObject;
+  if (id == Ctx.Id_NativeRefCountedObjectLayout)
+    return LayoutConstraintKind::NativeRefCountedObject;
+  if (id == Ctx.Id_ClassLayout)
+    return LayoutConstraintKind::Class;
+  if (id == Ctx.Id_NativeClassLayout)
+    return LayoutConstraintKind::NativeClass;
+  return LayoutConstraintKind::UnknownLayout;
+}
+
+LayoutConstraint ASTGen::generate(const LayoutConstraintSyntax &constraint,
+                                  const SourceLoc Loc) {
+  auto name = Context.getIdentifier(constraint.getName().getIdentifierText());
+  auto constraintKind = getLayoutConstraintKind(name, Context);
+  assert(constraintKind != LayoutConstraintKind::UnknownLayout);
+
+  // Non-trivial constraint kinds don't have size/alignment.
+  // TODO: Diagnose if it's supplied?
+  if (!LayoutConstraintInfo::isTrivial(constraintKind)) {
+    return LayoutConstraint::getLayoutConstraint(constraintKind, Context);
+  }
+
+  // '_Trivial' without explicit size/alignment.
+  if (!constraint.getSize()) {
+    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Trivial,
+                                                 Context);
+  }
+
+  int size = 0;
+  if (auto sizeSyntax = constraint.getSize()) {
+    sizeSyntax->getText().getAsInteger(10, size);
+  }
+  if (size < 0) {
+    return LayoutConstraint::getUnknownLayout();
+  }
+
+  int alignment = 0;
+  if (auto alignmentSyntax = constraint.getAlignment()) {
+    alignmentSyntax->getText().getAsInteger(10, alignment);
+  }
+  if (alignment > 0) {
+    return LayoutConstraint::getUnknownLayout();
+  }
+
+  return LayoutConstraint::getLayoutConstraint(constraintKind, size, alignment,
+                                               Context);
 }
 
 TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,

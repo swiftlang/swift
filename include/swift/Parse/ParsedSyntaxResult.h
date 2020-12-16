@@ -122,6 +122,16 @@ makeParsedResult(ParsedSyntaxNode node, ParserStatus Status) {
   return ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node), Status);
 }
 
+template <typename ParsedSyntaxNode>
+static ParsedSyntaxResult<ParsedSyntaxNode>
+makeParsedResult(Optional<ParsedSyntaxNode> Node, ParserStatus Status) {
+  if (Node) {
+    return makeParsedResult(std::move(*Node), Status);
+  } else {
+    return Status;
+  }
+}
+
 } // namespace swift
 
 #endif
