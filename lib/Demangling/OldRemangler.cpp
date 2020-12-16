@@ -2177,8 +2177,8 @@ void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
 }
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
-  Buffer << "MM";
   mangleSingleChildNode(node); // type
+  Buffer << "MM";
 }
 
 void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(

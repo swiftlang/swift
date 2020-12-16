@@ -232,7 +232,7 @@ bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
       if (node == nullptr)
         llvm::report_fatal_error("Unexpected FINGERPRINT_NODE record");
 
-      node->setFingerprint(Fingerprint{BlobData.str()});
+      node->setFingerprint(Fingerprint::fromString(BlobData));
       break;
     }
 

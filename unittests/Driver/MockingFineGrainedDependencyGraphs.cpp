@@ -45,7 +45,7 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
   assert(!swiftDeps.empty());
   swiftDeps.resize(Fingerprint::DIGEST_LENGTH, 'X');
   auto interfaceHash =
-    interfaceHashIfNonEmpty.getValueOr(Fingerprint{swiftDeps});
+    interfaceHashIfNonEmpty.getValueOr(Fingerprint::fromString(swiftDeps));
 
   SourceManager sm;
   DiagnosticEngine diags(sm);

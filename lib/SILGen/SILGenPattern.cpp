@@ -2207,7 +2207,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // the value. This invariant makes it easy to specialize code for
       // ownership.
       if (eltTL->isLoadable()) {
-        // If we do not have a loadable value, just use getManagedSubObject
+        // If we do not have a loadable value, just use getManagedSubobject
         // Load a loadable data value.
         if (eltConsumption == CastConsumptionKind::CopyOnSuccess) {
           eltValue = SGF.B.createLoadBorrow(loc, eltValue);
