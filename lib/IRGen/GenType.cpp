@@ -2092,6 +2092,20 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     align = IGM.getCappedAlignment(align);
     return createPrimitive(llvmTy, size, align);
   }
+  case TypeKind::BuiltinDefaultActorStorage: {
+    // Builtin.DefaultActorStorage represents the extra storage
+    // (beyond the heap header) of a default actor class.  It is
+    // fixed-size and totally opaque.
+    auto numWords = NumWords_DefaultActor;
+
+    auto ty = llvm::StructType::create(IGM.getLLVMContext(),
+                                 llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
+                                       "swift.defaultactor");
+    auto size = IGM.getPointerSize() * numWords;
+    auto align = Alignment(2 * IGM.getPointerAlignment().getValue());
+    auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
+    return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
+  }
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:

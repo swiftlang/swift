@@ -25,6 +25,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "IRGen.h"
+#include "Field.h"
 #include "NominalMetadataVisitor.h"
 
 namespace swift {
@@ -157,10 +158,9 @@ private:
     // But we currently always give classes field-offset vectors,
     // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
-    for (auto field :
-           theClass->getStoredPropertiesAndMissingMemberPlaceholders()) {
-      addFieldEntries(field);
-    }
+    forEachField(IGM, theClass, [&](Field field) {
+      asImpl().addFieldEntries(field);
+    });
     asImpl().noteEndOfFieldOffsets(theClass);
 
     // If the class has resilient metadata, we cannot make any assumptions
@@ -183,13 +183,16 @@ private:
   }
   
         
-  void addFieldEntries(Decl *field) {
-    if (auto var = dyn_cast<VarDecl>(field)) {
-      asImpl().addFieldOffset(var);
+  void addFieldEntries(Field field) {
+    switch (field.getKind()) {
+    case Field::Var:
+      asImpl().addFieldOffset(field.getVarDecl());
       return;
-    }
-    if (auto placeholder = dyn_cast<MissingMemberDecl>(field)) {
-      asImpl().addFieldOffsetPlaceholders(placeholder);
+    case Field::MissingMember:
+      asImpl().addFieldOffsetPlaceholders(field.getMissingMemberDecl());
+      return;
+    case Field::DefaultActorStorage:
+      asImpl().addDefaultActorStorageFieldOffset();
       return;
     }
   }
@@ -227,6 +230,7 @@ public:
     addPointer();
   }
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
+  void addDefaultActorStorageFieldOffset() { addPointer(); }
   void addFieldOffset(VarDecl *var) { addPointer(); }
   void addFieldOffsetPlaceholders(MissingMemberDecl *mmd) {
     for (unsigned i = 0, e = mmd->getNumberOfFieldOffsetVectorEntries();
