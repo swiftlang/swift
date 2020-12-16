@@ -1013,7 +1013,8 @@ bool ConstraintSystem::PotentialBindings::infer(
         // type from context e.g. parameter type of a function call),
         // we need to test type with and without l-value after
         // delaying bindings for as long as possible.
-        if (isExpr<ForceValueExpr>(anchor) && !type->is<LValueType>()) {
+        if (isExpr<ForceValueExpr>(anchor) &&
+            TypeVar->getImpl().canBindToLValue() && !type->is<LValueType>()) {
           addPotentialBinding(binding->withType(LValueType::get(type)));
           DelayedBy.push_back(constraint);
         }
