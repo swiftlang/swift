@@ -632,6 +632,8 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
+
   /// Finds top-level decls of this module filtered by their attributes.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

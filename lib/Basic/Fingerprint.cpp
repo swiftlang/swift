@@ -12,7 +12,11 @@
 
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/STLExtras.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <inttypes.h>
+#include <sstream>
 
 using namespace swift;
 
@@ -25,19 +29,26 @@ void swift::simple_display(llvm::raw_ostream &out, const Fingerprint &fp) {
   out << fp.getRawValue();
 }
 
-namespace {
-  template <class T> struct SmallStringBound;
-  template <size_t N> struct SmallStringBound<llvm::SmallString<N>> {
-    static constexpr size_t value = N;
-  };
-};
+Fingerprint Fingerprint::fromString(StringRef value) {
+  assert(value.size() == Fingerprint::DIGEST_LENGTH &&
+         "Only supports 32-byte hash values!");
+  auto fp = Fingerprint::ZERO();
+  {
+    std::istringstream s(value.drop_back(Fingerprint::DIGEST_LENGTH/2).str());
+    s >> std::hex >> fp.core.first;
+  }
+  {
+    std::istringstream s(value.drop_front(Fingerprint::DIGEST_LENGTH/2).str());
+    s >> std::hex >> fp.core.second;
+  }
+  return fp;
+}
 
-// Assert that the \c DIGEST_LENGTH value we export from the \c Fingerprint
-// has the right byte length. It's unlikely this value will change in LLVM,
-// but it's always good to have compile-time justification for a
-// magic constant - especially one that gets used for serialization.
-using MD5Digest_t =
-    decltype (&llvm::MD5::MD5Result::digest)(llvm::MD5::MD5Result);
-static_assert(SmallStringBound<std::result_of<MD5Digest_t>::type>::value ==
-                  Fingerprint::DIGEST_LENGTH,
-              "MD5 digest size does not match size expected by Fingerprint!");
+llvm::SmallString<Fingerprint::DIGEST_LENGTH> Fingerprint::getRawValue() const {
+  llvm::SmallString<Fingerprint::DIGEST_LENGTH> Str;
+  llvm::raw_svector_ostream Res(Str);
+  Res << llvm::format_hex_no_prefix(core.first, 16);
+  Res << llvm::format_hex_no_prefix(core.second, 16);
+  assert(*this == Fingerprint::fromString(Str));
+  return Str;
+}
