@@ -45,6 +45,8 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_ERROR | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_FIXME | %FileCheck %s --check-prefix=NORESULTS
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=REGULAR_MULTICLOSURE_APPLIED | %FileCheck %s --check-prefix=POINT_MEMBER
+
 
 struct A {
   func doAThings() -> A { return self }
@@ -424,4 +426,15 @@ CreateThings {
       point.#^MULTICLOSURE_FUNCBUILDER_FIXME^#
     }
     Thing. // ErrorExpr
+}
+
+
+func takesClosureOfPoint(_: (Point)->()) {}
+func overloadedWithDefaulted(_: ()->()) {}
+func overloadedWithDefaulted(_: ()->(), _ defaulted: Int = 10) {}
+
+takesClosureOfPoint { p in
+  overloadedWithDefaulted {
+    if p.#^REGULAR_MULTICLOSURE_APPLIED^# {}
+  }
 }
