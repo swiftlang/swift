@@ -401,12 +401,25 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
   // Key is a literal protocol requirement, Value indicates whether (first)
   // given protocol is a direct requirement, and (second) whether it has been
   // covered by an existing binding.
+  bool canBeNil = false;
   llvm::SmallMapVector<ProtocolDecl *, std::pair<bool, bool>, 4>
       literalProtocols;
   for (auto *constraint : Protocols) {
-    if (constraint->getKind() == ConstraintKind::LiteralConformsTo)
-      literalProtocols.insert({constraint->getProtocol(),
-                               {isDirectRequirement(constraint), false}});
+    if (constraint->getKind() != ConstraintKind::LiteralConformsTo)
+      continue;
+
+    auto *protocol = constraint->getProtocol();
+
+    // No reason to add `ExpressibleByNilLiteral` into the set
+    // because it doesn't have a default type.
+    if (protocol->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByNilLiteral)) {
+      canBeNil = true;
+      continue;
+    }
+
+    literalProtocols.insert(
+        {protocol, {isDirectRequirement(constraint), false}});
   }
 
   for (auto &binding : Bindings) {
@@ -435,16 +448,17 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       if (isCovered)
         continue;
 
-      // FIXME: This is a hack and it's incorrect because it depends
-      // on ordering of the literal procotols e.g. if `ExpressibleByNilLiteral`
-      // appears before e.g. `ExpressibleByIntegerLiteral` we'd drop
-      // optionality although that would be incorrect.
       do {
         // If the type conforms to this protocol, we're covered.
         if (TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
           isCovered = true;
           break;
         }
+
+        // Can't unwrap optionals if there is `ExpressibleByNilLiteral`
+        // conformance requirement placed on the type variable.
+        if (canBeNil)
+          break;
 
         // If this literal protocol is not a direct requirement it
         // would be possible to change optionality while inferring
