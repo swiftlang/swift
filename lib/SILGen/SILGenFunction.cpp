@@ -555,7 +555,7 @@ void SILGenFunction::emitAsyncHandler(FuncDecl *fd) {
     SILLinkage::Hidden, name, bodyFnTy, F.getGenericEnvironment(),
     loc, F.isBare(), F.isTransparent(),
     F.isSerialized(), IsNotDynamic, ProfileCounter(), IsNotThunk,
-    F.getClassSubclassScope(), F.getInlineStrategy(), F.getEffectsKind());
+    SubclassScope::NotApplicable, F.getInlineStrategy(), F.getEffectsKind());
   bodyFn->setDebugScope(new (getModule()) SILDebugScope(loc, bodyFn));
 
   SILGenFunction(SGM, *bodyFn, fd).emitFunction(fd);
