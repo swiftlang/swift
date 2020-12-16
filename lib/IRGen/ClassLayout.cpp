@@ -27,7 +27,7 @@ using namespace irgen;
 ClassLayout::ClassLayout(const StructLayoutBuilder &builder,
                          ClassMetadataOptions options,
                          llvm::Type *classTy,
-                         ArrayRef<VarDecl *> allStoredProps,
+                         ArrayRef<Field> allStoredProps,
                          ArrayRef<FieldAccess> allFieldAccesses,
                          ArrayRef<ElementLayout> allElements,
                          Size headerSize)

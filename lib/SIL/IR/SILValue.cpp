@@ -327,19 +327,6 @@ bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
   if (constraint->satisfiesConstraint(kind))
     return true;
 
-  // Then see if our preferred ownership constraint was not guaranteed or our
-  // use lifetime constraint was LifetimeEnding. If it wasn't, then we fail
-  // since we do not allow for implicit borrows in such situations.
-  if (kind == OwnershipKind::Owned && !isLifetimeEnding()) {
-    // Otherwise, we now know that our constraint is non lifetime ending
-    // and guaranteed and our value had owned ownership. If our user
-    // allows for implicit borrows and thus can accept owned values,
-    // return true.
-    if (auto borrowingOperand = BorrowingOperand::get(this))
-      if (borrowingOperand->canAcceptOwnedValues())
-        return true;
-  }
-
   return false;
 }
 
@@ -380,4 +367,50 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                "Kind:" << constraint.getPreferredKind()
             << " LifetimeConstraint:" << constraint.getLifetimeConstraint()
             << ">";
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     OperandOwnership operandOwnership) {
+  switch (operandOwnership) {
+  case OperandOwnership::None:
+    os << "none";
+    break;
+  case OperandOwnership::InstantaneousUse:
+    os << "instantaneous";
+    break;
+  case OperandOwnership::PointerEscape:
+    os << "pointer-escape";
+    break;
+  case OperandOwnership::BitwiseEscape:
+    os << "bitwise-escape";
+    break;
+  case OperandOwnership::ForwardingUnowned:
+    os << "bitwise-escape";
+    break;
+  case OperandOwnership::Borrow:
+    os << "borrow";
+    break;
+  case OperandOwnership::DestroyingConsume:
+    os << "destroying-consume";
+    break;
+  case OperandOwnership::ForwardingConsume:
+    os << "forwarding-consume";
+    break;
+  case OperandOwnership::NestedBorrow:
+    os << "nested-borrow";
+    break;
+  case OperandOwnership::InteriorPointer:
+    os << "interior-pointer";
+    break;
+  case OperandOwnership::ForwardingBorrow:
+    os << "forwarded-borrow";
+    break;
+  case OperandOwnership::EndBorrow:
+    os << "end-borrow";
+    break;
+  case OperandOwnership::Reborrow:
+    os << "reborrow";
+    break;
+  }
+  return os;
 }

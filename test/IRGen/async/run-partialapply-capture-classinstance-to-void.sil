@@ -2,7 +2,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
@@ -11,44 +11,16 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
-
 import Builtin
 import Swift
 import PrintShims
 import _Concurrency
 
-sil public_external @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
-
-
-
-
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 
 class S {
-  func classinstanceSVoidToVoid() async
   deinit
   init()
-}
-
-// CHECK-LL: @classinstanceSVoidToVoidTu =
-// CHECK-LL: define hidden swiftcc void @classinstanceSVoidToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
-sil hidden @classinstanceSVoidToVoid : $@async @convention(method) (@guaranteed S) -> () {
-bb0(%instance : $S):
-  %take_s = function_ref @take_S : $@async @convention(thin) (@guaranteed S) -> ()
-  %result = apply %take_s(%instance) : $@async @convention(thin) (@guaranteed S) -> ()
-  return %result : $()
-}
-
-sil hidden @take_S : $@async @convention(thin) (@guaranteed S) -> () {
-bb0(%instance : $S):
-  %any = alloc_stack $Any
-  strong_retain %instance : $S
-  %any_addr = init_existential_addr %any : $*Any, $S
-  store %instance to %any_addr : $*S
-  %print_any = function_ref @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
-  %result = apply %print_any(%any) : $@convention(thin) (@in_guaranteed Any) -> ()
-  destroy_addr %any_addr : $*S
-  dealloc_stack %any : $*Any
-  return %result : $()
 }
 
 sil hidden [exact_self_class] @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S {
@@ -81,9 +53,20 @@ bb0(%0 : $S):
 }
 
 sil_vtable S {
-  #S.classinstanceSVoidToVoid: (S) -> () async -> () : @classinstanceSVoidToVoid
   #S.init!allocator: (S.Type) -> () -> S : @S_allocating_init
   #S.deinit!deallocator: @S_deallocating_deinit
+}
+
+// CHECK-LL: @classinstanceSToVoidTu =
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classinstanceSToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+sil @classinstanceSToVoid : $@async @convention(method) (@owned S) -> () {
+entry(%c : $S):
+  %class_addr = alloc_stack $S
+  store %c to %class_addr : $*S
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %printGeneric<S>(%class_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: main.S
+  dealloc_stack %class_addr : $*S
+  return %result : $()
 }
 
 // Defined in _Concurrency
@@ -93,9 +76,12 @@ sil @test_case : $@convention(thin) @async () -> () {
   %s_type = metatype $@thick S.Type
   %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S
   %instance = apply %allocating_init(%s_type) : $@convention(method) (@thick S.Type) -> @owned S
-  %classinstanceSVoidToVoid = class_method %instance : $S, #S.classinstanceSVoidToVoid : (S) -> () async -> (), $@convention(method) @async (@guaranteed S) -> ()
   strong_retain %instance : $S
-  %result = apply %classinstanceSVoidToVoid(%instance) : $@convention(method) @async (@guaranteed S) -> () // CHECK: main.S
+
+  %classinstanceSToVoid = function_ref @classinstanceSToVoid : $@async @convention(method) (@owned S) -> ()
+  %partiallyApplied = partial_apply %classinstanceSToVoid(%instance) : $@async @convention(method) (@owned S) -> ()
+  %result = apply %partiallyApplied() : $@async @callee_owned () -> ()
+
   strong_release %instance : $S
 
   %void = tuple()
@@ -114,3 +100,4 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %7 = struct $Int32 (%6 : $Builtin.Int32)
   return %7 : $Int32
 }
+

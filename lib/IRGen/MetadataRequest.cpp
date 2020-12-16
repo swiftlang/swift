@@ -1714,10 +1714,16 @@ namespace {
       llvm_unreachable("error type should not appear in IRGen");
     }
 
-    MetadataResponse visitSILBlockStorageType(CanSILBlockStorageType type,
-                                              DynamicMetadataRequest request) {
-      llvm_unreachable("cannot ask for metadata of block storage");
+    // These types are artificial types used for for internal purposes and
+    // should never appear in a metadata request.
+#define INTERNAL_ONLY_TYPE(ID)                                               \
+    MetadataResponse visit##ID##Type(Can##ID##Type type,                     \
+                                     DynamicMetadataRequest request) {       \
+      llvm_unreachable("cannot ask for metadata of compiler-internal type"); \
     }
+    INTERNAL_ONLY_TYPE(SILBlockStorage)
+    INTERNAL_ONLY_TYPE(BuiltinDefaultActorStorage)
+#undef INTERNAL_ONLY_TYPE
 
     MetadataResponse visitSILBoxType(CanSILBoxType type,
                                      DynamicMetadataRequest request) {
