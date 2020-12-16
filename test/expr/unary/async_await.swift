@@ -165,12 +165,9 @@ func testAsyncLet() async throws {
   } catch {
   }
 
-  async let x1 = getIntUnsafely() // expected-error{{call can throw but is not marked with 'try'}}
-  // expected-note@-1{{did you mean to use 'try'}}
-  // expected-note@-2{{did you mean to handle error as optional value?}}
-  // expected-note@-3{{did you mean to disable error propagation?}}
+  async let x1 = getIntUnsafely() // okay, try is implicit here
 
-  async let x2 = getInt() // expected-error{{call is 'async' in an 'async let' initializer that is not marked with 'await'}}
+  async let x2 = getInt() // okay, await is implicit here
 
   async let x3 = try getIntUnsafely()
   async let x4 = try! getIntUnsafely()
