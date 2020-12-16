@@ -46,6 +46,8 @@ class SwiftTestCase(unittest.TestCase):
 
         # Setup args
         self.args = argparse.Namespace(
+            llvm_assertions=True,
+            swift_assertions=True,
             enable_tsan_runtime=False,
             compiler_vendor='none',
             swift_compiler_version=None,
@@ -80,7 +82,7 @@ class SwiftTestCase(unittest.TestCase):
         self.toolchain = None
         self.args = None
 
-    def test_by_default_no_cmake_options(self):
+    def test_default_cmake_options(self):
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,
@@ -88,12 +90,36 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         expected = [
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+            '-DSWIFT_ENABLE_ASSERTIONS:BOOL=TRUE',
             '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
+
+    # SR-13934
+    def test_swift_assertions_separate_from_llvm(self):
+        self.args.llvm_assertions = False
+        self.args.swift_assertions = True
+        swift = Swift(
+            self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_ENABLE_ASSERTIONS:BOOL=TRUE',
+            swift.cmake_options)
+        self.args.llvm_assertions = True
+        self.args.swift_assertions = False
+        swift = Swift(
+            self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_ENABLE_ASSERTIONS:BOOL=FALSE',
+            swift.cmake_options)
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -103,6 +129,7 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         flags_set = [
+            '-DSWIFT_ENABLE_ASSERTIONS:BOOL=TRUE',
             '-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
             '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',

@@ -1157,7 +1157,7 @@ function(_add_swift_target_library_single target name)
     set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
   else()
     set(build_type "${CMAKE_BUILD_TYPE}")
-    set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
+    set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
     set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   endif()
 
@@ -2339,7 +2339,7 @@ function(_add_swift_target_executable_single name)
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
-    ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
+    ENABLE_ASSERTIONS "${SWIFT_ENABLE_ASSERTIONS}"
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
@@ -2347,7 +2347,7 @@ function(_add_swift_target_executable_single name)
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
-    ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
+    ENABLE_ASSERTIONS "${SWIFT_ENABLE_ASSERTIONS}"
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
