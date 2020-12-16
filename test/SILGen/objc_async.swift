@@ -56,6 +56,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[THROWBB]]([[ERROR_VALUE:%.*]] : @owned $Error):
   // CHECK:   throw [[ERROR_VALUE]]
 
+  let _: String = await slowServer.findAnswerNullably("foo")
+  let _: String = await try slowServer.doSomethingDangerousNullably("foo")
 }
 
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]

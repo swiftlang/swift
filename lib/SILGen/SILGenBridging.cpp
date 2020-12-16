@@ -1362,7 +1362,12 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
     }
 
     if (foreignAsync && i == foreignAsync->completionHandlerParamIndex()) {
-      foreignAsyncSlot = arg;
+      // Copy the block.
+      foreignAsyncSlot = SGF.B.createCopyBlock(loc, arg);
+      // If the argument is consumed, we're still responsible for releasing the
+      // original.
+      if (inputs[i].isConsumed())
+        SGF.emitManagedRValueWithCleanup(arg);
       continue;
     }
 
@@ -1597,7 +1602,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // Bridge the arguments.
   Optional<ForeignErrorConvention> foreignError;
   Optional<ForeignAsyncConvention> foreignAsync;
-  SILValue foreignErrorSlot, foreignAsyncSlot;
+  SILValue foreignErrorSlot;
+  SILValue foreignAsyncSlot;
   CanType nativeFormalResultType, bridgedFormalResultType;
   auto objcFnTy = emitObjCThunkArguments(*this, loc, thunk, args,
                                          foreignErrorSlot, foreignAsyncSlot,
@@ -1634,15 +1640,62 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
   SILValue result;
   
+  CanSILFunctionType completionTy;
+  bool completionIsOptional = false;
+  if (foreignAsyncSlot) {
+    completionTy = foreignAsyncSlot->getType().getAs<SILFunctionType>();
+    if (!completionTy) {
+      completionTy = foreignAsyncSlot->getType().getOptionalObjectType()
+        .castTo<SILFunctionType>();
+      completionIsOptional = true;
+    }
+  }
+  
+  // Helper function to take ownership of the completion handler from the
+  // foreign async slot, and unwrap it if it's in an optional.
+  auto consumeAndUnwrapCompletionBlock = [&](SILValue &completionBlock,
+                                             SILBasicBlock *&doneBBOrNull) {
+    auto completionBlockMV = emitManagedRValueWithCleanup(foreignAsyncSlot);
+    
+    // If the completion handler argument is nullable, and the caller gave us
+    // no completion handler, discard the result.
+    completionBlock = completionBlockMV.borrow(*this, loc).getValue();
+    doneBBOrNull = nullptr;
+    if (completionIsOptional) {
+      doneBBOrNull = createBasicBlock();
+      auto hasCompletionBB = createBasicBlock();
+      auto noCompletionBB = createBasicBlock();
+
+      std::pair<EnumElementDecl *, SILBasicBlock *> dests[] = {
+        {getASTContext().getOptionalSomeDecl(), hasCompletionBB},
+        {getASTContext().getOptionalNoneDecl(), noCompletionBB},
+      };
+      
+      B.createSwitchEnum(loc, completionBlock, nullptr, dests);
+      
+      B.emitBlock(noCompletionBB);
+      B.createBranch(loc, doneBBOrNull);
+
+      B.emitBlock(hasCompletionBB);
+      completionBlock = hasCompletionBB->createPhiArgument(
+                                  SILType::getPrimitiveObjectType(completionTy),
+                                  OwnershipKind::Guaranteed);
+      
+    }
+  };
+  
   // Helper function to pass a native async function's result as arguments to
   // the ObjC completion handler block.
   auto passResultToCompletionHandler = [&](SILValue result) -> SILValue {
     Scope completionArgScope(*this, loc);
     
     SmallVector<SILValue, 2> completionHandlerArgs;
-    auto completionTy = foreignAsyncSlot->getType().castTo<SILFunctionType>();
     
     auto asyncResult = emitManagedRValueWithCleanup(result);
+    
+    SILValue completionBlock;
+    SILBasicBlock *doneBB;
+    consumeAndUnwrapCompletionBlock(completionBlock, doneBB);
     
     auto pushArg = [&](ManagedValue arg,
                        CanType nativeFormalTy,
@@ -1654,7 +1707,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
                                  SILType::getPrimitiveObjectType(bridgedTy));
       completionHandlerArgs.push_back(bridgedArg.borrow(*this, loc).getValue());
     };
-    
+ 
+    Scope completionArgDestructureScope(*this, loc);
+
     auto errorParamIndex = foreignAsync->completionHandlerErrorParamIndex();
     auto pushErrorPlaceholder = [&]{
       auto errorArgTy = completionTy->getParameters()[*errorParamIndex]
@@ -1696,7 +1751,13 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       }
     }
     // Pass the bridged results on to the completion handler.
-    B.createApply(loc, foreignAsyncSlot, {}, completionHandlerArgs);
+    B.createApply(loc, completionBlock, {}, completionHandlerArgs);
+    completionArgDestructureScope.pop();
+    
+    if (doneBB) {
+      B.createBranch(loc, doneBB);
+      B.emitBlock(doneBB);
+    }
     
     // The immediate function result is an empty tuple.
     return SILUndef::get(SGM.Types.getEmptyTupleType(), F);
@@ -1763,6 +1824,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // Emit the error destination.
     {
       B.emitBlock(errorBB);
+      
       SILValue nativeError = errorBB->createPhiArgument(
           substConv.getSILErrorType(getTypeExpansionContext()),
           OwnershipKind::Owned);
@@ -1772,15 +1834,23 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
         // completion handler, with dummy values for the other argument(s).
         Scope completionArgScope(*this, loc);
         
+        auto nativeErrorMV = emitManagedRValueWithCleanup(nativeError);
+        
+        SILValue completionBlock;
+        SILBasicBlock *doneBB;
+        consumeAndUnwrapCompletionBlock(completionBlock, doneBB);
+
+        Scope completionErrorScope(*this, loc);
+
         SmallVector<SILValue, 2> completionHandlerArgs;
-        auto completionTy = foreignAsyncSlot->getType().castTo<SILFunctionType>();
+        auto completionTy = completionBlock->getType().castTo<SILFunctionType>();
         auto errorParamIndex = *foreignAsync->completionHandlerErrorParamIndex();
         auto completionErrorTy = completionTy->getParameters()[errorParamIndex]
           .getInterfaceType();
         auto bridgedError = emitNativeToBridgedError(loc,
-                                     emitManagedRValueWithCleanup(nativeError),
-                                     nativeError->getType().getASTType(),
-                                     completionErrorTy);
+                                           nativeErrorMV,
+                                           nativeError->getType().getASTType(),
+                                           completionErrorTy);
         
         // Fill in placeholder arguments, and put the bridged error in its
         // rightful place.
@@ -1805,10 +1875,17 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
             completionHandlerArgs.push_back(none);
           }
         }
-        // Pass the bridged results on to the completion handler.
-        B.createApply(loc, foreignAsyncSlot, {}, completionHandlerArgs);
-        completionArgScope.pop();
+        // Pass the bridged error on to the completion handler.
+        B.createApply(loc, completionBlock, {}, completionHandlerArgs);
+
+        completionErrorScope.pop();
         
+        if (doneBB) {
+          B.createBranch(loc, doneBB);
+          B.emitBlock(doneBB);
+        }
+        completionArgScope.pop();
+
         B.createBranch(loc, contBB);
       } else {
         // In this branch, the eventual return value is mostly invented.
