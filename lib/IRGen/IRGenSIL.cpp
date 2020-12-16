@@ -2942,6 +2942,9 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // The callee type must use the `method` convention.
   auto calleeTy = i->getCallee()->getType().castTo<SILFunctionType>();
   auto resultTy = i->getFunctionType();
+
+  if (calleeTy->isAsync())
+    return false;
   
   if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method)
     return false;
