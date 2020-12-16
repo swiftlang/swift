@@ -23,6 +23,10 @@ class Swift(product.Product):
     def __init__(self, args, toolchain, source_dir, build_dir):
         product.Product.__init__(self, args, toolchain, source_dir,
                                  build_dir)
+
+        # Add the cmake option for enabling or disabling assertions.
+        self.cmake_options.extend(self._swift_assertions)
+
         # Add any runtime sanitizer arguments.
         self.cmake_options.extend(self._runtime_sanitizer_flags)
 
@@ -59,6 +63,10 @@ class Swift(product.Product):
         Whether this product is produced by build-script-impl.
         """
         return True
+
+    @property
+    def _swift_assertions(self):
+        return [('SWIFT_ENABLE_ASSERTIONS:BOOL', self.args.swift_assertions)]
 
     @property
     def _runtime_sanitizer_flags(self):

@@ -162,6 +162,7 @@ endif()
 
 # Normalize spelling of boolean values.
 normalize_boolean_spelling(LLVM_ENABLE_ASSERTIONS)
+normalize_boolean_spelling(SWIFT_ENABLE_ASSERTIONS)
 normalize_boolean_spelling(SWIFT_STDLIB_ASSERTIONS)
 normalize_boolean_spelling(SWIFT_AST_VERIFIER)
 normalize_boolean_spelling(SWIFT_ASAN_BUILD)

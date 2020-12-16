@@ -304,7 +304,7 @@ cmake^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
-    -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
+    -DSWIFT_ENABLE_ASSERTIONS:BOOL=YES^
     -DLLDB_USE_STATIC_BINDINGS:BOOL=YES^
     -DPYTHON_HOME:PATH=%PYTHON_HOME%^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^

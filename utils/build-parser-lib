@@ -213,6 +213,7 @@ class Builder(object):
             cmake_args += ["-DCMAKE_BUILD_TYPE:STRING=Debug"]
         if self.enable_assertions:
             cmake_args += ["-DLLVM_ENABLE_ASSERTIONS:BOOL=ON"]
+            cmake_args += ["-DSWIFT_ENABLE_ASSERTIONS:BOOL=ON"]
         if instrumentation:
             cmake_args += ["-DLLVM_BUILD_INSTRUMENTED=" + instrumentation]
         if profile_data:
