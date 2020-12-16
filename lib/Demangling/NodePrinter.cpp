@@ -564,6 +564,7 @@ private:
     case Node::Kind::GlobalVariableOnceFunction:
     case Node::Kind::GlobalVariableOnceToken:
     case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+    case Node::Kind::AsyncFunctionPointer:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2551,6 +2552,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "flag for loading of canonical specialized generic type "
                "metadata for ";
     print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::AsyncFunctionPointer:
+    Printer << "async function pointer to ";
     return nullptr;
   }
   printer_unreachable("bad node kind!");
