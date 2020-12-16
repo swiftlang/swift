@@ -3558,8 +3558,6 @@ namespace {
           
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion:
-        // Check is trivially true.
-        ctx.Diags.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ValueCast:
@@ -3979,7 +3977,6 @@ namespace {
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // The subexpression is always an rvalue.
-      auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
@@ -4007,19 +4004,6 @@ namespace {
         return nullptr;
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
-        if (cs.getType(sub)->isEqual(toType)) {
-          ctx.Diags.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
-              .fixItRemove(SourceRange(expr->getLoc(),
-                                       castTypeRepr->getSourceRange().End));
-
-        } else {
-          ctx.Diags
-              .diagnose(expr->getLoc(), diag::forced_downcast_coercion,
-                        cs.getType(sub), toType)
-              .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
-                            "as");
-        }
-
         expr->setCastKind(castKind);
         cs.setType(expr, toType);
         return expr;
@@ -4111,8 +4095,6 @@ namespace {
 
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
-        ctx.Diags.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
-                           fromType, toType);
         expr->setCastKind(castKind);
         cs.setType(expr, OptionalType::get(toType));
         return expr;

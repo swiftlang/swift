@@ -6040,8 +6040,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     auto fromBaseType = *isArrayType(fromType);
     auto toBaseType = *isArrayType(toType);
 
-    return simplifyCheckedCastConstraint(fromBaseType, toBaseType, subflags,
-                                         locator);
+    return simplifyCheckedCastConstraint(fromBaseType, toBaseType,
+                                         subflags | TMF_ApplyingFix, locator);
   }
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
@@ -6054,16 +6054,15 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                                       locator) == SolutionKind::Error)
       return SolutionKind::Error;
 
-
-    return simplifyCheckedCastConstraint(fromValueType, toValueType, subflags,
-                                         locator);
+    return simplifyCheckedCastConstraint(fromValueType, toValueType,
+                                         subflags | TMF_ApplyingFix, locator);
   }
 
   case CheckedCastKind::SetDowncast: {
     auto fromBaseType = *isSetType(fromType);
     auto toBaseType = *isSetType(toType);
-    return simplifyCheckedCastConstraint(fromBaseType, toBaseType, subflags,
-                                         locator);
+    return simplifyCheckedCastConstraint(fromBaseType, toBaseType,
+                                         subflags | TMF_ApplyingFix, locator);
   }
 
   case CheckedCastKind::ValueCast: {
@@ -6076,7 +6075,50 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       addConstraint(ConstraintKind::Subtype, toType, fromType,
                     getConstraintLocator(locator));
     }
-      
+
+    // Both types are known and statically convertible.
+    if (!(fromType->hasTypeVariable() || toType->hasTypeVariable())) {
+      if (flags.contains(TMF_ApplyingFix))
+        return SolutionKind::Solved;
+
+      auto *loc = getConstraintLocator(locator);
+      if (!isExpr<ExplicitCastExpr>(loc->getAnchor()))
+        return SolutionKind::Solved;
+
+      auto castKind = TypeChecker::typeCheckCheckedCast(
+          fromType, toType, CheckedCastContextKind::None, DC, SourceLoc(),
+          nullptr, SourceRange());
+      if (castKind == CheckedCastKind::Coercion) {
+        auto fnFromType = fromType->getAs<FunctionType>();
+        auto fnToType = toType->getAs<FunctionType>();
+        if (fnFromType && fnToType) {
+          // Although function types are compile-time convertible because
+          // compiler can emit thunks at SIL to handle the conversion when
+          // required, only convertions that are supported by the runtime are
+          // when types are trivially equal or non-throwing from type is equal
+          // to throwing to type without throwing clause conversions are not
+          // possible at runtime.
+          if (fnFromType->isEqual(fnToType)) {
+            (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
+                *this, fromType, toType, getConstraintLocator(locator)));
+          } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
+            if (fnFromType->isEqual(
+                    fnToType->getWithoutThrowing()->castTo<FunctionType>())) {
+              (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
+                  *this, fromType, toType, getConstraintLocator(locator)));
+            }
+          } else {
+            // Runtime cannot perform such conversion.
+            (void)recordFix(AllowUnsuportedRuntimeCheckedCast::create(
+                *this, fromType, toType, getConstraintLocator(locator)));
+          }
+        } else {
+          (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
+              *this, fromType, toType, getConstraintLocator(locator)));
+        }
+      }
+    }
+
     return SolutionKind::Solved;
   }
 
@@ -10331,7 +10373,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidResultBuilderBody:
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
-  case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember: {
+  case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
+  case FixKind::AllowAlwaysSucceedCheckedCast:
+  case FixKind::AllowUnsuportedRuntimeCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
