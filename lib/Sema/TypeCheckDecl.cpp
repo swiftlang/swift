@@ -778,7 +778,7 @@ ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = decl->getASTContext();
 
   // only allow rethrowing requirements to be determined from marked protocols
-  if (decl->getAttrs().hasAttribute<swift::AtRethrowsAttr>()) {
+  if (!decl->getAttrs().hasAttribute<swift::AtRethrowsAttr>()) {
     return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
   }
 
@@ -789,7 +789,7 @@ ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
     // it must have a rethrows attribute
     // it must not have any parameters that are closures that cause rethrowing
     if (!fnDecl || 
-        !fnDecl->getAttrs().hasAttribute<RethrowsAttr>()) {
+        !fnDecl->hasThrows()) {
       continue;
     }
 
@@ -828,22 +828,25 @@ ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
 FunctionRethrowingKind
 FunctionRethrowingKindRequest::evaluate(Evaluator &evaluator,
                                         AbstractFunctionDecl *decl) const {
-  if (decl->getAttrs().hasAttribute<RethrowsAttr>()) {
-    GenericSignature genericSig = decl->getGenericSignature();
-    FunctionRethrowingKind kind = getParameterThrowingKind(decl, genericSig);
-    // since we have checked all arguments, if we still havent found anything
-    // check the self parameter
-    if (kind == FunctionRethrowingKind::Invalid && 
-        decl->hasImplicitSelfDecl()) {
-      auto selfParam = decl->getImplicitSelfDecl();
-      if (selfParam) {
-        auto interfaceTy = selfParam->getInterfaceType();
-        kind = getTypeThrowingKind(interfaceTy, genericSig);
+  if (decl->hasThrows()) {
+    if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (proto->isRethrowingProtocol()) {
+        GenericSignature genericSig = decl->getGenericSignature();
+        FunctionRethrowingKind kind = getParameterThrowingKind(decl, genericSig);
+        // since we have checked all arguments, if we still havent found anything
+        // check the self parameter
+        if (kind == FunctionRethrowingKind::Invalid && 
+            decl->hasImplicitSelfDecl()) {
+          auto selfParam = decl->getImplicitSelfDecl();
+          if (selfParam) {
+            auto interfaceTy = selfParam->getInterfaceType();
+            kind = getTypeThrowingKind(interfaceTy, genericSig);
+          }
+        }
+
+        return kind;
       }
     }
-
-    return kind;
-  } else if (decl->hasThrows()) {
     return FunctionRethrowingKind::Throws;
   }
   return FunctionRethrowingKind::None;
