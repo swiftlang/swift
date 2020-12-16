@@ -14,10 +14,10 @@
 #define SWIFT_DEPENDENCY_SCANNING_TOOL_H
 
 #include "swift-c/DependencyScan/DependencyScan.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"
 
@@ -63,9 +63,13 @@ private:
   llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
   initCompilerInstanceForScan(ArrayRef<const char *> Command);
 
-  /// Shared cache of module dependencies, re-used by individual queries
+  /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
   std::unique_ptr<ModuleDependenciesCache> SharedCache;
+
+  /// Shared cache of compiler instances created during batch scanning, corresponding to
+  /// command-line options specified in the batch scan input entry.
+  std::unique_ptr<CompilerArgInstanceCacheMap> VersionedPCMInstanceCacheCache;
 
   /// A shared consumer that, for now, just prints the encountered diagnostics.
   PrintingDiagnosticConsumer PDC;

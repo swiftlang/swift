@@ -15,7 +15,6 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
-#include "swift/Frontend/Frontend.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -25,8 +24,10 @@ namespace swift {
 namespace dependencies {
 
 DependencyScanningTool::DependencyScanningTool()
-    : SharedCache(std::make_unique<ModuleDependenciesCache>()), PDC(), Alloc(),
-      Saver(Alloc) {}
+    : SharedCache(std::make_unique<ModuleDependenciesCache>()),
+      VersionedPCMInstanceCacheCache(
+          std::make_unique<CompilerArgInstanceCacheMap>()),
+      PDC(), Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
@@ -76,8 +77,9 @@ DependencyScanningTool::getDependencies(
         BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
   auto Instance = std::move(*InstanceOrErr);
 
-  auto batchScanResults =
-      performBatchModuleScan(*Instance.get(), *SharedCache, Saver, BatchInput);
+  auto batchScanResults = performBatchModuleScan(
+      *Instance.get(), *SharedCache, VersionedPCMInstanceCacheCache.get(),
+      Saver, BatchInput);
 
   return batchScanResults;
 }

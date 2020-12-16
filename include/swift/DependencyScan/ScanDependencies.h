@@ -15,6 +15,7 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 
 namespace llvm {
@@ -28,6 +29,10 @@ class CompilerInstance;
 class ModuleDependenciesCache;
 
 namespace dependencies {
+
+using CompilerArgInstanceCacheMap =
+    llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
+                              std::unique_ptr<ModuleDependenciesCache>>>;
 
 struct BatchScanInput {
   llvm::StringRef moduleName;
@@ -64,13 +69,15 @@ performModulePrescan(CompilerInstance &instance);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-performBatchModuleScan(CompilerInstance &instance,
-                       ModuleDependenciesCache &cache, llvm::StringSaver &saver,
+performBatchModuleScan(CompilerInstance &invocationInstance,
+                       ModuleDependenciesCache &invocationCache,
+                       CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
+                       llvm::StringSaver &saver,
                        const std::vector<BatchScanInput> &BatchInput);
 
 /// Batch prescan the imports of modules specified in \c batchInputFile.
 std::vector<llvm::ErrorOr<swiftscan_import_set_t>>
-performBatchModulePrescan(CompilerInstance &instance,
+performBatchModulePrescan(CompilerInstance &invocationInstance,
                           ModuleDependenciesCache &cache,
                           llvm::StringSaver &saver,
                           const std::vector<BatchScanInput> &BatchInput);

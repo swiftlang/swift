@@ -925,53 +925,59 @@ using CompilerArgInstanceCacheMap =
                               std::unique_ptr<ModuleDependenciesCache>>>;
 
 static bool
-forEachBatchEntry(CompilerInstance &instance, ModuleDependenciesCache &cache,
+forEachBatchEntry(CompilerInstance &invocationInstance,
+                  ModuleDependenciesCache &invocationCache,
+                  CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
                   llvm::StringSaver &saver,
                   const std::vector<BatchScanInput> &batchInput,
                   llvm::function_ref<void(BatchScanInput, CompilerInstance &,
                                           ModuleDependenciesCache &)>
                       scanningAction) {
-  const CompilerInvocation &invok = instance.getInvocation();
-  // Keep track of all compiler instances and dependency caches we have
-  // created.
-  // TODO: Re-use a single cache across all invocations, once `alreadySeen`
-  // state is no longer shared.
-  CompilerArgInstanceCacheMap subInstanceMap;
-  auto &diags = instance.getDiags();
-  ForwardingDiagnosticConsumer FDC(instance.getDiags());
+  const CompilerInvocation &invok = invocationInstance.getInvocation();
+  bool localSubInstanceMap = false;
+  CompilerArgInstanceCacheMap *subInstanceMap;
+  if (versionedPCMInstanceCache)
+    subInstanceMap = versionedPCMInstanceCache;
+  else {
+    subInstanceMap = new CompilerArgInstanceCacheMap;
+    localSubInstanceMap = true;
+  }
+
+  auto &diags = invocationInstance.getDiags();
+  ForwardingDiagnosticConsumer FDC(invocationInstance.getDiags());
 
   for (auto &entry : batchInput) {
     CompilerInstance *pInstance = nullptr;
     ModuleDependenciesCache *pCache = nullptr;
     if (entry.arguments.empty()) {
       // Use the compiler's instance if no arguments are specified.
-      pInstance = &instance;
-      pCache = &cache;
-    } else if (subInstanceMap.count(entry.arguments)) {
+      pInstance = &invocationInstance;
+      pCache = &invocationCache;
+    } else if (subInstanceMap->count(entry.arguments)) {
       // Use the previously created instance if we've seen the arguments
       // before.
-      pInstance = subInstanceMap[entry.arguments].first.get();
-      pCache = subInstanceMap[entry.arguments].second.get();
+      pInstance = (*subInstanceMap)[entry.arguments].first.get();
+      pCache = (*subInstanceMap)[entry.arguments].second.get();
     } else {
       // Create a new instance by the arguments and save it in the map.
-      subInstanceMap.insert(
+      subInstanceMap->insert(
           {entry.arguments,
            std::make_pair(std::make_unique<CompilerInstance>(),
                           std::make_unique<ModuleDependenciesCache>())});
 
-      pInstance = subInstanceMap[entry.arguments].first.get();
-      pCache = subInstanceMap[entry.arguments].second.get();
+      pInstance = (*subInstanceMap)[entry.arguments].first.get();
+      pCache = (*subInstanceMap)[entry.arguments].second.get();
       SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvok = invok;
       pInstance->addDiagnosticConsumer(&FDC);
       if (subInvok.parseArgs(args, diags)) {
-        instance.getDiags().diagnose(
+        invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
       if (pInstance->setup(subInvok)) {
-        instance.getDiags().diagnose(
+        invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
@@ -980,6 +986,9 @@ forEachBatchEntry(CompilerInstance &instance, ModuleDependenciesCache &cache,
     assert(pCache);
     scanningAction(entry, *pInstance, *pCache);
   }
+
+  if (localSubInstanceMap)
+    delete subInstanceMap;
   return false;
 }
 
@@ -1132,8 +1141,9 @@ bool swift::dependencies::batchScanDependencies(
   if (!batchInput.hasValue())
     return true;
 
-  auto batchScanResults =
-      performBatchModuleScan(instance, cache, saver, *batchInput);
+  auto batchScanResults = performBatchModuleScan(
+      instance, cache, /*versionedPCMInstanceCache*/ nullptr, saver,
+      *batchInput);
 
   // Write the result JSON to the specified output path, for each entry
   auto ientries = batchInput->cbegin();
@@ -1268,14 +1278,17 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance) {
 
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 swift::dependencies::performBatchModuleScan(
-    CompilerInstance &instance, ModuleDependenciesCache &cache,
+    CompilerInstance &invocationInstance,
+    ModuleDependenciesCache &invocationCache,
+    CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
   std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>> batchScanResult;
   batchScanResult.reserve(batchInput.size());
 
   // Perform a full dependency scan for each batch entry module
   forEachBatchEntry(
-      instance, cache, saver, batchInput,
+      invocationInstance, invocationCache, versionedPCMInstanceCache, saver,
+      batchInput,
       [&batchScanResult](BatchScanInput entry, CompilerInstance &instance,
                          ModuleDependenciesCache &cache) {
         StringRef moduleName = entry.moduleName;
@@ -1343,7 +1356,7 @@ swift::dependencies::performBatchModulePrescan(
 
   // Perform a full dependency scan for each batch entry module
   forEachBatchEntry(
-      instance, cache, saver, batchInput,
+      instance, cache, /*versionedPCMInstanceCache*/ nullptr, saver, batchInput,
       [&batchPrescanResult](BatchScanInput entry, CompilerInstance &instance,
                             ModuleDependenciesCache &cache) {
         StringRef moduleName = entry.moduleName;
