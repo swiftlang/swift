@@ -34,7 +34,18 @@ public:
   //===--------------------------------------------------------------------===//
   // MARK: - Expressions
 public:
+  Expr *generate(const BooleanLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const FloatLiteralExprSyntax &Expr, const SourceLoc &Loc);
   Expr *generate(const IntegerLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const NilLiteralExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundColumnExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundDsohandleExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundFileExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundFileIDExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundFilePathExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundLineExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const PoundFunctionExprSyntax &Expr, const SourceLoc &Loc);
+  Expr *generate(const UnknownExprSyntax &Expr, const SourceLoc &Loc);
 
 private:
   /// Map magic literal tokens such as #file to their MagicIdentifierLiteralExpr
