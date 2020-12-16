@@ -793,7 +793,8 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
                           DiagnosticConsumer &DiagConsumer) :                 \
     TokenBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
-  static bool isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag);   \
+  static bool isApplicable(const ResolvedCursorInfo &Info,                    \
+                           DiagnosticEngine &Diag);                           \
   bool isApplicable() {                                                       \
     return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine) ;    \
   }                                                                           \
@@ -821,7 +822,8 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
                           DiagnosticConsumer &DiagConsumer) :                 \
     RangeBasedRefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {}      \
   bool performChange() override;                                              \
-  static bool isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag);   \
+  static bool isApplicable(const ResolvedRangeInfo &Info,                     \
+                           DiagnosticEngine &Diag);                           \
   bool isApplicable() {                                                       \
     return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine) ;     \
   }                                                                           \
@@ -829,7 +831,7 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
 #include "swift/IDE/RefactoringKinds.def"
 
 bool RefactoringActionLocalRename::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
 
@@ -950,7 +952,7 @@ public:
 /// Check whether a given range can be extracted.
 /// Return true on successful condition checking,.
 /// Return false on failed conditions.
-ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
+ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
                                           DiagnosticEngine &DiagEngine) {
   SmallVector<CannotExtractReason, 2> AllReasons;
   // If any declared declaration is refered out of the given range, return false.
@@ -1050,7 +1052,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
 }
 
 bool RefactoringActionExtractFunction::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::PartOfExpression:
   case RangeKind::SingleDecl:
@@ -1579,7 +1581,7 @@ bool RefactoringActionExtractExprBase::performChange() {
 }
 
 bool RefactoringActionExtractExpr::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
     case RangeKind::SingleExpression:
       // We disallow extract literal expression for two reasons:
@@ -1605,7 +1607,7 @@ bool RefactoringActionExtractExpr::performChange() {
 }
 
 bool RefactoringActionExtractRepeatedExpr::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
     case RangeKind::SingleExpression:
       return checkExtractConditions(Info, Diag).
@@ -1628,7 +1630,7 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
 
 
 bool RefactoringActionMoveMembersToExtension::isApplicable(
-    ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+    const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::SingleDecl:
   case RangeKind::MultiTypeMemberDecl: {
@@ -1727,7 +1729,7 @@ class FindAllSubDecls : public SourceEntityWalker {
 };
 }
 bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
-  ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::SingleDecl:
   case RangeKind::MultiTypeMemberDecl: {
@@ -1775,7 +1777,7 @@ bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
 }
 
 static std::pair<IfStmt *, IfStmt *>
-findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
+findCollapseNestedIfTarget(const ResolvedCursorInfo &CursorInfo) {
   if (CursorInfo.Kind != CursorInfoKind::StmtStart)
     return {};
 
@@ -1804,7 +1806,7 @@ findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
 }
 
 bool RefactoringActionCollapseNestedIfStmt::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   return findCollapseNestedIfTarget(CursorInfo).first;
 }
 
@@ -1842,7 +1844,7 @@ bool RefactoringActionCollapseNestedIfStmt::performChange() {
 }
 
 static std::unique_ptr<llvm::SetVector<Expr*>>
-findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
+findConcatenatedExpressions(const ResolvedRangeInfo &Info, ASTContext &Ctx) {
   Expr *E = nullptr;
 
   switch (Info.Kind) {
@@ -1940,7 +1942,7 @@ static void interpolatedExpressionForm(Expr *E, SourceManager &SM,
 }
 
 bool RefactoringActionConvertStringsConcatenationToInterpolation::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   auto RangeContext = Info.RangeContext;
   if (RangeContext) {
     auto &Ctx = Info.RangeContext->getASTContext();
@@ -2080,7 +2082,7 @@ private:
 };
 
 std::unique_ptr<ExpandableTernaryExprInfo>
-findExpandableTernaryExpression(ResolvedRangeInfo Info) {
+findExpandableTernaryExpression(const ResolvedRangeInfo &Info) {
 
   if (Info.Kind != RangeKind::SingleDecl
       && Info.Kind != RangeKind:: SingleExpression)
@@ -2101,7 +2103,7 @@ findExpandableTernaryExpression(ResolvedRangeInfo Info) {
 }
 
 bool RefactoringActionExpandTernaryExpr::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   auto Target = findExpandableTernaryExpression(Info);
   return Target && Target->isValid();
 }
@@ -2166,7 +2168,7 @@ bool RefactoringActionExpandTernaryExpr::performChange() {
 }
 
 bool RefactoringActionConvertIfLetExprToGuardExpr::
-  isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
 
   if (Info.Kind != RangeKind::SingleStatement
       && Info.Kind != RangeKind::MultiStatement)
@@ -2254,7 +2256,7 @@ bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
 }
 
 bool RefactoringActionConvertGuardExprToIfLetExpr::
-  isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   if (Info.Kind != RangeKind::SingleStatement
       && Info.Kind != RangeKind::MultiStatement)
     return false;
@@ -2340,7 +2342,7 @@ bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
 }
 
 bool RefactoringActionConvertToSwitchStmt::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
 
   class ConditionalChecker : public ASTWalker {
   public:
@@ -2386,9 +2388,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
 
   class SwitchConvertable {
   public:
-    SwitchConvertable(ResolvedRangeInfo Info) {
-      this->Info = Info;
-    }
+    SwitchConvertable(const ResolvedRangeInfo &Info) : Info(Info) { }
 
     bool isApplicable() {
       if (Info.Kind != RangeKind::SingleStatement)
@@ -2399,7 +2399,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     }
 
   private:
-    ResolvedRangeInfo Info;
+    const ResolvedRangeInfo &Info;
     IfStmt *If = nullptr;
     ConditionalChecker checker;
 
@@ -2507,9 +2507,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
 
   class ConverterToSwitch {
   public:
-    ConverterToSwitch(ResolvedRangeInfo Info, SourceManager &SM) : SM(SM) {
-      this->Info = Info;
-    }
+    ConverterToSwitch(const ResolvedRangeInfo &Info,
+                      SourceManager &SM) : Info(Info), SM(SM) { }
 
     void performConvert(SmallString<64> &Out) {
       If = findIf();
@@ -2521,7 +2520,7 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     }
 
   private:
-    ResolvedRangeInfo Info;
+    const ResolvedRangeInfo &Info;
     SourceManager &SM;
 
     IfStmt *If;
@@ -2686,7 +2685,7 @@ struct ConvertToTernaryExprInfo {
 };
 
 ConvertToTernaryExprInfo
-findConvertToTernaryExpression(ResolvedRangeInfo Info) {
+findConvertToTernaryExpression(const ResolvedRangeInfo &Info) {
 
   auto notFound = ConvertToTernaryExprInfo();
 
@@ -2746,7 +2745,7 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
 }
 
 bool RefactoringActionConvertToTernaryExpr::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   return findConvertToTernaryExpression(Info).isValid();
 }
 
@@ -2836,7 +2835,8 @@ public:
 
   FillProtocolStubContext() : DC(nullptr), Adopter(), FillingContents({}) {};
 
-  static FillProtocolStubContext getContextFromCursorInfo(ResolvedCursorInfo Tok);
+  static FillProtocolStubContext getContextFromCursorInfo(
+      const ResolvedCursorInfo &Tok);
 
   ArrayRef<ValueDecl*> getFillingContents() const {
     return llvm::makeArrayRef(FillingContents);
@@ -2855,7 +2855,7 @@ public:
 };
 
 FillProtocolStubContext FillProtocolStubContext::
-getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
+getContextFromCursorInfo(const ResolvedCursorInfo &CursorInfo) {
   if(!CursorInfo.isValid())
     return FillProtocolStubContext();
   if (!CursorInfo.IsRef) {
@@ -2887,7 +2887,7 @@ getUnsatisfiedRequirements(const IterableDeclContext *IDC) {
 }
 
 bool RefactoringActionFillProtocolStub::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   return FillProtocolStubContext::getContextFromCursorInfo(Tok).canProceed();
 };
 
@@ -3005,7 +3005,7 @@ static SwitchStmt* findEnclosingSwitchStmt(CaseStmt *CS,
 }
 
 bool RefactoringActionExpandDefault::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   auto Exit = [&](bool Applicable) {
     if (!Applicable)
       Diag.diagnose(SourceLoc(), diag::invalid_default_location);
@@ -3042,7 +3042,7 @@ bool RefactoringActionExpandDefault::performChange() {
 }
 
 bool RefactoringActionExpandSwitchCases::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &DiagEngine) {
+isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &DiagEngine) {
   if (!CursorInfo.TrailingStmt)
     return false;
   if (auto *Switch = dyn_cast<SwitchStmt>(CursorInfo.TrailingStmt)) {
@@ -3079,7 +3079,7 @@ bool RefactoringActionExpandSwitchCases::performChange() {
   return Result;
 }
 
-static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
+static Expr *findLocalizeTarget(const ResolvedCursorInfo &CursorInfo) {
   if (CursorInfo.Kind != CursorInfoKind::ExprStart)
     return nullptr;
   struct StringLiteralFinder: public SourceEntityWalker {
@@ -3103,7 +3103,7 @@ static Expr *findLocalizeTarget(ResolvedCursorInfo CursorInfo) {
 }
 
 bool RefactoringActionLocalizeString::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   return findLocalizeTarget(Tok);
 }
 
@@ -3184,7 +3184,7 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
 }
 
 static SourceLoc
-collectMembersForInit(ResolvedCursorInfo CursorInfo,
+collectMembersForInit(const ResolvedCursorInfo &CursorInfo,
                       SmallVectorImpl<MemberwiseParameter> &memberVector) {
 
   if (!CursorInfo.ValueD)
@@ -3232,7 +3232,7 @@ collectMembersForInit(ResolvedCursorInfo CursorInfo,
 }
 
 bool RefactoringActionMemberwiseInitLocalRefactoring::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   
   SmallVector<MemberwiseParameter, 8> memberVector;
   return collectMembersForInit(Tok, memberVector).isValid();
@@ -3482,7 +3482,7 @@ printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent, ParameterList *Par
 }
 
 bool RefactoringActionAddEquatableConformance::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   return AddEquatableContext::getDeclarationContextFromInfo(Tok).isValid();
 }
 
@@ -3497,9 +3497,9 @@ performChange() {
 }
 
 static CharSourceRange
-  findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
-                               SourceFile *TheFile,
-                               SourceManager &SM) {
+findSourceRangeToWrapInCatch(const ResolvedCursorInfo &CursorInfo,
+                             SourceFile *TheFile,
+                             SourceManager &SM) {
   Expr *E = CursorInfo.TrailingExpr;
   if (!E)
     return CharSourceRange();
@@ -3527,7 +3527,7 @@ static CharSourceRange
 }
 
 bool RefactoringActionConvertToDoCatch::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   if (!Tok.TrailingExpr)
     return false;
   return isa<ForceTryExpr>(Tok.TrailingExpr);
@@ -3553,7 +3553,8 @@ bool RefactoringActionConvertToDoCatch::performChange() {
 
 /// Given a cursor position, this function tries to collect a number literal
 /// expression immediately following the cursor.
-static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
+static NumberLiteralExpr *getTrailingNumberLiteral(
+    const ResolvedCursorInfo &Tok) {
   // This cursor must point to the start of an expression.
   if (Tok.Kind != CursorInfoKind::ExprStart)
     return nullptr;
@@ -3624,7 +3625,7 @@ void insertUnderscoreInDigits(StringRef Digits,
 }
 
 bool RefactoringActionSimplifyNumberLiteral::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   if (auto *Literal = getTrailingNumberLiteral(Tok)) {
     SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
@@ -3652,8 +3653,8 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
   return true;
 }
 
-static CallExpr *findTrailingClosureTarget(SourceManager &SM,
-                                           ResolvedCursorInfo CursorInfo) {
+static CallExpr *findTrailingClosureTarget(
+    SourceManager &SM, const ResolvedCursorInfo &CursorInfo) {
   if (CursorInfo.Kind == CursorInfoKind::StmtStart)
     // StmtStart postion can't be a part of CallExpr.
     return nullptr;
@@ -3706,7 +3707,7 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
 }
 
 bool RefactoringActionTrailingClosure::
-isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   SourceManager &SM = CursorInfo.SF->getASTContext().SourceMgr;
   return findTrailingClosureTarget(SM, CursorInfo);
 }
@@ -3758,7 +3759,7 @@ bool RefactoringActionTrailingClosure::performChange() {
   return false;
 }
 
-static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
+static bool rangeStartMayNeedRename(const ResolvedRangeInfo &Info) {
   switch(Info.Kind) {
     case RangeKind::SingleExpression: {
       Expr *E = Info.ContainedNodes[0].get<Expr*>();
@@ -3798,7 +3799,7 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
 }
     
 bool RefactoringActionConvertToComputedProperty::
-isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   if (Info.Kind != RangeKind::SingleDecl) {
     return false;
   }
@@ -4059,7 +4060,7 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
 
 ArrayRef<RefactoringKind> swift::ide::
 collectAvailableRefactorings(SourceFile *SF,
-                             ResolvedCursorInfo CursorInfo,
+                             const ResolvedCursorInfo &CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
                              bool ExcludeRename) {
   SmallVector<RefactoringKind, 2> AllKinds;
