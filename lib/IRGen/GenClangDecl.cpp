@@ -64,10 +64,6 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
     if (initializingDecl) {
       return initializingDecl;
     }
-  } else if (auto rd = dyn_cast<clang::CXXRecordDecl>(decl)) {
-    if(rd->hasDefinition()) {
-      return rd->getDefinition();
-    }
   }
   return nullptr;
 }
