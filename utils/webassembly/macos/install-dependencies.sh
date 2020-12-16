@@ -2,9 +2,7 @@
 
 set -ex
 
-if [[ ! -z "$CI" ]]; then
-  brew uninstall $(brew list | grep python@2)
-fi
+pip install six
 
 brew install cmake ninja llvm sccache
 
