@@ -306,5 +306,8 @@ NODE(GlobalVariableOnceToken)
 NODE(GlobalVariableOnceDeclList)
 NODE(CanonicalPrespecializedGenericTypeCachingOnceToken)
 
+// Added in Swift 5.5
+NODE(AsyncFunctionPointer)
+
 #undef CONTEXT_NODE
 #undef NODE

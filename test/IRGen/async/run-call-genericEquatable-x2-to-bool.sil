@@ -19,7 +19,7 @@ import _Concurrency
 
 sil public_external @printBool : $@convention(thin) (Bool) -> ()
 
-// CHECK-LL: @genericEquatableAndGenericEquatableToBoolAD =
+// CHECK-LL: @genericEquatableAndGenericEquatableToBoolTu =
 // CHECK-LL: define hidden swiftcc void @genericEquatableAndGenericEquatableToBool(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @genericEquatableAndGenericEquatableToBool : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool {
 bb0(%0 : $*T, %1 : $*T):

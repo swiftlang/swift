@@ -29,7 +29,7 @@ class S {
   init()
 }
 
-// CHECK-LL: @classinstanceSInt64ToVoidAD =
+// CHECK-LL: @classinstanceSInt64ToVoidTu =
 // CHECK-LL: define hidden swiftcc void @classinstanceSInt64ToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 sil hidden @classinstanceSInt64ToVoid : $@async @convention(method) (Int64, @guaranteed S) -> () {
 bb0(%int : $Int64, %instance : $S):
