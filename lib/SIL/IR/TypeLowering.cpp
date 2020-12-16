@@ -265,6 +265,15 @@ namespace {
                                                isSensitive});
     }
 
+    RetTy visitBuiltinDefaultActorStorageType(
+                                         CanBuiltinDefaultActorStorageType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive});
+    }
+
     RetTy visitAnyFunctionType(CanAnyFunctionType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {

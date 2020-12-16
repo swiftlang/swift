@@ -83,6 +83,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheRawUnsafeContinuationType;
   if (Name == "Job")
     return Context.TheJobType;
+  if (Name == "DefaultActorStorage")
+    return Context.TheDefaultActorStorageType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
   if (Name == "BridgeObject")
@@ -2732,6 +2734,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinJob:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_JOB);
+    break;
+  case BuiltinTypeKind::BuiltinDefaultActorStorage:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);
     break;
   case BuiltinTypeKind::BuiltinNativeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);

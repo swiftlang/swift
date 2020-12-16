@@ -493,6 +493,7 @@ Types
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
+  type ::= 'BD'                              // Builtin.DefaultActorStorage
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral

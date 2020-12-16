@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency | %target-FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency | %IRGenFileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -7,7 +7,8 @@
 
 import Foundation
 
-// CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, [10 x i8*], %TSi }>
+// CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
+// CHECK: %swift.defaultactor = type { [10 x i8*] }
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass" = global
 //   Metaclass is an instance of the root class.
@@ -25,7 +26,8 @@ import Foundation
 // CHECK-64-SAME: i32 104,
 // CHECK-32-SAME: i32 52,
 //   Alignment mask
-// CHECK-SAME: i16 15,
+// CHECK-64-SAME: i16 15,
+// CHECK-32-SAME: i16 7,
 //   Field offset for 'x'
 // CHECK-64-SAME: i64 96,
 // CHECK-32-SAME: i32 48,
@@ -42,7 +44,7 @@ public actor class MyClass: NSObject {
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"
 // CHECK: [[T0:%.*]] = getelementptr inbounds %T16actor_class_objc7MyClassC, %T16actor_class_objc7MyClassC* %0, i32 0, i32 2
 // CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, %TSi* [[T0]], i32 0, i32 0
-// CHECK: load [[INT]], [[INT]]* [[T1]], align 16
+// CHECK: load [[INT]], [[INT]]* [[T1]], align
 
 // CHECK-LABEL: define {{.*}}swiftcc %T16actor_class_objc7MyClassC* @"$s16actor_class_objc7MyClassCACycfc"
 // CHECK: swift_defaultActor_initialize
