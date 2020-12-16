@@ -1224,7 +1224,7 @@ namespace {
         llvm_unreachable("ARM SVE type in ABI lowering");
 
       // We should never see PPC MMA types at all.
-#define PPC_MMA_VECTOR_TYPE(Name, Id, Size) \
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
       case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
         llvm_unreachable("PPC MMA type in ABI lowering");

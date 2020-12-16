@@ -367,7 +367,7 @@ namespace {
         return Type();
 
       // PPC SVE builtin types that don't have Swift equivalents.
-#define PPC_MMA_VECTOR_TYPE(Name, Id, Size) \
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
       case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
         return Type();
