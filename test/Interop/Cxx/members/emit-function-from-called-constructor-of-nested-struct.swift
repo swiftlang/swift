@@ -2,13 +2,13 @@
 //
 // REQUIRES: executable_test
 
-import MethodCallsMethodFromNestedStruct
+import ConstructorCallsFunctionFromNestedStruct
 import StdlibUnittest
 
 var MembersTestSuite = TestSuite("MembersTestSuite")
 
-MembersTestSuite.test("emit-method-from-nested-struct") {
-  expectEqual(42, callMethod(41))
+MembersTestSuite.test("emit-function-from-constructor-of-nested-struct") {
+  expectEqual(42, callConstructor(41))
 }
 
 runAllTests()

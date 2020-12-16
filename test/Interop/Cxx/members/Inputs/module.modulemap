@@ -17,3 +17,7 @@ module MethodCallsMethod {
 module MethodCallsMethodFromNestedStruct {
   header "method-calls-method-from-nested-struct.h"
 }
+
+module ConstructorCallsFunctionFromNestedStruct {
+  header "constructor-calls-function-from-nested-struct.h"
+}

@@ -10,6 +10,8 @@ struct IncrementUser {
   IncrementUser(int value) { incrementee = Incrementor().increment(value); }
 };
 
-inline int callConstructor(int value) { return IncrementUser(value).incrementee; }
+inline int callConstructor(int value) {
+  return IncrementUser(value).incrementee;
+}
 
 #endif // TEST_INTEROP_CXX_MEMBERS_INPUTS_CONSTRUCTOR_CALLS_METHOD_H

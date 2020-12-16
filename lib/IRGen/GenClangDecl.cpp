@@ -37,8 +37,13 @@ public:
     return true;
   }
 
-  bool VisitMemberExpr(clang::MemberExpr *DRE) {
-    callback(DRE->getMemberDecl());
+  bool VisitMemberExpr(clang::MemberExpr *ME) {
+    callback(ME->getMemberDecl());
+    return true;
+  }
+
+  bool VisitCXXConstructExpr(clang::CXXConstructExpr *CXXCE) {
+    callback(CXXCE->getConstructor());
     return true;
   }
 };
@@ -91,17 +96,20 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // we want to add the entire file-level declaration because Clang doesn't
     // expect to see members directly here.
     for (auto *DC = D->getDeclContext();; DC = DC->getParent()) {
-      if (DC->isFunctionOrMethod())
+      if (DC->isFunctionOrMethod()) {
         return;
-      if (DC->isFileContext())
-        break;
-      D = cast<const clang::Decl>(DC);
-      if (DC->isRecord()) {
+      }
+      if (DC->isFileContext()) {
         break;
       }
+      if (isa<clang::TagDecl>(DC)) {
+        break;
+      }
+      D = cast<const clang::Decl>(DC);
     }
-    if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second)
+    if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second) {
       return;
+    }
     stack.push_back(D);
   });
 
@@ -115,7 +123,9 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     if (auto var = dyn_cast<clang::VarDecl>(next))
       if (!var->isFileVarDecl())
         continue;
-
+    if (auto fieldDecl = dyn_cast<clang::FieldDecl>(next)) {
+      continue;
+    }
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
 }
