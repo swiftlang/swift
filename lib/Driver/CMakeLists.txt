@@ -10,7 +10,6 @@ set(swiftDriver_sources
   FineGrainedDependencyDriverGraph.cpp
   FrontendUtil.cpp
   Job.cpp
-  ParseableOutput.cpp
   PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp

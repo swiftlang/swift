@@ -73,7 +73,7 @@ highlighting the parts that you think are important.
 Remember that the [Swift Code of Conduct][] applies whenever you are
 participating in the Swift project.
 
-[Swift Code of Conduct]: https://swift.org/community/#code-of-conduct
+[Swift Code of Conduct]: https://swift.org/code-of-conduct/
 
 ### I didn't get a response from someone. What should I do?
 

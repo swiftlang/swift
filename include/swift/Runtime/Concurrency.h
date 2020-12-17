@@ -148,6 +148,40 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitSignature::FunctionType
 swift_task_future_wait;
 
+/// Wait for a readyQueue of a Channel to become non empty.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_wait_next(on groupTask: Builtin.NativeObject) async
+///     -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+TaskFutureWaitSignature::FunctionType
+swift_task_group_wait_next;
+
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_add_pending(
+///     _ groupTask: Builtin.NativeObject)
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void
+swift_task_group_add_pending(AsyncTask *groupTask);
+
+/// Check the readyQueue of a Channel, return true if it has no pending tasks.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_is_empty(on groupTask: Builtin.NativeObject) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool
+swift_task_group_is_empty(AsyncTask *task);
+
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
 ///
@@ -187,6 +221,9 @@ bool swift_task_removeStatusRecord(AsyncTask *task,
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCancelled(AsyncTask* task);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {

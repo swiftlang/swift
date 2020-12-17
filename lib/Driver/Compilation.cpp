@@ -17,6 +17,7 @@
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/Basic/OutputFileMap.h"
+#include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -28,7 +29,6 @@
 #include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
@@ -60,6 +60,7 @@
 using namespace swift;
 using namespace swift::sys;
 using namespace swift::driver;
+using namespace swift::parseable_output;
 using namespace llvm::opt;
 
 struct LogJob {
@@ -173,6 +174,56 @@ using BatchPartition = std::vector<std::vector<const Job*>>;
 using InputInfoMap = llvm::SmallMapVector<const llvm::opt::Arg *,
                                           CompileJobAction::InputInfo, 16>;
 
+namespace {
+static DetailedTaskDescription
+constructDetailedTaskDescription(const driver::Job &Cmd) {
+  std::string Executable = Cmd.getExecutable();
+  SmallVector<std::string, 16> Arguments;
+  std::string CommandLine;
+  SmallVector<CommandInput, 4> Inputs;
+  SmallVector<OutputPair, 8> Outputs;
+  for (const auto &A : Cmd.getArguments()) {
+    Arguments.push_back(A);
+  }
+  llvm::raw_string_ostream wrapper(CommandLine);
+  Cmd.printCommandLine(wrapper, "");
+  wrapper.flush();
+
+  for (const Action *A : Cmd.getSource().getInputs()) {
+    if (const auto *IA = dyn_cast<InputAction>(A))
+      Inputs.push_back(CommandInput(IA->getInputArg().getValue()));
+  }
+
+  for (const driver::Job *J : Cmd.getInputs()) {
+    auto OutFiles = J->getOutput().getPrimaryOutputFilenames();
+    if (const auto *BJAction = dyn_cast<BackendJobAction>(&Cmd.getSource())) {
+      Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
+    } else {
+      for (llvm::StringRef FileName : OutFiles) {
+        Inputs.push_back(CommandInput(FileName));
+      }
+    }
+  }
+
+  // TODO: set up Outputs appropriately.
+  file_types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
+  if (PrimaryOutputType != file_types::TY_Nothing) {
+    for (llvm::StringRef OutputFileName :
+         Cmd.getOutput().getPrimaryOutputFilenames()) {
+      Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName.str()));
+    }
+  }
+  file_types::forAllTypes([&](file_types::ID Ty) {
+    for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
+      Outputs.push_back(OutputPair(Ty, Output.str()));
+    }
+  });
+
+  return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
+                                 Outputs};
+}
+} // namespace
+
 namespace swift {
 namespace driver {
   class PerformJobsState {
@@ -204,7 +255,7 @@ namespace driver {
     /// PIDs (which are always positive). We start at -1000 here as a crude but
     /// harmless hedge against colliding with an errno value that might slip
     /// into the stream of real PIDs (say, due to a TaskQueue bug).
-    int64_t NextBatchQuasiPID = -1000;
+    int64_t NextBatchQuasiPID = parseable_output::QUASI_PID_START;
 
     /// All jobs which have finished execution or which have been determined
     /// that they don't need to run.
@@ -431,7 +482,10 @@ namespace driver {
         break;
       case OutputLevel::Parseable:
         BeganCmd->forEachContainedJobAndPID(Pid, [&](const Job *J, Job::PID P) {
-          parseable_output::emitBeganMessage(llvm::errs(), *J, P,
+          auto TascDesc = constructDetailedTaskDescription(*J);
+          parseable_output::emitBeganMessage(llvm::errs(),
+                                             J->getSource().getClassName(),
+                                             TascDesc, P,
                                              TaskProcessInformation(Pid));
         });
         break;
@@ -614,12 +668,15 @@ namespace driver {
           // Simulate SIGINT-interruption to parseable-output consumer for any
           // constituent of a failing batch job that produced no errors of its
           // own.
-          parseable_output::emitSignalledMessage(llvm::errs(), *J, P,
+          parseable_output::emitSignalledMessage(llvm::errs(),
+                                                 J->getSource().getClassName(),
                                                  "cancelled batch constituent",
-                                                 "", SIGINT, ProcInfo);
+                                                 "", SIGINT, P, ProcInfo);
         } else {
-          parseable_output::emitFinishedMessage(llvm::errs(), *J, P, ReturnCode,
-                                                Output, ProcInfo);
+          parseable_output::emitFinishedMessage(llvm::errs(),
+                                                J->getSource().getClassName(),
+                                                Output.str(), ReturnCode,
+                                                P, ProcInfo);
         }
       });
     }
@@ -795,8 +852,10 @@ namespace driver {
         // Parseable output was requested.
         SignalledCmd->forEachContainedJobAndPID(Pid, [&](const Job *J,
                                                          Job::PID P) {
-          parseable_output::emitSignalledMessage(llvm::errs(), *J, P, ErrorMsg,
-                                                 Output, Signal, ProcInfo);
+          parseable_output::emitSignalledMessage(llvm::errs(),
+                                                 J->getSource().getClassName(),
+                                                 ErrorMsg, Output, Signal, P,
+                                                 ProcInfo);
         });
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
@@ -1610,7 +1669,10 @@ namespace driver {
           if (Comp.getOutputLevel() == OutputLevel::Parseable) {
             // Provide output indicating this command was skipped if parseable
             // output was requested.
-            parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+            auto TaskDesc = constructDetailedTaskDescription(*Cmd);
+            parseable_output::emitSkippedMessage(llvm::errs(),
+                                                 Cmd->getSource().getClassName(),
+                                                 TaskDesc);
           }
           ScheduledCommands.insert(Cmd);
           markFinished(Cmd, /*Skipped=*/true);
