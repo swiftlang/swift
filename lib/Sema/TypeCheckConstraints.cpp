@@ -1330,8 +1330,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.
   if (toType->isAnyObject()) {
-    if (fromType->is<ArchetypeType>())
-      return CheckedCastKind::Unresolved;
     return CheckedCastKind::BridgingCoercion;
   }
 

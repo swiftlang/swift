@@ -302,7 +302,7 @@ enum class FixKind : uint8_t {
   /// Allow a runtime checked cast where at compile time the from is
   /// convertible, but runtime does not support such convertions. e.g.
   /// funtion type casts.
-  AllowUnsuportedRuntimeCheckedCast,
+  AllowUnsupportedRuntimeCheckedCast,
 };
 
 class ConstraintFix {
@@ -2221,10 +2221,10 @@ public:
                                                ConstraintLocator *locator);
 };
 
-class AllowUnsuportedRuntimeCheckedCast final : public ContextualMismatch {
-  AllowUnsuportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
+class AllowUnsupportedRuntimeCheckedCast final : public ContextualMismatch {
+  AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
                                     Type toType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowUnsuportedRuntimeCheckedCast,
+      : ContextualMismatch(cs, FixKind::AllowUnsupportedRuntimeCheckedCast,
                            fromType, toType, locator,
                            /*isWarning*/ true) {}
 
@@ -2234,9 +2234,9 @@ public:
   }
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowUnsuportedRuntimeCheckedCast *create(ConstraintSystem &cs,
-                                                   Type fromType, Type toType,
-                                                   ConstraintLocator *locator);
+  static AllowUnsupportedRuntimeCheckedCast *create(ConstraintSystem &cs,
+                                                    Type fromType, Type toType,
+                                                    ConstraintLocator *locator);
 };
 
 } // end namespace constraints

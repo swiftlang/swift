@@ -6080,6 +6080,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (!(fromType->hasTypeVariable() || toType->hasTypeVariable())) {
       if (flags.contains(TMF_ApplyingFix))
         return SolutionKind::Solved;
+      
+      if (fromType->is<ArchetypeType>())
+        return SolutionKind::Solved;
 
       auto *loc = getConstraintLocator(locator);
       if (!isExpr<ExplicitCastExpr>(loc->getAnchor()))
@@ -6109,7 +6112,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
             }
           } else {
             // Runtime cannot perform such conversion.
-            (void)recordFix(AllowUnsuportedRuntimeCheckedCast::create(
+            (void)recordFix(AllowUnsupportedRuntimeCheckedCast::create(
                 *this, fromType, toType, getConstraintLocator(locator)));
           }
         } else {
@@ -10375,7 +10378,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
   case FixKind::AllowAlwaysSucceedCheckedCast:
-  case FixKind::AllowUnsuportedRuntimeCheckedCast: {
+  case FixKind::AllowUnsupportedRuntimeCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

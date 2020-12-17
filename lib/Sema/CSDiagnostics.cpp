@@ -7241,7 +7241,7 @@ bool UnnecessaryCheckedCastFailure::diagnoseAsError() {
   llvm_unreachable("Shouldn't reach here");
 }
 
-bool UnsuportedRuntimeCheckedCastFailure::diagnoseAsError() {
+bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
   emitDiagnostic(diag::checked_cast_ont_supported, getFromType(), getToType(),
                  isExpr<IsExpr>(getAnchor()) ? 0 : 1);
   return true;

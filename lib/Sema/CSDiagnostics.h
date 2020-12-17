@@ -2412,10 +2412,10 @@ public:
 
 /// Warn situations where the compiler can statically know a runtime
 /// check is not supported.
-class UnsuportedRuntimeCheckedCastFailure final
+class UnsupportedRuntimeCheckedCastFailure final
     : public CheckedCastBaseFailure {
 public:
-  UnsuportedRuntimeCheckedCastFailure(const Solution &solution, Type fromType,
+  UnsupportedRuntimeCheckedCastFailure(const Solution &solution, Type fromType,
                                       Type toType, ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, locator) {}
 

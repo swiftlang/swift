@@ -1806,17 +1806,17 @@ bool AllowAlwaysSucceedCheckedCast::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-AllowUnsuportedRuntimeCheckedCast *
-AllowUnsuportedRuntimeCheckedCast::create(ConstraintSystem &cs, Type fromType,
+AllowUnsupportedRuntimeCheckedCast *
+AllowUnsupportedRuntimeCheckedCast::create(ConstraintSystem &cs, Type fromType,
                                           Type toType,
                                           ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowUnsuportedRuntimeCheckedCast(cs, fromType, toType, locator);
+      AllowUnsupportedRuntimeCheckedCast(cs, fromType, toType, locator);
 }
 
-bool AllowUnsuportedRuntimeCheckedCast::diagnose(const Solution &solution,
+bool AllowUnsupportedRuntimeCheckedCast::diagnose(const Solution &solution,
                                                  bool asNote) const {
-  UnsuportedRuntimeCheckedCastFailure failure(solution, getFromType(),
+  UnsupportedRuntimeCheckedCastFailure failure(solution, getFromType(),
                                               getToType(), getLocator());
   return failure.diagnose(asNote);
 }
