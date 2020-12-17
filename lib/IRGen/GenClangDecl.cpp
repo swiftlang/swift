@@ -87,11 +87,8 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   stack.push_back(decl);
 
   ClangDeclFinder refFinder([&](const clang::Decl *D) {
-    // Check that this is a file-level declaration and not inside a function.
-    // If it's a member of a file-level decl, like a C++ static member variable,
-    // we want to add the entire file-level declaration because Clang doesn't
-    // expect to see members directly here.
     for (auto *DC = D->getDeclContext();; DC = DC->getParent()) {
+      // Check that this is not a local declaration inside a function.
       if (DC->isFunctionOrMethod()) {
         return;
       }
