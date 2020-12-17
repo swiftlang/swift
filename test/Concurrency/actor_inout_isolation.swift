@@ -131,3 +131,31 @@ extension TestActor {
     await other.modify(&value2)
   }
 }
+
+// Verify global actor protection
+
+@globalActor
+struct MyGlobalActor {
+  static let shared = TestActor()
+}
+
+@MyGlobalActor var number: Int = 0
+// expected-note@-1{{var declared here}}
+// expected-note@-2{{var declared here}}
+// expected-note@-3{{mutable state is only available within the actor instance}}
+
+// expected-error@+2{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
+// expected-error@+1{{var 'number' isolated to global actor 'MyGlobalActor' can not be referenced from this context}}
+let _ = Task.runDetached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
+
+// attempt to pass global state owned by the global actor to another async function
+// expected-error@+1{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
+@MyGlobalActor func sneaky() async { await modifyAsynchronously(&number) }
+
+// It's okay to pass actor state inout to synchronous functions!
+
+func globalSyncFunction(_ foo: inout Int) { }
+@MyGlobalActor func globalActorSyncFunction(_ foo: inout Int) { }
+@MyGlobalActor func globalActorAsyncOkay() async { globalActorSyncFunction(&number) }
+@MyGlobalActor func globalActorAsyncOkay2() async { globalSyncFunction(&number) }
+@MyGlobalActor func globalActorSyncOkay() { globalSyncFunction(&number) }
