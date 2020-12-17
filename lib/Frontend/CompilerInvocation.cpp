@@ -1553,6 +1553,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
+  if (Args.hasArg(OPT_no_stdlib_link)) {
+    Opts.DisableAutolinkStdlib = true;
+  }
+
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
         parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitizers);

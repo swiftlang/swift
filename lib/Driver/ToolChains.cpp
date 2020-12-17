@@ -304,6 +304,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   addLTOArgs(OI, arguments);
+  inputArgs.AddLastArg(arguments, options::OPT_no_stdlib_link);
 
   // -g implies -enable-anonymous-context-mangled-names, because the extra
   // metadata aids debugging.
