@@ -2449,6 +2449,18 @@ public:
       auto fieldLayout = layout.getLocalContextLayout();
       saveValue(fieldLayout, localExplosion, isOutlined);
     }
+    if (auto selfMetadata = witnessMetadata->SelfMetadata) {
+      Explosion selfMetadataExplosion;
+      selfMetadataExplosion.add(selfMetadata);
+      auto fieldLayout = layout.getSelfMetadataLayout();
+      saveValue(fieldLayout, selfMetadataExplosion, isOutlined);
+    }
+    if (auto selfWitnessTable = witnessMetadata->SelfWitnessTable) {
+      Explosion selfWitnessTableExplosion;
+      selfWitnessTableExplosion.add(selfWitnessTable);
+      auto fieldLayout = layout.getSelfWitnessTableLayout();
+      saveValue(fieldLayout, selfWitnessTableExplosion, isOutlined);
+    }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
     auto layout = getAsyncContextLayout();
