@@ -122,6 +122,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
+    case Node::Kind::AsyncFunctionPointer:
       return true;
     default:
       return false;
@@ -1183,6 +1184,10 @@ NodePointer Demangler::demangleBuiltinType() {
     case 'j':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_JOB);
+      break;
+    case 'D':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);
       break;
     case 'c':
       Ty = createNode(Node::Kind::BuiltinTypeName,
@@ -2473,6 +2478,7 @@ NodePointer Demangler::popProtocolConformance() {
         return nullptr;
       return createNode(Node::Kind::OutlinedBridgedMethod, Params);
     }
+    case 'u': return createNode(Node::Kind::AsyncFunctionPointer);
     default:
       return nullptr;
   }

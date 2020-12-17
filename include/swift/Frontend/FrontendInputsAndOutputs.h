@@ -110,6 +110,11 @@ public:
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
+  /// Iterates over primary inputs, exposing their unique ordered index
+  /// If \p fn returns true, exit early and return true.
+  bool forEachPrimaryInputWithIndex(
+      llvm::function_ref<bool(const InputFile &, unsigned index)> fn) const;
+
   /// If \p fn returns true, exit early and return true.
   bool
   forEachNonPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;

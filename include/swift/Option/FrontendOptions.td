@@ -30,6 +30,8 @@ def output_filelist : Separate<["-"], "output-filelist">,
 def supplementary_output_file_map : Separate<["-"], "supplementary-output-file-map">,
   HelpText<"Specify supplementary outputs in a file rather than on the command line">;
 
+def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
+  HelpText<"Emit textual output in a parseable format">;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "

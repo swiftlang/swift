@@ -7,6 +7,7 @@
 // RUN: %target-run %t/oldSDK oldSDK
 
 // REQUIRES: VENDOR=apple
+// REQUIRES: executable_test
 
 // Simulators refuse to run binaries built with an SDK newer than the simulator.
 // UNSUPPORTED: DARWIN_SIMULATOR=ios

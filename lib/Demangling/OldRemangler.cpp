@@ -816,6 +816,10 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node,
   mangleNamedEntity(node, 'I', "A", ctx);
 }
 
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
+}
+
 void Remangler::mangleDeallocator(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'F', "D", ctx);
 }
@@ -2177,8 +2181,8 @@ void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
 }
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
-  Buffer << "MM";
   mangleSingleChildNode(node); // type
+  Buffer << "MM";
 }
 
 void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(

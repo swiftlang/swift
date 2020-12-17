@@ -69,7 +69,7 @@ template <> struct ScalarTraits<swift::Fingerprint> {
     os << fp.getRawValue();
   }
   static StringRef input(StringRef s, void *, swift::Fingerprint &fp) {
-    fp = swift::Fingerprint{s.str()};
+    fp = swift::Fingerprint::fromString(s);
     return StringRef();
   }
   static QuotingType mustQuote(StringRef S) { return needsQuotes(S); }

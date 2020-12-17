@@ -44,6 +44,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   _TimeTypes.swift
   TaskAlloc.cpp
   TaskStatus.cpp
+  TaskGroup.cpp
   TaskGroup.swift
   Mutex.cpp
   ${swift_concurrency_objc_sources}

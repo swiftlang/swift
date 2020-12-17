@@ -101,6 +101,14 @@ bool FrontendInputsAndOutputs::forEachPrimaryInput(
   return false;
 }
 
+bool FrontendInputsAndOutputs::forEachPrimaryInputWithIndex(
+    llvm::function_ref<bool(const InputFile &, unsigned index)> fn) const {
+  for (unsigned i : PrimaryInputsInOrder)
+    if (fn(AllInputs[i], i))
+      return true;
+  return false;
+}
+
 bool FrontendInputsAndOutputs::forEachNonPrimaryInput(
     llvm::function_ref<bool(const InputFile &)> fn) const {
   return forEachInput([&](const InputFile &f) -> bool {

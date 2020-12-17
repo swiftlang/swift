@@ -101,7 +101,7 @@ bb0(%0 : $@thin Big.Type):
   return %62 : $Big
 }
 
-// CHECK-LL: @getBigAD =
+// CHECK-LL: @getBigTu =
 // CHECK-LL: define hidden swiftcc void @getBig(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @getBig : $@async @convention(thin) () -> Big {
 bb0:

@@ -33,11 +33,11 @@ func test_taskGroup_add() async throws -> Int {
 
 func test_taskGroup_addHandles() async throws -> Int {
   await try Task.withGroup(resultType: Int.self) { group in
-    let one = await group.addWithHandle {
+    let one = await group.add {
       await asyncFunc()
     }
 
-    let two = await group.addWithHandle {
+    let two = await group.add {
       await asyncFunc()
     }
 
@@ -48,11 +48,11 @@ func test_taskGroup_addHandles() async throws -> Int {
 
 func test_taskGroup_cancel_handles() async throws {
   await try Task.withGroup(resultType: Int.self) { group in
-    let one = await group.addWithHandle {
+    let one = await group.add {
       await try asyncThrowsOnCancel()
     }
 
-    let two = await group.addWithHandle {
+    let two = await group.add {
       await asyncFunc()
     }
 
@@ -170,5 +170,55 @@ func test_taskGroup_quorum_thenCancel() async {
   }
 
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
+}
+
+extension Collection {
+
+  /// Just another example of how one might use task groups.
+  func map<T>(
+    parallelism requestedParallelism: Int? = nil/*system default*/,
+    // ordered: Bool = true, /
+    _ transform: (Element) async throws -> T
+  ) async throws -> [T] { // TODO: can't use rethrows here, maybe that's just life though; rdar://71479187 (rethrows is a bit limiting with async functions that use task groups)
+    let defaultParallelism = 2
+    let parallelism = requestedParallelism ?? defaultParallelism
+
+    let n = self.count
+    if n == 0 {
+      return []
+    }
+
+    return await try Task.withGroup(resultType: (Int, T).self) { group in
+      var result = ContiguousArray<T>()
+      result.reserveCapacity(n)
+
+      var i = self.startIndex
+      var submitted = 0
+
+      func submitNext() async throws {
+        await group.add {
+          let value = await try transform(self[i])
+          return (submitted, value)
+        }
+        submitted += 1
+        formIndex(after: &i)
+      }
+
+      // submit first initial tasks
+      for _ in 0..<parallelism {
+        await try submitNext()
+      }
+
+      while let (index, taskResult) = await try group.next() {
+        result[index] = taskResult
+
+        await try Task.checkCancellation()
+        await try submitNext()
+      }
+
+      assert(result.count == n)
+      return Array(result)
+    }
+  }
 }
 

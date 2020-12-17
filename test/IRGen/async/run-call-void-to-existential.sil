@@ -36,7 +36,7 @@ bb0(%int : $Int64, %S_type : $@thin S.Type):
   return %instance : $S
 }
 
-// CHECK-LL: @voidToExistentialAD =
+// CHECK-LL: @voidToExistentialTu =
 // CHECK-LL: define hidden swiftcc void @voidToExistential(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @voidToExistential : $@async @convention(thin) () -> @out P {
 bb0(%out : $*P):

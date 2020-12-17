@@ -1532,10 +1532,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.set(ContextFlags::IsTryCovered);
       Self.Flags.clear(ContextFlags::HasTryThrowSite);
     }
-    
+
     void enterAwait() {
       Self.Flags.set(ContextFlags::IsAsyncCovered);
       Self.Flags.clear(ContextFlags::HasAnyAsyncSite);
+    }
+
+    void enterAsyncLet() {
+      Self.Flags.set(ContextFlags::IsTryCovered);
+      Self.Flags.set(ContextFlags::IsAsyncCovered);
     }
 
     void refineLocalContext(Context newContext) {
@@ -1602,7 +1607,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
-    
+
     bool wasTopLevelDebuggerFunction() const {
       return OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction);
     }
@@ -1678,6 +1683,7 @@ private:
 
     case AutoClosureExpr::Kind::AsyncLet:
       scope.resetCoverage();
+      scope.enterAsyncLet();
       shouldPreserveCoverage = false;
       break;
     }
@@ -1817,10 +1823,11 @@ private:
   }
 
   ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
-      // Diagnose async calls in a context that doesn't handle async.
-      if (!CurContext.handlesAsync()) {
-        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
-      }
+    // Diagnose async let in a context that doesn't handle async.
+    if (!CurContext.handlesAsync()) {
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
+    }
+
     return ShouldRecurse;
   }
 

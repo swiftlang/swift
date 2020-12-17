@@ -94,8 +94,11 @@ DerivativeRegistrationTests.testWithLeakChecking("InstanceMethod") {
 
 extension Wrapper {
   subscript(_ x: Tracked<Float>) -> Tracked<Float> {
+    @differentiable
     @_semantics("autodiff.opaque")
     get { float * x }
+
+    @differentiable
     set {}
   }
 
@@ -117,7 +120,10 @@ DerivativeRegistrationTests.testWithLeakChecking("SubscriptGetter") {
 
 extension Wrapper {
   subscript() -> Tracked<Float> {
+    @differentiable
     get { float }
+
+    @differentiable
     set { float = newValue }
   }
 

@@ -67,7 +67,7 @@ diligently to make the Swift community welcoming to everyone.
 To give clarity of what is expected of our members, Swift has adopted the
 code of conduct defined by the Contributor Covenant. This document is used
 across many open source communities, and we think it articulates our values
-well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-conduct).
+well. For more, see the [Code of Conduct](https://swift.org/code-of-conduct/).
 
 ## Getting Started
 

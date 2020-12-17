@@ -27,7 +27,7 @@ struct Pack {
   public let e: Bool
 }
 
-// CHECK-LL: @test_caseAD =
+// CHECK-LL: @test_caseTu =
 
 sil @structPackToVoid : $@async @convention(thin) (Pack) -> () {
 entry(%pack : $Pack):

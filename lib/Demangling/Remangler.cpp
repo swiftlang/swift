@@ -748,6 +748,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'c';
   } else if (text == BUILTIN_TYPE_NAME_JOB) {
     Buffer << 'j';
+  } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
+    Buffer << 'D';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
@@ -833,6 +835,10 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node) {
   mangleChildNode(node, 0);
   Buffer << "fA";
   mangleChildNode(node, 1);
+}
+
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
 }
 
 void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
@@ -1382,6 +1388,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
+      case Node::Kind::AsyncFunctionPointer:
         mangleInReverseOrder = true;
         break;
       default:
