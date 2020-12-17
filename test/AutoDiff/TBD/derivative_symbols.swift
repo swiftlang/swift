@@ -22,10 +22,12 @@ public func topLevelDerivative<T: Differentiable>(_ x: T) -> (
 public struct Struct: Differentiable {
   var stored: Float
 
-  // Test property.
-  @differentiable
+  // Test property: getter and setter.
   public var property: Float {
-    stored
+    @differentiable
+    get { stored }
+    @differentiable
+    set { stored = newValue }
   }
 
   // Test initializer.
@@ -35,21 +37,34 @@ public struct Struct: Differentiable {
   }
 
   // Test method.
-  public func method(x: Float, y: Float) -> Float { x }
+  public func method(_ x: Float, _ y: Float) -> Float { x }
 
   @derivative(of: method)
-  public func jvpMethod(x: Float, y: Float) -> (
+  public func jvpMethod(_ x: Float, _ y: Float) -> (
     value: Float, differential: (TangentVector, Float, Float) -> Float
   ) {
     fatalError()
   }
 
-  // Test subscript.
-  public subscript(x: Float) -> Float { x }
+  // Test subscript: getter and setter.
+  public subscript(_ x: Float) -> Float {
+    @differentiable
+    get { x }
+
+    @differentiable
+    set { stored = newValue }
+  }
 
   @derivative(of: subscript)
-  public func vjpSubscript(x: Float) -> (
+  public func vjpSubscript(_ x: Float) -> (
     value: Float, pullback: (Float) -> (TangentVector, Float)
+  ) {
+    fatalError()
+  }
+
+  @derivative(of: subscript.set)
+  public mutating func vjpSubscriptSetter(_ x: Float, _ newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> (Float, Float)
   ) {
     fatalError()
   }
