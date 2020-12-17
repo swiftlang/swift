@@ -5372,6 +5372,24 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   if (Any) {
     Bindings.push_back(*Any);
   }
+
+  {
+    bool noBindings = Bindings.empty();
+
+    for (const auto &entry : bindings.Defaults) {
+      auto *constraint = entry.second;
+      if (noBindings) {
+        // If there are no direct or transitive bindings to attempt
+        // let's add defaults to the list right away.
+        Bindings.push_back(getDefaultBinding(constraint));
+      } else {
+        // Otherwise let's delay attempting default bindings
+        // until all of the direct & transitive bindings and
+        // their derivatives have been attempted.
+        DelayedDefaults.push_back(constraint);
+      }
+    }
+  }
 }
 
 bool TypeVarBindingProducer::requiresOptionalAdjustment(
@@ -5402,4 +5420,16 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
   }
 
   return false;
+}
+
+ConstraintSystem::PotentialBinding
+TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
+  assert(constraint->getKind() == ConstraintKind::Defaultable ||
+         constraint->getKind() == ConstraintKind::DefaultClosureType);
+
+  auto type = constraint->getSecondType();
+  Binding binding{type, BindingKind::Exact, constraint};
+  return requiresOptionalAdjustment(binding)
+             ? binding.withType(OptionalType::get(type))
+             : binding;
 }
