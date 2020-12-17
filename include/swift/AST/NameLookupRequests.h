@@ -406,7 +406,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           LookupResult res) const;
+                           const LookupResult &res) const;
 };
 
 using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
@@ -434,7 +434,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           QualifiedLookupResult l) const;
+                           const QualifiedLookupResult &l) const;
 };
 
 /// Perform \c AnyObject lookup for a given member.
@@ -457,7 +457,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           QualifiedLookupResult l) const;
+                           const QualifiedLookupResult &l) const;
 };
 
 class ModuleQualifiedLookupRequest
@@ -482,7 +482,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           QualifiedLookupResult lookupResult) const;
+                           const QualifiedLookupResult &lookupResult) const;
 };
 
 class QualifiedLookupRequest
@@ -555,7 +555,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           TinyPtrVector<ValueDecl *> result) const;
+                           const TinyPtrVector<ValueDecl *> &result) const;
 };
 
 class OperatorLookupDescriptor final {
@@ -636,7 +636,7 @@ private:
 public:
   // Incremental dependencies.
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           TinyPtrVector<OperatorDecl *> ops) const;
+                           const TinyPtrVector<OperatorDecl *> &ops) const;
 };
 
 /// Looks up an precedencegroup in a given file or module without looking
@@ -659,7 +659,7 @@ private:
 public:
   // Incremental dependencies.
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           TinyPtrVector<PrecedenceGroupDecl *> groups) const;
+                           const TinyPtrVector<PrecedenceGroupDecl *> &groups) const;
 };
 
 class LookupConformanceDescriptor final {
