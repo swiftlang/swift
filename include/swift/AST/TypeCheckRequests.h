@@ -2504,7 +2504,7 @@ public:
 
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           ProtocolConformanceLookupResult r) const;
+                           const ProtocolConformanceLookupResult &r) const;
 };
 
 class CheckRedeclarationRequest
