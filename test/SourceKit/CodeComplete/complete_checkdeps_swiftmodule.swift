@@ -1,3 +1,5 @@
+// REQUIRES: rdar72439700
+
 import ClangFW
 import SwiftFW
 
