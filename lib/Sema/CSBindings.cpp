@@ -481,7 +481,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
           break;
 
         // If this literal protocol is not a direct requirement it
-        // would be possible to change optionality while inferring
+        // would not be possible to change optionality while inferring
         // bindings for a supertype, so this hack doesn't apply.
         if (!isDirectRequirement)
           break;
@@ -506,17 +506,22 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       binding.BindingType = type;
   }
 
-  // If this is not a literal protocol or it has been "covered" by an existing
-  // binding it can't provide a default type.
-  auto isUnviableForDefaulting = [&literalProtocols](ProtocolDecl *protocol) {
-    auto literal = literalProtocols.find(protocol);
-    return literal == literalProtocols.end() || literal->second.second;
-  };
-
   for (auto *constraint : Protocols) {
     auto *protocol = constraint->getProtocol();
 
-    if (isUnviableForDefaulting(protocol))
+    auto literal = literalProtocols.find(protocol);
+    if (literal == literalProtocols.end())
+      continue;
+
+    bool isDirectRequirement = false;
+    bool isCovered = false;
+
+    std::tie(isDirectRequirement, isCovered) = literal->second;
+
+    // Can't be defaulted because it's already covered by an
+    // existing direct or transitive binding which is always
+    // better.
+    if (isCovered)
       continue;
 
     auto defaultType = TypeChecker::getDefaultType(protocol, cs.DC);
@@ -530,9 +535,8 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     // requirement or inferred transitive one to identify binding
     // kind correctly.
     addPotentialBinding({defaultType,
-                         isDirectRequirement(constraint)
-                             ? AllowedBindingKind::Subtypes
-                             : AllowedBindingKind::Supertypes,
+                         isDirectRequirement ? AllowedBindingKind::Subtypes
+                                             : AllowedBindingKind::Supertypes,
                          constraint});
   }
 }
