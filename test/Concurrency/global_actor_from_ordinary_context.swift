@@ -129,3 +129,10 @@ func fromAsync() async {
   _ = a[1]  // expected-error{{subscript 'subscript(_:)' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
   a[0] = 1  // expected-error{{subscript 'subscript(_:)' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
 }
+
+// expected-note@+1{{mutable state is only available within the actor instance}}
+@SomeGlobalActor var value: Int = 42
+
+func topLevelSyncFunction(_ number: inout Int) { }
+// expected-error@+1{{var 'value' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+topLevelSyncFunction(&value)

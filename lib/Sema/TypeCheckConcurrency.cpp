@@ -904,6 +904,7 @@ namespace {
         return false;
 
       Expr *subArg = arg->getSubExpr();
+      ValueDecl *valueDecl = nullptr;
       if (LookupExpr *baseArg = dyn_cast<LookupExpr>(subArg)) {
         while (LookupExpr *nextLayer = dyn_cast<LookupExpr>(baseArg->getBase()))
           baseArg = nextLayer;
@@ -911,38 +912,50 @@ namespace {
         // baseArg: the property in the actor who's property is being passed
         // inout
 
-        auto memberDecl = baseArg->getMember().getDecl();
-        auto isolation = ActorIsolationRestriction::forDeclaration(memberDecl);
-        switch (isolation) {
-        case ActorIsolationRestriction::Unrestricted:
-        case ActorIsolationRestriction::LocalCapture:
-        case ActorIsolationRestriction::Unsafe:
-        case ActorIsolationRestriction::GlobalActor: // TODO: handle global
-                                                     // actors
-          break;
-        case ActorIsolationRestriction::ActorSelf: {
-          if (isPartialApply) {
-            // The partially applied InoutArg is a property of actor. This can
-            // really only happen when the property is a struct with a mutating
-            // async method.
-            if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
-              ValueDecl *fnDecl =
-                  cast<DeclRefExpr>(partialApply->getFn())->getDecl();
-              ctx.Diags.diagnose(
-                  call->getLoc(), diag::actor_isolated_mutating_func,
-                  fnDecl->getName(), memberDecl->getDescriptiveKind(),
-                  memberDecl->getName());
-              return true;
-            }
-          } else {
+        valueDecl = baseArg->getMember().getDecl();
+      } else if (DeclRefExpr *declExpr = dyn_cast<DeclRefExpr>(subArg)) {
+        valueDecl = declExpr->getDecl();
+      } else {
+        llvm_unreachable("Inout argument is neither a lookup nor decl.");
+      }
+      assert(valueDecl != nullptr && "valueDecl was never set!");
+      auto isolation = ActorIsolationRestriction::forDeclaration(valueDecl);
+      switch (isolation) {
+      case ActorIsolationRestriction::Unrestricted:
+      case ActorIsolationRestriction::LocalCapture:
+      case ActorIsolationRestriction::Unsafe:
+        break;
+      case ActorIsolationRestriction::GlobalActor: {
+        ctx.Diags.diagnose(call->getLoc(),
+                           diag::actor_isolated_inout_state,
+                           valueDecl->getDescriptiveKind(),
+                           valueDecl->getName(),
+                           call->implicitlyAsync());
+        valueDecl->diagnose(diag::kind_declared_here,
+                            valueDecl->getDescriptiveKind());
+        return true;
+      }
+      case ActorIsolationRestriction::ActorSelf: {
+        if (isPartialApply) {
+          // The partially applied InoutArg is a property of actor. This can
+          // really only happen when the property is a struct with a mutating
+          // async method.
+          if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
+            ValueDecl *fnDecl =
+                cast<DeclRefExpr>(partialApply->getFn())->getDecl();
             ctx.Diags.diagnose(
-                subArg->getLoc(), diag::actor_isolated_inout_state,
-                memberDecl->getDescriptiveKind(), memberDecl->getName(),
-                call->implicitlyAsync());
+                call->getLoc(), diag::actor_isolated_mutating_func,
+                fnDecl->getName(), valueDecl->getDescriptiveKind(),
+                valueDecl->getName());
             return true;
           }
+        } else {
+          ctx.Diags.diagnose(
+              subArg->getLoc(), diag::actor_isolated_inout_state,
+              valueDecl->getDescriptiveKind(), valueDecl->getName(), call->implicitlyAsync());
+          return true;
         }
-        }
+      }
       }
       return false;
     }
