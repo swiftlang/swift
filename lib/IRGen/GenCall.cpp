@@ -3693,22 +3693,22 @@ llvm::Value *irgen::emitTaskCreate(
   // Determine the size of the async context for the closure.
   ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  AnyFunctionType *taskFunctionType;
+  CanSILFunctionType taskFunctionType;
+  CanSILFunctionType substTaskFunctionType;
   if (futureResultType) {
     auto genericParam = GenericTypeParamType::get(0, 0, ctx);
     auto genericSig = GenericSignature::get({genericParam}, {});
-    taskFunctionType = GenericFunctionType::get(
-        genericSig, { }, genericParam, extInfo);
+    auto *ty = GenericFunctionType::get(genericSig, { }, genericParam, extInfo);
 
-    taskFunctionType = Type(taskFunctionType).subst(subs)->castTo<FunctionType>();
+    taskFunctionType = IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
+    substTaskFunctionType = taskFunctionType->withInvocationSubstitutions(subs);
   } else {
-    taskFunctionType = FunctionType::get(
-        { }, ctx.TheEmptyTupleType, extInfo);
+    auto *ty = FunctionType::get({ }, ctx.TheEmptyTupleType, extInfo);
+    taskFunctionType = IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
+    substTaskFunctionType = taskFunctionType;
   }
-  CanSILFunctionType taskFunctionCanSILType =
-      IGF.IGM.getLoweredType(taskFunctionType).castTo<SILFunctionType>();
   auto layout = getAsyncContextLayout(
-      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType, subs);
+      IGF.IGM, taskFunctionType, substTaskFunctionType, subs);
 
   CanSILFunctionType taskContinuationFunctionTy = [&]() {
     ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
@@ -3729,7 +3729,7 @@ llvm::Value *irgen::emitTaskCreate(
   llvm::CallInst *result;
   llvm::Value *theSize, *theFunction;
   auto taskFunctionPointer = FunctionPointer::forExplosionValue(
-      IGF, taskFunction, taskFunctionCanSILType);
+      IGF, taskFunction, substTaskFunctionType);
   std::tie(theFunction, theSize) =
       getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
                               taskFunctionPointer, localContextInfo);
