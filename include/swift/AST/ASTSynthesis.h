@@ -16,6 +16,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 
 namespace swift {
@@ -23,24 +24,102 @@ namespace swift {
 struct SynthesisContext {
   ASTContext &Context;
   DeclContext *DC;
+  GenericParamList *GenericParams = nullptr;
 
   SynthesisContext(ASTContext &ctx, DeclContext *DC)
     : Context(ctx), DC(DC) {}
 };
 
+/// Allow literal types to be passed at an arbitrary position
+/// in the type-synthesis DSL.
+inline Type synthesizeType(SynthesisContext &SC, Type type) {
+  return type;
+}
+
 /// A synthesizer which generates a specific type.
 enum SingletonTypeSynthesizer {
-  _void,
-  _nativeObject,
+  _any,
+  _bridgeObject,
+  _error,
   _job,
+  _nativeObject,
+  _never,
+  _rawPointer,
+  _void,
+  _word,
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
   switch (kind) {
-  case _void: return SC.Context.TheEmptyTupleType;
-  case _nativeObject: return SC.Context.TheNativeObjectType;
+  case _any: return SC.Context.TheAnyType;
+  case _bridgeObject: return SC.Context.TheBridgeObjectType;
+  case _error: return SC.Context.getExceptionType();
   case _job: return SC.Context.TheJobType;
+  case _nativeObject: return SC.Context.TheNativeObjectType;
+  case _never: return SC.Context.getNeverType();
+  case _rawPointer: return SC.Context.TheRawPointerType;
+  case _void: return SC.Context.TheEmptyTupleType;
+  case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
+                                             SC.Context);
   }
+}
+
+/// A synthesizer which generates an integer type.
+struct IntegerTypeSynthesizer {
+  unsigned BitWidth;
+};
+constexpr inline IntegerTypeSynthesizer _int(unsigned bitWidth) {
+  return {bitWidth};
+}
+inline Type synthesizeType(SynthesisContext &SC, IntegerTypeSynthesizer S) {
+  return BuiltinIntegerType::get(S.BitWidth, SC.Context);
+}
+
+/// A synthesizer which generates a vector type.
+template <class S>
+struct VectorTypeSynthesizer {
+  unsigned Count;
+  S Sub;
+};
+template <class S>
+constexpr VectorTypeSynthesizer<S> _vector(unsigned count, S sub) {
+  return {count, sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const VectorTypeSynthesizer<S> &V) {
+  return BuiltinVectorType::get(SC.Context, synthesizeType(SC, V.Sub),
+                                V.Count);
+}
+
+/// A synthesizer which generates a metatype type.
+template <class S>
+struct MetatypeTypeSynthesizer {
+  S Sub;
+};
+template <class S>
+constexpr MetatypeTypeSynthesizer<S> _metatype(S sub) {
+  return {sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const MetatypeTypeSynthesizer<S> &M) {
+  return MetatypeType::get(synthesizeType(SC, M.Sub));
+}
+
+/// A synthesizer which generates an existential metatype type.
+template <class S>
+struct ExistentialMetatypeTypeSynthesizer {
+  S Sub;
+};
+template <class S>
+constexpr ExistentialMetatypeTypeSynthesizer<S> _existentialMetatype(S sub) {
+  return {sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const ExistentialMetatypeTypeSynthesizer<S> &M) {
+  return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub));
 }
 
 /// Helper types for variadic synthesis.
@@ -51,9 +130,8 @@ template <>
 struct VariadicSynthesizerStorage<> {
   constexpr VariadicSynthesizerStorage() {}
 
-  template <class T, class Fn>
-  void collect(SynthesisContext &SC, SmallVectorImpl<T> &results,
-               Fn fn) const {}
+  template <class Fn>
+  void visit(const Fn &fn) const {}
 };
 template <class Head, class... Tail>
 struct VariadicSynthesizerStorage<Head, Tail...> {
@@ -62,24 +140,38 @@ struct VariadicSynthesizerStorage<Head, Tail...> {
   constexpr VariadicSynthesizerStorage(Head head, Tail... tail)
     : head(head), tail(tail...) {}
 
-  template <class T, class Fn>
-  void collect(SynthesisContext &SC,
-               SmallVectorImpl<T> &results,
-               Fn fn) const {
-    results.push_back(fn(SC, head));
-    tail.collect(SC, results, fn);
+  template <class Fn>
+  void visit(const Fn &fn) const {
+    fn(head);
+    tail.visit(fn);
   }
 };
+
+/// A synthesizer which generates a generic type parameter.
+struct TypeParamTypeSynthesizer {
+  unsigned Index;
+};
+constexpr inline TypeParamTypeSynthesizer _typeparam(unsigned index) {
+  return {index};
+}
+inline Type synthesizeType(SynthesisContext &SC,
+                           const TypeParamTypeSynthesizer &S) {
+  assert(SC.GenericParams);
+  return SC.GenericParams->getParams()[S.Index]->getDeclaredInterfaceType();
+}
 
 /// Synthesize tuple type elements.
 template <class S>
 TupleTypeElt synthesizeTupleTypeElt(SynthesisContext &SC, S s) {
   return synthesizeType(SC, s);
 }
-struct SynthesizeTupleTypeElt {
+struct CollectTupleTypeElements {
+  SynthesisContext &SC;
+  SmallVectorImpl<TupleTypeElt> &Elts;
+
   template <class S>
-  TupleTypeElt operator()(SynthesisContext &SC, const S &s) {
-    synthesizeTupleTypeElt(SC, s);
+  void operator()(const S &s) const {
+    Elts.push_back(synthesizeTupleTypeElt(SC, s));
   }
 };
 
@@ -96,7 +188,7 @@ template <class... Elts>
 Type synthesizeType(SynthesisContext &SC,
                     const TupleSynthesizer<Elts...> &tuple) {
   SmallVector<TupleTypeElt, sizeof...(Elts)> elts;
-  tuple.Elements.collect(SC, elts, SynthesizeTupleTypeElt());
+  tuple.Elements.visit(CollectTupleTypeElements{SC, elts});
   return TupleType::get(elts, SC.Context);
 }
 
@@ -107,6 +199,7 @@ ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s) {
   auto PD = new (SC.Context) ParamDecl(SourceLoc(), SourceLoc(),
                                        Identifier(), SourceLoc(),
                                        Identifier(), SC.DC);
+  PD->setSpecifier(ParamSpecifier::Default);
   PD->setInterfaceType(type);
   PD->setImplicit();
   return PD;
@@ -157,33 +250,39 @@ constexpr ParameterListSynthesizer<Params...> _parameters(Params... ps) {
   return {{ps...}};
 }
 
-struct SynthesizeParamDecl {
+struct CollectParamDecls {
+  SynthesisContext &SC;
+  SmallVectorImpl<ParamDecl*> &Results;
+
   template <class S>
-  ParamDecl *operator()(SynthesisContext &SC, const S &s) {
+  void operator()(const S &s) const {
     // Found by argument-dependent lookup.
-    return synthesizeParamDecl(SC, s);
+    Results.push_back(synthesizeParamDecl(SC, s));
   }
 };
 template <class... Params>
 ParameterList *synthesizeParameterList(SynthesisContext &SC,
                     const ParameterListSynthesizer<Params...> &list) {
   SmallVector<ParamDecl*, 4> decls;
-  list.params.collect(SC, decls, SynthesizeParamDecl());
+  list.params.visit(CollectParamDecls{SC, decls});
   return ParameterList::create(SC.Context, decls);
 }
 
-struct SynthesizeParamType {
+struct CollectParamTypes {
+  SynthesisContext &SC;
+  SmallVectorImpl<FunctionType::Param> &Results;
+
   template <class S>
-  FunctionType::Param operator()(SynthesisContext &SC, const S &s) {
+  void operator()(const S &s) const {
     // Found by argument-dependent lookup.
-    return synthesizeParamType(SC, s);
+    Results.push_back(synthesizeParamType(SC, s));
   }
 };
 template <class... Params>
 void synthesizeParameterTypes(SynthesisContext &SC,
                         const ParameterListSynthesizer<Params...> &list,
                               SmallVectorImpl<FunctionType::Param> &types) {
-  list.params.collect(SC, types, SynthesizeParamType());
+  list.params.visit(CollectParamTypes{SC, types});
 }
 
 /// Synthesize function ExtInfo.

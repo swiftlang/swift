@@ -1104,6 +1104,13 @@ def sanitize_recover_EQ
                "checks should be comma separated. Default behavior is to not "
                "allow error recovery.">;
 
+def sanitize_address_use_odr_indicator
+    : Flag<["-"], "sanitize-address-use-odr-indicator">,
+      Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+      HelpText<"When using AddressSanitizer enable ODR indicator globals to "
+               "avoid false ODR violation reports in partially sanitized "
+               "programs at the cost of an increase in binary size">;
+
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   MetaVarName<"<type>">,
