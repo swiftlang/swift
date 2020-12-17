@@ -33,12 +33,19 @@ public:
   explicit ClangDeclFinder(Fn fn) : callback(fn) {}
 
   bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
-    callback(DRE->getDecl());
+    if (isa<clang::FunctionDecl>(DRE->getDecl()) ||
+        isa<clang::VarDecl>(DRE->getDecl())) {
+      callback(DRE->getDecl());
+    }
     return true;
   }
 
   bool VisitMemberExpr(clang::MemberExpr *ME) {
-    callback(ME->getMemberDecl());
+    if (isa<clang::FunctionDecl>(ME->getMemberDecl()) ||
+        isa<clang::VarDecl>(ME->getMemberDecl()) || 
+        isa<clang::FieldDecl>(ME->getMemberDecl())) {
+      callback(ME->getMemberDecl());
+    }
     return true;
   }
 
@@ -63,6 +70,10 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
     if (initializingDecl) {
       return initializingDecl;
+    }
+  } else if (auto fd = dyn_cast<clang::FieldDecl>(decl)) {
+    if(fd->hasInClassInitializer()) {
+      return fd;
     }
   }
   return nullptr;
@@ -116,7 +127,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     if (auto var = dyn_cast<clang::VarDecl>(next))
       if (!var->isFileVarDecl())
         continue;
-    if (auto fieldDecl = dyn_cast<clang::FieldDecl>(next)) {
+    if (isa<clang::FieldDecl>(next)) {
       continue;
     }
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
