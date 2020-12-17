@@ -418,6 +418,26 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       continue;
     }
 
+    // Let's try to coalesce integer and floating point literal protocols
+    // if they appear together because the only possible default type that
+    // could satisfy both requirements is `Double`.
+    {
+      if (protocol->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+        auto *floatLiteral = CS.getASTContext().getProtocol(
+            KnownProtocolKind::ExpressibleByFloatLiteral);
+        if (literalProtocols.count(floatLiteral))
+          continue;
+      }
+
+      if (protocol->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByFloatLiteral)) {
+        auto *intLiteral = CS.getASTContext().getProtocol(
+            KnownProtocolKind::ExpressibleByIntegerLiteral);
+        literalProtocols.erase(intLiteral);
+      }
+    }
+
     literalProtocols.insert(
         {protocol, {isDirectRequirement(constraint), false}});
   }
@@ -498,19 +518,6 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 
     if (isUnviableForDefaulting(protocol))
       continue;
-
-    // Let's try to coalesce integer and floating point literal protocols
-    // if they appear together because the only possible default type that
-    // could satisfy both requirements is `Double`.
-    if (protocol->isSpecificProtocol(
-          KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-      auto *floatLiteral = cs.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByFloatLiteral);
-      // If `ExpressibleByFloatLiteral` is a requirement and it isn't
-      // covered, let's skip `ExpressibleByIntegerLiteral` requirement.
-      if (!isUnviableForDefaulting(floatLiteral))
-        continue;
-    }
 
     auto defaultType = TypeChecker::getDefaultType(protocol, cs.DC);
     if (!defaultType)
