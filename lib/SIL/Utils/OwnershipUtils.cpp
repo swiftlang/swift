@@ -884,6 +884,7 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
   case OperandOwnership::ForwardingBorrow:
     break;
   case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
   case OperandOwnership::Borrow:

@@ -319,13 +319,41 @@ SILFunction *Operand::getParentFunction() const {
   return self->getUser()->getFunction();
 }
 
-bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
-  auto constraint = getOwnershipConstraint();
-  if (!constraint)
-    return false;
-
-  if (constraint->satisfiesConstraint(kind))
+/// Return true if this use can accept Unowned values.
+static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
+  switch (operandOwnership) {
+  case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::ForwardingUnowned:
+  case OperandOwnership::PointerEscape:
+  case OperandOwnership::BitwiseEscape:
     return true;
+  case OperandOwnership::None:
+  case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::Borrow:
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume:
+  case OperandOwnership::NestedBorrow:
+  case OperandOwnership::InteriorPointer:
+  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::EndBorrow:
+  case OperandOwnership::Reborrow:
+    return false;
+  }
+}
+
+bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
+  auto operandOwnership = getOperandOwnership();
+  if (!operandOwnership) {
+    return false;
+  }
+  auto constraint = ::getOwnershipConstraint(operandOwnership.getValue());
+  if (constraint.satisfiesConstraint(kind)) {
+    // Constraints aren't precise enough to enforce Unowned value uses.
+    if (kind == OwnershipKind::Unowned) {
+      return canAcceptUnownedValue(operandOwnership.getValue());
+    }
+    return true;
+  }
 
   return false;
 }
@@ -378,13 +406,16 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   case OperandOwnership::InstantaneousUse:
     os << "instantaneous";
     break;
+  case OperandOwnership::UnownedInstantaneousUse:
+    os << "unowned-instantaneous";
+    break;
+  case OperandOwnership::ForwardingUnowned:
+    os << "forwarding-unowned";
+    break;
   case OperandOwnership::PointerEscape:
     os << "pointer-escape";
     break;
   case OperandOwnership::BitwiseEscape:
-    os << "bitwise-escape";
-    break;
-  case OperandOwnership::ForwardingUnowned:
     os << "bitwise-escape";
     break;
   case OperandOwnership::Borrow:
@@ -403,7 +434,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
     os << "interior-pointer";
     break;
   case OperandOwnership::ForwardingBorrow:
-    os << "forwarded-borrow";
+    os << "forwarding-borrow";
     break;
   case OperandOwnership::EndBorrow:
     os << "end-borrow";
