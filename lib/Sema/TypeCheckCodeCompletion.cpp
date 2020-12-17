@@ -821,20 +821,6 @@ static void filterSolutions(SolutionApplicationTarget &target,
   });
 }
 
-/// When solving for code completion we still consider solutions with holes as
-/// valid. Regular type-checking does not. This is intended to return true only
-/// if regular type-checking would consider this solution viable.
-static bool isViableForReTypeCheck(const Solution &S) {
-  if (llvm::any_of(S.Fixes, [&](const ConstraintFix *CF) {
-    return !CF->isWarning();
-  }))
-    return false;
-  using Binding = std::pair<swift::TypeVariableType *, swift::Type>;
-  return llvm::none_of(S.typeBindings, [&](const Binding& binding) {
-    return binding.second->hasHole();
-  });
-}
-
 bool TypeChecker::typeCheckForCodeCompletion(
     SolutionApplicationTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const Solution &)> callback) {
@@ -931,15 +917,14 @@ bool TypeChecker::typeCheckForCodeCompletion(
       }
 
       // At this point we know the code completion expression wasn't checked
-      // with the closure's surrounding context. If a single valid solution
-      // was formed we can wait until the body of the closure is type-checked
-      // and gather completions then.
-      if (solutions.size() == 1 && isViableForReTypeCheck(solution))
-        return CompletionResult::NotApplicable;
-
-      // Otherwise, it's unlikely the body will ever be type-checked, so fall
-      // back to manually checking a sub-expression within the closure body.
-      return CompletionResult::Fallback;
+      // with the closure's surrounding context, so can defer to regular type-
+      // checking for the current call to typeCheckExpression. If that succeeds
+      // we will get a second call to typeCheckExpression for the body of the
+      // closure later and can gather completions then. If it doesn't we rely
+      // on the fallback typechecking in the subclasses of
+      // TypeCheckCompletionCallback that considers in isolation a
+      // sub-expression of the closure that contains the completion location.
+      return CompletionResult::NotApplicable;
     }
 
     llvm::for_each(solutions, callback);
