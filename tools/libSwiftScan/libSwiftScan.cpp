@@ -22,12 +22,6 @@ using namespace swift::dependencies;
 
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t);
 
-//=== String Functions ----------------------------------------------------===//
-
-const char *swiftscan_get_C_string(swiftscan_string_ref_t string) {
-  return static_cast<const char *>(string.data);
-}
-
 //=== Private Cleanup Functions -------------------------------------------===//
 
 /// Free the given string.
@@ -124,7 +118,7 @@ swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto ScanResult = ScanningTool->getDependencies(Compilation, {});
@@ -142,13 +136,13 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
 
   std::vector<BatchScanInput> BatchInput;
   for (size_t i = 0; i < batch_input->count; ++i) {
     swiftscan_batch_scan_entry_s *Entry = batch_input->modules[i];
-    BatchInput.push_back({swiftscan_get_C_string(Entry->module_name),
-                          swiftscan_get_C_string(Entry->arguments),
+    BatchInput.push_back({get_C_string(Entry->module_name),
+                          get_C_string(Entry->arguments),
                           /*outputPath*/ "", Entry->is_swift});
   }
 
@@ -176,7 +170,7 @@ swiftscan_import_set_create(swiftscan_scanner_t scanner,
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
-    Compilation.push_back(swiftscan_get_C_string(invocation->argv->strings[i]));
+    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
   auto PreScanResult = ScanningTool->getImports(Compilation);

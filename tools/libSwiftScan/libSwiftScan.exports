@@ -51,4 +51,3 @@ swiftscan_dependency_graph_dispose
 swiftscan_batch_scan_result_dispose
 swiftscan_import_set_dispose
 swiftscan_scanner_dispose
-swiftscan_get_C_string

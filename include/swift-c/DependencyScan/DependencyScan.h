@@ -36,8 +36,7 @@ SWIFTSCAN_BEGIN_DECLS
 /**
  * A character string used to pass around dependency scan result metadata.
  * Lifetime of the string is strictly tied to the object whose field it
- * represents. When the owning object is released, string memory is freed. Use
- * \c swiftscan_get_C_string() to retrieve the string data.
+ * represents. When the owning object is released, string memory is freed.
  */
 typedef struct {
   const void *data;
@@ -94,12 +93,6 @@ typedef struct {
 /// Opaque container of all relevant context required to launch a dependency
 /// scan (command line arguments, working directory, etc.)
 typedef struct swiftscan_scan_invocation_s *swiftscan_scan_invocation_t;
-
-//=== String Functions ----------------------------------------------------===//
-
-/// Retrieve the character data associated with the given string.
-SWIFTSCAN_PUBLIC const char *
-swiftscan_get_C_string(swiftscan_string_ref_t string);
 
 //=== Dependency Result Functions -----------------------------------------===//
 
