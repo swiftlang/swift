@@ -65,6 +65,7 @@
 #include <algorithm>
 #include <memory>
 
+
 using namespace swift;
 
 #define DEBUG_TYPE "ASTContext"
@@ -206,8 +207,8 @@ struct ASTContext::Implementation {
   /// The declaration of 'Sequence.makeIterator()'.
   FuncDecl *MakeIterator = nullptr;
 
-  /// The declaration of 'AsyncSequence.makeGenerator()'.
-  FuncDecl *MakeGenerator = nullptr;
+  /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
+  FuncDecl *MakeAsyncIterator = nullptr;
 
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
@@ -775,16 +776,16 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getAsyncSequenceMakeGenerator() const {
-  if (getImpl().MakeGenerator) {
-    return getImpl().MakeGenerator;
+FuncDecl *ASTContext::getAsyncSequenceMakeAsyncIterator() const {
+  if (getImpl().MakeAsyncIterator) {
+    return getImpl().MakeAsyncIterator;
   }
 
   auto proto = getProtocol(KnownProtocolKind::AsyncSequence);
   if (!proto)
     return nullptr;
 
-  for (auto result : proto->lookupDirect(Id_makeGenerator)) {
+  for (auto result : proto->lookupDirect(Id_makeAsyncIterator)) {
     if (result->getDeclContext() != proto)
       continue;
 
@@ -792,7 +793,7 @@ FuncDecl *ASTContext::getAsyncSequenceMakeGenerator() const {
       if (func->getParameters()->size() != 0)
         continue;
 
-      getImpl().MakeGenerator = func;
+      getImpl().MakeAsyncIterator = func;
       return func;
     }
   }

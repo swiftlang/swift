@@ -3712,7 +3712,7 @@ generateForEachStmtConstraints(
   // Determine the iterator type.
   auto iteratorAssocType =
       sequenceProto->getAssociatedType(isAsync ? 
-        cs.getASTContext().Id_Generator : cs.getASTContext().Id_Iterator);
+        cs.getASTContext().Id_AsyncIterator : cs.getASTContext().Id_Iterator);
   Type iteratorType = DependentMemberType::get(sequenceType, iteratorAssocType);
 
   // The iterator type must conform to IteratorProtocol.
@@ -3725,7 +3725,7 @@ generateForEachStmtConstraints(
 
   // Reference the makeIterator witness.
   FuncDecl *makeIterator = isAsync ? 
-    ctx.getAsyncSequenceMakeGenerator() : ctx.getSequenceMakeIterator();
+    ctx.getAsyncSequenceMakeAsyncIterator() : ctx.getSequenceMakeIterator();
   
   Type makeIteratorType =
       cs.createTypeVariable(locator, TVO_CanBindToNoEscape);

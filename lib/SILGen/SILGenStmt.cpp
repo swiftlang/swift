@@ -934,6 +934,33 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
+namespace {
+  class CancelCleanup : public Cleanup {
+    SILLocation loc;
+    std::function<ArgumentSource ()> iteratorGen;
+    ConcreteDeclRef generatorCancelRef;
+  public:
+    CancelCleanup(SILLocation loc, std::function<ArgumentSource ()> iteratorGen, 
+      ConcreteDeclRef generatorCancelRef) : 
+      loc(loc), iteratorGen(iteratorGen),
+      generatorCancelRef(generatorCancelRef) { }
+
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
+      FormalEvaluationScope scope(SGF);
+      SGF.emitApplyMethod(loc, generatorCancelRef, iteratorGen(),
+          PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
+          SGFContext());
+    }
+
+    void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+      llvm::errs() << "CancelCleanup\n"
+                   << "State: " << getState() << "\n";
+#endif
+    }
+  };
+}
+
 void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
 
   // Dig out information about the sequence conformance.
@@ -954,7 +981,7 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
 
     // Compute the reference to the AsyncSequence's makeGenerator().
     FuncDecl *makeGeneratorReq = 
-      SGF.getASTContext().getAsyncSequenceMakeGenerator();
+      SGF.getASTContext().getAsyncSequenceMakeAsyncIterator();
     ConcreteDeclRef makeGeneratorRef(makeGeneratorReq, sequenceSubs);
 
     // Call makeGenerator().
@@ -997,18 +1024,17 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
   JumpDest loopDest = createJumpDest(S->getBody());
   SGF.B.emitBlock(loopDest.getBlock(), S);
 
-  // Set the destinations for 'break' and 'continue'.
-  JumpDest endDest = createJumpDest(S->getBody());
-  SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
-
-  // Compute the reference to the the generator's next().
+  // Compute the reference to the the generator's next() && cancel().
   auto generatorProto =
       SGF.getASTContext().getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
   ValueDecl *generatorNextReq = generatorProto->getSingleRequirement(
       DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
                ArrayRef<Identifier>()));
+  ValueDecl *generatorCancelReq = generatorProto->getSingleRequirement(
+      DeclName(SGF.getASTContext(), SGF.getASTContext().Id_cancel,
+               ArrayRef<Identifier>()));
   auto generatorAssocType =
-      asyncSequenceProto->getAssociatedType(SGF.getASTContext().Id_Generator);
+      asyncSequenceProto->getAssociatedType(SGF.getASTContext().Id_AsyncIterator);
   auto generatorMemberRef = DependentMemberType::get(
       asyncSequenceProto->getSelfInterfaceType(), generatorAssocType);
   auto generatorType = sequenceConformance.getAssociatedType(
@@ -1018,6 +1044,12 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
   auto generatorSubs = SubstitutionMap::getProtocolSubstitutions(
       generatorProto, generatorType, generatorConformance);
   ConcreteDeclRef generatorNextRef(generatorNextReq, generatorSubs);
+  ConcreteDeclRef generatorCancelRef(generatorCancelReq, generatorSubs);
+
+  // Set the destinations for 'break' and 'continue'.
+  JumpDest endDest = createJumpDest(S->getBody());
+  SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
+  
 
   auto buildArgumentSource = [&]() {
     if (cast<FuncDecl>(generatorNextRef.getDecl())->getSelfAccessKind() ==
@@ -1047,6 +1079,10 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
     }
     return result;
   };
+
+  SGF.Cleanups.pushCleanup<CancelCleanup>(SILLocation(S->getSequence()),
+    buildArgumentSource, generatorCancelRef);
+  auto cancelCleanup = SGF.Cleanups.getTopCleanup();
   // Then emit the loop destination block.
   //
   // Advance the generator.  Use a scope to ensure that any temporary stack
@@ -1146,6 +1182,10 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
       createBasicBlock(), failExitingBlock,
       [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
+        // cancelCleanup.setState(SGF, CleanupState::Dormant);
+
+        SGF.Cleanups.forwardCleanup(cancelCleanup);
+
         scope.exitAndBranch(S);
       },
       SGF.loadProfilerCount(S));
