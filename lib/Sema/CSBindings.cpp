@@ -1652,20 +1652,32 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   cs.addConstraint(ConstraintKind::Bind, TypeVar, type, srcLocator);
 
+  auto reportHole = [&]() {
+    if (cs.isForCodeCompletion()) {
+      // Don't penalize solutions with unresolved generics.
+      if (TypeVar->getImpl().getGenericParameter())
+        return false;
+      // Don't penalize solutions with holes due to missing arguments after the
+      // code completion position.
+      auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
+      if (argLoc && argLoc->isAfterCodeCompletionLoc())
+        return false;
+    }
+    cs.increaseScore(SK_Hole);
+
+    if (auto fix = fixForHole(cs)) {
+      if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
+        return true;
+    }
+    return false;
+  };
+
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.push_back(srcLocator);
 
-    if (type->isHole()) {
-      // Reflect in the score that this type variable couldn't be
-      // resolved and had to be bound to a placeholder "hole" type.
-      cs.increaseScore(SK_Hole);
-
-      if (auto fix = fixForHole(cs)) {
-        if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
-          return true;
-      }
-    }
+    if (type->isHole() && reportHole())
+      return true;
   }
 
   return !cs.failedConstraint && !cs.simplify();
