@@ -1,3 +1,7 @@
 module BoolEnums {
   header "bool-enums.h"
 }
+
+module ScopedEnums {
+  header "scoped-enums.h"
+}
