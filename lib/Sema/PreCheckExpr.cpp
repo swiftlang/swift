@@ -1926,6 +1926,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
                                           bool replaceInvalidRefsWithErrors) {
+  auto &ctx = dc->getASTContext();
+  FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
+
   PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {

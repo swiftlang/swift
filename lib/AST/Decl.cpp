@@ -5910,6 +5910,11 @@ void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) con
   if (getDeclContext()->isTypeContext())
     return;
 
+  // Avoid request evaluator overhead in the common case where there's
+  // no wrapper.
+  if (!getAttrs().hasAttribute<CustomAttr>())
+    return;
+
   if (auto *backingVar = getPropertyWrapperBackingProperty())
     visit(backingVar);
 
