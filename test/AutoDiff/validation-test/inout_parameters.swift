@@ -117,6 +117,15 @@ InoutParameterAutoDiffTests.test("SetAccessor") {
       get { x }
       set { x = newValue }
     }
+
+    // Computed property with explicit `@differentiable` accessors.
+    var doubled: Float {
+      @differentiable
+      get { x + x }
+
+      @differentiable
+      set { x = newValue / 2 }
+    }
   }
 
   // `squared` implemented using a `set` accessor.
@@ -126,8 +135,19 @@ InoutParameterAutoDiffTests.test("SetAccessor") {
     s.computed *= x
     return s.x
   }
-  expectEqual(6, gradient(at: 3, in: squared))
-  expectEqual(8, gradient(at: 4, in: squared))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: squared))
+  expectEqual((16, 8), valueWithGradient(at: 4, in: squared))
+
+  // `quadrupled` implemented using a `set` accessor.
+  func quadrupled(_ x: Float) -> Float {
+    var s = S(x: 1)
+    s.doubled *= 4 * x
+    return s.x
+  }
+  print(valueWithGradient(at: 3, in: quadrupled))
+  print(valueWithGradient(at: 4, in: quadrupled))
+  expectEqual((12, 4), valueWithGradient(at: 3, in: quadrupled))
+  expectEqual((16, 4), valueWithGradient(at: 4, in: quadrupled))
 }
 
 // Test differentiation wrt `inout` parameters that have a class type.
