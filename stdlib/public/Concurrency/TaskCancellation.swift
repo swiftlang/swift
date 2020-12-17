@@ -25,9 +25,7 @@ extension Task {
   /// - SeeAlso: `checkCancellation()`
   /* @instantaneous */
   public static func isCancelled() async -> Bool {
-    // let task = __getTask() // TODO: pending internal API to get tasks
-    // task.isCancelled || task.deadline.isOverdue
-    fatalError("\(#function) not implemented yet.")
+     _taskIsCancelled(Builtin.getCurrentAsyncTask())
   }
 
   /// Check if the task is cancelled and throw an `CancellationError` if it was.
