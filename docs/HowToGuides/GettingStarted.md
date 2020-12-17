@@ -343,7 +343,7 @@ git remote add my-remote https://github.com/username/swift.git
 Finally, create a new branch.
 ```sh
 # Using 'my-branch' as a placeholder name
-git checkout my-branch
+git checkout -b my-branch
 git push --set-upstream my-remote my-branch
 ```
 
