@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
-// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc,CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
 
@@ -59,7 +59,8 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_future_f(
   // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
-  // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 7
+  // CHECK-32-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 6
+  // CHECK-64-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 7
   // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
   %20 = builtin "createAsyncTaskFuture"<T>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %10 : $@thick Any.Type, %2 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   end_borrow %4 : $Optional<Builtin.NativeObject>
@@ -77,7 +78,8 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_future_f(
   // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
-  // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 7
+  // CHECK-32-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 6
+  // CHECK-64-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 7
   // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
   %20 = builtin "createAsyncTaskFuture"<()>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %9 : $@thick Any.Type, %2 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
   end_borrow %4 : $Optional<Builtin.NativeObject>
