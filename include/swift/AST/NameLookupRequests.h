@@ -350,30 +350,6 @@ public:
   void cacheResult(GenericParamList *value) const;
 };
 
-/// Expand the given ASTScope. Requestified to detect recursion.
-class ExpandASTScopeRequest
-    : public SimpleRequest<ExpandASTScopeRequest,
-                           ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
-                                                     ast_scope::ScopeCreator *),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  ast_scope::ASTScopeImpl *
-  evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
-           ast_scope::ScopeCreator *) const;
-
-public:
-  // Separate caching.
-  bool isCached() const;
-  Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
-  void cacheResult(ast_scope::ASTScopeImpl *) const {}
-};
-
 /// The input type for an unqualified lookup request.
 class UnqualifiedLookupDescriptor {
   using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
