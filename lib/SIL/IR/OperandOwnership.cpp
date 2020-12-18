@@ -791,7 +791,7 @@ Optional<OperandOwnership> Operand::getOperandOwnership() const {
     // If we don't have a function, then we must have a SILGlobalVariable. In
     // that case, we act as if we aren't in ownership.
     if (!func || !func->hasOwnership()) {
-      return OperandOwnership::InstantaneousUse;
+      return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
 

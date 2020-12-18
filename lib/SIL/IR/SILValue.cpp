@@ -346,7 +346,7 @@ bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
   if (!operandOwnership) {
     return false;
   }
-  auto constraint = ::getOwnershipConstraint(operandOwnership.getValue());
+  auto constraint = operandOwnership->getOwnershipConstraint();
   if (constraint.satisfiesConstraint(kind)) {
     // Constraints aren't precise enough to enforce Unowned value uses.
     if (kind == OwnershipKind::Unowned) {
@@ -397,51 +397,40 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
             << ">";
 }
 
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     OperandOwnership operandOwnership) {
-  switch (operandOwnership) {
+StringRef OperandOwnership::asString() const {
+  switch (value) {
   case OperandOwnership::None:
-    os << "none";
-    break;
+    return "none";
   case OperandOwnership::InstantaneousUse:
-    os << "instantaneous";
-    break;
+    return "instantaneous";
   case OperandOwnership::UnownedInstantaneousUse:
-    os << "unowned-instantaneous";
-    break;
+    return "unowned-instantaneous";
   case OperandOwnership::ForwardingUnowned:
-    os << "forwarding-unowned";
-    break;
+    return "forwarding-unowned";
   case OperandOwnership::PointerEscape:
-    os << "pointer-escape";
-    break;
+    return "pointer-escape";
   case OperandOwnership::BitwiseEscape:
-    os << "bitwise-escape";
-    break;
+    return "bitwise-escape";
   case OperandOwnership::Borrow:
-    os << "borrow";
-    break;
+    return "borrow";
   case OperandOwnership::DestroyingConsume:
-    os << "destroying-consume";
-    break;
+    return "destroying-consume";
   case OperandOwnership::ForwardingConsume:
-    os << "forwarding-consume";
-    break;
+    return "forwarding-consume";
   case OperandOwnership::NestedBorrow:
-    os << "nested-borrow";
-    break;
+    return "nested-borrow";
   case OperandOwnership::InteriorPointer:
-    os << "interior-pointer";
-    break;
+    return "interior-pointer";
   case OperandOwnership::ForwardingBorrow:
-    os << "forwarding-borrow";
-    break;
+    return "forwarding-borrow";
   case OperandOwnership::EndBorrow:
-    os << "end-borrow";
-    break;
+    return "end-borrow";
   case OperandOwnership::Reborrow:
-    os << "reborrow";
-    break;
+    return "reborrow";
   }
-  return os;
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OperandOwnership &operandOwnership) {
+  return os << operandOwnership.asString();
 }
