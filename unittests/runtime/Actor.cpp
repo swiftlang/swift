@@ -119,7 +119,7 @@ class TaskContinuationFromLambda {
 
   SWIFT_CC(swiftasync)
   static void invoke(AsyncTask *task, ExecutorRef executor,
-                     AsyncContext *context) {
+                     SWIFT_ASYNC_CONTEXT AsyncContext *context) {
     (*lambdaStorage)(task, executor, static_cast<Context*>(context));
   }
 
