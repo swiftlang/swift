@@ -326,7 +326,8 @@ bool SILValueOwnershipChecker::gatherUsers(
     // Example: A guaranteed parameter of a co-routine.
 
     // Now check if we have a non guaranteed forwarding inst...
-    if (op->getOperandOwnership() != OperandOwnership::ForwardingBorrow) {
+    if (op->getOperandOwnership().getValue()
+        != OperandOwnership::ForwardingBorrow) {
       // First check if we are visiting an operand that is a consuming use...
       if (op->isLifetimeEnding()) {
         // If its underlying value is our original value, then this is a true

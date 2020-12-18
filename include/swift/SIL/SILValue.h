@@ -226,7 +226,7 @@ struct OwnershipKind {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const OwnershipKind &kind);
 
-enum class OperandOwnership;
+struct OperandOwnership;
 
 /// A value representing the specific ownership semantics that a SILValue may
 /// have.
@@ -624,86 +624,108 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Used to verify completeness of the ownership use model and exhaustively
 /// switch over any category of ownership use. Implies ownership constraints and
 /// lifetime constraints.
-enum class OperandOwnership {
-  /// Uses of ownership None. These uses are incompatible with values that have
-  /// ownership but are otherwise not verified.
-  None,
+struct OperandOwnership {
+  enum innerty : uint8_t {
+    /// Uses of ownership None. These uses are incompatible with values that
+    /// have ownership but are otherwise not verified.
+    None,
 
-  /// Use the value only for the duration of the operation, which may have side
-  /// effects. Requires an owned or guaranteed value.
-  /// (single-instruction apply with @guaranteed argument)
-  InstantaneousUse,
+    /// Use the value only for the duration of the operation, which may have
+    /// side effects. Requires an owned or guaranteed value.
+    /// (single-instruction apply with @guaranteed argument)
+    InstantaneousUse,
 
-  /// MARK: Uses of Any ownership values:
+    /// MARK: Uses of Any ownership values:
 
-  /// Use a value without requiring or propagating ownership. The operation may
-  /// not have side-effects that could affect ownership. This is limited to a
-  /// small number of operations that are allowed to take Unowned values.
-  /// (copy_value, single-instruction apply with @unowned argument))
-  UnownedInstantaneousUse,
+    /// Use a value without requiring or propagating ownership. The operation
+    /// may not have side-effects that could affect ownership. This is limited
+    /// to a small number of operations that are allowed to take Unowned values.
+    /// (copy_value, single-instruction apply with @unowned argument))
+    UnownedInstantaneousUse,
 
-  /// Forwarding instruction with an Unowned result. Its operands may have any
-  /// ownership.
-  ForwardingUnowned,
+    /// Forwarding instruction with an Unowned result. Its operands may have any
+    /// ownership.
+    ForwardingUnowned,
 
-  // Escape a pointer into a value in a way that cannot be tracked or verified.
-  //
-  // TODO: Eliminate the PointerEscape category. All pointer escapes should be
-  // InteriorPointer, guarded by a borrow scope, and verified.
-  PointerEscape,
+    // Escape a pointer into a value which cannot be tracked or verified.
+    //
+    // TODO: Eliminate the PointerEscape category. All pointer escapes should be
+    // InteriorPointer, guarded by a borrow scope, and verified.
+    PointerEscape,
 
-  /// Bitwise escape. Escapes the nontrivial contents of the value.
-  /// OSSA does not enforce the lifetime of the escaping bits.
-  /// The programmer must explicitly force lifetime extension.
-  /// (ref_to_unowned, unchecked_trivial_bitcast)
-  BitwiseEscape,
+    /// Bitwise escape. Escapes the nontrivial contents of the value.
+    /// OSSA does not enforce the lifetime of the escaping bits.
+    /// The programmer must explicitly force lifetime extension.
+    /// (ref_to_unowned, unchecked_trivial_bitcast)
+    BitwiseEscape,
 
-  /// MARK: Uses of Owned values:
+    /// MARK: Uses of Owned values:
 
-  /// Borrow. Propagates the owned value within a scope, without consuming it.
-  /// (begin_borrow, begin_apply with @guaranteed argument)
-  Borrow,
-  /// Destroying Consume. Destroys the owned value immediately.
-  /// (store, destroy, @owned destructure).
-  DestroyingConsume,
-  /// Forwarding Consume. Consumes the owned value indirectly via a move.
-  /// (br, destructure, tuple, struct, cast, switch).
-  ForwardingConsume,
+    /// Borrow. Propagates the owned value within a scope, without consuming it.
+    /// (begin_borrow, begin_apply with @guaranteed argument)
+    Borrow,
+    /// Destroying Consume. Destroys the owned value immediately.
+    /// (store, destroy, @owned destructure).
+    DestroyingConsume,
+    /// Forwarding Consume. Consumes the owned value indirectly via a move.
+    /// (br, destructure, tuple, struct, cast, switch).
+    ForwardingConsume,
 
-  /// MARK: Uses of Guaranteed values:
+    /// MARK: Uses of Guaranteed values:
 
-  /// Nested Borrow. Propagates the guaranteed value within a nested borrow
-  /// scope, without ending the outer borrow scope, following stack discipline.
-  /// (begin_borrow, begin_apply with @guaranteed).
-  NestedBorrow,
-  /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
-  /// no-escape closure) that depends on the guaranteed value within the base's
-  /// borrow scope. The verifier checks that all uses of the trivial value are
-  /// in scope.  (ref_element_addr, open_existential_box)
-  InteriorPointer,
-  /// Forwarded Borrow. Propagates the guaranteed value within the base's
-  /// borrow scope.
-  /// (tuple_extract, struct_extract, cast, switch)
-  ForwardingBorrow,
-  /// End Borrow. End the borrow scope opened directly by the operand.
-  /// The operand must be a begin_borrow, begin_apply, or function argument.
-  /// (end_borrow, end_apply)
-  EndBorrow,
-  // Reborrow. Ends the borrow scope opened directly by the operand and begins
-  // one or multiple disjoint borrow scopes. If a forwarded value is reborrowed,
-  // then its base must also be reborrowed at the same point.
-  // (br, FIXME: should also include destructure, tuple, struct)
-  Reborrow
+    /// Nested Borrow. Propagates the guaranteed value within a nested borrow
+    /// scope, without ending the outer borrow scope, following stack
+    /// discipline.
+    /// (begin_borrow, begin_apply with @guaranteed).
+    NestedBorrow,
+    /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
+    /// no-escape closure) that depends on the guaranteed value within the
+    /// base's borrow scope. The verifier checks that all uses of the trivial
+    /// value are in scope.
+    /// (ref_element_addr, open_existential_box)
+    InteriorPointer,
+    /// Forwarded Borrow. Propagates the guaranteed value within the base's
+    /// borrow scope.
+    /// (tuple_extract, struct_extract, cast, switch)
+    ForwardingBorrow,
+    /// End Borrow. End the borrow scope opened directly by the operand.
+    /// The operand must be a begin_borrow, begin_apply, or function argument.
+    /// (end_borrow, end_apply)
+    EndBorrow,
+    // Reborrow. Ends the borrow scope opened directly by the operand and begins
+    // one or multiple disjoint borrow scopes. If a forwarded value is
+    // reborrowed, then its base must also be reborrowed at the same point.
+    // (br, FIXME: should also include destructure, tuple, struct)
+    Reborrow
+  } value;
+
+  OperandOwnership(innerty newValue) : value(newValue) {}
+  OperandOwnership(const OperandOwnership &other): value(other.value) {}
+
+  OperandOwnership &operator=(const OperandOwnership &other) {
+    value = other.value;
+    return *this;
+  }
+
+  OperandOwnership &operator=(OperandOwnership::innerty other) {
+    value = other;
+    return *this;
+  }
+
+  operator innerty() const { return value; }
+
+  StringRef asString() const;
+
+  /// Return the OwnershipConstraint corresponding to this OperandOwnership.
+  OwnershipConstraint getOwnershipConstraint();
 };
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, OperandOwnership operandOwnership);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const OperandOwnership &operandOwnership);
 
-/// Return the OwnershipConstraint for a OperandOwnership.
-///
 /// Defined inline so the switch is eliminated for constant OperandOwnership.
-inline OwnershipConstraint
-getOwnershipConstraint(OperandOwnership operandOwnership) {
-  switch (operandOwnership) {
+inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
+  switch (value) {
   case OperandOwnership::None:
     return {OwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::InstantaneousUse:
@@ -847,7 +869,7 @@ public:
     if (!operandOwnership) {
       return None;
     }
-    return swift::getOwnershipConstraint(operandOwnership.getValue());
+    return operandOwnership->getOwnershipConstraint();
   }
 
   /// Returns true if changing the operand to use a value with the given
