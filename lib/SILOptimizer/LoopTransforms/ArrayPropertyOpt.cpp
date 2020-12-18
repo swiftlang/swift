@@ -102,7 +102,8 @@ public:
   /// Check if it is profitable to specialize a loop when you see an apply
   /// instruction. We consider it is not profitable to specialize the loop when:
   /// 1. The callee is not found in the module, or cannot be determined
-  /// 2. The number of instructions the analysis scans has exceeded the AnalysisThreshold
+  /// 2. The number of instructions the analysis scans has exceeded the
+  /// AnalysisThreshold
   uint32_t checkProfitabilityRecursively(SILFunction *Callee) {
     if (!Callee)
       return AnalysisThreshold;
@@ -118,7 +119,8 @@ public:
     for (auto &BB : *Callee) {
       for (auto &I : BB) {
         if (InstCount++ >= AnalysisThreshold) {
-          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Exceeded Analysis Threshold in "
+          LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - "
+                                     "Exceeded Analysis Threshold in "
                                   << BB.getParent()->getName() << "\n");
           InstCountCache[Callee] = AnalysisThreshold;
           return AnalysisThreshold;
@@ -126,8 +128,10 @@ public:
         if (auto Apply = FullApplySite::isa(&I)) {
           auto Callee = Apply.getReferencedFunctionOrNull();
           if (!Callee) {
-            LLVM_DEBUG(llvm::dbgs() << "ArrayPropertyOpt: Disabled Reason - Found opaque code in "
-                                    << BB.getParent()->getName() << "\n");
+            LLVM_DEBUG(
+                llvm::dbgs()
+                << "ArrayPropertyOpt: Disabled Reason - Found opaque code in "
+                << BB.getParent()->getName() << "\n");
             LLVM_DEBUG(Apply.dump());
             LLVM_DEBUG(I.getOperand(0)->dump());
           }
@@ -182,9 +186,11 @@ public:
     if (!FoundHoistable)
       return false;
 
-    // If the LoopInstCount exceeds the threshold, we will disable the optimization on this loop
-    // For loops of deeper nesting we increase the threshold by an additional 10%
-    if (LoopInstCount > LoopInstCountThreshold * (1 + (Loop->getLoopDepth() - 1) / 10)) {
+    // If the LoopInstCount exceeds the threshold, we will disable the
+    // optimization on this loop For loops of deeper nesting we increase the
+    // threshold by an additional 10%
+    if (LoopInstCount >
+        LoopInstCountThreshold * (1 + (Loop->getLoopDepth() - 1) / 10)) {
       LLVM_DEBUG(llvm::dbgs() << "Exceeded LoopInstCountThreshold\n");
       return false;
     }
@@ -205,8 +211,9 @@ public:
       }
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Profitable ArrayPropertyOpt in "
-                            << Loop->getLoopPreheader()->getParent()->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Profitable ArrayPropertyOpt in "
+               << Loop->getLoopPreheader()->getParent()->getName() << "\n");
     LLVM_DEBUG(Loop->dump());
     return true;
   }
