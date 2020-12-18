@@ -2654,20 +2654,29 @@ bool ConformanceChecker::checkActorIsolation(
               ActorIsolationRestriction::forDeclaration(witness)) {
   case ActorIsolationRestriction::ActorSelf: {
     // Actor-isolated witnesses cannot conform to protocol requirements.
-    bool canBeAsyncHandler = false;
+    witness->diagnose(diag::actor_isolated_witness,
+                      witness->getDescriptiveKind(),
+                      witness->getName());
     if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
-      canBeAsyncHandler = !witnessFunc->isAsyncHandler() &&
       witnessFunc->canBeAsyncHandler();
+      if (!witnessFunc->isAsyncHandler()) {
+        auto handlerNote = witness->diagnose(
+            diag::note_add_asynchandler_to_function,
+            witness->getName());
+        handlerNote.fixItInsert(witness->getAttributeInsertionLoc(false),
+            "@asyncHandler ");
+      }
     }
-    auto diag = witness->diagnose(
-        canBeAsyncHandler
-            ? diag::actor_isolated_witness_could_be_async_handler
-            : diag::actor_isolated_witness,
-        witness->getDescriptiveKind(), witness->getName());
 
-    if (canBeAsyncHandler) {
-      diag.fixItInsert(
-         witness->getAttributeInsertionLoc(false), "@asyncHandler ");
+    {
+      auto witnessVar = dyn_cast<VarDecl>(witness);
+      if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
+        auto independentNote = witness->diagnose(
+            diag::note_add_actorindependent_to_decl,
+            witness->getName(), witness->getDescriptiveKind());
+        independentNote.fixItInsert(witness->getAttributeInsertionLoc(false),
+            "@actorIndependent ");
+      }
     }
 
     return true;
