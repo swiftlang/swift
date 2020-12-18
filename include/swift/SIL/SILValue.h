@@ -288,7 +288,10 @@ struct ValueOwnershipKind {
     llvm_unreachable("covered switch");
   }
 
-  OperandOwnership getForwardingOperandOwnership() const;
+  /// Return the OperandOwnership for a forwarded operand when the forwarded
+  /// result has this ValueOwnershipKind. \p allowUnowned is true for a subset
+  /// of forwarding operations that are allowed to propagate Unowned values.
+  OperandOwnership getForwardingOperandOwnership(bool allowUnowned) const;
 
   /// Returns true if \p Other can be merged successfully with this, implying
   /// that the two ownership kinds are "compatibile".
@@ -626,24 +629,34 @@ enum class OperandOwnership {
   /// ownership but are otherwise not verified.
   None,
 
-  /// MARK: Uses of any ownership values:
-
-  /// Point-in-time use. Uses the value instantaneously.
-  /// (copy_value, single-instruction apply with @guaranteed argument)
+  /// Use the value only for the duration of the operation, which may have side
+  /// effects. Requires an owned or guaranteed value.
+  /// (single-instruction apply with @guaranteed argument)
   InstantaneousUse,
-  // FIXME: The PointerEscape category should be eliminated. All pointer escapes
-  // should be InteriorPointer, guarded by a borrow scope.
+
+  /// MARK: Uses of Any ownership values:
+
+  /// Use a value without requiring or propagating ownership. The operation may
+  /// not have side-effects that could affect ownership. This is limited to a
+  /// small number of operations that are allowed to take Unowned values.
+  /// (copy_value, single-instruction apply with @unowned argument))
+  UnownedInstantaneousUse,
+
+  /// Forwarding instruction with an Unowned result. Its operands may have any
+  /// ownership.
+  ForwardingUnowned,
+
+  // Escape a pointer into a value in a way that cannot be tracked or verified.
+  //
+  // TODO: Eliminate the PointerEscape category. All pointer escapes should be
+  // InteriorPointer, guarded by a borrow scope, and verified.
   PointerEscape,
+
   /// Bitwise escape. Escapes the nontrivial contents of the value.
   /// OSSA does not enforce the lifetime of the escaping bits.
   /// The programmer must explicitly force lifetime extension.
   /// (ref_to_unowned, unchecked_trivial_bitcast)
   BitwiseEscape,
-
-  /// MARK: Uses of Unowned values:
-
-  /// Forwarding instruction with an Unowned result must have Unowned operands.
-  ForwardingUnowned,
 
   /// MARK: Uses of Owned values:
 
@@ -663,8 +676,10 @@ enum class OperandOwnership {
   /// scope, without ending the outer borrow scope, following stack discipline.
   /// (begin_borrow, begin_apply with @guaranteed).
   NestedBorrow,
-  /// Interior Pointer. Propagates an address into the guaranteed value within
-  /// the base's borrow scope.  (ref_element_addr, open_existential_box)
+  /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
+  /// no-escape closure) that depends on the guaranteed value within the base's
+  /// borrow scope. The verifier checks that all uses of the trivial value are
+  /// in scope.  (ref_element_addr, open_existential_box)
   InteriorPointer,
   /// Forwarded Borrow. Propagates the guaranteed value within the base's
   /// borrow scope.
@@ -692,11 +707,11 @@ getOwnershipConstraint(OperandOwnership operandOwnership) {
   case OperandOwnership::None:
     return {OwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
     return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
-  case OperandOwnership::ForwardingUnowned:
-    return {OwnershipKind::Unowned, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::Borrow:
     return {OwnershipKind::Owned, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::DestroyingConsume:
@@ -713,20 +728,27 @@ getOwnershipConstraint(OperandOwnership operandOwnership) {
   }
 }
 
-// Forwarding instructions have a dynamic ownership kind. Their forwarded
-// operand constraint depends on that dynamic result ownership. If the result is
-// owned, then the instruction moves owned operand to its result, ending its
-// lifetime. If the result is guaranteed value, then the instruction propagates
-// the lifetime of its borrows operand through its result.
+/// Return the OperandOwnership for a forwarded operand when the forwarded
+/// result has this ValueOwnershipKind. \p allowUnowned is true for a subset
+/// of forwarding operations that are allowed to propagate Unowned values.
+///
+/// The ownership of a forwarded value is derived from the forwarding
+/// instruction's constant ownership attribute. If the result is owned, then the
+/// instruction moves owned operand to its result, ending its lifetime. If the
+/// result is guaranteed value, then the instruction propagates the lifetime of
+/// its borrows operand through its result.
 inline OperandOwnership
-ValueOwnershipKind::getForwardingOperandOwnership() const {
+ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   switch (value) {
   case OwnershipKind::Any:
     llvm_unreachable("invalid value ownership");
+  case OwnershipKind::Unowned:
+    if (allowUnowned) {
+      return OperandOwnership::ForwardingUnowned;
+    }
+    llvm_unreachable("invalid value ownership");
   case OwnershipKind::None:
     return OperandOwnership::None;
-  case OwnershipKind::Unowned:
-    return OperandOwnership::ForwardingUnowned;
   case OwnershipKind::Guaranteed:
     return OperandOwnership::ForwardingBorrow;
   case OwnershipKind::Owned:
@@ -829,8 +851,8 @@ public:
   }
 
   /// Returns true if changing the operand to use a value with the given
-  /// ownership kind would not cause the operand to violate the operand's
-  /// ownership constraints. Returns false otherwise.
+  /// ownership kind, without rewriting the instruction, would not cause the
+  /// operand to violate the operand's ownership constraints.
   bool canAcceptKind(ValueOwnershipKind kind) const;
 
   /// Returns true if this operand and its value satisfy the operand's
