@@ -226,8 +226,19 @@ public:
 
   void addThrows() {
     addChunkWithTextNoCopy(
-       CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword,
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " throws");
+  }
+
+  void addAnnotatedAsync() {
+    addAsync();
+    getLastChunk().setIsAnnotation();
+  }
+
+  void addAsync() {
+    addChunkWithTextNoCopy(
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+       " async");
   }
 
   void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
@@ -242,7 +253,8 @@ public:
 
   void addRethrows() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword, " rethrows");
+        CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+        " rethrows");
   }
 
   void addAnnotatedLeftParen() {

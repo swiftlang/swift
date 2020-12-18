@@ -83,8 +83,6 @@ UID_KEYS = [
     KEY('NameLength', 'key.namelength'),
     KEY('BodyOffset', 'key.bodyoffset'),
     KEY('BodyLength', 'key.bodylength'),
-    KEY('ThrowOffset', 'key.throwoffset'),
-    KEY('ThrowLength', 'key.throwlength'),
     KEY('DocOffset', 'key.docoffset'),
     KEY('DocLength', 'key.doclength'),
     KEY('IsLocal', 'key.is_local'),
