@@ -779,44 +779,36 @@ generateFullDependencyGraph(CompilerInstance &instance,
                 : create_null();
 
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
+
         details->swift_textual_details = {
-            .module_interface_path = moduleInterfacePath,
-            .compiled_module_candidates =
-                create_set(swiftTextualDeps->compiledModuleCandidates),
-            .bridging_header_path = bridgingHeaderPath,
-            .bridging_source_files =
-                create_set(swiftTextualDeps->bridgingSourceFiles),
-            .bridging_module_dependencies =
-                create_set(swiftTextualDeps->bridgingModuleDependencies),
-            .command_line = create_set(swiftTextualDeps->buildCommandLine),
-            .extra_pcm_args = create_set(swiftTextualDeps->extraPCMArgs),
-            .context_hash = create_clone(swiftTextualDeps->contextHash.c_str()),
-            .is_framework = swiftTextualDeps->isFramework};
+            moduleInterfacePath,
+            create_set(swiftTextualDeps->compiledModuleCandidates),
+            bridgingHeaderPath,
+            create_set(swiftTextualDeps->bridgingSourceFiles),
+            create_set(swiftTextualDeps->bridgingModuleDependencies),
+            create_set(swiftTextualDeps->buildCommandLine),
+            create_set(swiftTextualDeps->extraPCMArgs),
+            create_clone(swiftTextualDeps->contextHash.c_str()),
+            swiftTextualDeps->isFramework};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
-            .compiled_module_path =
-                create_clone(swiftPlaceholderDeps->compiledModulePath.c_str()),
-            .module_doc_path =
-                create_clone(swiftPlaceholderDeps->moduleDocPath.c_str()),
-            .module_source_info_path =
-                create_clone(swiftPlaceholderDeps->sourceInfoPath.c_str())};
+            create_clone(swiftPlaceholderDeps->compiledModulePath.c_str()),
+            create_clone(swiftPlaceholderDeps->moduleDocPath.c_str()),
+            create_clone(swiftPlaceholderDeps->sourceInfoPath.c_str())};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
         details->swift_binary_details = {
-            .compiled_module_path =
-                create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
-            .module_doc_path =
-                create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
-            .module_source_info_path =
-                create_clone(swiftBinaryDeps->sourceInfoPath.c_str())};
+            create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
+            create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
+            create_clone(swiftBinaryDeps->sourceInfoPath.c_str())};
       } else {
         // Clang module details
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_CLANG;
         details->clang_details = {
-            .module_map_path = create_clone(clangDeps->moduleMapFile.c_str()),
-            .context_hash = create_clone(clangDeps->contextHash.c_str()),
-            .command_line = create_set(clangDeps->nonPathCommandLine)};
+            create_clone(clangDeps->moduleMapFile.c_str()),
+            create_clone(clangDeps->contextHash.c_str()),
+            create_set(clangDeps->nonPathCommandLine)};
       }
       return details;
     };
