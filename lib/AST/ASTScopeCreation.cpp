@@ -579,7 +579,7 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
 
 void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   ASTScopeAssert(!child->getParent(), "child should not already have parent");
-  child->parent = this;
+  child->parentAndWasExpanded.setPointer(this);
 
 #ifndef NDEBUG
   checkSourceRangeBeforeAddingChild(child, ctx);
@@ -587,11 +587,9 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
 
   // If this is the first time we've added children, notify the ASTContext
   // that there's a SmallVector that needs to be cleaned up.
-  // FIXME: If we had access to SmallVector::isSmall(), we could do better.
-  if (storedChildren.empty() && !haveAddedCleanup) {
+  if (storedChildren.empty())
     ctx.addDestructorCleanup(storedChildren);
-    haveAddedCleanup = true;
-  }
+
   storedChildren.push_back(child);
 }
 
