@@ -298,7 +298,6 @@ bbExitBlock(%result : @owned $FakeOptional<Klass>):
 
 // CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
 // CHECK: bb0(
-// CHECK-NEXT: unchecked_ownership_conversion
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2'
@@ -317,8 +316,7 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: destroy_value
 //
 // CHECK: bb2:
-// CHECK-NEXT: [[ARG_CONVERT:%.*]] = unchecked_ownership_conversion [[ARG]]
-// CHECK-NEXT: [[TUP:%.*]] = tuple ([[ARG_CONVERT]] : $Klass, [[ARG_CONVERT]] : $Klass)
+// CHECK-NEXT: [[TUP:%.*]] = tuple ([[ARG]] : $Klass, [[ARG]] : $Klass)
 // CHECK-NEXT: [[COPY:%.*]] = copy_value [[TUP]]
 // CHECK-NEXT: cond_br undef, bb3, bb4
 //
