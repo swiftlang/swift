@@ -247,13 +247,7 @@ private:
 
 #pragma mark - Scope tree creation
 public:
-  /// expandScope me, sending deferred nodes to my descendants.
-  /// Return the scope into which to place subsequent decls
-  ASTScopeImpl *expandAndBeCurrentDetectingRecursion(ScopeCreator &);
-
-  /// Expand or reexpand the scope if unexpanded or if not current.
-  /// There are several places in the compiler that mutate the AST after the
-  /// fact, above and beyond adding Decls to the SourceFile.
+  /// Expand the scope. Asserts if it was already expanded.
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
   bool getWasExpanded() const { return wasExpanded; }
@@ -629,8 +623,6 @@ public:
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-
-  void countBodies(ScopeCreator &) const;
 };
 
 class NominalTypeScope final : public IterableTypeScope {

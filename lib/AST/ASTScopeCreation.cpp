@@ -82,8 +82,7 @@ public:
     if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
       return ip;
 
-    ASTScopeImpl *insertionPoint =
-        child->expandAndBeCurrentDetectingRecursion(*this);
+    ASTScopeImpl *insertionPoint = child->expandAndBeCurrent(*this);
     return insertionPoint;
   }
 
@@ -224,15 +223,18 @@ ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
 }
 
 void ASTSourceFileScope::buildFullyExpandedTree() {
-  expandAndBeCurrentDetectingRecursion(*scopeCreator);
+  if (!getWasExpanded())
+    expandAndBeCurrent(*scopeCreator);
   preOrderChildrenDo([&](ASTScopeImpl *s) {
-    s->expandAndBeCurrentDetectingRecursion(*scopeCreator);
+    if (!s->getWasExpanded())
+      s->expandAndBeCurrent(*scopeCreator);
   });
 }
 
 void ASTSourceFileScope::
     buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals() {
-      expandAndBeCurrentDetectingRecursion(*scopeCreator);
+  if (!getWasExpanded())
+    expandAndBeCurrent(*scopeCreator);
 }
 
 void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
@@ -242,7 +244,8 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   if (sr.isInvalid())
     return;
   ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
-  bodyScope->expandAndBeCurrentDetectingRecursion(*scopeCreator);
+  if (!bodyScope->getWasExpanded())
+    bodyScope->expandAndBeCurrent(*scopeCreator);
 }
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
@@ -411,8 +414,6 @@ public:
       endLocForBraceStmt = *endLoc;
 
     ASTContext &ctx = scopeCreator.getASTContext();
-    if (auto *s = ctx.Stats)
-      ++s->getFrontendCounters().NumBraceStmtASTScopes;
 
     return
         scopeCreator.constructExpandAndInsert<BraceStmtScope>(
@@ -596,25 +597,16 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
 
 #pragma mark implementations of expansion
 
-ASTScopeImpl *
-ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
-  return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
-                           ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
-}
-
-ASTScopeImpl *
-ExpandASTScopeRequest::evaluate(Evaluator &evaluator, ASTScopeImpl *parent,
-                                ScopeCreator *scopeCreator) const {
-  auto *insertionPoint = parent->expandAndBeCurrent(*scopeCreator);
-  ASTScopeAssert(insertionPoint,
-                 "Used to return a null pointer if the insertion point would "
-                 "not be used, but it breaks the request dependency hashing");
-  return insertionPoint;
-}
-
 ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   ASTScopeAssert(!getWasExpanded(),
                  "Cannot expand the same scope twice");
+
+  // Set the flag before we actually expand, to detect re-entrant calls
+  // via the above assertion.
+  setWasExpanded();
+
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumASTScopeExpansions;
 
   auto *insertionPoint = expandSpecifically(scopeCreator);
   ASTScopeAssert(!insertionPointForDeferredExpansion() ||
@@ -623,8 +615,6 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
                  "In order for lookups into lazily-expanded scopes to be "
                  "accurate before expansion, the insertion point before "
                  "expansion must be the same as after expansion.");
-
-  setWasExpanded();
 
   return insertionPoint;
 }
@@ -825,9 +815,6 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(
         nd, insertionPoint, endLoc);
   }
-
-  if (auto *s = scopeCreator.getASTContext().Stats)
-    ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
 
   return {
       insertionPoint,
@@ -1085,24 +1072,17 @@ ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
 
 #pragma mark createBodyScope
 
-void IterableTypeScope::countBodies(ScopeCreator &scopeCreator) const {
-  if (auto *s = scopeCreator.getASTContext().Stats)
-    ++s->getFrontendCounters().NumIterableTypeBodyASTScopes;
-}
-
 void ExtensionScope::createBodyScope(ASTScopeImpl *leaf,
                                      ScopeCreator &scopeCreator) {
   scopeCreator.constructWithPortionExpandAndInsert<ExtensionScope,
                                                    IterableTypeBodyPortion>(
       leaf, decl);
-  countBodies(scopeCreator);
 }
 void NominalTypeScope::createBodyScope(ASTScopeImpl *leaf,
                                        ScopeCreator &scopeCreator) {
   scopeCreator.constructWithPortionExpandAndInsert<NominalTypeScope,
                                                    IterableTypeBodyPortion>(
       leaf, decl);
-  countBodies(scopeCreator);
 }
 
 #pragma mark createTrailingWhereClauseScope
@@ -1192,9 +1172,6 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   for (auto *d : getIterableDeclContext().get()->getMembers())
     scopeCreator.addToScopeTree(ASTNode(d), this);
-
-  if (auto *s = scopeCreator.getASTContext().Stats)
-    ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }
 
 #pragma mark getScopeCreator
@@ -1240,17 +1217,4 @@ IterableTypeBodyPortion::insertionPointForDeferredExpansion(
 void ast_scope::simple_display(llvm::raw_ostream &out,
                                const ScopeCreator *scopeCreator) {
   scopeCreator->print(out);
-}
-
-//----------------------------------------------------------------------------//
-// ExpandASTScopeRequest computation.
-//----------------------------------------------------------------------------//
-
-bool ExpandASTScopeRequest::isCached() const {
-  ASTScopeImpl *scope = std::get<0>(getStorage());
-  return scope->getWasExpanded();
-}
-
-Optional<ASTScopeImpl *> ExpandASTScopeRequest::getCachedResult() const {
-  return std::get<0>(getStorage());
 }
