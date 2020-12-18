@@ -184,8 +184,7 @@ void ExtendedNominalRequest::writeDependencySink(
   auto *SF = std::get<0>(getStorage())->getParentSourceFile();
   if (!SF)
     return;
-  if (SF != tracker.getRecorder().getActiveDependencySourceOrNull().getPtrOrNull())
-    return;
+
   tracker.addPotentialMember(value);
 }
 
