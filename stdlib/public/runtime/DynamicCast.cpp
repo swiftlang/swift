@@ -724,15 +724,33 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
-  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
-  if (hashableConformance) {
-    _swift_convertToAnyHashableIndirect(srcValue, destLocation,
-                                        srcType, hashableConformance);
-    return DynamicCastResult::SuccessViaCopy;
-  } else {
-    return DynamicCastResult::Failure;
+  switch (srcType->getKind()) {
+  case MetadataKind::ForeignClass: // CF -> String
+  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+#if SWIFT_OBJC_INTEROP
+    // TODO: Implement a fast path for NSString->AnyHashable casts.
+    // These are incredibly common because an NSDictionary with
+    // NSString keys is bridged by default to [AnyHashable:Any].
+    // Until this is implemented, fall through to the default case
+    SWIFT_FALLTHROUGH;
+#else
+    // If no Obj-C interop, just fall through to the default case.
+    SWIFT_FALLTHROUGH;
+#endif
   }
+  default: {
+    auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+    if (hashableConformance) {
+      _swift_convertToAnyHashableIndirect(srcValue, destLocation,
+                                          srcType, hashableConformance);
+      return DynamicCastResult::SuccessViaCopy;
+    } else {
+      return DynamicCastResult::Failure;
+    }
+  }
+  }
+  return DynamicCastResult::Failure;
 }
 
 static DynamicCastResult
