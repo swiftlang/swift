@@ -345,6 +345,10 @@ void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
                                                 void *continuation,
                                                 const Metadata *resumeType);
 
+/// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
+extern "C" SWIFT_CC(swift)
+void swift_continuation_logFailedCheck(const char *message);
+
 }
 
 #endif
