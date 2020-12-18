@@ -14,7 +14,11 @@
 ///
 /// Contains optimizations that eliminate redundant copy values.
 ///
+/// FIXME: CanonicalizeOSSALifetime likely replaces everything this file.
+///
 //===----------------------------------------------------------------------===//
+
+#define DEBUG_TYPE "sil-semantic-arc-opts"
 
 #include "OwnershipPhiOperand.h"
 #include "SemanticARCOptVisitor.h"
@@ -61,6 +65,8 @@ using namespace swift::semanticarc;
 // are within the borrow scope.
 //
 // TODO: This needs a better name.
+//
+// FIXME: CanonicalizeOSSALifetime replaces this once it supports borrows.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     CopyValueInst *cvi) {
   // For now, do not run this optimization. This is just to be careful.
@@ -236,6 +242,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
   // Otherwise, our copy must truly not be needed, o RAUW and convert to
   // guaranteed!
+  LLVM_DEBUG(llvm::dbgs() << "Replace copy with guaranteed source: " << *cvi);
   std::move(lr).convertToGuaranteedAndRAUW(cvi->getOperand(), getCallbacks());
   return true;
 }
@@ -246,6 +253,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
+///
+/// FIXME: CanonicalizeOSSALifetime replaces this.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
     CopyValueInst *cvi) {
   // This is a cheap optimization generally.
@@ -253,6 +262,7 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
   // See if we are lucky and have a simple case.
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
+      LLVM_DEBUG(llvm::dbgs() << "Erasing single-use copy: " << *cvi);
       eraseInstruction(dvi);
       eraseInstructionAndAddOperandsToWorklist(cvi);
       return true;
@@ -276,6 +286,7 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
   }
 
   // Now that we have a truly dead live range copy value, eliminate it!
+  LLVM_DEBUG(llvm::dbgs() << "Eliminate dead copy: " << *cvi);
   while (!destroys.empty()) {
     eraseInstruction(destroys.pop_back_val());
   }
@@ -366,6 +377,8 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
   SmallPtrSet<SILInstruction *, 8> visitedInsts;
   if (!isUseBetweenInstAndBlockEnd(singleCVIConsumingUse->getUser(),
                                    &dvi->getAllOperands()[0], &visitedInsts)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Eliminate copy with useless lifetime: " << *cvi);
     ctx.eraseInstruction(dvi);
     ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
     return true;
@@ -474,6 +487,8 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
   }
 
   // Ok, we now know that we can eliminate this value.
+  LLVM_DEBUG(llvm::dbgs()
+             << "Eliminate borrowed copy with useless lifetime: " << *cvi);
   ctx.eraseInstruction(dvi);
   ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
   return true;
@@ -532,6 +547,7 @@ static bool tryJoiningIfCopyOperandHasSingleDestroyValue(
   // post-dominate destroy_value and can eliminate the hand off traffic.
   if (canJoinIfCopyDiesInFunctionExitingBlock(operand, dvi, cvi,
                                               singleCVIConsumingUse)) {
+    LLVM_DEBUG(llvm::dbgs() << "Eliminate returned copy: " << *cvi);
     ctx.eraseInstruction(dvi);
     ctx.eraseAndRAUWSingleValueInstruction(cvi, operand);
     return true;
@@ -602,6 +618,8 @@ static bool tryJoiningIfCopyOperandHasSingleDestroyValue(
 // interior pointers (e.x. project_box) are properly guarded by
 // begin_borrow. Because of that we can not shrink lifetimes and instead rely on
 // SILGen's correctness.
+//
+// FIXME: CanonicalizeOSSALifetime replaces this.
 bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     CopyValueInst *cvi) {
   // First do a quick check if our operand is owned. If it is not owned, we can
@@ -659,6 +677,8 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     // can optimize without any further analysis since we know we will not be
     // shrinking lifetimes of owned values.
     if (singleCVIConsumingUse == nullptr) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Eliminate multiply consumed live-out copy: " << *cvi);
       eraseInstruction(dvi);
       eraseAndRAUWSingleValueInstruction(cvi, operand);
       return true;
@@ -668,6 +688,7 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     // is not in the same block as our copy_value/destroy_value, it must be live
     // out of the block and thus we are not shrinking any lifetimes.
     if (singleCVIConsumingUse->getParentBlock() != cvi->getParent()) {
+      LLVM_DEBUG(llvm::dbgs() << "Eliminate non-local live-out copy: " << *cvi);
       eraseInstruction(dvi);
       eraseAndRAUWSingleValueInstruction(cvi, operand);
       return true;
@@ -702,6 +723,8 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
 
 /// Given an owned value that is completely enclosed within its parent owned
 /// value and is not consumed, eliminate the copy.
+///
+/// FIXME: CanonicalizeOSSALifetime replaces this.
 bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
     CopyValueInst *cvi) {
   if (ctx.onlyGuaranteedOpts)
