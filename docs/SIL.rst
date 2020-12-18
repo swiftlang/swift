@@ -1719,13 +1719,13 @@ Ownership Kind
 The semantics in the previous example is of just one form of ownership semantics
 supported: "owned" semantics. In SIL, we map these "ownership semantics" into a
 form that a compiler can reason about by mapping semantics onto a lattice with
-the following elements: `None`_, `Owned`_, `Guaranteed`_, `Unowned`_, `Any`_. We
+the following elements: `None`_, `Owned`_, `Guaranteed`_, `Unowned`_, `Any`. We
 call this the lattice of "Ownership Kinds" and each individual value an
 "Ownership Kind". This lattice is defined as a 3-level lattice with::
 
-1. None being Top.
-2. Any being Bottom.
-3. All non-Any, non-None OwnershipKinds being defined as a mid-level elements of the lattice
+  1. None being Top.
+  2. Any being Bottom.
+  3. All non-Any, non-None OwnershipKinds being defined as a mid-level elements of the lattice
 
 We can graphically represent the lattice via a diagram like the following::
 
@@ -1760,8 +1760,8 @@ This lattice is applied to SIL by requiring well formed SIL to:
 1. Define a static map of each SIL value to an OwnershipKind that classify the
    semantics that the SIL value obeys. We call this subset of OwnershipKind to
    be the set of `Value Ownership Kind`_: `None`_, `Unowned`_, `Guaranteed`_,
-   `Owned`_ (note conspiciously missing `Any`_). This is because in our model
-   `Any`_ represents an unknown ownership semantics and since our model is
+   `Owned`_ (note conspiciously missing `Any`). This is because in our model
+   `Any` represents an unknown ownership semantics and since our model is
    statically strict, we do not allow for values to have unknown ownership.
 
 2. Define a static map from each operand of a SILInstruction, `i`, to an
@@ -1787,13 +1787,13 @@ In prose, a value can be passed to an operand if applying the operand's
 ownership constraint to the value's ownership does not change the value's
 ownership. Operationally this has a few interesting effects on SIL::
 
-1. We have defined away invalid value-operand (aka def-use) pairing since the
-   SILVerifier validates the aforementioned relationship on all SIL values,
-   uses at all points of the pipeline until ossa is lowered.
+  1. We have defined away invalid value-operand (aka def-use) pairing since the
+     SILVerifier validates the aforementioned relationship on all SIL values,
+     uses at all points of the pipeline until ossa is lowered.
 
-2. Many SIL instructions do not care about the ownership kind that their value
-   will take. They can just define all of their operand's as having an
-   ownership constraint of Any.
+  2. Many SIL instructions do not care about the ownership kind that their value
+     will take. They can just define all of their operand's as having an
+     ownership constraint of Any.
 
 Now lets go into more depth upon `Value Ownership Kind`_ and `Ownership Constraint`_.
 
