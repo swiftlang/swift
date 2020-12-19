@@ -1675,17 +1675,17 @@ Ownership SSA
 A SILFunction marked with the ``[ossa]`` function attribute is considered to be
 in Ownership SSA form. Ownership SSA is an augmented version of SSA that
 enforces ownership invariants by imbuing value-operand edges with semantic
-ownership information. All SIL values are statically assigned an ownership kind
+ownership information. All SIL values are assigned a constant ownership kind
 that defines the ownership semantics that the value models. All SIL operands
 that use a SIL value are required to be able to be semantically partitioned in
-between "normal uses" that just require the value to be live and "consuming
-uses" that end the lifetime of the value and after which the value can no longer
-be used. Since operands that are consuming uses end a value's lifetime,
-naturally we must have that the consuming use points jointly post-dominate all
-non-consuming use points and that a value must be consumed exactly once along
-all reachable program paths, preventing leaks and use-after-frees. As an
-example, consider the following SIL example with partitioned defs/uses annotated
-inline::
+between "non-lifetime ending uses" that just require the value to be live and
+"lifetime ending uses" that end the lifetime of the value and after which the
+value can no longer be used. Since by definition operands that are lifetime
+ending uses end their associated value's lifetime, we must have that the
+lifetime ending use points jointly post-dominate all non-lifetime ending use
+points and that a value must have exactly one lifetime ending use along all
+reachable program paths, preventing leaks and use-after-frees. As an example,
+consider the following SIL example with partitioned defs/uses annotated inline::
 
   sil @stash_and_cast : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
   bb0(%kls1 : @owned $Klass): // Definition of %kls1
@@ -1710,7 +1710,7 @@ inline::
 
 Notice how every value in the SIL above has a partionable set of uses with
 normal uses always before consuming uses. Any such violations of ownership
-semantics would trigger a static SILVerifier error allowing us to know that we
+semantics would trigger a SILVerifier error allowing us to know that we
 do not have any leaks or use-after-frees in the above code.
 
 Ownership Kind
@@ -1757,33 +1757,34 @@ and one moves up the lattice by performing a "join" operation, e.x.::
 
 This lattice is applied to SIL by requiring well formed SIL to:
 
-1. Define a static map of each SIL value to an OwnershipKind that classify the
-   semantics that the SIL value obeys. We call this subset of OwnershipKind to
-   be the set of `Value Ownership Kind`_: `None`_, `Unowned`_, `Guaranteed`_,
-   `Owned`_ (note conspiciously missing `Any`). This is because in our model
-   `Any` represents an unknown ownership semantics and since our model is
-   statically strict, we do not allow for values to have unknown ownership.
+1. Define a map of each SIL value to a constant OwnershipKind that classify the
+   semantics that the SIL value obeys. This ownership kind may be static (i.e.:
+   the same for all instances of an instruction) or dynamic (e.x.: forwarding
+   instructions set their ownership upon construction). We call this subset of
+   OwnershipKind to be the set of `Value Ownership Kind`_: `None`_, `Unowned`_,
+   `Guaranteed`_, `Owned`_ (note conspiciously missing `Any`). This is because
+   in our model `Any` represents an unknown ownership semantics and since our
+   model is strict, we do not allow for values to have unknown ownership.
 
-2. Define a static map from each operand of a SILInstruction, `i`, to an
-   (Ownership Kind, Boolean) called the operand's `Ownership Constraint`_. The
-   Ownership Kind element of the `Ownership Constraint`_ acts as a a static
-   "constraint" on the Value Ownership Kind that the operand's value can be mapped
-   to. The second boolean value is used to know if an operand will end the
-   lifetime of the incoming value when checking dataflow rules. The dataflow
-   rules that each `Value Ownership Kind`_ obeys is documented for each
-   `Value Ownership Kind`_ in its detailed description below.
+2. Define a map from each operand of a SILInstruction, `i`, to a constant
+   Ownership Kind, Boolean pair called the operand's `Ownership
+   Constraint`_. The Ownership Kind element of the `Ownership Constraint`_
+   determines semantically which ownership kind's the operand's value can take
+   on. The Boolean value is used to know if an operand will end the lifetime of
+   the incoming value when checking dataflow rules. The dataflow rules that each
+   `Value Ownership Kind`_ obeys is documented for each `Value Ownership Kind`_
+   in its detailed description below.
 
-Then we take these static definitions and require that valid SIL has the
-property that given a value ``v``, an instruction ``i`` and said instruction's
-operand ``operand(i)``, that ``v`` can be used as a value in ``operand(i)`` only
-if the join of the ownership constraint of ``operand(i)`` with ``v`` is the
-ownership kind of ``v``! In symbols, we must have the following join is
-defined::
+Then we take these two maps and require that valid SIL has the property that
+given an operand, ``op(i)`` of an instruction ``i`` and a value ``v`` that
+``op(i)`` can only use ``v`` if the ``join`` of
+``OwnershipConstraint(operand(i))`` with ``ValueOwnershipKind(v)`` is equal to
+the ``ValueOwnershipKind`` of ``v``. In symbols, we must have that::
 
   join : (OwnershipConstraint, ValueOwnershipKind) -> ValueOwnershipKind
   OwnershipConstraint(operand(i)) join ValueOwnershipKind(v) = ValueOwnershipKind(v)
 
-In prose, a value can be passed to an operand if applying the operand's
+In words, a value can be passed to an operand if applying the operand's
 ownership constraint to the value's ownership does not change the value's
 ownership. Operationally this has a few interesting effects on SIL::
 
