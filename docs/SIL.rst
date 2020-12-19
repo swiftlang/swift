@@ -1729,9 +1729,9 @@ call this the lattice of "Ownership Kinds" and each individual value an
 
 We can graphically represent the lattice via a diagram like the following::
 
-                +----+
-      +-------- |None| -----------+
-      |         +----+            |
+                +------+
+      +-------- | None | ---------+
+      |         +------+          |
       |            |              |
       v            v              v         ^
   +-------+  +-----+------+  +---------+    |
@@ -1739,9 +1739,9 @@ We can graphically represent the lattice via a diagram like the following::
   +-------+  +-----+------+  +---------+         Ownership Constraints
       |            |              |
       |            v              |         +--- Only Ownership Constraints
-      |          +---+            |         |
-      +--------->|Any|<-----------+         v
-                 +---+
+      |         +-----+           |         |
+      +-------->| Any |<----------+         v
+                +-----+
 
 One moves down the lattice by performing a "meet" operation::
 
