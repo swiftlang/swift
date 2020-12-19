@@ -775,9 +775,15 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-Optional<OperandOwnership> Operand::getOperandOwnership() const {
+OperandOwnership Operand::getOperandOwnership() const {
+  // We consider type dependent uses to be instantaneous uses.
+  //
+  // NOTE: We could instead try to exclude type dependent uses from our system,
+  // but that adds a bunch of Optionals and unnecessary types. This doesn't hurt
+  // anything and allows us to eliminate Optionals and thus confusion in between
+  // Optional::None and OwnershipKind::None.
   if (isTypeDependent())
-    return None;
+    return OperandOwnership::InstantaneousUse;
 
   // If we do not have ownership enabled, just return any. This ensures that we
   // do not have any consuming uses and everything from an ownership perspective

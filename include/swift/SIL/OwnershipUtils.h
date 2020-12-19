@@ -86,7 +86,7 @@ public:
   OwnershipConstraint getOwnershipConstraint() const {
     // We use a force unwrap since a ForwardingOperand should always have an
     // ownership constraint.
-    return *use->getOwnershipConstraint();
+    return use->getOwnershipConstraint();
   }
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;

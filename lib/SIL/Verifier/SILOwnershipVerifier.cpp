@@ -188,7 +188,7 @@ bool SILValueOwnershipChecker::isCompatibleDefUse(
     return true;
   }
 
-  auto constraint = *op->getOwnershipConstraint();
+  auto constraint = op->getOwnershipConstraint();
   errorBuilder.handleMalformedSIL([&]() {
     llvm::errs() << "Have operand with incompatible ownership?!\n"
                  << "Value: " << op->get() << "User: " << *user
@@ -326,8 +326,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     // Example: A guaranteed parameter of a co-routine.
 
     // Now check if we have a non guaranteed forwarding inst...
-    if (op->getOperandOwnership().getValue()
-        != OperandOwnership::ForwardingBorrow) {
+    if (op->getOperandOwnership() != OperandOwnership::ForwardingBorrow) {
       // First check if we are visiting an operand that is a consuming use...
       if (op->isLifetimeEnding()) {
         // If its underlying value is our original value, then this is a true
@@ -744,7 +743,7 @@ void SILInstruction::verifyOperandOwnership() const {
     if (op.satisfiesConstraints())
       continue;
 
-    auto constraint = *op.getOwnershipConstraint();
+    auto constraint = op.getOwnershipConstraint();
     SILValue opValue = op.get();
     auto valueOwnershipKind = opValue.getOwnershipKind();
     errorBuilder->handleMalformedSIL([&] {
