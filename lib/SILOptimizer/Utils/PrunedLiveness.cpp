@@ -50,7 +50,7 @@ void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB) {
 ///
 /// Terminators are not live out of the block.
 PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(Operand *use) {
-  seenUse = true;
+  SWIFT_ASSERT_ONLY(seenUse = true);
 
   auto *bb = use->getUser()->getParent();
   switch (getBlockLiveness(bb)) {

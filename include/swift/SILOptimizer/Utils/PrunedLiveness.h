@@ -145,7 +145,7 @@ private:
 public:
   bool empty() const { return liveBlocks.empty(); }
 
-  void clear() { liveBlocks.clear(); seenUse = false; }
+  void clear() { liveBlocks.clear(); SWIFT_ASSERT_ONLY(seenUse = false); }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
     assert(!seenUse && "cannot initialize more defs with partial liveness");
