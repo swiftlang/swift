@@ -343,14 +343,11 @@ static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
 
 bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
   auto operandOwnership = getOperandOwnership();
-  if (!operandOwnership) {
-    return false;
-  }
-  auto constraint = operandOwnership->getOwnershipConstraint();
+  auto constraint = operandOwnership.getOwnershipConstraint();
   if (constraint.satisfiesConstraint(kind)) {
     // Constraints aren't precise enough to enforce Unowned value uses.
     if (kind == OwnershipKind::Unowned) {
-      return canAcceptUnownedValue(operandOwnership.getValue());
+      return canAcceptUnownedValue(operandOwnership);
     }
     return true;
   }
@@ -365,13 +362,8 @@ bool Operand::satisfiesConstraints() const {
 bool Operand::isLifetimeEnding() const {
   auto constraint = getOwnershipConstraint();
 
-  // If we got back Optional::None, then our operand is for a type dependent
-  // operand. So return false.
-  if (!constraint)
-    return false;
-
   // If our use lifetime constraint is NonLifetimeEnding, just return false.
-  if (!constraint->isLifetimeEnding())
+  if (!constraint.isLifetimeEnding())
     return false;
 
   // Otherwise, we may have a lifetime ending use. We consider two cases here:

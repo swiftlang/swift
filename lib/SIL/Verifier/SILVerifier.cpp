@@ -1127,21 +1127,12 @@ public:
       // type dependent operand then we should have a constraint of
       // OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding.
       if (!I->getFunction()->hasOwnership()) {
-        if (operand.isTypeDependent()) {
-          require(
-              !operand.getOwnershipConstraint(),
-              "Non Optional::None constraint for a type dependent operand?!");
-        } else {
-          auto constraint = operand.getOwnershipConstraint();
-          require(constraint.hasValue(),
-                  "All non-type dependent operands must have a "
-                  "non-Optional::None constraint?!");
-          require(constraint->getPreferredKind() == OwnershipKind::Any &&
-                      constraint->getLifetimeConstraint() ==
-                          UseLifetimeConstraint::NonLifetimeEnding,
-                  "In non-ossa all non-type dependent operands must have a "
-                  "constraint of Any, NonLifetimeEnding");
-        }
+        auto constraint = operand.getOwnershipConstraint();
+        require(constraint.getPreferredKind() == OwnershipKind::Any &&
+                    constraint.getLifetimeConstraint() ==
+                        UseLifetimeConstraint::NonLifetimeEnding,
+                "In non-ossa all non-type dependent operands must have a "
+                "constraint of Any, NonLifetimeEnding");
       }
     }
 
