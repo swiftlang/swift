@@ -322,12 +322,13 @@ SILFunction *Operand::getParentFunction() const {
 /// Return true if this use can accept Unowned values.
 static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   switch (operandOwnership) {
+  case OperandOwnership::NonUse:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
     return true;
-  case OperandOwnership::None:
+  case OperandOwnership::TrivialUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::Borrow:
   case OperandOwnership::DestroyingConsume:
@@ -391,8 +392,10 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 StringRef OperandOwnership::asString() const {
   switch (value) {
-  case OperandOwnership::None:
-    return "none";
+  case OperandOwnership::NonUse:
+    return "non-use";
+  case OperandOwnership::TrivialUse:
+    return "trivial-use";
   case OperandOwnership::InstantaneousUse:
     return "instantaneous";
   case OperandOwnership::UnownedInstantaneousUse:

@@ -121,63 +121,63 @@ SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
   }
 
 // Instructions that require trivial operands.
-OPERAND_OWNERSHIP(None, AwaitAsyncContinuation)
-OPERAND_OWNERSHIP(None, AbortApply)
-OPERAND_OWNERSHIP(None, AddressToPointer)
-OPERAND_OWNERSHIP(None, AllocRef)        // with tail operand
-OPERAND_OWNERSHIP(None, AllocRefDynamic) // with tail operand
-OPERAND_OWNERSHIP(None, BeginAccess)
-OPERAND_OWNERSHIP(None, BeginUnpairedAccess)
-OPERAND_OWNERSHIP(None, BindMemory)
-OPERAND_OWNERSHIP(None, CheckedCastAddrBranch)
-OPERAND_OWNERSHIP(None, CondBranch)
-OPERAND_OWNERSHIP(None, CondFail)
-OPERAND_OWNERSHIP(None, CopyAddr)
-OPERAND_OWNERSHIP(None, DeallocStack)
-OPERAND_OWNERSHIP(None, DebugValueAddr)
-OPERAND_OWNERSHIP(None, DeinitExistentialAddr)
-OPERAND_OWNERSHIP(None, DestroyAddr)
-OPERAND_OWNERSHIP(None, EndAccess)
-OPERAND_OWNERSHIP(None, EndApply)
-OPERAND_OWNERSHIP(None, EndUnpairedAccess)
-OPERAND_OWNERSHIP(None, GetAsyncContinuationAddr)
-OPERAND_OWNERSHIP(None, IndexAddr)
-OPERAND_OWNERSHIP(None, IndexRawPointer)
-OPERAND_OWNERSHIP(None, InitBlockStorageHeader)
-OPERAND_OWNERSHIP(None, InitEnumDataAddr)
-OPERAND_OWNERSHIP(None, InitExistentialAddr)
-OPERAND_OWNERSHIP(None, InitExistentialMetatype)
-OPERAND_OWNERSHIP(None, InjectEnumAddr)
-OPERAND_OWNERSHIP(None, IsUnique)
-OPERAND_OWNERSHIP(None, Load)
-OPERAND_OWNERSHIP(None, LoadBorrow)
-OPERAND_OWNERSHIP(None, MarkFunctionEscape)
-OPERAND_OWNERSHIP(None, ObjCExistentialMetatypeToObject)
-OPERAND_OWNERSHIP(None, ObjCMetatypeToObject)
-OPERAND_OWNERSHIP(None, ObjCToThickMetatype)
-OPERAND_OWNERSHIP(None, OpenExistentialAddr)
-OPERAND_OWNERSHIP(None, OpenExistentialMetatype)
-OPERAND_OWNERSHIP(None, PointerToAddress)
-OPERAND_OWNERSHIP(None, PointerToThinFunction)
-OPERAND_OWNERSHIP(None, ProjectBlockStorage)
-OPERAND_OWNERSHIP(None, ProjectValueBuffer)
-OPERAND_OWNERSHIP(None, RawPointerToRef)
-OPERAND_OWNERSHIP(None, SelectEnumAddr)
-OPERAND_OWNERSHIP(None, SelectValue)
-OPERAND_OWNERSHIP(None, StructElementAddr)
-OPERAND_OWNERSHIP(None, SwitchEnumAddr)
-OPERAND_OWNERSHIP(None, SwitchValue)
-OPERAND_OWNERSHIP(None, TailAddr)
-OPERAND_OWNERSHIP(None, ThickToObjCMetatype)
-OPERAND_OWNERSHIP(None, ThinFunctionToPointer)
-OPERAND_OWNERSHIP(None, ThinToThickFunction)
-OPERAND_OWNERSHIP(None, TupleElementAddr)
-OPERAND_OWNERSHIP(None, UncheckedAddrCast)
-OPERAND_OWNERSHIP(None, UncheckedRefCastAddr)
-OPERAND_OWNERSHIP(None, UncheckedTakeEnumDataAddr)
-OPERAND_OWNERSHIP(None, UnconditionalCheckedCastAddr)
-OPERAND_OWNERSHIP(None, AllocValueBuffer)
-OPERAND_OWNERSHIP(None, DeallocValueBuffer)
+OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
+OPERAND_OWNERSHIP(TrivialUse, AbortApply)
+OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
+OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
+OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
+OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
+OPERAND_OWNERSHIP(TrivialUse, BeginUnpairedAccess)
+OPERAND_OWNERSHIP(TrivialUse, BindMemory)
+OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
+OPERAND_OWNERSHIP(TrivialUse, CondBranch)
+OPERAND_OWNERSHIP(TrivialUse, CondFail)
+OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
+OPERAND_OWNERSHIP(TrivialUse, DebugValueAddr)
+OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
+OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
+OPERAND_OWNERSHIP(TrivialUse, EndAccess)
+OPERAND_OWNERSHIP(TrivialUse, EndApply)
+OPERAND_OWNERSHIP(TrivialUse, EndUnpairedAccess)
+OPERAND_OWNERSHIP(TrivialUse, GetAsyncContinuationAddr)
+OPERAND_OWNERSHIP(TrivialUse, IndexAddr)
+OPERAND_OWNERSHIP(TrivialUse, IndexRawPointer)
+OPERAND_OWNERSHIP(TrivialUse, InitBlockStorageHeader)
+OPERAND_OWNERSHIP(TrivialUse, InitEnumDataAddr)
+OPERAND_OWNERSHIP(TrivialUse, InitExistentialAddr)
+OPERAND_OWNERSHIP(TrivialUse, InitExistentialMetatype)
+OPERAND_OWNERSHIP(TrivialUse, InjectEnumAddr)
+OPERAND_OWNERSHIP(TrivialUse, IsUnique)
+OPERAND_OWNERSHIP(TrivialUse, Load)
+OPERAND_OWNERSHIP(TrivialUse, LoadBorrow)
+OPERAND_OWNERSHIP(TrivialUse, MarkFunctionEscape)
+OPERAND_OWNERSHIP(TrivialUse, ObjCExistentialMetatypeToObject)
+OPERAND_OWNERSHIP(TrivialUse, ObjCMetatypeToObject)
+OPERAND_OWNERSHIP(TrivialUse, ObjCToThickMetatype)
+OPERAND_OWNERSHIP(TrivialUse, OpenExistentialAddr)
+OPERAND_OWNERSHIP(TrivialUse, OpenExistentialMetatype)
+OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
+OPERAND_OWNERSHIP(TrivialUse, PointerToThinFunction)
+OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
+OPERAND_OWNERSHIP(TrivialUse, ProjectValueBuffer)
+OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
+OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
+OPERAND_OWNERSHIP(TrivialUse, SelectValue)
+OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
+OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
+OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
+OPERAND_OWNERSHIP(TrivialUse, TailAddr)
+OPERAND_OWNERSHIP(TrivialUse, ThickToObjCMetatype)
+OPERAND_OWNERSHIP(TrivialUse, ThinFunctionToPointer)
+OPERAND_OWNERSHIP(TrivialUse, ThinToThickFunction)
+OPERAND_OWNERSHIP(TrivialUse, TupleElementAddr)
+OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
+OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
+OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
+OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
+OPERAND_OWNERSHIP(TrivialUse, AllocValueBuffer)
+OPERAND_OWNERSHIP(TrivialUse, DeallocValueBuffer)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -263,13 +263,14 @@ OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialBoxValue)
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
-  OPERAND_OWNERSHIP(None, Load##Name)
+  OPERAND_OWNERSHIP(TrivialUse, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
   OPERAND_OWNERSHIP(DestroyingConsume, Name##Release)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")                              \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
-#define UNCHECKED_REF_STORAGE(Name, ...) OPERAND_OWNERSHIP(None, Name##ToRef)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  OPERAND_OWNERSHIP(TrivialUse, Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
@@ -345,7 +346,7 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
   case OwnershipKind::Any:
     llvm_unreachable("invalid value ownership");
   case OwnershipKind::None:
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   case OwnershipKind::Unowned:
     // FIXME: disallow borrowing an Unowned value. Temporarily model it as an
     // instantaneous use until SILGenFunction::emitClassMemberDestruction is
@@ -365,7 +366,7 @@ visitDeallocPartialRefInst(DeallocPartialRefInst *i) {
   if (getValue() == i->getInstance()) {
     return OperandOwnership::DestroyingConsume;
   }
-  return OperandOwnership::None;
+  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership
@@ -395,7 +396,7 @@ OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   if (getValue() == i->getSrc()) {
     return OperandOwnership::ForwardingBorrow;
   }
-  return OperandOwnership::None;
+  return OperandOwnership::TrivialUse;
 }
 
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv) {
@@ -428,7 +429,7 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   // Before considering conventions, filter all (trivial) indirect
   // arguments. This also rules out result arguments.
   if (getValue()->getType().isAddress()) {
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   }
   SILArgumentConvention argConv = apply.isCalleeOperand(op)
     ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
@@ -472,7 +473,7 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
 OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
   // Before considering conventions, filter all indirect arguments.
   if (getValue()->getType().isAddress()) {
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   }
   auto fnType = i->getFunction()->getLoweredFunctionType();
   SILArgumentConvention argConv(
@@ -486,7 +487,7 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   case OwnershipKind::Guaranteed:
     llvm_unreachable("invalid value ownership");
   case OwnershipKind::None:
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   case OwnershipKind::Unowned:
     return OperandOwnership::UnownedInstantaneousUse;
   case OwnershipKind::Owned:
@@ -496,7 +497,7 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
 
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {
   if (getValue() != i->getSrc()) {
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::DestroyingConsume;
 }
@@ -507,14 +508,14 @@ OperandOwnershipClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i) {
     return OperandOwnership::DestroyingConsume;
   }
   if (getValue() == i->getDest()) {
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::InstantaneousUse; // initializer/setter closure
 }
 
 OperandOwnership OperandOwnershipClassifier::visitStoreInst(StoreInst *i) {
   if (getValue() != i->getSrc()) {
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::DestroyingConsume;
 }
@@ -560,7 +561,7 @@ struct OperandOwnershipBuiltinClassifier
   OperandOwnership visitLLVMIntrinsic(BuiltinInst *bi, llvm::Intrinsic::ID id) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be trivial.
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   }
 
   // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
@@ -741,10 +742,10 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
 
 // FIXME: ConvertTaskToJob is documented as taking NativePointer. It's operand's
-// ownership should be 'None'.
+// ownership should be 'TrivialUse'.
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
 
-BUILTIN_OPERAND_OWNERSHIP(None, AutoDiffCreateLinearMapContext)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 
@@ -776,14 +777,12 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //===----------------------------------------------------------------------===//
 
 OperandOwnership Operand::getOperandOwnership() const {
-  // We consider type dependent uses to be instantaneous uses.
-  //
-  // NOTE: We could instead try to exclude type dependent uses from our system,
-  // but that adds a bunch of Optionals and unnecessary types. This doesn't hurt
-  // anything and allows us to eliminate Optionals and thus confusion in between
-  // Optional::None and OwnershipKind::None.
+  // NOTE: NonUse distinguishes itself from InstantaneousUse because it does not
+  // require liveness. Discrimating such uses in the enum avoids the need to
+  // return an Optional<OperandOwnership>::None, which could be confused with
+  // OwnershipKind::None.
   if (isTypeDependent())
-    return OperandOwnership::InstantaneousUse;
+    return OperandOwnership::NonUse;
 
   // If we do not have ownership enabled, just return any. This ensures that we
   // do not have any consuming uses and everything from an ownership perspective

@@ -878,11 +878,12 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
   }
 #ifndef NDEBUG
   switch (use->getOperandOwnership()) {
-  case OperandOwnership::None:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::ForwardingBorrow:
     break;
+  case OperandOwnership::NonUse:
+  case OperandOwnership::TrivialUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::PointerEscape:
