@@ -4132,6 +4132,9 @@ NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
 NOTE(note_add_asynchandler_to_function,none,
      "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
+NOTE(note_add_actorindependent_to_decl,none,
+     "add '@actorIndependent' to %0 to make this %1 independent of the actor",
+     (DeclName, DescriptiveDeclKind))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
@@ -4254,10 +4257,6 @@ WARNING(shared_mutable_state_access,none,
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(actor_isolated_witness_could_be_async_handler,none,
-     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement; "
-     "did you mean to make it an asychronous handler?",
      (DescriptiveDeclKind, DeclName))
 ERROR(global_actor_isolated_requirement,none,
       "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "

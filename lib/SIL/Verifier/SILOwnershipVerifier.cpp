@@ -188,7 +188,7 @@ bool SILValueOwnershipChecker::isCompatibleDefUse(
     return true;
   }
 
-  auto constraint = *op->getOwnershipConstraint();
+  auto constraint = op->getOwnershipConstraint();
   errorBuilder.handleMalformedSIL([&]() {
     llvm::errs() << "Have operand with incompatible ownership?!\n"
                  << "Value: " << op->get() << "User: " << *user
@@ -743,7 +743,7 @@ void SILInstruction::verifyOperandOwnership() const {
     if (op.satisfiesConstraints())
       continue;
 
-    auto constraint = *op.getOwnershipConstraint();
+    auto constraint = op.getOwnershipConstraint();
     SILValue opValue = op.get();
     auto valueOwnershipKind = opValue.getOwnershipKind();
     errorBuilder->handleMalformedSIL([&] {

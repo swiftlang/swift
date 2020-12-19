@@ -319,13 +319,38 @@ SILFunction *Operand::getParentFunction() const {
   return self->getUser()->getFunction();
 }
 
-bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
-  auto constraint = getOwnershipConstraint();
-  if (!constraint)
-    return false;
-
-  if (constraint->satisfiesConstraint(kind))
+/// Return true if this use can accept Unowned values.
+static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
+  switch (operandOwnership) {
+  case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::ForwardingUnowned:
+  case OperandOwnership::PointerEscape:
+  case OperandOwnership::BitwiseEscape:
     return true;
+  case OperandOwnership::None:
+  case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::Borrow:
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume:
+  case OperandOwnership::NestedBorrow:
+  case OperandOwnership::InteriorPointer:
+  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::EndBorrow:
+  case OperandOwnership::Reborrow:
+    return false;
+  }
+}
+
+bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
+  auto operandOwnership = getOperandOwnership();
+  auto constraint = operandOwnership.getOwnershipConstraint();
+  if (constraint.satisfiesConstraint(kind)) {
+    // Constraints aren't precise enough to enforce Unowned value uses.
+    if (kind == OwnershipKind::Unowned) {
+      return canAcceptUnownedValue(operandOwnership);
+    }
+    return true;
+  }
 
   return false;
 }
@@ -337,13 +362,8 @@ bool Operand::satisfiesConstraints() const {
 bool Operand::isLifetimeEnding() const {
   auto constraint = getOwnershipConstraint();
 
-  // If we got back Optional::None, then our operand is for a type dependent
-  // operand. So return false.
-  if (!constraint)
-    return false;
-
   // If our use lifetime constraint is NonLifetimeEnding, just return false.
-  if (!constraint->isLifetimeEnding())
+  if (!constraint.isLifetimeEnding())
     return false;
 
   // Otherwise, we may have a lifetime ending use. We consider two cases here:
@@ -369,48 +389,40 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
             << ">";
 }
 
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     OperandOwnership operandOwnership) {
-  switch (operandOwnership) {
+StringRef OperandOwnership::asString() const {
+  switch (value) {
   case OperandOwnership::None:
-    os << "none";
-    break;
+    return "none";
   case OperandOwnership::InstantaneousUse:
-    os << "instantaneous";
-    break;
-  case OperandOwnership::PointerEscape:
-    os << "pointer-escape";
-    break;
-  case OperandOwnership::BitwiseEscape:
-    os << "bitwise-escape";
-    break;
+    return "instantaneous";
+  case OperandOwnership::UnownedInstantaneousUse:
+    return "unowned-instantaneous";
   case OperandOwnership::ForwardingUnowned:
-    os << "bitwise-escape";
-    break;
+    return "forwarding-unowned";
+  case OperandOwnership::PointerEscape:
+    return "pointer-escape";
+  case OperandOwnership::BitwiseEscape:
+    return "bitwise-escape";
   case OperandOwnership::Borrow:
-    os << "borrow";
-    break;
+    return "borrow";
   case OperandOwnership::DestroyingConsume:
-    os << "destroying-consume";
-    break;
+    return "destroying-consume";
   case OperandOwnership::ForwardingConsume:
-    os << "forwarding-consume";
-    break;
+    return "forwarding-consume";
   case OperandOwnership::NestedBorrow:
-    os << "nested-borrow";
-    break;
+    return "nested-borrow";
   case OperandOwnership::InteriorPointer:
-    os << "interior-pointer";
-    break;
+    return "interior-pointer";
   case OperandOwnership::ForwardingBorrow:
-    os << "forwarded-borrow";
-    break;
+    return "forwarding-borrow";
   case OperandOwnership::EndBorrow:
-    os << "end-borrow";
-    break;
+    return "end-borrow";
   case OperandOwnership::Reborrow:
-    os << "reborrow";
-    break;
+    return "reborrow";
   }
-  return os;
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OperandOwnership &operandOwnership) {
+  return os << operandOwnership.asString();
 }

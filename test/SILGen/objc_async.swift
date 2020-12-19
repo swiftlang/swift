@@ -22,6 +22,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: dealloc_stack [[RESUME_BUF]]
   let _: Int = await slowServer.doSomethingSlow("mail")
 
+  let _: Int = await slowServer.doSomethingSlowNullably("mail")
+
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $String
   // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), SlowServer) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] String, [[RESUME_BUF]]
@@ -54,6 +56,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[THROWBB]]([[ERROR_VALUE:%.*]] : @owned $Error):
   // CHECK:   throw [[ERROR_VALUE]]
 
+  let _: String = await slowServer.findAnswerNullably("foo")
+  let _: String = await try slowServer.doSomethingDangerousNullably("foo")
 }
 
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]

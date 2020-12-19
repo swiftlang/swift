@@ -41,7 +41,9 @@ class C1: Actor {
 
 // Method that is not usable as a witness.
 actor class BA1 {
-  func enqueue(partialTask: PartialAsyncTask) { } // expected-error{{actor-isolated instance method 'enqueue(partialTask:)' cannot be used to satisfy a protocol requirement; did you mean to make it an asychronous handler?}}
+  func enqueue(partialTask: PartialAsyncTask) { } // expected-error{{actor-isolated instance method 'enqueue(partialTask:)' cannot be used to satisfy a protocol requirement}}
+  //expected-note@-1{{add '@asyncHandler' to function 'enqueue(partialTask:)' to create an implicit asynchronous context}}{{3-3=@asyncHandler }}
+  //expected-note@-2{{add '@actorIndependent' to 'enqueue(partialTask:)' to make this instance method independent of the actor}}{{3-3=@actorIndependent }}
 }
 
 // Method that isn't part of the main class definition cannot be used to

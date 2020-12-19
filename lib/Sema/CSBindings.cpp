@@ -319,7 +319,8 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
                   });
 
     // Infer transitive defaults.
-    llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
+    for (const auto &def : bindings.Defaults)
+      addDefault(def.second);
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
@@ -400,12 +401,45 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
   // Key is a literal protocol requirement, Value indicates whether (first)
   // given protocol is a direct requirement, and (second) whether it has been
   // covered by an existing binding.
+  bool canBeNil = false;
   llvm::SmallMapVector<ProtocolDecl *, std::pair<bool, bool>, 4>
       literalProtocols;
   for (auto *constraint : Protocols) {
-    if (constraint->getKind() == ConstraintKind::LiteralConformsTo)
-      literalProtocols.insert({constraint->getProtocol(),
-                               {isDirectRequirement(constraint), false}});
+    if (constraint->getKind() != ConstraintKind::LiteralConformsTo)
+      continue;
+
+    auto *protocol = constraint->getProtocol();
+
+    // No reason to add `ExpressibleByNilLiteral` into the set
+    // because it doesn't have a default type.
+    if (protocol->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByNilLiteral)) {
+      canBeNil = true;
+      continue;
+    }
+
+    // Let's try to coalesce integer and floating point literal protocols
+    // if they appear together because the only possible default type that
+    // could satisfy both requirements is `Double`.
+    {
+      if (protocol->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+        auto *floatLiteral = CS.getASTContext().getProtocol(
+            KnownProtocolKind::ExpressibleByFloatLiteral);
+        if (literalProtocols.count(floatLiteral))
+          continue;
+      }
+
+      if (protocol->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByFloatLiteral)) {
+        auto *intLiteral = CS.getASTContext().getProtocol(
+            KnownProtocolKind::ExpressibleByIntegerLiteral);
+        literalProtocols.erase(intLiteral);
+      }
+    }
+
+    literalProtocols.insert(
+        {protocol, {isDirectRequirement(constraint), false}});
   }
 
   for (auto &binding : Bindings) {
@@ -434,10 +468,6 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       if (isCovered)
         continue;
 
-      // FIXME: This is a hack and it's incorrect because it depends
-      // on ordering of the literal procotols e.g. if `ExpressibleByNilLiteral`
-      // appears before e.g. `ExpressibleByIntegerLiteral` we'd drop
-      // optionality although that would be incorrect.
       do {
         // If the type conforms to this protocol, we're covered.
         if (TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
@@ -445,8 +475,13 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
           break;
         }
 
+        // Can't unwrap optionals if there is `ExpressibleByNilLiteral`
+        // conformance requirement placed on the type variable.
+        if (canBeNil)
+          break;
+
         // If this literal protocol is not a direct requirement it
-        // would be possible to change optionality while inferring
+        // would not be possible to change optionality while inferring
         // bindings for a supertype, so this hack doesn't apply.
         if (!isDirectRequirement)
           break;
@@ -471,31 +506,23 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       binding.BindingType = type;
   }
 
-  // If this is not a literal protocol or it has been "covered" by an existing
-  // binding it can't provide a default type.
-  auto isUnviableForDefaulting = [&literalProtocols](ProtocolDecl *protocol) {
-    auto literal = literalProtocols.find(protocol);
-    return literal == literalProtocols.end() || literal->second.second;
-  };
-
   for (auto *constraint : Protocols) {
     auto *protocol = constraint->getProtocol();
 
-    if (isUnviableForDefaulting(protocol))
+    auto literal = literalProtocols.find(protocol);
+    if (literal == literalProtocols.end())
       continue;
 
-    // Let's try to coalesce integer and floating point literal protocols
-    // if they appear together because the only possible default type that
-    // could satisfy both requirements is `Double`.
-    if (protocol->isSpecificProtocol(
-          KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-      auto *floatLiteral = cs.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByFloatLiteral);
-      // If `ExpressibleByFloatLiteral` is a requirement and it isn't
-      // covered, let's skip `ExpressibleByIntegerLiteral` requirement.
-      if (!isUnviableForDefaulting(floatLiteral))
-        continue;
-    }
+    bool isDirectRequirement = false;
+    bool isCovered = false;
+
+    std::tie(isDirectRequirement, isCovered) = literal->second;
+
+    // Can't be defaulted because it's already covered by an
+    // existing direct or transitive binding which is always
+    // better.
+    if (isCovered)
+      continue;
 
     auto defaultType = TypeChecker::getDefaultType(protocol, cs.DC);
     if (!defaultType)
@@ -508,28 +535,9 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     // requirement or inferred transitive one to identify binding
     // kind correctly.
     addPotentialBinding({defaultType,
-                         isDirectRequirement(constraint)
-                             ? AllowedBindingKind::Subtypes
-                             : AllowedBindingKind::Supertypes,
+                         isDirectRequirement ? AllowedBindingKind::Subtypes
+                                             : AllowedBindingKind::Supertypes,
                          constraint});
-  }
-
-  /// Add defaultable constraints.
-  for (auto *constraint : Defaults) {
-    Type type = constraint->getSecondType();
-    if (!existingTypes.insert(type->getCanonicalType()).second)
-      continue;
-
-    if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
-      // If there are no other possible bindings for this closure
-      // let's default it to the type inferred from its parameters/body,
-      // otherwise we should only attempt contextual types as a
-      // top-level closure type.
-      if (!Bindings.empty())
-        continue;
-    }
-
-    addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
   }
 }
 
@@ -575,7 +583,7 @@ ConstraintSystem::determineBestBindings() {
     if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
       return true;
 
-    return bindings || !bindings.Defaults.empty() ||
+    return bindings ||
            llvm::any_of(bindings.Protocols, [&](Constraint *constraint) {
              return bool(
                  TypeChecker::getDefaultType(constraint->getProtocol(), DC));
@@ -652,6 +660,11 @@ findInferableTypeVars(Type type,
   };
 
   type.walk(Walker(typeVars));
+}
+
+void ConstraintSystem::PotentialBindings::addDefault(Constraint *constraint) {
+  auto defaultTy = constraint->getSecondType();
+  Defaults.insert({defaultTy->getCanonicalType(), constraint});
 }
 
 void ConstraintSystem::PotentialBindings::addPotentialBinding(
@@ -1025,7 +1038,8 @@ bool ConstraintSystem::PotentialBindings::infer(
         // type from context e.g. parameter type of a function call),
         // we need to test type with and without l-value after
         // delaying bindings for as long as possible.
-        if (isExpr<ForceValueExpr>(anchor) && !type->is<LValueType>()) {
+        if (isExpr<ForceValueExpr>(anchor) &&
+            TypeVar->getImpl().canBindToLValue() && !type->is<LValueType>()) {
           addPotentialBinding(binding->withType(LValueType::get(type)));
           DelayedBy.push_back(constraint);
         }
@@ -1094,7 +1108,7 @@ bool ConstraintSystem::PotentialBindings::infer(
     // Do these in a separate pass.
     if (cs.getFixedTypeRecursive(constraint->getFirstType(), true)
             ->getAs<TypeVariableType>() == TypeVar) {
-      Defaults.push_back(constraint);
+      addDefault(constraint);
     }
     break;
 
@@ -1355,6 +1369,22 @@ bool TypeVarBindingProducer::computeNext() {
         if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
           addNewBinding(binding.withType(*simplifiedSuper));
       }
+    }
+  }
+
+  if (NumTries == 0) {
+    // Add defaultable constraints (if any).
+    for (auto *constraint : DelayedDefaults) {
+      if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
+        // If there are no other possible bindings for this closure
+        // let's default it to the type inferred from its parameters/body,
+        // otherwise we should only attempt contextual types as a
+        // top-level closure type.
+        if (!ExploredTypes.empty())
+          continue;
+      }
+
+      addNewBinding(getDefaultBinding(constraint));
     }
   }
 

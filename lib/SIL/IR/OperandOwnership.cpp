@@ -179,9 +179,7 @@ OPERAND_OWNERSHIP(None, UnconditionalCheckedCastAddr)
 OPERAND_OWNERSHIP(None, AllocValueBuffer)
 OPERAND_OWNERSHIP(None, DeallocValueBuffer)
 
-// Point-in-time uses of any ownership.
-OPERAND_OWNERSHIP(InstantaneousUse, CopyValue)
-OPERAND_OWNERSHIP(InstantaneousUse, DebugValue)
+// Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
 OPERAND_OWNERSHIP(InstantaneousUse, FixLifetime)
 OPERAND_OWNERSHIP(InstantaneousUse, WitnessMethod)
@@ -189,16 +187,10 @@ OPERAND_OWNERSHIP(InstantaneousUse, DynamicMethodBranch)
 OPERAND_OWNERSHIP(InstantaneousUse, ValueMetatype)
 OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
-OPERAND_OWNERSHIP(InstantaneousUse, ObjCMethod)
-OPERAND_OWNERSHIP(InstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, BridgeObjectToWord)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
-OPERAND_OWNERSHIP(InstantaneousUse, CopyBlock)
 OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
-OPERAND_OWNERSHIP(InstantaneousUse, UnmanagedRetainValue)
-OPERAND_OWNERSHIP(InstantaneousUse, UnmanagedReleaseValue)
-OPERAND_OWNERSHIP(InstantaneousUse, UnmanagedAutoreleaseValue)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   OPERAND_OWNERSHIP(InstantaneousUse, RefTo##Name)                             \
   OPERAND_OWNERSHIP(InstantaneousUse, Name##ToRef)                             \
@@ -207,6 +199,16 @@ OPERAND_OWNERSHIP(InstantaneousUse, UnmanagedAutoreleaseValue)
   OPERAND_OWNERSHIP(InstantaneousUse, RefTo##Name)                             \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
+
+// Unowned uses ignore the value's ownership
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, DebugValue)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyBlock)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyValue)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCMethod)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
 
 // Instructions that currently violate structural ownership requirements,
 // and therefore completely defeat canonicalization and optimization of any
@@ -278,39 +280,63 @@ OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
 #undef OPERAND_OWNERSHIP
 
-// Conditionally either ForwardingConsume or ForwardingBorrow, depending on
-// instruction result's dynamic ownership kind.
-#define FORWARD_ANY_OWNERSHIP(INST)                                            \
-  OperandOwnership                                                             \
-  OperandOwnershipClassifier::visit##INST##Inst(INST##Inst *i) {               \
-    return i->getOwnershipKind().getForwardingOperandOwnership();              \
+// Forwarding operations are conditionally either ForwardingConsumes or
+// ForwardingBorrows, depending on the instruction's constant ownership
+// attribute.
+#define FORWARDING_OWNERSHIP(INST)                                             \
+  OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
+      INST##Inst *i) {                                                         \
+    return i->getOwnershipKind().getForwardingOperandOwnership(         \
+      /*allowUnowned*/false);                                           \
   }
-FORWARD_ANY_OWNERSHIP(Object)
-FORWARD_ANY_OWNERSHIP(Enum)
-FORWARD_ANY_OWNERSHIP(OpenExistentialRef)
-FORWARD_ANY_OWNERSHIP(Upcast)
-FORWARD_ANY_OWNERSHIP(UncheckedRefCast)
-FORWARD_ANY_OWNERSHIP(ConvertFunction)
-FORWARD_ANY_OWNERSHIP(RefToBridgeObject)
-FORWARD_ANY_OWNERSHIP(BridgeObjectToRef)
-FORWARD_ANY_OWNERSHIP(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP(UncheckedEnumData)
-FORWARD_ANY_OWNERSHIP(InitExistentialRef)
-FORWARD_ANY_OWNERSHIP(DifferentiableFunction)
-FORWARD_ANY_OWNERSHIP(LinearFunction)
-FORWARD_ANY_OWNERSHIP(UncheckedValueCast)
-FORWARD_ANY_OWNERSHIP(SwitchEnum)
-FORWARD_ANY_OWNERSHIP(CheckedCastBranch)
-FORWARD_ANY_OWNERSHIP(Return)
+FORWARDING_OWNERSHIP(Object)
+FORWARDING_OWNERSHIP(OpenExistentialRef)
+FORWARDING_OWNERSHIP(ConvertFunction)
+FORWARDING_OWNERSHIP(RefToBridgeObject)
+FORWARDING_OWNERSHIP(BridgeObjectToRef)
+FORWARDING_OWNERSHIP(UnconditionalCheckedCast)
+FORWARDING_OWNERSHIP(InitExistentialRef)
+FORWARDING_OWNERSHIP(DifferentiableFunction)
+FORWARDING_OWNERSHIP(LinearFunction)
+#undef FORWARDING_OWNERSHIP
 
-// FIXME: Guaranteed Tuple, Struct, and Destructure should be Reborrow, not
-// ForwardingBorrow, because the borrowed value is different on either side of
-// the operation and the lifetimes of borrowed members could differ.
-FORWARD_ANY_OWNERSHIP(Tuple)
-FORWARD_ANY_OWNERSHIP(Struct)
-FORWARD_ANY_OWNERSHIP(DestructureStruct)
-FORWARD_ANY_OWNERSHIP(DestructureTuple)
-#undef FORWARD_ANY_OWNERSHIP
+// Arbitrary value casts are forwarding instructions that are also allowed to
+// propagate Unowned values. If the result is Unowned, then the operand must
+// also be Unowned.
+#define FORWARDING_ANY_OWNERSHIP(INST)                                         \
+  OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
+      INST##Inst *i) {                                                         \
+    return i->getOwnershipKind().getForwardingOperandOwnership(         \
+      /*allowUnowned*/true);                                            \
+  }
+FORWARDING_ANY_OWNERSHIP(Upcast)
+FORWARDING_ANY_OWNERSHIP(UncheckedRefCast)
+FORWARDING_ANY_OWNERSHIP(UncheckedValueCast)
+FORWARDING_ANY_OWNERSHIP(CheckedCastBranch)
+#undef FORWARDING_ANY_OWNERSHIP
+
+// Any valid ownership kind can be combined with values of None ownership, but
+// they cannot be combined with each other. An aggregates result ownership is
+// the meet of its operands' ownership. A destructured member has the same
+// ownership as its aggregate unless its type gives it None ownership.
+//
+// TODO: Aggregate operations should be Reborrows, not ForwardingBorrows,
+// because the borrowed value is different on either side of the operation and
+// the lifetimes of borrowed members could differ.
+#define AGGREGATE_OWNERSHIP(INST)                                              \
+  OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
+      INST##Inst *i) {                                                         \
+    return i->getOwnershipKind().getForwardingOperandOwnership(         \
+      /*allowUnowned*/true);                                            \
+  }
+AGGREGATE_OWNERSHIP(Tuple)
+AGGREGATE_OWNERSHIP(Struct)
+AGGREGATE_OWNERSHIP(DestructureStruct)
+AGGREGATE_OWNERSHIP(DestructureTuple)
+AGGREGATE_OWNERSHIP(Enum)
+AGGREGATE_OWNERSHIP(UncheckedEnumData)
+AGGREGATE_OWNERSHIP(SwitchEnum)
+#undef AGGREGATE_OWNERSHIP
 
 // A begin_borrow is conditionally nested.
 OperandOwnership
@@ -321,7 +347,10 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
   case OwnershipKind::None:
     return OperandOwnership::None;
   case OwnershipKind::Unowned:
-    return OperandOwnership::InstantaneousUse;
+    // FIXME: disallow borrowing an Unowned value. Temporarily model it as an
+    // instantaneous use until SILGenFunction::emitClassMemberDestruction is
+    // fixed.
+    return OperandOwnership::UnownedInstantaneousUse;
   case OwnershipKind::Guaranteed:
     return OperandOwnership::NestedBorrow;
   case OwnershipKind::Owned:
@@ -344,17 +373,21 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   if (getValue() == i->getEnumOperand()) {
     return OperandOwnership::InstantaneousUse;
   }
-  return getOwnershipKind().getForwardingOperandOwnership();
+  return getOwnershipKind().getForwardingOperandOwnership(
+    /*allowUnowned*/true);
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
   ValueOwnershipKind destBlockArgOwnershipKind =
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
+  // FIXME: remove this special case once all aggregate operations behave just
+  // like phis.
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
     return OperandOwnership::Reborrow;
   }
-  return destBlockArgOwnershipKind.getForwardingOperandOwnership();
+  return destBlockArgOwnershipKind.getForwardingOperandOwnership(
+    /*allowUnowned*/true);
 }
 
 OperandOwnership
@@ -378,8 +411,10 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv) {
   case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
-  case SILArgumentConvention::Direct_Unowned:
     return OperandOwnership::InstantaneousUse;
+
+  case SILArgumentConvention::Direct_Unowned:
+    return OperandOwnership::UnownedInstantaneousUse;
 
   case SILArgumentConvention::Indirect_Out:
   case SILArgumentConvention::Indirect_Inout:
@@ -445,6 +480,20 @@ OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
   return getFunctionArgOwnership(argConv);
 }
 
+OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
+  switch (i->getOwnershipKind()) {
+  case OwnershipKind::Any:
+  case OwnershipKind::Guaranteed:
+    llvm_unreachable("invalid value ownership");
+  case OwnershipKind::None:
+    return OperandOwnership::None;
+  case OwnershipKind::Unowned:
+    return OperandOwnership::UnownedInstantaneousUse;
+  case OwnershipKind::Owned:
+    return OperandOwnership::ForwardingConsume;
+  }
+}
+
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {
   if (getValue() != i->getSrc()) {
     return OperandOwnership::None;
@@ -476,14 +525,15 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
   if (getValue() == i->getClosure()) {
     return OperandOwnership::ForwardingConsume;
   }
-  return OperandOwnership::InstantaneousUse;
+  return OperandOwnership::UnownedInstantaneousUse;
 }
 
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
   if (getValue() == mdi->getValue()) {
-    return getOwnershipKind().getForwardingOperandOwnership();
+    return getOwnershipKind().getForwardingOperandOwnership(
+      /*allowUnowned*/true);
   }
   // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
   // a borrow of the base (mark_dependence %base -> end_dependence is analogous
@@ -725,9 +775,15 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-Optional<OperandOwnership> Operand::getOperandOwnership() const {
+OperandOwnership Operand::getOperandOwnership() const {
+  // We consider type dependent uses to be instantaneous uses.
+  //
+  // NOTE: We could instead try to exclude type dependent uses from our system,
+  // but that adds a bunch of Optionals and unnecessary types. This doesn't hurt
+  // anything and allows us to eliminate Optionals and thus confusion in between
+  // Optional::None and OwnershipKind::None.
   if (isTypeDependent())
-    return None;
+    return OperandOwnership::InstantaneousUse;
 
   // If we do not have ownership enabled, just return any. This ensures that we
   // do not have any consuming uses and everything from an ownership perspective
@@ -741,7 +797,7 @@ Optional<OperandOwnership> Operand::getOperandOwnership() const {
     // If we don't have a function, then we must have a SILGlobalVariable. In
     // that case, we act as if we aren't in ownership.
     if (!func || !func->hasOwnership()) {
-      return OperandOwnership::InstantaneousUse;
+      return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
 

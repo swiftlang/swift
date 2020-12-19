@@ -281,7 +281,6 @@ extension Task {
 
 }
 
-@_optimize(none)
 public func _runAsyncHandler(operation: @escaping () async -> ()) {
   _ = Task.runDetached(operation: operation)
 }

@@ -4741,7 +4741,7 @@ private:
     Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
     /// The set of constraints which would be used to infer default types.
-    llvm::TinyPtrVector<Constraint *> Defaults;
+    llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
     /// The set of constraints which delay attempting this type variable.
     llvm::TinyPtrVector<Constraint *> DelayedBy;
@@ -4772,7 +4772,7 @@ private:
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
-      return !Bindings.empty() || isDirectHole();
+      return !Bindings.empty() || !Defaults.empty() || isDirectHole();
     }
 
     /// Determine whether attempting this type variable should be
@@ -4822,7 +4822,8 @@ private:
       if (!CS.shouldAttemptFixes())
         return false;
 
-      return Bindings.empty() && TypeVar->getImpl().canBindToHole();
+      return Bindings.empty() && Defaults.empty() &&
+             TypeVar->getImpl().canBindToHole();
     }
 
     /// Determine if the bindings only constrain the type variable from above
@@ -4838,19 +4839,45 @@ private:
       });
     }
 
-    unsigned getNumDefaultableBindings() const {
-      return isDirectHole()
-                 ? 1
-                 : llvm::count_if(Bindings,
-                                  [](const PotentialBinding &binding) {
-                                    return binding.isDefaultableBinding();
-                                  });
+    unsigned getNumViableDefaultableBindings() const {
+      if (isDirectHole())
+        return 1;
+
+      auto numDefaultable = llvm::count_if(
+          Defaults, [](const std::pair<CanType, Constraint *> &entry) {
+            return entry.second->getKind() == ConstraintKind::Defaultable;
+          });
+
+      // Short-circuit unviable checks if there are no defaultable bindings.
+      if (numDefaultable == 0)
+        return 0;
+
+      // Defaultable constraint is unviable if its type is covered by
+      // an existing direct or transitive binding.
+      auto unviable =
+          llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+            auto type = binding.BindingType->getCanonicalType();
+            auto def = Defaults.find(type);
+            return def != Defaults.end()
+                       ? def->second->getKind() == ConstraintKind::Defaultable
+                       : false;
+          });
+
+      assert(numDefaultable >= unviable);
+      return numDefaultable - unviable;
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
-      auto numDefaults = b.getNumDefaultableBindings();
+      // If there are no bindings available but this type
+      // variable represents a closure - let's consider it
+      // as having a single non-default binding - that would
+      // be a type inferred based on context.
+      // It's considered to be non-default for purposes of
+      // ranking because we'd like to prioritize resolving
+      // closures to gain more information from their bodies.
       auto numNonDefaultableBindings =
-          b.isDirectHole() ? 0 : b.Bindings.size() - numDefaults;
+          !b.Bindings.empty() ? b.Bindings.size()
+                              : b.TypeVar->getImpl().isClosureType() ? 1 : 0;
 
       return std::make_tuple(b.isHole(),
                              numNonDefaultableBindings == 0,
@@ -4874,10 +4901,8 @@ private:
       if (yScore < xScore)
         return false;
 
-      auto xDefaults =
-          x.isDirectHole() ? 1 : x.Bindings.size() + std::get<6>(xScore);
-      auto yDefaults =
-          y.isDirectHole() ? 1 : y.Bindings.size() + std::get<6>(yScore);
+      auto xDefaults = x.getNumViableDefaultableBindings();
+      auto yDefaults = y.getNumViableDefaultableBindings();
 
       // If there is a difference in number of default types,
       // prioritize bindings with fewer of them.
@@ -4921,6 +4946,8 @@ private:
         break;
       }
     }
+
+    void addDefault(Constraint *constraint);
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
@@ -5014,34 +5041,46 @@ public:
       if (involvesTypeVariables())
         out << "involves_type_vars ";
 
-      auto numDefaultable = getNumDefaultableBindings();
+      auto numDefaultable = getNumViableDefaultableBindings();
       if (numDefaultable > 0)
         out << "#defaultable_bindings=" << numDefaultable << " ";
 
       PrintOptions PO;
       PO.PrintTypesForDebugging = true;
+
+      auto printBinding = [&](const PotentialBinding &binding) {
+        auto type = binding.BindingType;
+        switch (binding.Kind) {
+        case AllowedBindingKind::Exact:
+          break;
+
+        case AllowedBindingKind::Subtypes:
+          out << "(subtypes of) ";
+          break;
+
+        case AllowedBindingKind::Supertypes:
+          out << "(supertypes of) ";
+          break;
+        }
+        if (auto *literal = binding.getDefaultedLiteralProtocol())
+          out << "(default from " << literal->getName() << ") ";
+        out << type.getString(PO);
+      };
+
       out << "bindings={";
-      interleave(Bindings,
-                 [&](const PotentialBinding &binding) {
-                   auto type = binding.BindingType;
-                   switch (binding.Kind) {
-                   case AllowedBindingKind::Exact:
-                     break;
-
-                   case AllowedBindingKind::Subtypes:
-                     out << "(subtypes of) ";
-                     break;
-
-                   case AllowedBindingKind::Supertypes:
-                     out << "(supertypes of) ";
-                     break;
-                   }
-                   if (auto *literal = binding.getDefaultedLiteralProtocol())
-                     out << "(default from " << literal->getName() << ") ";
-                   out << type.getString(PO);
-                 },
-                 [&]() { out << "; "; });
+      interleave(Bindings, printBinding, [&]() { out << "; "; });
       out << "}";
+
+      if (!Defaults.empty()) {
+        out << " defaults={";
+        for (const auto &entry : Defaults) {
+          auto *constraint = entry.second;
+          PotentialBinding binding{constraint->getSecondType(),
+                                   AllowedBindingKind::Exact, constraint};
+          printBinding(binding);
+        }
+        out << "}";
+      }
     }
 
     void dump(ConstraintSystem *cs,
@@ -5839,6 +5878,9 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 
   TypeVariableType *TypeVar;
   llvm::SmallVector<Binding, 8> Bindings;
+  /// The set of defaults to attempt once producer
+  /// runs out of direct & transitive bindings.
+  llvm::SmallVector<Constraint *, 4> DelayedDefaults;
 
   // The index pointing to the offset in the bindings
   // generator is currently at, `numTries` represents
@@ -5886,6 +5928,8 @@ private:
   /// Check whether binding type is required to either conform to
   /// `ExpressibleByNilLiteral` protocol or be wrapped into an optional type.
   bool requiresOptionalAdjustment(const Binding &binding) const;
+
+  Binding getDefaultBinding(Constraint *constraint) const;
 };
 
 /// Iterator over disjunction choices, makes it

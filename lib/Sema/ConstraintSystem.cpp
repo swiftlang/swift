@@ -5089,6 +5089,20 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   if (D->getAttrs().isUnavailable(ctx))
     return true;
 
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  if (!DC->getParentSourceFile()) {
+    // We only check availability if this reference is in a source file; we do
+    // not check in other kinds of FileUnits.
+    return false;
+  }
+
+  AvailabilityContext safeRangeUnderApprox{
+      AvailabilityInference::availableRange(D, ctx)};
+  if (safeRangeUnderApprox.isAlwaysAvailable())
+    return false;
+
   SourceLoc loc;
 
   if (locator) {
@@ -5096,10 +5110,15 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  // If not, let's check contextual unavailability.
-  ExportContext where = ExportContext::forFunctionBody(DC, loc);
-  auto result = TypeChecker::checkDeclarationAvailability(D, where);
-  return result.hasValue();
+  AvailabilityContext runningOSOverApprox =
+      TypeChecker::overApproximateAvailabilityAtLocation(loc, DC);
+
+  // The reference is safe if an over-approximation of the running OS
+  // versions is fully contained within an under-approximation
+  // of the versions on which the declaration is available. If this
+  // containment cannot be guaranteed, we say the reference is
+  // not available.
+  return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -5113,24 +5132,7 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
   if (ext == nullptr)
     return false;
 
-  auto &ctx = getASTContext();
-
-  // First check whether this declaration is universally unavailable.
-  if (ext->getAttrs().isUnavailable(ctx))
-    return true;
-
-  SourceLoc loc;
-
-  if (locator) {
-    if (auto anchor = locator->getAnchor())
-      loc = getLoc(anchor);
-  }
-
-  // If not, let's check contextual unavailability.
-  ExportContext where = ExportContext::forFunctionBody(DC, loc);
-  auto result = TypeChecker::checkConformanceAvailability(
-      rootConf, ext, where);
-  return result.hasValue();
+  return isDeclUnavailable(ext, locator);
 }
 
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
@@ -5372,6 +5374,24 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   if (Any) {
     Bindings.push_back(*Any);
   }
+
+  {
+    bool noBindings = Bindings.empty();
+
+    for (const auto &entry : bindings.Defaults) {
+      auto *constraint = entry.second;
+      if (noBindings) {
+        // If there are no direct or transitive bindings to attempt
+        // let's add defaults to the list right away.
+        Bindings.push_back(getDefaultBinding(constraint));
+      } else {
+        // Otherwise let's delay attempting default bindings
+        // until all of the direct & transitive bindings and
+        // their derivatives have been attempted.
+        DelayedDefaults.push_back(constraint);
+      }
+    }
+  }
 }
 
 bool TypeVarBindingProducer::requiresOptionalAdjustment(
@@ -5402,4 +5422,16 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
   }
 
   return false;
+}
+
+ConstraintSystem::PotentialBinding
+TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
+  assert(constraint->getKind() == ConstraintKind::Defaultable ||
+         constraint->getKind() == ConstraintKind::DefaultClosureType);
+
+  auto type = constraint->getSecondType();
+  Binding binding{type, BindingKind::Exact, constraint};
+  return requiresOptionalAdjustment(binding)
+             ? binding.withType(OptionalType::get(type))
+             : binding;
 }

@@ -220,6 +220,9 @@ public:
     setCreateSyntax(Kind);
   }
 
+  SyntaxParsingContext(const SyntaxParsingContext &other) = delete;
+  SyntaxParsingContext &operator=(const SyntaxParsingContext &other) = delete;
+
   ~SyntaxParsingContext();
 
   /// Try looking up if an unmodified node exists at \p LexerOffset of the same
