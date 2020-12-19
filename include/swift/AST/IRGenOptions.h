@@ -244,6 +244,9 @@ public:
   /// Frameworks that we should not autolink against.
   SmallVector<std::string, 1> DisableAutolinkFrameworks;
 
+  /// Disable autolinking swiftCore for stdlib thin CMO
+  unsigned DisableAutolinkStdlib : 1;
+
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
@@ -358,6 +361,7 @@ public:
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         DisableLLVMSLPVectorizer(false), Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
+        DisableAutolinkStdlib(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),

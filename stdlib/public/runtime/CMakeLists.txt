@@ -153,6 +153,13 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)
 
+
+add_swift_target_library(swiftStandaloneRuntime STATIC IS_STDLIB
+  INCORPORATE_OBJECT_LIBRARIES
+    swiftRuntime swiftLLVMSupport swiftDemangling swiftStdlibStubs
+  INSTALL_IN_COMPONENT
+    stdlib)
+
 set(ELFISH_SDKS)
 set(COFF_SDKS)
 set(WASM_SDKS)

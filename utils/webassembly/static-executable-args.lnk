@@ -1,5 +1,4 @@
 -static
--lswiftCore
 -lswiftSwiftOnoneSupport
 -lswiftWasiPthread
 -licuuc

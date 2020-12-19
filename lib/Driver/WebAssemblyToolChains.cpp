@@ -163,6 +163,12 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
     llvm::report_fatal_error(linkFile + " not found");
   }
 
+  if (context.Args.hasArg(options::OPT_no_stdlib_link)) {
+    Arguments.push_back("-lswiftStandaloneRuntime");
+  } else {
+    Arguments.push_back("-lswiftCore");
+  }
+
   // Explicitly pass the target to the linker
   Arguments.push_back(
       context.Args.MakeArgString("--target=" + getTriple().str()));

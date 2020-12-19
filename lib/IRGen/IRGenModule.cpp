@@ -1220,6 +1220,8 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
+    if (linkLib.getName() == "swiftCore" && IRGen.Opts.DisableAutolinkStdlib)
+      return;
     AutolinkEntries.emplace_back(linkLib);
     break;
   }

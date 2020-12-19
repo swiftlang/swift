@@ -22,6 +22,7 @@ set(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY NO CACHE BOOL "")
 # TODO(katei): This should get turned off, as this is not an ABI stable platform.
 # But current CMake build system doesn't support SWIFT_STDLIB_STABLE_ABI=NO
 set(SWIFT_STDLIB_STABLE_ABI YES CACHE BOOL "")
+set(SWIFT_STDLIB_ENABLE_THINCMO YES CACHE BOOL "")
 
 # build with the host compiler
 set(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER YES CACHE BOOL "")

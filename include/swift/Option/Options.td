@@ -713,6 +713,10 @@ def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't add any rpath entries.">;
 
+def no_stdlib_link: Flag<["-"], "no-stdlib-link">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Don't link stdlib.">;
+
 def static_executable : Flag<["-"], "static-executable">,
   HelpText<"Statically link the executable">;
 def no_static_executable : Flag<["-"], "no-static-executable">,
