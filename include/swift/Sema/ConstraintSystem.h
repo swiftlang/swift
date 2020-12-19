@@ -4700,6 +4700,8 @@ private:
       return BindingSource.get<ConstraintLocator *>();
     }
 
+    Constraint *getSource() const { return BindingSource.get<Constraint *>(); }
+
     PotentialBinding withType(Type type) const {
       return {type, Kind, BindingSource};
     }
@@ -4725,6 +4727,13 @@ private:
     using BindingScore =
         std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
 
+    /// - Constraint * - The source of the literal requirement;
+    /// - bool - Determines whether this literal is a direct requirement
+    ///          of the current type variable;
+    /// - Constraint * - If the literal is covered, this points to the
+    ///                  source of the binding;
+    using LiteralInfo = std::tuple<Constraint *, bool, Constraint *>;
+
     /// The constraint system this type variable and its bindings belong to.
     ConstraintSystem &CS;
 
@@ -4739,6 +4748,14 @@ private:
     /// The set of transitive protocol requirements inferred through
     /// subtype/conversion/equivalence relations with other type variables.
     Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
+
+    /// The set of unique literal protocol requirements placed on this
+    /// type variable or inferred transitively through subtype chains.
+    ///
+    /// Note that ordering is important when it comes to bindings, we'd
+    /// like to add any "direct" default types first to attempt them
+    /// before transitive ones.
+    llvm::SmallMapVector<ProtocolDecl *, LiteralInfo, 2> Literals;
 
     /// The set of constraints which would be used to infer default types.
     llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
@@ -4948,6 +4965,8 @@ private:
     }
 
     void addDefault(Constraint *constraint);
+
+    void addLiteral(Constraint *constraint);
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.

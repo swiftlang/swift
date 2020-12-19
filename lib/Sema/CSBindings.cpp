@@ -312,11 +312,8 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     // If one of the literal arguments doesn't propagate its
     // `ExpressibleByStringLiteral` conformance, we'd end up picking
     // `T` with only one type `Any?` which is incorrect.
-    llvm::copy_if(bindings.Protocols, std::back_inserter(Protocols),
-                  [](const Constraint *protocol) {
-                    return protocol->getKind() ==
-                           ConstraintKind::LiteralConformsTo;
-                  });
+    for (const auto &literal : bindings.Literals)
+      addLiteral(std::get<0>(literal.second));
 
     // Infer transitive defaults.
     for (const auto &def : bindings.Defaults)
@@ -380,67 +377,11 @@ isUnviableDefaultType(Type defaultType,
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
-  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
-    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
-      auto *repr = cs.getRepresentative(typeVar);
-      return repr == TypeVar;
-    }
-
-    return false;
-  };
-
-  // If we have any literal constraints, check whether there is already a
-  // binding that provides a type that conforms to that literal protocol. In
-  // such cases, don't add the default binding suggestion because the existing
-  // suggestion is better.
-  //
-  // Note that ordering is important when it comes to bindings, we'd like to
-  // add any "direct" default types first to attempt them before transitive
-  // ones.
-  //
-  // Key is a literal protocol requirement, Value indicates whether (first)
-  // given protocol is a direct requirement, and (second) whether it has been
-  // covered by an existing binding.
-  bool canBeNil = false;
-  llvm::SmallMapVector<ProtocolDecl *, std::pair<bool, bool>, 4>
-      literalProtocols;
-  for (auto *constraint : Protocols) {
-    if (constraint->getKind() != ConstraintKind::LiteralConformsTo)
-      continue;
-
-    auto *protocol = constraint->getProtocol();
-
-    // No reason to add `ExpressibleByNilLiteral` into the set
-    // because it doesn't have a default type.
-    if (protocol->isSpecificProtocol(
-            KnownProtocolKind::ExpressibleByNilLiteral)) {
-      canBeNil = true;
-      continue;
-    }
-
-    // Let's try to coalesce integer and floating point literal protocols
-    // if they appear together because the only possible default type that
-    // could satisfy both requirements is `Double`.
-    {
-      if (protocol->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-        auto *floatLiteral = CS.getASTContext().getProtocol(
-            KnownProtocolKind::ExpressibleByFloatLiteral);
-        if (literalProtocols.count(floatLiteral))
-          continue;
-      }
-
-      if (protocol->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByFloatLiteral)) {
-        auto *intLiteral = CS.getASTContext().getProtocol(
-            KnownProtocolKind::ExpressibleByIntegerLiteral);
-        literalProtocols.erase(intLiteral);
-      }
-    }
-
-    literalProtocols.insert(
-        {protocol, {isDirectRequirement(constraint), false}});
-  }
+  bool canBeNil = llvm::any_of(
+      Literals, [](const std::pair<ProtocolDecl *, LiteralInfo> &literal) {
+        return literal.first->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByNilLiteral);
+      });
 
   for (auto &binding : Bindings) {
     Type type;
@@ -460,18 +401,24 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       continue;
 
     bool requiresUnwrap = false;
-    for (auto &entry : literalProtocols) {
-      auto *protocol = entry.first;
-      bool isDirectRequirement = entry.second.first;
-      bool &isCovered = entry.second.second;
+    for (auto &literal : Literals) {
+      auto *protocol = literal.first;
+      bool isDirectRequirement = std::get<1>(literal.second);
+      Constraint *&coveredBy = std::get<2>(literal.second);
 
-      if (isCovered)
+      if (coveredBy)
+        continue;
+
+      // Ignore `ExpressibleByNilLiteral` since it can't produce
+      // a default type.
+      if (protocol->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral))
         continue;
 
       do {
         // If the type conforms to this protocol, we're covered.
         if (TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
-          isCovered = true;
+          coveredBy = binding.getSource();
           break;
         }
 
@@ -506,25 +453,20 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       binding.BindingType = type;
   }
 
-  for (auto *constraint : Protocols) {
-    auto *protocol = constraint->getProtocol();
-
-    auto literal = literalProtocols.find(protocol);
-    if (literal == literalProtocols.end())
-      continue;
-
+  for (const auto &literal : Literals) {
+    Constraint *constraint = nullptr;
     bool isDirectRequirement = false;
-    bool isCovered = false;
+    Constraint *coveredBy = nullptr;
 
-    std::tie(isDirectRequirement, isCovered) = literal->second;
+    std::tie(constraint, isDirectRequirement, coveredBy) = literal.second;
 
     // Can't be defaulted because it's already covered by an
     // existing direct or transitive binding which is always
     // better.
-    if (isCovered)
+    if (coveredBy)
       continue;
 
-    auto defaultType = TypeChecker::getDefaultType(protocol, cs.DC);
+    auto defaultType = TypeChecker::getDefaultType(literal.first, cs.DC);
     if (!defaultType)
       continue;
 
@@ -584,10 +526,12 @@ ConstraintSystem::determineBestBindings() {
       return true;
 
     return bindings ||
-           llvm::any_of(bindings.Protocols, [&](Constraint *constraint) {
-             return bool(
-                 TypeChecker::getDefaultType(constraint->getProtocol(), DC));
-           });
+           llvm::any_of(
+               bindings.Literals,
+               [&](const std::pair<ProtocolDecl *,
+                                   PotentialBindings::LiteralInfo> &literal) {
+                 return bool(TypeChecker::getDefaultType(literal.first, DC));
+               });
   };
 
   // Now let's see if we could infer something for related type
@@ -714,6 +658,43 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
     return;
 
   Bindings.push_back(std::move(binding));
+}
+
+void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
+  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
+    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
+      auto *repr = CS.getRepresentative(typeVar);
+      return repr == TypeVar;
+    }
+
+    return false;
+  };
+
+  auto *protocol = constraint->getProtocol();
+
+  // Let's try to coalesce integer and floating point literal protocols
+  // if they appear together because the only possible default type that
+  // could satisfy both requirements is `Double`.
+  {
+    if (protocol->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+      auto *floatLiteral = CS.getASTContext().getProtocol(
+          KnownProtocolKind::ExpressibleByFloatLiteral);
+      if (Literals.count(floatLiteral))
+        return;
+    }
+
+    if (protocol->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByFloatLiteral)) {
+      auto *intLiteral = CS.getASTContext().getProtocol(
+          KnownProtocolKind::ExpressibleByIntegerLiteral);
+      Literals.erase(intLiteral);
+    }
+  }
+
+  Literals.insert(
+      {protocol, std::make_tuple(constraint, isDirectRequirement(constraint),
+                                 /*coveredBy=*/nullptr)});
 }
 
 bool ConstraintSystem::PotentialBindings::isViable(
@@ -1129,13 +1110,14 @@ bool ConstraintSystem::PotentialBindings::infer(
     if (!protocolTy->is<ProtocolType>())
       return false;
 
-    LLVM_FALLTHROUGH;
+    Protocols.push_back(constraint);
+    break;
   }
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated
     // this is useful to use for the binding later.
-    Protocols.push_back(constraint);
+    addLiteral(constraint);
     break;
   }
 

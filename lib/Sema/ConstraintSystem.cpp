@@ -5331,9 +5331,8 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     ConstraintSystem::PotentialBindings &bindings)
     : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
       TypeVar(bindings.TypeVar),
-      CanBeNil(llvm::any_of(bindings.Protocols, [](Constraint *constraint) {
-        auto *protocol = constraint->getProtocol();
-        return protocol->isSpecificProtocol(
+      CanBeNil(llvm::any_of(bindings.Literals, [](const auto &literal) {
+        return literal.first->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByNilLiteral);
       })) {
   if (bindings.isDirectHole()) {
