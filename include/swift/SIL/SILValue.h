@@ -626,9 +626,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// lifetime constraints.
 struct OperandOwnership {
   enum innerty : uint8_t {
-    /// Uses of ownership None. These uses are incompatible with values that
-    /// have ownership but are otherwise not verified.
-    None,
+    /// Operands that do not use the value. They only represent a dependence
+    /// on a dominating definition and do not require liveness.
+    /// (type-dependent operands)
+    NonUse,
+
+    /// Uses that can only handle trivial values. The operand value must have
+    /// None ownership. These uses require liveness but are otherwise
+    /// unverified.
+    TrivialUse,
 
     /// Use the value only for the duration of the operation, which may have
     /// side effects. Requires an owned or guaranteed value.
@@ -726,8 +732,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Defined inline so the switch is eliminated for constant OperandOwnership.
 inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   switch (value) {
-  case OperandOwnership::None:
+  case OperandOwnership::TrivialUse:
     return {OwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding};
+  case OperandOwnership::NonUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
@@ -770,7 +777,7 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
     }
     llvm_unreachable("invalid value ownership");
   case OwnershipKind::None:
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   case OwnershipKind::Guaranteed:
     return OperandOwnership::ForwardingBorrow;
   case OwnershipKind::Owned:
