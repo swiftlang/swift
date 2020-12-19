@@ -2207,10 +2207,13 @@ public:
 
 class AllowAlwaysSucceedCheckedCast final : public ContextualMismatch {
   AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
-                                Type toType, ConstraintLocator *locator)
+                                Type toType, CheckedCastKind kind,
+                                ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowAlwaysSucceedCheckedCast, fromType,
                            toType, locator,
-                           /*isWarning*/ true) {}
+                           /*isWarning*/ true),
+        CastKind(kind) {}
+  CheckedCastKind CastKind;
 
 public:
   std::string getName() const override { return "checked cast always succeed"; }
@@ -2218,6 +2221,7 @@ public:
 
   static AllowAlwaysSucceedCheckedCast *create(ConstraintSystem &cs,
                                                Type fromType, Type toType,
+                                               CheckedCastKind kind,
                                                ConstraintLocator *locator);
 };
 

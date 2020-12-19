@@ -7205,36 +7205,117 @@ bool CheckedCastBaseFailure::anchorHasForcedOptionalResult() const {
 
 bool UnnecessaryCheckedCastFailure::diagnoseAsError() {
   auto anchor = getAnchor();
-  if (isExpr<IsExpr>(anchor)) {
-    emitDiagnostic(diag::isa_is_always_true, "is");
-    return true;
-  }
+  auto &ctx = getASTContext();
 
-  auto *checkCastExpr = getAsExpr<CheckedCastExpr>(anchor);
+  auto *checkCastExpr = castToExpr<CheckedCastExpr>(anchor);
+  auto asLoc = checkCastExpr->getAsLoc();
+  SourceRange diagFromRange = checkCastExpr->getSubExpr()->getSourceRange();
+  SourceRange diagToRange = checkCastExpr->getCastTypeRepr()->getSourceRange();
+
   auto fromType =
       resolveType(getType(checkCastExpr->getSubExpr()))->getRValueType();
   auto toType = resolveType(getType(checkCastExpr->getCastTypeRepr()));
 
-  if (auto *expr = getAsExpr<ForcedCheckedCastExpr>(anchor)) {
-    if (anchorHasForcedOptionalResult())
-      toType = toType->getOptionalObjectType();
+  SmallVector<Type, 4> fromOptionals;
+  SmallVector<Type, 4> toOptionals;
+  Type unwrappedFromType = fromType->lookThroughAllOptionalTypes(fromOptionals);
+  Type unwrappedToType = toType->lookThroughAllOptionalTypes(toOptionals);
+  auto extraFromOptionals = fromOptionals.size() - toOptionals.size();
+  bool isBridged = CastKind == CheckedCastKind::BridgingCoercion;
 
-    if (fromType->isEqual(toType)) {
-      auto castTypeRepr = expr->getCastTypeRepr();
-      emitDiagnostic(diag::forced_downcast_noop, toType)
-          .fixItRemove(
-              SourceRange(expr->getLoc(), castTypeRepr->getSourceRange().End));
+  if (auto *expr = getAsExpr<IsExpr>(anchor)) {
+    // If we're only unwrapping a single optional, we could have just
+    // checked for 'nil'.
+    if (extraFromOptionals == 1) {
+      auto diag = emitDiagnostic(diag::is_expr_same_type,
+                                 fromType, toType);
+      diag.highlight(diagFromRange);
+      diag.highlight(diagToRange);
+      diag.fixItReplace(SourceRange(asLoc, diagToRange.End), "!= nil");
 
+      // Add parentheses if needed.
+      if (!expr->getSubExpr()->canAppendPostfixExpression()) {
+        diag.fixItInsert(expr->getSubExpr()->getStartLoc(), "(");
+        diag.fixItInsertAfter(expr->getSubExpr()->getEndLoc(), ")");
+      }
     } else {
-      emitDiagnostic(diag::forced_downcast_coercion, fromType, toType)
-          .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
-                        "as");
+      emitDiagnostic(diag::isa_is_always_true, "is");
+    }
+    return true;
+  }
+
+  if (auto *expr = getAsExpr<ForcedCheckedCastExpr>(anchor)) {
+    if (anchorHasForcedOptionalResult()) {
+      toType = toType->getOptionalObjectType();
+      extraFromOptionals--;
+    }
+
+    if (extraFromOptionals > 0) {
+      std::string extraFromOptionalsStr(extraFromOptionals, '!');
+      auto diag = emitDiagnostic(diag::downcast_same_type, fromType, toType,
+                                 extraFromOptionalsStr, isBridged);
+      diag.highlight(diagFromRange);
+      diag.highlight(diagToRange);
+
+      /// Add the '!''s needed to adjust the type.
+      diag.fixItInsertAfter(diagFromRange.End,
+                            std::string(extraFromOptionals, '!'));
+      if (isBridged) {
+        // If it's bridged, we still need the 'as' to perform the bridging.
+        diag.fixItReplaceChars(asLoc, asLoc.getAdvancedLocOrInvalid(3), "as");
+      } else {
+        // Otherwise, implicit conversions will handle it in most cases.
+        SourceLoc afterExprLoc =
+            Lexer::getLocForEndOfToken(ctx.SourceMgr, diagFromRange.End);
+
+        diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
+      }
+    } else {
+      if (fromType->isEqual(toType)) {
+        auto castTypeRepr = expr->getCastTypeRepr();
+        emitDiagnostic(diag::forced_downcast_noop, toType)
+            .fixItRemove(SourceRange(expr->getLoc(),
+                                     castTypeRepr->getSourceRange().End));
+
+      } else {
+        emitDiagnostic(diag::forced_downcast_coercion, fromType, toType)
+            .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
+                          "as");
+      }
     }
     return true;
   }
 
   if (auto *expr = getAsExpr<ConditionalCheckedCastExpr>(anchor)) {
-    emitDiagnostic(diag::conditional_downcast_coercion, fromType, toType);
+    // Single level of optionality.
+    if (extraFromOptionals == 1) {
+      // A single optional is carried through. It's better to use 'as' to
+      // the appropriate optional type.
+      auto diag = emitDiagnostic(
+          diag::conditional_downcast_same_type, fromType, toType,
+          unwrappedFromType->isEqual(unwrappedToType) ? 0 : isBridged ? 2 : 1);
+      diag.highlight(diagFromRange);
+      diag.highlight(diagToRange);
+
+      if (isBridged) {
+        // For a bridged cast, replace the 'as?' with 'as'.
+        diag.fixItReplaceChars(asLoc, asLoc.getAdvancedLoc(3), "as");
+
+        // Make sure we'll cast to the appropriately-optional type by adding
+        // the '?'.
+        // FIXME: Parenthesize!
+        diag.fixItInsertAfter(diagToRange.End, "?");
+      } else {
+        // Just remove the cast; implicit conversions will handle it.
+        SourceLoc afterExprLoc =
+            Lexer::getLocForEndOfToken(ctx.SourceMgr, diagFromRange.End);
+
+        if (afterExprLoc.isValid() && diagToRange.isValid())
+          diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
+      }
+    } else {
+      emitDiagnostic(diag::conditional_downcast_coercion, fromType, toType);
+    }
     return true;
   }
 

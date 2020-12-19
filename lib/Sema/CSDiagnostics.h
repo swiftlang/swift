@@ -2402,10 +2402,14 @@ public:
 /// Warn situations where the compiler can statically know a runtime
 /// checked cast always succeed.
 class UnnecessaryCheckedCastFailure final : public CheckedCastBaseFailure {
+  CheckedCastKind CastKind;
+
 public:
   UnnecessaryCheckedCastFailure(const Solution &solution, Type fromType,
-                                Type toType, ConstraintLocator *locator)
-      : CheckedCastBaseFailure(solution, fromType, toType, locator) {}
+                                Type toType, CheckedCastKind kind,
+                                ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, locator),
+        CastKind(kind) {}
 
   bool diagnoseAsError() override;
 };

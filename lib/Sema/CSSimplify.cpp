@@ -6091,7 +6091,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::None, DC, SourceLoc(),
           nullptr, SourceRange());
-      if (castKind == CheckedCastKind::Coercion) {
+      if (castKind == CheckedCastKind::Coercion ||
+          castKind == CheckedCastKind::BridgingCoercion) {
         auto fnFromType = fromType->getAs<FunctionType>();
         auto fnToType = toType->getAs<FunctionType>();
         if (fnFromType && fnToType) {
@@ -6103,12 +6104,14 @@ ConstraintSystem::simplifyCheckedCastConstraint(
           // possible at runtime.
           if (fnFromType->isEqual(fnToType)) {
             (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
-                *this, fromType, toType, getConstraintLocator(locator)));
+                *this, fromType, toType, castKind,
+                getConstraintLocator(locator)));
           } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
             if (fnFromType->isEqual(
                     fnToType->getWithoutThrowing()->castTo<FunctionType>())) {
               (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
-                  *this, fromType, toType, getConstraintLocator(locator)));
+                  *this, fromType, toType, castKind,
+                  getConstraintLocator(locator)));
             }
           } else {
             // Runtime cannot perform such conversion.
@@ -6117,7 +6120,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
           }
         } else {
           (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
-              *this, fromType, toType, getConstraintLocator(locator)));
+              *this, fromType, toType, castKind,
+              getConstraintLocator(locator)));
         }
       }
     }
