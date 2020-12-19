@@ -877,7 +877,7 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
     return None;
   }
 #ifndef NDEBUG
-  switch (use->getOperandOwnership().getValue()) {
+  switch (use->getOperandOwnership()) {
   case OperandOwnership::None:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::ForwardingConsume:

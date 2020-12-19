@@ -855,21 +855,15 @@ public:
   /// Return which operand this is in the operand list of the using instruction.
   unsigned getOperandNumber() const;
 
-  /// Return the use ownership of this operand. Returns none if the operand is a
-  /// type dependent operand.
+  /// Return the use ownership of this operand.
   ///
   /// NOTE: This is implemented in OperandOwnership.cpp.
-  Optional<OperandOwnership> getOperandOwnership() const;
+  OperandOwnership getOperandOwnership() const;
 
   /// Return the ownership constraint that restricts what types of values this
-  /// Operand can contain. Returns none if the operand is a type dependent
-  /// operand.
-  Optional<OwnershipConstraint> getOwnershipConstraint() const {
-    auto operandOwnership = getOperandOwnership();
-    if (!operandOwnership) {
-      return None;
-    }
-    return operandOwnership->getOwnershipConstraint();
+  /// Operand can contain.
+  OwnershipConstraint getOwnershipConstraint() const {
+    return getOperandOwnership().getOwnershipConstraint();
   }
 
   /// Returns true if changing the operand to use a value with the given
