@@ -1393,30 +1393,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  SourceLoc(), nullptr, SourceRange())) {
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion: {
-      // FIXME: Add a Fix-It, when the caller provides us with enough
-      // information.
-      if (!suppressDiagnostics) {
-        switch (contextKind) {
-        case CheckedCastContextKind::None:
-        case CheckedCastContextKind::Coercion:
-          llvm_unreachable("suppressing diagnostics");
-
-        case CheckedCastContextKind::IsExpr:
-        case CheckedCastContextKind::ConditionalCast:
-        case CheckedCastContextKind::ForcedCast:
-          // If there is more than one extra optional, don't do anything: this
-          // conditional cast is trying to unwrap some levels of optional;
-          // let the runtime handle it.
-          break;
-
-        case CheckedCastContextKind::IsPattern:
-        case CheckedCastContextKind::EnumElementPattern:
-          // Note: Don't diagnose these, because the code is testing whether
-          // the optionals can be unwrapped.
-          break;
-        }
-      }
-
       // Treat this as a value cast so we preserve the semantics.
       return CheckedCastKind::ValueCast;
     }
