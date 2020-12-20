@@ -297,7 +297,7 @@ enum class FixKind : uint8_t {
 
   /// Allow a runtime checked cast where we statically know the result
   /// is always succeed.
-  AllowAlwaysSucceedCheckedCast,
+  AllowCheckedCastCoecibleTypes,
 
   /// Allow a runtime checked cast where at compile time the from is
   /// convertible, but runtime does not support such convertions. e.g.
@@ -2205,21 +2205,23 @@ public:
           MemberLookupResult result, ConstraintLocator *locator);
 };
 
-class AllowAlwaysSucceedCheckedCast final : public ContextualMismatch {
-  AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
+class AllowCheckedCastCoecibleTypes final : public ContextualMismatch {
+  AllowCheckedCastCoecibleTypes(ConstraintSystem &cs, Type fromType,
                                 Type toType, CheckedCastKind kind,
                                 ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowAlwaysSucceedCheckedCast, fromType,
+      : ContextualMismatch(cs, FixKind::AllowCheckedCastCoecibleTypes, fromType,
                            toType, locator,
                            /*isWarning*/ true),
         CastKind(kind) {}
   CheckedCastKind CastKind;
 
 public:
-  std::string getName() const override { return "checked cast always succeed"; }
+  std::string getName() const override {
+    return "checked cast types are coercible";
+  }
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowAlwaysSucceedCheckedCast *create(ConstraintSystem &cs,
+  static AllowCheckedCastCoecibleTypes *create(ConstraintSystem &cs,
                                                Type fromType, Type toType,
                                                CheckedCastKind kind,
                                                ConstraintLocator *locator);

@@ -7203,7 +7203,7 @@ bool CheckedCastBaseFailure::anchorHasForcedOptionalResult() const {
   return false;
 }
 
-bool UnnecessaryCheckedCastFailure::diagnoseAsError() {
+bool CoercibleCheckedCastFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto &ctx = getASTContext();
 

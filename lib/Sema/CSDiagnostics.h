@@ -2400,14 +2400,14 @@ public:
 };
 
 /// Warn situations where the compiler can statically know a runtime
-/// checked cast always succeed.
-class UnnecessaryCheckedCastFailure final : public CheckedCastBaseFailure {
+/// types involved in checked cast are coercible.
+class CoercibleCheckedCastFailure final : public CheckedCastBaseFailure {
   CheckedCastKind CastKind;
 
 public:
-  UnnecessaryCheckedCastFailure(const Solution &solution, Type fromType,
-                                Type toType, CheckedCastKind kind,
-                                ConstraintLocator *locator)
+  CoercibleCheckedCastFailure(const Solution &solution, Type fromType,
+                              Type toType, CheckedCastKind kind,
+                              ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, locator),
         CastKind(kind) {}
 

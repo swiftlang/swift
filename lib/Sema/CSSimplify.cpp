@@ -6103,13 +6103,13 @@ ConstraintSystem::simplifyCheckedCastConstraint(
           // to throwing to type without throwing clause conversions are not
           // possible at runtime.
           if (fnFromType->isEqual(fnToType)) {
-            (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
+            (void)recordFix(AllowCheckedCastCoecibleTypes::create(
                 *this, fromType, toType, castKind,
                 getConstraintLocator(locator)));
           } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
             if (fnFromType->isEqual(
                     fnToType->getWithoutThrowing()->castTo<FunctionType>())) {
-              (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
+              (void)recordFix(AllowCheckedCastCoecibleTypes::create(
                   *this, fromType, toType, castKind,
                   getConstraintLocator(locator)));
             }
@@ -6119,7 +6119,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                 *this, fromType, toType, getConstraintLocator(locator)));
           }
         } else {
-          (void)recordFix(AllowAlwaysSucceedCheckedCast::create(
+          (void)recordFix(AllowCheckedCastCoecibleTypes::create(
               *this, fromType, toType, castKind,
               getConstraintLocator(locator)));
         }
@@ -10381,7 +10381,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
-  case FixKind::AllowAlwaysSucceedCheckedCast:
+  case FixKind::AllowCheckedCastCoecibleTypes:
   case FixKind::AllowUnsupportedRuntimeCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

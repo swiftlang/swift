@@ -1792,18 +1792,18 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
       SpecifyBaseTypeForOptionalUnresolvedMember(cs, memberName, locator);
 }
 
-AllowAlwaysSucceedCheckedCast *
-AllowAlwaysSucceedCheckedCast::create(ConstraintSystem &cs, Type fromType,
+AllowCheckedCastCoecibleTypes *
+AllowCheckedCastCoecibleTypes::create(ConstraintSystem &cs, Type fromType,
                                       Type toType, CheckedCastKind kind,
                                       ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowAlwaysSucceedCheckedCast(cs, fromType, toType, kind, locator);
+      AllowCheckedCastCoecibleTypes(cs, fromType, toType, kind, locator);
 }
 
-bool AllowAlwaysSucceedCheckedCast::diagnose(const Solution &solution,
+bool AllowCheckedCastCoecibleTypes::diagnose(const Solution &solution,
                                              bool asNote) const {
-  UnnecessaryCheckedCastFailure failure(solution, getFromType(), getToType(),
-                                        CastKind, getLocator());
+  CoercibleCheckedCastFailure failure(solution, getFromType(), getToType(),
+                                      CastKind, getLocator());
   return failure.diagnose(asNote);
 }
 
