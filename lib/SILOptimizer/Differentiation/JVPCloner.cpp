@@ -76,7 +76,7 @@ private:
   //--------------------------------------------------------------------------//
 
   /// The builder for the differential function.
-  SILBuilder differentialBuilder;
+  TangentBuilder differentialBuilder;
 
   /// Mapping from original basic blocks to corresponding differential basic
   /// blocks.
@@ -100,7 +100,7 @@ private:
   llvm::DenseMap<VarDecl *, SILValue> differentialStructElements;
 
   /// An auxiliary differential local allocation builder.
-  SILBuilder diffLocalAllocBuilder;
+  TangentBuilder diffLocalAllocBuilder;
 
   /// Stack buffers allocated for storing local tangent values.
   SmallVector<SILValue, 8> differentialLocalAllocations;
@@ -116,7 +116,7 @@ private:
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
   const AutoDiffConfig getConfig() const { return witness->getConfig(); }
-  SILBuilder &getDifferentialBuilder() { return differentialBuilder; }
+  TangentBuilder &getDifferentialBuilder() { return differentialBuilder; }
   SILFunction &getDifferential() { return differentialBuilder.getFunction(); }
   SILArgument *getDifferentialStructArgument(SILBasicBlock *origBB) {
 #ifndef NDEBUG
@@ -193,19 +193,19 @@ private:
   // Tangent materialization
   //--------------------------------------------------------------------------//
 
-  void emitZeroIndirect(CanType type, SILValue bufferAccess, SILLocation loc) {
+  void emitZeroIndirect(CanType type, SILValue buffer, SILLocation loc) {
     auto builder = getDifferentialBuilder();
     auto tangentSpace = getTangentSpace(type);
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector:
-      emitZeroIntoBuffer(builder, type, bufferAccess, loc);
+      builder.emitZeroIntoBuffer(loc, buffer, IsInitialization);
       return;
     case TangentSpace::Kind::Tuple: {
       auto tupleType = tangentSpace->getTuple();
       SmallVector<SILValue, 8> zeroElements;
       for (unsigned i : range(tupleType->getNumElements())) {
-        auto eltAddr = builder.createTupleElementAddr(loc, bufferAccess, i);
+        auto eltAddr = builder.createTupleElementAddr(loc, buffer, i);
         emitZeroIndirect(tupleType->getElementType(i)->getCanonicalType(),
                          eltAddr, loc);
       }
@@ -1421,9 +1421,10 @@ JVPCloner::Implementation::Implementation(ADContext &context,
                    ->get(original)),
       differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
                        jvp, witness->getConfig(), activityInfo, loopInfo),
-      differentialBuilder(SILBuilder(
-          *createEmptyDifferential(context, witness, &differentialInfo))),
-      diffLocalAllocBuilder(getDifferential()) {
+      differentialBuilder(TangentBuilder(
+          *createEmptyDifferential(context, witness, &differentialInfo),
+          context)),
+      diffLocalAllocBuilder(getDifferential(), context) {
   // Create empty differential function.
   context.recordGeneratedFunction(&getDifferential());
 }

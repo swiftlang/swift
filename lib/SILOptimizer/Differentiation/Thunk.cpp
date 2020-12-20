@@ -561,7 +561,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig desiredConfig, AutoDiffConfig actualConfig) {
+    AutoDiffConfig desiredConfig, AutoDiffConfig actualConfig,
+    ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
              << " from " << actualConfig << " to " << desiredConfig << '\n');
@@ -596,7 +597,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   thunk->setOwnershipEliminated();
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
-  SILBuilder builder(entry);
+  TangentBuilder builder(entry, adContext);
   createEntryArguments(thunk);
 
   // Get arguments.
@@ -615,7 +616,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     case TangentSpace::Kind::TangentVector: {
       auto *buf = builder.createAllocStack(loc, zeroSILObjType);
       localAllocations.push_back(buf);
-      emitZeroIntoBuffer(builder, zeroType, buf, loc);
+      builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
         arguments.push_back(buf);
       } else {
@@ -800,7 +801,7 @@ std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
     AutoDiffDerivativeFunctionKind kind, AutoDiffConfig desiredConfig,
-    AutoDiffConfig actualConfig) {
+    AutoDiffConfig actualConfig, ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for derivative function "
              << derivativeFn << " of the original function " << origFnOperand
@@ -939,7 +940,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
           fb, thunk, origFnType, unsubstLinearMapType,
-          unsubstLinearMapTargetType, kind, desiredConfig, actualConfig);
+          unsubstLinearMapTargetType, kind, desiredConfig, actualConfig,
+          adContext);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
   SILValue thunkedLinearMap = linearMap;
