@@ -607,7 +607,7 @@ bool CompletionInstance::shouldCheckDependencies() const {
   auto now = system_clock::now();
   auto threshold = DependencyCheckedTimestamp +
                    seconds(Opts.DependencyCheckIntervalSecond);
-  return threshold < now;
+  return threshold <= now;
 }
 
 void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
