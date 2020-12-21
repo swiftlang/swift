@@ -1,0 +1,138 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+
+// This file tests routines in SILCombinerMiscVisitors.cpp
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+// We test both the ossa and non-ossa variants.
+//
+// CHECK-LABEL: sil [ossa] @fix_lifetime_promotion_ossa : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   [[BORROW:%.*]] = load_borrow [[STACK]]
+// CHECK:   fix_lifetime [[BORROW]]
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function 'fix_lifetime_promotion_ossa'
+sil [ossa] @fix_lifetime_promotion_ossa : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  fix_lifetime %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @fix_lifetime_promotion : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG]] to [[STACK]]
+// CHECK:   [[BORROW:%.*]] = load [[STACK]]
+// CHECK:   fix_lifetime [[BORROW]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function 'fix_lifetime_promotion'
+sil @fix_lifetime_promotion : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to %1 : $*Klass
+  fix_lifetime %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Unused alloc-ref elim
+
+// CHECK-LABEL: sil @remove_unused_alloc_ref :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref'
+sil @remove_unused_alloc_ref : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $Klass
+  dealloc_ref %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_ossa :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref_ossa'
+sil [ossa] @remove_unused_alloc_ref_ossa : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $Klass
+  dealloc_ref %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @remove_unused_alloc_ref_stack :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref_stack'
+sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_stack_ossa :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref_stack_ossa'
+sil [ossa] @remove_unused_alloc_ref_stack_ossa : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @remove_unused_alloc_ref_fixlifetime :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK-NOT: fix_lifetime
+// CHECK: } // end sil function 'remove_unused_alloc_ref_fixlifetime'
+sil @remove_unused_alloc_ref_fixlifetime : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  fix_lifetime %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_fixlifetime_ossa :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK-NOT: fix_lifetime
+// CHECK: } // end sil function 'remove_unused_alloc_ref_fixlifetime_ossa'
+sil [ossa] @remove_unused_alloc_ref_fixlifetime_ossa : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  fix_lifetime %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
