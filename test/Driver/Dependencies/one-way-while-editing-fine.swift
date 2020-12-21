@@ -7,7 +7,6 @@
 // RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/modify-non-primary-files.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
 
 // CHECK: Handled main.swift
-// CHECK: Handled other.swift
 // CHECK-NOT: error
 // CHECK: error: input file 'other.swift' was modified during the build
 // CHECK-NOT: error
@@ -22,7 +21,6 @@
 // RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/modify-non-primary-files.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./other.swift ./main.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-REVERSED %s
 
 // CHECK-REVERSED: Handled other.swift
-// CHECK-REVERSED: Handled main.swift
 // CHECK-REVERSED-NOT: error
 // CHECK-REVERSED: error: input file 'main.swift' was modified during the build
 // CHECK-REVERSED-NOT: error
