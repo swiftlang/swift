@@ -571,7 +571,7 @@ public:
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(DeadEndBlocks *DEBlocks = nullptr) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 };
 
 inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {

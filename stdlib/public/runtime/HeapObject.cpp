@@ -60,6 +60,7 @@ using namespace swift;
 
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
+SWIFT_ALWAYS_INLINE
 static inline bool isValidPointerForNativeRetain(const void *p) {
 #if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
   // On these platforms, except s390x, the upper half of address space is reserved for the
@@ -332,6 +333,7 @@ HeapObject *swift::swift_allocEmptyBox() {
 extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
 _swift_release_dealloc(HeapObject *object);
 
+SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
   if (isValidPointerForNativeRetain(object))
@@ -358,6 +360,7 @@ HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   return object;
 }
 
+SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain_n);
   if (isValidPointerForNativeRetain(object))
@@ -384,6 +387,7 @@ HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   return object;
 }
 
+SWIFT_ALWAYS_INLINE
 static void _swift_release_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_release);
   if (isValidPointerForNativeRetain(object))
@@ -408,6 +412,7 @@ void swift::swift_nonatomic_release(HeapObject *object) {
     object->refCounts.decrementAndMaybeDeinitNonAtomic(1);
 }
 
+SWIFT_ALWAYS_INLINE
 static void _swift_release_n_(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_release_n);
   if (isValidPointerForNativeRetain(object))
@@ -567,6 +572,7 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
   }
 }
 
+SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_tryRetain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_tryRetain);
   if (!isValidPointerForNativeRetain(object))
