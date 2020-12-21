@@ -1522,7 +1522,7 @@ constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
   //
   // We can look through ownership instructions to get to the string value that
   // is passed to this builtin.
-  SILValue builtinOperand = stripOwnershipInsts(bi->getOperand(0));
+  SILValue builtinOperand = lookThroughOwnershipInsts(bi->getOperand(0));
   SILFunction *caller = bi->getFunction();
 
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);
