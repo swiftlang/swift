@@ -630,9 +630,6 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
 
 SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Cvt) {
-  if (Cvt->getFunction()->hasOwnership())
-    return nullptr;
-
   auto *OrigThinToThick =
       dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
   if (!OrigThinToThick)

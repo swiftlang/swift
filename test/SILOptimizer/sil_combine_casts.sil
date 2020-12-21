@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+sil @returnInt : $@convention(thin) () -> Builtin.Int32
+
+// CHECK-LABEL: sil @optimize_convert_escape_to_noescape :
+// CHECK: [[FN:%.*]] = function_ref @returnInt
+// CHECK: apply [[FN]]()
+// CHECK: } // end sil function 'optimize_convert_escape_to_noescape'
+sil @optimize_convert_escape_to_noescape : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @returnInt : $@convention(thin) () -> Builtin.Int32
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Builtin.Int32 to $@callee_guaranteed () -> Builtin.Int32
+  %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Builtin.Int32 to $@noescape @callee_guaranteed () -> Builtin.Int32
+  %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
+  return %4 : $Builtin.Int32
+}
+
+// We have an extra thin_to_thick_function here since we do not yet have the
+// optimization for eliminating it enabled in OSSA yet.
+//
+// CHECK-LABEL: sil [ossa] @optimize_convert_escape_to_noescape_ossa :
+// CHECK: [[FN:%.*]] = function_ref @returnInt
+// CHECK: [[TTTFI:%.*]] = thin_to_thick_function [[FN]]
+// CHECK: apply [[TTTFI]]()
+// CHECK: } // end sil function 'optimize_convert_escape_to_noescape_ossa'
+sil [ossa] @optimize_convert_escape_to_noescape_ossa : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @returnInt : $@convention(thin) () -> Builtin.Int32
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Builtin.Int32 to $@callee_guaranteed () -> Builtin.Int32
+  %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Builtin.Int32 to $@noescape @callee_guaranteed () -> Builtin.Int32
+  %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
+  return %4 : $Builtin.Int32
+}

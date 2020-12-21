@@ -680,11 +680,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 }
 
 SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
-  if (AR->getFunction()->hasOwnership())
-    return nullptr;
-
-  if (!AR)
-    return nullptr;
   // Check if the only uses are deallocating stack or deallocating.
   SmallPtrSet<SILInstruction *, 16> ToDelete;
   bool HasNonRemovableUses = false;
