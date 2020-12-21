@@ -295,13 +295,17 @@ enum class FixKind : uint8_t {
   /// types.
   SpecifyBaseTypeForOptionalUnresolvedMember,
 
+  /// Allow a runtime checked cast from an optional type where we statically
+  /// know the result is always succeed.
+  AllowCheckedCastCoercibleOptionalType,
+
   /// Allow a runtime checked cast where we statically know the result
   /// is always succeed.
-  AllowCheckedCastCoecibleTypes,
+  AllowAlwaysSucceedCheckedCast,
 
   /// Allow a runtime checked cast where at compile time the from is
   /// convertible, but runtime does not support such convertions. e.g.
-  /// funtion type casts.
+  /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
 };
 
@@ -2205,23 +2209,41 @@ public:
           MemberLookupResult result, ConstraintLocator *locator);
 };
 
-class AllowCheckedCastCoecibleTypes final : public ContextualMismatch {
-  AllowCheckedCastCoecibleTypes(ConstraintSystem &cs, Type fromType,
-                                Type toType, CheckedCastKind kind,
-                                ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowCheckedCastCoecibleTypes, fromType,
-                           toType, locator,
-                           /*isWarning*/ true),
+class AllowCheckedCastCoercibleOptionalType final : public ContextualMismatch {
+  AllowCheckedCastCoercibleOptionalType(ConstraintSystem &cs, Type fromType,
+                                        Type toType, CheckedCastKind kind,
+                                        ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowCheckedCastCoercibleOptionalType,
+                           fromType, toType, locator, /*isWarning*/ true),
         CastKind(kind) {}
   CheckedCastKind CastKind;
 
 public:
   std::string getName() const override {
-    return "checked cast types are coercible";
+    return "checked cast coecible optional";
   }
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowCheckedCastCoecibleTypes *create(ConstraintSystem &cs,
+  static AllowCheckedCastCoercibleOptionalType *
+  create(ConstraintSystem &cs, Type fromType, Type toType, CheckedCastKind kind,
+         ConstraintLocator *locator);
+};
+
+class AllowAlwaysSucceedCheckedCast final : public ContextualMismatch {
+  AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
+                                Type toType, CheckedCastKind kind,
+                                ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowUnsupportedRuntimeCheckedCast,
+                           fromType, toType, locator,
+                           /*isWarning*/ true),
+        CastKind(kind) {}
+  CheckedCastKind CastKind;
+
+public:
+  std::string getName() const override { return "checked cast always succeed"; }
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowAlwaysSucceedCheckedCast *create(ConstraintSystem &cs,
                                                Type fromType, Type toType,
                                                CheckedCastKind kind,
                                                ConstraintLocator *locator);
@@ -2229,10 +2251,13 @@ public:
 
 class AllowUnsupportedRuntimeCheckedCast final : public ContextualMismatch {
   AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
-                                    Type toType, ConstraintLocator *locator)
+                                     Type toType, CheckedCastKind kind,
+                                     ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowUnsupportedRuntimeCheckedCast,
                            fromType, toType, locator,
-                           /*isWarning*/ true) {}
+                           /*isWarning*/ true),
+        CastKind(kind) {}
+  CheckedCastKind CastKind;
 
 public:
   std::string getName() const override {
@@ -2242,6 +2267,7 @@ public:
 
   static AllowUnsupportedRuntimeCheckedCast *create(ConstraintSystem &cs,
                                                     Type fromType, Type toType,
+                                                    CheckedCastKind kind,
                                                     ConstraintLocator *locator);
 };
 

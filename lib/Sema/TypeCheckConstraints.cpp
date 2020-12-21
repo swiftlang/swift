@@ -1329,9 +1329,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.
-  if (toType->isAnyObject()) {
+  if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
-  }
 
   if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
     return CheckedCastKind::BridgingCoercion;
@@ -1594,7 +1593,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
 
       return CheckedCastKind::ValueCast;
-      break;
 
     case CheckedCastContextKind::IsPattern:
     case CheckedCastContextKind::EnumElementPattern:

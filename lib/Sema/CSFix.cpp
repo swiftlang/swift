@@ -1792,32 +1792,48 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
       SpecifyBaseTypeForOptionalUnresolvedMember(cs, memberName, locator);
 }
 
-AllowCheckedCastCoecibleTypes *
-AllowCheckedCastCoecibleTypes::create(ConstraintSystem &cs, Type fromType,
+AllowCheckedCastCoercibleOptionalType *
+AllowCheckedCastCoercibleOptionalType::create(ConstraintSystem &cs,
+                                              Type fromType, Type toType,
+                                              CheckedCastKind kind,
+                                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowCheckedCastCoercibleOptionalType(
+      cs, fromType, toType, kind, locator);
+}
+
+bool AllowCheckedCastCoercibleOptionalType::diagnose(const Solution &solution,
+                                                     bool asNote) const {
+  CoercibleOptionalCheckedCastFailure failure(
+      solution, getFromType(), getToType(), CastKind, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowAlwaysSucceedCheckedCast *
+AllowAlwaysSucceedCheckedCast::create(ConstraintSystem &cs, Type fromType,
                                       Type toType, CheckedCastKind kind,
                                       ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowCheckedCastCoecibleTypes(cs, fromType, toType, kind, locator);
+      AllowAlwaysSucceedCheckedCast(cs, fromType, toType, kind, locator);
 }
 
-bool AllowCheckedCastCoecibleTypes::diagnose(const Solution &solution,
+bool AllowAlwaysSucceedCheckedCast::diagnose(const Solution &solution,
                                              bool asNote) const {
-  CoercibleCheckedCastFailure failure(solution, getFromType(), getToType(),
-                                      CastKind, getLocator());
+  AlwaysSucceedCheckedCastFailure failure(solution, getFromType(), getToType(),
+                                          CastKind, getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowUnsupportedRuntimeCheckedCast *
 AllowUnsupportedRuntimeCheckedCast::create(ConstraintSystem &cs, Type fromType,
-                                          Type toType,
-                                          ConstraintLocator *locator) {
+                                           Type toType, CheckedCastKind kind,
+                                           ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowUnsupportedRuntimeCheckedCast(cs, fromType, toType, locator);
+      AllowUnsupportedRuntimeCheckedCast(cs, fromType, toType, kind, locator);
 }
 
 bool AllowUnsupportedRuntimeCheckedCast::diagnose(const Solution &solution,
                                                  bool asNote) const {
-  UnsupportedRuntimeCheckedCastFailure failure(solution, getFromType(),
-                                              getToType(), getLocator());
+  UnsupportedRuntimeCheckedCastFailure failure(
+      solution, getFromType(), getToType(), CastKind, getLocator());
   return failure.diagnose(asNote);
 }

@@ -2392,26 +2392,70 @@ public:
 };
 
 class CheckedCastBaseFailure : public ContextualFailure {
+protected:
+  CheckedCastKind CastKind;
+  CheckedCastExpr *CastExpr;
+
 public:
   CheckedCastBaseFailure(const Solution &solution, Type fromType, Type toType,
-                         ConstraintLocator *locator)
-      : ContextualFailure(solution, fromType, toType, locator) {}
-  bool anchorHasForcedOptionalResult() const;
+                         CheckedCastKind kind, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator), CastKind(kind) {
+    CastExpr = castToExpr<CheckedCastExpr>(locator->getAnchor());
+  }
+
+  bool isCastTypeIUO() const;
+
+  SourceRange getCastRange() const;
+
+protected:
+  SourceRange getFromRange() const {
+    return CastExpr->getSubExpr()->getSourceRange();
+  }
+
+  SourceRange getToRange() const {
+    return CastExpr->getCastTypeRepr()->getSourceRange();
+  }
 };
 
 /// Warn situations where the compiler can statically know a runtime
-/// types involved in checked cast are coercible.
-class CoercibleCheckedCastFailure final : public CheckedCastBaseFailure {
-  CheckedCastKind CastKind;
-
+/// optional checked cast involved in checked cast are coercible.
+class CoercibleOptionalCheckedCastFailure final
+    : public CheckedCastBaseFailure {
 public:
-  CoercibleCheckedCastFailure(const Solution &solution, Type fromType,
-                              Type toType, CheckedCastKind kind,
-                              ConstraintLocator *locator)
-      : CheckedCastBaseFailure(solution, fromType, toType, locator),
-        CastKind(kind) {}
+  CoercibleOptionalCheckedCastFailure(const Solution &solution, Type fromType,
+                                      Type toType, CheckedCastKind kind,
+                                      ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
 
   bool diagnoseAsError() override;
+
+private:
+  std::tuple<Type, Type, unsigned> unwrapedTypes() const;
+
+  bool diagnoseIfExpr() const;
+
+  bool diagnoseForcedCastExpr() const;
+
+  bool diagnoseConditionalCastExpr() const;
+};
+
+/// Warn situations where the compiler can statically know a runtime
+/// checked cast always succeed.
+class AlwaysSucceedCheckedCastFailure final : public CheckedCastBaseFailure {
+public:
+  AlwaysSucceedCheckedCastFailure(const Solution &solution, Type fromType,
+                                  Type toType, CheckedCastKind kind,
+                                  ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  bool diagnoseIfExpr() const;
+
+  bool diagnoseForcedCastExpr() const;
+
+  bool diagnoseConditionalCastExpr() const;
 };
 
 /// Warn situations where the compiler can statically know a runtime
@@ -2420,8 +2464,9 @@ class UnsupportedRuntimeCheckedCastFailure final
     : public CheckedCastBaseFailure {
 public:
   UnsupportedRuntimeCheckedCastFailure(const Solution &solution, Type fromType,
-                                      Type toType, ConstraintLocator *locator)
-      : CheckedCastBaseFailure(solution, fromType, toType, locator) {}
+                                       Type toType, CheckedCastKind kind,
+                                       ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
 
   bool diagnoseAsError() override;
 };

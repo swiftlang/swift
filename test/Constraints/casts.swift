@@ -490,19 +490,31 @@ let blockalias =  { (_: BA) in  }
 let derivedalias =  { (_: DA) in  }
 
 let _ = block is ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
 let _ = blockalias is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-22=as}}
 let _ = block is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
 let _ = block is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
 
 let _ = block as! ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
 let _ = blockalias as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-23=as}}
 let _ = block as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
 let _ = block as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
 
 let _ = block as? ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
 let _ = blockalias as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-23=as}}
 let _ = block as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
 let _ = block as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
 
 
 let _ = derived is (SR13899_Base) -> Void // expected-warning{{always fails}}

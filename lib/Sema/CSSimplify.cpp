@@ -5963,6 +5963,24 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
   return CheckedCastKind::ValueCast;
 }
 
+// Although function types maybe compile-time convertible because
+// compiler can emit thunks at SIL to handle the conversion when
+// required, only convertions that are supported by the runtime are
+// when types are trivially equal or non-throwing from type is equal
+// to throwing to type without throwing clause conversions are not
+// possible at runtime.
+static bool runtimeSupportedFunctionTypeCast(FunctionType *fnFromType,
+                                             FunctionType *fnToType) {
+  if (fnFromType->isEqual(fnToType)) {
+    return true;
+  } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
+    return fnFromType->isEqual(
+        fnToType->getWithoutThrowing()->castTo<FunctionType>());
+  }
+  // Runtime cannot perform such conversion.
+  return false;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyCheckedCastConstraint(
                     Type fromType, Type toType,
@@ -5981,6 +5999,13 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     return SolutionKind::Unsolved;
   };
+
+  Type origFromType =
+      getFixedTypeRecursive(fromType, flags, /*wantRValue=*/true);
+  Type origToType = getFixedTypeRecursive(toType, flags, /*wantRValue=*/true);
+
+  SmallVector<Type, 4> fromOptionals;
+  SmallVector<Type, 4> toOptionals;
 
   do {
     // Dig out the fixed type this type refers to.
@@ -6004,8 +6029,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     // Peel off optionals metatypes from the types, because we might cast through
     // them.
-    toType = toType->lookThroughAllOptionalTypes();
-    fromType = fromType->lookThroughAllOptionalTypes();
+    toType = toType->lookThroughAllOptionalTypes(toOptionals);
+    fromType = fromType->lookThroughAllOptionalTypes(fromOptionals);
 
     // Peel off metatypes, since if we can cast two types, we can cast their
     // metatypes.
@@ -6034,14 +6059,118 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       break;
   } while (true);
 
+  auto fixForCheckedConvertibleTypes = [&]() -> ConstraintFix * {
+    // Both types are known.
+    if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+      return nullptr;
+
+    if (flags.contains(TMF_ApplyingFix))
+      return nullptr;
+
+    auto loc = getConstraintLocator(locator);
+    auto anchor = loc->getAnchor();
+    auto *castExpr = getAsExpr<ExplicitCastExpr>(anchor);
+    if (!castExpr)
+      return nullptr;
+
+    unsigned extraOptionals = fromOptionals.size() - toOptionals.size();
+    // Removing the optionality from to type when the force cast expr is an IUO.
+    const auto *const TR = castExpr->getCastTypeRepr();
+    if (isExpr<ForcedCheckedCastExpr>(anchor) && TR &&
+        TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+      extraOptionals++;
+    }
+
+    // In some special cases e.g.
+    //  struct A {
+    //    func opt() throws -> Int { return 3 }
+    //  }
+    //  let a: A? = A()
+    //  let _ = (try? a?.opt()) as? Int
+    //
+    // If original from type is a non-optional and subExpr is an
+    // OptionalTryExpr, to make sure we handle this correctly lets add the
+    // optionality because the result of the expression is always an optional
+    // type.
+    auto *sub = castExpr->getSubExpr()->getSemanticsProvidingExpr();
+    if (isExpr<OptionalTryExpr>(sub) &&
+        !origFromType->getOptionalObjectType()) {
+      origFromType = OptionalType::get(fromType);
+      extraOptionals++;
+    }
+
+    // Except for forced cast expressions, if optionals are more than a single
+    // level difference, we don't need to record the fix.
+    if (!isExpr<ForcedCheckedCastExpr>(anchor) && extraOptionals > 1)
+      return nullptr;
+
+    // Explicit handling cast to ExpressibleByNilLiteral because
+    // optional types trivially satisfy the conformance.
+    auto &ctx = getASTContext();
+    auto *nilLiteral =
+        ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral);
+    if (toType->isEqual(nilLiteral->getDeclaredType()) &&
+        origFromType->getOptionalObjectType()) {
+      return AllowAlwaysSucceedCheckedCast::create(
+          *this, fromType, toType, CheckedCastKind::Coercion,
+          getConstraintLocator(locator));
+    }
+
+    // If both original are metatypes we have to use them because most of the
+    // logic on how correctly handle metatypes casting is on
+    // typeCheckCheckedCast.
+    if (origFromType->is<AnyMetatypeType>() &&
+        origToType->is<AnyMetatypeType>()) {
+      fromType = origFromType;
+      toType = origToType;
+    }
+
+    auto castKind = TypeChecker::typeCheckCheckedCast(
+        fromType, toType, CheckedCastContextKind::None, DC, SourceLoc(),
+        nullptr, SourceRange());
+    if (!(castKind == CheckedCastKind::Coercion ||
+          castKind == CheckedCastKind::BridgingCoercion))
+      return nullptr;
+    
+    auto fnFromType = fromType->getAs<FunctionType>();
+    auto fnToType = toType->getAs<FunctionType>();
+    if (fnFromType && fnToType &&
+        !runtimeSupportedFunctionTypeCast(fnFromType, fnToType)) {
+      // Runtime cannot perform such conversion.
+      return AllowUnsupportedRuntimeCheckedCast::create(
+          *this, origFromType, origToType, castKind,
+          getConstraintLocator(locator));
+    }
+    if (extraOptionals > 0) {
+      return AllowCheckedCastCoercibleOptionalType::create(
+          *this, origFromType, origToType, castKind,
+          getConstraintLocator(locator));
+    } else {
+      // No optionals, just a trivial cast that always succeed.
+      return AllowAlwaysSucceedCheckedCast::create(
+          *this, origFromType, origToType, castKind,
+          getConstraintLocator(locator));
+    }
+  };
+
+  auto recordCastFixIfNeeded = [&](SolutionKind result) {
+    if (result == SolutionKind::Solved) {
+      if (auto *fix = fixForCheckedConvertibleTypes()) {
+        (void)recordFix(fix);
+      }
+    }
+  };
+
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = *isArrayType(fromType);
     auto toBaseType = *isArrayType(toType);
 
-    return simplifyCheckedCastConstraint(fromBaseType, toBaseType,
-                                         subflags | TMF_ApplyingFix, locator);
+    auto result = simplifyCheckedCastConstraint(
+        fromBaseType, toBaseType, subflags | TMF_ApplyingFix, locator);
+    recordCastFixIfNeeded(result);
+    return result;
   }
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
@@ -6050,19 +6179,24 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     Type toKeyType, toValueType;
     std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
 
-    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType, subflags,
+    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType,
+                                      subflags | TMF_ApplyingFix,
                                       locator) == SolutionKind::Error)
       return SolutionKind::Error;
 
-    return simplifyCheckedCastConstraint(fromValueType, toValueType,
-                                         subflags | TMF_ApplyingFix, locator);
+    auto result = simplifyCheckedCastConstraint(
+        fromValueType, toValueType, subflags | TMF_ApplyingFix, locator);
+    recordCastFixIfNeeded(result);
+    return result;
   }
 
   case CheckedCastKind::SetDowncast: {
     auto fromBaseType = *isSetType(fromType);
     auto toBaseType = *isSetType(toType);
-    return simplifyCheckedCastConstraint(fromBaseType, toBaseType,
-                                         subflags | TMF_ApplyingFix, locator);
+    auto result = simplifyCheckedCastConstraint(
+        fromBaseType, toBaseType, subflags | TMF_ApplyingFix, locator);
+    recordCastFixIfNeeded(result);
+    return result;
   }
 
   case CheckedCastKind::ValueCast: {
@@ -6076,54 +6210,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                     getConstraintLocator(locator));
     }
 
-    // Both types are known and statically convertible.
-    if (!(fromType->hasTypeVariable() || toType->hasTypeVariable())) {
-      if (flags.contains(TMF_ApplyingFix))
-        return SolutionKind::Solved;
-      
-      if (fromType->is<ArchetypeType>())
-        return SolutionKind::Solved;
-
-      auto *loc = getConstraintLocator(locator);
-      if (!isExpr<ExplicitCastExpr>(loc->getAnchor()))
-        return SolutionKind::Solved;
-
-      auto castKind = TypeChecker::typeCheckCheckedCast(
-          fromType, toType, CheckedCastContextKind::None, DC, SourceLoc(),
-          nullptr, SourceRange());
-      if (castKind == CheckedCastKind::Coercion ||
-          castKind == CheckedCastKind::BridgingCoercion) {
-        auto fnFromType = fromType->getAs<FunctionType>();
-        auto fnToType = toType->getAs<FunctionType>();
-        if (fnFromType && fnToType) {
-          // Although function types are compile-time convertible because
-          // compiler can emit thunks at SIL to handle the conversion when
-          // required, only convertions that are supported by the runtime are
-          // when types are trivially equal or non-throwing from type is equal
-          // to throwing to type without throwing clause conversions are not
-          // possible at runtime.
-          if (fnFromType->isEqual(fnToType)) {
-            (void)recordFix(AllowCheckedCastCoecibleTypes::create(
-                *this, fromType, toType, castKind,
-                getConstraintLocator(locator)));
-          } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
-            if (fnFromType->isEqual(
-                    fnToType->getWithoutThrowing()->castTo<FunctionType>())) {
-              (void)recordFix(AllowCheckedCastCoecibleTypes::create(
-                  *this, fromType, toType, castKind,
-                  getConstraintLocator(locator)));
-            }
-          } else {
-            // Runtime cannot perform such conversion.
-            (void)recordFix(AllowUnsupportedRuntimeCheckedCast::create(
-                *this, fromType, toType, getConstraintLocator(locator)));
-          }
-        } else {
-          (void)recordFix(AllowCheckedCastCoecibleTypes::create(
-              *this, fromType, toType, castKind,
-              getConstraintLocator(locator)));
-        }
-      }
+    if (auto *fix = fixForCheckedConvertibleTypes()) {
+      (void)recordFix(fix);
     }
 
     return SolutionKind::Solved;
@@ -10381,8 +10469,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
-  case FixKind::AllowCheckedCastCoecibleTypes:
-  case FixKind::AllowUnsupportedRuntimeCheckedCast: {
+  case FixKind::AllowCheckedCastCoercibleOptionalType:
+  case FixKind::AllowUnsupportedRuntimeCheckedCast:
+  case FixKind::AllowAlwaysSucceedCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
