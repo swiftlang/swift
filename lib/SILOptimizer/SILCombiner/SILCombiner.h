@@ -49,17 +49,20 @@ class SILCombiner :
 
   DominanceAnalysis *DA;
 
-  // Determine the set of types a protocol conforms to in whole-module
-  // compilation mode.
+  /// Determine the set of types a protocol conforms to in whole-module
+  /// compilation mode.
   ProtocolConformanceAnalysis *PCA;
 
-  // Class hierarchy analysis needed to confirm no derived classes of a sole
-  // conforming class.
+  /// Class hierarchy analysis needed to confirm no derived classes of a sole
+  /// conforming class.
   ClassHierarchyAnalysis *CHA;
 
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+  /// A cache of "dead end blocks" through which all paths it is known that the
+  /// program will terminate. This means that we are allowed to leak
+  /// objects.
   DeadEndBlocks deadEndBlocks;
 
   /// Variable to track if the SILCombiner made any changes.
