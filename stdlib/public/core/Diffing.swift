@@ -136,7 +136,7 @@ extension BidirectionalCollection {
   ///   - areEquivalent: A closure that returns a Boolean value indicating
   ///     whether two elements are equivalent.
   ///
-  /// - Returns: The difference needed to produce the reciever's state from
+  /// - Returns: The difference needed to produce the receiver's state from
   ///   the parameter's state.
   ///
   /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the
