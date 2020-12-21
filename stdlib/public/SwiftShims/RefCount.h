@@ -793,6 +793,7 @@ class RefCounts {
   }
 
   // Increment the reference count.
+  SWIFT_ALWAYS_INLINE
   void increment(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
@@ -815,6 +816,7 @@ class RefCounts {
                                               std::memory_order_relaxed));
   }
 
+  SWIFT_ALWAYS_INLINE
   void incrementNonAtomic(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
@@ -835,6 +837,7 @@ class RefCounts {
  }
 
   // Increment the reference count, unless the object is deiniting.
+  SWIFT_ALWAYS_INLINE
   bool tryIncrement() {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
@@ -854,6 +857,7 @@ class RefCounts {
     return true;
   }
 
+  SWIFT_ALWAYS_INLINE
   bool tryIncrementNonAtomic() {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
@@ -896,6 +900,7 @@ class RefCounts {
   // object as deiniting.
   //
   // Precondition: the reference count must be 1
+  SWIFT_ALWAYS_INLINE
   void decrementFromOneNonAtomic() {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.isImmortal(true)) {
@@ -1078,6 +1083,7 @@ class RefCounts {
   // Deinit is optionally handled directly instead of always deferring to 
   // the caller because the compiler can optimize this arrangement better.
   template <PerformDeinit performDeinit>
+  SWIFT_ALWAYS_INLINE
   bool doDecrement(uint32_t dec) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
