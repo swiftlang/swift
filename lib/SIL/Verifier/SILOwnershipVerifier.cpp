@@ -772,16 +772,9 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
     return;
 
   SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
-  if (deadEndBlocks) {
-    SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder, liveBlocks,
-                             reborrowVerifier)
-        .check();
-  } else {
-    DeadEndBlocks deadEndBlocks(f);
-    SILValueOwnershipChecker(deadEndBlocks, value, errorBuilder, liveBlocks,
-                             reborrowVerifier)
-        .check();
-  }
+  SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder, liveBlocks,
+                           reborrowVerifier)
+    .check();
 }
 
 void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
