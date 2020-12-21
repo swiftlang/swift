@@ -781,7 +781,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 // Top level entry points to RAUW code.
 //
 bool OwnershipFixupContext::canFixUpOwnershipForRAUW(
-    SingleValueInstruction *oldValue, SILValue newValue) {
+    const SingleValueInstruction *oldValue, SILValue newValue) {
   auto newOwnershipKind = newValue.getOwnershipKind();
 
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
