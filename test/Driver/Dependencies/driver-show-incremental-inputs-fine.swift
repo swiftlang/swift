@@ -20,5 +20,5 @@
 
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json 2>&1 | %FileCheck --check-prefix CHECK-INPUTS-MISMATCH %s
 // CHECK-INPUTS-MISMATCH: Incremental compilation has been disabled{{.*}}inputs
-// CHECK-INPUTS-MISMATCH: ./other.swift
+// CHECK-INPUTS-MISMATCH: {{(./)?}}other.swift
 // CHECK-INPUTS-MISMATCH-NOT: Queuing (initial): {compile: main.o <= main.swift}
