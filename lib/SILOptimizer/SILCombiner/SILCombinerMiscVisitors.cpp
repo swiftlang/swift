@@ -1849,17 +1849,17 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
-  if (FLI->getFunction()->hasOwnership())
-    return nullptr;
-
+SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
   // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
-  Builder.setCurrentDebugScope(FLI->getDebugScope());
-  if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
-    if (FLI->getOperand()->getType().isLoadable(*FLI->getFunction())) {
-      auto Load = Builder.createLoad(FLI->getLoc(), AI,
-                                     LoadOwnershipQualifier::Unqualified);
-      return Builder.createFixLifetime(FLI->getLoc(), Load);
+  Builder.setCurrentDebugScope(fli->getDebugScope());
+  if (auto *ai = dyn_cast<AllocStackInst>(fli->getOperand())) {
+    if (fli->getOperand()->getType().isLoadable(*fli->getFunction())) {
+      // load when ossa is disabled
+      auto load = Builder.emitLoadBorrowOperation(fli->getLoc(), ai);
+      Builder.createFixLifetime(fli->getLoc(), load);
+      // no-op when ossa is disabled
+      Builder.emitEndBorrowOperation(fli->getLoc(), load);
+      return eraseInstFromFunction(*fli);
     }
   }
   return nullptr;
