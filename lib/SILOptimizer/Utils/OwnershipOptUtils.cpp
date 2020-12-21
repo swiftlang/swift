@@ -391,7 +391,7 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
   return phiArg;
 }
 
-static void getAllBorrowedValueUsePoints(
+static void getAllNonTrivialUsePointsOfBorrowedValue(
     SILValue value, SmallVectorImpl<Operand *> &usePoints,
     SmallVectorImpl<BorrowingOperand> &reborrowPoints) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
@@ -407,6 +407,9 @@ static void getAllBorrowedValueUsePoints(
   for (unsigned i = firstOffset; i < usePoints.size(); ++i) {
     if (auto fOperand = ForwardingOperand::get(usePoints[i])) {
       fOperand->visitForwardedValues([&](SILValue transitiveValue) {
+        // Do not include transitive uses with 'none' ownership
+        if (transitiveValue.getOwnershipKind() == OwnershipKind::None)
+          return true;
         for (auto *transitiveUse : transitiveValue->getUses())
           usePoints.push_back(transitiveUse);
         return true;
@@ -685,8 +688,8 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
   // workspace.
   SmallVector<Operand *, 32> usePoints;
   SmallVector<BorrowingOperand, 8> recursiveBorrowScopeReborrows;
-  getAllBorrowedValueUsePoints(oldValue, usePoints,
-                               recursiveBorrowScopeReborrows);
+  getAllNonTrivialUsePointsOfBorrowedValue(oldValue, usePoints,
+                                           recursiveBorrowScopeReborrows);
 
   // If we have any transitive reborrows on sub-borrows.
   if (recursiveBorrowScopeReborrows.size())
