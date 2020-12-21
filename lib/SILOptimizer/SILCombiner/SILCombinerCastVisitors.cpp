@@ -30,31 +30,67 @@ using namespace swift;
 using namespace swift::PatternMatch;
 
 SILInstruction *
-SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
-  if (RRPI->getFunction()->hasOwnership())
-    return nullptr;
-
-  // Ref to raw pointer consumption of other ref casts.
-  if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
-    // (ref_to_raw_pointer (unchecked_ref_cast x))
-    //    -> (ref_to_raw_pointer x)
-    if (URCI->getOperand()->getType().isAnyClassReferenceType()) {
-      RRPI->setOperand(URCI->getOperand());
-      return URCI->use_empty() ? eraseInstFromFunction(*URCI) : nullptr;
+SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
+  if (auto *urci = dyn_cast<UncheckedRefCastInst>(rrpi->getOperand())) {
+    // In this optimization, we try to move ref_to_raw_pointer up the def-use
+    // graph. E.x.:
+    //
+    // ```
+    // %0 = ...
+    // %1 = unchecked_ref_cast %0
+    // %2 = ref_to_raw_pointer %1
+    // ```
+    //
+    // to:
+    //
+    // ```
+    // %0 = ...
+    // %2 = ref_to_raw_pointer %0
+    // %1 = unchecked_ref_cast %0
+    // ```
+    //
+    // If we find that the unchecked_ref_cast has no uses, we then eliminate
+    // it.
+    //
+    // Naturally, this requires us to always hoist our new instruction (or
+    // modified instruction) to before the unchecked_ref_cast.
+    //
+    // First we handle the case where we have a class type where we do not need
+    // to insert a new instruction.
+    if (urci->getOperand()->getType().isAnyClassReferenceType()) {
+      rrpi->setOperand(urci->getOperand());
+      rrpi->moveBefore(urci);
+      return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
     }
+
+    // Otherwise, we ened to use an unchecked_trivial_bit_cast insert it at
+    // urci.
+    //
     // (ref_to_raw_pointer (unchecked_ref_cast x))
     //    -> (unchecked_trivial_bit_cast x)
-    return Builder.createUncheckedTrivialBitCast(RRPI->getLoc(),
-                                                 URCI->getOperand(),
-                                                 RRPI->getType());
+    auto *utbi = withBuilder(urci, [&](auto &b, auto l) {
+      return b.createUncheckedTrivialBitCast(l, urci->getOperand(),
+                                             rrpi->getType());
+    });
+    rrpi->replaceAllUsesWith(utbi);
+    eraseInstFromFunction(*rrpi);
+    return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
   }
 
   // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
   // (ref_to_raw_pointer x)
-  if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand()))
-    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
-      return Builder.createRefToRawPointer(RRPI->getLoc(), IER->getOperand(),
-                                           RRPI->getType());
+  //
+  // In terms of ownership, we need to insert this at the init_existential to
+  // ensure that x is live if we have an owned value.
+  if (auto *oeri = dyn_cast<OpenExistentialRefInst>(rrpi->getOperand())) {
+    if (auto *ieri = dyn_cast<InitExistentialRefInst>(oeri->getOperand())) {
+      auto *utbi = withBuilder(ieri, [&](auto &b, auto l) {
+        return b.createRefToRawPointer(l, ieri->getOperand(), rrpi->getType());
+      });
+      rrpi->replaceAllUsesWith(utbi);
+      return eraseInstFromFunction(*rrpi);
+    }
+  }
 
   return nullptr;
 }
