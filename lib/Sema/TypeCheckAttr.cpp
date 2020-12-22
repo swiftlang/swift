@@ -1952,14 +1952,14 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
 
   if (mainFunction->hasThrows()) {
     auto *tryExpr = new (context) TryExpr(
-        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
+        callExpr->getLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
     returnedExpr = tryExpr;
   } else {
     returnedExpr = callExpr;
   }
 
   auto *returnStmt =
-      new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
+      new (context) ReturnStmt(SourceLoc(), returnedExpr, /*Implicit=*/true);
 
   SmallVector<ASTNode, 1> stmts;
   stmts.push_back(returnStmt);
