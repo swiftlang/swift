@@ -9,3 +9,10 @@ target_link_libraries(swift-ast-script
                       PRIVATE
                         swiftAST
                         swiftFrontendTool)
+if (NOT LLVM_ENABLE_ASSERTIONS)
+  target_link_options(
+    swift-ast-script
+    PRIVATE
+    "LINKER:-weak_library"
+    "LINKER:$<TARGET_FILE:swiftExternalSILVerifier>")
+endif()

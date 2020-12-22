@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt %s
+// RUN: env DYLD_INSERT_LIBRARIES=%swift_obj_root/lib/libswiftExternalSILVerifier.dylib not --crash %target-sil-opt %s
+
+// We only run this test when asserts are disabled.
+
+// UNSUPPORTED: asserts
+
+sil_stage canonical
+
+import Builtin
+
+sil [ossa] @double_consume_same_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %3 = tuple ()
+  return %3 : $()
+}

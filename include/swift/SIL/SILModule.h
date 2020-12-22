@@ -776,6 +776,13 @@ public:
   /// declaration context ought to be serialized as part of this module.
   bool
   shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const;
+
+  /// Returns true if the internal cache in this module maps vt -> method.
+  bool isVTableEntryInCache(const SILVTable *vt, SILDeclRef method) const {
+    return VTableEntryCache.find({vt, method}) == VTableEntryCache.end();
+  }
+
+  unsigned getVTableCacheSize() const { return VTableEntryCache.size(); }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

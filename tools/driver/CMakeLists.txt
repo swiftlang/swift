@@ -67,4 +67,10 @@ add_dependencies(editor-integration swift-frontend)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT editor-integration)
-
+if (NOT LLVM_ENABLE_ASSERTIONS)
+  target_link_options(
+    swift-frontend
+    PRIVATE
+    "LINKER:-weak_library"
+    "LINKER:$<TARGET_FILE:swiftExternalSILVerifier>")
+endif()

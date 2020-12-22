@@ -162,6 +162,17 @@ public:
 
   const_iterator begin() const { return StaticInitializerBlock.begin(); }
   const_iterator end() const { return StaticInitializerBlock.end(); }
+  const SILInstruction &front() const { return StaticInitializerBlock.front(); }
+  const SILInstruction &back() const { return StaticInitializerBlock.back(); }
+
+  using const_range = llvm::iterator_range<const_iterator>;
+  const_range getBlockInsts() const {
+    return {StaticInitializerBlock.begin(), StaticInitializerBlock.end()};
+  }
+
+  bool isInstructionInBlock(const SILInstruction &i) const {
+    return &StaticInitializerBlock == i.getParent();
+  }
 
   /// Returns true if \p I is a valid instruction to be contained in the
   /// static initializer.

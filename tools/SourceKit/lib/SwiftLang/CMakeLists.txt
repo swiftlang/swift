@@ -64,3 +64,20 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   clangAPINotes
   clangBasic)
 add_dependencies(SourceKitSwiftLang clang-tablegen-targets)
+
+if (NOT LLVM_ENABLE_ASSERTIONS)
+  if (APPLE)
+    target_link_options(
+      SourceKitSwiftLang
+      PRIVATE
+      "LINKER:-weak_library"
+      "LINKER:$<TARGET_FILE:swiftExternalSILVerifier>")
+  elseif (LINUX)
+    target_link_libraries(
+      SourceKitSwiftLang
+      PRIVATE
+      swiftExternalSILVerifier)
+  else()
+    message(FATAL_ERROR "Unsupported platform")
+  endif()
+endif()

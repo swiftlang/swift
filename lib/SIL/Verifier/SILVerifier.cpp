@@ -11,7 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
+
+#include "SILVerifierCAPI.h"
 #include "VerifierPrivate.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -5548,38 +5551,54 @@ public:
 //===----------------------------------------------------------------------===//
 
 static bool verificationEnabled(const SILModule &M) {
-#ifdef NDEBUG
   if (!M.getOptions().VerifyAll)
     return false;
-#endif
   return !M.getOptions().VerifyNone;
+}
+
+/// Out of line call to verify a SIL function.
+void swift::silverifier::verifySILFunction(const SILFunction *fn,
+                                           bool singleFunction) {
+  SILVerifier(*fn, singleFunction).verify();
+}
+
+/// Out of line call to verify a SIL function's critical edges.
+void swift::silverifier::verifyCriticalEdgesSILFunction(const SILFunction *fn) {
+  SILVerifier(*fn, /*SingleFunction=*/true).verifyBranches(fn);
 }
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(bool SingleFunction) const {
+void SILFunction::verify(bool singleFunction) const {
   if (!verificationEnabled(getModule()))
     return;
 
+#ifndef NDEBUG
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this, SingleFunction).verify();
+  verifySILFunction(this, singleFunction);
+#else
+  if (SILVerifierCAPI_SILFunction_verify)
+    SILVerifierCAPI_SILFunction_verify((void *)this, singleFunction);
+#endif
 }
 
 void SILFunction::verifyCriticalEdges() const {
   if (!verificationEnabled(getModule()))
     return;
 
-  SILVerifier(*this, /*SingleFunction=*/true).verifyBranches(this);
+#ifndef NDEBUG
+  verifyCriticalEdgesSILFunction(this);
+#else
+  if (SILVerifierCAPI_SILFunction_verifyCriticalEdges)
+    SILVerifierCAPI_SILFunction_verifyCriticalEdges((void *)this);
+#endif
 }
 
-/// Verify that a property descriptor follows invariants.
-void SILProperty::verify(const SILModule &M) const {
-  if (!verificationEnabled(M))
-    return;
-
-  auto *decl = getDecl();
+void swift::silverifier::verifySILProperty(const SILProperty *prop,
+                                           const SILModule &mod) {
+  auto *decl = prop->getDecl();
   auto *dc = decl->getInnermostDeclContext();
   
   // TODO: base type for global/static descriptors
@@ -5608,21 +5627,14 @@ void SILProperty::verify(const SILModule &M) const {
       }
     };
 
-  if (auto &component = getComponent()) {
+  if (auto &component = prop->getComponent()) {
     auto typeExpansionContext =
         TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
             ResilienceExpansion::Maximal);
-    verifyKeyPathComponent(const_cast<SILModule&>(M),
-                           typeExpansionContext,
-                           require,
-                           baseTy,
-                           leafTy,
-                           *component,
-                           {},
-                           canSig,
+    verifyKeyPathComponent(const_cast<SILModule &>(mod), typeExpansionContext,
+                           require, baseTy, leafTy, *component, {}, canSig,
                            subs,
-                           /*property descriptor*/true,
-                           hasIndices);
+                           /*property descriptor*/ true, hasIndices);
     // verifyKeyPathComponent updates baseTy to be the projected type of the
     // component, which should be the same as the type of the declared storage
     require(baseTy == leafTy,
@@ -5630,34 +5642,47 @@ void SILProperty::verify(const SILModule &M) const {
   }
 }
 
-/// Verify that a vtable follows invariants.
-void SILVTable::verify(const SILModule &M) const {
-  if (!verificationEnabled(M))
+/// Verify that a property descriptor follows invariants.
+void SILProperty::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
     return;
-  
+
+#ifndef NDEBUG
+  verifySILProperty(this, mod);
+#else
+  if (SILVerifierCAPI_SILProperty_verify)
+    SILVerifierCAPI_SILProperty_verify((void *)this, (void *)&mod);
+#endif
+}
+
+void swift::silverifier::verifySILVTable(const SILVTable *vt,
+                                         const SILModule &mod) {
+  using Entry = SILVTable::Entry;
+
   // Compare against the base class vtable if there is one.
   const SILVTable *superVTable = nullptr;
-  auto superclass = getClass()->getSuperclassDecl();
+  auto superclass = vt->getClass()->getSuperclassDecl();
   if (superclass) {
-    for (auto &vt : M.getVTables()) {
+    for (auto &vt : mod.getVTables()) {
       if (vt->getClass() == superclass) {
         superVTable = vt;
         break;
       }
     }
   }
-  
-  for (unsigned i : indices(getEntries())) {
-    auto &entry = getEntries()[i];
-    
+
+  for (unsigned i : indices(vt->getEntries())) {
+    auto &entry = vt->getEntries()[i];
+
     // Make sure the module's lookup cache is consistent.
-    assert(entry == *getEntry(const_cast<SILModule &>(M), entry.getMethod())
-           && "vtable entry is out of sync with method's vtable cache");
-    
+    assert(entry ==
+               *vt->getEntry(const_cast<SILModule &>(mod), entry.getMethod()) &&
+           "vtable entry is out of sync with method's vtable cache");
+
     // All vtable entries must be decls in a class context.
     assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");
-    auto baseInfo = M.Types.getConstantInfo(TypeExpansionContext::minimal(),
-                                            entry.getMethod());
+    auto baseInfo = mod.Types.getConstantInfo(TypeExpansionContext::minimal(),
+                                              entry.getMethod());
     ValueDecl *decl = entry.getMethod().getDecl();
 
     assert((!isa<AccessorDecl>(decl)
@@ -5674,7 +5699,7 @@ void SILVTable::verify(const SILModule &M) const {
     assert(theClass && "vtable entry must refer to a class member");
 
     // The class context must be the vtable's class, or a superclass thereof.
-    assert(theClass->isSuperclassOf(getClass()) &&
+    assert(theClass->isSuperclassOf(vt->getClass()) &&
            "vtable entry must refer to a member of the vtable's class");
 
     // Foreign entry points shouldn't appear in vtables.
@@ -5687,7 +5712,7 @@ void SILVTable::verify(const SILModule &M) const {
       entry.getMethod().print(os);
     }
 
-    if (M.getStage() != SILStage::Lowered) {
+    if (mod.getStage() != SILStage::Lowered) {
       SILVerifier(*entry.getImplementation())
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
@@ -5695,7 +5720,7 @@ void SILVTable::verify(const SILModule &M) const {
               "vtable entry for " + baseName + " must be ABI-compatible",
               *entry.getImplementation());
     }
-    
+
     // Validate the entry against its superclass vtable.
     if (!superclass) {
       // Root methods should not have inherited or overridden entries.
@@ -5753,38 +5778,66 @@ void SILVTable::verify(const SILModule &M) const {
   }
 }
 
-/// Verify that a witness table follows invariants.
-void SILWitnessTable::verify(const SILModule &M) const {
-  if (!verificationEnabled(M))
+/// Verify that a vtable follows invariants.
+void SILVTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
     return;
 
-  if (isDeclaration())
-    assert(getEntries().empty() &&
+#ifndef NDEBUG
+  verifySILVTable(this, mod);
+#else
+  if (SILVerifierCAPI_SILVTable_verify)
+    SILVerifierCAPI_SILVTable_verify((void *)this, (void *)&mod);
+#endif
+}
+
+void swift::silverifier::verifySILWitnessTable(const SILWitnessTable *wt,
+                                               const SILModule &mod) {
+  using Entry = SILWitnessTable::Entry;
+
+  if (wt->isDeclaration())
+    assert(wt->getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
-  for (const Entry &E : getEntries())
+  for (const Entry &E : wt->getEntries())
     if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
       SILFunction *F = E.getMethodWitness().Witness;
       if (F) {
         // If a SILWitnessTable is going to be serialized, it must only
         // reference public or serializable functions.
-        if (isSerialized()) {
+        if (wt->isSerialized()) {
           assert(F->hasValidLinkageForFragileRef() &&
                  "Fragile witness tables should not reference "
                  "less visible functions.");
         }
 
         assert(F->getLoweredFunctionType()->getRepresentation() ==
-               SILFunctionTypeRepresentation::WitnessMethod &&
+                   SILFunctionTypeRepresentation::WitnessMethod &&
                "Witnesses must have witness_method representation.");
       }
     }
 }
 
-/// Verify that a default witness table follows invariants.
-void SILDefaultWitnessTable::verify(const SILModule &M) const {
+/// Verify that a witness table follows invariants.
+void SILWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
+    return;
+
 #ifndef NDEBUG
-  for (const Entry &E : getEntries()) {
+  verifySILWitnessTable(this, mod);
+#else
+  if (SILVerifierCAPI_SILWitnessTable_verify)
+    SILVerifierCAPI_SILWitnessTable_verify((void *)this, (void *)&mod);
+#endif
+}
+
+/// Out of line verify a SIL default witness table. Called by
+/// SILDefaultWitnessTable::verify().
+void swift::silverifier::verifySILDefaultWitnessTable(
+    const SILDefaultWitnessTable *wt, const SILModule &mod) {
+  using Entry = SILDefaultWitnessTable::Entry;
+
+  for (const Entry &E : wt->getEntries()) {
     // FIXME: associated type witnesses.
     if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
@@ -5802,7 +5855,39 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
   }
+}
+
+/// Verify that a default witness table follows invariants.
+void SILDefaultWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
+    return;
+
+#ifndef NDEBUG
+  verifySILDefaultWitnessTable(this, mod);
+#else
+  if (SILVerifierCAPI_SILDefaultWitnessTable_verify)
+    SILVerifierCAPI_SILDefaultWitnessTable_verify((void *)this, (void *)&mod);
 #endif
+}
+
+void swift::silverifier::verifySILGlobalVariable(const SILGlobalVariable *gv) {
+  assert(gv->getLoweredType().isObject() &&
+         "global variable cannot have address type");
+
+  // Verify the static initializer.
+  for (const SILInstruction &I : gv->getBlockInsts()) {
+    assert(gv->isValidStaticInitializerInst(&I, gv->getModule()) &&
+           "illegal static initializer");
+    auto init = cast<SingleValueInstruction>(&I);
+    if (init == &gv->back()) {
+      assert(init->use_empty() && "Init value must not have another use");
+    } else {
+      assert(!init->use_empty() && "dead instruction in static initializer");
+      assert(!isa<ObjectInst>(init) &&
+             "object instruction is only allowed for final initial value");
+    }
+    assert(gv->isInstructionInBlock(I));
+  }
 }
 
 /// Verify that a global variable follows invariants.
@@ -5810,37 +5895,22 @@ void SILGlobalVariable::verify() const {
   if (!verificationEnabled(getModule()))
     return;
 
-  assert(getLoweredType().isObject()
-         && "global variable cannot have address type");
-
-  // Verify the static initializer.
-  for (const SILInstruction &I : StaticInitializerBlock) {
-    assert(isValidStaticInitializerInst(&I, getModule()) &&
-           "illegal static initializer");
-    auto init = cast<SingleValueInstruction>(&I);
-    if (init == &StaticInitializerBlock.back()) {
-      assert(init->use_empty() && "Init value must not have another use");
-    } else {
-      assert(!init->use_empty() && "dead instruction in static initializer");
-      assert(!isa<ObjectInst>(init) &&
-             "object instruction is only allowed for final initial value");
-    }
-    assert(I.getParent() == &StaticInitializerBlock);
-  }
+#ifndef NDEBUG
+  verifySILGlobalVariable(this);
+#else
+  if (SILVerifierCAPI_SILGlobalVariable_verify)
+    SILVerifierCAPI_SILGlobalVariable_verify((void *)this);
+#endif
 }
 
-/// Verify the module.
-void SILModule::verify() const {
-  if (!verificationEnabled(*this))
-    return;
-
-  checkForLeaks();
+void swift::silverifier::verifySILModule(const SILModule &mod) {
+  mod.checkForLeaks();
 
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;
 
   // Check all functions.
-  for (const SILFunction &f : *this) {
+  for (const auto &f : mod) {
     if (!symbolNames.insert(f.getName()).second) {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
@@ -5849,7 +5919,7 @@ void SILModule::verify() const {
   }
 
   // Check all globals.
-  for (const SILGlobalVariable &g : getSILGlobals()) {
+  for (const auto &g : mod.getSILGlobals()) {
     if (!symbolNames.insert(g.getName()).second) {
       llvm::errs() << "Symbol redefined: " << g.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
@@ -5859,32 +5929,31 @@ void SILModule::verify() const {
 
   // Check all vtables and the vtable cache.
   llvm::DenseSet<ClassDecl*> vtableClasses;
-  unsigned EntriesSZ = 0;
-  for (const auto &vt : getVTables()) {
+  unsigned entriesSize = 0;
+  for (const auto &vt : mod.getVTables()) {
     if (!vtableClasses.insert(vt->getClass()).second) {
       llvm::errs() << "Vtable redefined: " << vt->getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    vt->verify(*this);
+    vt->verify(mod);
     // Check if there is a cache entry for each vtable entry
     for (auto entry : vt->getEntries()) {
-      if (VTableEntryCache.find({vt, entry.getMethod()}) ==
-          VTableEntryCache.end()) {
+      if (mod.isVTableEntryInCache(vt, entry.getMethod())) {
         llvm::errs() << "Vtable entry for function: "
                      << entry.getImplementation()->getName()
                      << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
-      ++EntriesSZ;
+      ++entriesSize;
     }
   }
-  assert(EntriesSZ == VTableEntryCache.size() &&
+  assert(entriesSize == mod.getVTableCacheSize() &&
          "Cache size is not equal to true number of VTable entries");
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
   llvm::DenseSet<RootProtocolConformance*> wtableConformances;
-  for (const SILWitnessTable &wt : getWitnessTables()) {
+  for (const SILWitnessTable &wt : mod.getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
     if (!wtableConformances.insert(conformance).second) {
@@ -5892,26 +5961,39 @@ void SILModule::verify() const {
       conformance->printName(llvm::errs());
       assert(false && "triggering standard assertion failure routine");
     }
-    wt.verify(*this);
+    wt.verify(mod);
   }
 
   // Check all default witness tables.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking default witness tables for "
              "duplicates ***\n");
   llvm::DenseSet<const ProtocolDecl *> defaultWitnessTables;
-  for (const SILDefaultWitnessTable &wt : getDefaultWitnessTables()) {
+  for (const auto &wt : mod.getDefaultWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Default Witness Table:\n"; wt.dump());
     if (!defaultWitnessTables.insert(wt.getProtocol()).second) {
       llvm::errs() << "Default witness table redefined: ";
       wt.dump();
       assert(false && "triggering standard assertion failure routine");
     }
-    wt.verify(*this);
+    wt.verify(mod);
   }
-  
+
   // Check property descriptors.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
-  for (auto &prop : getPropertyList()) {
-    prop.verify(*this);
+  for (auto &prop : mod.getPropertyList()) {
+    prop.verify(mod);
   }
+}
+
+/// Verify the module.
+void SILModule::verify() const {
+  if (!verificationEnabled(*this))
+    return;
+
+#ifndef NDEBUG
+  verifySILModule(*this);
+#else
+  if (SILVerifierCAPI_SILModule_verify)
+    SILVerifierCAPI_SILModule_verify((void *)this);
+#endif
 }

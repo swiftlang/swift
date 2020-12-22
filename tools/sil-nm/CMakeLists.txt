@@ -10,3 +10,10 @@ target_link_libraries(sil-nm
                         swiftSerialization
                         swiftSILGen
                         swiftSILOptimizer)
+if (NOT LLVM_ENABLE_ASSERTIONS)
+  target_link_options(
+    sil-nm
+    PRIVATE
+    "LINKER:-weak_library"
+    "LINKER:$<TARGET_FILE:swiftExternalSILVerifier>")
+endif()

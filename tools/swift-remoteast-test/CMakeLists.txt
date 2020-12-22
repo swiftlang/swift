@@ -13,3 +13,10 @@ if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift-frontend clang-resource-headers)
 endif()
 
+if (NOT LLVM_ENABLE_ASSERTIONS)
+  target_link_options(
+    swift-remoteast-test
+    PRIVATE
+    "LINKER:-weak_library"
+    "LINKER:$<TARGET_FILE:swiftExternalSILVerifier>")
+endif()

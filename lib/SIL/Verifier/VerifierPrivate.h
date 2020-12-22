@@ -44,6 +44,41 @@ private:
                           AccessPath accessPath);
 };
 
+/// Out of line verify a SILFunction without going through
+/// SILFunction->verify().
+///
+/// This is a lower level interface to the verification functionality only for
+/// use with the C API and SILFunction::verify() itself.
+void verifySILFunction(const SILFunction *fn, bool singleFunction);
+
+/// Out of line call to verify that a SILFunction doesn't have critical edges.
+void verifyCriticalEdgesSILFunction(const SILFunction *fn);
+
+/// Out of line verify a SIL property. Called by SILProperty::verify().
+void verifySILProperty(const SILProperty *prop, const SILModule &mod);
+
+/// Out of line verify a SIL property. Called by SILProperty::verify().
+void verifySILVTable(const SILVTable *vt, const SILModule &mod);
+
+/// Out of line verify a SIL witness table. Called by SILWitnessTable::verify().
+void verifySILWitnessTable(const SILWitnessTable *wt, const SILModule &mod);
+
+/// Out of line verify a SIL default witness table. Called by
+/// SILDefaultWitnessTable::verify().
+void verifySILDefaultWitnessTable(const SILDefaultWitnessTable *wt,
+                                  const SILModule &mod);
+
+/// Out of line verify a SIL global variable. Called by
+/// SILGlobalVariable::verify().
+void verifySILGlobalVariable(const SILGlobalVariable *gv);
+
+/// Out of line verify a SILModule without going through
+/// SILModule->verify().
+///
+/// This is a lower level interface to the verification functionality only for
+/// use with the C API and SILModule::verify() itself.
+void verifySILModule(const SILModule &mod);
+
 } // namespace silverifier
 } // namespace swift
 
