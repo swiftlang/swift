@@ -55,3 +55,10 @@
 // CHECK:     }
 // CHECK:   }
 // CHECK: }
+
+// CHECK: struct HasForwardDeclaredNestedType {
+// CHECK:   struct NormalSubType {
+// CHECK:   }
+// CHECK:   struct ForwardDeclaredType {
+// CHECK:   }
+// CHECK: }

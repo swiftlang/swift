@@ -3374,6 +3374,11 @@ namespace {
         }
 
         if (isa<TypeDecl>(member)) {
+          // Only import definitions. Otherwise, we might add the same member
+          // twice.
+          if (auto tagDecl = dyn_cast<clang::TagDecl>(nd))
+            if (tagDecl->getDefinition() != tagDecl)
+              continue;
           // A struct nested inside another struct will either be logically
           // a sibling of the outer struct, or contained inside of it, depending
           // on if it has a declaration name or not.
