@@ -136,17 +136,15 @@ protected:
   /// storage declaration or is directly descended from it.
 
 private:
-  /// Always set by the constructor, so that when creating a child
-  /// the parent chain is available.
-  ASTScopeImpl *parent = nullptr; // null at the root
+  /// The pointer:
+  /// - Always set by the constructor, so that when creating a child
+  ///   the parent chain is available. Null at the root.
+  /// The int:
+  /// - A flag indicating if the scope has been expanded yet or not.
+  llvm::PointerIntPair<ASTScopeImpl *, 1> parentAndWasExpanded;
 
   /// Child scopes, sorted by source range.
   Children storedChildren;
-
-  bool wasExpanded = false;
-
-  /// Can clear storedChildren, so must remember this
-  bool haveAddedCleanup = false;
 
   mutable Optional<CharSourceRange> cachedCharSourceRange;
 
@@ -177,8 +175,12 @@ public:
 
 #pragma mark - tree declarations
 protected:
-  NullablePtr<ASTScopeImpl> getParent() { return parent; }
-  NullablePtr<const ASTScopeImpl> getParent() const { return parent; }
+  NullablePtr<ASTScopeImpl> getParent() {
+    return parentAndWasExpanded.getPointer();
+  }
+  NullablePtr<const ASTScopeImpl> getParent() const {
+    return parentAndWasExpanded.getPointer();
+  }
 
   const Children &getChildren() const { return storedChildren; }
 
@@ -247,19 +249,13 @@ private:
 
 #pragma mark - Scope tree creation
 public:
-  /// expandScope me, sending deferred nodes to my descendants.
-  /// Return the scope into which to place subsequent decls
-  ASTScopeImpl *expandAndBeCurrentDetectingRecursion(ScopeCreator &);
-
-  /// Expand or reexpand the scope if unexpanded or if not current.
-  /// There are several places in the compiler that mutate the AST after the
-  /// fact, above and beyond adding Decls to the SourceFile.
+  /// Expand the scope if unexpanded.
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
-  bool getWasExpanded() const { return wasExpanded; }
+  bool getWasExpanded() const { return parentAndWasExpanded.getInt(); }
 
 protected:
-  void setWasExpanded() { wasExpanded = true; }
+  void setWasExpanded() { parentAndWasExpanded.setInt(1); }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
 
 public:
@@ -360,7 +356,7 @@ public:
   /// what obtaines for scoping. However, guards are different. The scope after
   /// the guard else must hop into the innermoset scope of the guard condition.
   virtual NullablePtr<const ASTScopeImpl> getLookupParent() const {
-    return parent;
+    return getParent();
   }
 
 #pragma mark - - lookup- local bindings
@@ -629,8 +625,6 @@ public:
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-
-  void countBodies(ScopeCreator &) const;
 };
 
 class NominalTypeScope final : public IterableTypeScope {
