@@ -1146,9 +1146,15 @@ struct StableAddressConcurrentReadableHashMap
         return {lastFound, false};
 
     // Optimize for the case where the value already exists.
-    if (auto wrapper = this->snapshot().find(key)) {
-      LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
-      return {wrapper->Ptr, false};
+    {
+      // Tightly scope the snapshot so it's gone before we call getOrInsert
+      // below, otherwise that call will always see an outstanding snapshot and
+      // never be able to collect garbage.
+      auto snapshot = this->snapshot();
+      if (auto wrapper = snapshot.find(key)) {
+        LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
+        return {wrapper->Ptr, false};
+      }
     }
 
     // No such element. Insert if needed. Note: another thread may have inserted
