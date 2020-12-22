@@ -250,7 +250,8 @@ class SimpleRequest;
 template<typename Derived, RequestFlags Caching, typename Output,
          typename ...Inputs>
 class SimpleRequest<Derived, Output(Inputs...), Caching> {
-  std::tuple<Inputs...> storage;
+  using Storage = std::tuple<Inputs...>;
+  Storage storage;
 
   Derived &asDerived() {
     return *static_cast<Derived *>(this);
@@ -269,7 +270,7 @@ class SimpleRequest<Derived, Output(Inputs...), Caching> {
 
 protected:
   /// Retrieve the storage value directly.
-  const std::tuple<Inputs...> &getStorage() const { return storage; }
+  const Storage &getStorage() const { return storage; }
 
 public:
   constexpr static bool isEverCached = detail::isEverCached(Caching);
@@ -280,9 +281,8 @@ public:
   constexpr static bool isDependencySink = detail::isDependencySink(Caching);
 
   using OutputType = Output;
-  
-  explicit SimpleRequest(const Inputs& ...inputs)
-    : storage(inputs...) { }
+
+  explicit SimpleRequest(const Inputs &... inputs) : storage(inputs...) {}
 
   /// Request evaluation function that will be registered with the evaluator.
   static OutputType

@@ -17,8 +17,6 @@
 #include "swift/Basic/AnyValue.h"
 using namespace swift;
 
-AnyValue::HolderBase::~HolderBase() { }
-
 std::string AnyValue::getAsString() const {
   std::string result;
   {
