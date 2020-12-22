@@ -1156,7 +1156,7 @@ extension Unicode.Scalar.Properties {
   /// The name of a scalar is immutable and never changed in future versions of
   /// the Unicode Standard. The `nameAlias` property is provided to issue
   /// corrections if a name was issued erroneously. For example, the `name` of
-  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRAKCET"
+  /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRACKET"
   /// (note that "BRACKET" is misspelled). The `nameAlias` property then
   /// contains the corrected name.
   ///
@@ -1356,7 +1356,7 @@ extension Unicode {
     /// type or a non-digit numeric value.
     ///
     /// This numeric type includes fractions such as "⅕" (U+2155 VULGAR
-    /// FRACITON ONE FIFTH), numerical CJK ideographs like "兆" (U+5146 CJK
+    /// FRACTION ONE FIFTH), numerical CJK ideographs like "兆" (U+5146 CJK
     /// UNIFIED IDEOGRAPH-5146), and other scalars that are not decimal digits
     /// used positionally in the writing of base-10 numbers.
     ///
