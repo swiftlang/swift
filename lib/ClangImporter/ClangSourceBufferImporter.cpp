@@ -43,7 +43,7 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
   auto buffer = clangSrcMgr.getBufferOrFake(clangFileID);
   unsigned mirrorID;
 
-  auto mirrorIter = mirroredBuffers.find(clangFileID);
+  auto mirrorIter = mirroredBuffers.find(buffer.getBufferStart());
   if (mirrorIter != mirroredBuffers.end()) {
     mirrorID = mirrorIter->second;
   } else {
@@ -53,7 +53,7 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
                                        /*RequiresNullTerminator=*/true)
     };
     mirrorID = swiftSourceManager.addNewSourceBuffer(std::move(mirrorBuffer));
-    mirroredBuffers[clangFileID] = mirrorID;
+    mirroredBuffers[buffer.getBufferStart()] = mirrorID;
   }
   loc = swiftSourceManager.getLocForOffset(mirrorID, decomposedLoc.second);
 
