@@ -1,6 +1,9 @@
 // REQUIRES: shell
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
+// RUN: %swift-dependency-tool --from-yaml --input-filename=%t/main.swiftdeps.yaml --output-filename=%t/main.swiftdeps
+// RUN: %swift-dependency-tool --from-yaml --input-filename=%t/other.swiftdeps.yaml --output-filename=%t/other.swiftdeps
+// RUN: %swift-dependency-tool --from-yaml --input-filename=%t/yet-another.swiftdeps.yaml --output-filename=%t/yet-another.swiftdeps
 // RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
 
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -driver-show-incremental -output-file-map %t/output.json 2>&1 |%FileCheck %s -check-prefix=MUST-EXEC
