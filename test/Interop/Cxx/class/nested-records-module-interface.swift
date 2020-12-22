@@ -58,7 +58,10 @@
 
 // CHECK: struct HasForwardDeclaredNestedType {
 // CHECK:   struct NormalSubType {
+// CHECK:     init()
 // CHECK:   }
 // CHECK:   struct ForwardDeclaredType {
+// CHECK:     init()
 // CHECK:   }
+// CHECK:   init()
 // CHECK: }

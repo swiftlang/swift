@@ -3539,7 +3539,7 @@ namespace {
           decl->needsImplicitDefaultConstructor()) {
         clang::CXXConstructorDecl *ctor =
             clangSema.DeclareImplicitDefaultConstructor(
-                const_cast<clang::CXXRecordDecl *>(decl));
+                const_cast<clang::CXXRecordDecl *>(decl->getDefinition()));
         if (!ctor->isDeleted())
           clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
                                                      ctor);
