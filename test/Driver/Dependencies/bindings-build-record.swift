@@ -1,6 +1,3 @@
-// XFAIL: *
-// REQUIRES: rdar72554270
-// REQUIRES: rdar72550007
 // REQUIRES: shell
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
@@ -15,13 +12,6 @@
 // MUST-EXEC-DAG: Disabling incremental build: could not read build record
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0], "./yet-another.swift": [443865900, 0]}, build_time: [443865901, 0]}' > %t/main~buildrecord.swiftdeps
-
-// Run it once to produce swiftdeps files for the new driver to have
-// RUN: cd %t && %swiftc_driver ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json
-
-// RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0], "./yet-another.swift": [443865900, 0]}, build_time: [443865901, 0]}' > %t/main~buildrecord.swiftdeps
-
-
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 -driver-show-incremental -driver-show-job-lifecycle |tee /tmp/x| %FileCheck %s -check-prefix=NO-EXEC
 
 // NO-EXEC: inputs: ["{{(\.\/)?}}main.swift"], output: {{[{].*[}]}}{{(, condition: check-dependencies)?}}
