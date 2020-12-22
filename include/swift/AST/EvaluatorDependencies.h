@@ -47,11 +47,10 @@ struct DependencyRecorder;
 /// A \c DependencyCollector defines an abstract write-only buffer of
 /// \c Reference objects. References are added to a collector during the write
 /// phase of request evaluation (in \c writeDependencySink) with the various
-/// \c add* functions below..
+/// \c add* functions below.
 ///
-/// A \c DependencyCollector cannot be created directly. You must invoke
-/// \c DependencyRecorder::record, which will wire a dependency collector into
-/// the provided continuation block.
+/// A \c DependencyCollector should not be created directly; instances are
+/// vended by the request evaluator infrastructure itself.
 struct DependencyCollector {
   friend DependencyRecorder;
 
@@ -174,28 +173,58 @@ struct DependencyRecorder {
   friend DependencyCollector;
 
 private:
+  /// References recorded while evaluating a dependency source request for each
+  /// source file. This map is updated upon completion of a dependency source
+  /// request, and includes all references from each downstream request as well.
   llvm::DenseMap<SourceFile *,
                  llvm::DenseSet<DependencyCollector::Reference,
                                 DependencyCollector::Reference::Info>>
       fileReferences;
+
+  /// References recorded while evaluating each request. This map is populated
+  /// upon completion of each request, and includes all references from each
+  /// downstream request as well. Note that uncached requests don't appear as
+  /// keys in this map; their references are charged to the innermost cached
+  /// active request.
   llvm::DenseMap<AnyRequest, std::vector<DependencyCollector::Reference>>
       requestReferences;
+
+  /// Stack of references from each cached active request. When evaluating a
+  /// dependency sink request, we update the innermost set of references.
+  /// Upon completion of a request, we union the completed request's references
+  /// with the next innermost active request.
   std::vector<llvm::DenseSet<DependencyCollector::Reference,
                              DependencyCollector::Reference::Info>>
       activeRequestReferences;
 
 #ifndef NDEBUG
+  /// Used to catch places where a request's writeDependencySink() method
+  /// kicks off another request, which would break invariants, so we
+  /// disallow this from happening.
   bool isRecording = false;
 #endif
 
 public:
+  /// Push a new empty set onto the activeRequestReferences stack.
   void beginRequest(const swift::ActiveRequest &req);
+
+  /// Pop the activeRequestReferences stack, and insert recorded references
+  /// into the requestReferences map, as well as the next innermost entry in
+  /// activeRequestReferences.
   void endRequest(const swift::ActiveRequest &req);
+
+  /// When replaying a request whose value has already been cached, we need
+  /// to update the innermost set in the activeRequestReferences stack.
   void replayCachedRequest(const swift::ActiveRequest &req);
+
+  /// Upon completion of a dependency source request, we update the
+  /// fileReferences map.
   void handleDependencySourceRequest(const swift::ActiveRequest &req,
                                      SourceFile *source);
 
 private:
+  /// Add an entry to the innermost set on the activeRequestReferences stack.
+  /// Called from the DependencyCollector.
   void recordDependency(const DependencyCollector::Reference &ref);
 
 public:
@@ -204,6 +233,10 @@ public:
 
   /// Enumerates the set of references associated with a given source file,
   /// passing them to the given enumeration callback.
+  ///
+  /// Only makes sense to call once all dependency sources associated with this
+  /// source file have already been evaluated, otherwise the map will obviously
+  /// be incomplete.
   ///
   /// The order of enumeration is completely undefined. It is the responsibility
   /// of callers to ensure they are order-invariant or are sorting the result.
