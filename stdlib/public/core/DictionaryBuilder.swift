@@ -49,7 +49,7 @@ extension Dictionary {
   ///
   /// Foundation uses this initializer to bridge the contents of an NSDictionary
   /// instance without allocating a pair of intermediary buffers.  Pass the
-  /// required capacity and a closure that can intialize the dictionary's
+  /// required capacity and a closure that can initialize the dictionary's
   /// elements. The closure must return `c`, the number of initialized elements
   /// in both buffers, such that the elements in the range `0..<c` are
   /// initialized and the elements in the range `c..<capacity` are

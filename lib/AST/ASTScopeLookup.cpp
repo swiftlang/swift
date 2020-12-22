@@ -64,7 +64,8 @@ ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
 ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
     SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
     ScopeCreator &scopeCreator) {
-  expandAndBeCurrentDetectingRecursion(scopeCreator);
+  if (!getWasExpanded())
+    expandAndBeCurrent(scopeCreator);
   auto child = findChildContaining(loc, sourceMgr);
   if (!child)
     return this;
