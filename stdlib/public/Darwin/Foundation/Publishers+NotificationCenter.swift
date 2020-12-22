@@ -22,7 +22,7 @@ extension NotificationCenter {
     ///
     /// - Parameters:
     ///   - name: The name of the notification to publish.
-    ///   - object: The object posting the named notfication. If `nil`, the publisher emits elements for any object producing a notification with the given name.
+    ///   - object: The object posting the named notification. If `nil`, the publisher emits elements for any object producing a notification with the given name.
     /// - Returns: A publisher that emits events when broadcasting notifications.
     public func publisher(
         for name: Notification.Name,
@@ -43,7 +43,7 @@ extension NotificationCenter {
         public let center: NotificationCenter
         /// The name of notifications published by this publisher.
         public let name: Notification.Name
-        /// The object posting the named notfication.
+        /// The object posting the named notification.
         public let object: AnyObject?
 
         /// Creates a publisher that emits events when broadcasting notifications.
@@ -51,7 +51,7 @@ extension NotificationCenter {
         /// - Parameters:
         ///   - center: The notification center to publish notifications for.
         ///   - name: The name of the notification to publish.
-        ///   - object: The object posting the named notfication. If `nil`, the publisher emits elements for any object producing a notification with the given name.
+        ///   - object: The object posting the named notification. If `nil`, the publisher emits elements for any object producing a notification with the given name.
         public init(center: NotificationCenter, name: Notification.Name, object: AnyObject? = nil) {
             self.center = center
             self.name = name

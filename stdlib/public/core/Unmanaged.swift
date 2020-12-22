@@ -124,7 +124,7 @@ public struct Unmanaged<Instance: AnyObject> {
   /// Violation of this will incur undefined behavior.
   ///
   /// A lifetime of a reference 'the instance' is fixed over a point in the
-  /// programm if:
+  /// program if:
   ///
   /// * There exists a global variable that references 'the instance'.
   ///

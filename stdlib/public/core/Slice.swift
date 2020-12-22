@@ -31,7 +31,7 @@
 ///
 /// You're tasked with finding the day with the most absences in the second
 /// half of the session. To find the index of the day in question, follow
-/// these setps:
+/// these steps:
 ///
 /// 1) Create a slice of the `absences` array that holds the second half of the
 ///    days.
