@@ -70,8 +70,8 @@ const std::function<void(SingleValueInstruction *, SILValue)>
         };
 
 Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
-  if (isa<SingleValueInstruction>(val)) {
-    return std::next(cast<SingleValueInstruction>(val)->getIterator());
+  if (auto *inst = val->getDefiningInstruction()) {
+    return std::next(inst->getIterator());
   }
   if (isa<SILArgument>(val)) {
     return cast<SILArgument>(val)->getParentBlock()->begin();
