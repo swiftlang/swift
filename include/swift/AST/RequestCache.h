@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines data structures to efficiently support the request
-// evaluator's request caching.
+// evaluator's per-request caching and dependency tracking maps.
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/DependencyCollector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -274,6 +275,127 @@ public:
 
   void clear() {
 #define SWIFT_TYPEID_ZONE(Name, Id) Name##ZoneCache.clear();
+#include "swift/Basic/TypeIDZones.def"
+#undef SWIFT_TYPEID_ZONE
+  }
+};
+
+/// Type-erased wrapper for caching dependencies from a single type of request.
+class PerRequestReferences {
+  void *Storage;
+  std::function<void(void *)> Deleter;
+
+  PerRequestReferences(void *storage, std::function<void(void *)> deleter)
+      : Storage(storage), Deleter(deleter) {}
+
+public:
+  PerRequestReferences() : Storage(nullptr), Deleter([](void *) {}) {}
+  PerRequestReferences(PerRequestReferences &&other)
+      : Storage(other.Storage), Deleter(std::move(other.Deleter)) {
+    other.Storage = nullptr;
+  }
+
+  PerRequestReferences &operator=(PerRequestReferences &&other) {
+    if (&other != this) {
+      this->~PerRequestReferences();
+      new (this) PerRequestReferences(std::move(other));
+    }
+    return *this;
+  }
+
+  PerRequestReferences(const PerRequestReferences &) = delete;
+  PerRequestReferences &operator=(const PerRequestReferences &) = delete;
+
+  template <typename Request>
+  static PerRequestReferences makeEmpty() {
+    using Map =
+        llvm::DenseMap<RequestKey<Request>,
+                       std::vector<DependencyCollector::Reference>>;
+    return PerRequestReferences(new Map(),
+                                [](void *ptr) { delete static_cast<Map *>(ptr); });
+  }
+
+  template <typename Request>
+  llvm::DenseMap<RequestKey<Request>,
+                 std::vector<DependencyCollector::Reference>> *
+  get() const {
+    using Map =
+        llvm::DenseMap<RequestKey<Request>,
+                       std::vector<DependencyCollector::Reference>>;
+    assert(Storage);
+    return static_cast<Map *>(Storage);
+  }
+
+  bool isNull() const { return !Storage; }
+  ~PerRequestReferences() {
+    if (Storage)
+      Deleter(Storage);
+  }
+};
+
+/// Data structure for caching dependencies from requests. Sharded by the
+/// type ID zone and request kind, with a PerRequestReferences for each
+/// request kind.
+///
+/// Conceptually equivalent to DenseMap<AnyRequest, vector<Reference>>, but
+/// without type erasure overhead for keys.
+class RequestReferences {
+
+#define SWIFT_TYPEID_ZONE(Name, Id)                                            \
+  std::vector<PerRequestReferences> Name##ZoneRefs;                            \
+                                                                               \
+  template <                                                                   \
+      typename Request, typename ZoneTypes = TypeIDZoneTypes<Zone::Name>,      \
+      typename std::enable_if<TypeID<Request>::zone == Zone::Name>::type * =   \
+          nullptr>                                                             \
+  llvm::DenseMap<RequestKey<Request>,                                          \
+                 std::vector<DependencyCollector::Reference>> *                \
+  getRefs() {                                                                  \
+    auto &refs = Name##ZoneRefs;                                               \
+    if (refs.empty()) {                                                        \
+      refs.resize(ZoneTypes::Count);                                           \
+    }                                                                          \
+    auto idx = TypeID<Request>::localID;                                       \
+    if (refs[idx].isNull()) {                                                  \
+      refs[idx] = PerRequestReferences::makeEmpty<Request>();                  \
+    }                                                                          \
+    return refs[idx].template get<Request>();                                  \
+  }
+#include "swift/Basic/TypeIDZones.def"
+#undef SWIFT_TYPEID_ZONE
+
+public:
+  template <typename Request>
+  typename llvm::DenseMap<RequestKey<Request>,
+                          std::vector<DependencyCollector::Reference>>::const_iterator
+  find_as(const Request &req) {
+    auto *refs = getRefs<Request>();
+    return refs->find_as(req);
+  }
+
+  template <typename Request>
+  typename llvm::DenseMap<RequestKey<Request>,
+                          std::vector<DependencyCollector::Reference>>::const_iterator
+  end() {
+    auto *refs = getRefs<Request>();
+    return refs->end();
+  }
+
+  template <typename Request>
+  void insert(Request req, std::vector<DependencyCollector::Reference> val) {
+    auto *refs = getRefs<Request>();
+    refs->insert({RequestKey<Request>(std::move(req)),
+                  std::move(val)});
+  }
+
+  template <typename Request>
+  void erase(Request req) {
+    auto *refs = getRefs<Request>();
+    refs->erase(RequestKey<Request>(std::move(req)));
+  }
+
+  void clear() {
+#define SWIFT_TYPEID_ZONE(Name, Id) Name##ZoneRefs.clear();
 #include "swift/Basic/TypeIDZones.def"
 #undef SWIFT_TYPEID_ZONE
   }
