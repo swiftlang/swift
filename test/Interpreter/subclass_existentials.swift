@@ -15,6 +15,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+// REQUIRES: rdar72636579
 
 import StdlibUnittest
 
