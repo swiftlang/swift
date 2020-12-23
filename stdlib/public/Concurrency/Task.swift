@@ -323,6 +323,9 @@ func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
+@_silgen_name("swift_task_runAndBlockThread")
+public func _runAsyncMain(_ asyncFun: () async throws -> ())
+
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
   on task: Builtin.NativeObject
