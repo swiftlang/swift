@@ -373,21 +373,21 @@ private:
     FrontendStatsTracer statsTracer = make_tracer(stats, request);
     if (stats) reportEvaluatedRequest(*stats, request);
 
-    recorder.beginRequest(activeReq);
+    recorder.beginRequest<Request>();
 
-    auto &&r = getRequestFunction<Request>()(request, *this);
+    auto &&result = getRequestFunction<Request>()(request, *this);
 
-    recorder.endRequest(activeReq);
+    recorder.endRequest<Request>(request);
 
     handleDependencySourceRequest<Request>(request);
-    handleDependencySinkRequest<Request>(request, r);
+    handleDependencySinkRequest<Request>(request, result);
 
     // Make sure we remove this from the set of active requests once we're
     // done.
     assert(activeRequests.back() == activeReq);
     activeRequests.pop_back();
 
-    return std::move(r);
+    return std::move(result);
   }
 
   /// Get the result of a request, consulting an external cache
@@ -399,7 +399,7 @@ private:
   getResultCached(const Request &request) {
     // If there is a cached result, return it.
     if (auto cached = request.getCachedResult()) {
-      recorder.replayCachedRequest(ActiveRequest(request));
+      recorder.replayCachedRequest(request);
       handleDependencySinkRequest<Request>(request, *cached);
       return *cached;
     }
@@ -428,7 +428,7 @@ private:
     auto known = cache.find_as<Request>(request);
     if (known != cache.end<Request>()) {
       auto result = known->second;
-      recorder.replayCachedRequest(ActiveRequest(request));
+      recorder.replayCachedRequest(request);
       handleDependencySinkRequest<Request>(request, result);
       return result;
     }
@@ -466,7 +466,7 @@ private:
   void handleDependencySourceRequest(const Request &r) {
     auto source = r.readDependencySource(recorder);
     if (!source.isNull() && source.get()->isPrimary()) {
-      recorder.handleDependencySourceRequest(ActiveRequest(r), source.get());
+      recorder.handleDependencySourceRequest(r, source.get());
     }
   }
 
