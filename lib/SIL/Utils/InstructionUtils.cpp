@@ -25,7 +25,7 @@
 
 using namespace swift;
 
-SILValue swift::stripOwnershipInsts(SILValue v) {
+SILValue swift::lookThroughOwnershipInsts(SILValue v) {
   while (true) {
     switch (v->getKind()) {
     default:
@@ -37,6 +37,14 @@ SILValue swift::stripOwnershipInsts(SILValue v) {
   }
 }
 
+SILValue swift::lookThroughCopyValueInsts(SILValue val) {
+  while (auto *cvi =
+             dyn_cast_or_null<CopyValueInst>(val->getDefiningInstruction())) {
+    val = cvi->getOperand();
+  }
+  return val;
+}
+
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
 ///
@@ -46,7 +54,7 @@ SILValue swift::getUnderlyingObject(SILValue v) {
     SILValue v2 = stripCasts(v);
     v2 = stripAddressProjections(v2);
     v2 = stripIndexingInsts(v2);
-    v2 = stripOwnershipInsts(v2);
+    v2 = lookThroughOwnershipInsts(v2);
     if (v2 == v)
       return v2;
     v = v2;
@@ -58,7 +66,7 @@ SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
     SILValue v2 = stripCastsWithoutMarkDependence(v);
     v2 = stripAddressProjections(v2);
     v2 = stripIndexingInsts(v2);
-    v2 = stripOwnershipInsts(v2);
+    v2 = lookThroughOwnershipInsts(v2);
     if (v2 == v)
       return v2;
     v = v2;
@@ -137,7 +145,7 @@ SILValue swift::stripCasts(SILValue v) {
         continue;
       }
     }
-    SILValue v2 = stripOwnershipInsts(v);
+    SILValue v2 = lookThroughOwnershipInsts(v);
     if (v2 != v) {
       v = v2;
       continue;
@@ -159,7 +167,7 @@ SILValue swift::stripUpCasts(SILValue v) {
     }
 
     SILValue v2 = stripSinglePredecessorArgs(v);
-    v2 = stripOwnershipInsts(v2);
+    v2 = lookThroughOwnershipInsts(v2);
     if (v2 == v) {
       return v2;
     }
@@ -179,7 +187,7 @@ SILValue swift::stripClassCasts(SILValue v) {
       continue;
     }
 
-    SILValue v2 = stripOwnershipInsts(v);
+    SILValue v2 = lookThroughOwnershipInsts(v);
     if (v2 != v) {
       v = v2;
       continue;
