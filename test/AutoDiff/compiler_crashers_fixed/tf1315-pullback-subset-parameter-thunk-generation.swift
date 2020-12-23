@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s
-// REQUIRES: asserts
 
 // TF-1315: Pullback subset thunk generation crash due to unmapped parameter
 // index for `inout` differentiability parameters.

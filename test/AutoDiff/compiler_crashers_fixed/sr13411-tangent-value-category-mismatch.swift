@@ -1,5 +1,4 @@
 // RUN: %target-build-swift %s
-// REQUIRES: asserts
 
 // SR-13411: Semantic member getter pullback generation crash due to tangent value category mismatch
 
@@ -9,4 +8,3 @@ struct Dense: Differentiable {
   @differentiable
   var bias: Float?
 }
-
