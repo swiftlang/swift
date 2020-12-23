@@ -1490,7 +1490,9 @@ namespace {
         }
 
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
-        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+        auto substSetterTy = setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
+                                                        SGF.getTypeExpansionContext());
+        SILFunctionConventions setterConv(substSetterTy, SGF.SGM.M);
 
         // Emit captures for the setter
         SmallVector<SILValue, 4> capturedArgs;
@@ -1538,8 +1540,6 @@ namespace {
         assert(value.isRValue());
         ManagedValue Mval = std::move(value).asKnownRValue(SGF).
                               getAsSingleValue(SGF, loc);
-        auto substSetterTy = setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
-                                                        SGF.getTypeExpansionContext());
         auto param = substSetterTy->getParameters()[0];
         SILType loweredSubstArgType = Mval.getType();
         if (param.isIndirectInOut()) {
