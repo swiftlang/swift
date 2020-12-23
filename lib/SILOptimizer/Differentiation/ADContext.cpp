@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using llvm::DenseMap;
