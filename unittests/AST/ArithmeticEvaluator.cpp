@@ -265,8 +265,8 @@ TEST(ArithmeticEvaluator, Simple) {
   }
 
   EXPECT_EQ(productDependencies,
-    " `--InternallyCachedEvaluationRule(Binary: product) -> 2.461145e+02\n"
-    "     `--InternallyCachedEvaluationRule(Binary: sum) -> 5.859870e+00\n"
+    " `--InternallyCachedEvaluationRule(Binary: product)\n"
+    "     `--InternallyCachedEvaluationRule(Binary: sum)\n"
     "     |   `--InternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
     "     |   `--InternallyCachedEvaluationRule(Literal: 2.718280e+00)\n"
     "     `--InternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");
@@ -311,8 +311,8 @@ TEST(ArithmeticEvaluator, Simple) {
     "  request_2 [label=\"ExternallyCachedEvaluationRule(Literal: 2.718280e+00)\"];\n"
     "  request_3 [label=\"ExternallyCachedEvaluationRule(Literal: 3.141590e+00)\"];\n"
     "  request_4 [label=\"ExternallyCachedEvaluationRule(Literal: 4.200000e+01)\"];\n"
-    "  request_5 [label=\"InternallyCachedEvaluationRule(Binary: product) -> 2.461145e+02\"];\n"
-    "  request_6 [label=\"InternallyCachedEvaluationRule(Binary: sum) -> 5.859870e+00\"];\n"
+    "  request_5 [label=\"InternallyCachedEvaluationRule(Binary: product)\"];\n"
+    "  request_6 [label=\"InternallyCachedEvaluationRule(Binary: sum)\"];\n"
     "  request_7 [label=\"InternallyCachedEvaluationRule(Literal: 2.718280e+00)\"];\n"
     "  request_8 [label=\"InternallyCachedEvaluationRule(Literal: 3.141590e+00)\"];\n"
     "  request_9 [label=\"InternallyCachedEvaluationRule(Literal: 4.200000e+01)\"];\n"
