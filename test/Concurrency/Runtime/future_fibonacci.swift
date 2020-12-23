@@ -39,7 +39,7 @@ func asyncFib(_ n: Int) async -> Int {
   // Sleep a random amount of time waiting on the result producing a result.
   usleep(UInt32.random(in: 0..<100) * 1000)
 
-  let result = await try! first.get() + second.get()
+  let result = try! await first.get() + second.get()
 
   // Sleep a random amount of time before producing a result.
   usleep(UInt32.random(in: 0..<100) * 1000)

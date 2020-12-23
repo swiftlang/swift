@@ -122,7 +122,7 @@ extension Task {
     /// and throwing a specific error or using `checkCancellation` the error
     /// thrown out of the task will be re-thrown here.
     public func get() async throws -> Success {
-      return await try _taskFutureGetThrowing(task)
+      return try await _taskFutureGetThrowing(task)
     }
 
     /// Attempt to cancel the task.

@@ -52,11 +52,11 @@ func testAsyncLetWithThrows(cond: Bool) async throws -> String {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A14AsyncLetThrowsSSyYKF : $@convention(thin) @async () -> (@owned String, @error Error) {
 func testAsyncLetThrows() async throws -> String {
-  async let s = await try getStringThrowingly()
+  async let s = try await getStringThrowingly()
 
   // CHECK: [[RUN_CHILD_TASK:%.*]] = function_ref @$s12_Concurrency22_taskFutureGetThrowingyxBoYKlF : $@convention(thin) @async <τ_0_0> (@guaranteed Builtin.NativeObject) -> (@out τ_0_0, @error Error)
   // CHECK: try_apply [[RUN_CHILD_TASK]]<String>
-  return await try s
+  return try await s
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A14DecomposeAwait4condSiSb_tYF : $@convention(thin) @async (Bool) -> Int {

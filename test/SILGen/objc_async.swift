@@ -39,16 +39,16 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[RESULT:%.*]] = load [take] [[RESUME_BUF]]
   // CHECK: destroy_value [[RESULT]]
   // CHECK: dealloc_stack [[RESUME_BUF]]
-  let _: String = await try slowServer.findAnswer()
+  let _: String = try await slowServer.findAnswer()
 
   // CHECK: objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) () -> (), SlowServer) -> ()
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<()>) -> ()
   await slowServer.serverRestart("somewhere")
 
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeThrowingContinuation<(String, Int)>, Optional<NSString>, Int, Optional<NSError>) -> ()
-  let (_, _): (String, Int) = await try slowServer.findMultipleAnswers()
+  let (_, _): (String, Int) = try await slowServer.findMultipleAnswers()
 
-  let (_, _): (Bool, Bool) = await try slowServer.findDifferentlyFlavoredBooleans()
+  let (_, _): (Bool, Bool) = try await slowServer.findDifferentlyFlavoredBooleans()
 
   // CHECK: [[ERROR]]([[ERROR_VALUE:%.*]] : @owned $Error):
   // CHECK:   dealloc_stack [[RESUME_BUF]]
@@ -57,7 +57,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK:   throw [[ERROR_VALUE]]
 
   let _: String = await slowServer.findAnswerNullably("foo")
-  let _: String = await try slowServer.doSomethingDangerousNullably("foo")
+  let _: String = try await slowServer.doSomethingDangerousNullably("foo")
 }
 
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]

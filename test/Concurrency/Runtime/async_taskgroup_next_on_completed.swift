@@ -16,7 +16,7 @@ func test_sum_nextOnCompleted() async {
     let numbers = [1, 2, 3, 4, 5]
     let expected = numbers.reduce(0, +)
 
-    let sum = await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
+    let sum = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
       for n in numbers {
         await group.add { () async -> Int in
           print("  complete group.add { \(n) }")
@@ -30,7 +30,7 @@ func test_sum_nextOnCompleted() async {
 
       var sum = 0
       do {
-        while let r = await try group.next() {
+        while let r = try await group.next() {
           fputs("error: \(#function)[\(#file):\(#line)]: next: \(r)\n", stderr)
           print("next: \(r)")
 //          DispatchQueue.main.sync { // TODO: remove once executors/actors are a thing

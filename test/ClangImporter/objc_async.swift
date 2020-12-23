@@ -8,16 +8,16 @@ import ObjCConcurrency
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
   let _: Bool = await slowServer.checkAvailability()
-  let _: String = await try slowServer.findAnswer()
-  let _: String = await try slowServer.findAnswerFailingly()
+  let _: String = try await slowServer.findAnswer()
+  let _: String = try await slowServer.findAnswerFailingly()
 
-  let (aOpt, b) = await try slowServer.findQAndA()
+  let (aOpt, b) = try await slowServer.findQAndA()
   if let a = aOpt { // make sure aOpt is optional
     print(a)
   }
   let _: String = b // make sure b is non-optional
 
-  let _: String = await try slowServer.findAnswer()
+  let _: String = try await slowServer.findAnswer()
 
   let _: Void = await slowServer.doSomethingFun("jump")
   let _: (Int) -> Void = slowServer.completionHandler
@@ -29,8 +29,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = slowServer.doSomethingConflicted("thinking")
   // expected-error@-1{{call is 'async' but is not marked with 'await'}}{{16-16=await }}
 
-  let _: String? = await try slowServer.fortune()
-  let _: Int = await try slowServer.magicNumber(withSeed: 42)
+  let _: String? = try await slowServer.fortune()
+  let _: Int = try await slowServer.magicNumber(withSeed: 42)
 
   await slowServer.serverRestart("localhost")
   await slowServer.serverRestart("localhost", atPriority: 0.8)

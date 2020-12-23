@@ -85,8 +85,8 @@ enum HomeworkError : Error {
 }
 
 func testThrowingAndAsync() async throws {
-  _ = await try throwingAndAsync()
-  _ = try await throwingAndAsync() // expected-error{{'await' must precede 'try'}}{{11-17=}}{{7-7=await }}
+  _ = try await throwingAndAsync()
+  _ = await try throwingAndAsync() // expected-warning{{'try' must precede 'await'}}{{7-13=}}{{17-17=await }}
   _ = await (try throwingAndAsync())
   _ = try (await throwingAndAsync())
 
@@ -100,12 +100,12 @@ func testThrowingAndAsync() async throws {
 
 func testExhaustiveDoCatch() async {
   do {
-    _ = await try throwingAndAsync()
+    _ = try await throwingAndAsync()
   } catch {
   }
 
   do {
-    _ = await try throwingAndAsync()
+    _ = try await throwingAndAsync()
     // expected-error@-1{{errors thrown from here are not handled because the enclosing catch is not exhaustive}}
   } catch let e as HomeworkError {
   }
@@ -113,7 +113,7 @@ func testExhaustiveDoCatch() async {
   // Ensure that we infer 'async' through an exhaustive do-catch.
   let fn = {
     do {
-      _ = await try throwingAndAsync()
+      _ = try await throwingAndAsync()
     } catch {
     }
   }
@@ -123,7 +123,7 @@ func testExhaustiveDoCatch() async {
   // Ensure that we infer 'async' through a non-exhaustive do-catch.
   let fn2 = {
     do {
-      _ = await try throwingAndAsync()
+      _ = try await throwingAndAsync()
     } catch let e as HomeworkError {
     }
   }
@@ -139,11 +139,11 @@ func testStringInterpolation() async throws {
 }
 
 func invalidAsyncFunction() async {
-  _ = await try throwingAndAsync() // expected-error {{errors thrown from here are not handled}}
+  _ = try await throwingAndAsync() // expected-error {{errors thrown from here are not handled}}
 }
 
 func validAsyncFunction() async throws {
-  _ = await try throwingAndAsync()
+  _ = try await throwingAndAsync()
 }
 
 // Async let checking
@@ -177,7 +177,7 @@ func testAsyncLet() async throws {
 
   _ = await x1 // expected-error{{reading 'async let' can throw but is not marked with 'try'}}
   _ = await x2
-  _ = await try x3
+  _ = try await x3
   _ = await x4
   _ = await x5
 }
