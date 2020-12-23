@@ -1325,23 +1325,6 @@ namespace {
             wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue())
           return false;
 
-        // If we have a nonmutating setter on a value type, the call
-        // captures all of 'self' and we cannot rewrite an assignment
-        // into an initialization.
-
-        // Unless this is an assignment to a self parameter inside a
-        // constructor, in which case we would like to still emit a
-        // assign_by_wrapper because the setter will be deleted by lowering
-        // anyway.
-        if (!isAssignmentToSelfParamInInit &&
-            !VD->isSetterMutating() &&
-            VD->getDeclContext()->getSelfNominalTypeDecl() &&
-            VD->isInstanceMember() &&
-            !VD->getDeclContext()->getDeclaredInterfaceType()
-                ->hasReferenceSemantics()) {
-          return false;
-        }
-
         // If this property wrapper uses autoclosure in it's initializer,
         // the argument types of the setter and initializer shall be
         // different, so we don't rewrite an assignment into an
