@@ -1109,7 +1109,7 @@ def create_argument_parser():
                 ' features.')
 
     option('--enable-experimental-concurrency', toggle_true,
-           default=True,
+           default=False,
            help='Enable experimental Swift concurrency model.')
 
     # -------------------------------------------------------------------------
