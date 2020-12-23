@@ -20,6 +20,7 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/AST/DependencyCollector.h"
+#include "swift/AST/RequestCache.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -63,8 +64,7 @@ private:
   /// downstream request as well. Note that uncached requests don't appear as
   /// keys in this map; their references are charged to the innermost cached
   /// active request.
-  llvm::DenseMap<AnyRequest, std::vector<DependencyCollector::Reference>>
-      requestReferences;
+  RequestReferences requestReferences;
 
   /// Stack of references from each cached active request. When evaluating a
   /// dependency sink request, we update the innermost set of references.
@@ -102,6 +102,10 @@ public:
   template<typename Request>
   void handleDependencySourceRequest(const Request &req,
                                      SourceFile *source);
+
+  /// Clear the recorded dependencies of a request, if any.
+  template<typename Request>
+  void clearRequest(const Request &req);
 
 private:
   /// Add an entry to the innermost set on the activeRequestReferences stack.
@@ -159,7 +163,7 @@ void evaluator::DependencyRecorder::endRequest(const Request &req) {
 
   // Finally, record the dependencies so we can replay them
   // later when the request is re-evaluated.
-  requestReferences.insert({AnyRequest(req), std::move(vec)});
+  requestReferences.insert<Request>(std::move(req), std::move(vec));
 }
 
 template<typename Request>
@@ -169,8 +173,8 @@ void evaluator::DependencyRecorder::replayCachedRequest(const Request &req) {
   if (activeRequestReferences.empty())
     return;
 
-  auto found = requestReferences.find_as(req);
-  if (found == requestReferences.end())
+  auto found = requestReferences.find_as<Request>(req);
+  if (found == requestReferences.end<Request>())
     return;
 
   activeRequestReferences.back().insert(found->second.begin(),
@@ -181,11 +185,17 @@ template<typename Request>
 void evaluator::DependencyRecorder::handleDependencySourceRequest(
     const Request &req,
     SourceFile *source) {
-  auto found = requestReferences.find_as(req);
-  if (found != requestReferences.end()) {
+  auto found = requestReferences.find_as<Request>(req);
+  if (found != requestReferences.end<Request>()) {
     fileReferences[source].insert(found->second.begin(),
                                   found->second.end());
   }
+}
+
+template<typename Request>
+void evaluator::DependencyRecorder::clearRequest(
+    const Request &req) {
+  requestReferences.erase(req);
 }
 
 } // end namespace evaluator

@@ -323,6 +323,7 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void clearCachedOutput(const Request &request) {
     cache.erase<Request>(request);
+    recorder.clearRequest<Request>(request);
   }
 
   /// Clear the cache stored within this evaluator.
