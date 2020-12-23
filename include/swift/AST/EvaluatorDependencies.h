@@ -70,8 +70,8 @@ private:
   /// dependency sink request, we update the innermost set of references.
   /// Upon completion of a request, we union the completed request's references
   /// with the next innermost active request.
-  std::vector<llvm::DenseSet<DependencyCollector::Reference,
-                             DependencyCollector::Reference::Info>>
+  std::vector<llvm::SmallDenseSet<DependencyCollector::Reference, 2,
+                                  DependencyCollector::Reference::Info>>
       activeRequestReferences;
 
 #ifndef NDEBUG
