@@ -1290,7 +1290,7 @@ void CheckRedeclarationRequest::writeDependencySink(
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,
-    ProtocolConformanceLookupResult conformances) const {
+    const ProtocolConformanceLookupResult &conformances) const {
   for (auto conformance : conformances) {
     tracker.addPotentialMember(conformance->getProtocol());
   }

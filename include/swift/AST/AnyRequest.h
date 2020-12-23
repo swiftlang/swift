@@ -83,6 +83,7 @@ struct AnyRequestVTable {
   const std::function<void(const void *, DiagnosticEngine &)> noteCycleStep;
   const std::function<SourceLoc(const void *)> getNearestLoc;
   const std::function<bool(const void *)> isCached;
+  bool isDependencySource;
 
   template <typename Request,
             typename std::enable_if<Request::isEverCached>::type * = nullptr>
@@ -99,6 +100,7 @@ struct AnyRequestVTable {
         &Impl<Request>::noteCycleStep,
         &Impl<Request>::getNearestLoc,
         &Impl<Request>::isCached,
+        Request::isDependencySource,
     };
     return &vtable;
   }
@@ -118,6 +120,7 @@ struct AnyRequestVTable {
         &Impl<Request>::noteCycleStep,
         &Impl<Request>::getNearestLoc,
         [](auto){ return false; },
+        Request::isDependencySource,
     };
     return &vtable;
   }
@@ -222,6 +225,10 @@ public:
 
   bool isCached() const {
     return getVTable()->isCached(getRawStorage());
+  }
+
+  bool isDependencySource() const {
+    return getVTable()->isDependencySource;
   }
 
   /// Compare two instances for equality.
