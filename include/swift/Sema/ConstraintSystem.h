@@ -4773,9 +4773,6 @@ private:
 
     ASTNode AssociatedCodeCompletionToken = ASTNode();
 
-    /// Whether this type variable has literal bindings.
-    LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
-
     /// A set of all not-yet-resolved type variables this type variable
     /// is a subtype of, supertype of or is equivalent to. This is used
     /// to determine ordering inside of a chain of subtypes to help infer
@@ -4901,7 +4898,7 @@ private:
                              b.isDelayed(),
                              b.isSubtypeOfExistentialType(),
                              b.involvesTypeVariables(),
-                             static_cast<unsigned char>(b.LiteralBinding),
+                             static_cast<unsigned char>(b.getLiteralKind()),
                              -numNonDefaultableBindings);
     }
 
@@ -4945,23 +4942,33 @@ private:
       return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
     }
 
-    void foundLiteralBinding(ProtocolDecl *proto) {
-      switch (*proto->getKnownProtocolKind()) {
-      case KnownProtocolKind::ExpressibleByDictionaryLiteral:
-      case KnownProtocolKind::ExpressibleByArrayLiteral:
-      case KnownProtocolKind::ExpressibleByStringInterpolation:
-        LiteralBinding = LiteralBindingKind::Collection;
-        break;
+    LiteralBindingKind getLiteralKind() const {
+      LiteralBindingKind kind = LiteralBindingKind::None;
 
-      case KnownProtocolKind::ExpressibleByFloatLiteral:
-        LiteralBinding = LiteralBindingKind::Float;
-        break;
+      for (const auto &binding : Bindings) {
+        auto *proto = binding.getDefaultedLiteralProtocol();
+        if (!proto)
+          continue;
 
-      default:
-        if (LiteralBinding != LiteralBindingKind::Collection)
-          LiteralBinding = LiteralBindingKind::Atom;
-        break;
+        switch (*proto->getKnownProtocolKind()) {
+        case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+        case KnownProtocolKind::ExpressibleByArrayLiteral:
+        case KnownProtocolKind::ExpressibleByStringInterpolation:
+          kind = LiteralBindingKind::Collection;
+          break;
+
+        case KnownProtocolKind::ExpressibleByFloatLiteral:
+          kind = LiteralBindingKind::Float;
+          break;
+
+        default:
+          if (kind != LiteralBindingKind::Collection)
+            kind = LiteralBindingKind::Atom;
+          break;
+        }
       }
+
+      return kind;
     }
 
     void addDefault(Constraint *constraint);
@@ -5055,8 +5062,9 @@ public:
         out << "delayed ";
       if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
-      if (LiteralBinding != LiteralBindingKind::None)
-        out << "literal=" << static_cast<int>(LiteralBinding) << " ";
+      auto literalKind = getLiteralKind();
+      if (literalKind != LiteralBindingKind::None)
+        out << "literal=" << static_cast<int>(literalKind) << " ";
       if (involvesTypeVariables())
         out << "involves_type_vars ";
 

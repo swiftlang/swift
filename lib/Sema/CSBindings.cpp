@@ -644,9 +644,6 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
       return;
   }
 
-  if (auto *literalProtocol = binding.getDefaultedLiteralProtocol())
-    foundLiteralBinding(literalProtocol);
-
   // If the type variable can't bind to an lvalue, make sure the
   // type we pick isn't an lvalue.
   if (!TypeVar->getImpl().canBindToLValue() &&
