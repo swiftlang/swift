@@ -1,5 +1,4 @@
 // RUN: not --crash %target-swift-frontend -c -enable-library-evolution %s
-// REQUIRES: asserts
 
 // SR-13866: TBDGen crasher on protocol with differentiable requirement
 

@@ -1,5 +1,4 @@
 // RUN: %target-build-swift -Osize %s
-// REQUIRES: asserts
 
 // SR-12732: Fix `partial_apply` optimization.
 

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
-// REQUIRES: asserts
 
 // SR-12642: Crash regarding `Differentiable` derived conformances and
 // redeclared properties. This crash surfaced only briefly during the

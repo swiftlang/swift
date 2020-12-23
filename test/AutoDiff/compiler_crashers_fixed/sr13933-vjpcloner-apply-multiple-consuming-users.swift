@@ -1,5 +1,4 @@
 // RUN: %target-build-swift %s
-// REQUIRES: asserts
 
 // SR-13933: Fix "multiple consuming users" ownership error caused by
 // `VJPCloner::visitApply` related to `@differentiable`-function-typed callees.
