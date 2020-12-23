@@ -234,7 +234,7 @@ public:
 //----------------------------------------------------------------------------//
 struct ProtocolNameOwner {
   DeclContext *DC;
-  StringRef Name;
+  std::string Name;
   ProtocolNameOwner(DeclContext *DC, StringRef Name): DC(DC), Name(Name) {}
 
   friend llvm::hash_code hash_value(const ProtocolNameOwner &CI) {
