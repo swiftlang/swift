@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
-var mutableGlobal: String = "can't touch this" // expected-note 2{{var declared here}}
+var mutableGlobal: String = "can't touch this" // expected-note 3{{var declared here}}
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
@@ -162,6 +162,11 @@ extension MyActor {
       }
     }
 
+    acceptEscapingClosure {
+      localFn1()
+      localFn2()
+    }
+
     localVar = 0
 
     // Partial application
@@ -303,4 +308,62 @@ func testGlobalRestrictions(actor: MyActor) async {
   // Operations on non-instances are permitted.
   MyActor.synchronousStatic()
   MyActor.synchronousClass()
+
+  // Global mutable state cannot be accessed.
+  _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+
+  // Local mutable variables cannot be accessed from concurrently-executing
+  // code.
+  var i = 17 // expected-note{{var declared here}}
+  acceptEscapingClosure {
+    i = 42 // expected-warning{{local var 'i' is unsafe to reference in code that may execute concurrently}}
+  }
+  print(i)
+}
+
+// ----------------------------------------------------------------------
+// Local function isolation restrictions
+// ----------------------------------------------------------------------
+func checkLocalFunctions() async {
+  var i = 0
+  var j = 0 // expected-note{{var declared here}}
+
+  func local1() {
+    i = 17
+  }
+
+  func local2() {
+    j = 42 // expected-warning{{local var 'j' is unsafe to reference in code that may execute concurrently}}
+  }
+
+  // Okay to call locally.
+  local1()
+  local2()
+
+  // Non-concurrent closures don't cause problems.
+  acceptClosure {
+    local1()
+    local2()
+  }
+
+  // Escaping closures can make the local function execute concurrently.
+  acceptEscapingClosure {
+    local2()
+  }
+
+  print(i)
+  print(j)
+
+  var k = 17 // expected-note{{var declared here}}
+  func local4() {
+    acceptEscapingClosure {
+      local3()
+    }
+  }
+
+  func local3() {
+    k = 25 // expected-warning{{local var 'k' is unsafe to reference in code that may execute concurrently}}
+  }
+
+  print(k)
 }

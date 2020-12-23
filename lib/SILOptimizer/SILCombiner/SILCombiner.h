@@ -113,6 +113,41 @@ public:
     MadeChange = false;
   }
 
+  /// A "syntactic" high level function that combines our insertPt with the main
+  /// builder's builder context.
+  ///
+  /// Since this is syntactic and we assume that our caller is passing in a
+  /// lambda that if we inline will be eliminated, we mark this function always
+  /// inline.
+  ///
+  /// What is nice about this formulation is it enables one to really concisely
+  /// create a SILBuilder that uses the SILCombiner's builder context but at a
+  /// different use point. Example:
+  ///
+  /// SILBuilderWithScope builder(insertPt);
+  /// builder.createInst1(insertPt->getLoc(), ...);
+  /// builder.createInst2(insertPt->getLoc(), ...);
+  /// builder.createInst3(insertPt->getLoc(), ...);
+  /// auto *finalValue = builder.createInst4(insertPt->getLoc(), ...);
+  ///
+  /// Thats a lot of typing! Instead, using this API, one can write:
+  ///
+  /// auto *finalValue = withBuilder(insertPt, [&](auto &b, auto l) {
+  ///   b.createInst1(l, ...);
+  ///   b.createInst2(l, ...);
+  ///   b.createInst3(l, ...);
+  ///   return b.createInst4(l, ...);
+  /// });
+  ///
+  /// Since this is meant to be just be syntactic, we always inline this method.
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SingleValueInstruction *
+  withBuilder(SILInstruction *insertPt,
+              llvm::function_ref<SingleValueInstruction * (SILBuilder &, SILLocation)> visitor) {
+    SILBuilderWithScope builder(insertPt, Builder);
+    return visitor(builder, insertPt->getLoc());
+  }
+
   // Insert the instruction New before instruction Old in Old's parent BB. Add
   // New to the worklist.
   SILInstruction *insertNewInstBefore(SILInstruction *New,

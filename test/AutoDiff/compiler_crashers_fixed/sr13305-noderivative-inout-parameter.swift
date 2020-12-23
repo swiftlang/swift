@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
-// REQUIRES: asserts
 
 import _Differentiation
 

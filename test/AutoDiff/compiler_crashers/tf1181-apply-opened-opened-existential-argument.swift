@@ -1,5 +1,4 @@
 // RUN: not --crash %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
-// REQUIRES: asserts
 
 // TF-1181: Differentiation transform crash for `apply` with opened existential arguments.
 

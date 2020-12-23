@@ -6,7 +6,6 @@
 
 import _Differentiation
 
-
 // Assertion failed: (mainPullbackStruct->getType() == pbStructLoweredType), function run, file swift/lib/SILOptimizer/Differentiation/PullbackCloner.cpp, line 1899.
 // Stack dump:
 // 1.	Swift version 5.3-dev (LLVM 618cb952e0f199a, Swift d74c261f098665c)
@@ -19,7 +18,6 @@ import _Differentiation
 public func i_have_a_pullback_struct(_ x: Float) -> Float {
   return x
 }
-
 
 // Assertion failed: (v->getType().isObject()), function operator(), file swift/lib/SIL/Utils/ValueUtils.cpp, line 22.
 // Stack dump:

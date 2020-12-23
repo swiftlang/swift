@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
-// REQUIRES: asserts
 
 // TF-1167: `OverrideMatcher::match` crash due to meaningless assertion:
 // `assert(false)`. The assertion was triggered when parameter indices
