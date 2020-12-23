@@ -20,6 +20,7 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/AST/EvaluatorDependencies.h"
+#include "swift/AST/RequestCache.h"
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LangOptions.h"
@@ -211,7 +212,7 @@ class Evaluator {
   llvm::SetVector<ActiveRequest> activeRequests;
 
   /// A cache that stores the results of requests.
-  llvm::DenseMap<AnyRequest, AnyValue> cache;
+  evaluator::RequestCache cache;
 
   /// Track the dependencies of each request.
   ///
@@ -314,14 +315,14 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert({AnyRequest(request), std::move(output)});
+    cache.insert<Request>(request, std::move(output));
   }
 
   /// Do not introduce new callers of this function.
   template<typename Request,
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void clearCachedOutput(const Request &request) {
-    cache.erase(AnyRequest(request));
+    cache.erase<Request>(request);
   }
 
   /// Clear the cache stored within this evaluator.
@@ -424,12 +425,12 @@ private:
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
     // If we already have an entry for this request in the cache, return it.
-    auto known = cache.find_as(request);
-    if (known != cache.end()) {
-      auto r = known->second.template castTo<typename Request::OutputType>();
+    auto known = cache.find_as<Request>(request);
+    if (known != cache.end<Request>()) {
+      auto result = known->second;
       recorder.replayCachedRequest(ActiveRequest(request));
-      handleDependencySinkRequest<Request>(request, r);
-      return r;
+      handleDependencySinkRequest<Request>(request, result);
+      return result;
     }
 
     // Compute the result.
@@ -438,7 +439,7 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({AnyRequest(request), *result});
+    cache.insert<Request>(request, *result);
     return result;
   }
 
