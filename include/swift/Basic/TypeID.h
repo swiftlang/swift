@@ -43,7 +43,7 @@ static_assert(std::is_same<std::underlying_type<Zone>::type, uint8_t>::value,
 ///
 /// This template needs to be specialized for every type that can
 /// participate in this kind of run-time type information, e.g., so
-/// that it can be stored in \c AnyValue.
+/// that it can be stored in a request.
 template<typename T>
 struct TypeID;
 
