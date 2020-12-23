@@ -1,8 +1,4 @@
-// RUN: rm -rf %t/stats-dir
-// RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
-// RUN: %FileCheck -check-prefix CHECK-DOT %s < %t.dot
 
 class Left // expected-error {{'Left' inherits from itself}} expected-note 2{{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
@@ -40,9 +36,6 @@ class Outer3 // expected-error {{'Outer3' inherits from itself}} expected-note 2
     : Outer3.Inner<Int> { // expected-note {{through reference here}}
   class Inner<T> {} // expected-error{{circular reference}}
 }
-
-// CHECK-DOT: digraph Dependencies
-// CHECK-DOT: label="InheritedTypeRequest
 
 protocol Initable {
   init()
