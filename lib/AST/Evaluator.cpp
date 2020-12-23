@@ -26,15 +26,6 @@
 
 using namespace swift;
 
-std::string AnyRequest::getAsString() const {
-  std::string result;
-  {
-    llvm::raw_string_ostream out(result);
-    simple_display(out, *this);
-  }
-  return result;
-}
-
 AbstractRequestFunction *
 Evaluator::getAbstractRequestFunction(uint8_t zoneID, uint8_t requestID) const {
   for (const auto &zone : requestFunctionsByZone) {
@@ -81,7 +72,7 @@ void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   if (debugDumpCycles) {
     llvm::errs() << "===CYCLE DETECTED===\n";
     for (auto &req : activeRequests) {
-      simple_display(llvm::errs(), AnyRequest(req));
+      simple_display(llvm::errs(), req);
       llvm::errs() << "\n";
     }
   }

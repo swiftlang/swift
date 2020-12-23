@@ -42,14 +42,8 @@ class DiagnosticEngine;
 struct AnyRequestVTable {
   template<typename Request>
   struct Impl {
-    static void copy(const void *input, void *output) {
-      new (output) Request(*static_cast<const Request *>(input));
-    }
     static hash_code getHash(const void *ptr) {
       return hash_value(*static_cast<const Request *>(ptr));
-    }
-    static void deleter(void *ptr) {
-      static_cast<Request *>(ptr)->~Request();
     }
     static bool isEqual(const void *lhs, const void *rhs) {
       return *static_cast<const Request *>(lhs) ==
@@ -64,63 +58,24 @@ struct AnyRequestVTable {
     static void noteCycleStep(const void *ptr, DiagnosticEngine &diags) {
       static_cast<const Request *>(ptr)->noteCycleStep(diags);
     }
-    static SourceLoc getNearestLoc(const void *ptr) {
-      return static_cast<const Request *>(ptr)->getNearestLoc();
-    }
-    static bool isCached(const void *ptr) {
-      return static_cast<const Request *>(ptr)->isCached();
-    }
   };
 
   const uint64_t typeID;
-  const size_t requestSize;
-  const std::function<void(const void *, void *)> copy;
   const std::function<hash_code(const void *)> getHash;
-  const std::function<void(void *)> deleter;
   const std::function<bool(const void *, const void *)> isEqual;
   const std::function<void(const void *, llvm::raw_ostream &)> simpleDisplay;
   const std::function<void(const void *, DiagnosticEngine &)> diagnoseCycle;
   const std::function<void(const void *, DiagnosticEngine &)> noteCycleStep;
-  const std::function<SourceLoc(const void *)> getNearestLoc;
-  const std::function<bool(const void *)> isCached;
-  bool isDependencySource;
 
-  template <typename Request,
-            typename std::enable_if<Request::isEverCached>::type * = nullptr>
+  template <typename Request>
   static const AnyRequestVTable *get() {
     static const AnyRequestVTable vtable = {
         TypeID<Request>::value,
-        sizeof(Request),
-        &Impl<Request>::copy,
         &Impl<Request>::getHash,
-        &Impl<Request>::deleter,
         &Impl<Request>::isEqual,
         &Impl<Request>::simpleDisplay,
         &Impl<Request>::diagnoseCycle,
-        &Impl<Request>::noteCycleStep,
-        &Impl<Request>::getNearestLoc,
-        &Impl<Request>::isCached,
-        Request::isDependencySource,
-    };
-    return &vtable;
-  }
-
-  template <typename Request,
-            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
-  static const AnyRequestVTable *get() {
-    static const AnyRequestVTable vtable = {
-        TypeID<Request>::value,
-        sizeof(Request),
-        &Impl<Request>::copy,
-        &Impl<Request>::getHash,
-        &Impl<Request>::deleter,
-        &Impl<Request>::isEqual,
-        &Impl<Request>::simpleDisplay,
-        &Impl<Request>::diagnoseCycle,
-        &Impl<Request>::noteCycleStep,
-        &Impl<Request>::getNearestLoc,
-        [](auto){ return false; },
-        Request::isDependencySource,
+        &Impl<Request>::noteCycleStep
     };
     return &vtable;
   }
@@ -218,19 +173,6 @@ public:
     getVTable()->noteCycleStep(getRawStorage(), diags);
   }
 
-  /// Retrieve the nearest source location to which this request applies.
-  SourceLoc getNearestLoc() const {
-    return getVTable()->getNearestLoc(getRawStorage());
-  }
-
-  bool isCached() const {
-    return getVTable()->isCached(getRawStorage());
-  }
-
-  bool isDependencySource() const {
-    return getVTable()->isDependencySource;
-  }
-
   /// Compare two instances for equality.
   friend bool operator==(const AnyRequestBase<Derived> &lhs,
                          const AnyRequestBase<Derived> &rhs) {
@@ -274,7 +216,6 @@ public:
 ///
 /// Requests must be value types and provide the following API:
 ///
-///   - Copy constructor
 ///   - Equality operator (==)
 ///   - Hashing support (hash_value)
 ///   - TypeID support (see swift/Basic/TypeID.h)
@@ -288,7 +229,6 @@ class ActiveRequest final : public AnyRequestBase<ActiveRequest> {
   template <typename T>
   friend class AnyRequestBase;
 
-  friend class AnyRequest;
   friend llvm::DenseMapInfo<ActiveRequest>;
 
   /// Pointer to the request stored on the stack.
@@ -310,117 +250,6 @@ public:
   }
 };
 
-/// Stores a request (for the \c Evaluator class) of any kind. Unlike
-/// \c ActiveRequest, this wrapper has ownership of the underlying request.
-///
-/// Requests must be value types and provide the following API to be stored in
-/// an \c AnyRequest instance:
-///
-///   - Copy constructor
-///   - Equality operator (==)
-///   - Hashing support (hash_value)
-///   - TypeID support (see swift/Basic/TypeID.h)
-///   - Display support (free function):
-///       void simple_display(llvm::raw_ostream &, const T &);
-///   - Cycle diagnostics operations:
-///       void diagnoseCycle(DiagnosticEngine &diags) const;
-///       void noteCycleStep(DiagnosticEngine &diags) const;
-///
-class AnyRequest final : public AnyRequestBase<AnyRequest> {
-  template <typename T>
-  friend class AnyRequestBase;
-
-  friend llvm::DenseMapInfo<AnyRequest>;
-
-  /// Pointer to the request on the heap.
-  void *storage;
-
-  /// Creates an \c AnyRequest without storage.
-  explicit AnyRequest(StorageKind storageKind)
-      : AnyRequestBase(/*vtable*/ nullptr, storageKind) {}
-
-  const void *getRawStorage() const { return storage; }
-
-  /// Whether this wrapper is storing the same underlying request as an
-  /// \c ActiveRequest.
-  bool isStorageEqual(const ActiveRequest &other) const {
-    // If either wrapper isn't storing anything, just return false.
-    if (!hasStorage() || !other.hasStorage())
-      return false;
-
-    if (getVTable()->typeID != other.getVTable()->typeID)
-      return false;
-
-    return getVTable()->isEqual(getRawStorage(), other.getRawStorage());
-  }
-
-public:
-  AnyRequest(const AnyRequest &other) : AnyRequestBase(other) {
-    if (hasStorage()) {
-      // For now, just allocate a new buffer and copy across the request. This
-      // should only happen when performing operations on the (disabled by
-      // default) dependency graph.
-      storage = llvm::safe_malloc(getVTable()->requestSize);
-      getVTable()->copy(other.storage, storage);
-    }
-  }
-  AnyRequest &operator=(const AnyRequest &other) {
-    if (&other != this) {
-      this->~AnyRequest();
-      new (this) AnyRequest(other);
-    }
-    return *this;
-  }
-
-  AnyRequest(AnyRequest &&other) : AnyRequestBase(other),
-        storage(other.storage) {
-    new (&other) AnyRequest(StorageKind::Empty);
-  }
-
-  AnyRequest &operator=(AnyRequest &&other) {
-    if (&other != this) {
-      this->~AnyRequest();
-      new (this) AnyRequest(std::move(other));
-    }
-    return *this;
-  }
-
-  // Create a local template typename `Request` in the template specialization
-  // so that we can refer to it in the SFINAE condition as well as the body of
-  // the template itself.  The SFINAE condition allows us to remove this
-  // constructor from candidacy when evaluating explicit construction with an
-  // instance of `AnyRequest`.  If we do not do so, we will find ourselves with
-  // ambiguity with this constructor and the defined move constructor above.
-  /// Construct a new instance with the given value.
-  template <typename T, typename Request = std::decay_t<T>,
-            typename = typename std::enable_if<
-                !std::is_same<Request, AnyRequest>::value>::type>
-  explicit AnyRequest(T &&request)
-      : AnyRequestBase(AnyRequestVTable::get<Request>(), StorageKind::Normal) {
-    storage = llvm::safe_malloc(sizeof(Request));
-    new (storage) Request(std::forward<T>(request));
-  }
-
-  /// Construct an \c AnyRequest from an \c ActiveRequest, allowing the
-  /// underlying request to persist.
-  explicit AnyRequest(const ActiveRequest &req)
-      : AnyRequestBase(req.getVTable(), StorageKind::Normal) {
-    assert(req.hasStorage());
-    storage = llvm::safe_malloc(getVTable()->requestSize);
-    getVTable()->copy(req.storage, storage);
-  }
-
-  ~AnyRequest() {
-    if (hasStorage()) {
-      getVTable()->deleter(storage);
-      std::free(storage);
-    }
-  }
-
-  /// Return the result of calling simple_display as a string.
-  std::string getAsString() const;
-};
-
 } // end namespace swift
 
 namespace llvm {
@@ -438,44 +267,6 @@ namespace llvm {
     }
     static bool isEqual(const ActiveRequest &lhs, const ActiveRequest &rhs) {
       return lhs == rhs;
-    }
-  };
-
-  template<>
-  struct DenseMapInfo<swift::AnyRequest> {
-    using AnyRequest = swift::AnyRequest;
-    using ActiveRequest = swift::ActiveRequest;
-
-    static inline AnyRequest getEmptyKey() {
-      return AnyRequest(AnyRequest::StorageKind::Empty);
-    }
-    static inline swift::AnyRequest getTombstoneKey() {
-      return AnyRequest(AnyRequest::StorageKind::Tombstone);
-    }
-    static unsigned getHashValue(const AnyRequest &request) {
-      return hash_value(request);
-    }
-    template <typename Request>
-    static unsigned getHashValue(const Request &request) {
-      return AnyRequest::hashForHolder(swift::TypeID<Request>::value,
-                                       hash_value(request));
-    }
-    static unsigned getHashValue(const ActiveRequest &request) {
-      return hash_value(request);
-    }
-    static bool isEqual(const AnyRequest &lhs, const AnyRequest &rhs) {
-      return lhs == rhs;
-    }
-    template <typename Request>
-    static bool isEqual(const Request &lhs, const AnyRequest &rhs) {
-      if (!rhs.hasStorage())
-        return false;
-
-      auto *rhsRequest = rhs.getAs<Request>();
-      return rhsRequest && lhs == *rhsRequest;
-    }
-    static bool isEqual(const ActiveRequest &lhs, const AnyRequest &rhs) {
-      return rhs.isStorageEqual(lhs);
     }
   };
 
