@@ -45,6 +45,12 @@ struct S10 {
   };
 };
 
+struct HasForwardDeclaredNestedType {
+  struct ForwardDeclaredType;
+  struct NormalSubType { };
+  struct ForwardDeclaredType { };
+};
+
 // TODO: Nested class templates (SR-13853).
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_NESTED_RECORDS_H
