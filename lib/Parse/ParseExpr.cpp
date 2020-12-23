@@ -393,16 +393,22 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (shouldParseExperimentalConcurrency() && Tok.isContextualKeyword("await")) {
-    SourceLoc awaitLoc = consumeToken();
-    ParserResult<Expr> sub =
-      parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
-    if (!sub.hasCodeCompletion() && !sub.isNull()) {
-      ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
-      sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
-    }
+  if (Tok.isContextualKeyword("await")) {
+    if (shouldParseExperimentalConcurrency()) {
+      SourceLoc awaitLoc = consumeToken();
+      ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
+      if (!sub.hasCodeCompletion() && !sub.isNull()) {
+        ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
+        sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+      }
 
-    return sub;
+      return sub;
+    } else {
+      // warn that future versions of Swift will parse this token differently.
+      diagnose(Tok.getLoc(), diag::warn_await_keyword)
+        .fixItReplace(Tok.getLoc(), "`await`");
+    }
   }
 
   SourceLoc tryLoc;
