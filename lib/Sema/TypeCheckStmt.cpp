@@ -2068,8 +2068,10 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
     performAbstractFuncDeclDiagnostics(AFD);
 
   TypeChecker::computeCaptures(AFD);
-  checkFunctionActorIsolation(AFD);
-  TypeChecker::checkFunctionEffects(AFD);
+  if (!AFD->getDeclContext()->isLocalContext()) {
+    checkFunctionActorIsolation(AFD);
+    TypeChecker::checkFunctionEffects(AFD);
+  }
 
   return hadError ? errorBody() : body;
 }

@@ -196,7 +196,7 @@ extension Collection {
       var submitted = 0
 
       func submitNext() async throws {
-        await group.add {
+        await group.add { [submitted,i] in
           let value = await try transform(self[i])
           return (submitted, value)
         }
