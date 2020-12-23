@@ -544,21 +544,6 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   return %6 : $(U, U, U)
 }
 
-// RefToRawPointer pointer consumption.
-//
-// (ref_to_raw_pointer (unchecked_ref_cast x))
-//    -> (ref_to_raw_pointer x)
-// CHECK-LABEL: sil @ref_to_raw_pointer_unchecked_ref_cast_composition : $@convention(thin) (C) -> Builtin.RawPointer
-// CHECK: bb0
-// CHECK-NEXT: ref_to_raw_pointer
-// CHECK-NEXT: return
-sil @ref_to_raw_pointer_unchecked_ref_cast_composition : $@convention(thin) (C) -> Builtin.RawPointer {
-bb0(%0 : $C):
-  %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
-  %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
-  return %2 : $Builtin.RawPointer
-}
-
 // CHECK-LABEL: sil @downcast_upcast_roundtrip
 // CHECK: bb0
 // CHECK-NEXT: return
@@ -2342,30 +2327,11 @@ bb0(%0: $MyClass):
   return %3 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil @collapse_existential_pack_unpack_ref_to_raw_pointer
-// CHECK:       bb0([[Ref:%.*]]: $MyClass):
-// CHECK-NOT:     init_existential_ref
-// CHECK-NOT:     open_existential_ref
-// CHECK:         ref_to_raw_pointer [[Ref]]
-
-sil @collapse_existential_pack_unpack_ref_to_raw_pointer : $@convention(thin) (MyClass) -> () {
-bb0(%0: $MyClass):
-  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
-  %5 = integer_literal $Builtin.Word, 5
-  store %5 to %4: $*Builtin.Word
-  %6 = tuple ()
-  return %6 : $()
-}
-
 // CHECK-LABEL: sil @load_fixlifetime_address
 // CHECK:          [[Stck:%.*]] = alloc_stack
 // CHECK-NOT:                     fix_lifetime [[Stck]]#1
 // CHECK:       [[StckVal:%.*]] = load [[Stck]]
 // CHECK:                         fix_lifetime [[StckVal]]
-
 sil @load_fixlifetime_address : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0: $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
@@ -2376,20 +2342,6 @@ bb0(%0: $Builtin.NativeObject):
   return %6 : $()
 }
 
-// CHECK-LABEL:     sil @collapse_to_unchecked_trivial_bit_cast
-// CHECK:           bb0([[Ref:%.*]]: $Optional<MyClass>):
-// CHECK:             unchecked_trivial_bit_cast [[Ref]]
-// CHECK-NOT:         unchecked_ref_cast
-// CHECK-NOT:         ref_to_raw_pointer
-// CHECK:             return
-// (ref_to_raw_pointer (unchecked_ref_cast x)) -> (unchecked_trivial_bit_cast x)
-sil @collapse_to_unchecked_trivial_bit_cast : $@convention(thin) (Optional<MyClass>) -> (Builtin.RawPointer) {
-bb0(%0 : $Optional<MyClass>):
-  %1 = unchecked_ref_cast %0 : $Optional<MyClass> to $Builtin.NativeObject
-  %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
-  return %2 : $Builtin.RawPointer
-}
-
 struct GenContainer<T> {
 }
 
@@ -2398,12 +2350,11 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContai
   unreachable
 }
 
-
-// CHECK-LABEL:   sil @remove_dead_code_after_cond_fail
+// CHECK-LABEL:   sil @remove_dead_code_after_cond_fail :
 // CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:      cond_fail [[Ref]]
 // CHECK-NEXT:      unreachable
-
+// CHECK: } // end sil function 'remove_dead_code_after_cond_fail'
 sil @remove_dead_code_after_cond_fail : $@convention(thin) () -> (Int32) {
 bb0:
   %0 = integer_literal $Builtin.Int32, -2
