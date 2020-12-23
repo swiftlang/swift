@@ -271,8 +271,6 @@ public:
            typename std::enable_if<Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
-                                                              request};
     // The request can be cached, but check a predicate to determine
     // whether this particular instance is cached. This allows more
     // fine-grained control over which instances get cache.
@@ -288,8 +286,6 @@ public:
            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
-                                                              request};
     return getResultUncached(request);
   }
 
@@ -366,13 +362,6 @@ private:
           std::make_unique<CyclicalRequestError<Request>>(request, *this));
     }
 
-    // Make sure we remove this from the set of active requests once we're
-    // done.
-    SWIFT_DEFER {
-      assert(activeRequests.back() == activeReq);
-      activeRequests.pop_back();
-    };
-
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
     if (buildDependencyGraph)
@@ -384,8 +373,20 @@ private:
     FrontendStatsTracer statsTracer = make_tracer(stats, request);
     if (stats) reportEvaluatedRequest(*stats, request);
 
+    recorder.beginRequest(activeReq);
+
     auto &&r = getRequestFunction<Request>()(request, *this);
-    reportEvaluatedResult<Request>(request, r);
+
+    recorder.endRequest(activeReq);
+
+    handleDependencySourceRequest<Request>(request);
+    handleDependencySinkRequest<Request>(request, r);
+
+    // Make sure we remove this from the set of active requests once we're
+    // done.
+    assert(activeRequests.back() == activeReq);
+    activeRequests.pop_back();
+
     return std::move(r);
   }
 
@@ -398,7 +399,8 @@ private:
   getResultCached(const Request &request) {
     // If there is a cached result, return it.
     if (auto cached = request.getCachedResult()) {
-      reportEvaluatedResult<Request>(request, *cached);
+      recorder.replayCachedRequest(ActiveRequest(request));
+      handleDependencySinkRequest<Request>(request, *cached);
       return *cached;
     }
 
@@ -426,7 +428,8 @@ private:
     auto known = cache.find_as(request);
     if (known != cache.end()) {
       auto r = known->second.template castTo<typename Request::OutputType>();
-      reportEvaluatedResult<Request>(request, r);
+      recorder.replayCachedRequest(ActiveRequest(request));
+      handleDependencySinkRequest<Request>(request, r);
       return r;
     }
 
@@ -441,22 +444,30 @@ private:
   }
 
 private:
-  // Report the result of evaluating a request that is not a dependency sink.
   template <typename Request, typename std::enable_if<
                                   !Request::isDependencySink>::type * = nullptr>
-  void reportEvaluatedResult(const Request &r,
-                             const typename Request::OutputType &o) {
-    recorder.replay(activeRequests, ActiveRequest(r));
-  }
+  void handleDependencySinkRequest(const Request &r,
+                                   const typename Request::OutputType &o) {}
 
-  // Report the result of evaluating a request that is a dependency sink.
   template <typename Request,
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
-  void reportEvaluatedResult(const Request &r,
-                             const typename Request::OutputType &o) {
-    return recorder.record(activeRequests, [&r, &o](auto &c) {
-      return r.writeDependencySink(c, o);
-    });
+  void handleDependencySinkRequest(const Request &r,
+                                   const typename Request::OutputType &o) {
+    evaluator::DependencyCollector collector(recorder);
+    r.writeDependencySink(collector, o);
+  }
+
+  template <typename Request, typename std::enable_if<
+                                  !Request::isDependencySource>::type * = nullptr>
+  void handleDependencySourceRequest(const Request &r) {}
+
+  template <typename Request,
+            typename std::enable_if<Request::isDependencySource>::type * = nullptr>
+  void handleDependencySourceRequest(const Request &r) {
+    auto source = r.readDependencySource(recorder);
+    if (!source.isNull() && source.get()->isPrimary()) {
+      recorder.handleDependencySourceRequest(ActiveRequest(r), source.get());
+    }
   }
 
 public:
