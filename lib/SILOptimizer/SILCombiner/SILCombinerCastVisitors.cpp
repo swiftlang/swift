@@ -298,43 +298,43 @@ SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
   return nullptr;
 }
 
-
-
 SILInstruction *
-SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
-  if (URCI->getFunction()->hasOwnership())
+SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *urci) {
+  // Promote unchecked_ref_cast_addr in between two loadable values to
+  // unchecked_ref_cast upon objects.
+  //
+  // NOTE: unchecked_ref_cast_addr is a taking operation, so we simulate that
+  // with objects.
+  SILType srcTy = urci->getSrc()->getType();
+  if (!srcTy.isLoadable(*urci->getFunction()))
     return nullptr;
 
-  SILType SrcTy = URCI->getSrc()->getType();
-  if (!SrcTy.isLoadable(*URCI->getFunction()))
-    return nullptr;
-
-  SILType DestTy = URCI->getDest()->getType();
-  if (!DestTy.isLoadable(*URCI->getFunction()))
+  SILType destTy = urci->getDest()->getType();
+  if (!destTy.isLoadable(*urci->getFunction()))
     return nullptr;
 
   // After promoting unchecked_ref_cast_addr to unchecked_ref_cast, the SIL
   // verifier will assert that the loadable source and dest type of reference
   // castable. If the static types are invalid, simply avoid promotion, that way
   // the runtime will then report a failure if this cast is ever executed.
-  if (!SILType::canRefCast(SrcTy.getObjectType(), DestTy.getObjectType(),
-                           URCI->getModule()))
+  if (!SILType::canRefCast(srcTy.getObjectType(), destTy.getObjectType(),
+                           urci->getModule()))
     return nullptr;
  
-  SILLocation Loc = URCI->getLoc();
-  Builder.setCurrentDebugScope(URCI->getDebugScope());
-  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
-                                      LoadOwnershipQualifier::Unqualified);
+  SILLocation loc = urci->getLoc();
+  Builder.setCurrentDebugScope(urci->getDebugScope());
+  SILValue load = Builder.emitLoadValueOperation(loc, urci->getSrc(),
+                                                 LoadOwnershipQualifier::Take);
 
-  assert(SILType::canRefCast(load->getType(), DestTy.getObjectType(),
+  assert(SILType::canRefCast(load->getType(), destTy.getObjectType(),
                              Builder.getModule()) &&
          "SILBuilder cannot handle reference-castable types");
-  auto *cast = Builder.createUncheckedRefCast(Loc, load,
-                                              DestTy.getObjectType());
-  Builder.createStore(Loc, cast, URCI->getDest(),
-                      StoreOwnershipQualifier::Unqualified);
+  auto *cast = Builder.createUncheckedRefCast(loc, load,
+                                              destTy.getObjectType());
+  Builder.emitStoreValueOperation(loc, cast, urci->getDest(),
+                                  StoreOwnershipQualifier::Init);
 
-  return eraseInstFromFunction(*URCI);
+  return eraseInstFromFunction(*urci);
 }
 
 template <class CastInst>
