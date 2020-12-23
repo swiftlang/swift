@@ -148,13 +148,6 @@ void Evaluator::printDependencies(
     out.resetColor();
   }
 
-  // Print the cached value, if known.
-  auto cachedValue = cache.find(request);
-  if (cachedValue != cache.end()) {
-    out << " -> ";
-    printEscapedString(cachedValue->second.getAsString(), out);
-  }
-
   if (!visitedAnywhere.insert(request).second) {
     // We've already seed this node. Check whether it's part of a cycle.
     if (std::find(visitedAlongPath.begin(), visitedAlongPath.end(), request)
@@ -313,11 +306,6 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
     out << " [label=\"";
     printEscapedString(request.getAsString(), out);
 
-    auto cachedValue = cache.find(request);
-    if (cachedValue != cache.end()) {
-      out << " -> ";
-      printEscapedString(cachedValue->second.getAsString(), out);
-    }
     out << "\"";
 
     if (auto color = getColor(request)) {
