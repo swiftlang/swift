@@ -1494,19 +1494,17 @@ namespace {
 
           if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
             capturedBase = base.getValue();
+          } else if (base.getType().isAddress() &&
+                     base.getType().getObjectType() ==
+                     setterConv.getSILArgumentType(argIdx,
+                                                   SGF.getTypeExpansionContext())) {
+            // If the base is a reference and the setter expects a value, emit a
+            // load. This pattern is emitted for property wrappers with a
+            // nonmutating setter, for example.
+            capturedBase = SGF.B.createTrivialLoadOr(
+                loc, base.getValue(), LoadOwnershipQualifier::Copy);
           } else {
             capturedBase = base.copy(SGF, loc).forward(SGF);
-          }
-
-          // If the base is a reference and the setter expects a value, emit a
-          // load. This pattern is emitted for property wrappers with a
-          // nonmutating setter, for example.
-          if (base.getType().isAddress() &&
-              base.getType().getObjectType() ==
-                  setterConv.getSILArgumentType(argIdx,
-                                                SGF.getTypeExpansionContext())) {
-            capturedBase = SGF.B.createTrivialLoadOr(
-                loc, capturedBase, LoadOwnershipQualifier::Take);
           }
 
           capturedArgs.push_back(capturedBase);
