@@ -4789,6 +4789,10 @@ private:
       return !Bindings.empty() || !Defaults.empty() || isDirectHole();
     }
 
+    /// Determines whether this type variable could be `nil`,
+    /// which means that all of its bindings should be optional.
+    bool canBeNil() const;
+
     /// Determine whether attempting this type variable should be
     /// delayed until the rest of the constraint system is considered
     /// "fully bound" meaning constraints, which affect completeness
@@ -4974,6 +4978,28 @@ private:
     void addDefault(Constraint *constraint);
 
     void addLiteral(Constraint *constraint);
+
+    /// Determines whether the given literal protocol is "covered"
+    /// by the given binding - type of the binding could either be
+    /// equal (in canonical sense) to the protocol's default type,
+    /// or conform to a protocol.
+    ///
+    /// \param literal The literal protocol requirement to check.
+    ///
+    /// \param binding The binding to check for coverage.
+    ///
+    /// \param canBeNil The flag that determines whether given type
+    /// variable requires all of its bindings to be optional.
+    ///
+    /// \param isDirectRequirement The flag that determines whether
+    /// this literal conformance requirement is associated with the
+    /// current type variable or it's inferred.
+    ///
+    /// \returns true if binding covers given literal protocol.
+    bool isLiteralCoveredBy(ProtocolDecl *literal,
+                            PotentialBinding &binding,
+                            bool canBeNil,
+                            bool isDirectRequirement) const;
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.

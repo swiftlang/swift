@@ -5330,11 +5330,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
 TypeVarBindingProducer::TypeVarBindingProducer(
     ConstraintSystem::PotentialBindings &bindings)
     : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
-      TypeVar(bindings.TypeVar),
-      CanBeNil(llvm::any_of(bindings.Literals, [](const auto &literal) {
-        return literal.first->isSpecificProtocol(
-            KnownProtocolKind::ExpressibleByNilLiteral);
-      })) {
+      TypeVar(bindings.TypeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token
