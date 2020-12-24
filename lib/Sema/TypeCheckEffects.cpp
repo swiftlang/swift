@@ -578,6 +578,13 @@ public:
         return Classification::forRethrowingOnly(
           PotentialThrowReason::forThrowingApply(), isAsync);
       }
+    } else if (fnRef.isBodyRethrows() && 
+               fnRef.getRethrowingKind() == FunctionRethrowingKind::Throws) {
+      return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
+                                      isAsync);
+    } else if (fnRef.isBodyRethrows() &&
+               fnRef.getRethrowingKind() == FunctionRethrowingKind::None) {
+      return isAsync ? Classification::forAsync() : Classification();
     }
 
     // If the function doesn't throw at all, we're done here.
@@ -1072,7 +1079,8 @@ public:
     if (!fn)
       return false;
 
-    return fn->getAttrs().hasAttribute<RethrowsAttr>();
+    
+    return fn->getRethrowingKind() == FunctionRethrowingKind::ByClosure;
   }
 
   /// Whether this is an autoclosure.
@@ -2074,6 +2082,7 @@ private:
   
   ShouldRecurse_t checkTry(TryExpr *E) {
     
+
     // Walk the operand.
     ContextScope scope(*this, None);
     scope.enterTry();

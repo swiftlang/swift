@@ -12,6 +12,7 @@
 
 import Swift
 
+@rethrows
 public protocol AsyncIteratorProtocol {
   associatedtype Element
   mutating func next() async throws -> Element?

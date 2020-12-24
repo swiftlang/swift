@@ -35,7 +35,7 @@ public struct AsyncPrefixWhileSequence<Upstream>: AsyncSequence where Upstream: 
       self.predicate = predicate
     }
     
-    public mutating func next() async throws /*rethrows*/ -> Element? {
+    public mutating func next() async rethrows -> Element? {
       guard let item = await try upstreamIterator?.next() else {
         return nil
       }

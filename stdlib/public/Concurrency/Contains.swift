@@ -13,7 +13,7 @@
 import Swift
 
 extension AsyncSequence {
-  public func contains(where predicate: (Element) async throws -> Bool) async throws /*rethrows*/ -> Bool {
+  public func contains(where predicate: (Element) async throws -> Bool) async rethrows -> Bool {
     var it = makeAsyncIterator()
     while let e = await try it.next() {
       if await try predicate(e) {
@@ -25,7 +25,7 @@ extension AsyncSequence {
 }
 
 extension AsyncSequence where Element: Equatable {
-  public func contains(_ element: Element) async throws /*rethrows*/ -> Bool {
-    return await try contains { $0 == element }
+  public func contains(_ element: Element) async rethrows -> Bool {
+    return await contains { $0 == element }
   }
 }

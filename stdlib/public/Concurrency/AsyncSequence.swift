@@ -12,6 +12,7 @@
 
 import Swift
 
+@rethrows
 public protocol AsyncSequence {
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
   associatedtype Element

@@ -13,7 +13,7 @@
 import Swift
 
 extension AsyncSequence {
-  public func first(where predicate: (Element) async throws -> Bool) async throws /*rethrows*/ -> Element? {
+  public func first(where predicate: (Element) async throws -> Bool) async rethrows -> Element? {
     var it = makeAsyncIterator()
     while let element = await try it.next() {
       if await try predicate(element) {
@@ -23,7 +23,7 @@ extension AsyncSequence {
     return nil
   }
   
-  public func first() async throws /*rethrows*/ -> Element? {
+  public func first() async rethrows -> Element? {
     var it = makeAsyncIterator()
     return await try it.next()
   }

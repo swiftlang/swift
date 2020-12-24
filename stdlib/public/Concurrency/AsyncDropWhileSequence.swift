@@ -35,7 +35,7 @@ public struct AsyncDropWhileSequence<Upstream>: AsyncSequence where Upstream: As
       self.predicate = predicate
     }
     
-    public mutating func next() async throws /*rethrows*/ -> Upstream.Element? {
+    public mutating func next() async rethrows -> Upstream.Element? {
       while true {
         guard let item = await try upstreamIterator?.next() else {
           return nil

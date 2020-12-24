@@ -36,7 +36,7 @@ public struct AsyncFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>: As
       self.transform = transform
     }
     
-    public mutating func next() async throws /*rethrows*/ -> SegmentOfResult.Element? {
+    public mutating func next() async rethrows -> SegmentOfResult.Element? {
       if let item = await try currentIterator?.next() {
         return item
       } else {

@@ -13,7 +13,7 @@
 import Swift
 
 extension AsyncSequence {
-  public func count() async throws /*rethrows*/ -> Int {
+  public func count() async rethrows -> Int {
     var count = 0
     var it = makeAsyncIterator()
     while await try it.next() != nil {

@@ -13,7 +13,7 @@
 import Swift
 
 extension AsyncSequence {
-  public func min(by areInIncreasingOrder: (Element, Element) async throws -> Bool) async throws /*rethrows*/ -> Element? {
+  public func min(by areInIncreasingOrder: (Element, Element) async throws -> Bool) async rethrows -> Element? {
     var it = makeAsyncIterator()
     guard var result = await try it.next() else { return nil }
     while let e = await try it.next() {
@@ -22,7 +22,7 @@ extension AsyncSequence {
     return result
   }
   
-  public func max(by areInIncreasingOrder: (Element, Element) async throws -> Bool) async throws /*rethrows*/ -> Element? {
+  public func max(by areInIncreasingOrder: (Element, Element) async throws -> Bool) async rethrows -> Element? {
     var it = makeAsyncIterator()
     guard var result = await try it.next() else { return nil }
     while let e = await try it.next() {
@@ -33,11 +33,11 @@ extension AsyncSequence {
 }
 
 extension AsyncSequence where Element: Comparable {
-  public func min() async throws /*rethrows*/ -> Element? {
+  public func min() async rethrows -> Element? {
     return await try min(by: <)
   }
   
-  public func max() async throws /*rethrows*/ -> Element? {
+  public func max() async rethrows -> Element? {
     return await try max(by: <)
   }
 }

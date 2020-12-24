@@ -40,7 +40,7 @@ public struct AsyncFilterSequence<Upstream>: AsyncSequence where Upstream: Async
       self.predicate = predicate
     }
     
-    public mutating func next() async throws /*rethrows*/ -> Upstream.Element? {
+    public mutating func next() async rethrows -> Upstream.Element? {
       guard let item = await try upstreamIterator?.next() else {
         return nil
       }

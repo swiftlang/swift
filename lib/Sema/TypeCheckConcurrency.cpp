@@ -820,9 +820,9 @@ namespace {
             if (isAsyncCall(outerCall)) {
               // This call is a partial application within an async call.
               // If the partial application take a value inout, it is bad.
-              if (InOutExpr *inoutArg = dyn_cast<InOutExpr>(
-                      call->getArg()->getSemanticsProvidingExpr()))
-                diagnoseInOutArg(outerCall, inoutArg, true);
+              // if (InOutExpr *inoutArg = dyn_cast<InOutExpr>(
+              //         call->getArg()->getSemanticsProvidingExpr()))
+              //   diagnoseInOutArg(outerCall, inoutArg, true);
             }
           }
 
@@ -958,6 +958,7 @@ namespace {
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
                           bool isPartialApply) {
+      
       // check that the call is actually async
       if (!isAsyncCall(call))
         return false;

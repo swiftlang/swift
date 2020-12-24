@@ -35,7 +35,7 @@ public struct AsyncConcatSequence<Prefix, Suffix>: AsyncSequence where Prefix: A
       self.suffixIterator = suffixIterator
     }
     
-    public mutating func next() async throws /*rethrows*/ -> Prefix.Element? {
+    public mutating func next() async rethrows -> Prefix.Element? {
       if let item = await try prefixIterator?.next() {
         return item
       }

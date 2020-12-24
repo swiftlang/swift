@@ -37,7 +37,7 @@ public struct AsyncMapSequence<Upstream, Transformed>: AsyncSequence where Upstr
       self.transform = transform
     }
     
-    public mutating func next() async throws /*rethrows*/ -> Transformed? {
+    public mutating func next() async rethrows -> Transformed? {
       guard let item = await try upstreamIterator?.next() else {
         return nil
       }

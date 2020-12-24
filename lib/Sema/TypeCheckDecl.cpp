@@ -829,23 +829,26 @@ FunctionRethrowingKind
 FunctionRethrowingKindRequest::evaluate(Evaluator &evaluator,
                                         AbstractFunctionDecl *decl) const {
   if (decl->hasThrows()) {
-    if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-      if (proto->isRethrowingProtocol()) {
-        GenericSignature genericSig = decl->getGenericSignature();
-        FunctionRethrowingKind kind = getParameterThrowingKind(decl, genericSig);
-        // since we have checked all arguments, if we still havent found anything
-        // check the self parameter
-        if (kind == FunctionRethrowingKind::Invalid && 
-            decl->hasImplicitSelfDecl()) {
-          auto selfParam = decl->getImplicitSelfDecl();
-          if (selfParam) {
-            auto interfaceTy = selfParam->getInterfaceType();
-            kind = getTypeThrowingKind(interfaceTy, genericSig);
-          }
+    auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext());
+    bool fromRethrow = proto != nullptr ? proto->isRethrowingProtocol() : false;
+    bool markedRethrows = decl->getAttrs().hasAttribute<RethrowsAttr>();
+    if (fromRethrow && !markedRethrows) {
+      return FunctionRethrowingKind::ByConformance;
+    }
+    if (markedRethrows) {
+      GenericSignature genericSig = decl->getGenericSignature();
+      FunctionRethrowingKind kind = getParameterThrowingKind(decl, genericSig);
+      // since we have checked all arguments, if we still havent found anything
+      // check the self parameter
+      if (kind == FunctionRethrowingKind::Invalid && 
+          decl->hasImplicitSelfDecl()) {
+        auto selfParam = decl->getImplicitSelfDecl();
+        if (selfParam) {
+          auto interfaceTy = selfParam->getInterfaceType();
+          kind = getTypeThrowingKind(interfaceTy, genericSig);
         }
-
-        return kind;
       }
+      return kind;
     }
     return FunctionRethrowingKind::Throws;
   }
