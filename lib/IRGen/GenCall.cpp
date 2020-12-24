@@ -1956,27 +1956,42 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     { // thin
       IGF.Builder.emitBlock(thinBlock);
       auto *ptr = functionPointer.getRawPointer();
-      if (auto authInfo = functionPointer.getAuthInfo()) {
-        ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
-      }
-      auto *afpPtr =
-          IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-      if (emitFunction) {
-        llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
-        auto *uncastFnPtr = IGF.emitLoadOfRelativePointer(
-            Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
-            /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
-        auto *fnPtr = IGF.Builder.CreateBitCast(uncastFnPtr, IGF.IGM.Int8PtrTy);
-        if (auto authInfo = functionPointer.getAuthInfo()) {
-          fnPtr = emitPointerAuthSign(IGF, fnPtr, authInfo);
+
+      // If function pointer is a direct pointer to a function, it could not be
+      // an async function pointer. And additive operation to function address is
+      // illegal on some archs like wasm32, so emit undefs instead.
+      if (isa<llvm::Function>(ptr)) {
+        if (emitFunction) {
+          auto *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+          fnPhiValues.push_back({thinBlock, undef});
         }
-        fnPhiValues.push_back({thinBlock, fnPtr});
-      }
-      if (emitSize) {
-        auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
-        auto *size =
-            IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
-        sizePhiValues.push_back({thinBlock, size});
+        if (emitSize) {
+          auto *undef = llvm::UndefValue::get(IGF.IGM.Int32Ty);
+          sizePhiValues.push_back({thinBlock, undef});
+        }
+      } else {
+        if (auto authInfo = functionPointer.getAuthInfo()) {
+          ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
+        }
+        auto *afpPtr =
+        IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
+        if (emitFunction) {
+          llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+          auto *uncastFnPtr = IGF.emitLoadOfRelativePointer(
+                                                            Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+                                                            /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
+          auto *fnPtr = IGF.Builder.CreateBitCast(uncastFnPtr, IGF.IGM.Int8PtrTy);
+          if (auto authInfo = functionPointer.getAuthInfo()) {
+            fnPtr = emitPointerAuthSign(IGF, fnPtr, authInfo);
+          }
+          fnPhiValues.push_back({thinBlock, fnPtr});
+        }
+        if (emitSize) {
+          auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
+          auto *size =
+          IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
+          sizePhiValues.push_back({thinBlock, size});
+        }
       }
       IGF.Builder.CreateBr(joinBlock);
     }
