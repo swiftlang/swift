@@ -523,12 +523,20 @@ public:
 private:
   /// Predicate used to filter OperandValueRange.
   struct OperandToValue;
+  /// Predicate used to filter TransformedOperandValueRange.
+  struct OperandToTransformedValue;
 
 public:
   using OperandValueRange =
       OptionalTransformRange<ArrayRef<Operand>, OperandToValue>;
+  using TransformedOperandValueRange =
+      OptionalTransformRange<ArrayRef<Operand>, OperandToTransformedValue>;
+
   OperandValueRange
   getOperandValues(bool skipTypeDependentOperands = false) const;
+  TransformedOperandValueRange
+  getOperandValues(std::function<SILValue(SILValue)> transformFn,
+                   bool skipTypeDependentOperands) const;
 
   SILValue getOperand(unsigned Num) const {
     return getAllOperands()[Num].get();
@@ -727,11 +735,38 @@ struct SILInstruction::OperandToValue {
   }
 };
 
+struct SILInstruction::OperandToTransformedValue {
+  const SILInstruction &i;
+  std::function<SILValue(SILValue)> transformFn;
+  bool skipTypeDependentOps;
+
+  OperandToTransformedValue(const SILInstruction &i,
+                            std::function<SILValue(SILValue)> transformFn,
+                            bool skipTypeDependentOps)
+      : i(i), transformFn(transformFn),
+        skipTypeDependentOps(skipTypeDependentOps) {}
+
+  Optional<SILValue> operator()(const Operand &use) const {
+    if (skipTypeDependentOps && i.isTypeDependentOperand(use))
+      return None;
+    return transformFn(use.get());
+  }
+};
+
 inline auto
 SILInstruction::getOperandValues(bool skipTypeDependentOperands) const
     -> OperandValueRange {
   return OperandValueRange(getAllOperands(),
                            OperandToValue(*this, skipTypeDependentOperands));
+}
+
+inline auto
+SILInstruction::getOperandValues(std::function<SILValue(SILValue)> transformFn,
+                                 bool skipTypeDependentOperands) const
+    -> TransformedOperandValueRange {
+  return TransformedOperandValueRange(
+      getAllOperands(),
+      OperandToTransformedValue(*this, transformFn, skipTypeDependentOperands));
 }
 
 struct SILInstruction::OperandToType {
