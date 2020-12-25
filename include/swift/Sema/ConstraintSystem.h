@@ -4786,7 +4786,8 @@ private:
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
-      return !Bindings.empty() || !Defaults.empty() || isDirectHole();
+      return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
+             !Defaults.empty() || isDirectHole();
     }
 
     /// Determines whether this type variable could be `nil`,
@@ -4840,8 +4841,8 @@ private:
       if (!CS.shouldAttemptFixes())
         return false;
 
-      return Bindings.empty() && Defaults.empty() &&
-             TypeVar->getImpl().canBindToHole();
+      return Bindings.empty() && getNumViableLiteralBindings() == 0 &&
+             Defaults.empty() && TypeVar->getImpl().canBindToHole();
     }
 
     /// Determine if the bindings only constrain the type variable from above
@@ -4856,6 +4857,8 @@ private:
                binding.Kind == AllowedBindingKind::Subtypes;
       });
     }
+
+    unsigned getNumViableLiteralBindings() const;
 
     unsigned getNumViableDefaultableBindings() const {
       if (isDirectHole())
@@ -4893,9 +4896,12 @@ private:
       // It's considered to be non-default for purposes of
       // ranking because we'd like to prioritize resolving
       // closures to gain more information from their bodies.
-      auto numNonDefaultableBindings =
-          !b.Bindings.empty() ? b.Bindings.size()
-                              : b.TypeVar->getImpl().isClosureType() ? 1 : 0;
+      unsigned numBindings =
+          b.Bindings.size() + b.getNumViableLiteralBindings();
+      auto numNonDefaultableBindings = numBindings > 0 ? numBindings
+                                       : b.TypeVar->getImpl().isClosureType()
+                                           ? 1
+                                           : 0;
 
       return std::make_tuple(b.isHole(),
                              numNonDefaultableBindings == 0,
@@ -4946,34 +4952,7 @@ private:
       return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
     }
 
-    LiteralBindingKind getLiteralKind() const {
-      LiteralBindingKind kind = LiteralBindingKind::None;
-
-      for (const auto &binding : Bindings) {
-        auto *proto = binding.getDefaultedLiteralProtocol();
-        if (!proto)
-          continue;
-
-        switch (*proto->getKnownProtocolKind()) {
-        case KnownProtocolKind::ExpressibleByDictionaryLiteral:
-        case KnownProtocolKind::ExpressibleByArrayLiteral:
-        case KnownProtocolKind::ExpressibleByStringInterpolation:
-          kind = LiteralBindingKind::Collection;
-          break;
-
-        case KnownProtocolKind::ExpressibleByFloatLiteral:
-          kind = LiteralBindingKind::Float;
-          break;
-
-        default:
-          if (kind != LiteralBindingKind::Collection)
-            kind = LiteralBindingKind::Atom;
-          break;
-        }
-      }
-
-      return kind;
-    }
+    LiteralBindingKind getLiteralKind() const;
 
     void addDefault(Constraint *constraint);
 
@@ -5059,11 +5038,6 @@ private:
         llvm::SmallDenseMap<TypeVariableType *,
                             ConstraintSystem::PotentialBindings>
             &inferredBindings);
-
-    /// Infer bindings based on any protocol conformances that have default
-    /// types.
-    void inferDefaultTypes(ConstraintSystem &cs,
-                           llvm::SmallPtrSetImpl<CanType> &existingTypes);
 
 public:
     bool infer(ConstraintSystem &cs,

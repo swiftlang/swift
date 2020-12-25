@@ -355,35 +355,6 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
   }
 }
 
-void ConstraintSystem::PotentialBindings::inferDefaultTypes(
-    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
-  for (const auto &literal : Literals) {
-    Constraint *constraint = nullptr;
-    bool isDirectRequirement = false;
-    Constraint *coveredBy = nullptr;
-
-    std::tie(constraint, isDirectRequirement, coveredBy) = literal.second;
-
-    // Can't be defaulted because it's already covered by an
-    // existing direct or transitive binding which is always
-    // better.
-    if (coveredBy)
-      continue;
-
-    auto defaultType = TypeChecker::getDefaultType(literal.first, cs.DC);
-    if (!defaultType)
-      continue;
-
-    // We need to figure out whether this is a direct conformance
-    // requirement or inferred transitive one to identify binding
-    // kind correctly.
-    addPotentialBinding({defaultType,
-                         isDirectRequirement ? AllowedBindingKind::Subtypes
-                                             : AllowedBindingKind::Supertypes,
-                         constraint});
-  }
-}
-
 void ConstraintSystem::PotentialBindings::finalize(
     ConstraintSystem &cs,
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
@@ -396,7 +367,6 @@ void ConstraintSystem::PotentialBindings::finalize(
 
   inferTransitiveProtocolRequirements(cs, inferredBindings);
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
-  inferDefaultTypes(cs, existingTypes);
 }
 
 Optional<ConstraintSystem::PotentialBindings>
@@ -426,13 +396,7 @@ ConstraintSystem::determineBestBindings() {
     if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
       return true;
 
-    return bindings ||
-           llvm::any_of(
-               bindings.Literals,
-               [&](const std::pair<ProtocolDecl *,
-                                   PotentialBindings::LiteralInfo> &literal) {
-                 return bool(TypeChecker::getDefaultType(literal.first, DC));
-               });
+    return bool(bindings);
   };
 
   // Now let's see if we could infer something for related type
@@ -1208,6 +1172,47 @@ bool ConstraintSystem::PotentialBindings::infer(
   }
 
   return false;
+}
+
+ConstraintSystem::LiteralBindingKind
+ConstraintSystem::PotentialBindings::getLiteralKind() const {
+  LiteralBindingKind kind = LiteralBindingKind::None;
+
+  for (const auto &literal : Literals) {
+    auto *protocol = literal.first;
+    auto *coveredBy = std::get<2>(literal.second);
+
+    // Only uncovered defaultable literal protocols participate.
+    if (coveredBy || !TypeChecker::getDefaultType(protocol, CS.DC))
+      continue;
+
+    switch (*protocol->getKnownProtocolKind()) {
+    case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+    case KnownProtocolKind::ExpressibleByArrayLiteral:
+    case KnownProtocolKind::ExpressibleByStringInterpolation:
+      kind = LiteralBindingKind::Collection;
+      break;
+
+    case KnownProtocolKind::ExpressibleByFloatLiteral:
+      kind = LiteralBindingKind::Float;
+      break;
+
+    default:
+      if (kind != LiteralBindingKind::Collection)
+        kind = LiteralBindingKind::Atom;
+      break;
+    }
+  }
+
+  return kind;
+}
+
+unsigned
+ConstraintSystem::PotentialBindings::getNumViableLiteralBindings() const {
+  return llvm::count_if(Literals, [&](const auto &literal) {
+    auto *coveredBy = std::get<2>(literal.second);
+    return !(coveredBy || !TypeChecker::getDefaultType(literal.first, CS.DC));
+  });
 }
 
 /// Check whether the given type can be used as a binding for the given

@@ -195,8 +195,9 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
-        if (defaultType->getAnyNominal() != type->getAnyNominal())
+        if (defaultType->getAnyNominal() != type->getAnyNominal()) {
           increaseScore(SK_NonDefaultLiteral);
+        }
       }
     }
   }
@@ -5349,18 +5350,48 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   // A binding to `Any` which should always be considered as a last resort.
   Optional<Binding> Any;
 
-  for (const auto &binding : bindings.Bindings) {
-    auto type = binding.BindingType;
-
+  auto addBinding = [&](const Binding &binding) {
     // Adjust optionality of existing bindings based on presence of
     // `ExpressibleByNilLiteral` requirement.
     if (requiresOptionalAdjustment(binding)) {
-      Bindings.push_back(binding.withType(OptionalType::get(type)));
-    } else if (type->isAny()) {
+      Bindings.push_back(
+          binding.withType(OptionalType::get(binding.BindingType)));
+    } else if (binding.BindingType->isAny()) {
       Any.emplace(binding);
     } else {
       Bindings.push_back(binding);
     }
+  };
+
+  for (const auto &binding : bindings.Bindings) {
+    addBinding(binding);
+  }
+
+  // Infer defaults based on "uncovered" literal protocol requirements.
+  for (const auto &literal : bindings.Literals) {
+    Constraint *constraint = nullptr;
+    bool isDirectRequirement = false;
+    Constraint *coveredBy = nullptr;
+
+    std::tie(constraint, isDirectRequirement, coveredBy) = literal.second;
+
+    // Can't be defaulted because it's already covered by an
+    // existing direct or transitive binding which is always
+    // better.
+    if (coveredBy)
+      continue;
+
+    auto defaultType = TypeChecker::getDefaultType(literal.first, CS.DC);
+    if (!defaultType)
+      continue;
+
+    // We need to figure out whether this is a direct conformance
+    // requirement or inferred transitive one to identify binding
+    // kind correctly.
+    addBinding(
+        {defaultType,
+         isDirectRequirement ? BindingKind::Subtypes : BindingKind::Supertypes,
+         constraint});
   }
 
   // Let's always consider `Any` to be a last resort binding because
