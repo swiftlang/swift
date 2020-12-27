@@ -9,11 +9,11 @@ UTILS_PATH=$SWIFT_PATH/utils/webassembly
 case $(uname -s) in
   Darwin)
     DEPENDENCIES_SCRIPT=$UTILS_PATH/macos/install-dependencies.sh
-    HOST_SUFFIX=macosx-x86_64
+    HOST_SUFFIX=macosx-$(uname -m)
   ;;
   Linux)
     DEPENDENCIES_SCRIPT=$UTILS_PATH/linux/install-dependencies.sh
-    HOST_SUFFIX=linux-x86_64
+    HOST_SUFFIX=linux-$(uname -m)
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
