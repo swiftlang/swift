@@ -9,7 +9,6 @@ else
   PIP_COMMAND=pip
 fi
 
-
 $PIP_COMMAND install six
 
 brew install cmake ninja llvm sccache
