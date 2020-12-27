@@ -2,7 +2,7 @@
 
 set -ex
 
-pip install six
+pip3 install six
 
 brew install cmake ninja llvm sccache
 
