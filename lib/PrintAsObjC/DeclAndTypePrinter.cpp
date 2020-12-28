@@ -71,7 +71,7 @@ static bool isClangKeyword(Identifier name) {
 
   if (name.empty())
     return false;
-  return keywords.find(name.str()) != keywords.end();
+  return keywords.contains(name.str());
 }
 
 

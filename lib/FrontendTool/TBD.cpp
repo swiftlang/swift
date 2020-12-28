@@ -93,7 +93,7 @@ static bool validateSymbols(DiagnosticEngine &diags,
           irNotTBD.push_back(unmangledName);
       }
     } else {
-      assert(symbolSet.find(name) == symbolSet.end() &&
+      assert(!symbolSet.contains(name) &&
              "non-global value in value symbol table");
     }
   }

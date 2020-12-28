@@ -128,7 +128,7 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
 
     // Verify the classification and string.
     if (I->Classification != Expected.Classification ||
-        !I->Message.contains(Expected.MessageStr))
+        I->Message.find(Expected.MessageStr) == StringRef::npos)
       continue;
 
     // Okay, we found a match, hurray!

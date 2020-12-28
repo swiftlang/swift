@@ -660,7 +660,7 @@ static SmallVector<StringRef, 8> findRemovedInputs(
   SmallVector<StringRef, 8> missingInputs;
   for (auto &previousInput : previousInputs) {
     auto previousInputArg = previousInput.getKey();
-    if (inputArgs.find(previousInputArg) == inputArgs.end()) {
+    if (!inputArgs.contains(previousInputArg)) {
       missingInputs.push_back(previousInputArg);
     }
   }
