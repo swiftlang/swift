@@ -53,7 +53,7 @@ class SILCFGPrinter : public SILFunctionTransform {
     if (!SILViewCFGOnlyFun.empty() && F && F->getName() != SILViewCFGOnlyFun)
       return;
     if (!SILViewCFGOnlyFuns.empty() && F &&
-        F->getName().find(SILViewCFGOnlyFuns, 0) == StringRef::npos)
+        !F->getName().contains(SILViewCFGOnlyFuns))
       return;
 
     F->viewCFG();

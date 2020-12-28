@@ -224,7 +224,7 @@ static void validateCompilationConditionArgs(DiagnosticEngine &diags,
                                              const ArgList &args) {
   for (const Arg *A : args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
-    if (name.find('=') != StringRef::npos) {
+    if (name.contains('=')) {
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);

@@ -163,12 +163,11 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
-      F->getName().find(SILPrintOnlyFuns, 0) == StringRef::npos)
+      !F->getName().contains(SILPrintOnlyFuns))
     return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
-    return T->getTag().find(Str) != StringRef::npos
-      || T->getID().find(Str) != StringRef::npos;
+    return T->getTag().contains(Str) || T->getID().contains(Str);
   };
 
   if (SILPrintBefore.end() !=
@@ -188,12 +187,11 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
-      F->getName().find(SILPrintOnlyFuns, 0) == StringRef::npos)
+      !F->getName().contains(SILPrintOnlyFuns))
     return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
-    return T->getTag().find(Str) != StringRef::npos
-      || T->getID().find(Str) != StringRef::npos;
+    return T->getTag().contains(Str) || T->getID().contains(Str);
   };
 
   if (SILPrintAfter.end() !=
@@ -215,8 +213,7 @@ static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
     return false;
 
   for (const std::string &NamePattern : SILDisablePass) {
-    if (T->getTag().find(NamePattern) != StringRef::npos
-        || T->getID().find(NamePattern) != StringRef::npos) {
+    if (T->getTag().contains(NamePattern) || T->getID().contains(NamePattern)) {
       return true;
     }
   }
@@ -233,8 +230,7 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
         std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F.getName()))
       F.dump(EmitVerboseSIL);
 
-    if (!SILPrintOnlyFuns.empty() &&
-        F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
+    if (!SILPrintOnlyFuns.empty() && F.getName().contains(SILPrintOnlyFuns))
       F.dump(EmitVerboseSIL);
   }
 }
@@ -429,8 +425,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   CurrentPassHasInvalidated = false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
-    return SFT->getTag().find(Str) != StringRef::npos ||
-           SFT->getID().find(Str) != StringRef::npos;
+    return SFT->getTag().contains(Str) || SFT->getID().contains(Str);
   };
   if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
                                                  SILVerifyBeforePass.end(),
@@ -597,8 +592,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   }
 
   auto MatchFun = [&](const std::string &Str) -> bool {
-    return SMT->getTag().find(Str) != StringRef::npos ||
-           SMT->getID().find(Str) != StringRef::npos;
+    return SMT->getTag().contains(Str) || SMT->getID().contains(Str);
   };
   if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
                                                  SILVerifyBeforePass.end(),
