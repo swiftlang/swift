@@ -8,21 +8,21 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 
 case $(uname -s) in
   Darwin)
-    OS_SUFFIX=macos_x86_64
+    OS_SUFFIX=macos_$(uname -m)
     HOST_PRESET=webassembly-host-install
-    HOST_SUFFIX=macosx-x86_64
+    HOST_SUFFIX=macosx-$(uname -m)
   ;;
   Linux)
     if [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=18.04" ]; then
-      OS_SUFFIX=ubuntu18.04_x86_64
+      OS_SUFFIX=ubuntu18.04_$(uname -m)
     elif [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=20.04" ]; then
-      OS_SUFFIX=ubuntu20.04_x86_64
+      OS_SUFFIX=ubuntu20.04_$(uname -m)
     else
       echo "Unknown Ubuntu version"
       exit 1
     fi
     HOST_PRESET=webassembly-linux-host-install
-    HOST_SUFFIX=linux-x86_64
+    HOST_SUFFIX=linux-$(uname -m)
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -53,6 +53,7 @@ build_host_toolchain() {
     --preset-file="$UTILS_PATH/build-presets.ini" \
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
+    HOST_ARCHITECTURE=$(uname -m) \
     INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
     TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
     C_CXX_LAUNCHER="$(which sccache)"
