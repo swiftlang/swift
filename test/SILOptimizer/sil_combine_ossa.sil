@@ -376,9 +376,9 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
 }
 
 // CHECK-LABEL: sil [ossa] @optimize_load_first_char_from_string_literal
-// XHECK:      bb0:
-// XHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 97
-// XHECK-NEXT:   return %0
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 97
+// CHECK-NEXT:   return %0
 sil [ossa] @optimize_load_first_char_from_string_literal : $@convention(thin) () -> Builtin.Int8 {
 bb0:
   %0 = string_literal utf8 "abc123a"
@@ -389,9 +389,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @optimize_load_from_string_literal
-// XHECK:      bb0:
-// XHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 49
-// XHECK-NEXT:   return %0
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 49
+// CHECK-NEXT:   return %0
 sil [ossa] @optimize_load_from_string_literal : $@convention(thin) () -> Builtin.Int8 {
 bb0:
   %0 = string_literal utf8 "abc123a"
@@ -604,8 +604,8 @@ sil [ossa] @mix1 : $@convention(thin) (Builtin.Int64, @guaranteed Builtin.Native
 sil [ossa] @mix2 : $@convention(thin) (@guaranteed Builtin.NativeObject, Builtin.Int64, @guaranteed Builtin.NativeObject, Builtin.Int32, Builtin.Int1) -> ()
 
 // CHECK-LABEL: sil [ossa] @load_proj_to_gep_load_canonicalization_no_rep_no_other_use_test : $@convention(thin) (@inout X) -> ()
-// XHECK-NOT: struct_extract
-// XHECK-NOT: tuple_extract
+// CHECK-NOT: struct_extract
+// CHECK-NOT: tuple_extract
 sil [ossa] @load_proj_to_gep_load_canonicalization_no_rep_no_other_use_test : $@convention(thin) (@inout X) -> () {
 bb0(%0 : $*X):
   %1 = load_borrow %0 : $*X
@@ -633,12 +633,12 @@ bb0(%0 : $*X):
 }
 
 // CHECK-LABEL: sil [ossa] @load_proj_to_gep_load_canonicalization_with_rep_no_other_use_test : $@convention(thin) (@inout X) -> ()
-// XHECK-NOT: struct_extract
-// XHECK-NOT: tuple_extract
-// XHECK: apply {{%[0-9]+}}([[ARG1:%[0-9]+]], [[ARG2:%[0-9]+]], [[ARG3:%[0-9]+]], [[ARG4:%[0-9]+]]
-// XHECK-NEXT: apply {{%[0-9]+}}([[ARG1]], [[ARG2]], [[ARG3]], [[ARG4]]
-// XHECK-NOT: struct_extract
-// XHECK-NOT: tuple_extract
+// CHECK-NOT: struct_extract
+// CHECK-NOT: tuple_extract
+// CHECK: apply {{%[0-9]+}}([[ARG1:%[0-9]+]], [[ARG2:%[0-9]+]], [[ARG3:%[0-9]+]], [[ARG4:%[0-9]+]]
+// CHECK-NEXT: apply {{%[0-9]+}}([[ARG1]], [[ARG2]], [[ARG3]], [[ARG4]]
+// CHECK-NOT: struct_extract
+// CHECK-NOT: tuple_extract
 sil [ossa] @load_proj_to_gep_load_canonicalization_with_rep_no_other_use_test : $@convention(thin) (@inout X) -> () {
 bb0(%0 : $*X):
   %1 = load_borrow %0 : $*X
@@ -664,41 +664,41 @@ bb0(%0 : $*X):
 sil [ossa] @disrupting_use : $@convention(thin) (@guaranteed Y) -> ()
 
 // CHECK-LABEL: sil [ossa] @load_proj_to_gep_load_canonicalization_no_rep_with_disrupting_use_test : $@convention(thin) (@inout X) -> ()
-// XHECK: bb0
-// XHECK-NEXT: struct_element_addr
-// XHECK-NEXT: struct_element_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: struct_element_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: struct_element_addr
-// XHECK-NEXT: tuple_element_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: tuple_element_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: struct_element_addr
-// XHECK-NEXT: tuple_element_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: tuple_element_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: struct_extract
-// XHECK-NEXT: struct_extract
-// XHECK-NEXT: struct_extract
-// XHECK-NEXT: tuple_extract
-// XHECK-NEXT: tuple_extract
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: apply
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: apply
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: function_ref
-// XHECK-NEXT: apply
-// XHECK-NEXT: end_borrow
-// XHECK-NEXT: end_borrow
-// XHECK-NEXT: end_borrow
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @load_proj_to_gep_load_canonicalization_no_rep_with_disrupting_use_test : $@convention(thin) (@inout X) -> () {
 bb0(%0 : $*X):
   %1 = load_borrow %0 : $*X
@@ -1188,16 +1188,35 @@ bb0(%0 : @owned $E):
 }
 
 // (load (upcast-addr %x)) -> (upcast-ref (load %x))
+//
 // CHECK-LABEL: sil [ossa] @load_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
-// XHECK: bb0
-// XHECK-NEXT: load
-// XHECK-NEXT: upcast
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: upcast
+// CHECK-NEXT: return
 sil [ossa] @load_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
 bb0(%0 : $*E):
   %1 = upcast %0 : $*E to $*B
   %2 = load [copy] %1 : $*B
   return %2 : $B
+}
+
+// (load (upcast-addr %x)) -> (upcast-ref (load %x))
+//
+// CHECK-LABEL: sil [ossa] @loadborrow_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
+// CHECK: bb0
+// CHECK-NEXT: load_borrow
+// CHECK-NEXT: upcast
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: return
+sil [ossa] @loadborrow_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
+bb0(%0 : $*E):
+  %1 = upcast %0 : $*E to $*B
+  %2 = load_borrow %1 : $*B
+  %3 = copy_value %2 : $B
+  end_borrow %2 : $B
+  return %3 : $B
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
@@ -3990,10 +4009,10 @@ sil_global [let] @initialized_tuple_global : $IntTuple = {
 }
 
 // CHECK-LABEL: sil [ossa] @load_from_global_let
-// XHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 27
-// XHECK:         [[R:%.*]] = struct $Int64 ([[I]] : $Builtin.Int64)
-// XHECK:         return [[R]]
-// XHECK:       } // end sil function 'load_from_global_let'
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK:         [[R:%.*]] = struct $Int64 ([[I]] : $Builtin.Int64)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'load_from_global_let'
 sil [ossa] @load_from_global_let : $@convention(thin) () -> Int64 {
 bb0:
   %0 = global_addr @initialized_let_global : $*Int64
@@ -4002,9 +4021,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @load_from_global_with_projections
-// XHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 28
-// XHECK:         return [[I]]
-// XHECK:       } // end sil function 'load_from_global_with_projections'
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_from_global_with_projections'
 sil [ossa] @load_from_global_with_projections : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = global_addr @initialized_tuple_global : $*IntTuple
@@ -4016,14 +4035,14 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @load_from_global_without_projections
-// XHECK-DAG:     [[I1:%.*]] = integer_literal $Builtin.Int64, 27
-// XHECK-DAG:     [[I2:%.*]] = integer_literal $Builtin.Int64, 28
-// XHECK-DAG:     [[S1:%.*]] = struct $Int64 ([[I1]] : $Builtin.Int64)
-// XHECK-DAG:     [[S2:%.*]] = struct $Int64 ([[I2]] : $Builtin.Int64)
-// XHECK-DAG:     [[T:%.*]] = tuple ([[S1]] : $Int64, [[S2]] : $Int64)
-// XHECK-DAG:     [[IT:%.*]] = struct $IntTuple ([[T]] : $(Int64, Int64))
-// XHECK:         return [[IT]]
-// XHECK:       } // end sil function 'load_from_global_without_projections'
+// CHECK-DAG:     [[I1:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK-DAG:     [[I2:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK-DAG:     [[S1:%.*]] = struct $Int64 ([[I1]] : $Builtin.Int64)
+// CHECK-DAG:     [[S2:%.*]] = struct $Int64 ([[I2]] : $Builtin.Int64)
+// CHECK-DAG:     [[T:%.*]] = tuple ([[S1]] : $Int64, [[S2]] : $Int64)
+// CHECK-DAG:     [[IT:%.*]] = struct $IntTuple ([[T]] : $(Int64, Int64))
+// CHECK:         return [[IT]]
+// CHECK:       } // end sil function 'load_from_global_without_projections'
 sil [ossa] @load_from_global_without_projections : $@convention(thin) () -> IntTuple {
 bb0:
   %0 = global_addr @initialized_tuple_global : $*IntTuple
@@ -4032,10 +4051,10 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @load_from_global_var
-// XHECK:         global_addr
-// XHECK-NEXT:    load
-// XHECK-NEXT:    return
-// XHECK:       } // end sil function 'load_from_global_var'
+// CHECK:         global_addr
+// CHECK-NEXT:    load
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'load_from_global_var'
 sil [ossa] @load_from_global_var : $@convention(thin) () -> Int64 {
 bb0:
   %0 = global_addr @initialized_var_global : $*Int64

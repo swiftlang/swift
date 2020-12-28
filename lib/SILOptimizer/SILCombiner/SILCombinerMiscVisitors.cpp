@@ -759,12 +759,13 @@ SILInstruction *SILCombiner::optimizeLoadFromStringLiteral(LoadInst *LI) {
 
 /// Returns true if \p LI loads a zero integer from the empty Array, Dictionary
 /// or Set singleton.
-static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
+static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
+  assert(isa<LoadInst>(LI) || isa<LoadBorrowInst>(LI));
   auto intTy = LI->getType().getAs<BuiltinIntegerType>();
   if (!intTy)
     return false;
-  
-  SILValue addr = LI->getOperand();
+
+  SILValue addr = LI->getOperand(0);
 
   // Find the root object of the load-address.
   for (;;) {
@@ -805,6 +806,8 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
       case ValueKind::UpcastInst:
       case ValueKind::RawPointerToRefInst:
       case ValueKind::AddressToPointerInst:
+      case ValueKind::BeginBorrowInst:
+      case ValueKind::CopyValueInst:
       case ValueKind::EndCOWMutationInst:
         addr = cast<SingleValueInstruction>(addr)->getOperand(0);
         break;
@@ -839,15 +842,56 @@ static SingleValueInstruction *getValueFromStaticLet(SILValue v) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
-  if (LI->getFunction()->hasOwnership())
-    return nullptr;
+SILInstruction *SILCombiner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
+  Builder.setCurrentDebugScope(lbi->getDebugScope());
+  if (auto *ui = dyn_cast<UpcastInst>(lbi->getOperand())) {
+    // We want to RAUW the current load_borrow with the upcast. To do that
+    // safely, we need to insert new end_borrow on the new load_borrow, erase
+    // the end_borrow and then RAUW.
+    SmallVector<EndBorrowInst *, 32> endBorrowInst;
+    for (auto *ebi : lbi->getEndBorrows())
+      endBorrowInst.push_back(ebi);
+    auto newLBI = Builder.createLoadBorrow(lbi->getLoc(), ui->getOperand());
+    for (auto *ebi : endBorrowInst) {
+      SILBuilderWithScope builder(ebi, Builder);
+      builder.emitEndBorrowOperation(ebi->getLoc(), newLBI);
+      eraseInstFromFunction(*ebi);
+    }
+    auto *uci = Builder.createUpcast(lbi->getLoc(), newLBI, lbi->getType());
+    replaceInstUsesWith(*lbi, uci);
+    return eraseInstFromFunction(*lbi);
+  }
 
+  // Constant-propagate the 0 value when loading "count" or "capacity" from the
+  // empty Array, Set or Dictionary storage.
+  // On high-level SIL this optimization is also done by the
+  // ArrayCountPropagation pass, but only for Array. And even for Array it's
+  // sometimes needed to propagate the empty-array count when high-level
+  // semantics function are already inlined.
+  // Note that for non-empty arrays/sets/dictionaries, the count can be
+  // propagated by redundant load elimination.
+  if (isZeroLoadFromEmptyCollection(lbi))
+    return Builder.createIntegerLiteral(lbi->getLoc(), lbi->getType(), 0);
+
+  // If we have a load_borrow that only has non_debug end_borrow uses, delete
+  // it.
+  if (llvm::all_of(getNonDebugUses(lbi), [](Operand *use) {
+        return isa<EndBorrowInst>(use->getUser());
+      })) {
+    eraseInstIncludingUsers(lbi);
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   Builder.setCurrentDebugScope(LI->getDebugScope());
   if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
-    auto NewLI = Builder.createLoad(LI->getLoc(), UI->getOperand(),
-                                    LoadOwnershipQualifier::Unqualified);
+    auto NewLI = Builder.emitLoadValueOperation(LI->getLoc(), UI->getOperand(),
+                                                LI->getOwnershipQualifier());
     return Builder.createUpcast(LI->getLoc(), NewLI, LI->getType());
   }
 
@@ -872,6 +916,17 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     StaticInitCloner cloner(LI);
     cloner.add(initVal);
     return cloner.clone(initVal);
+  }
+
+  // If we have a load [copy] whose only non-debug users are destroy_value, just
+  // eliminate it.
+  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+    if (llvm::all_of(getNonDebugUses(LI), [](Operand *use) {
+          return isa<DestroyValueInst>(use->getUser());
+        })) {
+      eraseInstIncludingUsers(LI);
+      return nullptr;
+    }
   }
 
   return nullptr;
