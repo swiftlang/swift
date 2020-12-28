@@ -256,47 +256,46 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *seai) {
   return eraseInstFromFunction(*seai);
 }
 
-SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
-  if (SVI->getFunction()->hasOwnership())
+SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *svi) {
+  SILValue cond = svi->getOperand();
+  BuiltinIntegerType *condTy = cond->getType().getAs<BuiltinIntegerType>();
+  if (!condTy || !condTy->isFixedWidth(1))
     return nullptr;
 
-  SILValue Cond = SVI->getOperand();
-  BuiltinIntegerType *CondTy = Cond->getType().getAs<BuiltinIntegerType>();
-  if (!CondTy || !CondTy->isFixedWidth(1))
-    return nullptr;
-
-  SILBasicBlock *FalseBB = nullptr;
-  SILBasicBlock *TrueBB = nullptr;
-  for (unsigned Idx = 0, Num = SVI->getNumCases(); Idx < Num; ++Idx) {
-    auto Case = SVI->getCase(Idx);
-    auto *CaseVal = dyn_cast<IntegerLiteralInst>(Case.first);
-    if (!CaseVal)
+  SILBasicBlock *falseBB = nullptr;
+  SILBasicBlock *trueBB = nullptr;
+  for (unsigned idx : range(svi->getNumCases())) {
+    auto switchCase = svi->getCase(idx);
+    auto *caseVal = dyn_cast<IntegerLiteralInst>(switchCase.first);
+    if (!caseVal)
       return nullptr;
-    SILBasicBlock *DestBB = Case.second;
-    assert(DestBB->args_empty() &&
+    SILBasicBlock *destBB = switchCase.second;
+    assert(destBB->args_empty() &&
            "switch_value case destination cannot take arguments");
-    if (CaseVal->getValue() == 0) {
-      assert(!FalseBB && "double case value 0 in switch_value");
-      FalseBB = DestBB;
+    if (caseVal->getValue() == 0) {
+      assert(!falseBB && "double case value 0 in switch_value");
+      falseBB = destBB;
     } else {
-      assert(!TrueBB && "double case value 1 in switch_value");
-      TrueBB = DestBB;
+      assert(!trueBB && "double case value 1 in switch_value");
+      trueBB = destBB;
     }
   }
-  if (SVI->hasDefault()) {
-    assert(SVI->getDefaultBB()->args_empty() &&
+
+  if (svi->hasDefault()) {
+    assert(svi->getDefaultBB()->args_empty() &&
            "switch_value default destination cannot take arguments");
-    if (!FalseBB) {
-      FalseBB = SVI->getDefaultBB();
-    } else if (!TrueBB) {
-      TrueBB = SVI->getDefaultBB();
+    if (!falseBB) {
+      falseBB = svi->getDefaultBB();
+    } else if (!trueBB) {
+      trueBB = svi->getDefaultBB();
     }
   }
-  if (!FalseBB || !TrueBB)
+
+  if (!falseBB || !trueBB)
     return nullptr;
 
-  Builder.setCurrentDebugScope(SVI->getDebugScope());
-  return Builder.createCondBranch(SVI->getLoc(), Cond, TrueBB, FalseBB);
+  Builder.setCurrentDebugScope(svi->getDebugScope());
+  return Builder.createCondBranch(svi->getLoc(), cond, trueBB, falseBB);
 }
 
 namespace {

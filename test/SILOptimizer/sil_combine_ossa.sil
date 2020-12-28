@@ -3681,9 +3681,10 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
   return %16 : $Int32                               // id: %17
 }
 
-// CHECK-LABEL: sil [ossa] @switch_value_to_cond_br_1
-// XHECK:      bb0({{.*}}):
-// XHECK-NEXT:   cond_br %0, bb1, bb2
+// CHECK-LABEL: sil [ossa] @switch_value_to_cond_br_1 :
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+// CHECK: } // end sil function 'switch_value_to_cond_br_1'
 sil [ossa] @switch_value_to_cond_br_1 : $@convention(thin) (Builtin.Int1) -> Int32 {
 bb0(%0 : $Builtin.Int1):
   %t1 = integer_literal $Builtin.Int1, -1
@@ -3703,9 +3704,10 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
   return %16 : $Int32                               // id: %17
 }
 
-// CHECK-LABEL: sil [ossa] @switch_value_to_cond_br_2
-// XHECK:      bb0({{.*}}):
-// XHECK-NEXT:   cond_br %0, bb2, bb1
+// CHECK-LABEL: sil [ossa] @switch_value_to_cond_br_2 :
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   cond_br %0, bb2, bb1
+// CHECK: } // end sil function 'switch_value_to_cond_br_2'
 sil [ossa] @switch_value_to_cond_br_2 : $@convention(thin) (Builtin.Int1) -> Int32 {
 bb0(%0 : $Builtin.Int1):
   %f1 = integer_literal $Builtin.Int1, 0
@@ -3725,9 +3727,10 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
   return %16 : $Int32                               // id: %17
 }
 
-// CHECK-LABEL: sil [ossa] @switch_value_to_cond_br_3
-// XHECK:      bb0({{.*}}):
-// XHECK-NEXT:   cond_br %0, bb1, bb2
+// CHECK-LABEL: sil [ossa] @switch_value_to_cond_br_3 :
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+// CHECK: } // end sil function 'switch_value_to_cond_br_3'
 sil [ossa] @switch_value_to_cond_br_3 : $@convention(thin) (Builtin.Int1) -> Int32 {
 bb0(%0 : $Builtin.Int1):
   %t1 = integer_literal $Builtin.Int1, -1
