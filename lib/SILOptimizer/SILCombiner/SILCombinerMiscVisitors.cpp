@@ -210,29 +210,25 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   return eraseInstFromFunction(*SEAI);
 }
 
-SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
-  if (SEAI->getFunction()->hasOwnership())
-    return nullptr;
-
+SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *seai) {
   // Canonicalize a select_enum_addr: if the default refers to exactly one case,
   // then replace the default with that case.
-  Builder.setCurrentDebugScope(SEAI->getDebugScope());
-  if (SEAI->hasDefault()) {
-    NullablePtr<EnumElementDecl> elementDecl = SEAI->getUniqueCaseForDefault();
+  Builder.setCurrentDebugScope(seai->getDebugScope());
+  if (seai->hasDefault()) {
+    NullablePtr<EnumElementDecl> elementDecl = seai->getUniqueCaseForDefault();
     if (elementDecl.isNonNull()) {
       // Construct a new instruction by copying all the case entries.
-      SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
-      for (int idx = 0, numIdcs = SEAI->getNumCases(); idx < numIdcs; ++idx) {
-        CaseValues.push_back(SEAI->getCase(idx));
+      SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> caseValues;
+      for (int idx = 0, numIdcs = seai->getNumCases(); idx < numIdcs; ++idx) {
+        caseValues.push_back(seai->getCase(idx));
       }
       // Add the default-entry of the original instruction as case-entry.
-      CaseValues.push_back(
-          std::make_pair(elementDecl.get(), SEAI->getDefaultResult()));
+      caseValues.push_back(
+          std::make_pair(elementDecl.get(), seai->getDefaultResult()));
 
-      return Builder.createSelectEnumAddr(SEAI->getLoc(),
-                                          SEAI->getEnumOperand(),
-                                          SEAI->getType(), SILValue(),
-                                          CaseValues);
+      return Builder.createSelectEnumAddr(
+          seai->getLoc(), seai->getEnumOperand(), seai->getType(), SILValue(),
+          caseValues);
     }
   }
 
@@ -241,20 +237,23 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   //     ->
   //   %value = load %ptr
   //   = select_enum %value
-  SILType Ty = SEAI->getEnumOperand()->getType();
-  if (!Ty.isLoadable(*SEAI->getFunction()))
+  SILType ty = seai->getEnumOperand()->getType();
+  if (!ty.isLoadable(*seai->getFunction()))
     return nullptr;
 
-  SmallVector<std::pair<EnumElementDecl*, SILValue>, 8> Cases;
-  for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
-    Cases.push_back(SEAI->getCase(i));
+  SmallVector<std::pair<EnumElementDecl *, SILValue>, 8> cases;
+  for (int i = 0, e = seai->getNumCases(); i < e; ++i)
+    cases.push_back(seai->getCase(i));
 
-  SILValue Default = SEAI->hasDefault() ? SEAI->getDefaultResult() : SILValue();
-  LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), SEAI->getEnumOperand(),
-                                         LoadOwnershipQualifier::Unqualified);
-  auto *I = Builder.createSelectEnum(SEAI->getLoc(), EnumVal, SEAI->getType(),
-                                     Default, Cases);
-  return I;
+  SILValue defaultCase =
+      seai->hasDefault() ? seai->getDefaultResult() : SILValue();
+  auto enumVal =
+      Builder.emitLoadBorrowOperation(seai->getLoc(), seai->getEnumOperand());
+  auto *result = Builder.createSelectEnum(seai->getLoc(), enumVal,
+                                          seai->getType(), defaultCase, cases);
+  Builder.emitEndBorrowOperation(seai->getLoc(), enumVal);
+  replaceInstUsesWith(*seai, result);
+  return eraseInstFromFunction(*seai);
 }
 
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {

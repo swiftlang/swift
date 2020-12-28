@@ -54,10 +54,11 @@ bb2:                                              // Preds: bb0
   unreachable                                     // id: %23
 }
 
-// CHECK-LABEL: sil [ossa] @eliminate_select_enum_addr
-// XHECK-NOT: select_enum_addr
-// XHECK: select_enum
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @eliminate_select_enum_addr :
+// CHECK-NOT: select_enum_addr
+// CHECK: [[BORROWED_VAL:%.*]] = load_borrow
+// CHECK: select_enum [[BORROWED_VAL]]
+// CHECK: } // end sil function 'eliminate_select_enum_addr'
 sil [ossa] @eliminate_select_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>
@@ -124,10 +125,9 @@ enum G<T> {
   case E2
 }
 
-// CHECK-LABEL: sil [ossa] @canonicalize_select_enum_addr
-// XHECK: select_enum_addr {{.*}} case #G.E2!enumelt:
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @canonicalize_select_enum_addr :
+// CHECK: select_enum_addr {{.*}} case #G.E2!enumelt:
+// CHECK: } // end sil function 'canonicalize_select_enum_addr'
 sil [ossa] @canonicalize_select_enum_addr : $@convention(thin) <T> (@in G<T>) -> Int32 {
 bb0(%0 : $*G<T>):
   %2 = integer_literal $Builtin.Int32, 0
