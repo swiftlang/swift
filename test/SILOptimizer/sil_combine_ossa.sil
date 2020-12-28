@@ -1329,6 +1329,9 @@ bb0(%0 : @owned $E):
   return %2 : $Builtin.NativeObject
 }
 
+// NOTE: We currently promote the switch_enum, but we do not handle the
+// unchecked_take_enum_data_addr yet.
+//
 // CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> @owned B {
 // XHECK: bb0(%0 : $*FakeOptional<B>):
 // XHECK-NEXT: [[BORROW:%.*]] = load_borrow
@@ -2254,12 +2257,13 @@ struct FakeInt32 {
   var val : Builtin.Int32
 }
 
-// CHECK-LABEL: sil [ossa] @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
-// XHECK-NOT: switch_enum_addr
-// XHECK: load
-// XHECK-NEXT: switch_enum
-// XHECK-NOT: switch_enum_addr
-sil [ossa] @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+// CHECK-LABEL: sil [ossa] @loadable_switchenumaddr_promotion_trivial : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK: load [trivial]
+// CHECK-NEXT: switch_enum
+// CHECK-NOT: switch_enum_addr
+// CHECK: } // end sil function 'loadable_switchenumaddr_promotion_trivial'
+sil [ossa] @loadable_switchenumaddr_promotion_trivial : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
   switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -2274,11 +2278,75 @@ bb3:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @resilient_enum_case_propagation
-// XHECK: bb0:
-// XHECK:   br bb2
-// XHECK: bb1:
-// XHECK:   return
+// CHECK-LABEL: sil [ossa] @loadable_switchenumaddr_promotion_nontrivial : $@convention(thin) (@in_guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK: load_borrow
+// CHECK-NEXT: switch_enum
+// CHECK-NOT: switch_enum_addr
+// CHECK: } // end sil function 'loadable_switchenumaddr_promotion_nontrivial'
+sil [ossa] @loadable_switchenumaddr_promotion_nontrivial : $@convention(thin) (@in_guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $*FakeOptional<Builtin.NativeObject>):
+  switch_enum_addr %0 : $*FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loadable_switchenumaddr_promotion_trivial_default : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK: load [trivial]
+// CHECK-NEXT: switch_enum
+// CHECK-NOT: switch_enum_addr
+// CHECK: } // end sil function 'loadable_switchenumaddr_promotion_trivial_default'
+sil [ossa] @loadable_switchenumaddr_promotion_trivial_default : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
+  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt: bb1, default bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loadable_switchenumaddr_promotion_nontrivial_default : $@convention(thin) (@in_guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK: load_borrow
+// CHECK-NEXT: switch_enum
+// CHECK-NOT: switch_enum_addr
+// CHECK: } // end sil function 'loadable_switchenumaddr_promotion_nontrivial_default'
+sil [ossa] @loadable_switchenumaddr_promotion_nontrivial_default : $@convention(thin) (@in_guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $*FakeOptional<Builtin.NativeObject>):
+  switch_enum_addr %0 : $*FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @resilient_enum_case_propagation :
+// CHECK: bb0:
+// CHECK:   br bb2
+// CHECK: bb1:
+// CHECK:   return
+// CHECK: } // end sil function 'resilient_enum_case_propagation'
 sil [ossa] @resilient_enum_case_propagation : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $FloatingPointRoundingRule
