@@ -321,6 +321,10 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
     if (useInsts.count(inst))
       ++numLoadsFound;
 
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(inst))
+      if (DAI->getOperand() == copySrc)
+        return nullptr;
+
     // If this is the last use of the temp we are ok. After this point,
     // modifications to the source don't matter anymore.
     // Note that we are assuming here that if an instruction loads and writes
