@@ -4638,13 +4638,13 @@ public: // binding inference logic is public for unit testing.
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      PointerUnion<Constraint *, ConstraintLocator *> source)
-        : BindingType(type->getWithoutParens()), Kind(kind),
-          BindingSource(source) {}
+        : BindingType(type), Kind(kind), BindingSource(source) {}
 
   public:
     PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
-        : BindingType(type->getWithoutParens()), Kind(kind),
-          BindingSource(source) {}
+        : PotentialBinding(
+              type->getWithoutParens(), kind,
+              PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
 
     bool isDefaultableBinding() const {
       if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
@@ -4694,6 +4694,11 @@ public: // binding inference logic is public for unit testing.
       return {HoleType::get(typeVar->getASTContext(), typeVar),
               AllowedBindingKind::Exact,
               /*source=*/locator};
+    }
+
+    static PotentialBinding forPlaceholder(Type placeholderTy) {
+      return {placeholderTy, AllowedBindingKind::Exact,
+              PointerUnion<Constraint *, ConstraintLocator *>()};
     }
   };
 
@@ -6233,6 +6238,53 @@ struct DenseMapInfo<swift::constraints::SolutionApplicationTargetsKey> {
   }
 };
 
+template <>
+struct DenseMapInfo<swift::constraints::ConstraintSystem::PotentialBinding> {
+  using Binding = swift::constraints::ConstraintSystem::PotentialBinding;
+
+  static Binding getEmptyKey() {
+    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
+  }
+
+  static Binding getTombstoneKey() {
+    return placeholderKey(
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const Binding &Val) {
+    return DenseMapInfo<swift::Type>::getHashValue(Val.BindingType);
+  }
+
+  static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    auto lhsTy = LHS.BindingType.getPointer();
+    auto rhsTy = RHS.BindingType.getPointer();
+
+    // Fast path: pointer equality.
+    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
+      return true;
+
+    // If either side is empty or tombstone, let's use pointer equality.
+    {
+      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
+      auto tombstoneTy =
+          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
+
+      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
+        return lhsTy == rhsTy;
+
+      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
+        return lhsTy == rhsTy;
+    }
+
+    // Otherwise let's drop the sugar and check.
+    return LHS.BindingType->isEqual(RHS.BindingType);
+  }
+
+private:
+  static Binding placeholderKey(swift::Type type) {
+    return Binding::forPlaceholder(type);
+  }
+};
 }
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
