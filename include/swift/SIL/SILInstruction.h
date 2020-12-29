@@ -8885,7 +8885,12 @@ private:
                    SILModule &module);
 
 public:
-  /// Note: explicit extractee type may be specified only in lowered SIL.
+  /// Note: explicit extractee type is used to avoid inconsistent typing in:
+  /// - Canonical SIL, due to generic specialization.
+  /// - Lowered SIL, due to LoadableByAddress.
+  /// - Raw SIL, due to deserialization of canonical/lowered SIL functions.
+  /// See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
+  /// explanation of how explicit extractee type is used.
   explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
       NormalDifferentiableFunctionTypeComponent extractee, SILValue function,

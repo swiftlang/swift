@@ -727,18 +727,6 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
                                : getExtracteeType(function, extractee, module),
                            function.getOwnershipKind()),
       Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
-#ifndef NDEBUG
-  if (extracteeType.hasValue()) {
-    // Note: explicit extractee type is used to avoid inconsistent typing in:
-    // - Canonical SIL, due to generic specialization.
-    // - Lowered SIL, due to LoadableByAddress.
-    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
-    // explanation of how explicit extractee type is used.
-    assert((module.getStage() == SILStage::Canonical ||
-            module.getStage() == SILStage::Lowered) &&
-           "Explicit type is valid only in canonical or lowered SIL");
-  }
-#endif
 }
 
 SILType LinearFunctionExtractInst::
