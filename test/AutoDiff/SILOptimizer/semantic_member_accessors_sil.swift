@@ -44,7 +44,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK-LABEL: // differentiability witness for Struct.x.getter
 // CHECK-NEXT: sil_differentiability_witness private [parameters 0] [results 0] @$s4null6StructV1xSfvg : $@convention(method) (Struct) -> Float {
 
-// CHECK-LABEL: sil private [ossa] @AD__$s4null7GenericV1xxvs__pullback_src_0_wrt_0_1_{{16_Differentiation|s}}14DifferentiableRzl : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@inout Generic<τ_0_0>.TangentVector, @owned {{.*}}) -> @out τ_0_0.TangentVector {
+// CHECK-LABEL: sil private [ossa] @AD__$s4null7GenericV1xxvs__pullback_src_0_wrt_0_1_{{16_Differentiation|s}}14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@inout Generic<τ_0_0>.TangentVector, @owned {{.*}}) -> @out τ_0_0.TangentVector {
 // CHECK: bb0([[ADJ_X_RESULT:%.*]] : $*τ_0_0.TangentVector, [[ADJ_SELF:%.*]] : $*Generic<τ_0_0>.TangentVector, {{.*}} : {{.*}}):
 // CHECK:   [[ADJ_X_TMP:%.*]] = alloc_stack $τ_0_0.TangentVector
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
@@ -60,7 +60,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK:   return {{.*}} : $()
 // CHECK: }
 
-// CHECK-LABEL: sil private [ossa] @AD__$s4null7GenericV1xxvg__pullback_src_0_wrt_0_{{16_Differentiation|s}}14DifferentiableRzl : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned {{.*}}) -> @out Generic<τ_0_0>.TangentVector {
+// CHECK-LABEL: sil private [ossa] @AD__$s4null7GenericV1xxvg__pullback_src_0_wrt_0_{{16_Differentiation|s}}14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned {{.*}}) -> @out Generic<τ_0_0>.TangentVector {
 // CHECK: bb0([[ADJ_SELF_RESULT:%.*]] : $*Generic<τ_0_0>.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{.*}} : ${{.*}}):
 // CHECK:   [[ADJ_SELF_TMP:%.*]] = alloc_stack $Generic<τ_0_0>.TangentVector
 // CHECK:   [[SEED_COPY:%.*]] = alloc_stack $τ_0_0.TangentVector
@@ -76,7 +76,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK:   return {{.*}} : $()
 // CHECK: }
 
-// CHECK-LABEL: sil private [ossa] @AD__$s4null6StructV1xSfvs__pullback_src_0_wrt_0_1 : $@convention(method) (@inout Struct.TangentVector, @owned _AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1) -> Float {
+// CHECK-LABEL: sil private [ossa] @AD__$s4null6StructV1xSfvs__pullback_src_0_wrt_0_1 : $@convention(thin) (@inout Struct.TangentVector, @owned _AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1) -> Float {
 // CHECK: bb0([[ADJ_SELF:%.*]] : $*Struct.TangentVector, {{.*}} : $_AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1):
 // CHECK:   [[ADJ_X_ADDR:%.*]] = struct_element_addr [[ADJ_SELF]] : $*Struct.TangentVector, #Struct.TangentVector.x
 // CHECK:   [[ADJ_X:%.*]] = load [trivial] [[ADJ_X_ADDR]] : $*Float
@@ -85,7 +85,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK:   return [[ADJ_X]] : $Float
 // CHECK: }
 
-// CHECK-LABEL: sil private [ossa] @AD__$s4null6StructV1xSfvg__pullback_src_0_wrt_0 : $@convention(method) (Float, @owned _AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0) -> Struct.TangentVector {
+// CHECK-LABEL: sil private [ossa] @AD__$s4null6StructV1xSfvg__pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0) -> Struct.TangentVector {
 // CHECK: bb0([[ADJ_X:%.*]] : $Float, {{.*}} : $_AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0):
 // CHECK:   [[ADJ_Y_ADDR:%.*]] = alloc_stack $Float
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
