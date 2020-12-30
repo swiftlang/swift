@@ -1458,11 +1458,11 @@ bb0(%0 : $*E, %1 : @owned $E, %2 : $*E):
 }
 
 // CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
-// XHECK: bb0
-// XHECK-NEXT: pointer_to_address
-// XHECK-NEXT: index_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: index_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: return
 sil [ossa] @indexrawpointer_to_indexaddr : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %3 = metatype $@thick Int8.Type
@@ -1477,11 +1477,12 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 // CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr_strideof : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
-// XHECK: bb0
-// XHECK-NEXT: pointer_to_address
-// XHECK-NEXT: index_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: index_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'indexrawpointer_to_indexaddr_strideof'
 sil [ossa] @indexrawpointer_to_indexaddr_strideof : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %3 = metatype $@thick Int8.Type
@@ -1512,11 +1513,11 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 // CHECK-LABEL: sil [ossa] @indexrawpointer_to_indexaddr_with_casts : $@convention(thin) (Builtin.RawPointer, Builtin.Int64) -> Int32
-// XHECK:      pointer_to_address
-// XHECK-NEXT: builtin "truncOrBitCast_Int64_Word"
-// XHECK-NEXT: index_addr
-// XHECK-NEXT: load
-// XHECK-NEXT: return
+// CHECK:      pointer_to_address
+// CHECK-NEXT: builtin "truncOrBitCast_Int64_Word"
+// CHECK-NEXT: index_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: return
 // CHECK: } // end sil function 'indexrawpointer_to_indexaddr_with_casts'
 sil [ossa] @indexrawpointer_to_indexaddr_with_casts : $@convention(thin) (Builtin.RawPointer, Builtin.Int64) -> Int32 {
 bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):

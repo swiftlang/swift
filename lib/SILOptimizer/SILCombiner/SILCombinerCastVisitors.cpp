@@ -114,8 +114,6 @@ SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   auto *F = PTAI->getFunction();
-  if (F->hasOwnership())
-    return nullptr;
 
   Builder.setCurrentDebugScope(PTAI->getDebugScope());
 
@@ -127,11 +125,20 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // (pointer-to-address strict (address-to-pointer %x))
   // -> (unchecked_addr_cast %x)
   if (PTAI->isStrict()) {
-    if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
-      return Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
-                                             PTAI->getType());
+    // We can not perform this optimization with ownership until we are able to
+    // handle issues around interior pointers and expanding borrow scopes.
+    if (!F->hasOwnership()) {
+      if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
+        return Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
+                                               PTAI->getType());
+      }
     }
   }
+
+  // The rest of these canonicalizations optimize the code around
+  // pointer_to_address by leave in a pointer_to_address meaning that we do not
+  // need to worry about moving addresses out of interior pointer scopes.
+
   // Turn this also into an index_addr. We generate this pattern after switching
   // the Word type to an explicit Int32 or Int64 in the stdlib.
   //
@@ -147,6 +154,10 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //         $Builtin.Word
   // %114 = index_raw_pointer %100 : $Builtin.RawPointer, %113 : $Builtin.Word
   // %115 = pointer_to_address %114 : $Builtin.RawPointer to [strict] $*Int
+  //
+  // This is safe for ownership since our final SIL still has a
+  // pointer_to_address meaning that we do not need to worry about interior
+  // pointers.
   SILValue Distance;
   SILValue TruncOrBitCast;
   MetatypeInst *Metatype;
@@ -197,6 +208,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       }
     }
   }
+
   // Turn:
   //
   //   %stride = Builtin.strideof(T) * %distance
@@ -208,6 +220,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //   %addr = pointer_to_address %ptr, [strict] $T
   //   %result = index_addr %addr, %distance
   //
+  // This is safe for ownership since our final SIL still has a
+  // pointer_to_address meaning that we do not need to worry about interior
+  // pointers.
   BuiltinInst *Bytes = nullptr;
   if (match(PTAI->getOperand(),
             m_IndexRawPointerInst(
