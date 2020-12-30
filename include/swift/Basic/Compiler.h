@@ -103,4 +103,12 @@
 #define SWIFT_CRASH_BUG_REPORT_MESSAGE \
   "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and the crash backtrace."
 
+#ifdef NDEBUG
+#define SWIFT_ASSERT_ONLY_DECL(X)
+#define SWIFT_ASSERT_ONLY(X) do { } while (false)
+#else
+#define SWIFT_ASSERT_ONLY_DECL(X) X
+#define SWIFT_ASSERT_ONLY(X) do { X; } while (false)
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H

@@ -90,14 +90,6 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 
-#ifdef NDEBUG
-#define SWIFT_ASSERT_ONLY_MEMBER(X)
-#define SWIFT_ASSERT_ONLY(X) do { } while (false)
-#else
-#define SWIFT_ASSERT_ONLY_MEMBER(X) X
-#define SWIFT_ASSERT_ONLY(X) do { X; } while (false)
-#endif
-
 namespace swift {
 
 /// Discover "pruned" liveness for an arbitrary set of uses. The client builds
@@ -140,7 +132,7 @@ private:
   llvm::SmallDenseMap<SILBasicBlock *, bool, 4> liveBlocks;
 
   // Once the first use has been seen, no definitions can be added.
-  SWIFT_ASSERT_ONLY_MEMBER(bool seenUse = false);
+  SWIFT_ASSERT_ONLY_DECL(bool seenUse = false);
 
 public:
   bool empty() const { return liveBlocks.empty(); }
