@@ -139,6 +139,8 @@ public:
 
   void clear() { liveBlocks.clear(); SWIFT_ASSERT_ONLY(seenUse = false); }
 
+  unsigned numLiveBlocks() const { return liveBlocks.size(); }
+
   void initializeDefBlock(SILBasicBlock *defBB) {
     assert(!seenUse && "cannot initialize more defs with partial liveness");
     markBlockLive(defBB, LiveWithin);
@@ -204,10 +206,17 @@ public:
     users.clear();
   }
 
+  unsigned numLiveBlocks() const { return liveBlocks.numLiveBlocks(); }
+
   void initializeDefBlock(SILBasicBlock *defBB) {
     liveBlocks.initializeDefBlock(defBB);
   }
 
+  /// For flexibility, \p lifetimeEnding is provided by the
+  /// caller. PrunedLiveness makes no assumptions about the def-use
+  /// relationships that generate liveness. For example, use->isLifetimeEnding()
+  /// cannot distinguish the end of the borrow scope that defines this extended
+  /// live range vs. a nested borrow scope within the extended live range.
   void updateForUse(Operand *use, bool lifetimeEnding);
 
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb) const {
