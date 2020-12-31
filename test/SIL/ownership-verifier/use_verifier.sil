@@ -113,6 +113,10 @@ class ClassProtConformingRef {}
 protocol ClassProt : AnyObject {}
 extension ClassProtConformingRef : ClassProt {}
 
+struct UInt64 {
+   var _value: Builtin.Int64
+}
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -1430,4 +1434,13 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = ref_to_unmanaged %0 : $Builtin.NativeObject to $@sil_unmanaged Builtin.NativeObject
   %2 = unmanaged_to_ref %1 : $@sil_unmanaged Builtin.NativeObject to $Builtin.NativeObject
   return %2 : $Builtin.NativeObject
+}
+
+sil [ossa] @conversion_to_and_from_bridge_object : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = value_to_bridge_object %1 : $UInt64
+  %3 = bridge_object_to_word %2 : $Builtin.BridgeObject to $Builtin.Word
+  %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64
+  return %4 : $Builtin.Int64
 }

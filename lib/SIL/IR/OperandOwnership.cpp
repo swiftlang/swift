@@ -188,7 +188,6 @@ OPERAND_OWNERSHIP(InstantaneousUse, ValueMetatype)
 OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
-OPERAND_OWNERSHIP(InstantaneousUse, BridgeObjectToWord)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
@@ -228,6 +227,7 @@ OPERAND_OWNERSHIP(BitwiseEscape, UncheckedBitwiseCast)
 OPERAND_OWNERSHIP(BitwiseEscape, ValueToBridgeObject)
 OPERAND_OWNERSHIP(BitwiseEscape, RefToRawPointer)
 OPERAND_OWNERSHIP(BitwiseEscape, UncheckedTrivialBitCast)
+OPERAND_OWNERSHIP(BitwiseEscape, BridgeObjectToWord)
 // FIXME: verify that no-escape results are always trivial
 OPERAND_OWNERSHIP(BitwiseEscape, ConvertEscapeToNoEscape)
 
