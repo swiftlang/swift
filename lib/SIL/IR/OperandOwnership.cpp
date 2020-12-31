@@ -259,6 +259,11 @@ OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialValue)
 OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialBoxValue)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
+
+// The begin_apply token represents the borrow scope of all owned and guaranteed
+// call arguments. Although SILToken is (currently) trivially typed, it must
+// have guaranteed ownership so end_apply and abort_apply will be recognized
+// as lifetime-ending uses.
 OPERAND_OWNERSHIP(EndBorrow, EndApply)
 OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 
