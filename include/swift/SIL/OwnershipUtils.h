@@ -82,29 +82,24 @@ class ForwardingOperand {
 public:
   static Optional<ForwardingOperand> get(Operand *use);
 
-  Operand *getUse() const { return use; }
   OwnershipConstraint getOwnershipConstraint() const {
     // We use a force unwrap since a ForwardingOperand should always have an
     // ownership constraint.
     return use->getOwnershipConstraint();
   }
+
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
-  const OwnershipForwardingInst *operator->() const {
-    return cast<OwnershipForwardingInst>(use->getUser());
-  }
-  OwnershipForwardingInst *operator->() {
-    return cast<OwnershipForwardingInst>(use->getUser());
-  }
-  const OwnershipForwardingInst &operator*() const {
-    return *cast<OwnershipForwardingInst>(use->getUser());
-  }
-  OwnershipForwardingInst &operator*() {
-    return *cast<OwnershipForwardingInst>(use->getUser());
-  }
+  const Operand *operator->() const { return use; }
+
+  Operand *operator->() { return use; }
+
+  const Operand &operator*() const { return *use; }
+
+  Operand &operator*() { return *use; }
 
   /// Call \p visitor with each value that contains the final forwarded
   /// ownership of. E.x.: result of a unchecked_ref_cast, phi arguments of a

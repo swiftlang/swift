@@ -900,7 +900,35 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
 }
 
 ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
-  return (*this)->getOwnershipKind();
+  auto *user = use->getUser();
+
+  // NOTE: This if chain is meant to be a covered switch, so make sure to return
+  // in each if itself since we have an unreachable at the bottom to ensure if a
+  // new subclass of OwnershipForwardingInst is added
+  if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
+    return ofsvi->getOwnershipKind();
+
+  if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
+    return ofsvi->getOwnershipKind();
+
+  if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
+    return ofci->getOwnershipKind();
+
+  if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
+    return ofseib->getOwnershipKind();
+
+  if (auto *ofmvi =
+          dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
+    assert(ofmvi->getNumOperands() == 1);
+    return ofmvi->getOwnershipKind();
+  }
+
+  if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
+    assert(ofti->getNumOperands() == 1);
+    return ofti->getOwnershipKind();
+  }
+
+  llvm_unreachable("Unhandled forwarding inst?!");
 }
 
 void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
