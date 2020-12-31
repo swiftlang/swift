@@ -55,7 +55,7 @@ sil [ossa] @unknown : $@convention(thin) () -> ()
 //////////////////////
 
 // CHECK-LABEL: sil [ossa] @dead_inst_elimination_one_bb
-// XHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
 sil [ossa] @dead_inst_elimination_one_bb : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int64, 24
   %1 = tuple()
@@ -63,10 +63,10 @@ sil [ossa] @dead_inst_elimination_one_bb : $@convention(thin) () -> () {
 }
 
 // CHECK-LABEL: sil [ossa] @dead_inst_elimination_diamond
-// XHECK: bb0
-// XHECK-NOT: integer_literal $Builtin.Int64, 24
-// XHECK: bb1
-// XHECK-NOT: integer_literal $Builtin.Int64, 48
+// CHECK: bb0
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK: bb1
+// CHECK-NOT: integer_literal $Builtin.Int64, 48
 sil [ossa] @dead_inst_elimination_diamond : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %1 = integer_literal $Builtin.Int64, 24
@@ -88,16 +88,16 @@ bb3:
 sil [ossa] @random_counter : $@convention(thin) () -> Builtin.Int1
 
 // CHECK-LABEL: sil [ossa] @dead_inst_elimination_loop
-// XHECK: bb0
-// XHECK-NOT: integer_literal
-// XHECK: bb1
-// XHECK: function_ref
-// XHECK: apply
-// XHECK-NOT: integer_literal
-// XHECK: bb2
-// XHECK-NOT: integer_literal
-// XHECK: tuple
-// XHECK: return
+// CHECK: bb0
+// CHECK-NOT: integer_literal
+// CHECK: bb1
+// CHECK: function_ref
+// CHECK: apply
+// CHECK-NOT: integer_literal
+// CHECK: bb2
+// CHECK-NOT: integer_literal
+// CHECK: tuple
+// CHECK: return
 sil [ossa] @dead_inst_elimination_loop : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int64, 24
@@ -122,10 +122,10 @@ bb2:
 // SILCombine, we should not dce dead instructions in unreachable code.
 
 // CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// XHECK: bb0
-// XHECK-NOT: integer_literal $Builtin.Int64, 24
-// XHECK: bb1
-// XHECK: integer_literal $Builtin.Int64, 48
+// CHECK: bb0
+// CHECK-NOT: integer_literal $Builtin.Int64, 24
+// CHECK: bb1
+// CHECK: integer_literal $Builtin.Int64, 48
 sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int64, 24
@@ -152,10 +152,10 @@ bb1:
 }
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
-// XHECK: store
-// XHECK-NEXT: destroy_value
-// XHECK-NOT: unchecked_ref_cast
-// XHECK: } // end sil function 'removeTriviallyDeadInstructions'
+// CHECK: store
+// CHECK-NEXT: destroy_value
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'removeTriviallyDeadInstructions'
 sil [ossa] @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
@@ -171,10 +171,10 @@ bb0(%0 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadCrossBasicBlocks
-// XHECK-NOT: unchecked_ref_cast
-// XHECK: cond_br
-// XHECK-NOT: unchecked_ref_cast
-// XHECK: }
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: cond_br
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: }
 sil [ossa] @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0 : @owned $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
@@ -193,10 +193,10 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @dead_use_of_alloc_stack
-// XHECK: bb
-// XHECK: alloc_stack
-// XHECK: dealloc_stack
-// XHECK: }
+// CHECK: bb
+// CHECK: alloc_stack
+// CHECK: dealloc_stack
+// CHECK: }
 sil [ossa] @dead_use_of_alloc_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $((), (), ())
@@ -207,8 +207,8 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @tuple_extract
-// XHECK: bb
-// XHECK-NEXT: return %0
+// CHECK: bb
+// CHECK-NEXT: return %0
 sil [ossa] @tuple_extract : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = tuple (%0 : $Int64, %0 : $Int64)
@@ -217,14 +217,14 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil [ossa] @do_not_fold_integer_literal
-// XHECK: bb
-// XHECK: cond_br
-// XHECK: {{^bb}}
-// XHECK-NEXT: integer_literal
-// XHECK-NEXT: br bb
-// XHECK: {{^bb}}
-// XHECK-NEXT: integer_literal
-// XHECK-NEXT: br bb
+// CHECK: bb
+// CHECK: cond_br
+// CHECK: {{^bb}}
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br bb
+// CHECK: {{^bb}}
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: br bb
 sil [ossa] @do_not_fold_integer_literal : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
@@ -243,15 +243,15 @@ bb2(%3 : $Builtin.Int1):
 
 enum BoolLike { case true_, false_ }
 
-// CHECK-LABEL: sil [ossa] @fold_enum
-// XHECK: bb
-// XHECK: switch_enum
-// XHECK: {{^bb}}
-// XHECK-NOT: enum
-// XHECK-NEXT: br bb
-// XHECK: {{^bb}}
-// XHECK-NOT: enum
-// XHECK-NEXT: br bb
+// CHECK-LABEL: sil [ossa] @fold_enum :
+// CHECK: bb
+// CHECK: switch_enum
+// CHECK: {{^bb}}
+// CHECK-NOT: enum
+// CHECK-NEXT: br bb
+// CHECK: {{^bb}}
+// CHECK-NOT: enum
+// CHECK-NEXT: br bb
 sil [ossa] @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -269,14 +269,14 @@ bb3(%3 : $BoolLike):
 }
 
 // CHECK-LABEL: sil [ossa] @do_not_fold_enum
-// XHECK: bb
-// XHECK: switch_enum
-// XHECK: {{^bb}}
-// XHECK-NEXT: enum
-// XHECK-NEXT: br bb
-// XHECK: {{^bb}}
-// XHECK-NEXT: enum
-// XHECK-NEXT: br bb
+// CHECK: bb
+// CHECK: switch_enum
+// CHECK: {{^bb}}
+// CHECK-NEXT: enum
+// CHECK-NEXT: br bb
+// CHECK: {{^bb}}
+// CHECK-NEXT: enum
+// CHECK-NEXT: br bb
 sil [ossa] @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -294,14 +294,14 @@ bb3(%3 : $BoolLike):
 }
 
 // CHECK-LABEL: sil [ossa] @struct_extract_load_to_load_struct_element_addr :
-// XHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
-// XHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
-// XHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
-// XHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// XHECK-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
-// XHECK-NEXT:  store [[UINT8]] to [trivial] [[IN]] : $*UInt8
-// XHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
-// XHECK: } // end sil function 'struct_extract_load_to_load_struct_element_addr'
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
+// CHECK-NEXT:  store [[UINT8]] to [trivial] [[IN]] : $*UInt8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+// CHECK: } // end sil function 'struct_extract_load_to_load_struct_element_addr'
 sil [ossa] @struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (Builtin.Int8) {
 bb0(%0 : $*UInt8):
   %1 = load [trivial] %0 : $*UInt8
@@ -313,14 +313,14 @@ bb0(%0 : $*UInt8):
 }
 
 // CHECK-LABEL: sil [ossa] @tuple_extract_load_to_load_tuple_element_addr :
-// XHECK: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
-// XHECK-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
-// XHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
-// XHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// XHECK-NEXT:  [[IN_STORE_GEP:%[0-9]+]] = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
-// XHECK-NEXT:  store [[LITERAL]] to [trivial] [[IN_STORE_GEP]] : $*Builtin.Int8
-// XHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
-// XHECK: } // end sil function 'tuple_extract_load_to_load_tuple_element_addr'
+// CHECK: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT:  [[IN_STORE_GEP:%[0-9]+]] = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  store [[LITERAL]] to [trivial] [[IN_STORE_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+// CHECK: } // end sil function 'tuple_extract_load_to_load_tuple_element_addr'
 sil [ossa] @tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> (Builtin.Int8) {
 bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
@@ -334,14 +334,14 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
 // Do not perform the optimization of the input load has multiple uses.
 //
 // CHECK-LABEL: sil [ossa] @multiple_use_struct_extract_load_to_load_struct_element_addr
-// XHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
-// XHECK-NEXT: load
-// XHECK-NEXT: integer_literal
-// XHECK-NEXT: struct
-// XHECK-NEXT: store
-// XHECK-NEXT: struct_extract
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK-NEXT: store
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @multiple_use_struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (UInt8, Builtin.Int8) {
 bb0(%0 : $*UInt8):
   %1 = load [trivial] %0 : $*UInt8
@@ -356,14 +356,14 @@ bb0(%0 : $*UInt8):
 // Do not perform the optimization of the input load has multiple uses.
 //
 // CHECK-LABEL: sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr
-// XHECK: bb0
-// XHECK-NEXT: load
-// XHECK-NEXT: integer_literal
-// XHECK-NEXT: tuple_element_addr
-// XHECK-NEXT: store
-// XHECK-NEXT: tuple_extract
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> ((Builtin.Int8, Builtin.Int8), Builtin.Int8) {
 bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
@@ -423,10 +423,10 @@ bb0(%0 : $Builtin.RawPointer):
 
 
 // CHECK-LABEL: sil [ossa] @destroy_value_test
-// XHECK: bb0({{%[0-9]+}} : $Builtin.Int8, [[RELEASE_TARGET:%[0-9]+]] : @owned $Builtin.NativeObject):
-// XHECK-NEXT: destroy_value [[RELEASE_TARGET]] : $Builtin.NativeObject
-// XHECK-NEXT: tuple ()
-// XHECK-NEXT: return
+// CHECK: bb0({{%[0-9]+}} : $Builtin.Int8, [[RELEASE_TARGET:%[0-9]+]] : @owned $Builtin.NativeObject):
+// CHECK-NEXT: destroy_value [[RELEASE_TARGET]] : $Builtin.NativeObject
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
 sil [ossa] @destroy_value_test : $@convention(thin) (Builtin.Int8, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.Int8, %1 : @owned $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
@@ -435,10 +435,10 @@ bb0(%0 : $Builtin.Int8, %1 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [ossa] @retain_value_test
-// XHECK: bb0([[TRIVIAL_TARGET:%[0-9]+]] : $Builtin.Int8, [[REFCOUNT_TARGET:%[0-9]+]] : @guaranteed $Builtin.NativeObject):
-// XHECK-NEXT: [[RC:%.*]] = copy_value [[REFCOUNT_TARGET]] : $Builtin.NativeObject
-// XHECK-NEXT: tuple ([[TRIVIAL_TARGET]] : $Builtin.Int8, [[RC]] : $Builtin.NativeObject)
-// XHECK-NEXT: return
+// CHECK: bb0([[TRIVIAL_TARGET:%[0-9]+]] : $Builtin.Int8, [[REFCOUNT_TARGET:%[0-9]+]] : @guaranteed $Builtin.NativeObject):
+// CHECK-NEXT: [[RC:%.*]] = copy_value [[REFCOUNT_TARGET]] : $Builtin.NativeObject
+// CHECK-NEXT: tuple ([[TRIVIAL_TARGET]] : $Builtin.Int8, [[RC]] : $Builtin.NativeObject)
+// CHECK-NEXT: return
 sil [ossa] @retain_value_test : $@convention(thin) (Builtin.Int8, @guaranteed Builtin.NativeObject) -> @owned (Builtin.Int8, Builtin.NativeObject) {
 bb0(%0 : $Builtin.Int8, %1 : @guaranteed $Builtin.NativeObject):
   %1a = copy_value %1 : $Builtin.NativeObject
@@ -502,9 +502,9 @@ enum U {
 // (ref_to_raw_pointer (unchecked_ref_cast x))
 //    -> (ref_to_raw_pointer x)
 // CHECK-LABEL: sil [ossa] @ref_to_raw_pointer_unchecked_ref_cast_composition : $@convention(thin) (@guaranteed C) -> Builtin.RawPointer
-// XHECK: bb0
-// XHECK-NEXT: ref_to_raw_pointer
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: ref_to_raw_pointer
+// CHECK-NEXT: return
 sil [ossa] @ref_to_raw_pointer_unchecked_ref_cast_composition : $@convention(thin) (@guaranteed C) -> Builtin.RawPointer {
 bb0(%0 : @guaranteed $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
@@ -547,8 +547,8 @@ bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
 }
 
 // CHECK-LABEL: sil [ossa] @raw_pointer_to_ref_ref_to_raw_pointer_round_trip
-// XHECK: bb0
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: return
 sil [ossa] @raw_pointer_to_ref_ref_to_raw_pointer_round_trip : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
@@ -800,9 +800,9 @@ struct XS {
 }
 
 // CHECK-LABEL: strc_from_extr
-// XHECK-NOT: struct_extract
-// XHECK-NOT: struct
-// XHECK: return
+// CHECK-NOT: struct_extract
+// CHECK-NOT: struct
+// CHECK: return
 sil [ossa] @strc_from_extr : $@convention(thin) (XS, @thin XS.Type) -> XS {
 bb0(%0 : $XS, %1 : $@thin XS.Type):
   %2 = struct_extract %0 : $XS, #XS.m
@@ -812,9 +812,9 @@ bb0(%0 : $XS, %1 : $@thin XS.Type):
 }
 
 // CHECK-LABEL: tup_from_extr_tup
-// XHECK-NOT: tuple_extract
-// XHECK-NOT: tuple
-// XHECK: return
+// CHECK-NOT: tuple_extract
+// CHECK-NOT: tuple
+// CHECK: return
 sil [ossa] @tup_from_extr_tup : $@convention(thin) () -> (Int, Int) {
 bb0:
   // function_ref x
@@ -833,7 +833,6 @@ bb0:
 // XHECK:  [[R1:%.*]] = apply [[C]](
 // XHECK:             = apply [[P]]([[R1]]
 // XHECK:  return
-
 sil [ossa] @apply_and_pa_merge : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = function_ref @some_closure : $@convention(thin) (Int) -> Int // user: %2
@@ -853,7 +852,7 @@ sil [ossa] @print_a_number : $@convention(thin) (Int) -> ()
 // CHECK-LABEL: sil [ossa] @applied
 sil [ossa] @applied : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
-// XHECK: return
+// CHECK: return
   return %0 : $Builtin.Int32
 }
 
@@ -886,7 +885,7 @@ bb0(%0 : $Builtin.Int32):
   return %11 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil shared [transparent] [ossa] @reabstract
+// CHECK-LABEL: sil shared [transparent] [ossa] @reabstract :
 sil shared [ossa] [transparent] @reabstract : $@convention(thin) (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> Builtin.Int32) -> @out Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) -> Builtin.Int32):
   %3 = apply %2(%1) : $@callee_owned (Builtin.Int32) -> Builtin.Int32
