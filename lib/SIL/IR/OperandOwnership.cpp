@@ -190,11 +190,8 @@ OPERAND_OWNERSHIP(InstantaneousUse, BridgeObjectToWord)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  OPERAND_OWNERSHIP(InstantaneousUse, RefTo##Name)                             \
-  OPERAND_OWNERSHIP(InstantaneousUse, Name##ToRef)                             \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  OPERAND_OWNERSHIP(InstantaneousUse, RefTo##Name)                             \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
@@ -207,6 +204,16 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
+
+// These act as a form of conversion that does not imply ownership. Thus from an
+// operand perspective we treat them as a pointer escape and from a value
+// perspective, they return a value with OwnershipKind::Unowned.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  OPERAND_OWNERSHIP(PointerEscape, RefTo##Name)                                \
+  OPERAND_OWNERSHIP(PointerEscape, Name##ToRef)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  OPERAND_OWNERSHIP(PointerEscape, RefTo##Name)
+#include "swift/AST/ReferenceStorage.def"
 
 // Instructions that currently violate structural ownership requirements,
 // and therefore completely defeat canonicalization and optimization of any
