@@ -96,11 +96,8 @@ class SILCombiner :
   /// post-dominating blocks to a full jointly post-dominating set.
   JointPostDominanceSetComputer jPostDomComputer;
 
-  /// A utility that we use to perform erase+RAUW that fixes up ownership for us
-  /// afterwards by lifetime extending/copy values as appropriate. We rely on
-  /// later optimizations to chew through this traffic. This ensures we can use
-  /// one code base for both OSSA and non-OSSA.
-  OwnershipFixupContext ownershipRAUWHelper;
+  /// External context struct used by \see ownershipRAUWHelper.
+  OwnershipFixupContext ownershipFixupContext;
 
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
@@ -134,7 +131,7 @@ public:
               Worklist.add(use->getUser());
             }),
         deBlocks(&B.getFunction()), jPostDomComputer(deBlocks),
-        ownershipRAUWHelper(instModCallbacks, deBlocks, jPostDomComputer) {}
+        ownershipFixupContext(instModCallbacks, deBlocks, jPostDomComputer) {}
 
   bool runOnFunction(SILFunction &F);
 

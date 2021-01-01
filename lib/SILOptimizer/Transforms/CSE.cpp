@@ -583,7 +583,7 @@ public:
 
   DeadEndBlocks &DeadEndBBs;
 
-  OwnershipRAUWHelper &RAUWHelper;
+  OwnershipFixupContext &RAUWFixupContext;
 
   /// The set of calls to lazy property getters which can be replace by a direct
   /// load of the property value.
@@ -591,9 +591,10 @@ public:
 
   CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
       SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs,
-      OwnershipRAUWHelper &RAUWHelper)
+      OwnershipFixupContext &RAUWFixupContext)
       : SEA(SEA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
-        RAUWHelper(RAUWHelper), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+        RAUWFixupContext(RAUWFixupContext),
+        RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
@@ -1017,14 +1018,14 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         // extend it here as well
         if (!isa<SingleValueInstruction>(Inst))
           continue;
-        if (!OwnershipRAUWHelper::canFixUpOwnershipForRAUW(
-                cast<SingleValueInstruction>(Inst),
-                cast<SingleValueInstruction>(AvailInst)))
+
+        OwnershipRAUWHelper helper(RAUWFixupContext,
+                                   cast<SingleValueInstruction>(Inst),
+                                   cast<SingleValueInstruction>(AvailInst));
+        if (!helper.isValid())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
-        nextI = RAUWHelper.replaceAllUsesAndErase(
-            cast<SingleValueInstruction>(Inst),
-            cast<SingleValueInstruction>(AvailInst));
+        nextI = helper.perform();
         Changed = true;
         ++NumCSE;
         continue;
@@ -1399,8 +1400,7 @@ class SILCSE : public SILFunctionTransform {
     JointPostDominanceSetComputer Computer(DeadEndBBs);
     InstModCallbacks callbacks;
     OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
-    OwnershipRAUWHelper RAUWHelper(FixupCtx);
-    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, RAUWHelper);
+    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 
     // Perform the traditional CSE.
