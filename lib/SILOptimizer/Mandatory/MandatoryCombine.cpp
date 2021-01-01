@@ -114,6 +114,8 @@ namespace {
 class MandatoryCombiner final
     : public SILInstructionVisitor<MandatoryCombiner, SILInstruction *> {
 
+  bool compilingWithOptimization;
+
   using Worklist = SmallSILInstructionWorklist<256>;
 
   /// The list of instructions remaining to visit, perhaps to combine.
@@ -135,9 +137,11 @@ class MandatoryCombiner final
   DeadEndBlocks &deadEndBlocks;
 
 public:
-  MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions,
+  MandatoryCombiner(bool optimized,
+                    SmallVectorImpl<SILInstruction *> &createdInstructions,
                     DeadEndBlocks &deadEndBlocks)
-      : worklist("MC"), madeChange(false), iteration(0),
+      : compilingWithOptimization(optimized), worklist("MC"), madeChange(false),
+        iteration(0),
         instModCallbacks(
             [&](SILInstruction *instruction) {
               worklist.erase(instruction);
@@ -210,8 +214,6 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
     blockAlreadyAddedToWorklist.insert(firstBlock);
   }
 
-  bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
-                                   OptimizationMode::NoOptimization;
   while (!blockWorklist.empty()) {
     auto *block = blockWorklist.pop_back_val();
 
@@ -248,9 +250,6 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
 
   addReachableCodeToWorklist(function);
   MandatoryCombineCanonicalize mcCanonicialize(worklist, deadEndBlocks);
-
-  bool compilingWithOptimization = function.getEffectiveOptimizationMode() !=
-                                   OptimizationMode::NoOptimization;
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
@@ -383,8 +382,11 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 namespace {
 
 class MandatoryCombine final : public SILFunctionTransform {
-
+  bool optimized;
   SmallVector<SILInstruction *, 64> createdInstructions;
+
+public:
+  MandatoryCombine(bool optimized) : optimized(optimized) {}
 
   void run() override {
     auto *function = getFunction();
@@ -396,7 +398,7 @@ class MandatoryCombine final : public SILFunctionTransform {
     }
 
     DeadEndBlocks deadEndBlocks(function);
-    MandatoryCombiner combiner(createdInstructions, deadEndBlocks);
+    MandatoryCombiner combiner(optimized, createdInstructions, deadEndBlocks);
     bool madeChange = combiner.runOnFunction(*function);
 
     if (madeChange) {
@@ -404,6 +406,7 @@ class MandatoryCombine final : public SILFunctionTransform {
     }
   }
 
+protected:
   void handleDeleteNotification(SILNode *node) override {
     // Remove instructions that were both created and deleted from the list of
     // created instructions which will eventually be added to the worklist.
@@ -426,4 +429,10 @@ class MandatoryCombine final : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createMandatoryCombine() { return new MandatoryCombine(); }
+SILTransform *swift::createMandatoryCombine() {
+  return new MandatoryCombine(/*optimized*/ false);
+}
+
+SILTransform *swift::createOptimizedMandatoryCombine() {
+  return new MandatoryCombine(/*optimized*/ true);
+}
