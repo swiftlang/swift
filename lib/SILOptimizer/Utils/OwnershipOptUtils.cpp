@@ -22,6 +22,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -157,6 +158,58 @@ static void getAllNonTrivialUsePointsOfBorrowedValue(
       continue;
     }
   }
+}
+
+// All callers of our RAUW routines must ensure that their values return true
+// from this.
+static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue) {
+  auto newOwnershipKind = newValue.getOwnershipKind();
+
+  // If our new kind is ValueOwnershipKind::None, then we are fine. We
+  // trivially support that. This check also ensures that we can always
+  // replace any value with a ValueOwnershipKind::None value.
+  if (newOwnershipKind == OwnershipKind::None)
+    return true;
+
+  // First check if oldValue is SILUndef. If it is, then we know that:
+  //
+  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
+  // 2. newValue is not OwnershipKind::None due to our check above.
+  //
+  // Thus we know that we would be replacing a value with OwnershipKind::None
+  // with a value with non-None ownership. This is a case we don't support, so
+  // we can bail now.
+  if (isa<SILUndef>(oldValue))
+    return false;
+
+  // Ok, we now know that we do not have SILUndef implying that we must be able
+  // to get a module from our value since we must have an argument or an
+  // instruction.
+  auto *m = oldValue->getModule();
+  assert(m);
+
+  // If we are in Raw SIL, just bail at this point. We do not support
+  // ownership fixups.
+  if (m->getStage() == SILStage::Raw)
+    return false;
+
+  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
+  // not, we may need to do more work that has not been implemented yet. So
+  // bail.
+  //
+  // Due to our requirement that types line up, this can only occur given a
+  // non-trivial typed value with None ownership. This can only happen when
+  // oldValue is a trivial payloaded or no-payload non-trivially typed
+  // enum. That doesn't occur that often so we just bail on it today until we
+  // implement this functionality.
+  auto oldOwnershipKind = SILValue(oldValue).getOwnershipKind();
+  if (oldOwnershipKind != OwnershipKind::None)
+    return true;
+
+  // Ok, we have an old ownership kind that is OwnershipKind::None and a new
+  // ownership kind that is not OwnershipKind::None. In that case, for now, do
+  // not perform this transform.
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -477,7 +530,7 @@ static void rewriteReborrows(SILValue newBorrowedValue,
 }
 
 //===----------------------------------------------------------------------===//
-//                            Ownership Fixup RAUW
+//                OwnershipRAUWUtility - RAUW + fix ownership
 //===----------------------------------------------------------------------===//
 
 /// Given an old value and a new value, lifetime extend new value as appropriate
@@ -644,7 +697,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
 SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   assert(oldValue->getFunction()->hasOwnership());
   assert(
-      OwnershipRAUWHelper::canFixUpOwnershipForRAUW(oldValue, newValue) &&
+      canFixUpOwnershipForRAUW(oldValue, newValue) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to do it so just RAUW
   // and return.
@@ -684,65 +737,244 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 }
 
 //===----------------------------------------------------------------------===//
-//                          Ownership Fixup Context
+//                     Interior Pointer Operand Rebasing
 //===----------------------------------------------------------------------===//
 
-// All callers of our RAUW routines must ensure that their values return true
-// from this.
-bool OwnershipRAUWHelper::canFixUpOwnershipForRAUW(SILValue oldValue,
-                                                     SILValue newValue) {
-  auto newOwnershipKind = newValue.getOwnershipKind();
+namespace {
 
-  // If our new kind is ValueOwnershipKind::None, then we are fine. We
-  // trivially support that. This check also ensures that we can always
-  // replace any value with a ValueOwnershipKind::None value.
-  if (newOwnershipKind == OwnershipKind::None)
-    return true;
+/// Clone all projections and casts on the access use-def chain until either the
+/// specified predicate is true or the access base is reached.
+///
+/// This will not clone ref_element_addr or ref_tail_addr because those aren't
+/// part of the access chain.
+class InteriorPointerAddressRebaseUseDefChainCloner
+    : public AccessUseDefChainVisitor<
+          InteriorPointerAddressRebaseUseDefChainCloner, SILValue> {
+  SILValue oldAddressValue;
+  SingleValueInstruction *oldIntPtr;
+  SingleValueInstruction *newIntPtr;
+  SILInstruction *insertPt;
 
-  // First check if oldValue is SILUndef. If it is, then we know that:
-  //
-  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
-  // 2. newValue is not OwnershipKind::None due to our check above.
-  //
-  // Thus we know that we would be replacing a value with OwnershipKind::None
-  // with a value with non-None ownership. This is a case we don't support, so
-  // we can bail now.
-  if (isa<SILUndef>(oldValue))
-    return false;
+public:
+  InteriorPointerAddressRebaseUseDefChainCloner(
+      SILValue oldAddressValue, SingleValueInstruction *oldIntPtr,
+      SingleValueInstruction *newIntPtr, SILInstruction *insertPt)
+      : oldAddressValue(oldAddressValue), oldIntPtr(oldIntPtr),
+        newIntPtr(newIntPtr), insertPt(insertPt) {}
 
-  // Ok, we now know that we do not have SILUndef implying that we must be able
-  // to get a module from our value since we must have an argument or an
-  // instruction.
-  auto *m = oldValue->getModule();
-  assert(m);
+  // Recursive main entry point
+  SILValue cloneUseDefChain(SILValue currentOldAddr) {
+    // If we have finally hit oldIntPtr, we are done.
+    if (currentOldAddr == oldIntPtr)
+      return currentOldAddr;
+    return this->visit(currentOldAddr);
+  }
 
-  // If we are in Raw SIL, just bail at this point. We do not support
-  // ownership fixups.
-  if (m->getStage() == SILStage::Raw)
-    return false;
+  // Recursively clone an address on the use-def chain.
+  SingleValueInstruction *cloneProjection(SingleValueInstruction *projectedAddr,
+                                          Operand *sourceOper) {
+    SILValue sourceOperVal = sourceOper->get();
+    SILValue projectedSource = cloneUseDefChain(sourceOperVal);
+    // If we hit the end of our chain, then make newIntPtr the operand so that
+    // we have successfully rebased.
+    if (sourceOperVal == projectedSource)
+      projectedSource = newIntPtr;
+    SILInstruction *clone = projectedAddr->clone(insertPt);
+    clone->setOperand(sourceOper->getOperandNumber(), projectedSource);
+    return cast<SingleValueInstruction>(clone);
+  }
 
-  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
-  // not, we may need to do more work that has not been implemented yet. So
-  // bail.
-  //
-  // Due to our requirement that types line up, this can only occur given a
-  // non-trivial typed value with None ownership. This can only happen when
-  // oldValue is a trivial payloaded or no-payload non-trivially typed
-  // enum. That doesn't occur that often so we just bail on it today until we
-  // implement this functionality.
-  auto oldOwnershipKind = SILValue(oldValue).getOwnershipKind();
-  if (oldOwnershipKind != OwnershipKind::None)
-    return true;
+  SILValue visitBase(SILValue base, AccessedStorage::Kind kind) {
+    assert(false && "access base cannot be cloned");
+    return SILValue();
+  }
 
-  // Ok, we have an old ownership kind that is OwnershipKind::None and a new
-  // ownership kind that is not OwnershipKind::None. In that case, for now, do
-  // not perform this transform.
-  return false;
+  SILValue visitNonAccess(SILValue base) {
+    assert(false && "unknown address root cannot be cloned");
+    return SILValue();
+  }
+
+  SILValue visitPhi(SILPhiArgument *phi) {
+    assert(false && "unexpected phi on access path");
+    return SILValue();
+  }
+
+  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+    assert(false && "unexpected storage cast on access path");
+    return SILValue();
+  }
+
+  SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
+                                 Operand *sourceOper) {
+    return cloneProjection(projectedAddr, sourceOper);
+  }
+};
+
+} // namespace
+
+/// \p oldAddressValue is an address rooted in \p oldIntPtr. Clone the use-def
+/// chain from \p oldAddressValue to \p oldIntPtr, but starting from \p
+/// newAddressValue.
+static SILValue cloneInteriorProjectionUseDefChain(
+    SILValue oldAddressValue, SingleValueInstruction *oldIntPtr,
+    SingleValueInstruction *newIntPtr, SILInstruction *insertPt) {
+  InteriorPointerAddressRebaseUseDefChainCloner cloner(
+      oldAddressValue, oldIntPtr, newIntPtr, insertPt);
+  return cloner.cloneUseDefChain(oldAddressValue);
 }
 
 SILBasicBlock::iterator
-OwnershipRAUWHelper::replaceAllUsesAndErase(SingleValueInstruction *oldValue,
-                                              SILValue newValue) {
-  OwnershipRAUWUtility utility{oldValue, newValue, ctx};
+OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
+                                        SILValue newValue) {
+  assert(oldValue->getType().isAddress() &&
+         oldValue->getType() == newValue->getType());
+
+  // If we are replacing addresses, see if we need to handle interior pointer
+  // fixups. If we don't have any extra info, then we know that we can just RAUW
+  // without any further work.
+  if (!ctx->extraAddressFixupInfo.intPtrOp)
+    return replaceAllUsesAndErase(oldValue, newValue, ctx->callbacks);
+
+  // We are RAUWing two addresses and we found that:
+  //
+  // 1. newValue is an address associated with an interior pointer instruction.
+  // 2. oldValue has uses that are outside of newValue's borrow scope.
+  //
+  // So, we need to copy/borrow the base value of the interior pointer to
+  // lifetime extend the base value over the new uses. Then we clone the
+  // interior pointer instruction and change the clone to use our new borrowed
+  // value. Then we RAUW as appropriate.
+  OwnershipLifetimeExtender extender{*ctx};
+  auto &extraInfo = ctx->extraAddressFixupInfo;
+  auto intPtr = *extraInfo.intPtrOp;
+  BeginBorrowInst *bbi = extender.createPlusZeroBorrow(
+      intPtr->get(), llvm::makeArrayRef(extraInfo.allAddressUsesFromOldValue));
+  auto bbiNext = &*std::next(bbi->getIterator());
+  auto *newIntPtrUser =
+      cast<SingleValueInstruction>(intPtr->getUser()->clone(bbiNext));
+  ctx->callbacks.createdNewInst(newIntPtrUser);
+  newIntPtrUser->setOperand(0, bbi);
+
+  // Now that we have extended our lifetime as appropriate, we need to recreate
+  // the access path from newValue to intPtr but upon newIntPtr. Then we make it
+  // use newIntPtr.
+  auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
+  SILValue initialAddr = cloneInteriorProjectionUseDefChain(
+      newValue /*address we originally wanted to replace*/,
+      intPtrUser /*the interior pointer of that value*/,
+      newIntPtrUser /*the interior pointer we need to recreate the chain upon*/,
+      oldValue /*insert point*/);
+
+  // If we got back newValue, then we need to set initialAddr to be int ptr
+  // user.
+  if (initialAddr == newValue)
+    initialAddr = newIntPtrUser;
+
+  // Now that we have an addr that is setup appropriately, RAUW!
+  return replaceAllUsesAndErase(oldValue, initialAddr, ctx->callbacks);
+}
+
+//===----------------------------------------------------------------------===//
+//                            Top Level Entrypoints
+//===----------------------------------------------------------------------===//
+
+OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
+                                         SingleValueInstruction *inputOldValue,
+                                         SILValue inputNewValue)
+    : ctx(&inputCtx), oldValue(inputOldValue), newValue(inputNewValue) {
+  // If we are already not valid, just bail.
+  if (!isValid())
+    return;
+
+  // Otherwise, lets check if we can perform this RAUW operation. If we can't,
+  // set ctx to nullptr to invalidate the helper and return.
+  if (!canFixUpOwnershipForRAUW(oldValue, newValue)) {
+    ctx = nullptr;
+    return;
+  }
+
+  // If we have an object, at this point we are good to go so we can just
+  // return.
+  if (newValue->getType().isObject())
+    return;
+
+  // But if we have an address, we need to check if new value is from an
+  // interior pointer or not in a way that the pass understands. What we do is:
+  //
+  // 1. Compute the AccessPathWithBase of newValue. If we do not get back a
+  //    valid such object, invalidate and then bail.
+  //
+  // 2. Then we check if the base address is the result of an interior pointer
+  //    instruction. If we do not find one we bail.
+  //
+  // 3. Then grab the base value of the interior pointer operand. We only
+  //    support cases where we have a single BorrowedValue as our base. This is
+  //    a safe future proof assumption since one reborrows are on
+  //    structs/tuple/destructures, a guaranteed value will always be associated
+  //    with a single BorrowedValue, so this will never fail (and the code will
+  //    probably be DCEed).
+  //
+  // 4. Then we compute an AccessPathWithBase for oldValue and then find its
+  //    derived uses. If we fail, we bail.
+  //
+  // 5. At this point, we know that we can perform this RAUW. The only question
+  //    is if we need to when we RAUW copy the interior pointer base value. We
+  //    perform this check by making sure all of the old value's derived uses
+  //    are within our BorrowedValue's scope. If so, we clear the extra state we
+  //    were tracking (the interior pointer/oldValue's transitive uses), so we
+  //    perform just a normal RAUW (without inserting the copy) when we RAUW.
+  auto accessPathWithBase = AccessPathWithBase::compute(newValue);
+  if (!accessPathWithBase.base) {
+    // Invalidate!
+    ctx = nullptr;
+    return;
+  }
+
+  auto &intPtr = ctx->extraAddressFixupInfo.intPtrOp;
+  intPtr = InteriorPointerOperand::inferFromResult(accessPathWithBase.base);
+  if (!intPtr) {
+    // We can optimize! Do not invalidate!
+    return;
+  }
+
+  auto borrowedValue = intPtr.getSingleBaseValue();
+  if (!borrowedValue) {
+    // Invalidate!
+    ctx = nullptr;
+    return;
+  }
+
+  // For now, just gather up uses
+  auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
+  if (InteriorPointerOperand::getImplicitUsesForAddress(oldValue,
+                                                        oldValueUses)) {
+    // If we found an error, invalidate and return!
+    ctx = nullptr;
+    return;
+  }
+
+  // Ok, at this point we know that we can optimize. The only question is if we
+  // need to perform the copy or not when we actually RAUW. So perform the is
+  // within region check. If we succeed, clear our extra state so we perform a
+  // normal RAUW.
+  SmallVector<Operand *, 8> scratchSpace;
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  if (borrowedValue.areUsesWithinScope(oldValueUses, scratchSpace,
+                                       visitedBlocks, ctx->deBlocks)) {
+    // We do not need to copy the base value! Clear the extra info we have.
+    ctx->extraAddressFixupInfo.clear();
+  }
+}
+
+SILBasicBlock::iterator OwnershipRAUWHelper::perform() {
+  assert(isValid() && "OwnershipRAUWHelper invalid?!");
+
+  // Make sure to always clear our context after we transform.
+  SWIFT_DEFER { ctx->clear(); };
+
+  if (oldValue->getType().isAddress())
+    return replaceAddressUses(oldValue, newValue);
+
+  OwnershipRAUWUtility utility{oldValue, newValue, *ctx};
   return utility.perform();
 }

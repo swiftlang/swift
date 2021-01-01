@@ -520,10 +520,9 @@ bool BorrowedValue::visitInteriorPointerOperands(
 //                           InteriorPointerOperand
 //===----------------------------------------------------------------------===//
 
-bool InteriorPointerOperand::getImplicitUses(
-    SmallVectorImpl<Operand *> &foundUses,
+bool InteriorPointerOperand::getImplicitUsesForAddress(
+    SILValue projectedAddress, SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *onError) {
-  SILValue projectedAddress = getProjectedAddress();
   SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
 
   bool foundError = false;

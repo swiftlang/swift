@@ -755,8 +755,8 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
-    OwnershipRAUWHelper helper(ctx);
-    return helper.replaceAllUsesAndErase(svi, result);
+    OwnershipRAUWHelper helper(ctx, svi, result);
+    return helper.perform();
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
 }
@@ -781,20 +781,7 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
 /// NOTE: We assume that the insertion point associated with the SILValue must
 /// dominate \p i.
 static SILValue simplifyInstruction(SILInstruction *i) {
-  SILValue result = InstSimplifier().visit(i);
-  if (!result)
-    return SILValue();
-
-  // If we have a result, we know that we must have a single value instruction
-  // by assumption since we have not implemented support in the rest of inst
-  // simplify for non-single value instructions. We put the cast here so that
-  // this code is not updated at this point in time.
-  auto *svi = cast<SingleValueInstruction>(i);
-  if (svi->getFunction()->hasOwnership())
-    if (!OwnershipRAUWHelper::canFixUpOwnershipForRAUW(svi, result))
-      return SILValue();
-
-  return result;
+  return InstSimplifier().visit(i);
 }
 
 SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
@@ -811,11 +798,16 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!result || svi == result)
     return next;
 
-  if (svi->getFunction()->hasOwnership()) {
-    JointPostDominanceSetComputer computer(*deadEndBlocks);
-    OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
-    OwnershipRAUWHelper helper(ctx);
-    return helper.replaceAllUsesAndErase(svi, result);
-  }
-  return replaceAllUsesAndErase(svi, result, callbacks);
+  if (!svi->getFunction()->hasOwnership())
+    return replaceAllUsesAndErase(svi, result, callbacks);
+
+  JointPostDominanceSetComputer computer(*deadEndBlocks);
+  OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
+  OwnershipRAUWHelper helper(ctx, svi, result);
+
+  // If our RAUW helper is invalid, we do not support RAUWing this case, so
+  // just return next.
+  if (!helper.isValid())
+    return next;
+  return helper.perform();
 }
