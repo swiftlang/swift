@@ -675,11 +675,13 @@ struct OperandOwnership {
     /// (ref_to_unowned, unchecked_trivial_bitcast)
     BitwiseEscape,
 
-    /// MARK: Uses of Owned values:
-
-    /// Borrow. Propagates the owned value within a scope, without consuming it.
+    /// Borrow. Propagates the owned or guaranteed value within a scope, without
+    /// ending its lifetime.
     /// (begin_borrow, begin_apply with @guaranteed argument)
     Borrow,
+
+    /// MARK: Uses of Owned values:
+
     /// Destroying Consume. Destroys the owned value immediately.
     /// (store, destroy, @owned destructure).
     DestroyingConsume,
@@ -689,11 +691,6 @@ struct OperandOwnership {
 
     /// MARK: Uses of Guaranteed values:
 
-    /// Nested Borrow. Propagates the guaranteed value within a nested borrow
-    /// scope, without ending the outer borrow scope, following stack
-    /// discipline.
-    /// (begin_borrow, begin_apply with @guaranteed).
-    NestedBorrow,
     /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
     /// no-escape closure) that depends on the guaranteed value within the
     /// base's borrow scope. The verifier checks that all uses of the trivial
@@ -750,13 +747,11 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
-    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::Borrow:
-    return {OwnershipKind::Owned, UseLifetimeConstraint::NonLifetimeEnding};
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
-  case OperandOwnership::NestedBorrow:
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::ForwardingBorrow:
     return {OwnershipKind::Guaranteed,

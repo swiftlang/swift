@@ -333,7 +333,6 @@ static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   case OperandOwnership::Borrow:
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
-  case OperandOwnership::NestedBorrow:
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::ForwardingBorrow:
   case OperandOwnership::EndBorrow:
@@ -412,8 +411,6 @@ StringRef OperandOwnership::asString() const {
     return "destroying-consume";
   case OperandOwnership::ForwardingConsume:
     return "forwarding-consume";
-  case OperandOwnership::NestedBorrow:
-    return "nested-borrow";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
   case OperandOwnership::ForwardingBorrow:

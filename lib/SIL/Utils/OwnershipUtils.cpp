@@ -890,7 +890,6 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
   case OperandOwnership::BitwiseEscape:
   case OperandOwnership::Borrow:
   case OperandOwnership::DestroyingConsume:
-  case OperandOwnership::NestedBorrow:
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
