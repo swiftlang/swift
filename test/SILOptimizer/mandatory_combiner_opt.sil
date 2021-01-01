@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce %s | %FileCheck %s
+// RUN: %target-sil-opt -optimized-mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce %s | %FileCheck %s
 
 // Tests for when the mandatory combiner is running with optimizations
 // enabled. Only put tests here for functionality that only occurs when the
@@ -105,4 +105,33 @@ bb0(%0 : @guaranteed $Klass):
   end_borrow %2 : $FakeOptional<Klass>
   %9999 = tuple()
   return %9999 : $()
+}
+
+// -----------------------------------------------------------------------------
+// Test removal of redundant borrow scopes for owned-to-guaranteed
+// coroutine arguments.
+class C {
+  @_hasStorage var float: Builtin.Int64 { get set }
+  init(_ float: Builtin.Int64)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testCoroutineBorrow : $@convention(thin) (@owned C, Builtin.Int64) -> () {
+// CHECK-LABEL: bb0(%0 : @owned $C, %1 : $Builtin.Int64):
+// CHECK-NOT: borrow
+// CHECK:   class_method %0 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
+// CHECK:   begin_apply %{{.*}}(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
+// CHECK-NOT: borrow
+// CHECK:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'testCoroutineBorrow'
+sil hidden [ossa] @testCoroutineBorrow : $@convention(thin) (@owned C, Builtin.Int64) -> () {
+bb0(%0 : @owned $C, %1 : $Builtin.Int64):
+  %14 = begin_borrow %0 : $C
+  %15 = class_method %14 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
+  (%16, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
+  store %1 to [trivial] %16 : $*Builtin.Int64
+  end_apply %17
+  end_borrow %14 : $C
+  destroy_value %0 : $C
+  %23 = tuple ()
+  return %23 : $()
 }
