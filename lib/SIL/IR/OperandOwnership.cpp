@@ -216,14 +216,14 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
 OPERAND_OWNERSHIP(PointerEscape, ProjectBox) // The result is a T*.
 OPERAND_OWNERSHIP(PointerEscape, ProjectExistentialBox)
 OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
+OPERAND_OWNERSHIP(PointerEscape, ConvertEscapeToNoEscape)
 
 // Instructions that escape reference bits with unenforced lifetime.
+// TODO: verify that BitwiseEscape results always have a trivial type.
 OPERAND_OWNERSHIP(BitwiseEscape, UncheckedBitwiseCast)
 OPERAND_OWNERSHIP(BitwiseEscape, ValueToBridgeObject)
 OPERAND_OWNERSHIP(BitwiseEscape, RefToRawPointer)
 OPERAND_OWNERSHIP(BitwiseEscape, UncheckedTrivialBitCast)
-// FIXME: verify that no-escape results are always trivial
-OPERAND_OWNERSHIP(BitwiseEscape, ConvertEscapeToNoEscape)
 
 // Instructions that end the lifetime of an owned value.
 OPERAND_OWNERSHIP(DestroyingConsume, AutoreleaseValue)
