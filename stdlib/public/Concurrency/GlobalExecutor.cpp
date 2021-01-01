@@ -56,7 +56,9 @@
 #include "swift/Runtime/Concurrency.h"
 #include "TaskPrivate.h"
 
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
+#endif
 
 using namespace swift;
 
