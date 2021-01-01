@@ -20,6 +20,7 @@
   #include "swift/Runtime/MutexSingleThreaded.h"
 #endif
 
+__attribute__ ((weak))
 SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
   abort();
 }
