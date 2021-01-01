@@ -148,6 +148,7 @@ void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
 HeapObject *swift_retain(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
