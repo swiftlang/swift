@@ -122,7 +122,6 @@ SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 
 // Instructions that require trivial operands.
 OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
-OPERAND_OWNERSHIP(TrivialUse, AbortApply)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
@@ -138,7 +137,6 @@ OPERAND_OWNERSHIP(TrivialUse, DebugValueAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
 OPERAND_OWNERSHIP(TrivialUse, EndAccess)
-OPERAND_OWNERSHIP(TrivialUse, EndApply)
 OPERAND_OWNERSHIP(TrivialUse, EndUnpairedAccess)
 OPERAND_OWNERSHIP(TrivialUse, GetAsyncContinuationAddr)
 OPERAND_OWNERSHIP(TrivialUse, IndexAddr)
@@ -261,6 +259,8 @@ OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialValue)
 OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialBoxValue)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
+OPERAND_OWNERSHIP(EndBorrow, EndApply)
+OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   OPERAND_OWNERSHIP(TrivialUse, Load##Name)
@@ -342,21 +342,7 @@ AGGREGATE_OWNERSHIP(SwitchEnum)
 // A begin_borrow is conditionally nested.
 OperandOwnership
 OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
-  switch (borrow->getOperand().getOwnershipKind()) {
-  case OwnershipKind::Any:
-    llvm_unreachable("invalid value ownership");
-  case OwnershipKind::None:
-    return OperandOwnership::TrivialUse;
-  case OwnershipKind::Unowned:
-    // FIXME: disallow borrowing an Unowned value. Temporarily model it as an
-    // instantaneous use until SILGenFunction::emitClassMemberDestruction is
-    // fixed.
-    return OperandOwnership::UnownedInstantaneousUse;
-  case OwnershipKind::Guaranteed:
-    return OperandOwnership::NestedBorrow;
-  case OwnershipKind::Owned:
-    return OperandOwnership::Borrow;
-  }
+  return OperandOwnership::Borrow;
 }
 
 // MARK: Instructions whose use ownership depends on the operand in question.
@@ -399,20 +385,31 @@ OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   return OperandOwnership::TrivialUse;
 }
 
-static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv) {
+// Get the OperandOwnership for instaneous apply, yield, and return uses.
+// This does not apply to uses that begin an explicit borrow scope in the
+// caller, such as begin_apply.
+static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
+                                                bool hasScopeInCaller) {
+
   switch (argConv) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Direct_Owned:
     return OperandOwnership::ForwardingConsume;
 
-  // A guaranteed argument is forwarded into the callee. However, from the
+  // A guaranteed argument is forwarded into the callee. If the call itself has
+  // no scope (i.e. it is a single apply, try_apply or yield), then from the
   // caller's point of view it looks like an instantaneous use. Consequently,
   // owned values may be passed to guaranteed arguments without an explicit
-  // borrow scope in the caller.
+  // borrow scope in the caller. In contrast, a begin_apply /does/ have an
+  // explicit borrow scope in the caller so we must treat arguments passed to it
+  // as being borrowed for the entire borrow scope.
   case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
-    return OperandOwnership::InstantaneousUse;
+    // For an apply that begins a borrow scope, its arguments are borrowed
+    // throughout the caller's borrow scope.
+    return hasScopeInCaller ? OperandOwnership::Borrow
+                            : OperandOwnership::InstantaneousUse;
 
   case SILArgumentConvention::Direct_Unowned:
     return OperandOwnership::UnownedInstantaneousUse;
@@ -435,15 +432,15 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
     : apply.getArgumentConvention(op);
 
-  auto operandOwnership = getFunctionArgOwnership(argConv);
-
   // Allow passing callee operands with no ownership as guaranteed.
   // FIXME: why do we allow this?
   if (operandOwnership == OperandOwnership::ForwardingBorrow
       && apply.isCalleeOperand(op)) {
     return OperandOwnership::InstantaneousUse;
   }
-  return operandOwnership;
+  return getFunctionArgOwnership(
+      argConv,
+      /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
 }
 
 OperandOwnership
@@ -478,7 +475,7 @@ OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
   auto fnType = i->getFunction()->getLoweredFunctionType();
   SILArgumentConvention argConv(
     fnType->getYields()[getOperandIndex()].getConvention());
-  return getFunctionArgOwnership(argConv);
+  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false);
 }
 
 OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
