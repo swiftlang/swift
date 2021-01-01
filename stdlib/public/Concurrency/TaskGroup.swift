@@ -267,7 +267,7 @@ extension Task.Group {
 @_silgen_name("swift_retain")
 func _swiftRetain(
   _ task: Builtin.NativeObject
-)
+) -> UInt
 
 @_silgen_name("swift_task_group_add_pending")
 func _taskGroupAddPendingTask(
