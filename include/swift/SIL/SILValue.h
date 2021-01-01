@@ -634,6 +634,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Used to verify completeness of the ownership use model and exhaustively
 /// switch over any category of ownership use. Implies ownership constraints and
 /// lifetime constraints.
+///
+/// OperandOwnership may be statically determined by the user's opcode alone, or
+/// by the opcode and operand type. Or it may be dynamically determined by an
+/// ownership kind variable in the user's state. However, it may never be
+/// inferred from the ownership of the incoming value. This way, the logic for
+/// determining which ValueOwnershipKind an operand may accept is reliable.
+///
+/// Any use that takes an Owned or Guaranteed value may also take a trivial
+/// value (ownership None), because the ownership semantics are irrelevant.
 struct OperandOwnership {
   enum innerty : uint8_t {
     /// Operands that do not use the value. They only represent a dependence
@@ -680,7 +689,7 @@ struct OperandOwnership {
     /// (begin_borrow, begin_apply with @guaranteed argument)
     Borrow,
 
-    /// MARK: Uses of Owned values:
+    /// MARK: Uses of Owned (or None) values:
 
     /// Destroying Consume. Destroys the owned value immediately.
     /// (store, destroy, @owned destructure).
@@ -689,7 +698,7 @@ struct OperandOwnership {
     /// (br, destructure, tuple, struct, cast, switch).
     ForwardingConsume,
 
-    /// MARK: Uses of Guaranteed values:
+    /// MARK: Uses of Guaranteed (or None) values:
 
     /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
     /// no-escape closure) that depends on the guaranteed value within the
