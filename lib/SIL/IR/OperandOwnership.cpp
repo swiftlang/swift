@@ -437,12 +437,6 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
     : apply.getArgumentConvention(op);
 
-  // Allow passing callee operands with no ownership as guaranteed.
-  // FIXME: why do we allow this?
-  if (operandOwnership == OperandOwnership::ForwardingBorrow
-      && apply.isCalleeOperand(op)) {
-    return OperandOwnership::InstantaneousUse;
-  }
   return getFunctionArgOwnership(
       argConv,
       /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
