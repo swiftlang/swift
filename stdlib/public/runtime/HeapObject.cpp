@@ -341,6 +341,7 @@ static HeapObject *_swift_retain_(HeapObject *object) {
   return object;
 }
 
+SWIFT_CC(swift)
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
   return swift_nonatomic_retain(object);

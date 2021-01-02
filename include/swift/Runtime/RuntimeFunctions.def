@@ -155,7 +155,7 @@ FUNCTION(CopyPOD, swift_copyPOD, C_CC, AlwaysAvailable,
          ATTRS(NoUnwind))
 
 // void *swift_retain(void *ptr);
-FUNCTION(NativeStrongRetain, swift_retain, C_CC, AlwaysAvailable,
+FUNCTION(NativeStrongRetain, swift_retain, SwiftCC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned))
