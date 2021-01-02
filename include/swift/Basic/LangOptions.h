@@ -135,9 +135,6 @@ namespace swift {
     /// Warn on usage of force unwrap operator
     bool ForceUnwrapWarning = false;
 
-    /// Prohibit use of force unwrap operator
-    bool ForceUnwrapError = false;
-
     ///
     /// Support for alternate usage modes
     ///

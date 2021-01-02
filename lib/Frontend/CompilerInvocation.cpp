@@ -590,7 +590,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
 
   Opts.ForceUnwrapWarning = Args.hasArg(OPT_force_unwrap_warning);
-  Opts.ForceUnwrapError = Args.hasArg(OPT_force_unwrap_error);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;

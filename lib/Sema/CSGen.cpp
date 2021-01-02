@@ -3001,8 +3001,6 @@ namespace {
       }
 
       auto &ctx = CS.getASTContext();
-      if (ctx.LangOpts.ForceUnwrapError)
-        ctx.Diags.diagnose(expr->getLoc(), diag::force_unwrap_error);
       if (ctx.LangOpts.ForceUnwrapWarning)
         ctx.Diags.diagnose(expr->getLoc(), diag::force_unwrap_warning);
 

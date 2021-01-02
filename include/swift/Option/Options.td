@@ -575,11 +575,6 @@ def force_unwrap_warning : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Audit code for force-unwrap usage">;
 
-def force_unwrap_error : Flag<["-"],
-    "force-unwrap-error">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Prohibit usage of force unwrap in code">;
-
 def disable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
     "disable-fuzzy-forward-scan-trailing-closure-matching">,
   Flags<[FrontendOption]>,
