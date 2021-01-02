@@ -343,6 +343,15 @@ module WinSDK [system] {
     link "sensorsapi.lib"
   }
 
+  module UI {
+    module XAML {
+      module Hosting {
+        header "windows.ui.xaml.hosting.desktopwindowxamlsource.h"
+        export *
+      }
+    }
+  }
+
   module User {
     header "WinUser.h"
     export *
