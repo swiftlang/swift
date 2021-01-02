@@ -1613,6 +1613,10 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 static StringRef getStringLiteralContent(const Token &Str) {
   StringRef Bytes = Str.getText();
 
+  if (Str.hasObjCDelimiter()) {
+    Bytes = Bytes.drop_front(1);
+  }
+
   if (unsigned CustomDelimiterLen = Str.getCustomDelimiterLen())
     Bytes = Bytes.drop_front(CustomDelimiterLen).drop_back(CustomDelimiterLen);
 
