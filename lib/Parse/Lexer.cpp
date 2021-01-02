@@ -1257,6 +1257,11 @@ static unsigned advanceIfCustomDelimiter(const char *&CurPtr,
   return 0;
 }
 
+static bool advanceIfObjCDelimiter(const char *&CurPtr,
+                                   DiagnosticEngine *Diags) {
+    return  false;
+}
+
 /// delimiterMatches - Does custom delimiter ('#' characters surrounding quotes)
 /// match the number of '#' characters after '\' inside the string? This allows
 /// interpolation inside a "raw" string. Normal/cooked string processing is
@@ -2410,7 +2415,11 @@ void Lexer::lexImpl() {
           "Embedded nul should be eaten by lexTrivia as LeadingTrivia");
     }
 
-  case '@': return formToken(tok::at_sign, TokStart);
+  case '@':
+          if (advanceIfObjCDelimiter(CurPtr, Diags)) {
+              return lexStringLiteral();
+          }
+          return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
   case '[': return formToken(tok::l_square, TokStart);
   case '(': return formToken(tok::l_paren, TokStart);
