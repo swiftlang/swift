@@ -320,11 +320,12 @@ static void validateMultilineIndents(const Token &Str, DiagnosticEngine *Diags);
 
 void Lexer::formStringLiteralToken(const char *TokStart,
                                    bool IsMultilineString,
-                                   unsigned CustomDelimiterLen) {
+                                   unsigned CustomDelimiterLen,
+                                   bool HasObjCDelimiter) {
   formToken(tok::string_literal, TokStart);
   if (NextToken.is(tok::eof))
     return;
-  NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen);
+  NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen, HasObjCDelimiter);
 
   if (IsMultilineString && Diags)
     validateMultilineIndents(NextToken, Diags);
@@ -1340,7 +1341,7 @@ static bool advanceIfMultilineDelimiter(unsigned CustomDelimiterLen,
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
                              bool EmitDiagnostics, bool IsMultilineString,
-                             unsigned CustomDelimiterLen) {
+                             unsigned CustomDelimiterLen, bool HasObjCDelimiter) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -1367,7 +1368,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
       // Mutliline and custom escaping are only enabled for " quote.
       if (LLVM_UNLIKELY(StopQuote != '"'))
         return ~0U;
-      if (!IsMultilineString && !CustomDelimiterLen)
+      if (!IsMultilineString && !CustomDelimiterLen && !HasObjCDelimiter)
         return ~0U;
 
       DiagnosticEngine *D = EmitDiagnostics ? Diags : nullptr;
@@ -1902,7 +1903,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen, bool HasObjCDelimiter)
     }
 
     unsigned CharValue = lexCharacter(CurPtr, QuoteChar, true,
-                                      IsMultilineString, CustomDelimiterLen);
+                                      IsMultilineString, CustomDelimiterLen, HasObjCDelimiter);
     // This is the end of string, we are done.
     if (CharValue == ~0U)
       break;
@@ -1921,7 +1922,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen, bool HasObjCDelimiter)
     return formToken(tok::unknown, TokStart);
 
   return formStringLiteralToken(TokStart, IsMultilineString,
-                                CustomDelimiterLen);
+                                CustomDelimiterLen, HasObjCDelimiter);
 }
 
 

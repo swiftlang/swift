@@ -530,7 +530,7 @@ private:
   void formToken(tok Kind, const char *TokStart);
   void formEscapedIdentifierToken(const char *TokStart);
   void formStringLiteralToken(const char *TokStart, bool IsMultilineString,
-                              unsigned CustomDelimiterLen);
+                              unsigned CustomDelimiterLen, bool HasObjCDelimiter = false);
 
   /// Advance to the end of the line.
   /// If EatNewLine is true, CurPtr will be at end of newline character.
@@ -555,7 +555,7 @@ private:
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,
                         bool EmitDiagnostics, bool IsMultilineString = false,
-                        unsigned CustomDelimiterLen = 0);
+                        unsigned CustomDelimiterLen = 0, bool HasObjCDelimiter = false);
   void lexStringLiteral(unsigned CustomDelimiterLen = 0, bool HasObjCDelimiter = false);
   void lexEscapedIdentifier();
 

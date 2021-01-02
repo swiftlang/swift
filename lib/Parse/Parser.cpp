@@ -238,6 +238,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
+  bool HasObjCDelimiter = Tok.hasObjCDelimiter();
   bool IsMultiline = Tok.isMultilineString();
   unsigned CustomDelimiterLen = Tok.getCustomDelimiterLen();
   unsigned QuoteLen = (IsMultiline ? 3 : 1) + CustomDelimiterLen;
@@ -263,7 +264,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
       NewTok.setToken(tok::string_literal, Text);
-      NewTok.setStringLiteral(IsMultiline, CustomDelimiterLen);
+      NewTok.setStringLiteral(IsMultiline, CustomDelimiterLen, HasObjCDelimiter);
       Toks.push_back(NewTok);
 
     } else {
