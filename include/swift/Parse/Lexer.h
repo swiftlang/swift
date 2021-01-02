@@ -556,7 +556,7 @@ private:
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,
                         bool EmitDiagnostics, bool IsMultilineString = false,
                         unsigned CustomDelimiterLen = 0);
-  void lexStringLiteral(unsigned CustomDelimiterLen = 0);
+  void lexStringLiteral(unsigned CustomDelimiterLen = 0, bool HasObjCDelimiter = false);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();

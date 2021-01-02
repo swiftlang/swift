@@ -1853,9 +1853,10 @@ static void diagnoseSingleQuoteStringLiteral(const char *TokStart,
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
 ///   string_literal ::= (#+)("")?".*"(\2\1) - "raw" strings
-void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
+void Lexer::lexStringLiteral(unsigned CustomDelimiterLen, bool HasObjCDelimiter) {
+  const unsigned ObjCDelimiterLen = HasObjCDelimiter ? 1 : 0;
   const char QuoteChar = CurPtr[-1];
-  const char *TokStart = CurPtr - 1 - CustomDelimiterLen;
+  const char *TokStart = CurPtr - 1 - CustomDelimiterLen - ObjCDelimiterLen;
 
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
@@ -2426,7 +2427,7 @@ void Lexer::lexImpl() {
 
   case '@':
           if (advanceIfObjCDelimiter(CurPtr, Diags)) {
-              return lexStringLiteral();
+              return lexStringLiteral(0, true);
           }
           return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
