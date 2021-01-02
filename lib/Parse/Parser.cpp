@@ -253,7 +253,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
       unsigned Len = Seg.Length;
       if (isFirst) {
         // Include the quote.
-        Loc = Loc.getAdvancedLoc(-QuoteLen);
+        unsigned StartQuoteLen = HasObjCDelimiter ? QuoteLen + 1 : QuoteLen;
+        Loc = Loc.getAdvancedLoc(-StartQuoteLen);
         Len += QuoteLen;
       }
       if (isLast) {
