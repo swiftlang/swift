@@ -122,8 +122,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 ///   information like knowledge of an enum case. Trivial values have no
 ///   ownership semantics.
 ///
-/// * OperandConstraint: This represents a constraint on the values that can be
-///   used by a specific operand. Here Any is valid and is used for operands
+/// * OwnershipConstraint: This represents a constraint on the values that can
+///   be used by a specific operand. Here Any is valid and is used for operands
 ///   that don't care about the ownership kind (lack ownership constraints). In
 ///   contrast, a constraint of None is the most restrictive. It requires a
 ///   trivial value. An Unowned, Owned, or Guaranteed constraint requires either
@@ -588,6 +588,18 @@ inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
   return isCompatibleWith(other.getOwnershipKind());
 }
 
+/// Constraints on the ownership of an operand value.
+///
+/// The ownershipKind component constrains the operand's value ownership to be
+/// the same or "above" the constraint in the lattice, such that
+/// join(constraint, valueOwnership) == valueOwnership. In other words, applying
+/// the constraint does not change the value's ownership. For example, a value
+/// with None ownership is accepted by any OwnershipConstraint, and an
+/// OwnershipConstraint with 'Any' ownership kind can accept any value. Note
+/// that operands commonly allow either Owned or Guaranteed operands. These
+/// operands have an Any ownership constraint to allow either. However,
+/// enforcement of Unowned value is more strict. This requires separate logic in
+/// canAcceptUnownedValue() to avoid complicating the OwnershipKind lattice.
 class OwnershipConstraint {
   OwnershipKind ownershipKind;
   UseLifetimeConstraint lifetimeConstraint;
@@ -746,6 +758,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const OperandOwnership &operandOwnership);
 
 /// Defined inline so the switch is eliminated for constant OperandOwnership.
+///
+/// Here, an Any ownership constraint is used to allow either Owned or
+/// Guaranteed values. However, enforcement of Unowned values is more
+/// strict. This is handled by separate logic in canAcceptUnownedValue() to
+/// avoid complicating the OwnershipKind lattice.
 inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   switch (value) {
   case OperandOwnership::TrivialUse:
