@@ -1257,8 +1257,17 @@ static unsigned advanceIfCustomDelimiter(const char *&CurPtr,
   return 0;
 }
 
+/// CurPtr は文字列のポインタ
 static bool advanceIfObjCDelimiter(const char *&CurPtr,
                                    DiagnosticEngine *Diags) {
+    assert(CurPtr[-1] == '@');
+
+    const char *TmpPtr = CurPtr;
+    if (diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags)) {
+      CurPtr = TmpPtr;
+      return true;
+    }
+
     return  false;
 }
 
