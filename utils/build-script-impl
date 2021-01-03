@@ -119,7 +119,7 @@ KNOWN_SETTINGS=(
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
     ## WebAssembly/WASI Options
-    wasi-sdk                                      ""                "An absolute path to the WASI SDK that will be used as a libc implementation for Wasm builds"
+    wasi-sysroot                                  ""                "An absolute path to the wasi-sysroot that will be used as a libc implementation for Wasm builds"
 
     ## Build Types for Components
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
@@ -1786,7 +1786,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ ! "${SKIP_BUILD_WASM}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_WASI_SDK_PATH:STRING="${WASI_SDK}"
+                        -DSWIFT_WASI_SYSROOT_PATH:STRING="${WASI_SYSROOT}"
                     )
                 fi
 

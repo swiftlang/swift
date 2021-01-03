@@ -94,7 +94,7 @@ build_target_toolchain() {
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
     -D LLVM_DIR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/lib/cmake/llvm/" \
     -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
-    -D SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
+    -D SWIFT_WASI_SYSROOT_PATH="$WASI_SYSROOT_PATH" \
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
