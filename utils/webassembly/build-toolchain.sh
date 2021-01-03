@@ -75,7 +75,7 @@ build_target_toolchain() {
     -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0/" \
-    -D COMPILER_RT_SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
+    -D CMAKE_SYSROOT="${WASI_SYSROOT_PATH}" \
     -G Ninja \
     -S "$SOURCE_PATH/llvm-project/compiler-rt"
 
