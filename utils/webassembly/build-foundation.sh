@@ -18,6 +18,7 @@ cmake -G Ninja \
   -DICU_ROOT="$SOURCE_PATH/icu_out" \
   -DBUILD_SHARED_LIBS=OFF \
   -DCMAKE_Swift_COMPILER_FORCED=ON \
+  -DCMAKE_ASM_FLAGS="-target wasm32-unknown-wasi" \
   "${SOURCE_PATH}/swift-corelibs-foundation"
   
 ninja -v
