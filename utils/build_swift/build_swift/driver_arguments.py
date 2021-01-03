@@ -1130,8 +1130,8 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Build settings for WebAssembly')
 
-    option('--wasi-sdk', store_path,
-           help='An absolute path to WASI SDK that will be used as a libc '
+    option('--wasi-sysroot', store_path,
+           help='An absolute path to wasi-sysroot that will be used as a libc '
                 'implementation for Wasm builds')
 
     # -------------------------------------------------------------------------

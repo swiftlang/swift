@@ -251,9 +251,9 @@ def validate_arguments(toolchain, args):
                 "--android-icu-i18n-include, and --android-icu-data "
                 "must be specified")
     if args.wasm:
-        if args.wasi_sdk is None:
+        if args.wasi_sysroot is None:
             fatal_error(
-                "when building for WebAssembly, --wasi-sdk must be specified")
+                "when building for WebAssembly, --wasi-sysroot must be specified")
 
     targets_needing_toolchain = [
         'build_indexstoredb',
@@ -697,7 +697,7 @@ class BuildScriptInvocation(object):
 
         if args.wasm:
             impl_args += [
-                "--wasi-sdk", args.wasi_sdk,
+                "--wasi-sysroot", args.wasi_sysroot,
             ]
 
         if platform.system() == 'Darwin':

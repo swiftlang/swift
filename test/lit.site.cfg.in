@@ -44,9 +44,6 @@ config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
-# --- WebAssembly ---
-config.wasi_sdk_path = "@SWIFT_WASI_SDK_PATH@"
-
 # --- Windows ---
 msvc_runtime_flags = {
   'MultiThreaded': 'MT',

@@ -4,7 +4,8 @@ set -ex
 SOURCE_PATH="$(cd "$(dirname "$0")/../../.." && pwd)"
 UTILS_PATH="$(cd "$(dirname "$0")" && pwd)"
 
-WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
+WASI_SDK_PATH="$SOURCE_PATH/wasi-sdk"
+WASI_SYSROOT_PATH="$WASI_SDK_PATH/share/wasi-sysroot"
 
 case $(uname -s) in
   Darwin)
@@ -74,7 +75,7 @@ build_target_toolchain() {
     -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0/" \
-    -D COMPILER_RT_SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
+    -D CMAKE_SYSROOT="${WASI_SYSROOT_PATH}" \
     -G Ninja \
     -S "$SOURCE_PATH/llvm-project/compiler-rt"
 
@@ -93,7 +94,7 @@ build_target_toolchain() {
     -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr" \
     -D LLVM_DIR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/lib/cmake/llvm/" \
     -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
-    -D SWIFT_WASI_SDK_PATH="$WASI_SDK_PATH" \
+    -D SWIFT_WASI_SYSROOT_PATH="$WASI_SYSROOT_PATH" \
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
@@ -110,8 +111,8 @@ build_target_toolchain() {
   # Remove host CoreFoundation module directory to avoid module conflict
   # while building Foundation
   rm -rf "$DIST_TOOLCHAIN_SDK/usr/lib/swift_static/CoreFoundation"
-  "$UTILS_PATH/build-foundation.sh" "$DIST_TOOLCHAIN_SDK"
-  "$UTILS_PATH/build-xctest.sh" "$DIST_TOOLCHAIN_SDK"
+  "$UTILS_PATH/build-foundation.sh" "$DIST_TOOLCHAIN_SDK" "$WASI_SYSROOT_PATH"
+  "$UTILS_PATH/build-xctest.sh" "$DIST_TOOLCHAIN_SDK" "$WASI_SYSROOT_PATH"
 
 }
 
