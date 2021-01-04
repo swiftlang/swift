@@ -645,6 +645,11 @@ struct InteriorPointerOperand {
   bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
                        std::function<void(Operand *)> *onError = nullptr);
 
+  Operand *operator->() { return operand; }
+  const Operand *operator->() const { return operand; }
+  Operand *operator*() { return operand; }
+  const Operand *operator*() const { return operand; }
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
