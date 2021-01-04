@@ -4729,6 +4729,10 @@ public: // binding inference logic is public for unit testing.
     /// this points to the source of the binding.
     mutable Constraint *CoveredBy = nullptr;
 
+    LiteralRequirement(Constraint *source, Type defaultTy, bool isDirect)
+        : Source(source), DefaultType(defaultTy),
+          IsDirectRequirement(isDirect) {}
+
     Constraint *getSource() const { return Source; }
 
     ProtocolDecl *getProtocol() const { return Source->getProtocol(); }

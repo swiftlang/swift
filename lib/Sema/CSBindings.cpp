@@ -664,19 +664,16 @@ void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
   // doesn't have a default type.
   if (protocol->isSpecificProtocol(
           KnownProtocolKind::ExpressibleByNilLiteral)) {
-    Literals.insert({protocol,
-                     {.Source = constraint,
-                      .DefaultType = Type(),
-                      .IsDirectRequirement = isDirect}});
+    Literals.insert(
+        {protocol, LiteralRequirement(constraint,
+                                      /*DefaultType=*/Type(), isDirect)});
     return;
   }
 
   // Check whether any of the existing bindings covers this literal
   // protocol.
-  LiteralRequirement literal{.Source = constraint,
-                             .DefaultType =
-                                 TypeChecker::getDefaultType(protocol, CS.DC),
-                             .IsDirectRequirement = isDirect};
+  LiteralRequirement literal(
+      constraint, TypeChecker::getDefaultType(protocol, CS.DC), isDirect);
 
   {
     bool allowsNil = canBeNil();
