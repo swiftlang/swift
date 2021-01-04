@@ -300,14 +300,6 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 }
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // (pointer_to_address strict (address_to_pointer x)) -> x
-  //
-  // NOTE: We can not perform this optimization in OSSA without dealing with
-  // interior pointers since we may be escaping an interior pointer address from
-  // a borrow scope.
-  if (PTAI->getFunction()->hasOwnership())
-    return SILValue();
-
   // If this address is not strict, then it cannot be replaced by an address
   // that may be strict.
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
