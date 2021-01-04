@@ -955,6 +955,7 @@ static bool isLazyPropertyGetter(ApplyInst *ai) {
 
 bool CSE::processNode(DominanceInfoNode *Node) {
   SILBasicBlock *BB = Node->getBlock();
+  InstModCallbacks callbacks;
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
@@ -981,8 +982,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V << '\n');
-      nextI = replaceAllSimplifiedUsesAndErase(Inst, V, nullptr, nullptr,
-                                               &DeadEndBBs);
+      nextI = replaceAllSimplifiedUsesAndErase(Inst, V, callbacks, &DeadEndBBs);
       Changed = true;
       ++NumSimplify;
       continue;
@@ -1412,9 +1412,8 @@ class SILCSE : public SILFunctionTransform {
     InstructionCloner Cloner(Fn);
     DeadEndBlocks DeadEndBBs(Fn);
     JointPostDominanceSetComputer Computer(DeadEndBBs);
-    OwnershipFixupContext FixupCtx{/* eraseNotify */ nullptr,
-                                   /* newInstNotify */ nullptr, DeadEndBBs,
-                                   Computer};
+    InstModCallbacks callbacks;
+    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
     CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, OpenedArchetypesTracker, Cloner,
           DeadEndBBs, FixupCtx);
     bool Changed = false;

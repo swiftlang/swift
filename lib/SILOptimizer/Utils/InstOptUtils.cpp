@@ -48,27 +48,6 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-// Defined here to avoid repeatedly paying the price of template instantiation.
-const std::function<void(SILInstruction *)>
-    InstModCallbacks::defaultDeleteInst
-        = [](SILInstruction *inst) {
-          inst->eraseFromParent();
-        };
-const std::function<void(SILInstruction *)>
-    InstModCallbacks::defaultCreatedNewInst
-        = [](SILInstruction *) {};
-const std::function<void(SILValue, SILValue)>
-    InstModCallbacks::defaultReplaceValueUsesWith
-        = [](SILValue oldValue, SILValue newValue) {
-          oldValue->replaceAllUsesWith(newValue);
-        };
-const std::function<void(SingleValueInstruction *, SILValue)>
-    InstModCallbacks::defaultEraseAndRAUWSingleValueInst
-        = [](SingleValueInstruction *i, SILValue newValue) {
-          i->replaceAllUsesWith(newValue);
-          i->eraseFromParent();
-        };
-
 Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
   if (auto *inst = val->getDefiningInstruction()) {
     return std::next(inst->getIterator());
@@ -1469,6 +1448,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
 bool swift::simplifyUsers(SingleValueInstruction *inst) {
   bool changed = false;
+  InstModCallbacks callbacks;
 
   for (auto ui = inst->use_begin(), ue = inst->use_end(); ui != ue;) {
     SILInstruction *user = ui->getUser();
@@ -1482,7 +1462,7 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
     if (!S)
       continue;
 
-    replaceAllSimplifiedUsesAndErase(svi, S);
+    replaceAllSimplifiedUsesAndErase(svi, S, callbacks);
     changed = true;
   }
 
