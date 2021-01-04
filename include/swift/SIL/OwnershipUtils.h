@@ -621,6 +621,11 @@ struct InteriorPointerOperand {
     return true;
   }
 
+  /// Return the base BorrowedValue of the incoming value's operand.
+  Optional<BorrowedValue> getSingleBaseValue() const {
+    return getSingleBorrowIntroducingValue(operand->get());
+  }
+
   SILValue getProjectedAddress() const {
     switch (kind) {
     case InteriorPointerOperandKind::Invalid:
