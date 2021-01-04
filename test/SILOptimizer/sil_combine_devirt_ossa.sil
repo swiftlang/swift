@@ -12,7 +12,8 @@ class Foo {
   func get() -> Int32 {return m_val}
 }
 func test_me(x : Int32) -> Foo { return Foo(x) }
-func main() { print(test_me(3).get()) } */
+func main() { print(test_me(3).get()) }
+*/
 
 class Foo {
   var m_val: Int32
