@@ -20,7 +20,7 @@ func completeSlowly(n: Int) async -> Int {
 
 /// Tasks complete AFTER they are next() polled.
 func test_sum_nextOnPending() async {
-  let sum = await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  let sum = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
     let firstHandle = await group.add {
       let res = await completeSlowly(n: 1)
       return res
@@ -34,16 +34,16 @@ func test_sum_nextOnPending() async {
       return res
     }
 
-    let first = await try! firstHandle.get()
+    let first = try! await firstHandle.get()
     print("firstHandle.get(): \(first)")
-    let second = await try! secondHandle.get()
+    let second = try! await secondHandle.get()
     print("secondHandle.get(): \(second)")
-    let third = await try! thirdHandle.get()
+    let third = try! await thirdHandle.get()
     print("thirdHandle.get(): \(third)")
 
     var sum = 0
     print("before group.next(), sum: \(sum)")
-    while let n = await try! group.next() {
+    while let n = try! await group.next() {
       assert(n <= 3, "Unexpected value: \(n)! Expected <= 3")
       print("next: \(n)")
       sum += n

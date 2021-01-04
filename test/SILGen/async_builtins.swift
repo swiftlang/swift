@@ -93,7 +93,7 @@ public func usesWithUnsafeContinuation() async {
 
 // CHECK-LABEL: sil [ossa] @$s4test34usesWithUnsafeThrowingContinuationyyYKF : $@convention(thin) @async () -> @error Error {
 public func usesWithUnsafeThrowingContinuation() async throws {
-  let _: Int = await try Builtin.withUnsafeThrowingContinuation { c in }
+  let _: Int = try await Builtin.withUnsafeThrowingContinuation { c in }
 
   // CHECK: [[FN:%.*]] = function_ref @$s4test34usesWithUnsafeThrowingContinuationyyYKFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()

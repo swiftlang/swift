@@ -34,7 +34,7 @@ func chopVegetables() async throws -> [String] { [] }
 func marinateMeat() async -> String { "MEAT" }
 
 func cook() async throws {
-  async let veggies = await try chopVegetables(), meat = await marinateMeat()
-  _ = await try veggies
+  async let veggies = try await chopVegetables(), meat = await marinateMeat()
+  _ = try await veggies
   _ = await meat
 }

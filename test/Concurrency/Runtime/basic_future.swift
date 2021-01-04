@@ -56,7 +56,7 @@ func testSimple(
 
     do {
       print("+ Reader waiting for the result")
-      let result = await try taskHandle.get()
+      let result = try await taskHandle.get()
       completed = true
       print("+ Normal return: \(result)")
       assert(result == "Hello \(name) from async world!")

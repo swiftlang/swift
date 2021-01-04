@@ -19,7 +19,7 @@ public func task_future_wait(_ task: __owned SomeClass) async throws -> Int
 // CHECK: tail call swiftcc void @swift_task_future_wait(
 public func testThis(_ task: __owned SomeClass) async {
   do {
-    let _ = await try task_future_wait(task)
+    let _ = try await task_future_wait(task)
   } catch _ {
     print("error")
   }

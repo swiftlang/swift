@@ -98,7 +98,7 @@ public func withUnsafeContinuation<T>(
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeThrowingContinuation<T>) -> Void
 ) async throws -> T {
-  return await try Builtin.withUnsafeThrowingContinuation {
+  return try await Builtin.withUnsafeThrowingContinuation {
     fn(UnsafeThrowingContinuation<T>($0))
   }
 }

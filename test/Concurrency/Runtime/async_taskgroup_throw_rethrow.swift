@@ -14,13 +14,13 @@ func boom() async throws -> Int { throw Boom() }
 
 func test_taskGroup_throws_rethrows() async {
   do {
-    let got = await try Task.withGroup(resultType: Int.self) { (group) async throws -> Int in
+    let got = try await Task.withGroup(resultType: Int.self) { (group) async throws -> Int in
       await group.add { await echo(1) }
       await group.add { await echo(2) }
-      await group.add { await try boom() }
+      await group.add { try await boom() }
 
       do {
-        while let r = await try group.next() {
+        while let r = try await group.next() {
           print("next: \(r)")
         }
       } catch {

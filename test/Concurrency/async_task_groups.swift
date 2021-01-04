@@ -14,7 +14,7 @@ func asyncThrowsOnCancel() async throws -> Int {
 }
 
 func test_taskGroup_add() async throws -> Int {
-  await try Task.withGroup(resultType: Int.self) { group in
+  try await Task.withGroup(resultType: Int.self) { group in
     await group.add {
       await asyncFunc()
     }
@@ -24,7 +24,7 @@ func test_taskGroup_add() async throws -> Int {
     }
 
     var sum = 0
-    while let v = await try group.next() {
+    while let v = try await group.next() {
       sum += v
     }
     return sum
@@ -32,7 +32,7 @@ func test_taskGroup_add() async throws -> Int {
 }
 
 func test_taskGroup_addHandles() async throws -> Int {
-  await try Task.withGroup(resultType: Int.self) { group in
+  try await Task.withGroup(resultType: Int.self) { group in
     let one = await group.add {
       await asyncFunc()
     }
@@ -41,23 +41,23 @@ func test_taskGroup_addHandles() async throws -> Int {
       await asyncFunc()
     }
 
-    _ = await try one.get()
-    _ = await try two.get()
+    _ = try await one.get()
+    _ = try await two.get()
   } // implicitly awaits
 }
 
 func test_taskGroup_cancel_handles() async throws {
-  await try Task.withGroup(resultType: Int.self) { group in
+  try await Task.withGroup(resultType: Int.self) { group in
     let one = await group.add {
-      await try asyncThrowsOnCancel()
+      try await asyncThrowsOnCancel()
     }
 
     let two = await group.add {
       await asyncFunc()
     }
 
-    _ = await try one.get()
-    _ = await try two.get()
+    _ = try await one.get()
+    _ = try await two.get()
   } // implicitly awaits
 }
 
@@ -70,12 +70,12 @@ func boom() async throws -> Int { throw Boom() }
 
 func first_allMustSucceed() async throws {
 
-  let first: Int = await try Task.withGroup(resultType: Int.self) { group in
+  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
     await group.add { await work() }
     await group.add { await work() }
-    await group.add { await try boom() }
+    await group.add { try await boom() }
 
-    if let first = await try group.next() {
+    if let first = try await group.next() {
       return first
     } else {
       fatalError("Should never happen, we either throw, or get a result from any of the tasks")
@@ -90,19 +90,19 @@ func first_ignoreFailures() async throws {
   func work() async -> Int { 42 }
   func boom() async throws -> Int { throw Boom() }
 
-  let first: Int = await try Task.withGroup(resultType: Int.self) { group in
+  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
     await group.add { await work() }
     await group.add { await work() }
     await group.add {
       do {
-        return await try boom()
+        return try await boom()
       } catch {
-        return 0 // TODO: until await try? works properly
+        return 0 // TODO: until try? await works properly
       }
     }
 
     var result: Int = 0
-    while let v = await try group.next() {
+    while let v = try await group.next() {
       result = v
 
       if result != 0 {
@@ -137,9 +137,9 @@ func test_taskGroup_quorum_thenCancel() async {
   ///
   /// - Returns: `true` iff `N/2 + 1` followers return `.yay`, `false` otherwise.
   func gatherQuorum(followers: [Follower]) async -> Bool {
-    await try! Task.withGroup(resultType: Vote.self) { group in
+    try! await Task.withGroup(resultType: Vote.self) { group in
       for follower in followers {
-        await group.add { await try follower.vote() }
+        await group.add { try await follower.vote() }
       }
 
       defer {
@@ -149,7 +149,7 @@ func test_taskGroup_quorum_thenCancel() async {
       var yays: Int = 0
       var nays: Int = 0
       let quorum = Int(followers.count / 2) + 1
-      while let vote = await try group.next() {
+      while let vote = try await group.next() {
         switch vote {
         case .yay:
           yays += 1
@@ -188,7 +188,7 @@ extension Collection {
       return []
     }
 
-    return await try Task.withGroup(resultType: (Int, T).self) { group in
+    return try await Task.withGroup(resultType: (Int, T).self) { group in
       var result = ContiguousArray<T>()
       result.reserveCapacity(n)
 
@@ -197,7 +197,7 @@ extension Collection {
 
       func submitNext() async throws {
         await group.add { [submitted,i] in
-          let value = await try transform(self[i])
+          let value = try await transform(self[i])
           return (submitted, value)
         }
         submitted += 1
@@ -206,14 +206,14 @@ extension Collection {
 
       // submit first initial tasks
       for _ in 0..<parallelism {
-        await try submitNext()
+        try await submitNext()
       }
 
-      while let (index, taskResult) = await try group.next() {
+      while let (index, taskResult) = try await group.next() {
         result[index] = taskResult
 
-        await try Task.checkCancellation()
-        await try submitNext()
+        try await Task.checkCancellation()
+        try await submitNext()
       }
 
       assert(result.count == n)
