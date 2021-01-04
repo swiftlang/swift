@@ -336,7 +336,7 @@ class InstModCallbacks {
   std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
   /// A boolean that tracks if any of our callbacks were ever called.
-  bool madeChange = false;
+  bool wereAnyCallbacksInvoked = false;
 
 public:
   InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc)
@@ -363,27 +363,27 @@ public:
   InstModCallbacks(InstModCallbacks &&) = default;
 
   void deleteInst(SILInstruction *instToDelete) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
     if (deleteInstFunc)
       return deleteInstFunc(instToDelete);
     instToDelete->eraseFromParent();
   }
 
   void createdNewInst(SILInstruction *newlyCreatedInst) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
     if (createdNewInstFunc)
       createdNewInstFunc(newlyCreatedInst);
   }
 
   void setUseValue(Operand *use, SILValue newValue) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
     if (setUseValueFunc)
       return setUseValueFunc(use, newValue);
     use->set(newValue);
   }
 
   void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
 
     while (!oldValue->use_empty()) {
       auto *use = *oldValue->use_begin();
@@ -393,12 +393,12 @@ public:
 
   void eraseAndRAUWSingleValueInst(SingleValueInstruction *oldInst,
                                    SILValue newValue) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
     replaceValueUsesWith(oldInst, newValue);
     deleteInst(oldInst);
   }
 
-  bool getMadeChange() const { return madeChange; }
+  bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
 };
 
 /// Get all consumed arguments of a partial_apply.
