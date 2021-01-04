@@ -433,7 +433,7 @@ static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
 #endif
 
   P.addForEachLoopUnroll();
-  P.addMandatoryCombine();
+  P.addOptimizedMandatoryCombine();
   P.addAccessMarkerElimination();
 }
 

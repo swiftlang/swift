@@ -169,6 +169,17 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
   prepareEpilog(false, false, cleanupLoc);
   {
     Scope S(*this, cleanupLoc);
+    // Self is effectively guaranteed for the duration of any destructor.  For
+    // ObjC classes, self may be unowned. A conversion to guaranteed is required
+    // to access its members.
+    if (selfValue.getOwnershipKind() != OwnershipKind::Guaranteed) {
+      // %guaranteedSelf = unchecked_ownership_conversion %self to @guaranteed
+      // ...
+      // end_borrow %guaranteedSelf
+      auto guaranteedSelf = B.createUncheckedOwnershipConversion(
+        cleanupLoc, selfValue.forward(*this), OwnershipKind::Guaranteed);
+      selfValue = emitManagedBorrowedRValueWithCleanup(guaranteedSelf);
+    }
     emitClassMemberDestruction(selfValue, cd, cleanupLoc);
   }
 
@@ -179,7 +190,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
 void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
                                                 ClassDecl *cd,
                                                 CleanupLocation cleanupLoc) {
-  selfValue = selfValue.borrow(*this, cleanupLoc);
+  assert(selfValue.getOwnershipKind() == OwnershipKind::Guaranteed);
   for (VarDecl *vd : cd->getStoredProperties()) {
     const TypeLowering &ti = getTypeLowering(vd->getType());
     if (!ti.isTrivial()) {

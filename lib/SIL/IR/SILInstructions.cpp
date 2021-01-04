@@ -482,7 +482,11 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
-  resultOwnerships.push_back(OwnershipKind::None);
+  // The begin_apply token represents the borrow scope of all owned and
+  // guaranteed call arguments. Although SILToken is (currently) trivially
+  // typed, it must have guaranteed ownership so end_apply and abort_apply will
+  // be recognized as lifetime-ending uses.
+  resultOwnerships.push_back(OwnershipKind::Guaranteed);
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
