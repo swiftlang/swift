@@ -5368,30 +5368,19 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   }
 
   // Infer defaults based on "uncovered" literal protocol requirements.
-  for (const auto &literal : bindings.Literals) {
-    Constraint *constraint = nullptr;
-    bool isDirectRequirement = false;
-    Constraint *coveredBy = nullptr;
+  for (const auto &info : bindings.Literals) {
+    const auto &literal = info.second;
 
-    std::tie(constraint, isDirectRequirement, coveredBy) = literal.second;
-
-    // Can't be defaulted because it's already covered by an
-    // existing direct or transitive binding which is always
-    // better.
-    if (coveredBy)
-      continue;
-
-    auto defaultType = TypeChecker::getDefaultType(literal.first, CS.DC);
-    if (!defaultType)
+    if (!literal.viableAsBinding())
       continue;
 
     // We need to figure out whether this is a direct conformance
     // requirement or inferred transitive one to identify binding
     // kind correctly.
-    addBinding(
-        {defaultType,
-         isDirectRequirement ? BindingKind::Subtypes : BindingKind::Supertypes,
-         constraint});
+    addBinding({literal.getDefaultType(),
+                literal.isDirectRequirement() ? BindingKind::Subtypes
+                                              : BindingKind::Supertypes,
+                literal.getSource()});
   }
 
   // Let's always consider `Any` to be a last resort binding because

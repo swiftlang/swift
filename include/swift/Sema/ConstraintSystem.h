@@ -4723,16 +4723,50 @@ private:
     }
   };
 
+  struct LiteralRequirement {
+    /// The source of the literal requirement.
+    Constraint *Source;
+    /// The default type associated with this literal (if any).
+    Type DefaultType;
+    /// Determines whether this literal is a direct requirement
+    /// of the current type variable.
+    bool IsDirectRequirement;
+
+    /// If the literal is covered by existing type binding,
+    /// this points to the source of the binding.
+    mutable Constraint *CoveredBy = nullptr;
+
+    Constraint *getSource() const { return Source; }
+
+    ProtocolDecl *getProtocol() const { return Source->getProtocol(); }
+
+    bool isCovered() const { return bool(CoveredBy); }
+
+    bool isDirectRequirement() const { return IsDirectRequirement; }
+
+    bool hasDefaultType() const { return bool(DefaultType); }
+
+    Type getDefaultType() const {
+      assert(hasDefaultType());
+      return DefaultType;
+    }
+
+    void setCoveredBy(Constraint *coveredBy) {
+      assert(!isCovered());
+      CoveredBy = coveredBy;
+    }
+
+    bool isCoveredBy(Type type, DeclContext *useDC) const;
+
+    /// Determines whether literal protocol associated with this
+    /// meta-information is viable for inclusion as a defaultable binding.
+    bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
+  };
+
+private:
   struct PotentialBindings {
     using BindingScore =
         std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
-
-    /// - Constraint * - The source of the literal requirement;
-    /// - bool - Determines whether this literal is a direct requirement
-    ///          of the current type variable;
-    /// - Constraint * - If the literal is covered, this points to the
-    ///                  source of the binding;
-    using LiteralInfo = std::tuple<Constraint *, bool, Constraint *>;
 
     /// The constraint system this type variable and its bindings belong to.
     ConstraintSystem &CS;
@@ -4755,7 +4789,7 @@ private:
     /// Note that ordering is important when it comes to bindings, we'd
     /// like to add any "direct" default types first to attempt them
     /// before transitive ones.
-    llvm::SmallMapVector<ProtocolDecl *, LiteralInfo, 2> Literals;
+    llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
 
     /// The set of constraints which would be used to infer default types.
     llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
@@ -4970,15 +5004,9 @@ private:
     /// \param canBeNil The flag that determines whether given type
     /// variable requires all of its bindings to be optional.
     ///
-    /// \param isDirectRequirement The flag that determines whether
-    /// this literal conformance requirement is associated with the
-    /// current type variable or it's inferred.
-    ///
     /// \returns true if binding covers given literal protocol.
-    bool isLiteralCoveredBy(ProtocolDecl *literal,
-                            PotentialBinding &binding,
-                            bool canBeNil,
-                            bool isDirectRequirement) const;
+    bool isLiteralCoveredBy(const LiteralRequirement &literal,
+                            PotentialBinding &binding, bool canBeNil) const;
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.

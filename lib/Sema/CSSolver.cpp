@@ -2301,12 +2301,8 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     conversionType = bindings.Bindings[0].BindingType;
   } else {
     for (const auto &literal : bindings.Literals) {
-      auto *coveredBy = std::get<2>(literal.second);
-      if (coveredBy)
-        continue;
-
-      if (auto defaultTy = TypeChecker::getDefaultType(literal.first, cs.DC)) {
-        conversionType = defaultTy;
+      if (literal.second.viableAsBinding()) {
+        conversionType = literal.second.getDefaultType();
         break;
       }
     }

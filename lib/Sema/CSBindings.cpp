@@ -319,7 +319,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     // `ExpressibleByStringLiteral` conformance, we'd end up picking
     // `T` with only one type `Any?` which is incorrect.
     for (const auto &literal : bindings.Literals)
-      addLiteral(std::get<0>(literal.second));
+      addLiteral(literal.second.getSource());
 
     // Infer transitive defaults.
     for (const auto &def : bindings.Defaults)
@@ -476,7 +476,8 @@ void ConstraintSystem::PotentialBindings::addDefault(Constraint *constraint) {
   Defaults.insert({defaultTy->getCanonicalType(), constraint});
 }
 
-static bool isCoveredBy(ProtocolDecl *protocol, Type type, DeclContext *useDC) {
+bool ConstraintSystem::LiteralRequirement::isCoveredBy(
+    Type type, DeclContext *useDC) const {
   auto coversDefaultType = [](Type type, Type defaultType) -> bool {
     if (!defaultType->hasUnboundGenericType())
       return type->isEqual(defaultType);
@@ -493,17 +494,15 @@ static bool isCoveredBy(ProtocolDecl *protocol, Type type, DeclContext *useDC) {
     return nominal == type->getAnyNominal();
   };
 
-  if (auto defaultType = TypeChecker::getDefaultType(protocol, useDC)) {
-    if (coversDefaultType(type, defaultType))
-      return true;
-  }
+  if (hasDefaultType() && coversDefaultType(type, getDefaultType()))
+    return true;
 
-  return bool(TypeChecker::conformsToProtocol(type, protocol, useDC));
+  return bool(TypeChecker::conformsToProtocol(type, getProtocol(), useDC));
 }
 
 bool ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
-    ProtocolDecl *literal, PotentialBinding &binding, bool canBeNil,
-    bool isDirectRequirement) const {
+    const LiteralRequirement &literal, PotentialBinding &binding,
+    bool canBeNil) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
   case AllowedBindingKind::Exact:
@@ -521,7 +520,7 @@ bool ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
 
   bool requiresUnwrap = false;
   do {
-    if (isCoveredBy(literal, type, CS.DC)) {
+    if (literal.isCoveredBy(type, CS.DC)) {
       // FIXME: Side-effect like this is not great (to say the least),
       // but this is an artifact of the binding collection which could
       // be fixed separately.
@@ -538,7 +537,7 @@ bool ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
     // If this literal protocol is not a direct requirement it
     // would not be possible to change optionality while inferring
     // bindings for a supertype, so this hack doesn't apply.
-    if (!isDirectRequirement)
+    if (!literal.isDirectRequirement())
       return false;
 
     // If we're allowed to bind to subtypes, look through optionals.
@@ -613,12 +612,11 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
               KnownProtocolKind::ExpressibleByNilLiteral))
         continue;
 
-      auto isDirectRequirement = std::get<1>(literal.second);
-      auto *&coveredBy = std::get<2>(literal.second);
+      auto &info = literal.second;
 
-      if (!coveredBy &&
-          isLiteralCoveredBy(protocol, binding, allowsNil, isDirectRequirement))
-        coveredBy = binding.getSource();
+      if (info.viableAsBinding() &&
+          isLiteralCoveredBy(info, binding, allowsNil))
+        info.setCoveredBy(binding.getSource());
     }
   }
 
@@ -661,32 +659,38 @@ void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
     return;
 
   bool isDirect = isDirectRequirement(constraint);
-  Constraint *coveredBy = nullptr;
 
   // Coverage is not applicable to `ExpressibleByNilLiteral` since it
   // doesn't have a default type.
   if (protocol->isSpecificProtocol(
           KnownProtocolKind::ExpressibleByNilLiteral)) {
-    Literals.insert(
-        {protocol, std::make_tuple(constraint, isDirect, coveredBy)});
+    Literals.insert({protocol,
+                     {.Source = constraint,
+                      .DefaultType = Type(),
+                      .IsDirectRequirement = isDirect}});
     return;
   }
 
   // Check whether any of the existing bindings covers this literal
   // protocol.
+  LiteralRequirement literal{.Source = constraint,
+                             .DefaultType =
+                                 TypeChecker::getDefaultType(protocol, CS.DC),
+                             .IsDirectRequirement = isDirect};
+
   {
     bool allowsNil = canBeNil();
 
     for (auto &binding : Bindings) {
-      if (!coveredBy &&
-          isLiteralCoveredBy(protocol, binding, allowsNil, isDirect)) {
-        coveredBy = binding.getSource();
+      if (!literal.isCovered() &&
+          isLiteralCoveredBy(literal, binding, allowsNil)) {
+        literal.setCoveredBy(binding.getSource());
         break;
       }
     }
   }
 
-  Literals.insert({protocol, std::make_tuple(constraint, isDirect, coveredBy)});
+  Literals.insert({protocol, std::move(literal)});
 }
 
 bool ConstraintSystem::PotentialBindings::isViable(
@@ -1180,10 +1184,10 @@ ConstraintSystem::PotentialBindings::getLiteralKind() const {
 
   for (const auto &literal : Literals) {
     auto *protocol = literal.first;
-    auto *coveredBy = std::get<2>(literal.second);
+    const auto &info = literal.second;
 
     // Only uncovered defaultable literal protocols participate.
-    if (coveredBy || !TypeChecker::getDefaultType(protocol, CS.DC))
+    if (!info.viableAsBinding())
       continue;
 
     switch (*protocol->getKnownProtocolKind()) {
@@ -1210,8 +1214,7 @@ ConstraintSystem::PotentialBindings::getLiteralKind() const {
 unsigned
 ConstraintSystem::PotentialBindings::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
-    auto *coveredBy = std::get<2>(literal.second);
-    return !(coveredBy || !TypeChecker::getDefaultType(literal.first, CS.DC));
+    return literal.second.viableAsBinding();
   });
 }
 
