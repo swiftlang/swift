@@ -468,6 +468,13 @@ struct BorrowedValue {
     return foundAnyReborrows;
   }
 
+  // Helpers to allow a BorrowedValue to easily be used as a SILValue
+  // programatically.
+  SILValue operator->() { return value; }
+  SILValue operator->() const { return value; }
+  SILValue operator*() { return value; }
+  SILValue operator*() const { return value; }
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
