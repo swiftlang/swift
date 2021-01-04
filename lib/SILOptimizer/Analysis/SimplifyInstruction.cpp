@@ -752,7 +752,7 @@ swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
       callbacks.deleteInst(user);
       continue;
     }
-    use->set(newValue);
+    callbacks.setUseValue(use, newValue);
   }
 
   callbacks.deleteInst(svi);

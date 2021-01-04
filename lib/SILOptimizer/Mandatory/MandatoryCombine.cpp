@@ -148,8 +148,9 @@ public:
               instructionsPendingDeletion.push_back(instruction);
             },
             [&](SILInstruction *instruction) { worklist.add(instruction); },
-            [this](SILValue oldValue, SILValue newValue) {
-              worklist.replaceValueUsesWith(oldValue, newValue);
+            [this](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              worklist.add(use->getUser());
             }),
         createdInstructions(createdInstructions),
         deadEndBlocks(deadEndBlocks){};
