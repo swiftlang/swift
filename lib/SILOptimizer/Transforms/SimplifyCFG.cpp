@@ -1139,6 +1139,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 /// result in exposing opportunities for CFG simplification.
 bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   bool Simplified = false;
+  InstModCallbacks callbacks;
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
@@ -1149,7 +1150,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
       // unreachable block. In this case it can reference itself as operand.
       if (Result && Result != I) {
         LLVM_DEBUG(llvm::dbgs() << "simplify branch operand " << *I);
-        replaceAllSimplifiedUsesAndErase(I, Result);
+        replaceAllSimplifiedUsesAndErase(I, Result, callbacks);
         Simplified = true;
       }
     }

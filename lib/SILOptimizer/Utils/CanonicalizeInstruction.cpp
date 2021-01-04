@@ -93,11 +93,8 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // Erase the simplified instruction and any instructions that end its
   // scope. Nothing needs to be added to the worklist except for Result,
   // because the instruction and all non-replaced users will be deleted.
-  auto nextII = replaceAllSimplifiedUsesAndErase(
-      inst, result,
-      [&pass](SILInstruction *deleted) { pass.killInstruction(deleted); },
-      [&pass](SILInstruction *newInst) { pass.notifyNewInstruction(newInst); },
-      &pass.deadEndBlocks);
+  auto nextII = replaceAllSimplifiedUsesAndErase(inst, result, pass.callbacks,
+                                                 &pass.deadEndBlocks);
 
   // Push the new instruction and any users onto the worklist.
   pass.notifyHasNewUsers(result);
