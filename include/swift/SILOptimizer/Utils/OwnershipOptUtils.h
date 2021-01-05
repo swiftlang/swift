@@ -29,9 +29,20 @@ namespace swift {
 struct JointPostDominanceSetComputer;
 
 struct OwnershipFixupContext {
-  InstModCallbacks callbacks;
+  Optional<InstModCallbacks> inlineCallbacks;
+  InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
   JointPostDominanceSetComputer &jointPostDomSetComputer;
+
+  OwnershipFixupContext(InstModCallbacks &callbacks, DeadEndBlocks &deBlocks,
+                        JointPostDominanceSetComputer &inputJPDComputer)
+      : inlineCallbacks(), callbacks(callbacks), deBlocks(deBlocks),
+        jointPostDomSetComputer(inputJPDComputer) {}
+
+  OwnershipFixupContext(DeadEndBlocks &deBlocks,
+                        JointPostDominanceSetComputer &inputJPDComputer)
+      : inlineCallbacks(InstModCallbacks()), callbacks(*inlineCallbacks),
+        deBlocks(deBlocks), jointPostDomSetComputer(inputJPDComputer) {}
 
   SILBasicBlock::iterator
   replaceAllUsesAndEraseFixingOwnership(SingleValueInstruction *oldValue,

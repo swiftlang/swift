@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -87,6 +88,20 @@ class SILCombiner :
   /// Centralized InstModCallback that we use for certain utility methods.
   InstModCallbacks instModCallbacks;
 
+  /// Dead end blocks cache. SILCombine is already not allowed to mess with CFG
+  /// edges so it is safe to use this here.
+  DeadEndBlocks deBlocks;
+
+  /// A utility struct used by OwnershipFixupContext to map sets of partially
+  /// post-dominating blocks to a full jointly post-dominating set.
+  JointPostDominanceSetComputer jPostDomComputer;
+
+  /// A utility that we use to perform erase+RAUW that fixes up ownership for us
+  /// afterwards by lifetime extending/copy values as appropriate. We rely on
+  /// later optimizations to chew through this traffic. This ensures we can use
+  /// one code base for both OSSA and non-OSSA.
+  OwnershipFixupContext ownershipRAUWHelper;
+
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
@@ -117,7 +132,9 @@ public:
             [&](Operand *use, SILValue newValue) {
               use->set(newValue);
               Worklist.add(use->getUser());
-            }) {}
+            }),
+        deBlocks(&B.getFunction()), jPostDomComputer(deBlocks),
+        ownershipRAUWHelper(instModCallbacks, deBlocks, jPostDomComputer) {}
 
   bool runOnFunction(SILFunction &F);
 
