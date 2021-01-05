@@ -622,6 +622,8 @@ public:
 
   /// Returns true if the instruction may write to memory, deinitialize memory,
   /// or have other unknown side effects.
+  ///
+  /// For details see SILInstruction::MemoryBehavior.
   bool mayWriteToMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayWrite ||
@@ -629,7 +631,10 @@ public:
       B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if the instruction may read from memory.
+  /// Returns true if the instruction may read from memory, or have other
+  /// unknown side effects.
+  ///
+  /// For details see SILInstruction::MemoryBehavior.
   bool mayReadFromMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayRead ||
@@ -639,6 +644,8 @@ public:
 
   /// Returns true if the instruction may read from memory, write to memory,
   /// deinitialize memory, or have other unknown side effects.
+  ///
+  /// For details see SILInstruction::MemoryBehavior.
   bool mayReadOrWriteMemory() const {
     return getMemoryBehavior() != MemoryBehavior::None;
   }
