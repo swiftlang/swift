@@ -620,7 +620,8 @@ public:
   /// that are not visible by merely examining their uses.
   bool mayHaveSideEffects() const;
 
-  /// Returns true if the instruction may write to memory.
+  /// Returns true if the instruction may write to memory, deinitialize memory,
+  /// or have other unknown side effects.
   bool mayWriteToMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayWrite ||
@@ -636,7 +637,8 @@ public:
       B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if the instruction may read from or write to memory.
+  /// Returns true if the instruction may read from memory, write to memory,
+  /// deinitialize memory, or have other unknown side effects.
   bool mayReadOrWriteMemory() const {
     return getMemoryBehavior() != MemoryBehavior::None;
   }
