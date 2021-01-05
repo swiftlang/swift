@@ -36,14 +36,19 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
           ->getDeclaredInterfaceType(),
       cs.getConstraintLocator(intLiteral));
 
-  auto bindings = cs.inferBindingsFor(literalTy);
+  auto intTy = getStdlibType("Int");
 
-  ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
+  {
+    auto bindings = cs.inferBindingsFor(literalTy);
 
-  const auto &binding = bindings.Bindings.front();
+    ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
-  ASSERT_TRUE(binding.BindingType->isEqual(getStdlibType("Int")));
-  ASSERT_TRUE(binding.hasDefaultedLiteralProtocol());
+    const auto &literal = bindings.Literals.front().second;
+
+    ASSERT_TRUE(literal.hasDefaultType());
+    ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
+    ASSERT_FALSE(literal.isCovered());
+  }
 }
 
 // Given a set of inferred protocol requirements, make sure that
