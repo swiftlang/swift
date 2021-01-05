@@ -510,20 +510,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
       return true;
     return false;
   };
-  auto canHandleOwnershipConversion = [](const SILInstruction *lhs,
-                                         const SILInstruction *rhs) -> bool {
-    if (!lhs->getFunction()->hasOwnership())
-      return true;
-    // TODO: Support MultipleValueInstructionResult in OSSA RAUW utility and
-    // extend it here as well
-    if (!isa<SingleValueInstruction>(lhs))
-      return false;
-    return OwnershipFixupContext::canFixUpOwnershipForRAUW(
-        cast<SingleValueInstruction>(lhs), cast<SingleValueInstruction>(rhs));
-  };
-  return LHSI->getKind() == RHSI->getKind() &&
-         LHSI->isIdenticalTo(RHSI, opCmp) &&
-         (LHSI == RHSI || canHandleOwnershipConversion(LHSI, RHSI));
+  return LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
 }
 
 namespace {
@@ -1032,9 +1019,15 @@ bool CSE::processNode(DominanceInfoNode *Node) {
           ++NumCSE;
           continue;
         }
-        // Replace SingleValueInstruction using OSSA RAUW here
         // TODO: Support MultipleValueInstructionResult in OSSA RAUW utility and
         // extend it here as well
+        if (!isa<SingleValueInstruction>(Inst))
+          continue;
+        if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(
+                cast<SingleValueInstruction>(Inst),
+                cast<SingleValueInstruction>(AvailInst)))
+          continue;
+        // Replace SingleValueInstruction using OSSA RAUW here
         nextI = FixupCtx.replaceAllUsesAndEraseFixingOwnership(
             cast<SingleValueInstruction>(Inst),
             cast<SingleValueInstruction>(AvailInst));
