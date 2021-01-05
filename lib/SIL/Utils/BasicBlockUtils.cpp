@@ -463,6 +463,13 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
     for (auto *predBlock : block->getPredecessorBlocks()) {
       if (initialBlocks.count(predBlock)) {
         reachableInputBlocks.push_back(predBlock);
+        for (auto *succBlock : predBlock->getSuccessorBlocks()) {
+          if (visitedBlocks.count(succBlock))
+            continue;
+          if (deadEndBlocks.isDeadEnd(succBlock))
+            continue;
+          blocksThatLeakIfNeverVisited.insert(succBlock);
+        }
       }
       if (visitedBlocks.insert(predBlock).second)
         worklist.push_back(predBlock);
