@@ -66,12 +66,6 @@ class SolutionApplicationTarget;
 
 } // end namespace constraints
 
-namespace unittest {
-
-class SemaTest;
-
-} // end namespace unittest
-
 // Forward declare some TypeChecker related functions
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
@@ -2025,8 +2019,6 @@ enum class SolutionApplicationToFunctionResult {
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
   ASTContext &Context;
-
-  friend class swift::unittest::SemaTest;
 
 public:
   DeclContext *DC;
@@ -4625,7 +4617,8 @@ public:
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
 
-private:
+public: // binding inference logic is public for unit testing.
+
   /// The kind of bindings that are permitted.
   enum class AllowedBindingKind : uint8_t {
     /// Only the exact type.
@@ -4763,7 +4756,6 @@ private:
     bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
   };
 
-private:
   struct PotentialBindings {
     using BindingScore =
         std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -5157,7 +5149,6 @@ public:
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
 
-public:
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
   PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
