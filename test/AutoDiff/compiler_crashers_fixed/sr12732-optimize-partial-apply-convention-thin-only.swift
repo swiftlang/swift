@@ -1,10 +1,12 @@
 // RUN: %target-build-swift -Osize %s
-// REQUIRES: asserts
 
 // SR-12732: Fix `partial_apply` optimization.
 
 // Do not rewrite `partial_apply` to `thin_to_thick_function` if the specialized
 // callee is not `@convention(thin)`.
+
+// FIXME(SR-13021): Disabled due to flakiness on Linux, likely related to TF-1197.
+// REQUIRES: SR13021
 
 import DifferentiationUnittest
 

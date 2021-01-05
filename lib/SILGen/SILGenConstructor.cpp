@@ -562,7 +562,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   // If the root class was implemented in Objective-C, use Objective-C's
   // allocation methods because they may have been overridden.
-  return theClass->checkAncestry(AncestryFlags::ClangImported);
+  return theClass->usesObjCObjectModel();
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
@@ -650,6 +650,19 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
                  initedSelfValue);
 }
 
+static void emitDefaultActorInitialization(SILGenFunction &SGF,
+                                           SILLocation loc,
+                                           ManagedValue self) {
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(
+    getBuiltinName(BuiltinValueKind::InitializeDefaultActor));
+  auto resultTy = SGF.SGM.Types.getEmptyTupleType();
+
+  FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
+  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
+                      { self.borrow(SGF, loc).getValue() });
+}
+
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
@@ -717,6 +730,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
     B.createDebugValue(PrologueLoc, selfArg.getValue(), DbgVar);
+  }
+
+  // Initialize the default-actor instance.
+  if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
+    SILLocation PrologueLoc(selfDecl);
+    PrologueLoc.markAsPrologue();
+    emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
   }
 
   if (!ctor->hasStubImplementation()) {

@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 588; // XRefClangTemplateInstantiation added
+const uint16_t SWIFTMODULE_VERSION_MINOR = 591; // XRefClangTemplateInstantiation added
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2022,7 +2022,8 @@ namespace index_block {
 
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
-    LastRecordKind = CLANG_TYPE_OFFSETS,
+    EXPORTED_PRESPECIALIZATION_DECLS,
+    LastRecordKind = EXPORTED_PRESPECIALIZATION_DECLS,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;

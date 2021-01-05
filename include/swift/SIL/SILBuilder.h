@@ -782,7 +782,7 @@ public:
   }
 
   void emitEndBorrowOperation(SILLocation loc, SILValue v) {
-    if (!hasOwnership())
+    if (!hasOwnership() || v.getOwnershipKind() == OwnershipKind::None)
       return;
     createEndBorrow(loc, v);
   }
@@ -1939,17 +1939,27 @@ public:
   //===--------------------------------------------------------------------===//
 
   GetAsyncContinuationInst *createGetAsyncContinuation(SILLocation Loc,
-                                                       SILType ContinuationTy) {
+                                                       CanType ResumeType,
+                                                       bool Throws) {
+    auto ContinuationType = SILType::getPrimitiveObjectType(
+        getASTContext().TheRawUnsafeContinuationType);
     return insert(new (getModule()) GetAsyncContinuationInst(getSILDebugLocation(Loc),
-                                                             ContinuationTy));
+                                                             ContinuationType,
+                                                             ResumeType,
+                                                             Throws));
   }
 
   GetAsyncContinuationAddrInst *createGetAsyncContinuationAddr(SILLocation Loc,
                                                                SILValue Operand,
-                                                               SILType ContinuationTy) {
+                                                               CanType ResumeType,
+                                                               bool Throws) {
+    auto ContinuationType = SILType::getPrimitiveObjectType(
+        getASTContext().TheRawUnsafeContinuationType);
     return insert(new (getModule()) GetAsyncContinuationAddrInst(getSILDebugLocation(Loc),
                                                                  Operand,
-                                                                 ContinuationTy));
+                                                                 ContinuationType,
+                                                                 ResumeType,
+                                                                 Throws));
   }
 
   HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor) {

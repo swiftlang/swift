@@ -2287,7 +2287,8 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     return;
 
   auto bindings = cs.inferBindingsFor(typeVar);
-  if (bindings.InvolvesTypeVariables || bindings.Bindings.size() != 1)
+  if (bindings.isHole() || bindings.involvesTypeVariables() ||
+      bindings.Bindings.size() != 1)
     return;
 
   auto conversionType = bindings.Bindings[0].BindingType;

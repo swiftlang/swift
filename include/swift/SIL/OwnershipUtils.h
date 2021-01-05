@@ -32,29 +32,47 @@ class DeadEndBlocks;
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
 
-/// Is this an operand that can forward both owned and guaranteed ownership into
-/// one of the operand's owner instruction's result.
-bool isOwnershipForwardingUse(Operand *op);
-
-/// Is this an operand that can forward guaranteed ownership into one of the
-/// operand's owner instruction's result.
-bool isGuaranteedForwardingUse(Operand *op);
-
-/// Is this an operand that can forward owned ownership into one of the
-/// operand's owner instruction's result.
-bool isOwnedForwardingUse(Operand *use);
-
-/// Is this a value that is the result of an instruction that forwards
-/// guaranteed ownership from one of its operands.
-bool isGuaranteedForwardingValue(SILValue value);
-
-/// Is this value the result of an instruction that 'forward's owned ownership,
-/// but may not be able to forward guaranteed ownership.
+/// Is the opcode that produces \p value capable of forwarding guaranteed
+/// values?
 ///
-/// This will be either a multiple value instruction resuilt, a single value
-/// instruction that forwards or an argument that forwards the ownership from a
-/// previous terminator.
-bool isOwnedForwardingValue(SILValue value);
+/// This may be true even if the current instance of the instruction is not a
+/// ForwardingBorrow. If true, then the operation may be trivially rewritten
+/// with Guaranteed ownership.
+bool canOpcodeForwardGuaranteedValues(SILValue value);
+
+/// Is the opcode that consumes \p use capable of forwarding guaranteed values?
+///
+/// This may be true even if \p use is not a ForwardingBorrow. If true, then the
+/// operation may be trivially rewritten with Guaranteed ownership.
+bool canOpcodeForwardGuaranteedValues(Operand *use);
+
+// This is the use-def equivalent of use->getOperandOwnership() ==
+// OperandOwnership::ForwardingBorrow.
+inline bool isForwardingBorrow(SILValue value) {
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  return canOpcodeForwardGuaranteedValues(value);
+}
+
+/// Is the opcode that produces \p value capable of forwarding owned values?
+///
+/// This may be true even if the current instance of the instruction is not a
+/// ForwardingConsume. If true, then the operation may be trivially rewritten
+/// with Owned ownership.
+bool canOpcodeForwardOwnedValues(SILValue value);
+
+/// Is this opcode that consumes \p use capable of forwarding owned values?
+///
+/// This may be true even if the current instance of the instruction is not a
+/// ForwardingConsume. If true, then the operation may be trivially rewritten
+/// with Owned ownership.
+bool canOpcodeForwardOwnedValues(Operand *use);
+
+// This is the use-def equivalent of use->getOperandOwnership() ==
+// OperandOwnership::ForwardingConsume.
+inline bool isForwardingConsume(SILValue value) {
+  assert(value.getOwnershipKind() == OwnershipKind::Owned);
+  return canOpcodeForwardOwnedValues(value);
+}
 
 class ForwardingOperand {
   Operand *use;
@@ -68,7 +86,7 @@ public:
   OwnershipConstraint getOwnershipConstraint() const {
     // We use a force unwrap since a ForwardingOperand should always have an
     // ownership constraint.
-    return *use->getOwnershipConstraint();
+    return use->getOwnershipConstraint();
   }
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
@@ -170,6 +188,15 @@ struct BorrowingOperand {
     return *this;
   }
 
+  // A set of operators so that a BorrowingOperand can be used like a normal
+  // operand in a light weight way.
+  operator const Operand *() const { return op; }
+  operator Operand *() { return op; }
+  const Operand *operator*() const { return op; }
+  Operand *operator*() { return op; }
+  const Operand *operator->() const { return op; }
+  Operand *operator->() { return op; }
+
   /// If \p op is a borrow introducing operand return it after doing some
   /// checks.
   static Optional<BorrowingOperand> get(Operand *op) {
@@ -212,25 +239,6 @@ struct BorrowingOperand {
       return false;
     case BorrowingOperandKind::Branch:
       return true;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
-
-  /// Is this a borrow scope operand that can open new borrow scopes
-  /// for owned values.
-  bool canAcceptOwnedValues() const {
-    switch (kind) {
-    // begin_borrow can take any parameter
-    case BorrowingOperandKind::BeginBorrow:
-    // Yield can implicit borrow owned values.
-    case BorrowingOperandKind::Yield:
-    // FullApplySites can implicit borrow owned values.
-    case BorrowingOperandKind::BeginApply:
-    case BorrowingOperandKind::Apply:
-    case BorrowingOperandKind::TryApply:
-      return true;
-    case BorrowingOperandKind::Branch:
-      return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -425,7 +433,7 @@ struct BorrowedValue {
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool areUsesWithinScope(ArrayRef<Operand *> instructions,
+  bool areUsesWithinScope(ArrayRef<Operand *> uses,
                           SmallVectorImpl<Operand *> &scratchSpace,
                           SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                           DeadEndBlocks &deadEndBlocks) const;
@@ -446,6 +454,24 @@ struct BorrowedValue {
   /// interior pointer uses. Returns false otherwise.
   bool visitInteriorPointerOperands(
       function_ref<void(const InteriorPointerOperand &)> func) const;
+
+  /// Visit all immediate uses of this borrowed value and if any of them are
+  /// reborrows, place them in BorrowingOperand form into \p
+  /// foundReborrows. Returns true if we appended any such reborrows to
+  /// foundReborrows... false otherwise.
+  bool
+  gatherReborrows(SmallVectorImpl<BorrowingOperand> &foundReborrows) const {
+    bool foundAnyReborrows = false;
+    for (auto *op : value->getUses()) {
+      if (auto borrowingOperand = BorrowingOperand::get(op)) {
+        if (borrowingOperand->isReborrow()) {
+          foundReborrows.push_back(*borrowingOperand);
+          foundAnyReborrows = true;
+        }
+      }
+    }
+    return foundAnyReborrows;
+  }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand

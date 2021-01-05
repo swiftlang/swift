@@ -480,40 +480,64 @@ public:
   emitForeignAsyncCompletionHandler(SILGenFunction &SGF, SILLocation loc)
   override {
     // Get the current continuation for the task.
-    auto continuationDecl = calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
+    bool throws = calleeTypeInfo.foreign.async
+        ->completionHandlerErrorParamIndex().hasValue();
+    
+    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
+                               calleeTypeInfo.substResultType, throws);
+
+    // Wrap the Builtin.RawUnsafeContinuation in an
+    // Unsafe[Throwing]Continuation<T>.
+    auto continuationDecl = throws
       ? SGF.getASTContext().getUnsafeThrowingContinuationDecl()
       : SGF.getASTContext().getUnsafeContinuationDecl();
     
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                 calleeTypeInfo.substResultType)
       ->getCanonicalType();
-    
-    
-    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
-                               SILType::getPrimitiveObjectType(continuationTy));
-    
+    auto wrappedContinuation =
+        SGF.B.createStruct(loc,
+                           SILType::getPrimitiveObjectType(continuationTy),
+                           {continuation});
+
     // Stash it in a buffer for a block object.
-    auto blockStorageTy = SILType::getPrimitiveAddressType(SILBlockStorageType::get(continuationTy));
+    auto blockStorageTy = SILType::getPrimitiveAddressType(
+        SILBlockStorageType::get(continuationTy));
     auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-    SGF.B.createStore(loc, continuation, continuationAddr,
+    SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
                       StoreOwnershipQualifier::Trivial);
 
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async
       ->completionHandlerParamIndex();
-    auto implTy = cast<SILFunctionType>(calleeTypeInfo.substFnType
-      ->getParameters()[completionHandlerIndex]
-      .getInterfaceType());
+    auto impTy = SGF.getSILType(calleeTypeInfo.substFnType
+                                      ->getParameters()[completionHandlerIndex],
+                                calleeTypeInfo.substFnType);
+    bool handlerIsOptional;
+    CanSILFunctionType impFnTy;
+    if (auto impObjTy = impTy.getOptionalObjectType()) {
+      handlerIsOptional = true;
+      impFnTy = cast<SILFunctionType>(impObjTy.getASTType());
+    } else {
+      handlerIsOptional = false;
+      impFnTy = cast<SILFunctionType>(impTy.getASTType());
+    }
     SILFunction *impl = SGF.SGM
-      .getOrCreateForeignAsyncCompletionHandlerImplFunction(implTy,
+      .getOrCreateForeignAsyncCompletionHandlerImplFunction(impFnTy,
                                                 continuationTy,
                                                 *calleeTypeInfo.foreign.async);
-    auto implRef = SGF.B.createFunctionRef(loc, impl);
+    auto impRef = SGF.B.createFunctionRef(loc, impl);
     
     // Initialize the block object for the completion handler.
-    auto block = SGF.B.createInitBlockStorageHeader(loc, blockStorage, implRef,
-                                  SILType::getPrimitiveObjectType(implTy), {});
+    SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
+                          impRef, SILType::getPrimitiveObjectType(impFnTy), {});
+    
+    // Wrap it in optional if the callee expects if.
+    if (handlerIsOptional) {
+      block = SGF.B.createOptionalSome(loc, block, impTy);
+    }
+    
     // We don't need to manage the block because it's still on the stack. We
     // know we won't escape it locally so the callee can be responsible for
     // _Block_copy-ing it.

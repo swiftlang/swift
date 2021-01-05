@@ -482,7 +482,11 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
-  resultOwnerships.push_back(OwnershipKind::None);
+  // The begin_apply token represents the borrow scope of all owned and
+  // guaranteed call arguments. Although SILToken is (currently) trivially
+  // typed, it must have guaranteed ownership so end_apply and abort_apply will
+  // be recognized as lifetime-ending uses.
+  resultOwnerships.push_back(OwnershipKind::Guaranteed);
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
@@ -727,18 +731,6 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
                                : getExtracteeType(function, extractee, module),
                            function.getOwnershipKind()),
       Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
-#ifndef NDEBUG
-  if (extracteeType.hasValue()) {
-    // Note: explicit extractee type is used to avoid inconsistent typing in:
-    // - Canonical SIL, due to generic specialization.
-    // - Lowered SIL, due to LoadableByAddress.
-    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
-    // explanation of how explicit extractee type is used.
-    assert((module.getStage() == SILStage::Canonical ||
-            module.getStage() == SILStage::Lowered) &&
-           "Explicit type is valid only in canonical or lowered SIL");
-  }
-#endif
 }
 
 SILType LinearFunctionExtractInst::
@@ -2840,11 +2832,6 @@ DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
       DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }
 
-CanType GetAsyncContinuationInstBase::getFormalResumeType() const {
-  // The resume type is the type argument to the continuation type.
-  return getType().castTo<BoundGenericType>().getGenericArgs()[0];
-}
-
 SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   // The lowered resume type is the maximally-abstracted lowering of the
   // formal resume type.
@@ -2852,12 +2839,6 @@ SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   auto &M = getFunction()->getModule();
   auto c = getFunction()->getTypeExpansionContext();
   return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
-}
-
-bool GetAsyncContinuationInstBase::throws() const {
-  // The continuation throws if it's an UnsafeThrowingContinuation
-  return getType().castTo<BoundGenericType>()->getDecl()
-    == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
 }
 
 ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,

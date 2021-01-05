@@ -372,6 +372,14 @@ namespace {
       return true;
     }
 
+    bool visitDestructureStructInst(const DestructureStructInst *RHS) {
+      return true;
+    }
+
+    bool visitDestructureTupleInst(const DestructureTupleInst *RHS) {
+      return true;
+    }
+
     bool visitAllocRefInst(const AllocRefInst *RHS) {
       auto *LHSInst = cast<AllocRefInst>(LHS);
       auto LHSTypes = LHSInst->getTailAllocatedTypes();

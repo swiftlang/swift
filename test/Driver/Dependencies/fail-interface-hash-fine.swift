@@ -24,10 +24,10 @@
 // CHECK-SECOND: Handled bad.swift
 // CHECK-SECOND-NOT: Handled depends
 
-// CHECK-RECORD-DAG: "./bad.swift": !private [
-// CHECK-RECORD-DAG: "./main.swift": [
-// CHECK-RECORD-DAG: "./depends-on-main.swift": !private [
-// CHECK-RECORD-DAG: "./depends-on-bad.swift": [
+// CHECK-RECORD-DAG: "{{(./)?}}bad.swift": !private [
+// CHECK-RECORD-DAG: "{{(./)?}}main.swift": [
+// CHECK-RECORD-DAG: "{{(./)?}}depends-on-main.swift": !private [
+// CHECK-RECORD-DAG: "{{(./)?}}depends-on-bad.swift": [
 
 // RUN: cd %t &&  %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./depends-on-main.swift ./depends-on-bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
 

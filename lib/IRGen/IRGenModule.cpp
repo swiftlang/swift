@@ -594,18 +594,27 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = createStructType(*this, "swift.context", {});
   auto *ContextPtrTy = llvm::PointerType::getUnqual(SwiftContextTy);
+
+  // This must match the definition of class AsyncTask in swift/ABI/Task.h.
   SwiftTaskTy = createStructType(*this, "swift.task", {
+    RefCountedStructTy,   // object header
     Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
-    Int64Ty,              // Job.Flags
+    SizeTy,               // Job.Flags
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     ContextPtrTy,         // Task.ResumeContext
-    Int64Ty               // Task.Status
+    IntPtrTy              // Task.Status
   });
+
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+  SwiftJobTy = createStructType(*this, "swift.job", {
+    SizeTy,               // flags
+    Int8PtrTy             // execution function pointer
+  });
+  SwiftJobPtrTy = SwiftJobTy->getPointerTo();
 
   // using TaskContinuationFunction =
   //   SWIFT_CC(swift)

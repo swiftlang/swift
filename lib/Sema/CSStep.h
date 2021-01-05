@@ -479,9 +479,9 @@ private:
 template <typename P> class BindingStep : public SolverStep {
   using Scope = ConstraintSystem::SolverScope;
 
+protected:
   P Producer;
 
-protected:
   /// Indicates whether any of the attempted bindings
   /// produced a solution.
   bool AnySolved = false;
@@ -569,10 +569,6 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   using Binding = ConstraintSystem::PotentialBinding;
 
   TypeVariableType *TypeVar;
-  // A set of the initial bindings to consider, which is
-  // also a source of follow-up "computed" bindings such
-  // as supertypes, defaults etc.
-  SmallVector<Binding, 4> InitialBindings;
 
   /// Indicates whether source of one of the previously
   /// attempted bindings was a literal constraint. This
@@ -581,10 +577,10 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   bool SawFirstLiteralConstraint = false;
 
 public:
-  TypeVariableStep(ConstraintSystem &cs, BindingContainer &bindings,
+  TypeVariableStep(BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, bindings}, solutions), TypeVar(bindings.TypeVar),
-        InitialBindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
+      : BindingStep(bindings.CS, {bindings}, solutions),
+        TypeVar(bindings.TypeVar) {}
 
   void setup() override;
 
@@ -593,8 +589,7 @@ public:
   void print(llvm::raw_ostream &Out) override {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    Out << "TypeVariableStep for " << TypeVar->getString(PO) << " with #"
-        << InitialBindings.size() << " initial bindings\n";
+    Out << "TypeVariableStep for " << TypeVar->getString(PO) << '\n';
   }
 
 protected:

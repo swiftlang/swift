@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s
 // REQUIRES: concurrency
 
 
@@ -118,3 +118,120 @@ struct GenericGlobalActorWithGetter<T> {
 func testGenericGlobalActorWithGetter() async {
 }
 
+
+actor class RedActorImpl {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test12RedActorImplC5helloyySiF : $@convention(method) (Int, @guaranteed RedActorImpl) -> () {
+  // CHECK-NOT: hop_to_executor
+  // CHECK: } // end sil function '$s4test12RedActorImplC5helloyySiF'
+  func hello(_ x : Int) {}
+}
+
+actor class BlueActorImpl {
+// CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYF : $@convention(method) @async (@guaranteed RedActorImpl, @guaranteed BlueActorImpl) -> () {
+// CHECK:       bb0([[RED:%[0-9]+]] : @guaranteed $RedActorImpl, [[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
+// CHECK:         hop_to_executor [[BLUE]] : $BlueActorImpl
+// CHECK-NOT:     hop_to_executor
+// CHECK:         [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK-NOT:     hop_to_executor
+// CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK:         hop_to_executor [[RED]] : $RedActorImpl
+// CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:    hop_to_executor [[BLUE]] : $BlueActorImpl
+// CHECK-NOT:     hop_to_executor
+// CHECK: } // end sil function '$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYF'
+  func poke(person red : RedActorImpl) async {
+    await red.hello(42)
+  }
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC14createAndGreetyyYF : $@convention(method) @async (@guaranteed BlueActorImpl) -> () {
+// CHECK:     bb0([[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
+// CHECK:       hop_to_executor [[BLUE]] : $BlueActorImpl
+// CHECK:       [[RED:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick RedActorImpl.Type) -> @owned RedActorImpl
+// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [[RED]] : $RedActorImpl
+// CHECK:       [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK:       [[METH:%[0-9]+]] = class_method [[REDBORROW]] : $RedActorImpl, #RedActorImpl.hello : (RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK:       hop_to_executor [[REDBORROW]] : $RedActorImpl
+// CHECK-NEXT:  = apply [[METH]]([[INTARG]], [[REDBORROW]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:  hop_to_executor [[BLUE]] : $BlueActorImpl
+// CHECK:       end_borrow [[REDBORROW]] : $RedActorImpl
+// CHECK:       destroy_value [[RED]] : $RedActorImpl
+// CHECK: } // end sil function '$s4test13BlueActorImplC14createAndGreetyyYF'
+  func createAndGreet() async {
+    let red = RedActorImpl()  // <- key difference from `poke` is local construction of the actor
+    await red.hello(42)
+  }
+}
+
+@globalActor
+struct RedActor {
+  static var shared: RedActorImpl { RedActorImpl() }
+}
+
+@globalActor
+struct BlueActor {
+  static var shared: BlueActorImpl { BlueActorImpl() }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test5redFnyySiF : $@convention(thin) (Int) -> () {
+// CHECK-NOT: hop_to_executor
+// CHECK: } // end sil function '$s4test5redFnyySiF'
+@RedActor func redFn(_ x : Int) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test6blueFnyyYF : $@convention(thin) @async () -> () {
+      // ---- switch to blue actor, since we're an async function ----
+// CHECK:       [[MT:%[0-9]+]] = metatype $@thin BlueActor.Type
+// CHECK:       [[F:%[0-9]+]] = function_ref @$s4test9BlueActorV6sharedAA0bC4ImplCvgZ : $@convention(method) (@thin BlueActor.Type) -> @owned BlueActorImpl
+// CHECK:       [[B:%[0-9]+]] = apply [[F]]([[MT]]) : $@convention(method) (@thin BlueActor.Type) -> @owned BlueActorImpl
+// CHECK:       [[BLUEEXE:%[0-9]+]] = begin_borrow [[B]] : $BlueActorImpl
+// CHECK:       hop_to_executor [[BLUEEXE]] : $BlueActorImpl
+      // ---- evaluate the argument to redFn ----
+// CHECK:       [[LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 100
+// CHECK:       [[INTMT:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK:       [[CTOR:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK:       [[ARG:%[0-9]+]] = apply [[CTOR]]([[LIT]], [[INTMT]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+      // ---- prepare to invoke redFn ----
+// CHECK:       [[CALLEE:%[0-9]+]] = function_ref @$s4test5redFnyySiF : $@convention(thin) (Int) -> ()
+      // ---- obtain and hop to RedActor's executor ----
+// CHECK:       [[REDMT:%[0-9]+]] = metatype $@thin RedActor.Type
+// CHECK:       [[GETTER:%[0-9]+]] = function_ref @$s4test8RedActorV6sharedAA0bC4ImplCvgZ : $@convention(method) (@thin RedActor.Type) -> @owned RedActorImpl
+// CHECK:       [[R:%[0-9]+]] = apply [[GETTER]]([[REDMT]]) : $@convention(method) (@thin RedActor.Type) -> @owned RedActorImpl
+// CHECK:       [[REDEXE:%[0-9]+]] = begin_borrow [[R]] : $RedActorImpl
+// CHECK:       hop_to_executor [[REDEXE]] : $RedActorImpl
+      // ---- now invoke redFn, hop back to Blue, and clean-up ----
+// CHECK-NEXT:  {{%[0-9]+}} = apply [[CALLEE]]([[ARG]]) : $@convention(thin) (Int) -> ()
+// CHECK-NEXT:  hop_to_executor [[BLUEEXE]] : $BlueActorImpl
+// CHECK:       end_borrow [[REDEXE]] : $RedActorImpl
+// CHECK:       destroy_value [[R]] : $RedActorImpl
+// CHECK:       end_borrow [[BLUEEXE]] : $BlueActorImpl
+// CHECK:       destroy_value [[B]] : $BlueActorImpl
+// CHECK-NOT:     hop_to_executor
+// CHECK: } // end sil function '$s4test6blueFnyyYF'
+@BlueActor func blueFn() async {
+  await redFn(100)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test20unspecifiedAsyncFuncyyYF : $@convention(thin) @async () -> () {
+// CHECK-NOT:     hop_to_executor
+// CHECK:         [[BORROW:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $RedActorImpl
+// CHECK-NEXT:    hop_to_executor [[BORROW]] : $RedActorImpl
+// CHECK-NEXT:    {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(thin) (Int) -> ()
+// CHECK-NEXT:    end_borrow [[BORROW]] : $RedActorImpl
+// CHECK-NOT:     hop_to_executor
+// CHECK: } // end sil function '$s4test20unspecifiedAsyncFuncyyYF'
+func unspecifiedAsyncFunc() async {
+  await redFn(200)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test27anotherUnspecifiedAsyncFuncyyAA12RedActorImplCYF : $@convention(thin) @async (@guaranteed RedActorImpl) -> () {
+// CHECK:       bb0([[RED:%[0-9]+]] : @guaranteed $RedActorImpl):
+// CHECK-NOT:     hop_to_executor
+// CHECK:         [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK-NOT:     hop_to_executor
+// CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:    hop_to_executor [[RED]] : $RedActorImpl
+// CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NOT:     hop_to_executor
+// CHECK: } // end sil function '$s4test27anotherUnspecifiedAsyncFuncyyAA12RedActorImplCYF'
+func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
+  await red.hello(12);
+}

@@ -792,6 +792,11 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
+void ModuleDecl::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &Results) const {
+  FORWARD(getExportedPrespecializations, (Results));
+}
+
 void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &Results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
@@ -1104,7 +1109,7 @@ syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
 
 void DirectOperatorLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
-    TinyPtrVector<OperatorDecl *> ops) const {
+    const TinyPtrVector<OperatorDecl *> &ops) const {
   auto &desc = std::get<0>(getStorage());
   reqTracker.addTopLevelName(desc.name);
 }
@@ -1139,7 +1144,7 @@ void SourceFile::lookupOperatorDirect(
 
 void DirectPrecedenceGroupLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
-    TinyPtrVector<PrecedenceGroupDecl *> groups) const {
+    const TinyPtrVector<PrecedenceGroupDecl *> &groups) const {
   auto &desc = std::get<0>(getStorage());
   reqTracker.addTopLevelName(desc.name);
 }

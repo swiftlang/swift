@@ -295,6 +295,9 @@ public:
   /// Add the NSObject object header to the layout. This must be the first
   /// thing added to the layout.
   void addNSObjectHeader();
+  /// Add the default-actor header to the layout.  This must be the second
+  /// thing added to the layout, following the Swift heap header.
+  void addDefaultActorHeader(ElementLayout &elt);
   
   /// Add a number of fields to the layout.  The field layouts need
   /// only have the TypeInfo set; the rest will be filled out.
@@ -454,6 +457,8 @@ public:
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,
                      const llvm::Twine &name = "") const;
 };
+
+Size getDefaultActorStorageFieldOffset(IRGenModule &IGM);
 
 } // end namespace irgen
 } // end namespace swift

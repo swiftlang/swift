@@ -110,6 +110,12 @@ extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
+// If this returns `true`, then we will call `fatalError` when we encounter a
+// null reference in a storage locaation whose type does not allow null.
+static bool unexpectedNullIsFatal() {
+  return true;  // Placeholder for an upcoming check.
+}
+
 static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
                                         const Metadata *srcType,
                                         const Metadata *destType) {
@@ -120,12 +126,21 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  swift::fatalError(/* flags = */ 0,
-                    "Found unexpected null pointer value"
+  const char *msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
-                    " to '%s' (%p)\n",
-                    srcTypeName.c_str(), srcType,
-                    destTypeName.c_str(), destType);
+                    " to '%s' (%p)%s\n";
+  if (unexpectedNullIsFatal()) {
+    swift::fatalError(/* flags = */ 0, msg,
+                      srcTypeName.c_str(), srcType,
+                      destTypeName.c_str(), destType,
+                      "");
+  } else {
+    swift::warning(/* flags = */ 0, msg,
+                   srcTypeName.c_str(), srcType,
+                   destTypeName.c_str(), destType,
+                   ": Continuing with null object, but expect problems later.");
+  }
+  return object;
 }
 
 /******************************************************************************/
@@ -709,15 +724,33 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
-  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
-  if (hashableConformance) {
-    _swift_convertToAnyHashableIndirect(srcValue, destLocation,
-                                        srcType, hashableConformance);
-    return DynamicCastResult::SuccessViaCopy;
-  } else {
-    return DynamicCastResult::Failure;
+  switch (srcType->getKind()) {
+  case MetadataKind::ForeignClass: // CF -> String
+  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+#if SWIFT_OBJC_INTEROP
+    // TODO: Implement a fast path for NSString->AnyHashable casts.
+    // These are incredibly common because an NSDictionary with
+    // NSString keys is bridged by default to [AnyHashable:Any].
+    // Until this is implemented, fall through to the default case
+    SWIFT_FALLTHROUGH;
+#else
+    // If no Obj-C interop, just fall through to the default case.
+    SWIFT_FALLTHROUGH;
+#endif
   }
+  default: {
+    auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+    if (hashableConformance) {
+      _swift_convertToAnyHashableIndirect(srcValue, destLocation,
+                                          srcType, hashableConformance);
+      return DynamicCastResult::SuccessViaCopy;
+    } else {
+      return DynamicCastResult::Failure;
+    }
+  }
+  }
+  return DynamicCastResult::Failure;
 }
 
 static DynamicCastResult

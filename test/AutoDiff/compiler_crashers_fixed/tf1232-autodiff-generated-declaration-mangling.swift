@@ -1,5 +1,4 @@
 // RUN: %target-build-swift -g %s
-// REQUIRES: asserts
 
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for
 // AutoDiff-generated declarations: linear map structs and branching trace

@@ -81,6 +81,33 @@
                 "swift-format": "main"
             }
         },
+        "rebranch": {
+            "aliases": ["rebranch", "swift/rebranch"],
+            "repos": {
+                "llvm-project": "swift/rebranch",
+                "swift": "rebranch",
+                "cmark": "main",
+                "llbuild": "main",
+                "swift-tools-support-core": "main",
+                "swiftpm": "main",
+                "swift-argument-parser": "0.3.0",
+                "swift-driver": "main",
+                "swift-syntax": "main",
+                "swift-stress-tester": "main",
+                "swift-corelibs-xctest": "main",
+                "swift-corelibs-foundation": "main",
+                "swift-corelibs-libdispatch": "main",
+                "swift-integration-tests": "main",
+                "swift-xcode-playground-support": "main",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "yams": "3.0.1",
+                "cmake": "v3.16.5",
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main"
+            }
+        },
         "next" : {
             "aliases": ["next", "master-next",
                         "swift/next",
@@ -304,6 +331,33 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.3",
                 "sourcekit-lsp": "release/5.3",
+                "swift-format": "main"
+            }
+        },
+        "release/5.4": {
+            "aliases": ["release/5.4", "swift/release/5.4"],
+            "repos": {
+                "llvm-project": "swift/release/5.4",
+                "swift": "release/5.4",
+                "cmark": "release/5.4",
+                "llbuild": "release/5.4",
+                "swift-tools-support-core": "main",
+                "swiftpm": "main",
+                "swift-argument-parser": "0.3.0",
+                "swift-driver": "main",
+                "swift-syntax": "release/5.4",
+                "swift-stress-tester": "release/5.4",
+                "swift-corelibs-xctest": "release/5.4",
+                "swift-corelibs-foundation": "release/5.4",
+                "swift-corelibs-libdispatch": "release/5.4",
+                "swift-integration-tests": "release/5.4",
+                "swift-xcode-playground-support": "release/5.4",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "yams": "3.0.1",
+                "cmake": "v3.16.5",
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
                 "swift-format": "main"
             }
         },

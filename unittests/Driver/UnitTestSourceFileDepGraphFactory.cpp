@@ -57,7 +57,7 @@ void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
   fingerprintString.resize(Fingerprint::DIGEST_LENGTH, 'X');
   const Optional<Fingerprint> fingerprint = fingerprintString.empty()
                                               ? Optional<Fingerprint>()
-                                              : Fingerprint{fingerprintString};
+                                              : Fingerprint::fromString(fingerprintString);
 
   AbstractSourceFileDepGraphFactory::addADefinedDecl(key.getValue(),
                                                      fingerprint);

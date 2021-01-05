@@ -685,6 +685,9 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::ORDERED_TOP_LEVEL_DECLS:
         allocateBuffer(OrderedTopLevelDecls, scratch);
         break;
+      case index_block::EXPORTED_PRESPECIALIZATION_DECLS:
+        allocateBuffer(ExportedPrespecializationDecls, scratch);
+        break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;

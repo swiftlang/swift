@@ -48,7 +48,9 @@ void EpilogueARCContext::initializeDataflow() {
       for (auto *X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.
         SILValue IA = A->getIncomingPhiValue(X);
-        getState(X).LocalArg = IA;
+        auto state = getState(X);
+        if (state.hasValue())
+          state.getValue()->LocalArg = IA;
 
         // Maybe the edge value is another SILArgument.
         ToProcess.push_back(IA);
@@ -64,15 +66,19 @@ bool EpilogueARCContext::convergeDataflow() {
     Changed = false;
     // Iterate until the data flow converges.
     for (SILBasicBlock *B : PO->getPostOrder()) {
-      auto &BS = getState(B);
+      // Since the basic block is in PO, it is reachable and will always have a
+      // state
+      auto *BS = getState(B).getValue();
       // Merge in all the successors.
       bool BBSetOut = false;
       if (!B->succ_empty()) {
         auto Iter = B->succ_begin();
-        BBSetOut = getState(*Iter).BBSetIn;
+        // Since the basic block is reachable, its successors are reachable, and
+        // will always have a state.
+        BBSetOut = getState(*Iter).getValue()->BBSetIn;
         Iter = std::next(Iter);
         for (auto E = B->succ_end(); Iter != E; ++Iter) {
-          BBSetOut &= getState(*Iter).BBSetIn;
+          BBSetOut &= getState(*Iter).getValue()->BBSetIn;
         }
       } else if (isExitBlock(B)) {
         // We set the BBSetOut for exit blocks.
@@ -100,8 +106,8 @@ bool EpilogueARCContext::convergeDataflow() {
       }
 
       // Update BBSetIn.
-      Changed |= (BS.BBSetIn != BBSetOut);
-      BS.BBSetIn = BBSetOut;
+      Changed |= (BS->BBSetIn != BBSetOut);
+      BS->BBSetIn = BBSetOut;
     }
   } while (Changed);
   return true;
@@ -122,10 +128,12 @@ bool EpilogueARCContext::computeEpilogueARC() {
       // not have an epilogue ARC instruction, which means the data flow has 
       // failed.
       auto Iter = B->succ_begin();
-      auto Base = getState(*Iter).BBSetIn;
+      // Since basic block B is in PO, its successors will be reachable and will
+      // always have a state
+      auto Base = getState(*Iter).getValue()->BBSetIn;
       Iter = std::next(Iter);
       for (auto E = B->succ_end(); Iter != E; ++Iter) {
-        if (getState(*Iter).BBSetIn != Base)
+        if (getState(*Iter).getValue()->BBSetIn != Base)
           return false;
       }
       BBSetOut = Base;

@@ -108,6 +108,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericPartialSpecialization:
     case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+    case Node::Kind::GenericSpecializationInResilienceDomain:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::DynamicAttribute:
@@ -121,6 +122,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
+    case Node::Kind::AsyncFunctionPointer:
       return true;
     default:
       return false;
@@ -1178,6 +1180,18 @@ NodePointer Demangler::demangleBuiltinType() {
     case 'p':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_RAWPOINTER);
+      break;
+    case 'j':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_JOB);
+      break;
+    case 'D':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);
+      break;
+    case 'c':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                               BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION);
       break;
     case 't':
       Ty = createNode(Node::Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN);
@@ -2309,6 +2323,9 @@ NodePointer Demangler::popProtocolConformance() {
     case 'G':
       return demangleGenericSpecialization(Node::Kind::
                                           GenericSpecializationNotReAbstracted);
+    case 'B':
+      return demangleGenericSpecialization(Node::Kind::
+                                      GenericSpecializationInResilienceDomain);
     case 's':
       return demangleGenericSpecialization(
           Node::Kind::GenericSpecializationPrespecialized);
@@ -2461,6 +2478,7 @@ NodePointer Demangler::popProtocolConformance() {
         return nullptr;
       return createNode(Node::Kind::OutlinedBridgedMethod, Params);
     }
+    case 'u': return createNode(Node::Kind::AsyncFunctionPointer);
     default:
       return nullptr;
   }

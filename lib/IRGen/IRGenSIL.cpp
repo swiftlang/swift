@@ -726,9 +726,9 @@ public:
 
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
-                              SILDebugVariable VarInfo, llvm::Optional<Alignment> _Align) {
+                              SILDebugVariable VarInfo,
+                              llvm::Optional<Alignment> _Align) {
     auto Align = _Align.getValueOr(IGM.getPointerAlignment());
-
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
     if (!Alloca.isValid())
@@ -750,10 +750,13 @@ public:
                                       SILDebugVariable VarInfo,
                                       bool IsAnonymous,
                                       llvm::Optional<Alignment> Align = None) {
-    // Never emit shadow copies when optimizing, or if already on the stack.
-    // No debug info is emitted for refcounts either.
+    // Never emit shadow copies when optimizing, or if already on the stack.  No
+    // debug info is emitted for refcounts either.  Shadow copies are also
+    // turned off for async functions, because they make it impossible to track
+    // debug info during coroutine splitting. Instead we are relying on LLVM's
+    // CoroSplit.cpp to emit shadow copies.
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous || CurSILFn->isAsync() ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
         !needsShadowCopy(Storage))
       return Storage;
@@ -780,7 +783,7 @@ public:
 
     // Only do this at -O0.
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous) {
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous || CurSILFn->isAsync()) {
       auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
       return;
@@ -1091,9 +1094,7 @@ public:
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i);
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
 
-  void visitHopToExecutorInst(HopToExecutorInst *i) {
-    //TODO(async)
-  }
+  void visitHopToExecutorInst(HopToExecutorInst *i);
 
   void visitKeyPathInst(KeyPathInst *I);
 
@@ -2278,7 +2279,9 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
       isa<PreviousDynamicFunctionRefInst>(i));
   llvm::Value *value;
   auto isSpecialAsyncWithoutCtxtSize =
-      fn->isAsync() && fn->getName().equals("swift_task_future_wait");
+      fn->isAsync() && (
+          fn->getName().equals("swift_task_future_wait") ||
+          fn->getName().equals("swift_task_group_wait_next"));
   if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = Builder.CreateBitCast(value, fnPtr->getType());
@@ -2941,6 +2944,9 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // The callee type must use the `method` convention.
   auto calleeTy = i->getCallee()->getType().castTo<SILFunctionType>();
   auto resultTy = i->getFunctionType();
+
+  if (calleeTy->isAsync())
+    return false;
   
   if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method)
     return false;
@@ -4336,8 +4342,28 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   assert(VarInfo && "debug_value_addr without debug info");
   bool IsAnonymous = false;
   bool IsLoadablyByAddress = isa<AllocStackInst>(SILVal);
+  IndirectionKind Indirection =
+      (IsLoadablyByAddress) ? DirectValue : IndirectValue;
   VarInfo->Name = getVarName(i, IsAnonymous);
-  auto Addr = getLoweredAddress(SILVal).getAddress();
+  auto *Addr = getLoweredAddress(SILVal).getAddress();
+  if (CurSILFn->isAsync() && VarInfo->ArgNo) {
+#ifndef NDEBUG
+    llvm::Value *Storage = Addr;
+    while (Storage) {
+      if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
+        Storage = LdInst->getOperand(0);
+      else if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
+        Storage = GEPInst->getOperand(0);
+      else if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
+        Storage = BCInst->getOperand(0);
+      else 
+        break;
+    }
+    assert(llvm::isa<llvm::Argument>(Storage) &&
+           "arg expected to be load from inside %swift.context");
+#endif
+    Indirection = CoroIndirectValue;
+  }
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
 
@@ -4351,8 +4377,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   // intrinsic.
   emitDebugVariableDeclaration(
       emitShadowCopyIfNeeded(Addr, i->getDebugScope(), *VarInfo, IsAnonymous),
-      DbgTy, SILType(), i->getDebugScope(), Decl, *VarInfo,
-      (IsLoadablyByAddress) ? DirectValue : IndirectValue);
+      DbgTy, SILType(), i->getDebugScope(), Decl, *VarInfo, Indirection);
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
@@ -5714,6 +5739,13 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                        getLoweredBB(i->getFailureBB()).bb);
 }
 
+void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
+  llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
+          llvm::Intrinsic::coro_async_resume, {});
+          
+  emitSuspensionPoint(getLoweredSingletonExplosion(i->getOperand()), resumeFn);
+}
+
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
@@ -6372,7 +6404,7 @@ void IRGenModule::emitSILStaticInitializers() {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getType(), StackAddress(), out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out);
   setLoweredExplosion(i, out);
 }
 
@@ -6380,7 +6412,7 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
   auto resultAddr = getLoweredStackAddress(i->getOperand());
   Explosion out;
-  emitGetAsyncContinuation(i->getType(), resultAddr, out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out);
   setLoweredExplosion(i, out);
 }
 
@@ -6388,9 +6420,11 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
   Explosion resumeResult;
 
-  auto continuationTy = i->getOperand()->getType();
-
   bool isIndirect = i->getResumeBB()->args_empty();
+  SILType resumeTy;
+  if (!isIndirect)
+    resumeTy = (*i->getResumeBB()->args_begin())->getType();
+
   auto &normalDest = getLoweredBB(i->getResumeBB());
   auto *normalDestBB = normalDest.bb;
 
@@ -6400,7 +6434,7 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
   assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
                           "error basic block should only expect one value");
 
-  emitAwaitAsyncContinuation(continuationTy, isIndirect, resumeResult,
+  emitAwaitAsyncContinuation(resumeTy, isIndirect, resumeResult,
                              normalDestBB, errorPhi, errorDestBB);
   if (!isIndirect) {
     unsigned firstIndex = 0;

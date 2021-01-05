@@ -67,8 +67,9 @@ void SwitchCaseFullExpr::unreachableExit() {
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getFunction()) &&
-                       getSGF().silConv.useLoweredAddresses();
+  bool isAddressOnly =
+      subjectExprOperand.getType().isAddressOnly(builder.getFunction()) &&
+      getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
@@ -90,20 +91,20 @@ void SwitchEnumBuilder::emit() && {
         defaultBlockData ? defaultBlockData->count : ProfileCounter();
     ArrayRef<ProfileCounter> caseBlockCountsRef = caseBlockCounts;
     if (isAddressOnly) {
-      builder.createSwitchEnumAddr(loc, optional.getValue(), defaultBlock,
-                                   caseBlocks, caseBlockCountsRef,
+      builder.createSwitchEnumAddr(loc, subjectExprOperand.getValue(),
+                                   defaultBlock, caseBlocks, caseBlockCountsRef,
                                    defaultBlockCount);
     } else {
-      if (optional.getType().isAddress()) {
+      if (subjectExprOperand.getType().isAddress()) {
         // TODO: Refactor this into a maybe load.
-        if (optional.hasCleanup()) {
-          optional = builder.createLoadTake(loc, optional);
+        if (subjectExprOperand.hasCleanup()) {
+          subjectExprOperand = builder.createLoadTake(loc, subjectExprOperand);
         } else {
-          optional = builder.createLoadCopy(loc, optional);
+          subjectExprOperand = builder.createLoadCopy(loc, subjectExprOperand);
         }
       }
-      builder.createSwitchEnum(loc, optional.forward(getSGF()), defaultBlock,
-                               caseBlocks, caseBlockCountsRef,
+      builder.createSwitchEnum(loc, subjectExprOperand.forward(getSGF()),
+                               defaultBlock, caseBlocks, caseBlockCountsRef,
                                defaultBlockCount);
     }
   }
@@ -121,9 +122,9 @@ void SwitchEnumBuilder::emit() && {
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
                                     CleanupLocation::get(loc), branchDest);
     builder.emitBlock(defaultBlock);
-    ManagedValue input = optional;
+    ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
-      input = builder.createOwnedPhiArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(subjectExprOperand.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
@@ -144,9 +145,9 @@ void SwitchEnumBuilder::emit() && {
     ManagedValue input;
     if (decl->hasAssociatedValues()) {
       // Pull the payload out if we have one.
-      SILType inputType = optional.getType().getEnumElementType(
+      SILType inputType = subjectExprOperand.getType().getEnumElementType(
           decl, builder.getModule(), builder.getFunction());
-      input = optional;
+      input = subjectExprOperand;
       if (!isAddressOnly) {
         input = builder.createOwnedPhiArgument(inputType);
       }
@@ -167,9 +168,9 @@ void SwitchEnumBuilder::emit() && {
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
                                     CleanupLocation::get(loc), branchDest);
     builder.emitBlock(defaultBlock);
-    ManagedValue input = optional;
+    ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
-      input = builder.createOwnedPhiArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(subjectExprOperand.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();

@@ -385,8 +385,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::DeclAttrKeyword:
     case ChunkKind::DeclAttrParamKeyword:
     case ChunkKind::OverrideKeyword:
-    case ChunkKind::ThrowsKeyword:
-    case ChunkKind::RethrowsKeyword:
+    case ChunkKind::EffectsSpecifierKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::Text:
     case ChunkKind::LeftParen:
@@ -1376,8 +1375,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::Whitespace:
     case ChunkKind::AccessControlKeyword:
     case ChunkKind::OverrideKeyword:
-    case ChunkKind::ThrowsKeyword:
-    case ChunkKind::RethrowsKeyword:
+    case ChunkKind::EffectsSpecifierKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::CallParameterColon:
     case ChunkKind::CallParameterTypeBegin:
@@ -1431,8 +1429,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
         --i;
         continue;
       }
-      case ChunkKind::ThrowsKeyword:
-      case ChunkKind::RethrowsKeyword:
+      case ChunkKind::EffectsSpecifierKeyword:
         shouldPrint = true; // Even when they're annotations.
         break;
       default:
@@ -1640,6 +1637,7 @@ public:
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
+  void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
@@ -2639,9 +2637,16 @@ public:
                                    genericSig, includeDefaultArgs);
   }
 
-  static void addThrows(CodeCompletionResultBuilder &Builder,
-                        const AnyFunctionType *AFT,
-                        const AbstractFunctionDecl *AFD) {
+  static void addEffectsSpecifiers(CodeCompletionResultBuilder &Builder,
+                             const AnyFunctionType *AFT,
+                             const AbstractFunctionDecl *AFD) {
+    assert(AFT != nullptr);
+
+    // 'async'.
+    if ((AFD && AFD->hasAsync()) || AFT->isAsync())
+      Builder.addAnnotatedAsync();
+
+    // 'throws' or 'rethrows'.
     if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Builder.addAnnotatedRethrows();
     else if (AFT->isThrowing())
@@ -2799,7 +2804,7 @@ public:
       else
         Builder.addAnnotatedRightParen();
 
-      addThrows(Builder, AFT, AFD);
+      addEffectsSpecifiers(Builder, AFT, AFD);
 
       if (AFD &&
           AFD->isImplicitlyUnwrappedOptional())
@@ -2946,14 +2951,14 @@ public:
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
-        addThrows(Builder, AFT, FD);
+        addEffectsSpecifiers(Builder, AFT, FD);
       } else {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
                                 FD->getGenericSignatureOfContext(),
                                 includeDefaultArgs);
         Builder.addRightParen();
-        addThrows(Builder, AFT, FD);
+        addEffectsSpecifiers(Builder, AFT, FD);
       }
 
       // Build type annotation.
@@ -3094,7 +3099,7 @@ public:
       else
         Builder.addAnnotatedRightParen();
 
-      addThrows(Builder, ConstructorType, CD);
+      addEffectsSpecifiers(Builder, ConstructorType, CD);
 
       if (!Result.hasValue())
         Result = ConstructorType->getResult();
@@ -5465,6 +5470,17 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeEffectsSpecifier(bool hasAsync,
+                                                           bool hasThrows) {
+  Kind = CompletionKind::EffectsSpecifier;
+  CurDeclContext = P.CurDeclContext;
+  ParsedKeywords.clear();
+  if (hasAsync)
+    ParsedKeywords.emplace_back("async");
+  if (hasThrows)
+    ParsedKeywords.emplace_back("throws");
+}
+
 void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
     bool Sil, bool isIndependent) {
   Kind = CompletionKind::AttributeBegin;
@@ -5737,11 +5753,15 @@ static void addObserverKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "didSet", CodeCompletionKeywordKind::None);
 }
 
-static void addExprKeywords(CodeCompletionResultSink &Sink) {
+static void addExprKeywords(CodeCompletionResultSink &Sink,
+                            bool IsConcurrencyEnabled) {
   // Expr keywords.
   addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try);
+  if (IsConcurrencyEnabled) {
+    addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
+  }
 }
 
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
@@ -5779,6 +5799,15 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::StmtLabel:
     break;
 
+  case CompletionKind::EffectsSpecifier: {
+    if (!llvm::is_contained(ParsedKeywords, "async") &&
+        Context.LangOpts.EnableExperimentalConcurrency)
+      addKeyword(Sink, "async", CodeCompletionKeywordKind::None);
+    if (!llvm::is_contained(ParsedKeywords, "throws"))
+      addKeyword(Sink, "throws", CodeCompletionKeywordKind::kw_throws);
+    break;
+  }
+
   case CompletionKind::AccessorBeginning: {
     // TODO: Omit already declared or mutally exclusive accessors.
     //       E.g. If 'get' is already declared, emit 'set' only.
@@ -5808,7 +5837,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);
-    addExprKeywords(Sink);
+    addExprKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
 
@@ -6635,7 +6664,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           addStmtKeywords(Sink, MaybeFuncBody);
           addSuperKeyword(Sink);
           addLetVarKeywords(Sink);
-          addExprKeywords(Sink);
+          addExprKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
           addAnyTypeKeyword(Sink, Context.TheAnyType);
           DoPostfixExprBeginning();
         }
@@ -6756,6 +6785,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
+  case CompletionKind::EffectsSpecifier:
     // Handled earlier by keyword completions.
     break;
   }

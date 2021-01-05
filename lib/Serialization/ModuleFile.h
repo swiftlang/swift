@@ -611,6 +611,8 @@ public:
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results);
+
   /// Adds all operators to the given vector.
   void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
 

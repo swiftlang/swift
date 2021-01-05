@@ -5,6 +5,9 @@
 % #   - Suite -- an identifier for the test suite to append tests to.
 % #   - ArrayType -- the type being tested.
 
+// We use this global array to prevent ARC from eliminating temporary ARC
+// traffic in nonUniqueCode below. It is only ever assigned to.
+var globalArrayForNonUnique = ${ArrayType}<Int>()
 
 extension ${ArrayType} {
   typealias _BufferID = UnsafeRawPointer?
@@ -107,7 +110,7 @@ ${Suite}.test("${ArrayType}/appendNonUnique")
   x.reserveCapacity(10002)
   let capacity = x.capacity
   for _ in 1...100 {
-    let y = x
+    globalArrayForNonUnique = x
     x.append(1)
     expectTrue(x.capacity == capacity)
   }
@@ -120,7 +123,7 @@ ${Suite}.test("${ArrayType}/removeNonUnique")
     var x = ${ArrayType}<Int>(repeating: 27, count: 200)
     x.reserveCapacity(10002)
     for _ in 1...100 {
-      let y = x
+      globalArrayForNonUnique = x
       x.remove(at: 0)
       expectTrue(x.capacity < 1000)
     }
@@ -133,7 +136,7 @@ ${Suite}.test("${ArrayType}/mutateNonUnique")
   var x = ${ArrayType}<Int>(repeating: 27, count: 200)
   x.reserveCapacity(10002)
   for _ in 1...100 {
-    let y = x
+    globalArrayForNonUnique = x
     x[0] = 0
     expectTrue(x.capacity < 1000)
   }

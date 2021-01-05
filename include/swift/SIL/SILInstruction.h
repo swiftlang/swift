@@ -523,12 +523,20 @@ public:
 private:
   /// Predicate used to filter OperandValueRange.
   struct OperandToValue;
+  /// Predicate used to filter TransformedOperandValueRange.
+  struct OperandToTransformedValue;
 
 public:
   using OperandValueRange =
       OptionalTransformRange<ArrayRef<Operand>, OperandToValue>;
+  using TransformedOperandValueRange =
+      OptionalTransformRange<ArrayRef<Operand>, OperandToTransformedValue>;
+
   OperandValueRange
   getOperandValues(bool skipTypeDependentOperands = false) const;
+  TransformedOperandValueRange
+  getOperandValues(std::function<SILValue(SILValue)> transformFn,
+                   bool skipTypeDependentOperands) const;
 
   SILValue getOperand(unsigned Num) const {
     return getAllOperands()[Num].get();
@@ -612,7 +620,8 @@ public:
   /// that are not visible by merely examining their uses.
   bool mayHaveSideEffects() const;
 
-  /// Returns true if the instruction may write to memory.
+  /// Returns true if the instruction may write to memory, deinitialize memory,
+  /// or have other unknown side effects.
   bool mayWriteToMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayWrite ||
@@ -628,7 +637,8 @@ public:
       B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if the instruction may read from or write to memory.
+  /// Returns true if the instruction may read from memory, write to memory,
+  /// deinitialize memory, or have other unknown side effects.
   bool mayReadOrWriteMemory() const {
     return getMemoryBehavior() != MemoryBehavior::None;
   }
@@ -727,11 +737,38 @@ struct SILInstruction::OperandToValue {
   }
 };
 
+struct SILInstruction::OperandToTransformedValue {
+  const SILInstruction &i;
+  std::function<SILValue(SILValue)> transformFn;
+  bool skipTypeDependentOps;
+
+  OperandToTransformedValue(const SILInstruction &i,
+                            std::function<SILValue(SILValue)> transformFn,
+                            bool skipTypeDependentOps)
+      : i(i), transformFn(transformFn),
+        skipTypeDependentOps(skipTypeDependentOps) {}
+
+  Optional<SILValue> operator()(const Operand &use) const {
+    if (skipTypeDependentOps && i.isTypeDependentOperand(use))
+      return None;
+    return transformFn(use.get());
+  }
+};
+
 inline auto
 SILInstruction::getOperandValues(bool skipTypeDependentOperands) const
     -> OperandValueRange {
   return OperandValueRange(getAllOperands(),
                            OperandToValue(*this, skipTypeDependentOperands));
+}
+
+inline auto
+SILInstruction::getOperandValues(std::function<SILValue(SILValue)> transformFn,
+                                 bool skipTypeDependentOperands) const
+    -> TransformedOperandValueRange {
+  return TransformedOperandValueRange(
+      getAllOperands(),
+      OperandToTransformedValue(*this, transformFn, skipTypeDependentOperands));
 }
 
 struct SILInstruction::OperandToType {
@@ -3244,15 +3281,22 @@ class GetAsyncContinuationInstBase
     : public SingleValueInstruction
 {
 protected:
-  using SingleValueInstruction::SingleValueInstruction;
-  
+  CanType ResumeType;
+  bool Throws;
+
+  GetAsyncContinuationInstBase(SILInstructionKind Kind, SILDebugLocation Loc,
+                               SILType ContinuationType, CanType ResumeType,
+                               bool Throws)
+    : SingleValueInstruction(Kind, Loc, ContinuationType),
+      ResumeType(ResumeType), Throws(Throws) {}
+
 public:
   /// Get the type of the value the async task receives on a resume.
-  CanType getFormalResumeType() const;
+  CanType getFormalResumeType() const { return ResumeType; }
   SILType getLoweredResumeType() const;
   
   /// True if the continuation can be used to resume the task by throwing an error.
-  bool throws() const;
+  bool throws() const { return Throws; }
   
   static bool classof(const SILNode *I) {
     return I->getKind() >= SILNodeKind::First_GetAsyncContinuationInstBase &&
@@ -3268,8 +3312,9 @@ class GetAsyncContinuationInst final
   friend SILBuilder;
   
   GetAsyncContinuationInst(SILDebugLocation Loc,
-                           SILType ContinuationTy)
-    : InstructionBase(Loc, ContinuationTy)
+                           SILType ContinuationType, CanType ResumeType,
+                           bool Throws)
+    : InstructionBase(Loc, ContinuationType, ResumeType, Throws)
   {}
   
 public:
@@ -3289,9 +3334,10 @@ class GetAsyncContinuationAddrInst final
 {
   friend SILBuilder;
   GetAsyncContinuationAddrInst(SILDebugLocation Loc,
-                               SILValue Operand,
-                               SILType ContinuationTy)
-    : UnaryInstructionBase(Loc, Operand, ContinuationTy)
+                               SILValue ResumeBuf,
+                               SILType ContinuationType, CanType ResumeType,
+                               bool Throws)
+    : UnaryInstructionBase(Loc, ResumeBuf, ContinuationType, ResumeType, Throws)
   {}
 };
 
@@ -8876,7 +8922,12 @@ private:
                    SILModule &module);
 
 public:
-  /// Note: explicit extractee type may be specified only in lowered SIL.
+  /// Note: explicit extractee type is used to avoid inconsistent typing in:
+  /// - Canonical SIL, due to generic specialization.
+  /// - Lowered SIL, due to LoadableByAddress.
+  /// - Raw SIL, due to deserialization of canonical/lowered SIL functions.
+  /// See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
+  /// explanation of how explicit extractee type is used.
   explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
       NormalDifferentiableFunctionTypeComponent extractee, SILValue function,

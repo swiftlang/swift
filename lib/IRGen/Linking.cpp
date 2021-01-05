@@ -432,13 +432,13 @@ std::string LinkEntity::mangleAsString() const {
          getSILDifferentiabilityWitness()->getConfig()});
   case Kind::AsyncFunctionPointer: {
     std::string Result(getSILFunction()->getName());
-    Result.append("AD");
+    Result.append("Tu");
     return Result;
   }
   case Kind::AsyncFunctionPointerAST: {
     std::string Result;
     Result = mangler.mangleEntity(getDecl());
-    Result.append("AD");
+    Result.append("Tu");
     return Result;
   }
   }

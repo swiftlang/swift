@@ -80,6 +80,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/Differentiation
     single-source/Diffing
     single-source/DiffingMyers
     single-source/DropFirst

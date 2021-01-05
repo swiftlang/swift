@@ -406,26 +406,19 @@ class UsedDeclEnumerator {
   StringRef swiftDeps;
 
   /// Cache these for efficiency
-  const DependencyKey sourceFileInterface;
   const DependencyKey sourceFileImplementation;
 
-  function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
-
 public:
-  UsedDeclEnumerator(
-      const SourceFile *SF, const DependencyTracker &depTracker,
-      StringRef swiftDeps,
-      function_ref<void(const DependencyKey &, const DependencyKey &)>
-          createDefUse)
+  UsedDeclEnumerator(const SourceFile *SF, const DependencyTracker &depTracker,
+                     StringRef swiftDeps)
       : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
-        sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::interface, swiftDeps)),
         sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::implementation, swiftDeps)),
-        createDefUse(createDefUse) {}
+            DeclAspect::implementation, swiftDeps)) {}
 
 public:
-  void enumerateAllUses() {
+  using UseEnumerator =
+      llvm::function_ref<void(const DependencyKey &, const DependencyKey &)>;
+  void enumerateAllUses(UseEnumerator enumerator) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       std::string name = ref.name.userFacingName().str();
@@ -437,36 +430,37 @@ public:
       case Kind::Tombstone:
         llvm_unreachable("Cannot enumerate dead reference!");
       case Kind::TopLevel:
-        return enumerateUse<NodeKind::topLevel>("", name);
+        return enumerateUse<NodeKind::topLevel>("", name, enumerator);
       case Kind::Dynamic:
-        return enumerateUse<NodeKind::dynamicLookup>("", name);
+        return enumerateUse<NodeKind::dynamicLookup>("", name, enumerator);
       case Kind::PotentialMember: {
         std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
-        return enumerateUse<NodeKind::potentialMember>(context, "");
+        return enumerateUse<NodeKind::potentialMember>(context, "", enumerator);
       }
       case Kind::UsedMember: {
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        return enumerateUse<NodeKind::member>(context, name);
+        return enumerateUse<NodeKind::member>(context, name, enumerator);
       }
       }
     });
-    enumerateExternalUses();
-    enumerateNominalUses();
+    enumerateExternalUses(enumerator);
+    enumerateNominalUses(enumerator);
   }
 
 private:
   template <NodeKind kind>
-  void enumerateUse(StringRef context, StringRef name) {
+  void enumerateUse(StringRef context, StringRef name,
+                    UseEnumerator createDefUse) {
     // Assume that what is depended-upon is the interface
     createDefUse(
         DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
         sourceFileImplementation);
   }
 
-  void enumerateNominalUses() {
+  void enumerateNominalUses(UseEnumerator enumerator) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       const NominalTypeDecl *subject = ref.subject;
@@ -477,26 +471,26 @@ private:
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
-      enumerateUse<NodeKind::nominal>(context, "");
+      enumerateUse<NodeKind::nominal>(context, "", enumerator);
     });
   }
 
-  void enumerateExternalUses() {
+  void enumerateExternalUses(UseEnumerator enumerator) {
     for (StringRef s : depTracker.getIncrementalDependencies())
-      enumerateUse<NodeKind::incrementalExternalDepend>("", s);
+      enumerateUse<NodeKind::incrementalExternalDepend>("", s, enumerator);
 
     for (StringRef s : depTracker.getDependencies())
-      enumerateUse<NodeKind::externalDepend>("", s);
+      enumerateUse<NodeKind::externalDepend>("", s, enumerator);
   }
 };
 } // end namespace
 
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  UsedDeclEnumerator(SF, depTracker, swiftDeps,
-                     [&](const DependencyKey &def, const DependencyKey &use) {
-                       addAUsedDecl(def, use);
-                     })
-    .enumerateAllUses();
+  UsedDeclEnumerator(SF, depTracker, swiftDeps)
+      .enumerateAllUses(
+          [&](const DependencyKey &def, const DependencyKey &use) {
+            addAUsedDecl(def, use);
+          });
 }
 
 //==============================================================================
@@ -544,6 +538,4 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
       declFinder.potentialMemberHolders);
   addAllDefinedDeclsOfAGivenType<NodeKind::member>(
       declFinder.valuesInExtensions);
-  addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
-      declFinder.classMembers);
 }

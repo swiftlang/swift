@@ -20,9 +20,6 @@ actor class Actor5<T> {
 }
 
 Tests.test("base generic class")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-        "actor generic class isa initialization: rdar://70589739"))
   .code {
   let x = Actor5(state: 5)
   print(type(of: x))
@@ -33,9 +30,6 @@ class Actor6<T> : Actor5<T> {
 }
 
 Tests.test("non-final sub-generic class parent generic class crash")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-        "actor generic class isa initialization: rdar://70589739"))
   .code {
   let x = Actor6(state: 5)
   print(type(of: x))
@@ -46,9 +40,6 @@ final class Actor6Final<T> : Actor5<T> {
 }
 
 Tests.test("final sub-generic class parent generic class crash")
-  .xfail(
-    .custom({ true }, reason: "We appear to be stomping on isa pointers during " +
-        "actor generic class isa initialization: rdar://70589739"))
   .code {
   let x = Actor6Final(state: 5)
   print(type(of: x))

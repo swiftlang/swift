@@ -357,6 +357,8 @@ PASS(ForEachLoopUnroll, "for-each-loop-unroll",
      "Unroll forEach loops over array literals")
 PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
+PASS(OptimizedMandatoryCombine, "optimized-mandatory-combine",
+    "Perform -O level mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS(OptRemarkGenerator, "sil-opt-remark-generator",

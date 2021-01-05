@@ -50,7 +50,7 @@ public:
   SILFunction &getVJP() const;
   SILFunction &getPullback() const;
   SILDifferentiabilityWitness *getWitness() const;
-  const SILAutoDiffIndices getIndices() const;
+  AutoDiffConfig getConfig() const;
   DifferentiationInvoker getInvoker() const;
   LinearMapInfo &getPullbackInfo() const;
   SILLoopInfo *getLoopInfo() const;

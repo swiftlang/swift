@@ -580,7 +580,7 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
-  
+
   /// Look for the declaration with the given name within the
   /// Swift module.
   void lookupInSwiftModule(StringRef name,
@@ -748,13 +748,10 @@ public:
   const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
-  const CanType TheNativeObjectType;      /// Builtin.NativeObject
-  const CanType TheBridgeObjectType;      /// Builtin.BridgeObject
-  const CanType TheRawPointerType;        /// Builtin.RawPointer
-  const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
-  const CanType TheSILTokenType;          /// Builtin.SILToken
-  const CanType TheIntegerLiteralType;    /// Builtin.IntegerLiteralType
-  
+#define SINGLETON_TYPE(SHORT_ID, ID) \
+  const CanType The##SHORT_ID##Type;
+#include "swift/AST/TypeNodes.def"
+
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
   

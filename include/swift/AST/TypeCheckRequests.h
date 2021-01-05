@@ -802,7 +802,7 @@ public:
 class IsAsyncHandlerRequest :
     public SimpleRequest<IsAsyncHandlerRequest,
                          bool(FuncDecl *),
-                         RequestFlags::Cached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -812,8 +812,10 @@ private:
   bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
 
 public:
-  // Caching
+  // Separate caching.
   bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
 };
 
 /// Determine whether the given function can be an @asyncHandler, without
@@ -838,6 +840,24 @@ public:
 /// Determine whether the given class is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
+                         bool(ClassDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Determine whether the given class is a default actor.
+class IsDefaultActorRequest :
+    public SimpleRequest<IsDefaultActorRequest,
                          bool(ClassDecl *),
                          RequestFlags::Cached> {
 public:
@@ -2484,7 +2504,7 @@ public:
 
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           ProtocolConformanceLookupResult r) const;
+                           const ProtocolConformanceLookupResult &r) const;
 };
 
 class CheckRedeclarationRequest

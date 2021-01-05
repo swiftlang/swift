@@ -35,3 +35,14 @@ Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new AP
 Func _getMetadataSection(_:) is a new API without @available attribute
 Func _getMetadataSectionCount() is a new API without @available attribute
 Func _getMetadataSectionName(_:) is a new API without @available attribute
+
+Func Collection.removingSubranges(_:) has been removed
+Func Collection.subranges(of:) has been removed
+Func Collection.subranges(where:) has been removed
+Func MutableCollection.moveSubranges(_:to:) has been removed
+Func MutableCollection.removeSubranges(_:) has been removed
+Func RangeReplaceableCollection.removeSubranges(_:) has been removed
+Struct DiscontiguousSlice has been removed
+Struct RangeSet has been removed
+Subscript Collection.subscript(_:) has been removed
+Subscript MutableCollection.subscript(_:) has been removed

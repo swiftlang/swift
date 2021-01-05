@@ -49,6 +49,7 @@
 #include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumMetadataVisitor.h"
+#include "Field.h"
 #include "FixedTypeInfo.h"
 #include "ForeignClassMetadataVisitor.h"
 #include "GenArchetype.h"
@@ -301,11 +302,15 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
                                                     SILDeclRef declRef) {
   auto entity = LinkEntity::forMethodDescriptor(declRef);
-  auto *var = cast<llvm::GlobalVariable>(getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  auto *var = cast<llvm::GlobalVariable>(
+      getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
   if (!var->isDeclaration()) {
     assert(IRGen.isLazilyReemittingNominalTypeDescriptor(VTable->getClass()));
     return;
   }
+
+  var->setConstant(true);
+  setTrueConstGlobal(var);
 
   ConstantInitBuilder ib(*this);
   ConstantStructBuilder sb(ib.beginStruct(MethodDescriptorStructTy));
@@ -1392,10 +1397,8 @@ namespace {
     }
     
     void addLayoutInfo() {
-      auto properties = getType()->getStoredProperties();
-
       // uint32_t NumFields;
-      B.addInt32(properties.size());
+      B.addInt32(getNumFields(getType()));
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
@@ -1540,8 +1543,11 @@ namespace {
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
       if (auto superclassDecl = getType()->getSuperclassDecl()) {
-        if (MetadataLayout && MetadataLayout->hasResilientSuperclass())
+        if (MetadataLayout && MetadataLayout->hasResilientSuperclass()) {
+          assert(!getType()->isRootDefaultActor() &&
+                 "root default actor has a resilient superclass?");
           ResilientSuperClassRef = IGM.getTypeEntityReference(superclassDecl);
+        }
       }
 
       addVTableEntries(getType());
@@ -1770,7 +1776,7 @@ namespace {
     void addLayoutInfo() {
 
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
-      if (auto superclassType = getType()->getSuperclass()) {
+      if (auto superclassType = getSuperclassForMetadata(IGM, getType())) {
         GenericSignature genericSig = getType()->getGenericSignature();
         B.addRelativeAddress(IGM.getTypeRef(superclassType, genericSig,
                                             MangledTypeRefRole::Metadata)
@@ -1778,8 +1784,6 @@ namespace {
       } else {
         B.addInt32(0);
       }
-
-      auto properties = getType()->getStoredProperties();
 
       // union {
       //   uint32_t MetadataNegativeSizeInWords;
@@ -1820,7 +1824,7 @@ namespace {
       B.addInt32(numImmediateMembers);
 
       // uint32_t NumFields;
-      B.addInt32(properties.size());
+      B.addInt32(getNumFields(getType()));
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
@@ -2189,33 +2193,30 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       .getAddress();
   
   // Collect the stored properties of the type.
-  llvm::SmallVector<VarDecl*, 4> storedProperties;
-  for (auto prop : target->getStoredProperties()) {
-    storedProperties.push_back(prop);
-  }
+  unsigned numFields = getNumFields(target);
 
   // Fill out an array with the field type metadata records.
   Address fields = IGF.createAlloca(
-                   llvm::ArrayType::get(IGM.Int8PtrPtrTy,
-                                        storedProperties.size()),
+                   llvm::ArrayType::get(IGM.Int8PtrPtrTy, numFields),
                    IGM.getPointerAlignment(), "classFields");
-  IGF.Builder.CreateLifetimeStart(fields,
-                  IGM.getPointerSize() * storedProperties.size());
+  IGF.Builder.CreateLifetimeStart(fields, IGM.getPointerSize() * numFields);
   fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
 
   unsigned index = 0;
-  for (auto prop : storedProperties) {
-    auto propTy = T.getFieldType(prop, IGF.getSILModule(),
-                                 TypeExpansionContext::minimal());
-    llvm::Value *metadata = emitTypeLayoutRef(IGF, propTy, collector);
-    Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
-                                                    IGM.getPointerSize());
-    IGF.Builder.CreateStore(metadata, field);
+  forEachField(IGM, target, [&](Field field) {
+    assert(field.isConcrete() &&
+           "initializing offset vector for type with missing member?");
+    SILType propTy = field.getType(IGM, T);
+    llvm::Value *fieldLayout = emitTypeLayoutRef(IGF, propTy, collector);
+    Address fieldLayoutAddr =
+      IGF.Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
+    IGF.Builder.CreateStore(fieldLayout, fieldLayoutAddr);
     ++index;
-  }
+  });
+  assert(index == numFields);
 
   // Ask the runtime to lay out the struct or class.
-  auto numFields = IGM.getSize(Size(storedProperties.size()));
+  auto numFieldsV = IGM.getSize(Size(numFields));
 
   if (auto *classDecl = dyn_cast<ClassDecl>(target)) {
     // Compute class layout flags.
@@ -2245,7 +2246,7 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
         IGF.Builder.CreateCall(IGM.getInitClassMetadata2Fn(),
                                {metadata,
                                 IGM.getSize(Size(uintptr_t(flags))),
-                                numFields, fields.getAddress(), fieldVector});
+                                numFieldsV, fields.getAddress(), fieldVector});
       break;
 
     case ClassMetadataStrategy::Update:
@@ -2259,7 +2260,7 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
         IGF.Builder.CreateCall(IGM.getUpdateClassMetadata2Fn(),
                                {metadata,
                                 IGM.getSize(Size(uintptr_t(flags))),
-                                numFields, fields.getAddress(), fieldVector});
+                                numFieldsV, fields.getAddress(), fieldVector});
       break;
 
     case ClassMetadataStrategy::Fixed:
@@ -2282,11 +2283,10 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
     // Call swift_initStructMetadata().
     IGF.Builder.CreateCall(IGM.getInitStructMetadataFn(),
                            {metadata, IGM.getSize(Size(uintptr_t(flags))),
-                            numFields, fields.getAddress(), fieldVector});
+                            numFieldsV, fields.getAddress(), fieldVector});
   }
 
-  IGF.Builder.CreateLifetimeEnd(fields,
-                  IGM.getPointerSize() * storedProperties.size());
+  IGF.Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -2334,8 +2334,13 @@ static void emitInitializeClassMetadata(IRGenFunction &IGF,
   // field offset globals for us; but if ObjC interop is disabled, we
   // have to do that ourselves, assuming we didn't just emit them all
   // correctly in the first place.
+  // FIXME: make the runtime do this in all cases, because there's no
+  // good reason it shouldn't
   if (!IGM.ObjCInterop) {
-    for (auto prop : classDecl->getStoredProperties()) {
+    forEachField(IGM, classDecl, [&](Field field) {
+      // FIXME: should we handle the other cases here?
+      if (field.getKind() != Field::Var) return;
+      auto prop = field.getVarDecl();
       auto fieldInfo = fieldLayout.getFieldAccessAndElement(prop);
       if (fieldInfo.first == FieldAccess::NonConstantDirect) {
         Address offsetA = IGM.getAddrOfFieldOffset(prop, ForDefinition);
@@ -2348,7 +2353,7 @@ static void emitInitializeClassMetadata(IRGenFunction &IGF,
         auto offsetVal = IGF.emitInvariantLoad(slot);
         IGF.Builder.CreateStore(offsetVal, offsetA);
       }
-    }
+    });
   }
 }
 
@@ -2746,7 +2751,23 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
                                    ClassDecl *classDecl,
                                    const ClassLayout &fragileLayout,
                                    const ClassLayout &resilientLayout) {
-  for (auto prop : classDecl->getStoredProperties()) {
+  forEachField(IGM, classDecl, [&](Field field) {
+    switch (field.getKind()) {
+    // This is case we actually care about.
+    case Field::Var:
+      break;
+
+    // We should never be in this case when emitting a type.
+    case Field::MissingMember:
+      llvm_unreachable("unexpected missing member when emitting type");
+
+    // We don't need to emit an offset global for the default-actor
+    // storage, which is never accessed directly.
+    case Field::DefaultActorStorage:
+      return;
+    }
+
+    auto prop = field.getVarDecl();
     auto fieldInfo = fragileLayout.getFieldAccessAndElement(prop);
     auto access = fieldInfo.first;
     auto element = fieldInfo.second;
@@ -2806,7 +2827,7 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
       // No global variable is needed.
       break;
     }
-  }
+  });
 }
 
 static ClassFlags getClassFlags(ClassDecl *classDecl) {
@@ -2935,12 +2956,15 @@ namespace {
       }
     }
 
-    llvm::Constant *getSuperclassMetadata() {
-      Type type = Target->mapTypeIntoContext(Target->getSuperclass());
-      auto *metadata =
-          tryEmitConstantHeapMetadataRef(IGM, type->getCanonicalType(),
-                                         /*allowUninit*/ false);
-      return metadata;
+    CanType getSuperclassTypeForMetadata() {
+      if (auto superclass = getSuperclassForMetadata(IGM, Target))
+        return Target->mapTypeIntoContext(superclass)->getCanonicalType();
+      return CanType();
+    }
+
+    llvm::Constant *getSuperclassMetadata(CanType superclass) {
+      return tryEmitConstantHeapMetadataRef(IGM, superclass,
+                                            /*allowUninit*/ false);
     }
 
     bool shouldAddNullSuperclass() {
@@ -2964,7 +2988,8 @@ namespace {
       }
 
       // If this is a root class, use SwiftObject as our formal parent.
-      if (!Target->hasSuperclass()) {
+      CanType superclass = asImpl().getSuperclassTypeForMetadata();
+      if (!superclass) {
         // This is only required for ObjC interoperation.
         if (!IGM.ObjCInterop) {
           B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -2980,8 +3005,10 @@ namespace {
         return;
       }
 
-      auto *metadata = asImpl().getSuperclassMetadata();
-      assert(metadata != nullptr);
+      // This should succeed because the cases where it doesn't should
+      // lead to shouldAddNullSuperclass returning true above.
+      auto metadata = asImpl().getSuperclassMetadata(superclass);
+      assert(metadata);
       B.add(metadata);
     }
 
@@ -3109,6 +3136,10 @@ namespace {
       data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
       data = llvm::ConstantExpr::getAdd(data, bit);
       B.add(data);
+    }
+
+    void addDefaultActorStorageFieldOffset() {
+      B.addInt(IGM.SizeTy, getDefaultActorStorageFieldOffset(IGM).getValue());
     }
 
     void addReifiedVTableEntry(SILDeclRef fn) {
@@ -3666,11 +3697,13 @@ namespace {
 
     bool shouldAddNullSuperclass() { return false; }
 
-    llvm::Constant *getSuperclassMetadata() {
-      Type superclass = type->getSuperclass(/*useArchetypes=*/false);
-      auto *metadata =
-          IGM.getAddrOfTypeMetadata(superclass->getCanonicalType());
-      return metadata;
+    CanType getSuperclassTypeForMetadata() {
+      return getSuperclassForMetadata(IGM, type, /*useArchetypes=*/false);
+    }
+
+    llvm::Constant *getSuperclassMetadata(CanType superclass) {
+      // We know that this is safe (???)
+      return IGM.getAddrOfTypeMetadata(superclass);
     }
 
     uint64_t getClassDataPointerHasSwiftMetadataBits() {
@@ -4221,7 +4254,7 @@ namespace {
       if (!isa<FixedTypeInfo>(ti))
         return false;
 
-      if (Target->getStoredProperties().empty())
+      if (getNumFields(Target) == 0)
         return false;
 
       return true;
@@ -4842,7 +4875,7 @@ namespace {
 
       // Emit a reference to the superclass.
       auto superclass = IGF.emitAbstractTypeMetadataRef(
-                                   Target->getSuperclass()->getCanonicalType());
+                          getSuperclassForMetadata(IGM, Target));
 
       // Dig out the address of the superclass field and store.
       auto &layout = IGF.IGM.getForeignMetadataLayout(Target);

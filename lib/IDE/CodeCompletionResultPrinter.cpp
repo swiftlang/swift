@@ -100,8 +100,7 @@ class AnnotatingResultPrinter {
     case ChunkKind::Keyword:
     case ChunkKind::OverrideKeyword:
     case ChunkKind::AccessControlKeyword:
-    case ChunkKind::ThrowsKeyword:
-    case ChunkKind::RethrowsKeyword:
+    case ChunkKind::EffectsSpecifierKeyword:
     case ChunkKind::DeclIntroducer:
       printWithTag("keyword", C.getText());
       break;

@@ -48,30 +48,9 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-// Defined here to avoid repeatedly paying the price of template instantiation.
-const std::function<void(SILInstruction *)>
-    InstModCallbacks::defaultDeleteInst
-        = [](SILInstruction *inst) {
-          inst->eraseFromParent();
-        };
-const std::function<void(SILInstruction *)>
-    InstModCallbacks::defaultCreatedNewInst
-        = [](SILInstruction *) {};
-const std::function<void(SILValue, SILValue)>
-    InstModCallbacks::defaultReplaceValueUsesWith
-        = [](SILValue oldValue, SILValue newValue) {
-          oldValue->replaceAllUsesWith(newValue);
-        };
-const std::function<void(SingleValueInstruction *, SILValue)>
-    InstModCallbacks::defaultEraseAndRAUWSingleValueInst
-        = [](SingleValueInstruction *i, SILValue newValue) {
-          i->replaceAllUsesWith(newValue);
-          i->eraseFromParent();
-        };
-
 Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
-  if (isa<SingleValueInstruction>(val)) {
-    return std::next(cast<SingleValueInstruction>(val)->getIterator());
+  if (auto *inst = val->getDefiningInstruction()) {
+    return std::next(inst->getIterator());
   }
   if (isa<SILArgument>(val)) {
     return cast<SILArgument>(val)->getParentBlock()->begin();
@@ -138,6 +117,12 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
   return builder.createReleaseValue(loc, ptr, builder.getDefaultAtomicity());
 }
 
+static bool isOSSAEndScopeWithNoneOperand(SILInstruction *i) {
+  if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
+    return false;
+  return i->getOperand(0).getOwnershipKind() == OwnershipKind::None;
+}
+
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -176,6 +161,15 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(inst))
+    return true;
+
+  // An ossa end scope instruction is trivially dead if its operand has
+  // OwnershipKind::None. This can occur after CFG simplification in the
+  // presence of non-payloaded or trivial payload cases of non-trivial enums.
+  //
+  // Examples of ossa end_scope instructions: end_borrow, destroy_value.
+  if (inst->getFunction()->hasOwnership() &&
+      isOSSAEndScopeWithNoneOperand(inst))
     return true;
 
   if (!inst->mayHaveSideEffects())
@@ -1454,6 +1448,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
 bool swift::simplifyUsers(SingleValueInstruction *inst) {
   bool changed = false;
+  InstModCallbacks callbacks;
 
   for (auto ui = inst->use_begin(), ue = inst->use_end(); ui != ue;) {
     SILInstruction *user = ui->getUser();
@@ -1467,7 +1462,7 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
     if (!S)
       continue;
 
-    replaceAllSimplifiedUsesAndErase(svi, S);
+    replaceAllSimplifiedUsesAndErase(svi, S, callbacks);
     changed = true;
   }
 

@@ -420,7 +420,7 @@ std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     Buffer << "_vjp_";
     break;
   }
-  Buffer << config.getSILAutoDiffIndices().mangle();
+  Buffer << config.mangle();
   if (config.derivativeGenericSignature) {
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);
@@ -445,7 +445,7 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
     Buffer << "_pullback_";
     break;
   }
-  Buffer << config.getSILAutoDiffIndices().mangle();
+  Buffer << config.mangle();
   if (config.derivativeGenericSignature) {
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);
@@ -484,7 +484,7 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
     }
     break;
   }
-  Buffer << config.getSILAutoDiffIndices().mangle();
+  Buffer << config.mangle();
   if (config.derivativeGenericSignature) {
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);
@@ -973,8 +973,14 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
     }
     case TypeKind::BuiltinIntegerLiteral:
       return appendOperator("BI");
+    case TypeKind::BuiltinJob:
+      return appendOperator("Bj");
+    case TypeKind::BuiltinDefaultActorStorage:
+      return appendOperator("BD");
     case TypeKind::BuiltinRawPointer:
       return appendOperator("Bp");
+    case TypeKind::BuiltinRawUnsafeContinuation:
+      return appendOperator("Bc");
     case TypeKind::BuiltinNativeObject:
       return appendOperator("Bo");
     case TypeKind::BuiltinBridgeObject:
@@ -1837,6 +1843,13 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         return ASTMangler::ObjCContext;
       }
     }
+
+    // Types apparently defined in the Builtin module are actually
+    // synthetic declarations for types defined in the runtime,
+    // and they should be mangled as C-namespace entities; see e.g.
+    // IRGenModule::getObjCRuntimeBaseClass.
+    if (decl->getModuleContext()->isBuiltinModule())
+      return ASTMangler::ObjCContext;
   }
 
   // Importer-synthesized types should always be mangled in the

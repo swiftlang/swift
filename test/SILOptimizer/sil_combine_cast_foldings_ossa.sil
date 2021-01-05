@@ -1,0 +1,175 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -sil-combine %s | %FileCheck %s
+
+import Swift
+
+class AClass {
+  deinit
+  init()
+}
+
+struct S {}
+
+@objc class NSCloud {}
+
+// CHECK-LABEL: sil [ossa] @dont_fold_unconditional_checked_cast_to_existentials :
+// CHECK: unconditional_checked_cast {{%.*}} : $NSCloud to AnyObject
+// CHECK: } // end sil function 'dont_fold_unconditional_checked_cast_to_existentials'
+sil [ossa] @dont_fold_unconditional_checked_cast_to_existentials : $@convention(thin) (@owned NSCloud) -> @owned AnyObject {
+entry(%arg : @owned $NSCloud):
+  %0 = alloc_stack $NSCloud
+  store %arg to [init] %0 : $*NSCloud
+  %1 = load [take] %0 : $*NSCloud
+  %2 = unconditional_checked_cast %1 : $NSCloud to AnyObject
+  dealloc_stack %0 : $*NSCloud
+  return %2 : $AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @dont_fold_unconditional_checked_cast_from_existentials :
+// CHECK: unconditional_checked_cast %0 : $AnyObject to NSCloud
+// CHECK: } // end sil function 'dont_fold_unconditional_checked_cast_from_existentials'
+sil [ossa] @dont_fold_unconditional_checked_cast_from_existentials : $@convention(thin) (@owned AnyObject) -> @owned NSCloud {
+entry(%0 : @owned $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to NSCloud
+  return %1 : $NSCloud
+}
+
+// We will handle this in a future commit.
+//
+// CHECK-LABEL: sil [ossa] @function_cast_nothrow_to_nothrow :
+// XHECK:         load
+// XHECK:         store
+// CHECK: } // end sil function 'function_cast_nothrow_to_nothrow'
+sil [ossa] @function_cast_nothrow_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  unconditional_checked_cast_addr () -> () in undef : $*(@in ()) -> @out () to () -> () in undef : $*(@in ()) -> @out ()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @function_cast_nothrow_to_nothrow_substitutable :
+// CHECK:         unconditional_checked_cast_addr
+// CHECK: } // end sil function 'function_cast_nothrow_to_nothrow_substitutable'
+sil [ossa] @function_cast_nothrow_to_nothrow_substitutable : $@convention(thin) <T> () -> () {
+entry:
+  unconditional_checked_cast_addr () -> () in undef : $*(@in ()) -> @out () to (T) -> T in undef : $*(@in T) -> @out T
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @function_cast_nothrow_substitutable_to_nothrow :
+// CHECK:         unconditional_checked_cast_addr
+// CHECK: } // end sil function 'function_cast_nothrow_substitutable_to_nothrow'
+sil [ossa] @function_cast_nothrow_substitutable_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  unconditional_checked_cast_addr (T) -> T in undef : $*(@in T) -> @out T to () -> () in undef : $*(@in ()) -> @out ()
+  return undef : $()
+}
+
+// We will handle this in a future commit.
+//
+// CHECK-LABEL: sil [ossa] @function_cast_throw_to_nothrow :
+// XHECK:         builtin "int_trap"
+// CHECK: } // end sil function 'function_cast_throw_to_nothrow'
+sil [ossa] @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  unconditional_checked_cast_addr () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () -> () in undef : $*(@in ()) -> @out ()
+  return undef : $()
+}
+
+// TODO: Do a function_conversion?
+// CHECK-LABEL: sil [ossa] @function_cast_nothrow_to_throw :
+// CHECK:         unconditional_checked_cast_addr
+// CHECK: } // end sil function 'function_cast_nothrow_to_throw'
+sil [ossa] @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
+entry:
+  unconditional_checked_cast_addr () -> () in undef : $*(@in ()) -> @out () to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
+  return undef : $()
+}
+
+// We will handle this in a future commit.
+//
+// CHECK-LABEL: sil [ossa] @function_cast_throw_to_throw :
+// XHECK:         load
+// XHECK:         store
+// CHECK: } // end sil function 'function_cast_throw_to_throw'
+sil [ossa] @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
+entry:
+  unconditional_checked_cast_addr () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @function_ref_cast_promote
+// CHECK: [[LD:%.*]] = load [take] %1 : $*AnyObject
+// CHECK-NEXT: unchecked_ref_cast [[LD]] : $AnyObject to $AClass
+// CHECK-NEXT: store %{{.*}} to [init] %0 : $*AClass
+sil [ossa] @function_ref_cast_promote : $@convention(thin) (@in AnyObject) -> @out AClass {
+bb0(%0 : $*AClass, %1 : $*AnyObject):
+  unchecked_ref_cast_addr AnyObject in %1 : $*AnyObject to AClass in %0 : $*AClass
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Do not promote a ref cast for invalid types. It's a runtime error.
+// CHECK-LABEL: sil [ossa] @function_ref_cast_struct
+// CHECK: unchecked_ref_cast_addr
+sil [ossa] @function_ref_cast_struct : $@convention(thin) () -> @owned AnyObject {
+bb0:
+  %0 = struct $S ()
+  %1 = alloc_stack $S
+  store %0 to [trivial] %1 : $*S
+  %4 = alloc_stack $AnyObject
+  unchecked_ref_cast_addr S in %1 : $*S to AnyObject in %4 : $*AnyObject
+  %6 = load [take] %4 : $*AnyObject
+  dealloc_stack %4 : $*AnyObject
+  dealloc_stack %1 : $*S
+  return %6 : $AnyObject
+}
+
+// We will handle this in a future commit.
+//
+// CHECK-LABEL: sil [ossa] @destroy_source_of_removed_cast :
+// XHECK: destroy_addr %0
+// CHECK: } // end sil function 'destroy_source_of_removed_cast'
+sil [ossa] @destroy_source_of_removed_cast : $@convention(thin) (@in AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %2 = alloc_stack $Int
+  unconditional_checked_cast_addr AnyObject in %0 : $*AnyObject to Int in %2 : $*Int
+  %3 = load [trivial] %2 : $*Int
+  dealloc_stack %2 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+protocol P {}
+
+// We will handle this in a future commit.
+//
+// CHECK-LABEL: sil [ossa] @remove_dead_checked_cast :
+// CHECK: bb0(%0 : $*AnyObject):
+// XHECK-NEXT: alloc_stack
+// XHECK-NEXT: destroy_addr %0
+// XHECK-NEXT: dealloc_stack
+// XHECK-NEXT: tuple
+// XHECK-NEXT: return
+// CHECK: } // end sil function 'remove_dead_checked_cast'
+sil [ossa] @remove_dead_checked_cast : $@convention(thin) (@in AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %5 = alloc_stack $P
+  unconditional_checked_cast_addr AnyObject in %0 : $*AnyObject to P in %5 : $*P
+  destroy_addr %5 : $*P
+  dealloc_stack %5 : $*P
+  %r = tuple ()
+  return %r : $()
+}
+
+// We will handle this in a future commit.
+//
+// CHECK-LABEL: sil [ossa] @testIOU :
+// CHECK: bb0(%0 : $*Optional<AnyObject>, %1 : $*Optional<AnyObject>):
+// XHECK:  [[TMP:%.*]] = load [take] %1 : $*Optional<AnyObject>
+// XHECK:  store [[TMP]] to [init] %0 : $*Optional<AnyObject>
+// CHECK: } // end sil function 'testIOU'
+sil [ossa] @testIOU : $@convention(thin) (@in Optional<AnyObject>) -> (@out Optional<AnyObject>) {
+bb0(%0 : $*Optional<AnyObject>, %1: $*Optional<AnyObject>):
+  unconditional_checked_cast_addr ImplicitlyUnwrappedOptional<AnyObject> in %1 : $*Optional<AnyObject> to Optional<AnyObject> in %0 : $*Optional<AnyObject>
+  %2 = tuple ()
+  return %2 : $()
+}

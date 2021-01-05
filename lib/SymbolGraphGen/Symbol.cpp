@@ -26,10 +26,15 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl)
+               const NominalTypeDecl *SynthesizedBaseTypeDecl,
+               Type BaseType)
 : Graph(Graph),
   VD(VD),
-  SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {}
+  BaseType(BaseType),
+  SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {
+    if (!BaseType && SynthesizedBaseTypeDecl)
+      BaseType = SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+  }
 
 void Symbol::serializeKind(StringRef Identifier, StringRef DisplayName,
                            llvm::json::OStream &OS) const {
@@ -40,6 +45,9 @@ void Symbol::serializeKind(StringRef Identifier, StringRef DisplayName,
 }
 
 void Symbol::serializeKind(llvm::json::OStream &OS) const {
+  // supportsKind and serializeKind must agree.
+  assert(Symbol::supportsKind(VD->getKind()) && "unsupported decl kind");
+
   AttributeRAII A("kind", OS);
   switch (VD->getKind()) {
   case swift::DeclKind::Class:
@@ -244,7 +252,8 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
                 }
                 Graph->serializeDeclarationFragments("declarationFragments",
                                                      Symbol(Graph, Param,
-                                                            nullptr), OS);
+                                                            getSynthesizedBaseTypeDecl(),
+                                                            getBaseType()), OS);
               }); // end parameter object
             }
           }); // end parameters:
@@ -253,35 +262,62 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
 
       // Returns
       if (const auto ReturnType = FD->getResultInterfaceType()) {
-        Graph->serializeDeclarationFragments("returns", ReturnType, OS);
+        Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
+                                             OS);
       }
     });
   }
 }
 
+static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
+  if (!BaseType || BaseType->isExistentialType())
+    return {};
+
+  // Map from the base type into the this declaration's innermost type context,
+  // or if we're dealing with an extention rather than a member, into its
+  // extended nominal (the extension's own requirements shouldn't be considered
+  // in the substitution).
+  swift::DeclContext *DC;
+  if (isa<swift::ExtensionDecl>(D))
+    DC = cast<swift::ExtensionDecl>(D)->getExtendedNominal();
+  else
+    DC = D->getInnermostDeclContext()->getInnermostTypeContext();
+
+  swift::ModuleDecl *M = DC->getParentModule();
+  if (isa<swift::NominalTypeDecl>(D) || isa<swift::ExtensionDecl>(D)) {
+    return BaseType->getContextSubstitutionMap(M, DC);
+  }
+
+  const swift::ValueDecl *SubTarget = D;
+  if (isa<swift::ParamDecl>(D)) {
+    auto *DC = D->getDeclContext();
+    if (auto *FD = dyn_cast<swift::AbstractFunctionDecl>(DC))
+      SubTarget = FD;
+  }
+  return BaseType->getMemberSubstitutionMap(M, SubTarget);
+}
+
 void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
+
+  SubstitutionMap SubMap;
+  if (BaseType)
+    SubMap = getSubMapForDecl(VD, BaseType);
+
   if (const auto *GC = VD->getAsGenericContext()) {
     if (const auto Generics = GC->getGenericSignature()) {
 
       SmallVector<const GenericTypeParamType *, 4> FilteredParams;
       SmallVector<Requirement, 4> FilteredRequirements;
-      for (const auto Param : Generics->getGenericParams()) {
-        if (const auto *D = Param->getDecl()) {
-          if (D->isImplicit()) {
-            continue;
-          }
-          FilteredParams.push_back(Param);
-        }
-      }
+      filterGenericParams(Generics->getGenericParams(), FilteredParams,
+                          SubMap);
 
       const auto *Self = dyn_cast<NominalTypeDecl>(VD);
       if (!Self) {
         Self = VD->getDeclContext()->getSelfNominalTypeDecl();
       }
 
-      filterGenericRequirements(Generics->getRequirements(),
-                                Self,
-                                FilteredRequirements);
+      filterGenericRequirements(Generics->getRequirements(), Self,
+                                FilteredRequirements, SubMap, FilteredParams);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {
         return;
@@ -501,5 +537,25 @@ void Symbol::getUSR(SmallVectorImpl<char> &USR) const {
   if (SynthesizedBaseTypeDecl) {
     OS << "::SYNTHESIZED::";
     ide::printDeclUSR(SynthesizedBaseTypeDecl, OS);
+  }
+}
+
+bool Symbol::supportsKind(DeclKind Kind) {
+  switch (Kind) {
+  case DeclKind::Class: LLVM_FALLTHROUGH;
+  case DeclKind::Struct: LLVM_FALLTHROUGH;
+  case DeclKind::Enum: LLVM_FALLTHROUGH;
+  case DeclKind::EnumElement: LLVM_FALLTHROUGH;
+  case DeclKind::Protocol: LLVM_FALLTHROUGH;
+  case DeclKind::Constructor: LLVM_FALLTHROUGH;
+  case DeclKind::Destructor: LLVM_FALLTHROUGH;
+  case DeclKind::Func: LLVM_FALLTHROUGH;
+  case DeclKind::Var: LLVM_FALLTHROUGH;
+  case DeclKind::Subscript: LLVM_FALLTHROUGH;
+  case DeclKind::TypeAlias: LLVM_FALLTHROUGH;
+  case DeclKind::AssociatedType:
+    return true;
+  default:
+    return false;
   }
 }

@@ -12,7 +12,6 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: CPU=arm64e
 
 import _Concurrency
 import ResilientProtocol
@@ -27,4 +26,4 @@ func test_case() async {
   await call(impl) // CHECK: Impl()
 }
 
-_Concurrency.runAsync(test_case)
+_Concurrency.runAsyncAndBlock(test_case)

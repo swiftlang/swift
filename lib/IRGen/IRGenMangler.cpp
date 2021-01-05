@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenMangler.h"
+#include "GenClass.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolAssociations.h"
@@ -91,7 +92,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     CanSymbolicReferenceLocally(CanSymbolicReference);
 
   AllowSymbolicReferences = true;
-  CanSymbolicReference = [](SymbolicReferent s) -> bool {
+  CanSymbolicReference = [&](SymbolicReferent s) -> bool {
     if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
@@ -113,10 +114,16 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // TODO: We could assign a symbolic reference discriminator to refer
       // to objc class refs.
       if (auto clas = dyn_cast<ClassDecl>(type)) {
-        if (clas->hasClangNode()
-            && clas->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-          return false;
-        }
+        // Swift-defined classes can be symbolically referenced.
+        if (hasKnownSwiftMetadata(IGM, const_cast<ClassDecl*>(clas)))
+          return true;
+
+        // Foreign class types can be symbolically referenced.
+        if (clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
+          return true;
+
+        // Otherwise no.
+        return false;
       }
 
       return true;

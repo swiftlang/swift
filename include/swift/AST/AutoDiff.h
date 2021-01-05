@@ -173,53 +173,6 @@ enum class AutoDiffGeneratedDeclarationKind : uint8_t {
   BranchingTraceEnum
 };
 
-/// SIL-level automatic differentiation indices. Consists of:
-/// - The differentiability parameter indices.
-/// - The differentiability result indices.
-// TODO(TF-913): Remove `SILAutoDiffIndices` in favor of `AutoDiffConfig`.
-// `AutoDiffConfig` additionally stores a derivative generic signature.
-struct SILAutoDiffIndices {
-  /// The indices of independent parameters to differentiate with respect to.
-  IndexSubset *parameters;
-  /// The indices of dependent results to differentiate from.
-  IndexSubset *results;
-
-  /*implicit*/ SILAutoDiffIndices(IndexSubset *parameters, IndexSubset *results)
-      : parameters(parameters), results(results) {
-    assert(parameters && "Parameter indices must be non-null");
-    assert(results && "Result indices must be non-null");
-  }
-
-  bool operator==(const SILAutoDiffIndices &other) const;
-
-  bool operator!=(const SILAutoDiffIndices &other) const {
-    return !(*this == other);
-  };
-
-  /// Returns true if `parameterIndex` is a differentiability parameter index.
-  bool isWrtParameter(unsigned parameterIndex) const {
-    return parameterIndex < parameters->getCapacity() &&
-           parameters->contains(parameterIndex);
-  }
-
-  void print(llvm::raw_ostream &s = llvm::outs()) const;
-  SWIFT_DEBUG_DUMP;
-
-  std::string mangle() const {
-    std::string result = "src_";
-    interleave(
-        results->getIndices(),
-        [&](unsigned idx) { result += llvm::utostr(idx); },
-        [&] { result += '_'; });
-    result += "_wrt_";
-    llvm::interleave(
-        parameters->getIndices(),
-        [&](unsigned idx) { result += llvm::utostr(idx); },
-        [&] { result += '_'; });
-    return result;
-  }
-};
-
 /// Identifies an autodiff derivative function configuration:
 /// - Parameter indices.
 /// - Result indices.
@@ -229,24 +182,50 @@ struct AutoDiffConfig {
   IndexSubset *resultIndices;
   GenericSignature derivativeGenericSignature;
 
-  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
-                              IndexSubset *resultIndices,
-                              GenericSignature derivativeGenericSignature)
+  /*implicit*/ AutoDiffConfig(
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature derivativeGenericSignature = GenericSignature())
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
 
-  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
-  // TODO(TF-913): This is a temporary shim for incremental removal of
-  // `SILAutoDiffIndices`. Eventually remove this.
-  SILAutoDiffIndices getSILAutoDiffIndices() const;
+  /// Returns true if `parameterIndex` is a differentiability parameter index.
+  bool isWrtParameter(unsigned parameterIndex) const {
+    return parameterIndex < parameterIndices->getCapacity() &&
+           parameterIndices->contains(parameterIndex);
+  }
+
+  /// Returns true if `resultIndex` is a differentiability result index.
+  bool isWrtResult(unsigned resultIndex) const {
+    return resultIndex < resultIndices->getCapacity() &&
+           resultIndices->contains(resultIndex);
+  }
+
+  AutoDiffConfig withGenericSignature(GenericSignature signature) const {
+    return AutoDiffConfig(parameterIndices, resultIndices, signature);
+  }
+
+  // TODO(SR-13506): Use principled mangling for AD-generated symbols.
+  std::string mangle() const {
+    std::string result = "src_";
+    interleave(
+        resultIndices->getIndices(),
+        [&](unsigned idx) { result += llvm::utostr(idx); },
+        [&] { result += '_'; });
+    result += "_wrt_";
+    llvm::interleave(
+        parameterIndices->getIndices(),
+        [&](unsigned idx) { result += llvm::utostr(idx); },
+        [&] { result += '_'; });
+    return result;
+  }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   SWIFT_DEBUG_DUMP;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
-                                     const SILAutoDiffIndices &indices) {
-  indices.print(s);
+                                     const AutoDiffConfig &config) {
+  config.print(s);
   return s;
 }
 

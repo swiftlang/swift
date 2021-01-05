@@ -342,7 +342,6 @@ void OwnershipModelEliminatorVisitor::splitDestructure(
   // instruction operands.
 
   SILModule &M = destructureInst->getModule();
-  SILLocation loc = destructureInst->getLoc();
   SILType opType = destructureOperand->getType();
 
   llvm::SmallVector<Projection, 8> projections;
@@ -436,10 +435,10 @@ static bool stripOwnership(SILFunction &func) {
     if (!value.hasValue())
       continue;
     if (SILValue newValue = simplifyInstruction(*value)) {
-      replaceAllSimplifiedUsesAndErase(*value, newValue,
-                                       [&](SILInstruction *instToErase) {
-                                         visitor.eraseInstruction(instToErase);
-                                       });
+      InstModCallbacks callbacks([&](SILInstruction *instToErase) {
+        visitor.eraseInstruction(instToErase);
+      });
+      replaceAllSimplifiedUsesAndErase(*value, newValue, callbacks);
       madeChange = true;
     }
   }

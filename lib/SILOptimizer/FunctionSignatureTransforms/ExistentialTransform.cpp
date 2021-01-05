@@ -292,9 +292,7 @@ std::string ExistentialTransform::createExistentialSpecializedFunctionName() {
     int Idx = IdxIt.first;
     Mangler.setArgumentExistentialToGeneric(Idx);
   }
-  auto MangledName = Mangler.mangle();
-  assert(!F->getModule().hasFunction(MangledName));
-  return MangledName;
+  return Mangler.mangle();
 }
 
 /// Convert all existential argument types to generic argument type.
@@ -642,41 +640,47 @@ void ExistentialTransform::populateThunkBody() {
 ///     its inline strategy as always inline.
 void ExistentialTransform::createExistentialSpecializedFunction() {
   std::string Name = createExistentialSpecializedFunctionName();
-  SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
-  /// Create devirtualized function type.
+  /// Create devirtualized function type and populate ArgToGenericTypeMap.
   auto NewFTy = createExistentialSpecializedFunctionType();
 
-  auto NewFGenericSig = NewFTy->getInvocationGenericSignature();
-  auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
-
   /// Step 1: Create the new protocol constrained generic function.
-  NewF = FunctionBuilder.createFunction(
+  if (auto *CachedFn = F->getModule().lookUpFunction(Name)) {
+    // The specialized body still exists (because it is now called directly),
+    // but the thunk has been dead-code eliminated.
+    assert(CachedFn->getLoweredFunctionType() == NewFTy);
+    NewF = CachedFn;
+  } else {
+    auto NewFGenericSig = NewFTy->getInvocationGenericSignature();
+    auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
+    SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
+
+    NewF = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
       F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
       F->getEffectsKind(), nullptr, F->getDebugScope());
-  /// Set the semantics attributes for the new function.
-  for (auto &Attr : F->getSemanticsAttrs())
-    NewF->addSemanticsAttr(Attr);
 
-  /// Set Unqualified ownership, if any.
-  if (!F->hasOwnership()) {
-    NewF->setOwnershipEliminated();
-  }
+    /// Set the semantics attributes for the new function.
+    for (auto &Attr : F->getSemanticsAttrs())
+      NewF->addSemanticsAttr(Attr);
 
-  /// Step 1a: Populate the body of NewF.
-  SubstitutionMap Subs = SubstitutionMap::get(
+    /// Set Unqualified ownership, if any.
+    if (!F->hasOwnership()) {
+      NewF->setOwnershipEliminated();
+    }
+    /// Step 1a: Populate the body of NewF.
+    SubstitutionMap Subs = SubstitutionMap::get(
       NewFGenericSig,
       [&](SubstitutableType *type) -> Type {
         return NewFGenericEnv->mapTypeIntoContext(type);
       },
       LookUpConformanceInModule(F->getModule().getSwiftModule()));
-  ExistentialSpecializerCloner cloner(F, NewF, Subs, ArgumentDescList,
-                                      ArgToGenericTypeMap,
-                                      ExistentialArgDescriptor);
-  cloner.cloneAndPopulateFunction();
-
+    ExistentialSpecializerCloner cloner(F, NewF, Subs, ArgumentDescList,
+                                        ArgToGenericTypeMap,
+                                        ExistentialArgDescriptor);
+    cloner.cloneAndPopulateFunction();
+  }
   /// Step 2: Create the thunk with always_inline and populate its body.
   populateThunkBody();
 

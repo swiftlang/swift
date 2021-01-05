@@ -40,7 +40,7 @@ class ValueDecl;
 
 /// Add notes suggesting the addition of 'async' or '@asyncHandler', as
 /// appropriate, to a diagnostic for a function that isn't an async context.
-void addAsyncNotes(FuncDecl *func);
+void addAsyncNotes(AbstractFunctionDecl const* func);
 
 /// Check actor isolation rules.
 void checkTopLevelActorIsolation(TopLevelCodeDecl *decl);

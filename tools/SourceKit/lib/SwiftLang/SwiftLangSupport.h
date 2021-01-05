@@ -557,8 +557,9 @@ public:
 
   void
   getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+                bool Actionables, bool SymbolGraph,
+                bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
                 std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
 
   void getNameInfo(StringRef Filename, unsigned Offset,

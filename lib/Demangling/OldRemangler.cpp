@@ -369,6 +369,9 @@ void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::mangleGenericSpecializationInResilienceDomain(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleInlinedGenericFunction(Node *node) {
   unreachable("unsupported");
@@ -811,6 +814,10 @@ void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
                                                  EntityContext &ctx) {
   mangleNamedEntity(node, 'I', "A", ctx);
+}
+
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
 }
 
 void Remangler::mangleDeallocator(Node *node, EntityContext &ctx) {
@@ -2174,8 +2181,8 @@ void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
 }
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
-  Buffer << "MM";
   mangleSingleChildNode(node); // type
+  Buffer << "MM";
 }
 
 void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(

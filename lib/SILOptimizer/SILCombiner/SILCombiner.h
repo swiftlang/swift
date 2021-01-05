@@ -21,6 +21,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
@@ -48,16 +49,21 @@ class SILCombiner :
 
   DominanceAnalysis *DA;
 
-  // Determine the set of types a protocol conforms to in whole-module
-  // compilation mode.
+  /// Determine the set of types a protocol conforms to in whole-module
+  /// compilation mode.
   ProtocolConformanceAnalysis *PCA;
 
-  // Class hierarchy analysis needed to confirm no derived classes of a sole
-  // conforming class.
+  /// Class hierarchy analysis needed to confirm no derived classes of a sole
+  /// conforming class.
   ClassHierarchyAnalysis *CHA;
 
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
+
+  /// A cache of "dead end blocks" through which all paths it is known that the
+  /// program will terminate. This means that we are allowed to leak
+  /// objects.
+  DeadEndBlocks deadEndBlocks;
 
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
@@ -78,24 +84,40 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
+  /// Centralized InstModCallback that we use for certain utility methods.
+  InstModCallbacks instModCallbacks;
+
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
-      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"), MadeChange(false),
+      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"),
+        deadEndBlocks(&B.getFunction()), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
-                /* ReplaceValueUsesAction */
-                [&](SILValue Original, SILValue Replacement) {
-                  replaceValueUsesWith(Original, Replacement);
-                },
-                /* ReplaceInstUsesAction */
-                [&](SingleValueInstruction *I, ValueBase *V) {
-                  replaceInstUsesWith(*I, V);
-                },
-                /* EraseAction */
-                [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
+        CastOpt(
+            FuncBuilder, nullptr /*SILBuilderContext*/,
+            /* ReplaceValueUsesAction */
+            [&](SILValue Original, SILValue Replacement) {
+              replaceValueUsesWith(Original, Replacement);
+            },
+            /* ReplaceInstUsesAction */
+            [&](SingleValueInstruction *I, ValueBase *V) {
+              replaceInstUsesWith(*I, V);
+            },
+            /* EraseAction */
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        instModCallbacks(
+            [&](SILInstruction *instToDelete) {
+              eraseInstFromFunction(*instToDelete);
+            },
+            [&](SILInstruction *newlyCreatedInst) {
+              Worklist.add(newlyCreatedInst);
+            },
+            [&](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              Worklist.add(use->getUser());
+            }) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -103,6 +125,41 @@ public:
     Iteration = 0;
     Worklist.resetChecked();
     MadeChange = false;
+  }
+
+  /// A "syntactic" high level function that combines our insertPt with the main
+  /// builder's builder context.
+  ///
+  /// Since this is syntactic and we assume that our caller is passing in a
+  /// lambda that if we inline will be eliminated, we mark this function always
+  /// inline.
+  ///
+  /// What is nice about this formulation is it enables one to really concisely
+  /// create a SILBuilder that uses the SILCombiner's builder context but at a
+  /// different use point. Example:
+  ///
+  /// SILBuilderWithScope builder(insertPt);
+  /// builder.createInst1(insertPt->getLoc(), ...);
+  /// builder.createInst2(insertPt->getLoc(), ...);
+  /// builder.createInst3(insertPt->getLoc(), ...);
+  /// auto *finalValue = builder.createInst4(insertPt->getLoc(), ...);
+  ///
+  /// Thats a lot of typing! Instead, using this API, one can write:
+  ///
+  /// auto *finalValue = withBuilder(insertPt, [&](auto &b, auto l) {
+  ///   b.createInst1(l, ...);
+  ///   b.createInst2(l, ...);
+  ///   b.createInst3(l, ...);
+  ///   return b.createInst4(l, ...);
+  /// });
+  ///
+  /// Since this is meant to be just be syntactic, we always inline this method.
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SingleValueInstruction *
+  withBuilder(SILInstruction *insertPt,
+              llvm::function_ref<SingleValueInstruction * (SILBuilder &, SILLocation)> visitor) {
+    SILBuilderWithScope builder(insertPt, Builder);
+    return visitor(builder, insertPt->getLoc());
   }
 
   // Insert the instruction New before instruction Old in Old's parent BB. Add
@@ -177,8 +234,12 @@ public:
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
-  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
+
+  // NOTE: The load optimized in this method is a load [trivial].
+  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
+
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
@@ -264,14 +325,7 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
-  InstModCallbacks getInstModCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *DeadInst) { eraseInstFromFunction(*DeadInst); },
-        [this](SILInstruction *NewInst) { Worklist.add(NewInst); },
-        [this](SILValue oldValue, SILValue newValue) {
-          replaceValueUsesWith(oldValue, newValue);
-        });
-  }
+  InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
 
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>

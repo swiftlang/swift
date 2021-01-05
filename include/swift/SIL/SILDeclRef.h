@@ -428,6 +428,8 @@ struct SILDeclRef {
     assert(isAutoDiffDerivativeFunction());
     return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
   }
+  
+  bool hasAsync() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

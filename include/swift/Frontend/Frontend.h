@@ -572,7 +572,9 @@ private:
   /// Return the buffer ID if it is not already compiled, or None if so.
   /// Set failed on failure.
 
-  Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
+  Optional<unsigned> getRecordedBufferID(const InputFile &input,
+                                         const bool shouldRecover,
+                                         bool &failed);
 
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.

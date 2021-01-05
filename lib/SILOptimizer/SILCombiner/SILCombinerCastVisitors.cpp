@@ -30,31 +30,67 @@ using namespace swift;
 using namespace swift::PatternMatch;
 
 SILInstruction *
-SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
-  if (RRPI->getFunction()->hasOwnership())
-    return nullptr;
-
-  // Ref to raw pointer consumption of other ref casts.
-  if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
-    // (ref_to_raw_pointer (unchecked_ref_cast x))
-    //    -> (ref_to_raw_pointer x)
-    if (URCI->getOperand()->getType().isAnyClassReferenceType()) {
-      RRPI->setOperand(URCI->getOperand());
-      return URCI->use_empty() ? eraseInstFromFunction(*URCI) : nullptr;
+SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
+  if (auto *urci = dyn_cast<UncheckedRefCastInst>(rrpi->getOperand())) {
+    // In this optimization, we try to move ref_to_raw_pointer up the def-use
+    // graph. E.x.:
+    //
+    // ```
+    // %0 = ...
+    // %1 = unchecked_ref_cast %0
+    // %2 = ref_to_raw_pointer %1
+    // ```
+    //
+    // to:
+    //
+    // ```
+    // %0 = ...
+    // %2 = ref_to_raw_pointer %0
+    // %1 = unchecked_ref_cast %0
+    // ```
+    //
+    // If we find that the unchecked_ref_cast has no uses, we then eliminate
+    // it.
+    //
+    // Naturally, this requires us to always hoist our new instruction (or
+    // modified instruction) to before the unchecked_ref_cast.
+    //
+    // First we handle the case where we have a class type where we do not need
+    // to insert a new instruction.
+    if (urci->getOperand()->getType().isAnyClassReferenceType()) {
+      rrpi->setOperand(urci->getOperand());
+      rrpi->moveBefore(urci);
+      return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
     }
+
+    // Otherwise, we ened to use an unchecked_trivial_bit_cast insert it at
+    // urci.
+    //
     // (ref_to_raw_pointer (unchecked_ref_cast x))
     //    -> (unchecked_trivial_bit_cast x)
-    return Builder.createUncheckedTrivialBitCast(RRPI->getLoc(),
-                                                 URCI->getOperand(),
-                                                 RRPI->getType());
+    auto *utbi = withBuilder(urci, [&](auto &b, auto l) {
+      return b.createUncheckedTrivialBitCast(l, urci->getOperand(),
+                                             rrpi->getType());
+    });
+    rrpi->replaceAllUsesWith(utbi);
+    eraseInstFromFunction(*rrpi);
+    return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
   }
 
   // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
   // (ref_to_raw_pointer x)
-  if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand()))
-    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
-      return Builder.createRefToRawPointer(RRPI->getLoc(), IER->getOperand(),
-                                           RRPI->getType());
+  //
+  // In terms of ownership, we need to insert this at the init_existential to
+  // ensure that x is live if we have an owned value.
+  if (auto *oeri = dyn_cast<OpenExistentialRefInst>(rrpi->getOperand())) {
+    if (auto *ieri = dyn_cast<InitExistentialRefInst>(oeri->getOperand())) {
+      auto *utbi = withBuilder(ieri, [&](auto &b, auto l) {
+        return b.createRefToRawPointer(l, ieri->getOperand(), rrpi->getType());
+      });
+      rrpi->replaceAllUsesWith(utbi);
+      return eraseInstFromFunction(*rrpi);
+    }
+  }
 
   return nullptr;
 }
@@ -298,43 +334,43 @@ SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
   return nullptr;
 }
 
-
-
 SILInstruction *
-SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
-  if (URCI->getFunction()->hasOwnership())
+SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *urci) {
+  // Promote unchecked_ref_cast_addr in between two loadable values to
+  // unchecked_ref_cast upon objects.
+  //
+  // NOTE: unchecked_ref_cast_addr is a taking operation, so we simulate that
+  // with objects.
+  SILType srcTy = urci->getSrc()->getType();
+  if (!srcTy.isLoadable(*urci->getFunction()))
     return nullptr;
 
-  SILType SrcTy = URCI->getSrc()->getType();
-  if (!SrcTy.isLoadable(*URCI->getFunction()))
-    return nullptr;
-
-  SILType DestTy = URCI->getDest()->getType();
-  if (!DestTy.isLoadable(*URCI->getFunction()))
+  SILType destTy = urci->getDest()->getType();
+  if (!destTy.isLoadable(*urci->getFunction()))
     return nullptr;
 
   // After promoting unchecked_ref_cast_addr to unchecked_ref_cast, the SIL
   // verifier will assert that the loadable source and dest type of reference
   // castable. If the static types are invalid, simply avoid promotion, that way
   // the runtime will then report a failure if this cast is ever executed.
-  if (!SILType::canRefCast(SrcTy.getObjectType(), DestTy.getObjectType(),
-                           URCI->getModule()))
+  if (!SILType::canRefCast(srcTy.getObjectType(), destTy.getObjectType(),
+                           urci->getModule()))
     return nullptr;
  
-  SILLocation Loc = URCI->getLoc();
-  Builder.setCurrentDebugScope(URCI->getDebugScope());
-  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
-                                      LoadOwnershipQualifier::Unqualified);
+  SILLocation loc = urci->getLoc();
+  Builder.setCurrentDebugScope(urci->getDebugScope());
+  SILValue load = Builder.emitLoadValueOperation(loc, urci->getSrc(),
+                                                 LoadOwnershipQualifier::Take);
 
-  assert(SILType::canRefCast(load->getType(), DestTy.getObjectType(),
+  assert(SILType::canRefCast(load->getType(), destTy.getObjectType(),
                              Builder.getModule()) &&
          "SILBuilder cannot handle reference-castable types");
-  auto *cast = Builder.createUncheckedRefCast(Loc, load,
-                                              DestTy.getObjectType());
-  Builder.createStore(Loc, cast, URCI->getDest(),
-                      StoreOwnershipQualifier::Unqualified);
+  auto *cast = Builder.createUncheckedRefCast(loc, load,
+                                              destTy.getObjectType());
+  Builder.emitStoreValueOperation(loc, cast, urci->getDest(),
+                                  StoreOwnershipQualifier::Init);
 
-  return eraseInstFromFunction(*URCI);
+  return eraseInstFromFunction(*urci);
 }
 
 template <class CastInst>
@@ -630,9 +666,6 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
 
 SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Cvt) {
-  if (Cvt->getFunction()->hasOwnership())
-    return nullptr;
-
   auto *OrigThinToThick =
       dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
   if (!OrigThinToThick)

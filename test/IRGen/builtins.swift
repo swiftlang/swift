@@ -839,5 +839,15 @@ func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
 }
 
 
+// CHECK-LABEL: define {{.*}}convertTaskToJob
+// CHECK:      call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
+// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.refcounted* %0 to i8*
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8, i8* [[T0]], i64 16
+// CHECK-NEXT: [[T2:%.*]] = bitcast i8* [[T1]] to %swift.job*
+// CHECK-NEXT: ret %swift.job* [[T2]]
+func convertTaskToJob(_ task: Builtin.NativeObject) -> Builtin.Job {
+  return Builtin.convertTaskToJob(task)
+}
+
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

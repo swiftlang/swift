@@ -242,14 +242,10 @@ struct OverloadSignature {
   /// Whether this declaration has an opaque return type.
   unsigned HasOpaqueReturnType : 1;
 
-  /// Whether this declaration is 'async'
-  unsigned HasAsync : 1;
-
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false),
-        HasAsync(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -422,7 +418,7 @@ protected:
     HasNestedTypeDeclarations : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1+1+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -441,6 +437,12 @@ protected:
     /// Backing bits for 'self' access kind.
     SelfAccess : 2,
 
+    /// Whether we've computed the IsAsyncHandlerRequest.
+    IsAsyncHandlerComputed : 1,
+
+    /// The value of IsAsyncHandlerRequest.
+    IsAsyncHandler : 1,
+
     /// Whether this is a top-level function which should be treated
     /// as if it were in local context for the purposes of capture
     /// analysis.
@@ -448,14 +450,15 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
-                        /// The kind of accessor this is.
-                        AccessorKind : 4,
+    /// The kind of accessor this is.
+    AccessorKind : 4,
 
-                        /// Whether the accessor is transparent.
-                        IsTransparent : 1,
+    /// Whether the accessor is transparent.
+    IsTransparent : 1,
 
-                        /// Whether we have computed the above.
-                        IsTransparentComputed : 1);
+    /// Whether we have computed the above.
+    IsTransparentComputed : 1
+  );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 1+1,
     /// Whether this constructor can fail, by building an Optional type.
@@ -3459,6 +3462,10 @@ enum class AncestryFlags : uint8_t {
 
   /// The class or one of its superclasses requires stored property initializers.
   RequiresStoredPropertyInits = (1<<6),
+
+  /// The class uses the ObjC object model (reference counting,
+  /// isa encoding, etc.).
+  ObjCObjectModel = (1<<7),
 };
 
 /// Return type of ClassDecl::checkAncestry(). Describes a set of interesting
@@ -3624,6 +3631,30 @@ public:
 
   /// Whether the class is an actor.
   bool isActor() const;
+
+  /// Whether the class is (known to be) a default actor.
+  bool isDefaultActor() const;
+
+  /// Whether the class is known to be a *root* default actor,
+  /// i.e. the first class in its hierarchy that is a default actor.
+  bool isRootDefaultActor() const;
+
+  /// Does this class explicitly declare any of the methods that
+  /// would prevent it from being a default actor?
+  bool hasExplicitCustomActorMethods() const;
+
+  /// Is this the NSObject class type?
+  bool isNSObject() const;
+
+  /// Whether the class directly inherits from NSObject but should use
+  /// Swift's native object model.
+  bool isNativeNSObjectSubclass() const;
+
+  /// Whether the class uses the ObjC object model (reference counting,
+  /// allocation, etc.) instead of the Swift model.
+  bool usesObjCObjectModel() const {
+    return checkAncestry(AncestryFlags::ObjCObjectModel);
+  }
 
   /// Returns true if the class has designated initializers that are not listed
   /// in its members.
@@ -5902,6 +5933,7 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
   friend class ResultTypeRequest;
+  friend class IsAsyncHandlerRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -5933,6 +5965,8 @@ protected:
     Bits.FuncDecl.SelfAccessComputed = false;
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
+    Bits.FuncDecl.IsAsyncHandlerComputed = false;
+    Bits.FuncDecl.IsAsyncHandler = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
   }
 
@@ -5961,6 +5995,18 @@ private:
       return Bits.FuncDecl.IsStatic;
 
     return None;
+  }
+
+  Optional<bool> getCachedIsAsyncHandler() const {
+    if (Bits.FuncDecl.IsAsyncHandlerComputed)
+      return Bits.FuncDecl.IsAsyncHandler;
+
+    return None;
+  }
+
+  void setIsAsyncHandler(bool value) {
+    Bits.FuncDecl.IsAsyncHandlerComputed = true;
+    Bits.FuncDecl.IsAsyncHandler = value;
   }
 
 public:

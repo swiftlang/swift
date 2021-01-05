@@ -17,8 +17,10 @@ target_sources(swiftSILOptimizer PRIVATE
   OptimizerStatsUtils.cpp
   PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp
+  PrunedLiveness.cpp
   SILInliner.cpp
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp
-  ValueLifetime.cpp)
+  ValueLifetime.cpp
+  OwnershipOptUtils.cpp)

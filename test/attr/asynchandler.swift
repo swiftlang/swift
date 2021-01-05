@@ -60,8 +60,8 @@ class Y: P {
   // @asyncHandler is not inferred for classes
 
   func callback() {
-    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}}
-    // expected-note@-2{{add '@asyncHandler' to function 'callback()' to create an implicit asynchronous context}}
+    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}} {{none}}
+    // expected-note@-2{{add '@asyncHandler' to function 'callback()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
 
     // okay, it's an async context
     let _ = await globalAsyncFunction() // expected-error{{'async' in a function that does not support concurrency}}

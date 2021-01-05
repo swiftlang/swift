@@ -107,7 +107,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
+PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
+                                                   bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs) {
   PrintOptions result;
@@ -115,6 +116,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
+  result.CurrentModule = ModuleToPrint;
   result.FullyQualifiedTypes = true;
   result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
@@ -748,8 +750,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
       else if (auto *ED = dyn_cast<ExtensionDecl>(Current))
         subMap = CurrentType->getContextSubstitutionMap(M, ED);
       else {
+        Decl *subTarget = Current;
+        if (isa<ParamDecl>(Current)) {
+          auto *DC = Current->getDeclContext();
+          if (auto *FD = dyn_cast<AbstractFunctionDecl>(DC))
+            subTarget = FD;
+        }
         subMap = CurrentType->getMemberSubstitutionMap(
-          M, cast<ValueDecl>(Current));
+          M, cast<ValueDecl>(subTarget));
       }
 
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
@@ -3648,6 +3656,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
+  Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
+      VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> Args) {
     if (Args.empty())
@@ -3678,7 +3688,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
   }
 
-  /// Determinee whether the given type has a simple representation
+  /// Determine whether the given type has a simple representation
   /// under the current print options.
   bool isSimpleUnderPrintOptions(Type T) {
     if (auto typealias = dyn_cast<TypeAliasType>(T.getPointer())) {
@@ -3700,10 +3710,90 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     return T->hasSimpleTypeRepr();
   }
 
+  /// Computes the map that is cached by `getVisibleClangModules()`.
+  /// Do not call directly.
+  llvm::DenseMap<const clang::Module *, ModuleDecl *>
+  computeVisibleClangModules() {
+    assert(Options.CurrentModule &&
+           "CurrentModule needs to be set to determine imported Clang modules");
+
+    llvm::DenseMap<const clang::Module *, ModuleDecl *> Result;
+
+    // For the current module, consider both private and public imports.
+    ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
+    Filter |= ModuleDecl::ImportFilterKind::Default;
+    Filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+    SmallVector<ImportedModule, 4> Imports;
+    Options.CurrentModule->getImportedModules(Imports, Filter);
+
+    SmallVector<ModuleDecl *, 4> ModulesToProcess;
+    for (const auto &Import : Imports) {
+      ModulesToProcess.push_back(Import.importedModule);
+    }
+
+    SmallPtrSet<ModuleDecl *, 4> Processed;
+    while (!ModulesToProcess.empty()) {
+      ModuleDecl *Mod = ModulesToProcess.back();
+      ModulesToProcess.pop_back();
+
+      if (!Processed.insert(Mod).second)
+        continue;
+
+      if (const clang::Module *ClangModule = Mod->findUnderlyingClangModule())
+        Result[ClangModule] = Mod;
+
+      // For transitive imports, consider only public imports.
+      Imports.clear();
+      Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Exported);
+      for (const auto &Import : Imports) {
+        ModulesToProcess.push_back(Import.importedModule);
+      }
+    }
+
+    return Result;
+  }
+
+  /// Returns all Clang modules that are visible from `Options.CurrentModule`.
+  /// This includes any modules that are imported transitively through public
+  /// (`@_exported`) imports.
+  ///
+  /// The returned map associates each visible Clang module with the
+  /// corresponding Swift module.
+  const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
+  getVisibleClangModules() {
+    if (!VisibleClangModules) {
+      VisibleClangModules = computeVisibleClangModules();
+    }
+    return *VisibleClangModules;
+  }
+
   template <typename T>
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
+    StringRef ExportedModuleName = File->getExportedModuleName();
+
+    // Clang declarations need special treatment: Multiple Clang modules can
+    // contain the same declarations from a textually included header, but not
+    // all of these modules may be visible. We therefore need to make sure we
+    // choose a module that is visible from the current module. This is possible
+    // only if we know what the current module is.
+    const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
+    if (ClangDecl && Options.CurrentModule) {
+      for (auto *Redecl : ClangDecl->redecls()) {
+        clang::Module *ClangModule =
+            Redecl->getOwningModule()->getTopLevelModule();
+        if (!ClangModule)
+          continue;
+
+        if (ModuleDecl *VisibleModule =
+                getVisibleClangModules().lookup(ClangModule)) {
+          Mod = VisibleModule;
+          ExportedModuleName = ClangModule->ExportAsModule;
+          break;
+        }
+      }
+    }
 
     if (Options.MapCrossImportOverlaysToDeclaringModule) {
       if (ModuleDecl *Declaring = Mod->getDeclaringModuleIfCrossImportOverlay())
@@ -3711,8 +3801,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     Identifier Name = Mod->getName();
-    if (Options.UseExportedModuleNames)
-      Name = Mod->getASTContext().getIdentifier(File->getExportedModuleName());
+    if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
+      Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
+    }
 
     Printer.printModuleRef(Mod, Name);
     Printer << ".";
@@ -3853,6 +3944,9 @@ public:
     Printer << buffer;                                                         \
   }
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawPointerType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawUnsafeContinuationType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinJobType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinDefaultActorStorageType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinNativeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinBridgeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnsafeValueBufferType)

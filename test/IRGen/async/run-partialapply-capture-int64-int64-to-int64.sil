@@ -10,7 +10,6 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -37,7 +36,7 @@ bb0:
   return %result : $()
 }
 
-// CHECK-LL: @closureAD =
+// CHECK-LL: @closureTu =
 // CHECK-LL: define internal swiftcc void @closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
 // CHECK-LL: define internal swiftcc void @"$s7closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
 sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
@@ -63,7 +62,7 @@ bb0(%one : $Int64, %two : $Int64):
   return %sum : $Int64
 }
 // Defined in _Concurrency
-sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
 sil @test_case : $@convention(thin) @async () -> () {
   %createAndInvokeClosure = function_ref @createAndInvokeClosure : $@async @convention(thin) () -> ()
@@ -78,7 +77,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
 
   %2 = function_ref @test_case : $@convention(thin) @async () -> ()
   %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
-  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
   %6 = integer_literal $Builtin.Int32, 0

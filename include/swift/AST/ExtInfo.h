@@ -827,6 +827,7 @@ public:
   SILExtInfo withNoEscape(bool noEscape = true) const {
     return builder.withNoEscape(noEscape).build();
   }
+  
 
   SILExtInfo withAsync(bool isAsync = true) const {
     return builder.withAsync(isAsync).build();

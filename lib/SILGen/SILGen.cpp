@@ -391,7 +391,13 @@ FuncDecl *
 SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
   return lookupConcurrencyIntrinsic(getASTContext(),
                                     ResumeUnsafeThrowingContinuationWithError,
-                                 "_resumeUnsafeThrowingContinuationWithError");
+                                  "_resumeUnsafeThrowingContinuationWithError");
+}
+FuncDecl *
+SILGenModule::getRunTaskForBridgedAsyncMethod() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunTaskForBridgedAsyncMethod,
+                                    "_runTaskForBridgedAsyncMethod");
 }
 FuncDecl *
 SILGenModule::getRunAsyncHandler() {
@@ -776,7 +782,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
+    // If the native function is async, then the foreign entry point is not,
+    // so it needs to spawn a detached task in which to run the native
+    // implementation, so the actual thunk logic needs to go into a closure
+    // implementation function.
+    if (constant.hasAsync()) {
+      f = SILGenFunction(*this, *f, dc).emitNativeAsyncToForeignThunk(constant);
+    }
+
     SILGenFunction(*this, *f, dc).emitNativeToForeignThunk(constant);
+
     postEmitFunction(constant, f);
     return;
   }
@@ -2074,37 +2089,32 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
 
 static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
                                                Decl *d) {
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(d)) {
-    for (auto ad : asd->getAllAccessors()) {
-      transferSpecializeAttributeTargets(SGM, M, ad);
+  auto *vd = cast<AbstractFunctionDecl>(d);
+  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+    auto *SA = cast<SpecializeAttr>(A);
+    // Filter _spi.
+    auto spiGroups = SA->getSPIGroups();
+    auto hasSPIGroup = !spiGroups.empty();
+    if (hasSPIGroup) {
+      if (vd->getModuleContext() != M.getSwiftModule() &&
+          !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
+        continue;
+      }
     }
-  } else if (auto *vd = dyn_cast<AbstractFunctionDecl>(d)) {
-    for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
-      // Filter _spi.
-      auto spiGroups = SA->getSPIGroups();
-      auto hasSPIGroup = !spiGroups.empty();
+    if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
+      auto target = SILDeclRef(targetFunctionDecl);
+      auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      Identifier spiGroupIdent;
       if (hasSPIGroup) {
-        if (vd->getModuleContext() != M.getSwiftModule() &&
-            !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
-          continue;
-        }
+        spiGroupIdent = spiGroups[0];
       }
-      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-        auto target = SILDeclRef(targetFunctionDecl);
-        auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
-        auto kind = SA->getSpecializationKind() ==
-                            SpecializeAttr::SpecializationKind::Full
-                        ? SILSpecializeAttr::SpecializationKind::Full
-                        : SILSpecializeAttr::SpecializationKind::Partial;
-        Identifier spiGroupIdent;
-        if (hasSPIGroup) {
-          spiGroupIdent = spiGroups[0];
-        }
-        targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-            M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-            spiGroupIdent, vd->getModuleContext()));
-      }
+      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+          spiGroupIdent, vd->getModuleContext()));
     }
   }
 }
@@ -2128,14 +2138,11 @@ void SILGenModule::visitImportDecl(ImportDecl *import) {
   if (module->isNonSwiftModule())
     return;
 
-  SmallVector<Decl*, 16> topLevelDecls;
-  module->getTopLevelDecls(topLevelDecls);
-  for (auto *t : topLevelDecls) {
-    if (auto *vd = dyn_cast<AbstractFunctionDecl>(t)) {
+  SmallVector<Decl*, 16> prespecializations;
+  module->getExportedPrespecializations(prespecializations);
+  for (auto *p : prespecializations) {
+    if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
       transferSpecializeAttributeTargets(*this, M, vd);
-    } else if (auto *extension = dyn_cast<ExtensionDecl>(t)) {
-      for (auto *d : extension->getMembers())
-        transferSpecializeAttributeTargets(*this, M, d);
     }
   }
 }

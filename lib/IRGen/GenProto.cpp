@@ -2712,12 +2712,14 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
       [&](GenericRequirement requirement) -> llvm::Value * {
         CanType type = requirement.TypeParameter;
         if (auto protocol = requirement.Protocol) {
-          if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+          CanArchetypeType archetype;
+          ProtocolConformanceRef conformance =
+              bindings.getConformance(requirement);
+          if ((archetype = dyn_cast<ArchetypeType>(type)) && !conformance) {
             auto wtable =
                 emitArchetypeWitnessTableRef(IGF, archetype, protocol);
             return transform(requirement, wtable);
           } else {
-            auto conformance = bindings.getConformance(requirement);
             auto wtable = emitWitnessTableRef(IGF, type, conformance);
             return transform(requirement, wtable);
           }

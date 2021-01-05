@@ -772,14 +772,14 @@ namespace {
       }
 
       auto VarD = dyn_cast<VarDecl>(VD);
-      if (VD->isFinal() && !(VarD && VarD->isLet()))
+      const auto &attrs = VD->getAttrs();
+      if (attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()))
         OS << " final";
-      if (VD->getAttrs().hasAttribute<ObjCAttr>())
+      if (attrs.hasAttribute<ObjCAttr>())
         OS << " @objc";
-      if (VD->getAttrs().hasAttribute<DynamicAttr>())
+      if (attrs.hasAttribute<DynamicAttr>())
         OS << " dynamic";
-      if (auto *attr =
-              VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+      if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
         OS << " @_dynamicReplacement(for: \"";
         OS << attr->getReplacedFunctionName();
         OS << "\")";
@@ -3560,7 +3560,10 @@ namespace {
     }
 
     TRIVIAL_TYPE_PRINTER(BuiltinIntegerLiteral, builtin_integer_literal)
+    TRIVIAL_TYPE_PRINTER(BuiltinJob, builtin_job)
+    TRIVIAL_TYPE_PRINTER(BuiltinDefaultActorStorage, builtin_default_actor_storage)
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
+    TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)

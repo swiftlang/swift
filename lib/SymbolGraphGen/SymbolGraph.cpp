@@ -34,12 +34,22 @@ SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker,
                          ModuleDecl &M,
                          Optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         Optional<llvm::VersionTuple> ModuleVersion)
+                         Optional<llvm::VersionTuple> ModuleVersion,
+                         bool IsForSingleNode)
 : Walker(Walker),
   M(M),
   ExtendedModule(ExtendedModule),
   Ctx(Ctx),
-  ModuleVersion(ModuleVersion) {}
+  ModuleVersion(ModuleVersion),
+  IsForSingleNode(IsForSingleNode) {
+    if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
+      DeclaringModule = DM;
+      SmallVector<Identifier, 1> Bystanders;
+      if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
+        BystanderModules = Bystanders;
+      }
+    }
+  }
 
 // MARK: - Utilities
 
@@ -62,6 +72,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.SkipUnderscoredStdlibProtocols = true;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
+  Opts.ExplodeEnumCaseDecls = IsForSingleNode;
 
   Opts.ExclusiveAttrList.clear();
 
@@ -499,7 +510,17 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     }); // end metadata:
 
     OS.attributeObject("module", [&](){
-      OS.attribute("name", M.getNameStr());
+      if (DeclaringModule) {
+        // A cross-import overlay can be considered part of its declaring module
+        OS.attribute("name", (*DeclaringModule)->getNameStr());
+        std::vector<StringRef> B;
+        for (auto BModule : BystanderModules) {
+          B.push_back(BModule.str());
+        }
+        OS.attribute("bystanders", B);
+      } else {
+        OS.attribute("name", M.getNameStr());
+      }
       AttributeRAII Platform("platform", OS);
 
       auto *MainFile = M.getFiles().front();
@@ -508,11 +529,14 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
             llvm_unreachable("Unexpected module kind: Builtin");
           case FileUnitKind::DWARFModule:
             llvm_unreachable("Unexpected module kind: DWARFModule");
-          case FileUnitKind::Source:
-            llvm_unreachable("Unexpected module kind: Source");
           case FileUnitKind::Synthesized:
             llvm_unreachable("Unexpected module kind: Synthesized");
             break;
+          case FileUnitKind::Source: {
+            auto Target = MainFile->getASTContext().LangOpts.Target;
+            symbolgraphgen::serialize(Target, OS);
+            break;
+          }
           case FileUnitKind::SerializedAST: {
             auto SerializedAST = cast<SerializedASTFile>(MainFile);
             auto Target = llvm::Triple(SerializedAST->getTargetTriple());
@@ -560,8 +584,9 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key,
                                            llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(this, OS, Key);
   auto Options = getDeclarationFragmentsPrintOptions();
-  if (S.getSynthesizedBaseType()) {
-    Options.setBaseType(S.getSynthesizedBaseType());
+  if (S.getBaseType()) {
+    Options.setBaseType(S.getBaseType());
+    Options.PrintAsMember = true;
   }
   S.getSymbolDecl()->print(Printer, Options);
 }
@@ -576,8 +601,9 @@ SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
     Printer.printAbridgedType(TD, /*PrintKeyword=*/false);
   } else {
     auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
-    if (S.getSynthesizedBaseType()) {
-      Options.setBaseType(S.getSynthesizedBaseType());
+    if (S.getBaseType()) {
+      Options.setBaseType(S.getBaseType());
+      Options.PrintAsMember = true;
     }
     S.getSymbolDecl()->print(Printer, Options);
   }
@@ -593,8 +619,9 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
     Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
   } else {
     auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
-    if (S.getSynthesizedBaseType()) {
-      Options.setBaseType(S.getSynthesizedBaseType());
+    if (S.getBaseType()) {
+      Options.setBaseType(S.getBaseType());
+      Options.PrintAsMember = true;
     }
     S.getSymbolDecl()->print(Printer, Options);
   }
@@ -602,9 +629,15 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
 
 void
 SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
-                                            llvm::json::OStream &OS) {
+                                           Type BaseType,
+                                           llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(this, OS, Key);
-  T->print(Printer, getDeclarationFragmentsPrintOptions());
+  auto Options = getDeclarationFragmentsPrintOptions();
+  if (BaseType) {
+    Options.setBaseType(BaseType);
+    Options.PrintAsMember = true;
+  }
+  T->print(Printer, Options);
 }
 
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,

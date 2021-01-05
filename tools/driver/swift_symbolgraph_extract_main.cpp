@@ -217,12 +217,12 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   }
 
   auto M = CI.getASTContext().getModuleByName(options::ModuleName);
+  SmallVector<Identifier, 32> VisibleModuleNames;
+  CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
   if (!M) {
     llvm::errs()
       << "Couldn't load module '" << options::ModuleName << '\''
       << " in the current SDK and search paths.\n";
-    SmallVector<Identifier, 32> VisibleModuleNames;
-    CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
 
     if (VisibleModuleNames.empty()) {
       llvm::errs() << "Could not find any modules.\n";
@@ -241,7 +241,29 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
 
   const auto &MainFile = M->getMainFile(FileUnitKind::SerializedAST);
   llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
+  
+  int Success = symbolgraphgen::emitSymbolGraphForModule(M, Options);
+  
+  // Look for cross-import overlays that the given module imports.
+  
+  // Clear out the diagnostic printer before looking for cross-import overlay modules,
+  // since some SDK modules can cause errors in the getModuleByName() call. The call
+  // itself will properly return nullptr after this failure, so for our purposes we
+  // don't need to print these errors.
+  CI.removeDiagnosticConsumer(&DiagPrinter);
+  
+  for (const auto &ModuleName : VisibleModuleNames) {
+    if (ModuleName.str().startswith("_")) {
+      auto CIM = CI.getASTContext().getModuleByName(ModuleName.str());
+      if (CIM && CIM->isCrossImportOverlayOf(M)) {
+        const auto &CIMainFile = CIM->getMainFile(FileUnitKind::SerializedAST);
+        llvm::errs() << "Emitting symbol graph for cross-import overlay module file: "
+          << CIMainFile.getModuleDefiningPath() << '\n';
+        
+        Success |= symbolgraphgen::emitSymbolGraphForModule(CIM, Options);
+      }
+    }
+  }
 
-  return symbolgraphgen::emitSymbolGraphForModule(M,
-    Options);
+  return Success;
 }

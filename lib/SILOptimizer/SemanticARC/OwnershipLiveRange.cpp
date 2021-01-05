@@ -72,7 +72,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // support it though if we need to.
     auto *ti = dyn_cast<TermInst>(user);
     if ((ti && !ti->isTransformationTerminator()) ||
-        !isGuaranteedForwardingUse(op) ||
+        !canOpcodeForwardGuaranteedValues(op) ||
         1 != count_if(user->getOperandValues(
                           true /*ignore type dependent operands*/),
                       [&](SILValue v) {

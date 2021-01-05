@@ -130,7 +130,7 @@ namespace {
 
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
-                            ResilienceExpansion expansion,
+                            TypeExpansionContext typeExpansionContext,
                             llvm::function_ref<void(bool, StringRef)> require,
                             CanType &baseTy,
                             CanType leafTy,
@@ -141,8 +141,7 @@ void verifyKeyPathComponent(SILModule &M,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
   auto &C = M.getASTContext();
-  auto typeExpansionContext =
-      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion);
+  auto expansion = typeExpansionContext.getResilienceExpansion();
   auto opaque = AbstractionPattern::getOpaque();
   auto loweredBaseTy =
       M.Types.getLoweredType(opaque, baseTy, typeExpansionContext);
@@ -150,7 +149,9 @@ void verifyKeyPathComponent(SILModule &M,
     ->getCanonicalType();
   auto loweredComponentTy =
       M.Types.getLoweredType(opaque, componentTy, typeExpansionContext);
-
+  auto getTypeInExpansionContext = [&](CanType ty) -> CanType {
+    return M.Types.getLoweredType(opaque, ty, typeExpansionContext).getASTType();
+  };
   auto checkIndexEqualsAndHash = [&]{
     if (!component.getSubscriptIndices().empty()) {
       // Equals should be
@@ -236,7 +237,8 @@ void verifyKeyPathComponent(SILModule &M,
     auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
                          ->getReferenceStorageReferent()
                          ->getCanonicalType();
-    require(fieldTy == componentTy,
+    require(getTypeInExpansionContext(fieldTy) ==
+                getTypeInExpansionContext(componentTy),
             "property decl should be a member of the base with the same type "
             "as the component");
     require(property->hasStorage(), "property must be stored");
@@ -289,10 +291,11 @@ void verifyKeyPathComponent(SILModule &M,
       auto baseParam = substGetterType->getParameters()[0];
       require(baseParam.getConvention() == normalArgConvention,
               "getter base parameter should have normal arg convention");
-      require(baseParam.getArgumentType(M, substGetterType, typeExpansionContext)
-                == loweredBaseTy.getASTType(),
+      require(getTypeInExpansionContext(baseParam.getArgumentType(
+                  M, substGetterType, typeExpansionContext)) ==
+                  loweredBaseTy.getASTType(),
               "getter base parameter should match base of component");
-      
+
       if (hasIndices) {
         auto indicesParam = substGetterType->getParameters()[1];
         require(indicesParam.getConvention()
@@ -310,11 +313,11 @@ void verifyKeyPathComponent(SILModule &M,
       auto result = substGetterType->getResults()[0];
       require(result.getConvention() == ResultConvention::Indirect,
               "getter result should be @out");
-      require(
-          result.getReturnValueType(M, substGetterType, typeExpansionContext) ==
-              loweredComponentTy.getASTType(),
-          "getter result should match the maximal abstraction of the "
-          "formal component type");
+      require(getTypeInExpansionContext(result.getReturnValueType(
+                  M, substGetterType, typeExpansionContext)) ==
+                  getTypeInExpansionContext(loweredComponentTy.getASTType()),
+              "getter result should match the maximal abstraction of the "
+              "formal component type");
     }
     
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
@@ -363,9 +366,9 @@ void verifyKeyPathComponent(SILModule &M,
             "indices pointer should be an UnsafeRawPointer");
       }
 
-      require(newValueParam.getArgumentType(M, substSetterType,
-                                            typeExpansionContext) ==
-                  loweredComponentTy.getASTType(),
+      require(getTypeInExpansionContext(newValueParam.getArgumentType(
+                  M, substSetterType, typeExpansionContext)) ==
+                  getTypeInExpansionContext(loweredComponentTy.getASTType()),
               "setter value should match the maximal abstraction of the "
               "formal component type");
 
@@ -462,7 +465,6 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
-    case SILArgumentConvention::Direct_Deallocating:
       assert(conv.isIndirectConvention() && "Expect an indirect convention");
       return true; // return something "conservative".
     }
@@ -494,7 +496,7 @@ struct ImmutableAddressUseVerifier {
     return false;
   }
 
-  bool isCastToNonConsuming(UncheckedAddrCastInst *i) {
+  bool isAddrCastToNonConsuming(SingleValueInstruction *i) {
     // Check if any of our uses are consuming. If none of them are consuming, we
     // are good to go.
     return llvm::none_of(i->getUses(), [&](Operand *use) -> bool {
@@ -589,8 +591,9 @@ struct ImmutableAddressUseVerifier {
           break;
       case SILInstructionKind::DestroyAddrInst:
         return true;
+      case SILInstructionKind::UpcastInst:
       case SILInstructionKind::UncheckedAddrCastInst: {
-        if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
+        if (isAddrCastToNonConsuming(cast<SingleValueInstruction>(inst))) {
           break;
         }
         return true;
@@ -1124,21 +1127,12 @@ public:
       // type dependent operand then we should have a constraint of
       // OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding.
       if (!I->getFunction()->hasOwnership()) {
-        if (operand.isTypeDependent()) {
-          require(
-              !operand.getOwnershipConstraint(),
-              "Non Optional::None constraint for a type dependent operand?!");
-        } else {
-          auto constraint = operand.getOwnershipConstraint();
-          require(constraint.hasValue(),
-                  "All non-type dependent operands must have a "
-                  "non-Optional::None constraint?!");
-          require(constraint->getPreferredKind() == OwnershipKind::Any &&
-                      constraint->getLifetimeConstraint() ==
-                          UseLifetimeConstraint::NonLifetimeEnding,
-                  "In non-ossa all non-type dependent operands must have a "
-                  "constraint of Any, NonLifetimeEnding");
-        }
+        auto constraint = operand.getOwnershipConstraint();
+        require(constraint.getPreferredKind() == OwnershipKind::Any &&
+                    constraint.getLifetimeConstraint() ==
+                        UseLifetimeConstraint::NonLifetimeEnding,
+                "In non-ossa all non-type dependent operands must have a "
+                "constraint of Any, NonLifetimeEnding");
       }
     }
 
@@ -1782,11 +1776,25 @@ public:
       return;
     }
 
+    auto builtinKind = BI->getBuiltinKind();
+
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
-    if (BI->getBuiltinKind() &&
-        *BI->getBuiltinKind() == BuiltinValueKind::GetCurrentAsyncTask) {
+    if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
       require(F.isAsync(),
           "getCurrentAsyncTask builtin can only be used in an async function");
+      return;
+    }
+
+    if (builtinKind == BuiltinValueKind::InitializeDefaultActor ||
+        builtinKind == BuiltinValueKind::DestroyDefaultActor) {
+      auto arguments = BI->getArguments();
+      require(arguments.size() == 1,
+              "default-actor builtin can only operate on a single object");
+      auto argType = arguments[0]->getType().getASTType();
+      auto argClass = argType.getClassOrBoundGenericClass();
+      require((argClass && argClass->isRootDefaultActor()) ||
+              isa<BuiltinNativeObjectType>(argType),
+              "default-actor builtin can only operate on default actors");
       return;
     }
   }
@@ -4736,12 +4744,17 @@ public:
     auto pattern = KPI->getPattern();
     SubstitutionMap patternSubs = KPI->getSubstitutions();
     requireSameType(
-        baseTy, pattern->getRootType().subst(patternSubs)->getCanonicalType(),
+        F.getLoweredType(baseTy).getASTType(),
+        F.getLoweredType(
+            pattern->getRootType().subst(patternSubs)->getCanonicalType()).getASTType(),
         "keypath root type should match root type of keypath pattern");
 
     auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
     requireSameType(
-        leafTy, pattern->getValueType().subst(patternSubs)->getCanonicalType(),
+        F.getLoweredType(leafTy).getASTType(),
+        F.getLoweredType(
+             pattern->getValueType().subst(patternSubs)->getCanonicalType())
+            .getASTType(),
         "keypath value type should match value type of keypath pattern");
 
     {
@@ -4762,7 +4775,7 @@ public:
           break;
         }
       
-        verifyKeyPathComponent(F.getModule(), F.getResilienceExpansion(),
+        verifyKeyPathComponent(F.getModule(), F.getTypeExpansionContext(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
           baseTy,
           leafTy,
@@ -4775,7 +4788,8 @@ public:
       }
     }
     requireSameType(
-        CanType(baseTy), CanType(leafTy),
+        F.getLoweredType(CanType(baseTy)).getASTType(),
+        F.getLoweredType(CanType(leafTy)).getASTType(),
         "final component should match leaf value type of key path type");
   }
 
@@ -4914,12 +4928,7 @@ public:
   
   void checkGetAsyncContinuationInstBase(GetAsyncContinuationInstBase *GACI) {
     auto resultTy = GACI->getType();
-    auto &C = resultTy.getASTContext();
-    auto resultBGT = resultTy.getAs<BoundGenericType>();
-    require(resultBGT, "Instruction type must be a continuation type");
-    auto resultDecl = resultBGT->getDecl();
-    require(resultDecl == C.getUnsafeContinuationDecl()
-             || resultDecl == C.getUnsafeThrowingContinuationDecl(),
+    require(resultTy.is<BuiltinRawUnsafeContinuationType>(),
             "Instruction type must be a continuation type");
   }
   
@@ -5472,6 +5481,16 @@ public:
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
 
+    // Don't verify functions that were skipped. We are likely to see them in
+    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+    auto Ctx = F->getDeclContext();
+    if (Ctx) {
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+        if (AFD->isBodySkipped())
+          return;
+      }
+    }
+
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())
         return;
@@ -5590,8 +5609,11 @@ void SILProperty::verify(const SILModule &M) const {
     };
 
   if (auto &component = getComponent()) {
+    auto typeExpansionContext =
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+            ResilienceExpansion::Maximal);
     verifyKeyPathComponent(const_cast<SILModule&>(M),
-                           ResilienceExpansion::Maximal,
+                           typeExpansionContext,
                            require,
                            baseTy,
                            leafTy,

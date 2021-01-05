@@ -243,6 +243,8 @@ namespace {
     IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
+    IMPL(BuiltinRawUnsafeContinuation, Trivial)
+    IMPL(BuiltinJob, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinVector, Trivial)
@@ -256,6 +258,15 @@ namespace {
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive});
+    }
+
+    RetTy visitBuiltinDefaultActorStorageType(
+                                         CanBuiltinDefaultActorStorageType type,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
@@ -3014,6 +3025,10 @@ TypeConverter::checkForABIDifferences(SILModule &M,
   // trivial.
   if (auto fnTy1 = type1.getAs<SILFunctionType>()) {
     if (auto fnTy2 = type2.getAs<SILFunctionType>()) {
+      // Async/synchronous conversions always need a thunk.
+      if (fnTy1->isAsync() != fnTy2->isAsync())
+        return ABIDifference::NeedsThunk;
+
       // @convention(block) is a single retainable pointer so optionality
       // change is allowed.
       if (optionalityChange)

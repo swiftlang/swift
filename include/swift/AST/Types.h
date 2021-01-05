@@ -1391,6 +1391,51 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
 
+/// BuiltinRawContinuationType - The builtin raw unsafe continuation type.
+/// In C, this is a non-null AsyncTask*.  This pointer is completely
+/// unmanaged (the unresumed task is self-owning), but has more spare bits
+/// than Builtin.RawPointer.
+class BuiltinRawUnsafeContinuationType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinRawUnsafeContinuationType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinRawUnsafeContinuation, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinRawUnsafeContinuation;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType);
+
+/// BuiltinJobType - The builtin job type.  In C, this is a
+/// non-null Job*.  This pointer is completely unmanaged (the unscheduled
+/// job is self-owning), but has more spare bits than Builtin.RawPointer.
+class BuiltinJobType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinJobType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinJob, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinJob;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinJobType, BuiltinType);
+
+/// BuiltinDefaultActorStorageType - The type of the stored property
+/// that's added implicitly to default actors.  No C equivalent because
+/// the C types all include a heap-object header.  Similarly, this type
+/// generally does not appear in the AST/SIL around default actors;
+/// it's purely a convenience in IRGen.
+class BuiltinDefaultActorStorageType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinDefaultActorStorageType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinDefaultActorStorage, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinDefaultActorStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType);
+
 /// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.
