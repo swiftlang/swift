@@ -81,6 +81,14 @@ SILInstruction *ValueBase::getDefiningInsertionPoint() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getNextInstruction() {
+  if (auto *inst = getDefiningInstruction())
+    return std::next(inst);
+  if (auto *arg = dyn_cast<SILArgument>(this))
+    return &*arg->getParentBlock()->begin();
+  return nullptr;
+}
+
 Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
