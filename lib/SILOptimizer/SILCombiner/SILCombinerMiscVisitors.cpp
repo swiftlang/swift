@@ -147,6 +147,9 @@ static EnumElementDecl *getInjectEnumCaseTo(SILValue Addr) {
 }
 
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
+  if (SEAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Convert switch_enum_addr -> br
   // if the only thing which writes to the address is an inject_enum_addr.
   SILValue Addr = SEAI->getOperand();
