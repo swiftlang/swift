@@ -1,0 +1,1345 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+// TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+typealias I32 = Builtin.Int32
+
+struct Int {
+  var value : Builtin.Int64
+}
+
+struct Int32 {
+  var value : Builtin.Int32
+}
+
+struct Int64 {
+  var value : Builtin.Int64
+}
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+class AX {
+  final var current: Int32
+  init()
+}
+
+struct A {
+  var i : Builtin.Int32
+}
+
+struct AA {
+  var a : A
+  var i : Builtin.Int32
+}
+
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
+struct X {
+  var c : B
+  init()
+}
+
+struct Agg2 {
+  var t : (Builtin.Int64, Builtin.Int32)
+}
+
+struct Agg1 {
+  var a : Agg2
+}
+
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
+class E : B { }
+
+struct C {
+  var i : Builtin.Int16
+}
+
+struct D {
+  var p : Builtin.RawPointer
+}
+
+struct Wrapper {
+  var value : Builtin.Int32
+}
+
+class AB {
+  var value: Int
+  var value2: Int
+  init(value: Int)
+   deinit
+}
+
+enum XYZ {
+  case A
+  case B((Int32, Int32))
+  case C(Int32)
+}
+
+struct TwoField {
+  var a: Int
+  var b: Int
+  init(a: Int, b: Int)
+  init()
+}
+
+class C1 {}
+
+class C2  {
+ var current: Int
+ init()
+}
+class C3 : C2 {
+ override init()
+}
+
+class NewRangeGenerator1 {
+  final var current: Int32
+  final let end: Int32
+  init(start: Int32, end: Int32)
+}
+
+final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
+  override init(start: Int32, end: Int32)
+}
+
+struct F {
+
+}
+
+sil_global @total : $Int32
+
+sil @use : $@convention(thin) (Builtin.Int32) -> ()
+sil @use_Int : $@convention(thin) (Int) -> ()
+sil @use_64 : $@convention(thin) (Builtin.Int64) -> ()
+sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+sil @use_a : $@convention(thin) (A) -> ()
+sil @use_twofield : $@convention(thin) (TwoField) -> ()
+sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+
+// We have a bug in the old projection code which this test case exposes.
+// Make sure its handled properly in the new projection.
+//
+// Make sure the store to the different fields does not affect the load
+//
+// CHECK-LABEL: sil hidden [ossa] @load_forward_across_store_to_different_field :
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_across_store_to_different_field'
+sil hidden [ossa] @load_forward_across_store_to_different_field : $@convention(thin) (@owned AB) -> Int {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  %3 = load [trivial] %2 : $*Int
+  %222 = ref_element_addr %borrow0 : $AB, #AB.value2
+  store %3 to [trivial] %222 : $*Int
+  %4 = ref_element_addr %borrow0 : $AB, #AB.value
+  %5 = load [trivial] %4 : $*Int
+  end_borrow %borrow0 : $AB
+  destroy_value %0 : $AB
+  %22 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %22(%3) : $@convention(thin) (Int) -> ()
+  apply %22(%5) : $@convention(thin) (Int) -> ()
+  return %5 : $Int
+}
+
+// CHECK-LABEL: sil hidden [ossa] @load_forward_across_end_cow_mutation :
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_across_end_cow_mutation'
+sil hidden [ossa] @load_forward_across_end_cow_mutation : $@convention(thin) (@owned AB, Int) -> Int {
+bb0(%0 : @owned $AB, %1 : $Int):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  store %1 to [trivial] %2 : $*Int
+  end_borrow %borrow0 : $AB
+  %4 = end_cow_mutation %0 : $AB
+  %borrow4 = begin_borrow %4 : $AB
+  %5 = ref_element_addr %borrow4 : $AB, #AB.value
+  %6 = load [trivial] %5 : $*Int
+  end_borrow %borrow4 : $AB
+  destroy_value %4 : $AB
+  return %6 : $Int
+}
+
+// CHECK-LABEL: sil hidden [ossa] @redundant_load_across_fixlifetime_inst :
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'redundant_load_across_fixlifetime_inst'
+sil hidden [ossa] @redundant_load_across_fixlifetime_inst : $@convention(thin) (@owned AB) -> Int {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  %3 = load [trivial] %2 : $*Int
+  %4 = ref_element_addr %borrow0 : $AB, #AB.value
+  fix_lifetime %0 : $AB
+  %5 = load [trivial] %4 : $*Int
+  end_borrow %borrow0 : $AB
+  destroy_value %0 : $AB
+  %22 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %22(%3) : $@convention(thin) (Int) -> ()
+  apply %22(%5) : $@convention(thin) (Int) -> ()
+  return %5 : $Int
+}
+
+// Check that we don't crash if the address is an unchecked_addr_cast.
+// CHECK-LABEL: sil [ossa] @test_unchecked_addr_cast :
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'test_unchecked_addr_cast'
+sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to [trivial] %2 : $*A
+  %l1 = load [trivial] %2 : $*A
+  return %l1 : $A
+}
+
+// Multi-BB version of the previous test.
+// CHECK-LABEL: sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
+// CHECK: bb1
+// CHECK-NOT: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_forwarding_ignoring_unchecked_addr_cast2'
+sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2: $A):
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to [trivial] %3 : $*A
+  br bb1
+
+bb1:
+  %5 = load [trivial] %3 : $*A
+  %6 = load [trivial] %3 : $*A
+  store %2 to [trivial] %3 : $*A
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  return %5 : $A
+}
+
+// CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
+// CHECK: bb0
+// CHECK: store
+// CHECK: bb1
+// CHECK: store
+// CHECK-NOT: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_read_dependence_allows_forwarding_multi_bb_1'
+sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  store %1 to [trivial] %0 : $*A
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  %3 = unchecked_addr_cast %2 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %4 = load [trivial] %3 : $*A
+  // But we still should be able to forward this load.
+  %5 = load [trivial] %0 : $*A
+  // We need to dedup this store to trigger the self loop
+  // forwarding. Once we do the full optimistic data flow this will no
+  // longer be needed.
+  %6 = load [trivial] %0 : $*A
+  store %1 to [trivial] %0 : $*A
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  return %5 : $A
+}
+
+// DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
+//
+// Make sure the switch does not affect the forwarding of the load.
+// switch_enum cannot have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
+// switch basic block.
+// DISABLE_CHECK-LABEL: load_elimination_disregard_switch_enum
+// DISABLE_CHECK: bb8
+// DISABLE_CHECK-NOT: = load
+// DISABLE_CHECK-LABEL: } // end sil function 'load_elimination_disregard_switch_enum'
+sil [ossa] @load_elimination_disregard_switch_enum : $@convention(thin) (Int32, Int32, @inout Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $*Int32):
+  cond_br undef, bb7, bb1
+
+bb1:
+  %4 = tuple (%0 : $Int32, %1 : $Int32)
+  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Int32, Int32)
+  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = integer_literal $Builtin.Int32, 0
+  %9 = struct $Int32 (%8 : $Builtin.Int32)
+  br bb5
+
+bb4(%11 : $(Int32, Int32)):
+  %12 = tuple_extract %11 : $(Int32, Int32), 0
+  br bb5
+
+bb5:
+  br bb5
+
+bb6(%15 : $Int32):
+  br bb5
+
+bb7:
+  %17 = load [trivial] %2 : $*Int32
+  br bb8
+
+bb8:
+  %19 = load [trivial] %2 : $*Int32
+  return %19 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_forwarding_from_aggregate_to_field :
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'load_store_forwarding_from_aggregate_to_field'
+sil [ossa] @load_store_forwarding_from_aggregate_to_field : $@convention(thin) (Agg1) -> (Builtin.Int32) {
+bb0(%0 : $Agg1):
+  %1 = alloc_stack $Agg1
+  store %0 to [trivial] %1 : $*Agg1
+  %2 = struct_element_addr %1 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
+  %5 = load [trivial] %4 : $*Builtin.Int32
+  dealloc_stack %1 : $*Agg1
+  return %5 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @store_promotion :
+// CHECK: store
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-LABEL: } // end sil function 'store_promotion'
+sil [ossa] @store_promotion : $@convention(thin) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
+  store %0 to [init] %1a : $*B
+  %3 = load [copy] %1a : $*B
+  %4 = load [take] %1a : $*B
+  destroy_value %4 : $B
+  destroy_value %3 : $B
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <B>
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_duplicate_loads_over_noread_builtins :
+// CHECK: bb0
+// CHECK-NEXT: [[LOAD_RESULT:%[0-9]+]] = load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: builtin "sadd_with_overflow_Int64"([[LOAD_RESULT]] : ${{.*}}, [[LOAD_RESULT]]
+// CHECK-NEXT: [[APPLY_RESULT:%[0-9]+]] = tuple_extract
+// CHECK-NEXT: builtin "sadd_with_overflow_Int64"([[LOAD_RESULT]] : ${{.*}}, [[APPLY_RESULT]]
+// CHECK-NEXT: tuple_extract
+// CHECK-LABEL: } // end sil function 'eliminate_duplicate_loads_over_noread_builtins'
+sil [ossa] @eliminate_duplicate_loads_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load [trivial] %0 : $*Builtin.Int64
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = builtin "sadd_with_overflow_Int64"(%1 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %5 = load [trivial] %0 : $*Builtin.Int64
+  %6 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %6 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
+  return %8 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_forwarding_over_noread_builtins :
+// CHECK: bb0
+// CHECK-NEXT: = load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: store
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
+// CHECK-LABEL: } // end sil function 'load_store_forwarding_over_noread_builtins'
+sil [ossa] @load_store_forwarding_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = load [trivial] %0 : $*Builtin.Int64
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  store %6 to [trivial] %1 : $*Builtin.Int64
+  %8 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = load [trivial] %1 : $*Builtin.Int64
+  %11 = builtin "sadd_with_overflow_Int64"(%10 : $Builtin.Int64, %9 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  return %12 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_forwarding_over_dealloc_stack :
+// CHECK: bb0
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: store
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: = load
+// CHECK: dealloc_stack
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_store_forwarding_over_dealloc_stack'
+sil [ossa] @load_store_forwarding_over_dealloc_stack : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_stack $Builtin.Int64
+  %2 = alloc_stack $Builtin.Int64
+  store %0 to [trivial] %1 : $*Builtin.Int64
+  %3 = alloc_stack $Builtin.Int64
+  %5 = load [trivial] %2 : $*Builtin.Int64
+  %22 = function_ref @use_64 : $@convention(thin) (Builtin.Int64) -> ()
+  %23 = apply %22(%5) : $@convention(thin) (Builtin.Int64) -> ()
+  dealloc_stack %3 : $*Builtin.Int64
+  %4 = load [trivial] %1 : $*Builtin.Int64
+  store %0 to [trivial] %1 : $*Builtin.Int64
+  %6 = load [trivial] %2 : $*Builtin.Int64
+  %222 = function_ref @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+  %232 = apply %222(%4, %6) : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+  dealloc_stack %2 : $*Builtin.Int64
+  dealloc_stack %1 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @load_dedup_forwarding_from_aggregate_to_field :
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]]
+// CHECK-NEXT: = load [trivial] [[INPUT_PTR]]
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-LABEL: } // end sil function 'load_dedup_forwarding_from_aggregate_to_field'
+sil [ossa] @load_dedup_forwarding_from_aggregate_to_field : $@convention(thin) (@inout Agg1) -> (Builtin.Int32) {
+bb0(%0 : $*Agg1):
+  %1 = load [trivial] %0 : $*Agg1
+  %2 = struct_element_addr %0 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
+  %5 = load [trivial] %4 : $*Builtin.Int32
+  return %5 : $Builtin.Int32
+}
+
+// CHECK-LABEL: promote_partial_load :
+// CHECK: alloc_stack
+// CHECK-NOT: = load
+// CHECK: [[RESULT:%[0-9]+]] = struct_extract
+// CHECK-LABEL: } // end sil function 'promote_partial_load'
+sil [ossa] @promote_partial_load : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = alloc_stack $Wrapper
+  %2 = struct $Wrapper (%0 : $Builtin.Int32)
+  store %2 to [trivial] %1 : $*Wrapper
+  %3 = struct_element_addr %1 : $*Wrapper, #Wrapper.value
+  %4 = load [trivial] %3 : $*Builtin.Int32
+  dealloc_stack %1 : $*Wrapper
+  return %4 : $Builtin.Int32
+}
+
+// TODO: HANDLE THIS, THIS IS SAME VALUE STORES.
+//
+// CHECK-LABEL: sil [ossa] @store_loaded_value :
+// CHECK-LABEL: } // end sil function 'store_loaded_value'
+sil [ossa]  @store_loaded_value : $@convention(thin) (@inout Agg2, @inout Agg1) -> () {
+bb0(%0 : $*Agg2, %1 : $*Agg1):
+  %2 = load [trivial] %1 : $*Agg1
+  %3 = load [trivial] %0 : $*Agg2
+  store %2 to [trivial]  %1 : $*Agg1
+  store %3 to [trivial] %0 : $*Agg2
+  %6 = tuple()
+  return %6 : $()
+}
+
+// Check load forwarding across strong_release in case the stored memory does
+// not escape.
+// CHECK-LABEL: sil @test_store_forwarding_strong_release :
+// CHECK: strong_release
+// CHECK-NOT: [[BOX0:%.*]] = load
+// CHECK: apply
+// CHECK-LABEL: } // end sil function 'test_store_forwarding_strong_release'
+sil @test_store_forwarding_strong_release : $@convention(thin) (B, X) -> () {
+bb0(%0 : $B, %1 : $X):
+  %2 = alloc_stack $A
+  %3 = struct_element_addr %2 : $*A, #A.i
+  %4 = integer_literal $Builtin.Int32, 32
+  store %4 to %3 : $*Builtin.Int32
+  %6 = ref_to_unowned %0 : $B to $@sil_unowned B
+  unowned_release %6 : $@sil_unowned B
+  strong_release %0 : $B
+  release_value %1 : $X
+  %10 = load %3 : $*Builtin.Int32
+  // function_ref use
+  %11 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %2 : $*A
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// Check load forwarding across strong_release in case the loaded memory does
+// not escape.
+// CHECK-LABEL: sil @test_load_forwarding_strong_release :
+// CHECK: strong_release
+// CHECK-NOT: [[BOX0:%.*]] = load
+// CHECK: apply
+// CHECK-LABEL: } // end sil function 'test_load_forwarding_strong_release'
+sil @test_load_forwarding_strong_release : $@convention(thin) (B, X) -> () {
+bb0(%0 : $B, %1 : $X):
+  %2 = alloc_stack $A
+  %3 = struct_element_addr %2 : $*A, #A.i
+  %4 = load %3 : $*Builtin.Int32
+  %5 = ref_to_unowned %0 : $B to $@sil_unowned B
+  unowned_release %5 : $@sil_unowned B
+  strong_release %0 : $B
+  release_value %1 : $X
+  %9 = load %3 : $*Builtin.Int32
+  // function_ref use
+  %10 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %2 : $*A
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// Make sure we RLE the second load.
+//
+// CHECK-LABEL: test_simple_rle_in_class :
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK: cond_fail
+// CHECK-LABEL: } // end sil function 'test_simple_rle_in_class'
+sil hidden [ossa] @test_simple_rle_in_class : $@convention(thin) (@owned AB) -> Int {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %2 = ref_element_addr %borrow0 : $AB, #AB.value
+  %3 = load [trivial] %2 : $*Int
+  %4 = ref_element_addr %borrow0 : $AB, #AB.value
+  %5 = load [trivial] %4 : $*Int
+  end_borrow %borrow0 : $AB
+  %6 = struct_extract %3 : $Int, #Int.value
+  %7 = struct_extract %5 : $Int, #Int.value
+  %8 = integer_literal $Builtin.Int1, -1
+  %9 = builtin "sadd_with_overflow_Int64"(%6 : $Builtin.Int64, %7 : $Builtin.Int64, %8 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %10 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 0
+  %11 = tuple_extract %9 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %11 : $Builtin.Int1
+  %13 = struct $Int (%10 : $Builtin.Int64)
+  destroy_value %0 : $AB
+  return %13 : $Int
+}
+
+// Make sure we RLE the load in BB2.
+//
+// CHECK-LABEL: test_silargument_rle :
+// CHECK: bb2
+// CHECK-NOT: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_silargument_rle'
+sil [ossa] @test_silargument_rle : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @total : $*Int32
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to [trivial] %0 : $*Int32
+  %6 = alloc_ref $AX
+  %borrow6 = begin_borrow %6 : $AX
+  %8 = ref_element_addr %borrow6 : $AX, #AX.current
+  store %2 to [trivial] %8 : $*Int32
+  end_borrow %borrow6 : $AX
+  cond_br undef, bb0b, bb0a
+
+bb0a:
+  br bb2
+
+bb0b:
+  br bb3
+
+bb2:
+  %24 = integer_literal $Builtin.Int1, -1
+  %31 = struct_element_addr %0 : $*Int32, #Int32.value
+  %32 = load [trivial] %31 : $*Builtin.Int32
+  %33 = builtin "sadd_with_overflow_Int32"(%32 : $Builtin.Int32, %1 : $Builtin.Int32, %24 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %34 = tuple_extract %33 : $(Builtin.Int32, Builtin.Int1), 0
+  %37 = struct $Int32 (%34 : $Builtin.Int32)
+  store %37 to [trivial] %0 : $*Int32
+  cond_br undef, bb2b, bb2a
+
+bb2a:
+  br bb2
+
+bb2b:
+  br bb3
+
+bb3:
+  destroy_value %6 : $AX
+  %44 = tuple ()
+  return %44 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_to_load_forwarding_diamonds'
+sil [ossa] @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32):
+  %1 = load [trivial] %0 : $*Builtin.Int32
+  // Simple diamond.
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  // Triangle
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6 
+
+bb6:
+  %2 = load [trivial] %0 : $*Builtin.Int32
+  return %2 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK: = load
+// CHECK: bb1:
+// CHECK-NOT: = load
+// CHECK: store
+// CHECK-NOT: = load
+// CHECK: bb2:
+// CHECK: bb3([[A:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NOT: = load
+// CHECK: apply %{{[0-9]+}}([[A]])
+// CHECK-LABEL: } // end sil function 'load_to_load_conflicting_branches_diamond'
+sil [ossa] @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
+// %0
+bb0(%0 : $*Builtin.Int32):
+  %1 = load [trivial] %0 : $*Builtin.Int32
+  %2 = builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = load [trivial] %0 : $*Builtin.Int32
+  // function_ref use
+  %5 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  %7 = integer_literal $Builtin.Int32, 2
+  %8 = builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  store %7 to [trivial] %0 : $*Builtin.Int32
+  %10 = builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  %11 = load [trivial] %0 : $*Builtin.Int32
+  // function_ref use
+  %12 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %13 = apply %12(%11) : $@convention(thin) (Builtin.Int32) -> ()
+  %14 = builtin "trunc_Int32_Int1"(%11 : $Builtin.Int32) : $Builtin.Int1
+  br bb3
+
+bb2:
+  %16 = load [trivial] %0 : $*Builtin.Int32
+  // function_ref use
+  %17 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %18 = apply %17(%16) : $@convention(thin) (Builtin.Int32) -> ()
+  %19 = builtin "trunc_Int32_Int1"(%16 : $Builtin.Int32) : $Builtin.Int1
+  br bb3
+
+bb3:
+  %21 = load [trivial] %0 : $*Builtin.Int32
+  // function_ref use
+  %22 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (Builtin.Int32) -> ()
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// Forward store %1 and store %2 such that load %3 becomes an identity trivial cast.
+// Both loads from %0 will be eliminated.
+// CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+// CHECK: bb1
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK: bb2
+// CHECK-LABEL: } // end sil function 'test_read_dependence_allows_forwarding_multi_bb_2'
+sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2 : $A):
+  store %1 to [trivial] %0 : $*A
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  %4 = unchecked_addr_cast %3 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %6 = load [trivial] %3 : $*A
+  %7 = load [trivial] %0 : $*A
+  %8 = load [trivial] %0 : $*A
+  %22 = function_ref @use_a : $@convention(thin) (A) -> ()
+  %123 = apply %22(%6) : $@convention(thin) (A) -> ()
+  %223 = apply %22(%7) : $@convention(thin) (A) -> ()
+  %323 = apply %22(%8) : $@convention(thin) (A) -> ()
+  store %2 to [trivial] %0 : $*A
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  return %7 : $A
+}
+
+// CHECK-LABEL: sil [ossa] @load_to_load_loop :
+// CHECK: bb1([[BBARG:%[0-9]+]]
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'load_to_load_loop'
+sil [ossa] @load_to_load_loop : $@convention(thin) () -> () {
+bb0:
+  %101 = alloc_stack $Int32
+  %102 = alloc_stack $Int32
+  %0 = struct_element_addr %101 : $*Int32, #Int32.value
+  %1 = struct_element_addr %102 : $*Int32, #Int32.value
+  %2 = load [trivial] %0 : $*Builtin.Int32
+  %99 = load [trivial] %1 : $*Builtin.Int32
+  %125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %126 = apply %125(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  %127 = apply %125(%99) : $@convention(thin) (Builtin.Int32) -> ()
+  br bb1
+
+bb1:
+  %4 = load [trivial] %0 : $*Builtin.Int32
+  %5 = integer_literal $Builtin.Int32, 2
+  %1125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %1126 = apply %1125(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  store %5 to [trivial] %0 : $*Builtin.Int32
+  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  %6 = load [trivial] %0 : $*Builtin.Int32
+  %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1  
+
+bb2:
+  %7 = load [trivial] %0 : $*Builtin.Int32
+  %111125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %111126 = apply %111125(%7) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %102 : $*Int32
+  dealloc_stack %101 : $*Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: store_and_load_to_load_branches_diamond :
+// CHECK: bb3
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'store_and_load_to_load_branches_diamond'
+sil [ossa] @store_and_load_to_load_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
+// %0
+bb0(%0 : $*Builtin.Int32):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = load [trivial] %0 : $*Builtin.Int32
+  br bb3
+
+bb2:
+  %5 = integer_literal $Builtin.Int32, 2
+  store %5 to [trivial] %0 : $*Builtin.Int32
+  br bb3
+
+bb3:
+  %21 = load [trivial] %0 : $*Builtin.Int32
+  // function_ref use
+  %22 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (Builtin.Int32) -> ()
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: agg_and_field_store_branches_diamond :
+// CHECK: bb3
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'agg_and_field_store_branches_diamond'
+sil hidden [ossa] @agg_and_field_store_branches_diamond : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $TwoField, var, name "x"
+  %7 = struct_extract %0 : $Bool, #Bool.value
+  cond_br %7, bb1, bb2
+
+bb1:
+  %9 = integer_literal $Builtin.Int64, 10
+  %10 = struct $Int (%9 : $Builtin.Int64)
+  %11 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %10 to [trivial] %11 : $*Int
+  %14 = integer_literal $Builtin.Int64, 20
+  %15 = struct $Int (%14 : $Builtin.Int64)
+  %16 = struct_element_addr %1 : $*TwoField, #TwoField.b
+  store %15 to [trivial] %16 : $*Int
+  br bb3
+
+bb2:
+  %3 = function_ref @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+  %4 = metatype $@thin TwoField.Type
+  %5 = apply %3(%4) : $@convention(thin) (@thin TwoField.Type) -> TwoField
+  store %5 to [trivial] %1 : $*TwoField
+  br bb3
+
+bb3:
+  %99 = load [trivial] %1 : $*TwoField
+  %991 = function_ref @use_twofield : $@convention(thin) (TwoField) -> ()
+  %55 = apply %991(%99) : $@convention(thin) (TwoField) -> ()
+  %23 = tuple ()
+  dealloc_stack %1 : $*TwoField
+  return %23 : $()
+}
+
+// CHECK-LABEL: agg_and_field_store_with_the_same_value :
+// CHECK: bb2
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'agg_and_field_store_with_the_same_value'
+sil hidden [ossa] @agg_and_field_store_with_the_same_value : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $TwoField, var, name "x"
+  %7 = struct_extract %0 : $Bool, #Bool.value
+  br bb1
+
+bb1:
+  %9 = integer_literal $Builtin.Int64, 10
+  %10 = struct $Int (%9 : $Builtin.Int64)
+  %11 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %10 to [trivial] %11 : $*Int
+  %16 = struct_element_addr %1 : $*TwoField, #TwoField.b
+  store %10 to [trivial] %16 : $*Int
+  br bb2
+
+bb2:
+  %99 = load [trivial] %1 : $*TwoField
+  %991 = function_ref @use_twofield : $@convention(thin) (TwoField) -> ()
+  %55 = apply %991(%99) : $@convention(thin) (TwoField) -> ()
+  %23 = tuple ()
+  dealloc_stack %1 : $*TwoField
+  return %23 : $()
+}
+
+// Make sure we form a single SILArgument.
+//
+// CHECK-LABEL: single_silargument_agg_in_one_block :
+// CHECK: bb3([[ARG:%.*]] : $TwoField):
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'single_silargument_agg_in_one_block'
+sil hidden [ossa] @single_silargument_agg_in_one_block : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $TwoField, var, name "x"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $Int (%3 : $Builtin.Int64)
+  %5 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %4 to [trivial] %5 : $*Int
+  %7 = struct_element_addr %1 : $*TwoField, #TwoField.b
+  store %4 to [trivial] %7 : $*Int
+  br bb3
+
+bb2:
+  %10 = integer_literal $Builtin.Int64, 10
+  %11 = struct $Int (%10 : $Builtin.Int64)
+  %12 = struct $TwoField (%11 : $Int, %11 : $Int)
+  store %12 to [trivial] %1 : $*TwoField
+  br bb3
+
+bb3:
+  %15 = load [trivial] %1 : $*TwoField
+  // function_ref use_twofield
+  %16 = function_ref @use_twofield : $@convention(thin) (TwoField) -> ()
+  %17 = apply %16(%15) : $@convention(thin) (TwoField) -> ()
+  %18 = tuple ()
+  dealloc_stack %1 : $*TwoField
+  return %18 : $()
+}
+
+// CHECK-LABEL: large_diamond_silargument_forwarding :
+// CHECK: bb9
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'large_diamond_silargument_forwarding'
+sil hidden [ossa] @large_diamond_silargument_forwarding : $@convention(thin) (Bool) -> Int {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $TwoField, var, name "x"
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb5, bb6
+
+bb3:
+  %7 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %7 : $*Int
+  br bb7
+
+bb4:
+  %10 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %10 : $*Int
+  br bb7
+
+bb5:
+  %13 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %13 : $*Int
+  br bb8
+
+bb6:
+  %16 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %16 : $*Int
+  br bb8
+
+bb7:
+  br bb9
+
+bb8:
+  br bb9
+
+bb9:
+  %21 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  %22 = load [trivial] %21 : $*Int
+  dealloc_stack %1 : $*TwoField
+  return %22 : $Int
+}
+
+// Make sure we can re-use the SILArgument inserted in bb8 for forwarding
+// in bb9 and bb10.
+//
+// CHECK-LABEL: reuse_silargument_multiple_bb_forwarding :
+// CHECK: bb8([[ARG:%.*]] : $Int)
+// CHECK: bb9
+// CHECK-NOT: = load
+// CHECK: bb10
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'reuse_silargument_multiple_bb_forwarding'
+sil hidden [ossa] @reuse_silargument_multiple_bb_forwarding : $@convention(thin) (Bool) -> Int {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $TwoField, var, name "x"
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb5, bb6
+
+bb3:
+  %7 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %7 : $*Int
+  br bb7
+
+bb4:
+  %10 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %10 : $*Int
+  br bb7
+
+bb5:
+  %13 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %13 : $*Int
+  br bb8
+
+bb6:
+  %16 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  store %3 to [trivial] %16 : $*Int
+  br bb8
+
+bb7:
+  br bb10
+
+bb8:
+  cond_br undef, bb9, bb8a
+
+bb8a:
+ br bb10
+
+bb9:
+  %21 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  %22 = load [trivial] %21 : $*Int
+  %23 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  %24 = apply %23(%22) : $@convention(thin) (Int) -> ()
+  br bb10
+
+bb10:
+  %26 = struct_element_addr %1 : $*TwoField, #TwoField.a
+  %27 = load [trivial] %26 : $*Int
+  dealloc_stack %1 : $*TwoField
+  return %27 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @test_project_box :
+// CHECK: [[PB:%[0-9]*]] = project_box %0
+// CHECK: [[LD:%[0-9]*]] = load [trivial] [[PB]]
+// CHECK: [[TP:%[0-9]*]] = tuple ([[LD]] : $Builtin.Int32, [[LD]] : $Builtin.Int32)
+// CHECK-LABEL: } // end sil function 'test_project_box'
+sil [ossa] @test_project_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> (Builtin.Int32, Builtin.Int32) {
+bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+  %2 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %4 = load [trivial] %2 : $*Builtin.Int32
+  %5 = load [trivial] %3 : $*Builtin.Int32
+  %r = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32)
+  destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  return %r : $(Builtin.Int32, Builtin.Int32)
+}
+
+// Make sure we can forward loads to class members from the same class through
+// upcast.
+//
+// CHECK-LABEL: sil [ossa] @load_forward_same_upcasted_base :
+// CHECK: bb0
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_same_upcasted_base'
+sil [ossa] @load_forward_same_upcasted_base : $@convention(thin)(@owned C3) -> () {
+bb0(%0 : @owned $C3):
+  %borrow0 = begin_borrow %0 : $C3
+  %1 = upcast %borrow0 : $C3 to $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  %3 = load [trivial] %2 : $*Int
+  %4 = upcast %borrow0 : $C3 to $C2
+  %5 = ref_element_addr %4 : $C2, #C2.current
+  %6 = load [trivial] %5 : $*Int
+  end_borrow %borrow0 : $C3
+  destroy_value %0 : $C3
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Make sure we can forward loads to class members from the same class through
+// downcast.
+//
+// CHECK-LABEL: sil [ossa] @load_forward_same_downcasted_base :
+// CHECK: bb0
+// CHECK: = load
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forward_same_downcasted_base'
+sil [ossa] @load_forward_same_downcasted_base : $@convention(thin)(@owned C1) -> () {
+bb0(%0 : @owned $C1):
+  %borrow0 = begin_borrow %0 : $C1
+  %1 = unchecked_ref_cast %borrow0 : $C1 to $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  %3 = load [trivial] %2 : $*Int
+  %4 = unchecked_ref_cast %borrow0 : $C1 to $C2
+  %5 = ref_element_addr %4 : $C2, #C2.current
+  %6 = load [trivial] %5 : $*Int
+  end_borrow %borrow0 : $C1
+  destroy_value %0 : $C1
+  %7 = tuple ()
+  return %7 : $()
+}
+
+struct F2 {
+
+}
+sil [ossa] @load_forward_same_downcasted_base1 : $@convention(thin)(@in F) -> () {
+bb0(%0 : $*F):
+  %stk = alloc_stack $F2
+  unchecked_ref_cast_addr F in %0 : $*F to F2 in %stk: $*F2
+  %2 = load [trivial] %stk : $*F2
+  dealloc_stack %stk : $*F2
+  %7 = tuple ()
+  return %7 : $()
+}
+// CHECK-LABEL: sil [ossa] @load_forwarding_self_cycle :
+// CHECK: bb0
+// CHECK-NOT: = load
+// CHECK-LABEL: } // end sil function 'load_forwarding_self_cycle'
+sil [ossa] @load_forwarding_self_cycle : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @total : $*Int32
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to [trivial] %0 : $*Int32
+  %4 = integer_literal $Builtin.Int32, 10
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
+  %6 = alloc_ref $NewHalfOpenRangeGenerator
+  %borrow6 = begin_borrow %6 :  $NewHalfOpenRangeGenerator
+  %7 = upcast %borrow6 : $NewHalfOpenRangeGenerator to $NewRangeGenerator1
+  %8 = ref_element_addr %7 : $NewRangeGenerator1, #NewRangeGenerator1.current
+  store %2 to [trivial] %8 : $*Int32
+  %10 = ref_element_addr %7 : $NewRangeGenerator1, #NewRangeGenerator1.end
+  store %5 to [trivial] %10 : $*Int32
+  %12 = struct_element_addr %8 : $*Int32, #Int32.value
+  %13 = struct_element_addr %10 : $*Int32, #Int32.value
+  %15 = load [trivial] %12 : $*Builtin.Int32
+  %16 = load [trivial] %13 : $*Builtin.Int32
+  %17 = builtin "cmp_eq_Int32"(%15 : $Builtin.Int32, %16 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %17, bb0a, bb1
+
+bb0a:
+  br bb3
+
+bb2(%20 : $Builtin.Int32):
+  %21 = load [trivial] %12 : $*Builtin.Int32
+  %22 = integer_literal $Builtin.Int32, 1
+  %24 = integer_literal $Builtin.Int1, -1
+  %25 = builtin "sadd_with_overflow_Int32"(%20 : $Builtin.Int32, %22 : $Builtin.Int32, %24 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %26 = tuple_extract %25 : $(Builtin.Int32, Builtin.Int1), 0
+  %27 = tuple_extract %25 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %27 : $Builtin.Int1
+  %29 = struct $Int32 (%26 : $Builtin.Int32)
+  store %29 to [trivial] %8 : $*Int32
+  %31 = struct_element_addr %0 : $*Int32, #Int32.value
+  %32 = load [trivial] %31 : $*Builtin.Int32
+  %33 = builtin "sadd_with_overflow_Int32"(%32 : $Builtin.Int32, %21 : $Builtin.Int32, %24 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %34 = tuple_extract %33 : $(Builtin.Int32, Builtin.Int1), 0
+  %35 = tuple_extract %33 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %35 : $Builtin.Int1
+  %37 = struct $Int32 (%34 : $Builtin.Int32)
+  store %37 to [trivial] %0 : $*Int32
+  %39 = load [trivial] %12 : $*Builtin.Int32
+  %40 = load [trivial] %13 : $*Builtin.Int32
+  %41 = builtin "cmp_eq_Int32"(%39 : $Builtin.Int32, %40 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %41, bb2a, bb2b(%39 : $Builtin.Int32)
+
+bb2a:
+  br bb3
+
+bb2b(%39a : $Builtin.Int32):
+  br bb2(%39a : $Builtin.Int32)
+
+// bb1 is after bb2 to make sure the first predecessor of bb2 is not bb2 to
+// expose the bug.
+bb1:
+  br bb2(%15 : $Builtin.Int32)
+
+bb3:
+  end_borrow %borrow6 :   $NewHalfOpenRangeGenerator
+  destroy_value %6 : $NewHalfOpenRangeGenerator
+  %44 = tuple ()
+  return %44 : $()
+}
+
+// Make sure the first load in bb1 is not eliminated as we have
+// this unreachable block which will have a liveout of nil.
+// we make this in the context of a loop, because we want to run an
+// optimistic data flow.
+//
+// CHECK-LABEL: sil [ossa] @load_to_load_loop_with_unreachable_block :
+// CHECK: bb1:
+// CHECK: = load
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'load_to_load_loop_with_unreachable_block'
+sil [ossa] @load_to_load_loop_with_unreachable_block : $@convention(thin) () -> () {
+bb0:
+  %101 = alloc_stack $Int32
+  %102 = alloc_stack $Int32
+  %0 = struct_element_addr %101 : $*Int32, #Int32.value
+  %1 = struct_element_addr %102 : $*Int32, #Int32.value
+  %2 = load [trivial] %0 : $*Builtin.Int32
+  %99 = load [trivial] %1 : $*Builtin.Int32
+  %125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %126 = apply %125(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  %127 = apply %125(%99) : $@convention(thin) (Builtin.Int32) -> ()
+  br bb1
+
+bb20:
+  %44 = load [trivial] %0 : $*Builtin.Int32
+  br bb1
+
+bb1:
+  %4 = load [trivial] %0 : $*Builtin.Int32
+  %5 = integer_literal $Builtin.Int32, 2
+  %1125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %1126 = apply %1125(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  store %5 to [trivial] %0 : $*Builtin.Int32
+  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
+  %6 = load [trivial] %0 : $*Builtin.Int32
+  %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  %7 = load [trivial] %0 : $*Builtin.Int32
+  %111125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  %111126 = apply %111125(%7) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %102 : $*Int32
+  dealloc_stack %101 : $*Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @redundant_load_over_intermediate_release_with_epilogue_release : $@convention(thin) (@owned AB) -> () {
+// CHECK: [[AD:%.*]] = ref_element_addr
+// CHECK: [[AD2:%.*]] = load [trivial] [[AD]]
+// CHECK-NOT: [[AD3:%.*]] = load [trivial] [[AD]]
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'redundant_load_over_intermediate_release_with_epilogue_release'
+sil hidden [ossa] @redundant_load_over_intermediate_release_with_epilogue_release : $@convention(thin) (@owned AB) -> () {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %1 = ref_element_addr %borrow0 : $AB, #AB.value
+  %2 = load [trivial] %1 : $*Int
+  %3 = load [trivial] %1 : $*Int
+  end_borrow %borrow0 : $AB
+  destroy_value %0 : $AB
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @redundant_load_over_intermediate_release_without_epilogue_release : $@convention(thin) (@owned AB) -> () {
+// CHECK: [[AD:%.*]] = ref_element_addr
+// CHECK: [[AD2:%.*]] = load [trivial] [[AD]]
+// CHECK-NOT: [[AD3:%.*]] = load [trivial] [[AD]]
+// CHECK-LABEL: } // end sil function 'redundant_load_over_intermediate_release_without_epilogue_release'
+sil hidden [ossa] @redundant_load_over_intermediate_release_without_epilogue_release : $@convention(thin) (@owned AB) -> () {
+bb0(%0 : @owned $AB):
+  %borrow0 = begin_borrow %0 : $AB
+  %1 = ref_element_addr %borrow0 : $AB, #AB.value
+  %2 = load [trivial] %1 : $*Int
+  %3 = load [trivial] %1 : $*Int
+  end_borrow %borrow0 : $AB
+  destroy_value %0 : $AB
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Make sure we have a deterministic forward ordering and also both loads are forwarded.
+//
+// CHECK-LABEL: sil [ossa] @load_store_deterministic_forwarding :
+// CHECK: bb0
+// CHECK-NEXT: [[VAL:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: store
+// CHECK-NEXT: store
+// CHECK-LABEL: } // end sil function 'load_store_deterministic_forwarding'
+sil [ossa] @load_store_deterministic_forwarding : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = integer_literal $Builtin.Int64, 0
+  store %2 to [trivial] %0 : $*Builtin.Int64
+  %3 = load [trivial] %0 : $*Builtin.Int64
+  store %3 to [trivial] %1: $*Builtin.Int64
+  %4 = load [trivial] %1 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @redundant_load_mark_dependence :
+// CHECK: load
+// CHECK-NOT: load
+// CHECK-LABEL: } // end sil function 'redundant_load_mark_dependence'
+sil [ossa] @redundant_load_mark_dependence : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
+  %4 = load [trivial] %2 : $*Builtin.Int64
+  %5 = load [trivial] %2 : $*Builtin.Int64
+  %6 = tuple(%4 : $Builtin.Int64, %5 : $Builtin.Int64)
+  return %6 : $(Builtin.Int64, Builtin.Int64)
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash_on_index_addr_projection :
+// CHECK-LABEL: } // end sil function 'dont_crash_on_index_addr_projection'
+sil [ossa] @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> (Int, Int, Int, Int) {
+bb0(%0 : $Builtin.RawPointer):
+  // Negative (valid constant index)
+  %3 = integer_literal $Builtin.Word, 4294967295 // '0xffffffff'
+  %4 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
+  %5 = index_addr %4 : $*Int, %3 : $Builtin.Word
+  %6 = load [trivial] %5 : $*Int
+  // TailIndex (invalid constant index)
+  %7 = integer_literal $Builtin.Word, 2147483647 // '0x7fffffff'
+  %8 = index_addr %4 : $*Int, %7 : $Builtin.Word
+  %9 = load [trivial] %8 : $*Int
+  // UnknownOffset (valid index)
+  %10 = integer_literal $Builtin.Word, 3221225472 // '0xC0000000'
+  %11 = index_addr %4 : $*Int, %10 : $Builtin.Word
+  %12 = load [trivial] %11 : $*Int
+  // Root (unused/invalid index))
+  %13 = integer_literal $Builtin.Word, 2147483648 // '0x80000000'
+  %14 = index_addr %4 : $*Int, %13 : $Builtin.Word
+  %15 = load [trivial] %14 : $*Int
+  %99 = tuple (%6 : $Int, %9 : $Int, %12 : $Int, %15 : $Int)
+  return %99 : $(Int, Int, Int, Int)
+}
+
+sil [ossa] @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
+
+// Make sure that the store is forwarded to the load, ie. the load is
+// eliminated. That's correct as the stored value can't be changed by the
+// callee as it's passed with @in_guaranteed.
+sil @test_rle_in_guaranteed_sink : $@convention(thin) (Int) -> ()
+sil @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_rle_in_guaranteed_entry :
+sil [ossa] @test_rle_in_guaranteed_entry : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %value_raw = integer_literal $Builtin.Int64, 42
+  // CHECK: [[VAL:%.*]] = struct $Int
+  %value = struct $Int (%value_raw : $Builtin.Int64)
+  store %value to [trivial] %0 : $*Int
+
+  %f_callee = function_ref @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+  %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+
+  // CHECK-NOT: load
+  %value_again = load [trivial] %0 : $*Int
+
+  %f_sink = function_ref @test_rle_in_guaranteed_sink : $@convention(thin) (Int) -> ()
+  // CHECK: ([[VAL]])
+  %r2 = apply %f_sink(%value_again) : $@convention(thin) (Int) -> ()
+
+  %3 = tuple()
+  return %3 : $()
+}
+// CHECK-LABEL: } // end sil function 'test_rle_in_guaranteed_entry'
+
+// Check that begin_access, end_access, strong_release, set_deallocating, and dealloc_ref don't prevent optimization.
+// CHECK-LABEL: ignore_read_write :
+// CHECK: bb0
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'ignore_read_write'
+sil [ossa] @ignore_read_write : $@convention(thin) () -> Int32 {
+bb0:
+  %1 = alloc_ref [stack] $AX
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %borrow1 = begin_borrow %1 : $AX
+  %4 = ref_element_addr %borrow1 : $AX, #AX.current
+  store %3 to [trivial] %4 : $*Int32
+  %5 = load [trivial] %4 : $*Int32
+  end_borrow %borrow1 : $AX
+  set_deallocating %1 : $AX
+  dealloc_ref [stack] %1 : $AX
+  return %5 : $Int32
+}
+

@@ -384,6 +384,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   } else {
     P.addRedundantLoadElimination();
   }
+  // Optimize copies created during RLE.
+  P.addSemanticARCOpts();
 
   P.addCOWOpts();
   P.addPerformanceConstantPropagation();
