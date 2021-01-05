@@ -716,6 +716,19 @@ ControlFlowTests.test("Loops") {
   expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
   expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
   expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
+
+  // SR13945: Loops in methods caused a runtime segfault.
+  struct SR13945 {
+    func loopInMethod(_ x: Float) -> Float {
+      var result = x
+      for _ in 0..<2 {
+        result *= result
+      }
+      return result
+    }
+  }
+  expectEqual((0, 0), valueWithGradient(at: 0, in: { SR13945().loopInMethod($0) }))
+  expectEqual((1, 4), valueWithGradient(at: 1, in: { SR13945().loopInMethod($0) }))
 }
 
 ControlFlowTests.test("BranchingCastInstructions") {

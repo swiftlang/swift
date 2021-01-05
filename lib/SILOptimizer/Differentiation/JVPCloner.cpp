@@ -1699,7 +1699,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *diffGenericEnv =
       diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
   auto diffType = SILFunctionType::get(
-      diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+      diffGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
