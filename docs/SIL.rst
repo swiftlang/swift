@@ -2334,11 +2334,11 @@ their lifetimes ended along paths that end in program terminating
 blocks. Operationally, this implies that:
 
 * All SIL values must have exactly one lifetime ending use on all paths that
-terminate in a `return`_ or `throw`_. In contrast, a SIL value does not need to
-have a lifetime ending use along paths that end in an `unreachable`_.
+  terminate in a `return`_ or `throw`_. In contrast, a SIL value does not need to
+  have a lifetime ending use along paths that end in an `unreachable`_.
 
 * `end_borrow`_ and `destroy_value`_ are redundent, albeit legal, in blocks
-where all paths through the block end in an `unreachable`_.
+  where all paths through the block end in an `unreachable`_.
 
 Consider the following legal SIL where we leak ``%0`` in blocks prefixed with
 ``bbDeadEndBlock`` and consume it in ``bb2``::
