@@ -25,6 +25,7 @@
 #include "llvm/Target/TargetMachine.h"
 
 namespace swift {
+class FileUnit;
 class SourceFile;
 class IRGenOptions;
 class SILModule;
@@ -34,6 +35,10 @@ class TBDGenDescriptor;
 
 namespace irgen {
   class IRGenModule;
+};
+
+namespace Lowering {
+  class TypeConverter;
 };
 
 }; // namespace swift

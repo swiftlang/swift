@@ -23,6 +23,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"

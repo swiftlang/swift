@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "closure-lifetime-fixup"
 
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
