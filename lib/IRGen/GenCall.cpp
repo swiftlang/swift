@@ -150,10 +150,11 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     addTaskContinuationFunction();
   }
 
-  //   SwiftError *errorResult;
+  //   SwiftError **errorResult;
   auto errorCanType = IGM.Context.getExceptionType();
   auto errorType = SILType::getPrimitiveObjectType(errorCanType);
-  auto &errorTypeInfo = IGM.getTypeInfoForLowered(errorCanType);
+  auto &errorTypeInfo =
+      IGM.getTypeInfoForLowered(CanInOutType::get(errorCanType));
   typeInfos.push_back(&errorTypeInfo);
   valTypes.push_back(errorType);
 
@@ -2320,7 +2321,7 @@ public:
 
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
-  Address getCalleeErrorSlot(SILType errorType) override {
+  Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
     return IGF.getCalleeErrorResultSlot(errorType);
   };
 };
@@ -2378,10 +2379,10 @@ public:
     context = layout.emitCastTo(IGF, contextBuffer.getAddress());
     if (layout.canHaveError()) {
       auto fieldLayout = layout.getErrorLayout();
-      auto addr = fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto &ti = fieldLayout.getType();
-      auto nullError = llvm::Constant::getNullValue(ti.getStorageType());
-      IGF.Builder.CreateStore(nullError, addr);
+      auto ptrToAddr =
+          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto errorSlot = IGF.getAsyncCalleeErrorResultSlot(layout.getErrorType());
+      IGF.Builder.CreateStore(errorSlot.getAddress(), ptrToAddr);
     }
   }
   void end() override {
@@ -2504,11 +2505,18 @@ public:
       loadValue(fieldLayout, out);
     }
   }
-  Address getCalleeErrorSlot(SILType errorType) override {
-    auto layout = getAsyncContextLayout();
-    auto errorLayout = layout.getErrorLayout();
-    auto address = errorLayout.project(IGF, context, /*offsets*/ llvm::None);
-    return address;
+  Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
+    if (isCalleeAsync) {
+      auto layout = getAsyncContextLayout();
+      auto errorLayout = layout.getErrorLayout();
+      auto pointerToAddress =
+          errorLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto load = IGF.Builder.CreateLoad(pointerToAddress);
+      auto address = Address(load, IGF.IGM.getPointerAlignment());
+      return address;
+    } else {
+      return IGF.getCalleeErrorResultSlot(errorType);
+    }
   };
 
   llvm::CallInst *createCall(const FunctionPointer &fn,
@@ -3931,42 +3939,60 @@ Explosion IRGenFunction::collectParameters() {
   return params;
 }
 
+Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync) {
+  auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
+
+  IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
+  builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
+
+  // Create the alloca.  We don't use allocateStack because we're
+  // not allocating this in stack order.
+  auto addr = createAlloca(errorTI.getStorageType(),
+                           errorTI.getFixedAlignment(), "swifterror");
+
+  // Only add the swifterror attribute on ABIs that pass it in a register.
+  // We create a shadow stack location of the swifterror parameter for the
+  // debugger on platforms that pass swifterror by reference and so we can't
+  // mark the parameter with a swifterror attribute for these.
+  // The slot for async callees cannot be annotated swifterror because those
+  // errors are never passed in registers but rather are always passed
+  // indirectly in the async context.
+  if (IGM.IsSwiftErrorInRegister && !isAsync)
+    cast<llvm::AllocaInst>(addr.getAddress())->setSwiftError(true);
+
+  // Initialize at the alloca point.
+  auto nullError = llvm::ConstantPointerNull::get(
+      cast<llvm::PointerType>(errorTI.getStorageType()));
+  builder.CreateStore(nullError, addr);
+
+  return addr;
+}
+
 /// Fetch the error result slot.
 Address IRGenFunction::getCalleeErrorResultSlot(SILType errorType) {
   if (!CalleeErrorResultSlot) {
-    auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
-
-    IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
-    builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
-
-    // Create the alloca.  We don't use allocateStack because we're
-    // not allocating this in stack order.
-    auto addr = createAlloca(errorTI.getStorageType(),
-                             errorTI.getFixedAlignment(),
-                             "swifterror");
-
-    // Only add the swifterror attribute on ABIs that pass it in a register.
-    // We create a shadow stack location of the swifterror parameter for the
-    // debugger on platforms that pass swifterror by reference and so we can't
-    // mark the parameter with a swifterror attribute for these.
-    if (IGM.IsSwiftErrorInRegister)
-      cast<llvm::AllocaInst>(addr.getAddress())->setSwiftError(true);
-
-    // Initialize at the alloca point.
-    auto nullError = llvm::ConstantPointerNull::get(
-                            cast<llvm::PointerType>(errorTI.getStorageType()));
-    builder.CreateStore(nullError, addr);
-
-    CalleeErrorResultSlot = addr.getAddress();
+    CalleeErrorResultSlot =
+        createErrorResultSlot(errorType, /*isAsync=*/false).getAddress();
   }
   return Address(CalleeErrorResultSlot, IGM.getPointerAlignment());
+}
+
+/// Fetch the error result slot.
+Address IRGenFunction::getAsyncCalleeErrorResultSlot(SILType errorType) {
+  assert(isAsync() &&
+         "throwing async functions must be called from async functions");
+  if (!AsyncCalleeErrorResultSlot) {
+    AsyncCalleeErrorResultSlot =
+        createErrorResultSlot(errorType, /*isAsync=*/true).getAddress();
+  }
+  return Address(AsyncCalleeErrorResultSlot, IGM.getPointerAlignment());
 }
 
 /// Fetch the error result slot received from the caller.
 Address IRGenFunction::getCallerErrorResultSlot() {
   assert(CallerErrorResultSlot && "no error result slot!");
   assert(isa<llvm::Argument>(CallerErrorResultSlot) && !isAsync() ||
-         isa<llvm::GetElementPtrInst>(CallerErrorResultSlot) && isAsync() &&
+         isa<llvm::LoadInst>(CallerErrorResultSlot) && isAsync() &&
              "error result slot is local!");
   return Address(CallerErrorResultSlot, IGM.getPointerAlignment());
 }

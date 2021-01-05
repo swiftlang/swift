@@ -14,8 +14,8 @@ final actor MyActor {
 // CHECK-LABEL: define{{.*}} void @test_simple(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
 // CHECK: [[TASK_LOC:%[0-9]+]] = alloca %swift.task*
 // CHECK: [[CTX:%[0-9]+]] = bitcast %swift.context* %2
-// CHECK-32: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, %swift.error*, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 5
-// CHECK-64: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, [4 x i8], %swift.error*, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 6
+// CHECK-32: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, %swift.error**, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 5
+// CHECK-64: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, [4 x i8], %swift.error**, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 6
 // CHECK: [[ACTOR:%[0-9]+]] = load %T4test7MyActorC*, %T4test7MyActorC** [[ACTOR_ADDR]]
 // CHECK: [[RESUME:%[0-9]+]] = call i8* @llvm.coro.async.resume()
 // CHECK: [[TASK:%[0-9]+]] = load %swift.task*, %swift.task** [[TASK_LOC]]
