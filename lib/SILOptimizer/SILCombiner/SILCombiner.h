@@ -84,6 +84,9 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
+  /// Centralized InstModCallback that we use for certain utility methods.
+  InstModCallbacks instModCallbacks;
+
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
@@ -103,7 +106,18 @@ public:
               replaceInstUsesWith(*I, V);
             },
             /* EraseAction */
-            [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        instModCallbacks(
+            [&](SILInstruction *instToDelete) {
+              eraseInstFromFunction(*instToDelete);
+            },
+            [&](SILInstruction *newlyCreatedInst) {
+              Worklist.add(newlyCreatedInst);
+            },
+            [&](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              Worklist.add(use->getUser());
+            }) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -311,14 +325,7 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
-  InstModCallbacks getInstModCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *DeadInst) { eraseInstFromFunction(*DeadInst); },
-        [this](SILInstruction *NewInst) { Worklist.add(NewInst); },
-        [this](SILValue oldValue, SILValue newValue) {
-          replaceValueUsesWith(oldValue, newValue);
-        });
-  }
+  InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
 
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>

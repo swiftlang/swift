@@ -330,41 +330,32 @@ class InstModCallbacks {
   /// Default implementation is a no-op, but we still mark madeChange.
   std::function<void(SILInstruction *newlyCreatedInst)> createdNewInstFunc;
 
-  /// A function that first replaces all uses of oldValue with uses of newValue.
+  /// A function sets the value in \p use to be \p newValue.
   ///
-  /// Default implementation just calls oldValue->replaceAllUsesWith(newValue);
-  std::function<void(SILValue oldValue, SILValue newValue)>
-      replaceValueUsesWithFunc;
-
-  /// A function that first replaces all uses of oldValue with uses of newValue
-  /// and then erases oldValue.
-  ///
-  /// Default implementation just calls replaceValueUsesWithFunc and then
-  /// deleteInstFunc.
-  std::function<void(SingleValueInstruction *oldValue, SILValue newValue)>
-      eraseAndRAUWSingleValueInstFunc;
+  /// Default implementation just calls use->set(newValue).
+  std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
   /// A boolean that tracks if any of our callbacks were ever called.
-  bool madeChange = false;
+  bool wereAnyCallbacksInvoked = false;
 
 public:
   InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc)
       : deleteInstFunc(deleteInstFunc) {}
 
   InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(createdNewInstFunc) createdNewInstFunc,
-                   decltype(replaceValueUsesWithFunc) replaceValueUsesWithFunc)
-      : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc),
-        replaceValueUsesWithFunc(replaceValueUsesWithFunc) {}
+                   decltype(createdNewInstFunc) createdNewInstFunc)
+      : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc) {
+  }
 
-  InstModCallbacks(
-      decltype(deleteInstFunc) deleteInstFunc,
-      decltype(createdNewInstFunc) createdNewInstFunc,
-      decltype(replaceValueUsesWithFunc) replaceValueUsesWithFunc,
-      decltype(eraseAndRAUWSingleValueInstFunc) eraseAndRAUWSingleValueInstFunc)
+  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
+                   decltype(setUseValueFunc) setUseValueFunc)
+      : deleteInstFunc(deleteInstFunc), setUseValueFunc(setUseValueFunc) {}
+
+  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
+                   decltype(createdNewInstFunc) createdNewInstFunc,
+                   decltype(setUseValueFunc) setUseValueFunc)
       : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc),
-        replaceValueUsesWithFunc(replaceValueUsesWithFunc),
-        eraseAndRAUWSingleValueInstFunc(eraseAndRAUWSingleValueInstFunc) {}
+        setUseValueFunc(setUseValueFunc) {}
 
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
@@ -372,35 +363,42 @@ public:
   InstModCallbacks(InstModCallbacks &&) = default;
 
   void deleteInst(SILInstruction *instToDelete) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
     if (deleteInstFunc)
       return deleteInstFunc(instToDelete);
     instToDelete->eraseFromParent();
   }
 
   void createdNewInst(SILInstruction *newlyCreatedInst) {
-    madeChange = true;
+    wereAnyCallbacksInvoked = true;
     if (createdNewInstFunc)
       createdNewInstFunc(newlyCreatedInst);
   }
 
+  void setUseValue(Operand *use, SILValue newValue) {
+    wereAnyCallbacksInvoked = true;
+    if (setUseValueFunc)
+      return setUseValueFunc(use, newValue);
+    use->set(newValue);
+  }
+
   void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
-    madeChange = true;
-    if (replaceValueUsesWithFunc)
-      return replaceValueUsesWithFunc(oldValue, newValue);
-    oldValue->replaceAllUsesWith(newValue);
+    wereAnyCallbacksInvoked = true;
+
+    while (!oldValue->use_empty()) {
+      auto *use = *oldValue->use_begin();
+      setUseValue(use, newValue);
+    }
   }
 
   void eraseAndRAUWSingleValueInst(SingleValueInstruction *oldInst,
                                    SILValue newValue) {
-    madeChange = true;
-    if (eraseAndRAUWSingleValueInstFunc)
-      return eraseAndRAUWSingleValueInstFunc(oldInst, newValue);
+    wereAnyCallbacksInvoked = true;
     replaceValueUsesWith(oldInst, newValue);
     deleteInst(oldInst);
   }
 
-  bool getMadeChange() const { return madeChange; }
+  bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
 };
 
 /// Get all consumed arguments of a partial_apply.

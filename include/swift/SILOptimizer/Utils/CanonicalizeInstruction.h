@@ -49,8 +49,8 @@ struct CanonicalizeInstruction {
         callbacks(
             [&](SILInstruction *toDelete) { killInstruction(toDelete); },
             [&](SILInstruction *newInst) { notifyNewInstruction(newInst); },
-            [&](SILValue oldValue, SILValue newValue) {
-              oldValue->replaceAllUsesWith(newValue);
+            [&](Operand *use, SILValue newValue) {
+              use->set(newValue);
               notifyHasNewUsers(newValue);
             }) {
 #ifndef NDEBUG

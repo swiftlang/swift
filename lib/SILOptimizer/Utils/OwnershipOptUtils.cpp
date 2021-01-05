@@ -434,7 +434,7 @@ void OwnershipRAUWUtility::eliminateReborrowsOfRecursiveBorrows(
 
     // Then set our borrowing operand to take our innerBorrow instead of value
     // (whose lifetime we just ended).
-    borrowingOperand->set(innerBorrow);
+    callbacks.setUseValue(*borrowingOperand, innerBorrow);
     // Add our outer end borrow as a use point to make sure that we extend our
     // base value to this point.
     usePoints.push_back(&outerEndBorrow->getAllOperands()[0]);
@@ -500,7 +500,7 @@ void OwnershipRAUWUtility::rewriteReborrows(
     callbacks.createdNewInst(innerBorrow);
     callbacks.createdNewInst(outerEndBorrow);
 
-    reborrow->set(innerBorrow);
+    callbacks.setUseValue(*reborrow, innerBorrow);
 
     auto *borrowedArg =
         const_cast<SILPhiArgument *>(bi->getArgForOperand(reborrow.op));
@@ -570,7 +570,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
           auto *newInst = builder.createUncheckedOwnershipConversion(
               ti->getLoc(), use->get(), OwnershipKind::Unowned);
           callbacks.createdNewInst(newInst);
-          use->set(newInst);
+          callbacks.setUseValue(use, newInst);
         }
       }
     }
@@ -602,7 +602,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
           auto *newInst = builder.createUncheckedOwnershipConversion(
               ti->getLoc(), use->get(), OwnershipKind::Unowned);
           callbacks.createdNewInst(newInst);
-          use->set(newInst);
+          callbacks.setUseValue(use, newInst);
         }
       }
     }
