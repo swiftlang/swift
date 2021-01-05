@@ -19,6 +19,7 @@
 
 #define DEBUG_TYPE "sil-opt-remark-gen"
 
+#include "swift/Basic/Defer.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"

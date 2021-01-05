@@ -20,6 +20,7 @@
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Fingerprint.h"
+#include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {

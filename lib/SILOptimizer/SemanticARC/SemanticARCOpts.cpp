@@ -16,6 +16,7 @@
 #include "SemanticARCOptVisitor.h"
 #include "Transforms.h"
 
+#include "swift/Basic/Defer.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 #include "llvm/Support/CommandLine.h"

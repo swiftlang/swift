@@ -22,6 +22,7 @@
 
 #include "OwnershipPhiOperand.h"
 #include "SemanticARCOptVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
