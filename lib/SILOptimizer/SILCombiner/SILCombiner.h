@@ -220,8 +220,12 @@ public:
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
-  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
+
+  // NOTE: The load optimized in this method is a load [trivial].
+  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
+
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
