@@ -147,6 +147,9 @@ static EnumElementDecl *getInjectEnumCaseTo(SILValue Addr) {
 }
 
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
+  if (SEAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Convert switch_enum_addr -> br
   // if the only thing which writes to the address is an inject_enum_addr.
   SILValue Addr = SEAI->getOperand();
@@ -169,44 +172,15 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   //     ->
   //   %value = load %ptr
   //   switch_enum %value
-  //
-  // If we are using ownership, we perform a load_borrow right before the new
-  // switch_enum and end the borrow scope right afterwards.
-  Builder.setCurrentDebugScope(SEAI->getDebugScope());
-  SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
-  for (int i : range(SEAI->getNumCases())) {
+  SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+  for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
     Cases.push_back(SEAI->getCase(i));
-  }
 
+  Builder.setCurrentDebugScope(SEAI->getDebugScope());
   SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : nullptr;
-  SILValue EnumVal = Builder.emitLoadBorrowOperation(SEAI->getLoc(), Addr);
-  auto *sei = Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
-
-  if (Builder.hasOwnership()) {
-    for (int i : range(sei->getNumCases())) {
-      auto c = sei->getCase(i);
-      if (c.first->hasAssociatedValues()) {
-        auto eltType = Addr->getType().getEnumElementType(
-            c.first, Builder.getModule(), Builder.getTypeExpansionContext());
-        eltType = eltType.getObjectType();
-        if (eltType.isTrivial(Builder.getFunction())) {
-          c.second->createPhiArgument(eltType, OwnershipKind::None);
-        } else {
-          c.second->createPhiArgument(eltType, OwnershipKind::Guaranteed);
-        }
-      }
-      Builder.setInsertionPoint(c.second->front().getIterator());
-      Builder.emitEndBorrowOperation(SEAI->getLoc(), EnumVal);
-    }
-
-    if (auto defaultBlock = sei->getDefaultBBOrNull()) {
-      defaultBlock.get()->createPhiArgument(EnumVal->getType(),
-                                            OwnershipKind::Guaranteed);
-      Builder.setInsertionPoint(defaultBlock.get()->front().getIterator());
-      Builder.emitEndBorrowOperation(SEAI->getLoc(), EnumVal);
-    }
-  }
-
+  LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), Addr,
+                                         LoadOwnershipQualifier::Unqualified);
+  Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
   return eraseInstFromFunction(*SEAI);
 }
 
