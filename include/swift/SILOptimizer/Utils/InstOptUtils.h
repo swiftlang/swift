@@ -310,44 +310,95 @@ bool tryCheckedCastBrJumpThreading(
 
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
-struct InstModCallbacks {
-  static const std::function<void(SILInstruction *)> defaultDeleteInst;
-  static const std::function<void(SILInstruction *)> defaultCreatedNewInst;
-  static const std::function<void(SILValue, SILValue)> defaultReplaceValueUsesWith;
-  static const std::function<void(SingleValueInstruction *, SILValue)>
-      defaultEraseAndRAUWSingleValueInst;
+///
+/// PERFORMANCE NOTES: This code can be used in loops, so we want to make sure
+/// to not have overhead when the user does not specify a callback. To do that
+/// instead of defining a "default" std::function, we represent the "default"
+/// functions as nullptr. Then, in the helper function trampoline that actually
+/// gets called, we check if we have a nullptr and if we do, we perform the
+/// default operation inline. What is nice about this from a perf perspective is
+/// that in a loop this property should predict well since you have a single
+/// branch that is going to go the same way everytime.
+class InstModCallbacks {
+  /// A function that takes in an instruction and deletes the inst.
+  ///
+  /// Default implementation is instToDelete->eraseFromParent();
+  std::function<void(SILInstruction *instToDelete)> deleteInstFunc;
 
-  std::function<void(SILInstruction *)> deleteInst =
-      InstModCallbacks::defaultDeleteInst;
-  std::function<void(SILInstruction *)> createdNewInst =
-      InstModCallbacks::defaultCreatedNewInst;
-  std::function<void(SILValue, SILValue)>
-      replaceValueUsesWith =
-          InstModCallbacks::defaultReplaceValueUsesWith;
-  std::function<void(SingleValueInstruction *, SILValue)>
-      eraseAndRAUWSingleValueInst =
-          InstModCallbacks::defaultEraseAndRAUWSingleValueInst;
+  /// A function that is called to notify that a new function was created.
+  ///
+  /// Default implementation is a no-op, but we still mark madeChange.
+  std::function<void(SILInstruction *newlyCreatedInst)> createdNewInstFunc;
 
-  InstModCallbacks(decltype(deleteInst) deleteInst,
-                   decltype(createdNewInst) createdNewInst,
-                   decltype(replaceValueUsesWith) replaceValueUsesWith)
-      : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith),
-        eraseAndRAUWSingleValueInst(
-            InstModCallbacks::defaultEraseAndRAUWSingleValueInst) {}
+  /// A function sets the value in \p use to be \p newValue.
+  ///
+  /// Default implementation just calls use->set(newValue).
+  std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
-  InstModCallbacks(
-      decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
-      decltype(replaceValueUsesWith) replaceValueUsesWith,
-      decltype(eraseAndRAUWSingleValueInst) eraseAndRAUWSingleValueInst)
-      : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith),
-        eraseAndRAUWSingleValueInst(eraseAndRAUWSingleValueInst) {}
+  /// A boolean that tracks if any of our callbacks were ever called.
+  bool wereAnyCallbacksInvoked = false;
+
+public:
+  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc)
+      : deleteInstFunc(deleteInstFunc) {}
+
+  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
+                   decltype(createdNewInstFunc) createdNewInstFunc)
+      : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc) {
+  }
+
+  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
+                   decltype(setUseValueFunc) setUseValueFunc)
+      : deleteInstFunc(deleteInstFunc), setUseValueFunc(setUseValueFunc) {}
+
+  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
+                   decltype(createdNewInstFunc) createdNewInstFunc,
+                   decltype(setUseValueFunc) setUseValueFunc)
+      : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc),
+        setUseValueFunc(setUseValueFunc) {}
 
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
   InstModCallbacks(InstModCallbacks &&) = default;
+
+  void deleteInst(SILInstruction *instToDelete) {
+    wereAnyCallbacksInvoked = true;
+    if (deleteInstFunc)
+      return deleteInstFunc(instToDelete);
+    instToDelete->eraseFromParent();
+  }
+
+  void createdNewInst(SILInstruction *newlyCreatedInst) {
+    wereAnyCallbacksInvoked = true;
+    if (createdNewInstFunc)
+      createdNewInstFunc(newlyCreatedInst);
+  }
+
+  void setUseValue(Operand *use, SILValue newValue) {
+    wereAnyCallbacksInvoked = true;
+    if (setUseValueFunc)
+      return setUseValueFunc(use, newValue);
+    use->set(newValue);
+  }
+
+  void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+    wereAnyCallbacksInvoked = true;
+
+    while (!oldValue->use_empty()) {
+      auto *use = *oldValue->use_begin();
+      setUseValue(use, newValue);
+    }
+  }
+
+  void eraseAndRAUWSingleValueInst(SingleValueInstruction *oldInst,
+                                   SILValue newValue) {
+    wereAnyCallbacksInvoked = true;
+    replaceValueUsesWith(oldInst, newValue);
+    deleteInst(oldInst);
+  }
+
+  bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
 };
 
 /// Get all consumed arguments of a partial_apply.

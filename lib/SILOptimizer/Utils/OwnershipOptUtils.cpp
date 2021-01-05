@@ -33,40 +33,6 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                           Low Level RAUW Utility
-//===----------------------------------------------------------------------===//
-
-static SILBasicBlock::iterator
-replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
-                            std::function<void(SILInstruction *)> eraseNotify) {
-  assert(svi != newValue && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!svi->use_empty()) {
-    Operand *use = *svi->use_begin();
-    SILInstruction *user = use->getUser();
-    // Erase the end of scope marker.
-    if (isEndOfScopeMarker(user)) {
-      if (&*nextii == user)
-        ++nextii;
-      if (eraseNotify)
-        eraseNotify(user);
-      else
-        user->eraseFromParent();
-      continue;
-    }
-    use->set(newValue);
-  }
-  if (eraseNotify)
-    eraseNotify(svi);
-  else
-    svi->eraseFromParent();
-
-  return nextii;
-}
-
-//===----------------------------------------------------------------------===//
 //                        Ownership Lifetime Extender
 //===----------------------------------------------------------------------===//
 
@@ -119,8 +85,9 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForLifetimeEndingRAUW(
     SILBuilderWithScope builder(newValInsertPt);
     copy = builder.createCopyValue(newValInsertPt->getLoc(), value);
   }
-  if (ctx.newInstNotify)
-    ctx.newInstNotify(copy);
+
+  auto &callbacks = ctx.callbacks;
+  callbacks.createdNewInst(copy);
 
   auto *result = copy;
   ctx.jointPostDomSetComputer.findJointPostDominatingSet(
@@ -135,8 +102,7 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForLifetimeEndingRAUW(
         auto front = loopBlock->begin();
         SILBuilderWithScope newBuilder(front);
         result = newBuilder.createCopyValue(front->getLoc(), copy);
-        if (ctx.newInstNotify)
-          ctx.newInstNotify(result);
+        callbacks.createdNewInst(result);
 
         llvm_unreachable("Should never visit this!");
       },
@@ -145,8 +111,7 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForLifetimeEndingRAUW(
         auto front = postDomBlock->begin();
         SILBuilderWithScope newBuilder(front);
         auto *dvi = newBuilder.createDestroyValue(front->getLoc(), copy);
-        if (ctx.newInstNotify)
-          ctx.newInstNotify(dvi);
+        callbacks.createdNewInst(dvi);
       });
   return result;
 }
@@ -167,8 +132,9 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForNonLifetimeEndingRAUW(
     SILBuilderWithScope builder(newValInsertPt);
     copy = builder.createCopyValue(newValInsertPt->getLoc(), value);
   }
-  if (ctx.newInstNotify)
-    ctx.newInstNotify(copy);
+
+  auto &callbacks = ctx.callbacks;
+  callbacks.createdNewInst(copy);
 
   auto opRange = makeUserRange(range);
   ValueLifetimeAnalysis lifetimeAnalysis(copy, opRange);
@@ -181,8 +147,7 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForNonLifetimeEndingRAUW(
     auto *insertPt = frontier.pop_back_val();
     SILBuilderWithScope frontierBuilder(insertPt);
     auto *dvi = frontierBuilder.createDestroyValue(insertPt->getLoc(), copy);
-    if (ctx.newInstNotify)
-      ctx.newInstNotify(dvi);
+    callbacks.createdNewInst(dvi);
   }
 
   return copy;
@@ -218,6 +183,7 @@ OwnershipLifetimeExtender::copyBorrowAndExtendForRAUW(SILValue newValue,
       frontier, ValueLifetimeAnalysis::DontModifyCFG, &ctx.deBlocks);
   assert(result);
 
+  auto &callbacks = ctx.callbacks;
   while (!frontier.empty()) {
     auto *insertPt = frontier.pop_back_val();
     SILBuilderWithScope frontierBuilder(insertPt);
@@ -227,10 +193,8 @@ OwnershipLifetimeExtender::copyBorrowAndExtendForRAUW(SILValue newValue,
         insertPt->getLoc().getSourceLoc());
     auto *ebi = frontierBuilder.createEndBorrow(loc, borrow);
     auto *dvi = frontierBuilder.createDestroyValue(loc, copy);
-    if (ctx.newInstNotify) {
-      ctx.newInstNotify(ebi);
-      ctx.newInstNotify(dvi);
-    }
+    callbacks.createdNewInst(ebi);
+    callbacks.createdNewInst(dvi);
   }
 
   return borrow;
@@ -262,9 +226,9 @@ OwnershipLifetimeExtender::copyBorrowAndExtendForLifetimeEndingRAUW(
   assert(oldValInsertPt);
   auto *borrow = SILBuilderWithScope(oldValInsertPt)
                      .createBeginBorrow(oldValInsertPt->getLoc(), copy);
-  if (ctx.newInstNotify) {
-    ctx.newInstNotify(borrow);
-  }
+
+  auto &callbacks = ctx.callbacks;
+  callbacks.createdNewInst(borrow);
 
   ValueLifetimeAnalysis lifetimeAnalysis(copy, oldValue->getUses());
   decltype(lifetimeAnalysis)::Frontier frontier;
@@ -276,9 +240,7 @@ OwnershipLifetimeExtender::copyBorrowAndExtendForLifetimeEndingRAUW(
     auto *insertPt = frontier.pop_back_val();
     SILBuilderWithScope frontierBuilder(insertPt);
     auto *dvi = frontierBuilder.createDestroyValue(insertPt->getLoc(), copy);
-    if (ctx.newInstNotify) {
-      ctx.newInstNotify(dvi);
-    }
+    callbacks.createdNewInst(dvi);
   }
 
   return borrow;
@@ -315,21 +277,13 @@ struct OwnershipRAUWUtility {
 
   OwnershipLifetimeExtender getLifetimeExtender() { return {ctx}; }
 
-  InstModCallbacks getCallbacks() const {
-    return InstModCallbacks(
-        ctx.eraseNotify, ctx.newInstNotify,
-        [](SILValue, SILValue) { llvm_unreachable("unhandled"); },
-        [](SingleValueInstruction *, SILValue) {
-          llvm_unreachable("unhandled");
-        });
-  }
+  const InstModCallbacks &getCallbacks() const { return ctx.callbacks; }
 };
 
 } // anonymous namespace
 
-static void cleanupOperandsBeforeDeletion(
-    SILInstruction *oldValue,
-    std::function<void(SILInstruction *)> newNotifyInst) {
+static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
+                                          InstModCallbacks &callbacks) {
   SILBuilderWithScope builder(oldValue);
   for (auto &op : oldValue->getAllOperands()) {
     if (!op.isLifetimeEnding()) {
@@ -341,15 +295,13 @@ static void cleanupOperandsBeforeDeletion(
       llvm_unreachable("Invalid ownership for value");
     case OwnershipKind::Owned: {
       auto *dvi = builder.createDestroyValue(oldValue->getLoc(), op.get());
-      if (newNotifyInst)
-        newNotifyInst(dvi);
+      callbacks.createdNewInst(dvi);
       continue;
     }
     case OwnershipKind::Guaranteed: {
       // Should only happen once we model destructures as true reborrows.
       auto *ebi = builder.createEndBorrow(oldValue->getLoc(), op.get());
-      if (newNotifyInst)
-        newNotifyInst(ebi);
+      callbacks.createdNewInst(ebi);
       continue;
     }
     case OwnershipKind::None:
@@ -363,7 +315,7 @@ static void cleanupOperandsBeforeDeletion(
 
 static SILPhiArgument *
 insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
-                                    const InstModCallbacks &callbacks) {
+                                    InstModCallbacks &callbacks) {
   auto *destBB = bi->getDestBB();
   // We need to create the phi argument before calling addNewEdgeValueToBranch
   // since it checks that the destination block has enough arguments for the
@@ -457,6 +409,7 @@ void OwnershipRAUWUtility::eliminateReborrowsOfRecursiveBorrows(
     SmallVectorImpl<Operand *> &usePoints) {
   SmallVector<std::pair<SILPhiArgument *, SILPhiArgument *>, 8>
       baseBorrowedValuePair;
+  auto &callbacks = ctx.callbacks;
 
   // Ok, we have transitive reborrows.
   for (auto borrowingOperand : transitiveReborrows) {
@@ -474,15 +427,14 @@ void OwnershipRAUWUtility::eliminateReborrowsOfRecursiveBorrows(
     auto *innerCopy = reborrowBuilder.createCopyValue(loc, value);
     auto *innerBorrow = reborrowBuilder.createBeginBorrow(loc, innerCopy);
     auto *outerEndBorrow = reborrowBuilder.createEndBorrow(loc, value);
-    if (ctx.newInstNotify) {
-      ctx.newInstNotify(innerCopy);
-      ctx.newInstNotify(innerBorrow);
-      ctx.newInstNotify(outerEndBorrow);
-    }
+
+    callbacks.createdNewInst(innerCopy);
+    callbacks.createdNewInst(innerBorrow);
+    callbacks.createdNewInst(outerEndBorrow);
 
     // Then set our borrowing operand to take our innerBorrow instead of value
     // (whose lifetime we just ended).
-    borrowingOperand->set(innerBorrow);
+    callbacks.setUseValue(*borrowingOperand, innerBorrow);
     // Add our outer end borrow as a use point to make sure that we extend our
     // base value to this point.
     usePoints.push_back(&outerEndBorrow->getAllOperands()[0]);
@@ -492,7 +444,7 @@ void OwnershipRAUWUtility::eliminateReborrowsOfRecursiveBorrows(
     auto *borrowedArg =
         const_cast<SILPhiArgument *>(bi->getArgForOperand(borrowingOperand));
     auto *baseArg =
-        insertOwnedBaseValueAlongBranchEdge(bi, innerCopy, getCallbacks());
+        insertOwnedBaseValueAlongBranchEdge(bi, innerCopy, callbacks);
     baseBorrowedValuePair.emplace_back(baseArg, borrowedArg);
   }
 
@@ -508,8 +460,7 @@ void OwnershipRAUWUtility::eliminateReborrowsOfRecursiveBorrows(
       if (isEndOfScopeMarker(use->getUser())) {
         SILBuilderWithScope::insertAfter(use->getUser(), [&](SILBuilder &b) {
           auto *dvi = b.createDestroyValue(b.getInsertionPointLoc(), baseArg);
-          if (ctx.newInstNotify)
-            ctx.newInstNotify(dvi);
+          callbacks.createdNewInst(dvi);
         });
         continue;
       }
@@ -521,7 +472,7 @@ void OwnershipRAUWUtility::eliminateReborrowsOfRecursiveBorrows(
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(borrowingOp);
       auto *newBasePhi =
-          insertOwnedBaseValueAlongBranchEdge(brInst, baseArg, getCallbacks());
+          insertOwnedBaseValueAlongBranchEdge(brInst, baseArg, callbacks);
       baseBorrowedValuePair.emplace_back(newBasePhi, newBorrowedPhi);
     }
   }
@@ -533,6 +484,7 @@ void OwnershipRAUWUtility::rewriteReborrows(
   // that copy should be valid at the reborrow.
   SmallVector<std::pair<SILPhiArgument *, SILPhiArgument *>, 8>
       baseBorrowedValuePair;
+  auto &callbacks = ctx.callbacks;
   for (auto reborrow : foundReborrows) {
     auto *bi = cast<BranchInst>(reborrow.op->getUser());
     SILBuilderWithScope reborrowBuilder(bi);
@@ -544,18 +496,16 @@ void OwnershipRAUWUtility::rewriteReborrows(
     auto *innerBorrow = reborrowBuilder.createBeginBorrow(loc, innerCopy);
     auto *outerEndBorrow =
         reborrowBuilder.createEndBorrow(loc, reborrow.op->get());
-    if (ctx.newInstNotify) {
-      ctx.newInstNotify(innerCopy);
-      ctx.newInstNotify(innerBorrow);
-      ctx.newInstNotify(outerEndBorrow);
-    }
+    callbacks.createdNewInst(innerCopy);
+    callbacks.createdNewInst(innerBorrow);
+    callbacks.createdNewInst(outerEndBorrow);
 
-    reborrow->set(innerBorrow);
+    callbacks.setUseValue(*reborrow, innerBorrow);
 
     auto *borrowedArg =
         const_cast<SILPhiArgument *>(bi->getArgForOperand(reborrow.op));
     auto *baseArg =
-        insertOwnedBaseValueAlongBranchEdge(bi, innerCopy, getCallbacks());
+        insertOwnedBaseValueAlongBranchEdge(bi, innerCopy, callbacks);
     baseBorrowedValuePair.emplace_back(baseArg, borrowedArg);
   }
 
@@ -571,8 +521,7 @@ void OwnershipRAUWUtility::rewriteReborrows(
       if (isEndOfScopeMarker(use->getUser())) {
         SILBuilderWithScope::insertAfter(use->getUser(), [&](SILBuilder &b) {
           auto *dvi = b.createDestroyValue(b.getInsertionPointLoc(), baseArg);
-          if (ctx.newInstNotify)
-            ctx.newInstNotify(dvi);
+          callbacks.createdNewInst(dvi);
         });
         continue;
       }
@@ -584,13 +533,14 @@ void OwnershipRAUWUtility::rewriteReborrows(
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(borrowingOp);
       auto *newBasePhi =
-          insertOwnedBaseValueAlongBranchEdge(brInst, baseArg, getCallbacks());
+          insertOwnedBaseValueAlongBranchEdge(brInst, baseArg, callbacks);
       baseBorrowedValuePair.emplace_back(newBasePhi, newBorrowedPhi);
     }
   }
 }
 
 SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
+  auto &callbacks = ctx.callbacks;
   switch (newValue.getOwnershipKind()) {
   case OwnershipKind::None:
     llvm_unreachable("Should have been handled elsewhere");
@@ -598,7 +548,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     llvm_unreachable("Invalid for values");
   case OwnershipKind::Unowned:
     // An unowned value can always be RAUWed with another unowned value.
-    return replaceAllUsesAndEraseInner(oldValue, newValue, ctx.eraseNotify);
+    return replaceAllUsesAndErase(oldValue, newValue, callbacks);
   case OwnershipKind::Guaranteed: {
     // If we have an unowned value that we want to replace with a guaranteed
     // value, we need to ensure that the guaranteed value is live at all use
@@ -619,9 +569,8 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
           SILBuilderWithScope builder(ti);
           auto *newInst = builder.createUncheckedOwnershipConversion(
               ti->getLoc(), use->get(), OwnershipKind::Unowned);
-          if (ctx.newInstNotify)
-            ctx.newInstNotify(newInst);
-          use->set(newInst);
+          callbacks.createdNewInst(newInst);
+          callbacks.setUseValue(use, newInst);
         }
       }
     }
@@ -631,9 +580,8 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     SILBuilderWithScope builder(oldValue);
     auto *newInst = builder.createUncheckedOwnershipConversion(
         oldValue->getLoc(), borrow, OwnershipKind::Unowned);
-    if (ctx.newInstNotify)
-      ctx.newInstNotify(newInst);
-    return replaceAllUsesAndEraseInner(oldValue, newInst, ctx.eraseNotify);
+    callbacks.createdNewInst(newInst);
+    return replaceAllUsesAndErase(oldValue, newInst, callbacks);
   }
   case OwnershipKind::Owned: {
     // If we have an unowned value that we want to replace with an owned value,
@@ -653,9 +601,8 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
           // lifetime to before the function end point.
           auto *newInst = builder.createUncheckedOwnershipConversion(
               ti->getLoc(), use->get(), OwnershipKind::Unowned);
-          if (ctx.newInstNotify)
-            ctx.newInstNotify(newInst);
-          use->set(newInst);
+          callbacks.createdNewInst(newInst);
+          callbacks.setUseValue(use, newInst);
         }
       }
     }
@@ -665,10 +612,8 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     SILBuilderWithScope builder(oldValue);
     auto *newInst = builder.createUncheckedOwnershipConversion(
         oldValue->getLoc(), copy, OwnershipKind::Unowned);
-    if (ctx.newInstNotify)
-      ctx.newInstNotify(newInst);
-    auto result =
-        replaceAllUsesAndEraseInner(oldValue, newInst, ctx.eraseNotify);
+    callbacks.createdNewInst(newInst);
+    auto result = replaceAllUsesAndErase(oldValue, newInst, callbacks);
     return result;
   }
   }
@@ -727,8 +672,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
   // Ok, we now have eliminated any reborrows if we had any. That means that
   // the uses of oldValue should be completely within the lifetime of our new
   // borrow.
-  return replaceAllUsesAndEraseInner(oldValue, newBorrowedValue,
-                                     ctx.eraseNotify);
+  return replaceAllUsesAndErase(oldValue, newBorrowedValue, ctx.callbacks);
 }
 
 SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
@@ -741,7 +685,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   //
   // NOTE: This handles RAUWing with undef.
   if (newValue.getOwnershipKind() == OwnershipKind::None)
-    return replaceAllUsesAndEraseInner(oldValue, newValue, ctx.eraseNotify);
+    return replaceAllUsesAndErase(oldValue, newValue, ctx.callbacks);
   assert(SILValue(oldValue).getOwnershipKind() != OwnershipKind::None);
 
   switch (SILValue(oldValue).getOwnershipKind()) {
@@ -763,8 +707,8 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
     auto extender = getLifetimeExtender();
     SILValue copy =
         extender.copyAndExtendForLifetimeEndingRAUW(newValue, oldValue);
-    cleanupOperandsBeforeDeletion(oldValue, ctx.newInstNotify);
-    auto result = replaceAllUsesAndEraseInner(oldValue, copy, ctx.eraseNotify);
+    cleanupOperandsBeforeDeletion(oldValue, ctx.callbacks);
+    auto result = replaceAllUsesAndErase(oldValue, copy, ctx.callbacks);
     return result;
   }
   case OwnershipKind::Unowned: {

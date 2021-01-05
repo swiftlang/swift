@@ -15,22 +15,22 @@ func asyncThrows() async throws {
 
 // T = Int
 func asyncRethrows(fn : () async throws -> Int) async rethrows -> Int {
-  return await try fn()
+  return try await fn()
 }
 
 // T = String
 func asyncRethrows(fn : () async throws -> String) async rethrows -> String {
-  return await try fn()
+  return try await fn()
 }
 
 // Generic. NOTE the 'rethrows'
 func invoke<T>(fn : () async throws -> T) async rethrows -> T {
-  return await try fn()
+  return try await fn()
 }
 
 // NOTE the 'rethrows'
 func invokeAuto<T>(_ val : @autoclosure () async throws -> T) async rethrows -> T {
-  return await try val()
+  return try await val()
 }
 
 func normalTask() async -> Int {
@@ -88,37 +88,37 @@ func asyncTest() async {
   let _ = await invoke(fn: normalTask) // ok
 
   let _ = await asyncRethrows(fn: normalTask)
-  let _ = await try! asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
-  let _ = await try? asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
+  let _ = try! await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
+  let _ = try? await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
   
-  let _ = await try! asyncRethrows(fn: throwingTask)
-  let _ = await try? asyncRethrows(fn: throwingTask)
-  let _ = await try! asyncThrows()
-  let _ = await try? asyncThrows()
+  let _ = try! await asyncRethrows(fn: throwingTask)
+  let _ = try? await asyncRethrows(fn: throwingTask)
+  let _ = try! await asyncThrows()
+  let _ = try? await asyncThrows()
 
   //////////
   // some auto-closure tests
 
   let _ = await invokeAuto("intuitive")
-  let _ = await try! invokeAuto(await throwingTask())
-  let _ = await try? invokeAuto(await throwingTask())
-  let _ = await invokeAuto(await try! throwingTask())
-  let _ = await invokeAuto(await try? throwingTask())
+  let _ = try! await invokeAuto(await throwingTask())
+  let _ = try? await invokeAuto(await throwingTask())
+  let _ = await invokeAuto(try! await throwingTask())
+  let _ = await invokeAuto(try? await throwingTask())
 
   let _ = await invokeAuto(try! throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
   let _ = await invokeAuto(try? throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
 
-  let _ = await invokeAuto(await try! throwingTask())
-  let _ = await invokeAuto(await try? throwingTask())
+  let _ = await invokeAuto(try! await throwingTask())
+  let _ = await invokeAuto(try? await throwingTask())
   /////////
 
   do {
-    let _ = await try asyncThrows()
-    let _ = await try asyncRethrows(fn: throwingTask)
+    let _ = try await asyncThrows()
+    let _ = try await asyncRethrows(fn: throwingTask)
 
     //////
     // more auto-closure tests
-    
+
     // expected-note@+6 {{did you mean to disable error propagation?}}
     // expected-note@+5 {{did you mean to handle error as optional value?}}
     // expected-note@+4 {{did you mean to use 'try'?}}
@@ -127,9 +127,9 @@ func asyncTest() async {
     // expected-error@+1 2 {{call can throw but is not marked with 'try'}}
     let _ = await invokeAuto(throwingTask())
 
-    let _ = await try invokeAuto(throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+    let _ = try await invokeAuto(throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
     let _ = try invokeAuto(await throwingTask()) // expected-error{{call is 'async' but is not marked with 'await'}}
-    let _ = await try invokeAuto(await throwingTask())
+    let _ = try await invokeAuto(await throwingTask())
   } catch {
     // ignore
   }

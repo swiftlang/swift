@@ -736,6 +736,19 @@ void TempRValueOptPass::run() {
   // Delete the copies and any unused address operands.
   // The same copy may have been added multiple times.
   sortUnique(deadCopies);
+  InstModCallbacks callbacks(
+#ifndef NDEBUG
+      // With asserts, we include this assert. Otherwise, we use the default
+      // impl for perf.
+      [](SILInstruction *instToKill) {
+        // SimplifyInstruction is not in the business of removing
+        // copy_addr. If it were, then we would need to update deadCopies.
+        assert(!isa<CopyAddrInst>(instToKill));
+        instToKill->eraseFromParent();
+      }
+#endif
+  );
+
   for (auto *deadCopy : deadCopies) {
     assert(changed);
     auto *srcInst = deadCopy->getSrc()->getDefiningInstruction();
@@ -744,13 +757,7 @@ void TempRValueOptPass::run() {
     // copy_addr and other potentially unused addresses.
     if (srcInst) {
       if (SILValue result = simplifyInstruction(srcInst)) {
-        replaceAllSimplifiedUsesAndErase(
-            srcInst, result, [](SILInstruction *instToKill) {
-              // SimplifyInstruction is not in the business of removing
-              // copy_addr. If it were, then we would need to update deadCopies.
-              assert(!isa<CopyAddrInst>(instToKill));
-              instToKill->eraseFromParent();
-            });
+        replaceAllSimplifiedUsesAndErase(srcInst, result, callbacks);
       }
     }
   }

@@ -224,8 +224,8 @@ public:
            B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if \p Inst may write to memory in a manner that
-  /// affects V.
+  /// Returns true if \p Inst may write to memory, deinitialize memory, or have
+  /// other side effects that may affect V.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayWrite ||
@@ -233,8 +233,8 @@ public:
            B == MemoryBehavior::MayHaveSideEffects;
   }
 
-  /// Returns true if \p Inst may read or write to memory in a manner that
-  /// affects V.
+  /// Returns true if \p Inst may read to memory, write to memory, deinitialize
+  /// memory, or have other side effects that may affect V.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return MemoryBehavior::None != B;

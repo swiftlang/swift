@@ -86,3 +86,25 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   dealloc_stack [[TMP_BUF_RES]] : $*Float
 // CHECK-SIL:   return [[DX]] : $Float
 // CHECK-SIL: }
+
+// Check the conventions of the generated functions for a method (SR-13945).
+struct ExampleStruct {
+  @_silgen_name("fooMethod")
+  @differentiable
+  func fooMethod(_ x: Float) -> Float {
+    let y = Float.add(x, x)
+    return y
+  }
+}
+
+// CHECK-SIL-LABEL: sil hidden [ossa] @AD__fooMethod__jvp_src_0_wrt_0 : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL: }  // end sil function 'AD__fooMethod__jvp_src_0_wrt_0'
+
+// CHECK-SIL-LABEL: sil hidden [ossa] @AD__fooMethod__differential_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__fooMethod_bb0__DF__src_0_wrt_0) -> Float {
+// CHECK-SIL: }  // end sil function 'AD__fooMethod__differential_src_0_wrt_0'
+
+// CHECK-SIL-LABEL: sil hidden [ossa] @AD__fooMethod__vjp_src_0_wrt_0 : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL: }  // end sil function 'AD__fooMethod__vjp_src_0_wrt_0'
+
+// CHECK-SIL-LABEL: sil private [ossa] @AD__fooMethod__pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__fooMethod_bb0__PB__src_0_wrt_0) -> Float {
+// CHECK-SIL: }  // end sil function 'AD__fooMethod__pullback_src_0_wrt_0'

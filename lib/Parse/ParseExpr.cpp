@@ -405,6 +405,13 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       ParserResult<Expr> sub =
         parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
       if (!sub.hasCodeCompletion() && !sub.isNull()) {
+        if (auto anyTry = dyn_cast<AnyTryExpr>(sub.get())) {
+          // "try" must precede "await".
+          diagnose(awaitLoc, diag::await_before_try)
+            .fixItRemove(awaitLoc)
+            .fixItInsert(anyTry->getSubExpr()->getStartLoc(), "await ");
+        }
+
         ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
         sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
       }
@@ -448,13 +455,6 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       : parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
-    // "await" must precede "try".
-    if (auto await = dyn_cast<AwaitExpr>(sub.get())) {
-      diagnose(await->getLoc(), diag::try_before_await)
-        .fixItRemove(await->getLoc())
-        .fixItInsert(tryLoc, "await ");
-    }
-
     ElementContext.setCreateSyntax(SyntaxKind::TryExpr);
     switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
     case tok::exclaim_postfix:

@@ -9,7 +9,7 @@ import Dispatch
 func test_skipCallingNext_butInvokeCancelAll() async {
   let numbers = [1, 1]
 
-  let result = await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  let result = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
     for n in numbers {
       print("group.add { \(n) }")
       await group.add { () async -> Int in
