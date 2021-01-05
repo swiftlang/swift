@@ -483,6 +483,10 @@ function set_build_options_for_host() {
               -DPython2_EXECUTABLE="$(xcrun -f python2.7)"
               -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
+            lldb_cmake_options+=(
+              -DPython2_EXECUTABLE="$(xcrun -f python2.7)"
+              -DPython3_EXECUTABLE="$(xcrun -f python3)"
+            )
             case ${host} in
                 macosx-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
