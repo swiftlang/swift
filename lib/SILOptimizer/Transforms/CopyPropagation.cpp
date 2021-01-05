@@ -38,6 +38,12 @@ using namespace swift;
 
 namespace {
 class CopyPropagation : public SILFunctionTransform {
+  /// True if debug_value instructions should be pruned.
+  bool pruneDebug;
+
+public:
+  CopyPropagation(bool pruneDebug): pruneDebug(pruneDebug) {}
+
   /// The entry point to this function transformation.
   void run() override;
 };
@@ -64,7 +70,7 @@ void CopyPropagation::run() {
     }
   }
   // Perform copy propgation for each copied value.
-  CanonicalizeOSSALifetime canonicalizer(/*pruneDebug*/ true);
+  CanonicalizeOSSALifetime canonicalizer(pruneDebug);
   for (auto &def : copiedDefs) {
     canonicalizer.canonicalizeValueLifetime(def);
     if (SILValue outerCopy = canonicalizer.createdOuterCopy()) {
@@ -81,4 +87,10 @@ void CopyPropagation::run() {
   }
 }
 
-SILTransform *swift::createCopyPropagation() { return new CopyPropagation(); }
+SILTransform *swift::createCopyPropagation() {
+  return new CopyPropagation(/*pruneDebug*/ true);
+}
+
+SILTransform *swift::createMandatoryCopyPropagation() {
+  return new CopyPropagation(/*pruneDebug*/ false);
+}

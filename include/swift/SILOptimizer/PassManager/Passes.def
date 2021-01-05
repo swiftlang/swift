@@ -123,7 +123,9 @@ PASS(ConstantEvaluableSubsetChecker, "test-constant-evaluable-subset",
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
-     "Copy propagation to Remove Redundant SSA Copies")
+     "Copy propagation to Remove Redundant SSA Copies, pruning debug info")
+PASS(MandatoryCopyPropagation, "mandatory-copy-propagation",
+     "Copy propagation to Remove Redundant SSA Copies, preserving debug info")
 PASS(COWOpts, "cow-opts",
      "Optimize COW operations")
 PASS(Differentiation, "differentiation",
