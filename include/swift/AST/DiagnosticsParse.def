@@ -1223,6 +1223,9 @@ NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
 ERROR(try_before_await,none, "'await' must precede 'try'", ())
+WARNING(warn_await_keyword,none, 
+      "future versions of Swift reserve the word 'await'; "
+      "if this name is unavoidable, use backticks to escape it", ())
 
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,none,
