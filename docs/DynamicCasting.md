@@ -302,6 +302,8 @@ Casting from a function type F1 to a function type F2 will succeed iff the follo
 
 Note that it is _not_ sufficient for argument and return types to be castable; they must actually be identical.
 
+Caveat: The current Swift compiler supports more general casts of function types in certain cases where the compiler has enough information to statically construct the necessary adapter function.  Function types that must be cast at runtime follow the less permissive rules described above.
+
 ## Existential Types
 
 Conceptually, an "existential type" is an opaque wrapper that carries a type and an instance of that type.
@@ -372,7 +374,7 @@ For casting purposes, `AnyHashable` behaves like an existential type.
 It satisfies the weak existential invariant above.
 
 However, note that `AnyHashable` does not act like an existential for other purposes.
-For example, it's metatype is named `AnyHashable.Type` and it does not have an existential metatype.
+For example, its metatype is named `AnyHashable.Type` and it does not have an existential metatype.
 
 ### Protocol Witness types
 
@@ -490,6 +492,12 @@ The existential metatype of a protocol `P` is called `P.Type`.
 Non-protocol types do not have existential metatypes.
 For a generic variable `G`, the expression also refers to the regular metatype, even if the generic variable is bound to a protocol.
 There is no mechanism in Swift to refer to the existential metatype via a generic variable.)
+
+In essence, an existential metatype simply defines an existential that can hold a metatype instance.
+An instance of the existential metatype `Any.Type` can hold any metatype instance.
+An instance of the existential metatype `P.Type` of a protocol `P` can hold a metatype instance of any type that conforms to `P`.
+As with other existentials, casting _from_ an existential metatype is equivalent to casting the contents of the existential.
+Casting _to_ an existential metatype succeeds whenever the source is a conforming metatype instance (or can be unwrapped to yield such a metatype instance).
 
 Example
 ```
