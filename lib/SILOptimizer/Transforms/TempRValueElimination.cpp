@@ -736,7 +736,7 @@ void TempRValueOptPass::run() {
   // Delete the copies and any unused address operands.
   // The same copy may have been added multiple times.
   sortUnique(deadCopies);
-  InstModCallbacks callbacks(
+  InstModCallbacks callbacks{
 #ifndef NDEBUG
       // With asserts, we include this assert. Otherwise, we use the default
       // impl for perf.
@@ -747,7 +747,7 @@ void TempRValueOptPass::run() {
         instToKill->eraseFromParent();
       }
 #endif
-  );
+  };
 
   for (auto *deadCopy : deadCopies) {
     assert(changed);
