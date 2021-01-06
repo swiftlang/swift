@@ -177,6 +177,21 @@ struct OtherContainer<U> {
   }
 }
 
+class SuperclassWithGlobalActors {
+  @GenericGlobalActor<Int> func f() { }
+  @GenericGlobalActor<Int> func g() { } // expected-note{{overridden declaration is here}}
+  func h() { }
+}
+
+@GenericGlobalActor<String>
+class SubclassWithGlobalActors : SuperclassWithGlobalActors {
+  override func f() { } // okay: inferred to @GenericGlobalActor<Int>
+
+  @GenericGlobalActor<String> override func g() { } // expected-error{{global actor 'GenericGlobalActor<String>'-isolated instance method 'g()' has different actor isolation from global actor 'GenericGlobalActor<Int>'-isolated overridden declaration}}
+
+  override func h() { } // okay: inferred to unspecified
+}
+
 // ----------------------------------------------------------------------
 // Global actor inference for unspecified contexts
 // ----------------------------------------------------------------------

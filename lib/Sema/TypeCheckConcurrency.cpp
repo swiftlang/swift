@@ -1807,16 +1807,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If the declaration overrides another declaration, it must have the same
   // actor isolation.
   if (auto overriddenValue = value->getOverriddenDecl()) {
-    if (auto isolation = getActorIsolation(overriddenValue)) {
-      SubstitutionMap subs;
-      if (auto env = value->getInnermostDeclContext()
-              ->getGenericEnvironmentOfContext()) {
-        subs = SubstitutionMap::getOverrideSubstitutions(
-            overriddenValue, value, subs);
-      }
-
-      return inferredIsolation(isolation.subst(subs));
+    auto isolation = getActorIsolation(overriddenValue);
+    SubstitutionMap subs;
+    if (auto env = value->getInnermostDeclContext()
+            ->getGenericEnvironmentOfContext()) {
+      subs = SubstitutionMap::getOverrideSubstitutions(
+        overriddenValue, value, subs);
     }
+
+    return inferredIsolation(isolation.subst(subs));
   }
 
   // If this is an accessor, use the actor isolation of its storage
