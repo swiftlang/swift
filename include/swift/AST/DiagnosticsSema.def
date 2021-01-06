@@ -4281,13 +4281,6 @@ ERROR(actorindependent_mutable_storage,none,
 ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
-ERROR(actorindependent_not_actor_member,none,
-      "'@actorIndependent' can only be applied to actor members and "
-      "global/static variables",
-      ())
-ERROR(actorindependent_not_actor_instance_member,none,
-      "'@actorIndependent' can only be applied to instance members of actors",
-      ())
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "

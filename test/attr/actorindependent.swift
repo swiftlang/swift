@@ -2,7 +2,6 @@
 
 // REQUIRES: concurrency
 
-// expected-error@+1{{'@actorIndependent' can only be applied to actor members and global/static variables}}
 @actorIndependent func globalFunction() { }
 
 @actorIndependent var globalComputedProperty1: Int { 17 }
@@ -33,9 +32,11 @@ struct X {
 }
 
 class C {
-  // expected-error@+1{{'@actorIndependent' can only be applied to actor members and global/static variables}}
   @actorIndependent
   var property3: Int { 5 }
+
+  @actorIndependent
+  func f() { }
 }
 
 actor class A {
@@ -65,6 +66,8 @@ actor class A {
     set { }
   }
 
+  @actorIndependent init() { }
+
   @actorIndependent
   func synchronousFunc() { }
 
@@ -74,7 +77,6 @@ actor class A {
   @actorIndependent
   subscript(index: Int) -> String { "\(index)" }
 
-  // expected-error@+1{{'@actorIndependent' can only be applied to instance members of actors}}
   @actorIndependent static func staticFunc() { }
 }
 
@@ -96,3 +98,5 @@ actor class FromProperty {
     set { counter = newValue }
   }
 }
+
+@actorIndependent extension FromProperty { }

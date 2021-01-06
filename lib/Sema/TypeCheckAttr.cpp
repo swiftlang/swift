@@ -298,7 +298,7 @@ public:
           case ActorIndependentKind::Safe:
             diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
             return;
-            
+
           case ActorIndependentKind::Unsafe:
             break;
         }
@@ -315,26 +315,11 @@ public:
           (dc->isTypeContext() && var->isStatic())) {
         return;
       }
-
-      // Otherwise, fall through to make sure we're in an appropriate
-      // context.
     }
 
-    // @actorIndependent only makes sense on an actor instance member.
-    if (!dc->getSelfClassDecl() ||
-        !dc->getSelfClassDecl()->isActor()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_not_actor_member);
-      return;
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      (void)getActorIsolation(VD);
     }
-
-    auto VD = cast<ValueDecl>(D);
-    if (!VD->isInstanceMember()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::actorindependent_not_actor_instance_member);
-      return;
-    }
-
-    (void)getActorIsolation(VD);
   }
 
   void visitGlobalActorAttr(GlobalActorAttr *attr) {

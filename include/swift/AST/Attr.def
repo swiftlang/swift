@@ -572,9 +572,10 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   102)
 
 DECL_ATTR(actorIndependent, ActorIndependent,
-  OnFunc | OnVar | OnSubscript | ConcurrencyOnly |
+  OnClass | OnStruct | OnEnum | OnExtension | OnFunc | OnConstructor |
+  OnVar | OnSubscript | ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
-  APIStableToAdd | APIBreakingToRemove,
+  APIBreakingToAdd | APIBreakingToRemove,
   103)
 
 SIMPLE_DECL_ATTR(globalActor, GlobalActor,
