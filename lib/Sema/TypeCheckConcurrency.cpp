@@ -1752,6 +1752,16 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
   return std::get<1>(isolatedRequirements.front());
 }
 
+// Check whether a declaration is an asynchronous handler.
+static bool isAsyncHandler(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (func->isAsyncHandler())
+      return true;
+  }
+
+  return false;
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has one of the actor isolation attributes, report
@@ -1807,15 +1817,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If the declaration overrides another declaration, it must have the same
   // actor isolation.
   if (auto overriddenValue = value->getOverriddenDecl()) {
-    auto isolation = getActorIsolation(overriddenValue);
-    SubstitutionMap subs;
-    if (auto env = value->getInnermostDeclContext()
-            ->getGenericEnvironmentOfContext()) {
-      subs = SubstitutionMap::getOverrideSubstitutions(
-        overriddenValue, value, subs);
-    }
+    // Ignore the overridden declaration's isolation for an async handler,
+    // because async handlers dispatch to wherever they need to be.
+    if (!isAsyncHandler(value)) {
+      auto isolation = getActorIsolation(overriddenValue);
+      SubstitutionMap subs;
+      if (auto env = value->getInnermostDeclContext()
+              ->getGenericEnvironmentOfContext()) {
+        subs = SubstitutionMap::getOverrideSubstitutions(
+          overriddenValue, value, subs);
+      }
 
-    return inferredIsolation(isolation.subst(subs));
+      return inferredIsolation(isolation.subst(subs));
+    }
   }
 
   // If this is an accessor, use the actor isolation of its storage
@@ -1885,6 +1899,10 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
   auto overridden = value->getOverriddenDecl();
   if (!overridden)
+    return;
+
+  // Actor isolation doesn't matter for async handlers.
+  if (isAsyncHandler(value))
     return;
 
   // Determine the actor isolation of this declaration.

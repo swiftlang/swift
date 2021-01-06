@@ -181,6 +181,8 @@ class SuperclassWithGlobalActors {
   @GenericGlobalActor<Int> func f() { }
   @GenericGlobalActor<Int> func g() { } // expected-note{{overridden declaration is here}}
   func h() { }
+  func i() { }
+  func j() { }
 }
 
 @GenericGlobalActor<String>
@@ -190,6 +192,20 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
   @GenericGlobalActor<String> override func g() { } // expected-error{{global actor 'GenericGlobalActor<String>'-isolated instance method 'g()' has different actor isolation from global actor 'GenericGlobalActor<Int>'-isolated overridden declaration}}
 
   override func h() { } // okay: inferred to unspecified
+
+  func onGenericGlobalActorString() { }
+  @GenericGlobalActor<Int> func onGenericGlobalActorInt() { }
+
+  @asyncHandler @GenericGlobalActor<String>
+  override func i() { // okay to differ from superclass because it's an asyncHandler.
+    onGenericGlobalActorString()
+  }
+
+  @asyncHandler
+  override func j() { // okay, isolated to GenericGlobalActor<String>
+    onGenericGlobalActorString() // okay
+    onGenericGlobalActorInt() // expected-error{{call is 'async' but is not marked with 'await'}}
+  }
 }
 
 // ----------------------------------------------------------------------
