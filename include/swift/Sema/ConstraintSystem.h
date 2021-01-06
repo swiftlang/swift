@@ -5464,7 +5464,8 @@ public:
   // have to visit all of the options.
   void partitionDisjunction(ArrayRef<Constraint *> Choices,
                             SmallVectorImpl<unsigned> &Ordering,
-                            SmallVectorImpl<unsigned> &PartitionBeginning);
+                            SmallVectorImpl<unsigned> &PartitionBeginning,
+                            ConstraintLocator *locator);
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
@@ -5989,7 +5990,7 @@ public:
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
     // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning, disjunction->getLocator());
   }
 
   DisjunctionChoiceProducer(ConstraintSystem &cs,
@@ -5999,7 +6000,7 @@ public:
         IsExplicitConversion(explicitConversion) {
 
     // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning, locator);
   }
 
   Optional<Element> operator()() override {

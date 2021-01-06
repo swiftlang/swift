@@ -624,8 +624,10 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (TypeChecker::isDeclRefinementOf(declA, declB))
+    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+        TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
+    }
   }
 
   // If the solver already found a solution with a choice that did not

@@ -2077,9 +2077,109 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
   }
 }
 
+/// Populates the \c found vector with the indices of the given constraints
+/// that are arithmetic operator choices in the best order to attempt based on
+/// the argument function type that the operator is applied to.
+static void takeArithmeticOperators(ConstraintSystem &CS, const FunctionType *argFnType,
+                                    ArrayRef<Constraint *> constraints,
+                                    SmallVectorImpl<unsigned> &found,
+                                    ConstraintSystem::ConstraintMatchLoop forEachChoice) {
+  auto operatorName = constraints[0]->getOverloadChoice().getName();
+  if (!operatorName.getBaseIdentifier().isArithmeticOperator())
+    return;
+
+  SmallVector<unsigned, 4> numericOverloads;
+  SmallVector<unsigned, 4> sequenceOverloads;
+  SmallVector<unsigned, 4> simdOverloads;
+  SmallVector<unsigned, 4> otherGenericOverloads;
+
+  auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, KnownProtocolKind kind) -> bool {
+    if (!nominal)
+      return false;
+
+    auto *protocol = TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
+
+    if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
+      return refined->inheritsFrom(protocol);
+
+    return (bool)TypeChecker::conformsToProtocol(nominal->getDeclaredType(), protocol,
+                                                 nominal->getDeclContext());
+  };
+
+  // Gather concrete, Numeric, Sequence, and SIMD overloads into separate buckets.
+  forEachChoice(constraints, [&](unsigned index, Constraint *constraint) -> bool {
+    auto *decl = constraint->getOverloadChoice().getDecl();
+
+    if (isSIMDOperator(decl)) {
+      simdOverloads.push_back(index);
+      return true;
+    }
+
+    auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
+    if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
+      // Concrete overloads should always be attempted first.
+      found.push_back(index);
+    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::AdditiveArithmetic)) {
+      numericOverloads.push_back(index);
+    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::Sequence)) {
+      sequenceOverloads.push_back(index);
+    } else {
+      otherGenericOverloads.push_back(index);
+    }
+
+    return true;
+  });
+
+  auto sortPartition = [&](SmallVectorImpl<unsigned> &partition) {
+    llvm::sort(partition, [&](unsigned lhs, unsigned rhs) -> bool {
+      auto *declA = dyn_cast<ValueDecl>(constraints[lhs]->getOverloadChoice().getDecl());
+      auto *declB = dyn_cast<ValueDecl>(constraints[rhs]->getOverloadChoice().getDecl());
+
+      return TypeChecker::isDeclRefinementOf(declA, declB);
+    });
+  };
+
+  // Sort sequence overloads so that refinements are attempted first.
+  // If the solver finds a solution with an overload, it can then skip
+  // subsequent choices that the successful choice is a refinement of.
+  sortPartition(sequenceOverloads);
+
+  // Check if any of the known argument types conform to one of the standard
+  // arithmetic protocols. If so, the sovler should attempt the corresponding
+  // overload choices first.
+  for (auto arg : argFnType->getParams()) {
+    auto argType = arg.getPlainType();
+    if (!argType || argType->hasTypeVariable())
+      continue;
+
+    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::AdditiveArithmetic)) {
+      found.append(numericOverloads.begin(), numericOverloads.end());
+      numericOverloads.clear();
+      break;
+    }
+
+    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::Sequence)) {
+      found.append(sequenceOverloads.begin(), sequenceOverloads.end());
+      sequenceOverloads.clear();
+      break;
+    }
+
+    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::SIMD)) {
+      found.append(simdOverloads.begin(), simdOverloads.end());
+      simdOverloads.clear();
+      break;
+    }
+  }
+
+  found.append(otherGenericOverloads.begin(), otherGenericOverloads.end());
+  found.append(numericOverloads.begin(), numericOverloads.end());
+  found.append(sequenceOverloads.begin(), sequenceOverloads.end());
+  found.append(simdOverloads.begin(), simdOverloads.end());
+}
+
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
-    SmallVectorImpl<unsigned> &PartitionBeginning) {
+    SmallVectorImpl<unsigned> &PartitionBeginning, ConstraintLocator *locator) {
   // Apply a special-case rule for favoring one generic function over
   // another.
   if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
@@ -2152,8 +2252,11 @@ void ConstraintSystem::partitionDisjunction(
     });
   }
 
-  // Partition SIMD operators.
+  // Gather arithmetic and SIMD operators.
   if (isOperatorBindOverload(Choices[0])) {
+    if (auto *argFnType = AppliedDisjunctions[locator])
+      takeArithmeticOperators(*this, argFnType, Choices, everythingElse, forEachChoice);
+
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (!isOperatorBindOverload(constraint))
         return false;
@@ -2167,6 +2270,12 @@ void ConstraintSystem::partitionDisjunction(
     });
   }
 
+  // Gather the remaining options.
+  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    everythingElse.push_back(index);
+    return true;
+  });
+
   // Local function to create the next partition based on the options
   // passed in.
   PartitionAppendCallback appendPartition =
@@ -2176,35 +2285,6 @@ void ConstraintSystem::partitionDisjunction(
           Ordering.insert(Ordering.end(), options.begin(), options.end());
         }
       };
-
-  // Gather the remaining options.
-
-  SmallVector<unsigned, 4> genericOverloads;
-
-  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-    if (!isForCodeCompletion() && isOperatorBindOverload(constraint)) {
-      // Collect generic overload choices separately, and sort these choices
-      // by specificity in order to try the most specific choice first.
-      auto *decl = constraint->getOverloadChoice().getDecl();
-      auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl);
-      if (fnDecl && fnDecl->isGeneric()) {
-        genericOverloads.push_back(index);
-        return true;
-      }
-    }
-
-    everythingElse.push_back(index);
-    return true;
-  });
-
-  llvm::sort(genericOverloads, [&](unsigned lhs, unsigned rhs) -> bool {
-    auto *declA = dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
-    auto *declB = dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
-
-    return TypeChecker::isDeclRefinementOf(declA, declB);
-  });
-
-  everythingElse.append(genericOverloads.begin(), genericOverloads.end());
 
   appendPartition(favored);
   appendPartition(everythingElse);
