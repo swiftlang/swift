@@ -2185,17 +2185,6 @@ tryCast(
 /****************************** Main Entrypoint *******************************/
 /******************************************************************************/
 
-// XXX REMOVE ME XXX TODO XXX
-// Declare the old entrypoint
-SWIFT_RUNTIME_EXPORT
-bool
-swift_dynamicCast_OLD(OpaqueValue *destLocation,
-                      OpaqueValue *srcValue,
-                      const Metadata *srcType,
-                      const Metadata *destType,
-                      DynamicCastFlags flags);
-// XXX REMOVE ME XXX TODO XXX
-
 /// ABI: Perform a dynamic cast to an arbitrary type.
 static bool
 swift_dynamicCastImpl(OpaqueValue *destLocation,
