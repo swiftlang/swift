@@ -133,7 +133,7 @@ namespace swift {
     bool EnableModuleLoadingRemarks = false;
 
     /// Warn on usage of force unwrap operator
-    bool ForceUnwrapWarning = false;
+    bool WarnForceUnwrap = false;
 
     ///
     /// Support for alternate usage modes

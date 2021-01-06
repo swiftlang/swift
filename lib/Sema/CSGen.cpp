@@ -3001,8 +3001,8 @@ namespace {
       }
 
       auto &ctx = CS.getASTContext();
-      if (ctx.LangOpts.ForceUnwrapWarning)
-        ctx.Diags.diagnose(expr->getLoc(), diag::force_unwrap_warning);
+      if (ctx.LangOpts.WarnForceUnwrap)
+        ctx.Diags.diagnose(expr->getLoc(), diag::warn_force_unwrap);
 
       // The result is the object type of the optional subexpression.
       CS.addConstraint(ConstraintKind::OptionalObject, CS.getType(valueExpr),

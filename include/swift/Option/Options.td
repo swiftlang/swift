@@ -570,8 +570,8 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def force_unwrap_warning : Flag<["-"],
-    "force-unwrap-warning">,
+def warn_force_unwrap : Flag<["-"],
+    "warn-force-unwrap">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Audit code for force-unwrap usage">;
 
