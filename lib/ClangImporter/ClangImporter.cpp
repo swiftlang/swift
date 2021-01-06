@@ -538,9 +538,28 @@ importer::getNormalInvocationArguments(
     });
   }
 
-  invocationArgStrs.insert(invocationArgStrs.end(), {
-    EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11",
-  });
+  {
+    const clang::LangStandard &stdcxx =
+#if defined(CLANG_DEFAULT_STD_CXX)
+        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_CXX);
+#else
+        clang::LangStandard::getLangStandardForKind(
+            clang::LangStandard::lang_gnucxx14);
+#endif
+
+    const clang::LangStandard &stdc =
+#if defined(CLANG_DEFAULT_STD_C)
+        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_C);
+#else
+        clang::LangStandard::getLangStandardForKind(
+            clang::LangStandard::lang_gnu11);
+#endif
+
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      (Twine("-std=") + StringRef(EnableCXXInterop ? stdcxx.getName()
+                                                   : stdc.getName())).str()
+    });
+  }
 
   // Set C language options.
   if (triple.isOSDarwin()) {
