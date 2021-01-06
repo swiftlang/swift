@@ -19,11 +19,11 @@ func testSlowServing(p: SlowServing) async throws {
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (NSString) -> (), τ_0_0) -> ()
     let _: String = await p.requestString()
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
-    let _: String = await try p.tryRequestString()
+    let _: String = try await p.tryRequestString()
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, NSString) -> (), τ_0_0) -> ()
     let _: (Int, String) = await p.requestIntAndString()
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
-    let _: (Int, String) = await try p.tryRequestIntAndString()
+    let _: (Int, String) = try await p.tryRequestIntAndString()
 }
 
 class SlowSwiftServer: NSObject, SlowServing {

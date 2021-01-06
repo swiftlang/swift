@@ -510,20 +510,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
       return true;
     return false;
   };
-  auto canHandleOwnershipConversion = [](const SILInstruction *lhs,
-                                         const SILInstruction *rhs) -> bool {
-    if (!lhs->getFunction()->hasOwnership())
-      return true;
-    // TODO: Support MultipleValueInstructionResult in OSSA RAUW utility and
-    // extend it here as well
-    if (!isa<SingleValueInstruction>(lhs))
-      return false;
-    return OwnershipFixupContext::canFixUpOwnershipForRAUW(
-        cast<SingleValueInstruction>(lhs), cast<SingleValueInstruction>(rhs));
-  };
-  return LHSI->getKind() == RHSI->getKind() &&
-         LHSI->isIdenticalTo(RHSI, opCmp) &&
-         (LHSI == RHSI || canHandleOwnershipConversion(LHSI, RHSI));
+  return LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
 }
 
 namespace {
@@ -955,6 +942,7 @@ static bool isLazyPropertyGetter(ApplyInst *ai) {
 
 bool CSE::processNode(DominanceInfoNode *Node) {
   SILBasicBlock *BB = Node->getBlock();
+  InstModCallbacks callbacks;
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
@@ -981,8 +969,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V << '\n');
-      nextI = replaceAllSimplifiedUsesAndErase(Inst, V, nullptr, nullptr,
-                                               &DeadEndBBs);
+      nextI = replaceAllSimplifiedUsesAndErase(Inst, V, callbacks, &DeadEndBBs);
       Changed = true;
       ++NumSimplify;
       continue;
@@ -1032,9 +1019,15 @@ bool CSE::processNode(DominanceInfoNode *Node) {
           ++NumCSE;
           continue;
         }
-        // Replace SingleValueInstruction using OSSA RAUW here
         // TODO: Support MultipleValueInstructionResult in OSSA RAUW utility and
         // extend it here as well
+        if (!isa<SingleValueInstruction>(Inst))
+          continue;
+        if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(
+                cast<SingleValueInstruction>(Inst),
+                cast<SingleValueInstruction>(AvailInst)))
+          continue;
+        // Replace SingleValueInstruction using OSSA RAUW here
         nextI = FixupCtx.replaceAllUsesAndEraseFixingOwnership(
             cast<SingleValueInstruction>(Inst),
             cast<SingleValueInstruction>(AvailInst));
@@ -1412,9 +1405,8 @@ class SILCSE : public SILFunctionTransform {
     InstructionCloner Cloner(Fn);
     DeadEndBlocks DeadEndBBs(Fn);
     JointPostDominanceSetComputer Computer(DeadEndBBs);
-    OwnershipFixupContext FixupCtx{/* eraseNotify */ nullptr,
-                                   /* newInstNotify */ nullptr, DeadEndBBs,
-                                   Computer};
+    InstModCallbacks callbacks;
+    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
     CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, OpenedArchetypesTracker, Cloner,
           DeadEndBBs, FixupCtx);
     bool Changed = false;

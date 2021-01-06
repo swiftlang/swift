@@ -980,7 +980,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto *pbGenericEnv =
       pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
   auto pbType = SILFunctionType::get(
-      pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+      pbGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());

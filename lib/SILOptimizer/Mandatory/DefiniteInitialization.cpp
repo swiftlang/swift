@@ -866,7 +866,8 @@ static void replaceValueMetatypeInstWithMetatypeArgument(
         valueMetatype->getLoc(), metatypeArgument,
         valueMetatype->getType());
   }
-  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+  InstModCallbacks callbacks;
+  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument, callbacks);
 }
 
 void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {

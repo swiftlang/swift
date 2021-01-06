@@ -116,10 +116,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 ///   statically. Thus we treat Any as representing an invalid
 ///   value. ValueOwnershipKinds can only perform a meet operation to determine
 ///   if two ownership kinds are compatible with a merge of Any showing the
-///   merge is impossible since values can not have any ownership.
+///   merge is impossible since values can not have any ownership. Values with
+///   ownership None are statically proven to be trivial values, often because
+///   they are trivially typed, but sometimes because of path-sensitive
+///   information like knowledge of an enum case. Trivial values have no
+///   ownership semantics.
 ///
-/// * OperandConstraint: This represents a constraint on the values that can be
-///   used by a specific operand. Here Any is valid.
+/// * OwnershipConstraint: This represents a constraint on the values that can
+///   be used by a specific operand. Here Any is valid and is used for operands
+///   that don't care about the ownership kind (lack ownership constraints). In
+///   contrast, a constraint of None is the most restrictive. It requires a
+///   trivial value. An Unowned, Owned, or Guaranteed constraint requires either
+///   a value with the named ownership, or a trivial value.
 struct OwnershipKind {
   enum innerty : uint8_t {
     /// An ownership kind that models an ownership that is unknown statically at
@@ -159,10 +167,12 @@ struct OwnershipKind {
     Guaranteed,
 
     /// A SILValue with None ownership kind is an independent value outside of
-    /// the ownership system. It is used to model trivially typed values as well
+    /// the ownership system. It is used to model values that are statically
+    /// determined to be trivial. This includes trivially typed values as well
     /// as trivial cases of non-trivial enums. Naturally None can be merged with
     /// any ValueOwnershipKind allowing us to naturally model merge and branch
-    /// points in the SSA graph.
+    /// points in the SSA graph, where more information about the value is
+    /// statically available on some control flow paths.
     None,
 
     LastValueOwnershipKind = None,
@@ -578,6 +588,18 @@ inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
   return isCompatibleWith(other.getOwnershipKind());
 }
 
+/// Constraints on the ownership of an operand value.
+///
+/// The ownershipKind component constrains the operand's value ownership to be
+/// the same or "above" the constraint in the lattice, such that
+/// join(constraint, valueOwnership) == valueOwnership. In other words, applying
+/// the constraint does not change the value's ownership. For example, a value
+/// with None ownership is accepted by any OwnershipConstraint, and an
+/// OwnershipConstraint with 'Any' ownership kind can accept any value. Note
+/// that operands commonly allow either Owned or Guaranteed operands. These
+/// operands have an Any ownership constraint to allow either. However,
+/// enforcement of Unowned value is more strict. This requires separate logic in
+/// canAcceptUnownedValue() to avoid complicating the OwnershipKind lattice.
 class OwnershipConstraint {
   OwnershipKind ownershipKind;
   UseLifetimeConstraint lifetimeConstraint;
@@ -624,11 +646,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Used to verify completeness of the ownership use model and exhaustively
 /// switch over any category of ownership use. Implies ownership constraints and
 /// lifetime constraints.
+///
+/// OperandOwnership may be statically determined by the user's opcode alone, or
+/// by the opcode and operand type. Or it may be dynamically determined by an
+/// ownership kind variable in the user's state. However, it may never be
+/// inferred from the ownership of the incoming value. This way, the logic for
+/// determining which ValueOwnershipKind an operand may accept is reliable.
+///
+/// Any use that takes an Owned or Guaranteed value may also take a trivial
+/// value (ownership None), because the ownership semantics are irrelevant.
 struct OperandOwnership {
   enum innerty : uint8_t {
-    /// Uses of ownership None. These uses are incompatible with values that
-    /// have ownership but are otherwise not verified.
-    None,
+    /// Operands that do not use the value. They only represent a dependence
+    /// on a dominating definition and do not require liveness.
+    /// (type-dependent operands)
+    NonUse,
+
+    /// Uses that can only handle trivial values. The operand value must have
+    /// None ownership. These uses require liveness but are otherwise
+    /// unverified.
+    TrivialUse,
 
     /// Use the value only for the duration of the operation, which may have
     /// side effects. Requires an owned or guaranteed value.
@@ -659,11 +696,13 @@ struct OperandOwnership {
     /// (ref_to_unowned, unchecked_trivial_bitcast)
     BitwiseEscape,
 
-    /// MARK: Uses of Owned values:
-
-    /// Borrow. Propagates the owned value within a scope, without consuming it.
+    /// Borrow. Propagates the owned or guaranteed value within a scope, without
+    /// ending its lifetime.
     /// (begin_borrow, begin_apply with @guaranteed argument)
     Borrow,
+
+    /// MARK: Uses of Owned (or None) values:
+
     /// Destroying Consume. Destroys the owned value immediately.
     /// (store, destroy, @owned destructure).
     DestroyingConsume,
@@ -671,13 +710,8 @@ struct OperandOwnership {
     /// (br, destructure, tuple, struct, cast, switch).
     ForwardingConsume,
 
-    /// MARK: Uses of Guaranteed values:
+    /// MARK: Uses of Guaranteed (or None) values:
 
-    /// Nested Borrow. Propagates the guaranteed value within a nested borrow
-    /// scope, without ending the outer borrow scope, following stack
-    /// discipline.
-    /// (begin_borrow, begin_apply with @guaranteed).
-    NestedBorrow,
     /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or
     /// no-escape closure) that depends on the guaranteed value within the
     /// base's borrow scope. The verifier checks that all uses of the trivial
@@ -724,22 +758,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const OperandOwnership &operandOwnership);
 
 /// Defined inline so the switch is eliminated for constant OperandOwnership.
+///
+/// Here, an Any ownership constraint is used to allow either Owned or
+/// Guaranteed values. However, enforcement of Unowned values is more
+/// strict. This is handled by separate logic in canAcceptUnownedValue() to
+/// avoid complicating the OwnershipKind lattice.
 inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   switch (value) {
-  case OperandOwnership::None:
+  case OperandOwnership::TrivialUse:
     return {OwnershipKind::None, UseLifetimeConstraint::NonLifetimeEnding};
+  case OperandOwnership::NonUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
-    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::Borrow:
-    return {OwnershipKind::Owned, UseLifetimeConstraint::NonLifetimeEnding};
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
-  case OperandOwnership::NestedBorrow:
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::ForwardingBorrow:
     return {OwnershipKind::Guaranteed,
@@ -770,7 +808,7 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
     }
     llvm_unreachable("invalid value ownership");
   case OwnershipKind::None:
-    return OperandOwnership::None;
+    return OperandOwnership::TrivialUse;
   case OwnershipKind::Guaranteed:
     return OperandOwnership::ForwardingBorrow;
   case OwnershipKind::Owned:

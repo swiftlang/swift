@@ -78,7 +78,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-LABEL: sil hidden [ossa] @$s12objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK:      bb0([[SELF:%[0-9]+]] : @unowned $SwiftGizmo):
   // CHECK-NEXT: debug_value [[SELF]] : $SwiftGizmo, let, name "self"
-  // CHECK-NEXT: [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
+  // CHECK-NEXT: [[SELF_BORROW:%.*]] = unchecked_ownership_conversion %0 : $SwiftGizmo, @unowned to @guaranteed
   // CHECK-NEXT: [[X:%[0-9]+]] = ref_element_addr [[SELF_BORROW]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK-NEXT: [[X_ACCESS:%.*]] = begin_access [deinit] [static] [[X]]
   // CHECK-NEXT: destroy_addr [[X_ACCESS]]

@@ -26,13 +26,13 @@ async throws -> Int {
 
 func test_taskGroup_throws() async {
   do {
-    let got = await try Task.withGroup(resultType: Int.self) {
+    let got = try await Task.withGroup(resultType: Int.self) {
       group async throws -> Int in
       await group.add { await one() }
-      await group.add { await try boom()  }
+      await group.add { try await boom()  }
 
       do {
-        while let r = await try group.next() {
+        while let r = try await group.next() {
           print("next: \(r)")
         }
       } catch {
@@ -43,7 +43,7 @@ func test_taskGroup_throws() async {
           return 3
         }
 
-        guard let got = await try! group.next() else {
+        guard let got = try! await group.next() else {
           print("task group failed to get 3 (:\(#line))")
           return 0
         }
@@ -53,7 +53,7 @@ func test_taskGroup_throws() async {
         if got == 1 {
           // the previous 1 completed before the 3 we just submitted,
           // we still want to see that three so let's await for it
-          guard let third = await try! group.next() else {
+          guard let third = try! await group.next() else {
             print("task group failed to get 3 (:\(#line))")
             return got
           }

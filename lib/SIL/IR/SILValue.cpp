@@ -322,17 +322,17 @@ SILFunction *Operand::getParentFunction() const {
 /// Return true if this use can accept Unowned values.
 static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   switch (operandOwnership) {
+  case OperandOwnership::NonUse:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
     return true;
-  case OperandOwnership::None:
+  case OperandOwnership::TrivialUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::Borrow:
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
-  case OperandOwnership::NestedBorrow:
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::ForwardingBorrow:
   case OperandOwnership::EndBorrow:
@@ -391,8 +391,10 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 StringRef OperandOwnership::asString() const {
   switch (value) {
-  case OperandOwnership::None:
-    return "none";
+  case OperandOwnership::NonUse:
+    return "non-use";
+  case OperandOwnership::TrivialUse:
+    return "trivial-use";
   case OperandOwnership::InstantaneousUse:
     return "instantaneous";
   case OperandOwnership::UnownedInstantaneousUse:
@@ -409,8 +411,6 @@ StringRef OperandOwnership::asString() const {
     return "destroying-consume";
   case OperandOwnership::ForwardingConsume:
     return "forwarding-consume";
-  case OperandOwnership::NestedBorrow:
-    return "nested-borrow";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
   case OperandOwnership::ForwardingBorrow:

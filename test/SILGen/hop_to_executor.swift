@@ -34,7 +34,7 @@ actor class MyActor {
   // CHECK:      } // end sil function '$s4test7MyActorC0A13AsyncFunctionyyYKF'
   func testAsyncFunction() async throws {
     await callee(p)
-    await try throwingCallee(p)
+    try await throwingCallee(p)
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A22ConsumingAsyncFunctionyyYF : $@convention(method) @async (@owned MyActor) -> () {

@@ -18,7 +18,7 @@ func test_sum_nextOnPending() async {
   let numbers = [1, 2, 3]
   let expected = numbers.reduce(0, +)
 
-  let sum = await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  let sum = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
     for n in numbers {
       await group.add {
         let res = await completeSlowly(n: n)
@@ -28,7 +28,7 @@ func test_sum_nextOnPending() async {
 
     var sum = 0
     print("before group.next(), sum: \(sum)")
-    while let n = await try! group.next() {
+    while let n = try! await group.next() {
       assert(numbers.contains(n), "Unexpected value: \(n)! Expected any of \(numbers)")
       print("next: \(n)")
       sum += n

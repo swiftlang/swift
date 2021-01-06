@@ -1223,7 +1223,7 @@ ERROR(super_in_closure_with_capture,none,
 NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
-ERROR(try_before_await,none, "'await' must precede 'try'", ())
+WARNING(await_before_try,none, "'try' must precede 'await'", ())
 WARNING(warn_await_keyword,none, 
       "future versions of Swift reserve the word 'await'; "
       "if this name is unavoidable, use backticks to escape it", ())

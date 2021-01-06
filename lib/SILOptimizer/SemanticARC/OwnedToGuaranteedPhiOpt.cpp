@@ -19,6 +19,7 @@
 #include "Context.h"
 #include "OwnershipPhiOperand.h"
 #include "Transforms.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 
 using namespace swift;

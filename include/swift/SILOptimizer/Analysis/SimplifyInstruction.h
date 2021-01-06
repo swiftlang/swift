@@ -25,6 +25,7 @@
 namespace swift {
 
 class SILInstruction;
+class InstModCallbacks;
 
 /// Try to simplify the specified instruction, performing local
 /// analysis of the operands of the instruction, without looking at its uses
@@ -46,11 +47,17 @@ SILValue simplifyInstruction(SILInstruction *I);
 ///
 /// NOTE: When OSSA is enabled this API assumes OSSA is properly formed and will
 /// insert compensating instructions.
-SILBasicBlock::iterator replaceAllSimplifiedUsesAndErase(
-    SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify = nullptr,
-    std::function<void(SILInstruction *)> newInstNotify = nullptr,
-    DeadEndBlocks *deadEndBlocks = nullptr);
+SILBasicBlock::iterator
+replaceAllSimplifiedUsesAndErase(SILInstruction *I, SILValue result,
+                                 InstModCallbacks &callbacks,
+                                 DeadEndBlocks *deadEndBlocks = nullptr);
+
+/// This is a low level routine that makes all uses of \p svi uses of \p
+/// newValue (ignoring end scope markers) and then deletes \p svi and all end
+/// scope markers. Then returns the next inst to process.
+SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
+                                               SILValue newValue,
+                                               InstModCallbacks &callbacks);
 
 /// Simplify invocations of builtin operations that may overflow.
 /// All such operations return a tuple (result, overflow_flag).

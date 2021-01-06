@@ -86,7 +86,7 @@ extension Task {
         //   (although there should be none left by that time)
         defer { group.cancelAll() }
 
-        let result = await try body(&group)
+        let result = try await body(&group)
 
         /// Drain all remaining tasks by awaiting on them;
         /// Their failures are ignored;
@@ -98,7 +98,7 @@ extension Task {
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(groupTask))
 
-    return await try Handle<BodyResult>(task: groupTask).get()
+    return try await Handle<BodyResult>(task: groupTask).get()
   }
 
   /// A task group serves as storage for dynamically started tasks.
@@ -122,7 +122,7 @@ extension Task {
     /// Add a child task to the group.
     ///
     /// ### Error handling
-    /// Operations are allowed to `throw`, in which case the `await try next()`
+    /// Operations are allowed to `throw`, in which case the `try await next()`
     /// invocation corresponding to the failed task will re-throw the given task.
     ///
     /// The `add` function will never (re-)throw errors from the `operation`.
@@ -155,13 +155,13 @@ extension Task {
     ///
     /// Await on a single completion:
     ///
-    ///     if let first = await try group.next() {
+    ///     if let first = try await group.next() {
     ///        return first
     ///     }
     ///
     /// Wait and collect all group child task completions:
     ///
-    ///     while let first = await try group.next() {
+    ///     while let first = try await group.next() {
     ///        collected += value
     ///     }
     ///     return collected
@@ -253,7 +253,7 @@ extension Task.Group {
     //
     // Failures of tasks are ignored.
     while !self.isEmpty {
-      _ = await try? self.next()
+      _ = try? await self.next()
       // TODO: Should a failure cause a cancellation of the task group?
       //       This looks very much like supervision trees,
       //       where one may have various decisions depending on use cases...

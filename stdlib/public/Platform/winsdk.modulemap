@@ -153,6 +153,35 @@ module WinSDK [system] {
     }
   }
 
+  module DirectX {
+    module Direct3D12 {
+      header "d3d12.h"
+      export *
+
+      link "d3d12.lib"
+      link "dxgi.lib"
+    }
+
+    module XAudio29 {
+      header "xaudio2.h"
+      header "xaudio2fx.h"
+      export *
+
+      link "xaudio2.lib"
+    }
+
+    // XInput 1.4 (Windows 10, XBox) is newer than the XInput 9.1.0 which was
+    // part of Vista.
+    module XInput14 {
+      header "Xinput.h"
+      export *
+
+      link "xinputuap.lib"
+    }
+
+    link "dxguid.lib"
+  }
+
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
   module __DirectX {
     header "directmanipulation.h"
@@ -341,6 +370,15 @@ module WinSDK [system] {
     export *
 
     link "sensorsapi.lib"
+  }
+
+  module UI {
+    module XAML {
+      module Hosting {
+        header "windows.ui.xaml.hosting.desktopwindowxamlsource.h"
+        export *
+      }
+    }
   }
 
   module User {

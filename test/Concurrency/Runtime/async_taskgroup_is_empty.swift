@@ -17,7 +17,7 @@ func asyncEcho(_ value: Int) async -> Int {
 }
 
 func test_taskGroup_isEmpty() async {
-  _ = await try! Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  _ = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
     // CHECK: before add: isEmpty=true
     print("before add: isEmpty=\(group.isEmpty)")
 
@@ -30,7 +30,7 @@ func test_taskGroup_isEmpty() async {
     print("while add running, outside: isEmpty=\(group.isEmpty)")
 
     // CHECK: next: 1
-    while let value = await try! group.next() {
+    while let value = try! await group.next() {
       print("next: \(value)")
     }
 

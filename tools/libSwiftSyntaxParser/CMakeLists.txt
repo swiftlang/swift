@@ -51,9 +51,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
 endif()
 
 add_dependencies(parser-lib libSwiftSyntaxParser)
-swift_install_in_component(PROGRAMS "${SWIFT_LIBRARY_OUTPUT_INTDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${SYNTAX_PARSER_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}"
-                           DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
-                           COMPONENT parser-lib)
+swift_install_in_component(TARGETS libSwiftSyntaxParser
+  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" COMPONENT parser-lib
+  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" COMPONENT parser-lib
+  RUNTIME DESTINATION "bin" COMPONENT parser-lib)
 swift_install_in_component(DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/SyntaxParser/"
                            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SYNTAX_PARSER_LIB_NAME}"
                            COMPONENT parser-lib)

@@ -735,9 +735,9 @@ case BuiltinValueKind::id:
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-static SILBasicBlock::iterator
-replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
-                            std::function<void(SILInstruction *)> eraseNotify) {
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
+                              InstModCallbacks &callbacks) {
   assert(svi != newValue && "Cannot RAUW a value with itself");
   SILBasicBlock::iterator nextii = std::next(svi->getIterator());
 
@@ -749,18 +749,13 @@ replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
     if (isEndOfScopeMarker(user)) {
       if (&*nextii == user)
         ++nextii;
-      if (eraseNotify)
-        eraseNotify(user);
-      else
-        user->eraseFromParent();
+      callbacks.deleteInst(user);
       continue;
     }
-    use->set(newValue);
+    callbacks.setUseValue(use, newValue);
   }
-  if (eraseNotify)
-    eraseNotify(svi);
-  else
-    svi->eraseFromParent();
+
+  callbacks.deleteInst(svi);
 
   return nextii;
 }
@@ -775,21 +770,19 @@ replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
 /// before this is called. It will perform fixups as necessary to preserve OSSA.
 ///
 /// Return an iterator to the next (nondeleted) instruction.
-SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
-    SILInstruction *i, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify,
-    std::function<void(SILInstruction *)> newInstNotify,
-    DeadEndBlocks *deadEndBlocks) {
+SILBasicBlock::iterator
+swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
+                                        InstModCallbacks &callbacks,
+                                        DeadEndBlocks *deadEndBlocks) {
   auto *svi = cast<SingleValueInstruction>(i);
   assert(svi != result && "Cannot RAUW a value with itself");
 
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
-    OwnershipFixupContext ctx{eraseNotify, newInstNotify, *deadEndBlocks,
-                              computer};
+    OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
     return ctx.replaceAllUsesAndEraseFixingOwnership(svi, result);
   }
-  return replaceAllUsesAndEraseInner(svi, result, eraseNotify);
+  return replaceAllUsesAndErase(svi, result, callbacks);
 }
 
 /// Simplify invocations of builtin operations that may overflow.

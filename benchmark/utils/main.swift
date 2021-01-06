@@ -177,6 +177,7 @@ import StringInterpolation
 import StringMatch
 import StringRemoveDupes
 import StringReplaceSubrange
+import StringSwitch
 import StringTests
 import StringWalk
 import Substring
@@ -375,6 +376,7 @@ registerBenchmark(StringMatch)
 registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringReplaceSubrange)
+registerBenchmark(StringSwitch)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
 registerBenchmark(SubstringTest)

@@ -53,9 +53,9 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
       : ctx(fn, onlyGuaranteedOpts,
             InstModCallbacks(
                 [this](SILInstruction *inst) { eraseInstruction(inst); },
-                [](SILInstruction *) {}, [](SILValue, SILValue) {},
-                [this](SingleValueInstruction *i, SILValue value) {
-                  eraseAndRAUWSingleValueInstruction(i, value);
+                [this](Operand *use, SILValue newValue) {
+                  use->set(newValue);
+                  worklist.insert(newValue);
                 })) {}
 
   void reset() {
@@ -118,14 +118,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     drainVisitedSinceLastMutationIntoWorklist();
   }
 
-  InstModCallbacks getCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *inst) { eraseInstruction(inst); },
-        [](SILInstruction *) {}, [](SILValue, SILValue) {},
-        [this](SingleValueInstruction *i, SILValue value) {
-          eraseAndRAUWSingleValueInstruction(i, value);
-        });
-  }
+  InstModCallbacks &getCallbacks() { return ctx.instModCallbacks; }
 
   bool visitSILInstruction(SILInstruction *i) {
     assert((isa<OwnershipForwardingTermInst>(i) ||

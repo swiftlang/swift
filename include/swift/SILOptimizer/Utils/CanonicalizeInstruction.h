@@ -29,6 +29,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
@@ -40,10 +41,18 @@ struct CanonicalizeInstruction {
   static constexpr const char *defaultDebugType = "sil-canonicalize";
   const char *debugType = defaultDebugType;
   DeadEndBlocks &deadEndBlocks;
+  InstModCallbacks callbacks;
 
   CanonicalizeInstruction(const char *passDebugType,
                           DeadEndBlocks &deadEndBlocks)
-      : deadEndBlocks(deadEndBlocks) {
+      : deadEndBlocks(deadEndBlocks),
+        callbacks(
+            [&](SILInstruction *toDelete) { killInstruction(toDelete); },
+            [&](SILInstruction *newInst) { notifyNewInstruction(newInst); },
+            [&](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              notifyHasNewUsers(newValue);
+            }) {
 #ifndef NDEBUG
     if (llvm::DebugFlag && !llvm::isCurrentDebugType(debugType))
       debugType = passDebugType;

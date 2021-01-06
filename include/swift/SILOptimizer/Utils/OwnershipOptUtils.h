@@ -21,6 +21,7 @@
 
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace swift {
 
@@ -28,8 +29,7 @@ namespace swift {
 struct JointPostDominanceSetComputer;
 
 struct OwnershipFixupContext {
-  std::function<void(SILInstruction *)> eraseNotify;
-  std::function<void(SILInstruction *)> newInstNotify;
+  InstModCallbacks callbacks;
   DeadEndBlocks &deBlocks;
   JointPostDominanceSetComputer &jointPostDomSetComputer;
 
