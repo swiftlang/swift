@@ -1907,6 +1907,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isolation == overriddenIsolation)
     return;
 
+  // If the overridden declaration is from Objective-C with no actor annotation,
+  // and the overriding declaration has been placed in a global actor, allow it.
+  if (overridden->hasClangNode() && !overriddenIsolation &&
+      isolation.getKind() == ActorIsolation::GlobalActor)
+    return;
+
   // Isolation mismatch. Diagnose it.
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
