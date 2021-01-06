@@ -180,18 +180,7 @@ public:
 class CanonicalizeOSSALifetime {
 public:
   /// Find the original definition of a potentially copied value.
-  ///
-  /// This use-def walk must be consistent with the def-use walks performed
-  /// within the canonicalizeValueLifetime() implementation.
-  static SILValue getCanonicalCopiedDef(SILValue v) {
-    while (true) {
-      if (auto *copy = dyn_cast<CopyValueInst>(v)) {
-        v = copy->getOperand();
-        continue;
-      }
-      return v;
-    }
-  }
+  static SILValue getCanonicalCopiedDef(SILValue v);
 
 private:
   /// If true, then debug_value instructions outside of non-debug

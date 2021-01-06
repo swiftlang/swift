@@ -21,11 +21,11 @@
 ///    destroys. Initializes `liveness`.
 ///
 /// 2. Find `def`s final destroy points based on its pruned
-///   liveness. Initializes `consumes` and inserts new destroy_value
-///   instructions.
+///    liveness. Initializes `consumes` and inserts new destroy_value
+///    instructions.
 ///
-/// 3. Rewrite `def`s original copies and destroys, inserting new copies
-/// where needed. Deletes original copies and destroys and inserts new copies.
+/// 3. Rewrite `def`s original copies and destroys, inserting new copies where
+///    needed. Deletes original copies and destroys and inserts new copies.
 ///
 /// See CanonicalOSSALifetime.h for examples.
 ///
@@ -56,6 +56,34 @@ STATISTIC(NumDestroysEliminated,
 STATISTIC(NumCopiesGenerated, "number of copy_value instructions created");
 STATISTIC(NumDestroysGenerated, "number of destroy_value instructions created");
 STATISTIC(NumUnknownUsers, "number of functions with unknown users");
+
+/// This use-def walk must be consistent with the def-use walks performed
+/// within the canonicalizeValueLifetime() implementation.
+SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
+  while (auto *copy = dyn_cast<CopyValueInst>(v)) {
+    auto def = copy->getOperand();
+    if (def.getOwnershipKind() == OwnershipKind::Owned) {
+      v = def;
+      continue;
+    }
+    if (auto borrowedVal = BorrowedValue::get(def)) {
+      // Any def's that aren't filtered out here must be handled by
+      // computeBorrowLiveness.
+      switch (borrowedVal->kind) {
+      case BorrowedValueKind::SILFunctionArgument:
+      case BorrowedValueKind::BeginBorrow:
+        return def;
+      case BorrowedValueKind::LoadBorrow:
+      case BorrowedValueKind::Phi:
+        break;
+      }
+    }
+    // This guaranteed value cannot be handled, treat the copy as an owned
+    // live range def instead.
+    return copy;
+  }
+  return v;
+}
 
 //===----------------------------------------------------------------------===//
 //                        MARK: Rewrite borrow scopes
@@ -224,7 +252,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       if (pruneDebug) {
         if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
           // Only instructions potentially outside current pruned liveness are
-          // insteresting.
+          // interesting.
           if (liveness.getBlockLiveness(dvi->getParent())
               != PrunedLiveBlocks::LiveOut) {
             recordDebugValue(dvi);
