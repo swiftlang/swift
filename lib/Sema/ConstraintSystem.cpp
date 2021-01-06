@@ -5180,15 +5180,15 @@ static Optional<Requirement> getRequirement(ConstraintSystem &cs,
 
   if (reqLoc->isConditionalRequirement()) {
     auto path = reqLocator->getPath();
-    auto *typeReqLoc =
+    auto *conformanceLoc =
         cs.getConstraintLocator(reqLocator->getAnchor(), path.drop_back());
 
     auto conformances = cs.getCheckedConformances();
     auto result = llvm::find_if(
         conformances,
-        [&typeReqLoc](
+        [&conformanceLoc](
             const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-                &conformance) { return conformance.first == typeReqLoc; });
+                &conformance) { return conformance.first == conformanceLoc; });
     assert(result != conformances.end());
 
     auto conformance = result->second;

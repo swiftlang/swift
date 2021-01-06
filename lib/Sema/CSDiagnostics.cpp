@@ -211,12 +211,12 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     return nullptr;
 
   auto path = locator->getPath();
-  auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
+  auto *conformanceLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
       solution.Conformances,
       [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-              &conformance) { return conformance.first == typeReqLoc; });
+              &conformance) { return conformance.first == conformanceLoc; });
   assert(result != solution.Conformances.end());
 
   auto conformance = result->second;

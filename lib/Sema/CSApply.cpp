@@ -7971,10 +7971,12 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   auto stmt = forEachStmtInfo.stmt;
   auto sequenceProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
-  auto contextualLocator = cs.getConstraintLocator(
-      target.getAsExpr(), LocatorPathElt::ContextualType());
-  auto sequenceConformance = solution.resolveConformance(
-      contextualLocator, sequenceProto);
+  auto contextualLocator = solution.getConstraintLocator(
+      target.getAsExpr(),
+      {LocatorPathElt::ContextualType(),
+       LocatorPathElt::ConformanceRequirement(sequenceProto)});
+  auto sequenceConformance =
+      solution.resolveConformance(contextualLocator, sequenceProto);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
 
@@ -8385,32 +8387,30 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 
 ProtocolConformanceRef Solution::resolveConformance(
     ConstraintLocator *locator, ProtocolDecl *proto) {
-  for (const auto &conformance : Conformances) {
-    if (conformance.first != locator)
-      continue;
-    if (conformance.second.getRequirement() != proto)
-      continue;
+  auto conformance = llvm::find_if(Conformances, [&locator](const auto &elt) {
+    return elt.first == locator;
+  });
 
-    // If the conformance doesn't require substitution, return it immediately.
-    auto conformanceRef = conformance.second;
-    if (conformanceRef.isAbstract())
-      return conformanceRef;
+  if (conformance == Conformances.end())
+    return ProtocolConformanceRef::forInvalid();
 
-    auto concrete = conformanceRef.getConcrete();
-    auto conformingType = concrete->getType();
-    if (!conformingType->hasTypeVariable())
-      return conformanceRef;
+  // If the conformance doesn't require substitution, return it immediately.
+  auto conformanceRef = conformance->second;
+  if (conformanceRef.isAbstract())
+    return conformanceRef;
 
-    // Substitute into the conformance type, then look for a conformance
-    // again.
-    // FIXME: Should be able to perform the substitution using the Solution
-    // itself rather than another conforms-to-protocol check.
-    Type substConformingType = simplifyType(conformingType);
-    return TypeChecker::conformsToProtocol(
-        substConformingType, proto, constraintSystem->DC);
-  }
+  auto concrete = conformanceRef.getConcrete();
+  auto conformingType = concrete->getType();
+  if (!conformingType->hasTypeVariable())
+    return conformanceRef;
 
-  return ProtocolConformanceRef::forInvalid();
+  // Substitute into the conformance type, then look for a conformance
+  // again.
+  // FIXME: Should be able to perform the substitution using the Solution
+  // itself rather than another conforms-to-protocol check.
+  Type substConformingType = simplifyType(conformingType);
+  return TypeChecker::conformsToProtocol(substConformingType, proto,
+                                         constraintSystem->DC);
 }
 
 bool Solution::hasType(ASTNode node) const {
