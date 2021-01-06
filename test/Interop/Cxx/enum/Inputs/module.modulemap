@@ -1,3 +1,4 @@
 module BoolEnums {
   header "bool-enums.h"
+  requires cplusplus
 }

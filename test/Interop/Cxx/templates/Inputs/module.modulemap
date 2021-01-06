@@ -1,67 +1,84 @@
 module ClassTemplateWithPrimitiveArgument {
   header "class-template-with-primitive-argument.h"
+  requires cplusplus
 }
 
 module NotPreDefinedClassTemplate {
   header "not-pre-defined-class-template.h"
+  requires cplusplus
 }
 
 module PartiallyPreDefinedClassTemplate {
   header "partially-pre-defined-class-template.h"
+  requires cplusplus
 }
 
 module FullyPreDefinedClassTemplate {
   header "fully-pre-defined-class-template.h"
+  requires cplusplus
 }
 
 module CanonicalTypes {
   header "canonical-types.h"
+  requires cplusplus
 }
 
 module ExplicitClassSpecialization {
   header "explicit-class-specialization.h"
+  requires cplusplus
 }
 
 module FunctionTemplates {
   header "function-templates.h"
+  requires cplusplus
 }
 
 module UsingDirective {
   header "using-directive.h"
+  requires cplusplus
 }
 
 module ClassTemplateEagerInstantiationProblems {
   header "class-template-eager-instantiation-problems.h"
+  requires cplusplus
 }
 
 module Mangling {
   header "mangling.h"
+  requires cplusplus
 }
 
 module LinkageOfSwiftSymbolsForImportedTypes {
   header "linkage-of-swift-symbols-for-imported-types.h"
+  requires cplusplus
 }
 
 module ClassTemplateVariadic {
   header "class-template-variadic.h"
+  requires cplusplus
 }
 
 module ClassTemplateNonTypeParameter {
   header "class-template-non-type-parameter.h"
+  requires cplusplus
 }
 
 module ClassTemplateTemplateParameter {
   header "class-template-template-parameter.h"
+  requires cplusplus
 }
 
 module ClassTemplateWithTypedef {
   header "class-template-with-typedef.h"
+  requires cplusplus
 }
 
 module ClassTemplateInNamespace {
   header "class-template-in-namespace.h"
+  requires cplusplus
 }
 
 module MemberTemplates {
   header "member-templates.h"
+  requires cplusplus
 }
