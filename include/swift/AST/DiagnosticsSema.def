@@ -3786,8 +3786,8 @@ ERROR(expression_unused_closure,none,
       "closure expression is unused", ())
 ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
-ERROR(expression_unused_lvalue,none,
-      "expression resolves to an unused %select{variable|property|subscript}0", (unsigned))
+WARNING(expression_unused_lvalue,none,
+        "expression resolves to an unused %select{variable|property|subscript}0", (unsigned))
 WARNING(expression_unused_result_call,none,
         "result of call to %0 is unused", (DeclName))
 WARNING(expression_unused_result_operator,none,
