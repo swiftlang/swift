@@ -16,8 +16,8 @@ extension AsyncSequence {
   public func reduce<Result>(_ initialResult: Result, _ nextPartialResult: (_ partialResult: Result, Element) async throws -> Result) async rethrows -> Result {
     var accumulator = initialResult
     var it = makeAsyncIterator()
-    while let element = await try it.next() {
-      accumulator = await try nextPartialResult(accumulator, element)
+    while let element = try await it.next() {
+      accumulator = try await nextPartialResult(accumulator, element)
     }
     return accumulator
   }
@@ -25,8 +25,8 @@ extension AsyncSequence {
   public func reduce<Result>(into initialResult: __owned Result, _ updateAccumulatingResult: (_ partialResult: inout Result, Element) async throws -> Void) async rethrows -> Result {
     var accumulator = initialResult
     var it = makeAsyncIterator()
-    while let element = await try it.next() {
-      await try updateAccumulatingResult(&accumulator, element)
+    while let element = try await it.next() {
+      try await updateAccumulatingResult(&accumulator, element)
     }
     return accumulator
   }

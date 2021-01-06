@@ -15,18 +15,18 @@ import Swift
 extension AsyncSequence {
   public func min(by areInIncreasingOrder: (Element, Element) async throws -> Bool) async rethrows -> Element? {
     var it = makeAsyncIterator()
-    guard var result = await try it.next() else { return nil }
-    while let e = await try it.next() {
-      if await try areInIncreasingOrder(e, result) { result = e }
+    guard var result = try await it.next() else { return nil }
+    while let e = try await it.next() {
+      if try await areInIncreasingOrder(e, result) { result = e }
     }
     return result
   }
   
   public func max(by areInIncreasingOrder: (Element, Element) async throws -> Bool) async rethrows -> Element? {
     var it = makeAsyncIterator()
-    guard var result = await try it.next() else { return nil }
-    while let e = await try it.next() {
-      if await try areInIncreasingOrder(result, e) { result = e }
+    guard var result = try await it.next() else { return nil }
+    while let e = try await it.next() {
+      if try await areInIncreasingOrder(result, e) { result = e }
     }
     return result
   }
@@ -34,10 +34,10 @@ extension AsyncSequence {
 
 extension AsyncSequence where Element: Comparable {
   public func min() async rethrows -> Element? {
-    return await try min(by: <)
+    return try await min(by: <)
   }
   
   public func max() async rethrows -> Element? {
-    return await try max(by: <)
+    return try await max(by: <)
   }
 }

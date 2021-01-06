@@ -41,7 +41,7 @@ public struct AsyncFilterSequence<Upstream>: AsyncSequence where Upstream: Async
     }
     
     public mutating func next() async rethrows -> Upstream.Element? {
-      guard let item = await try upstreamIterator?.next() else {
+      guard let item = try await upstreamIterator?.next() else {
         return nil
       }
       guard await predicate(item) else {
@@ -87,10 +87,10 @@ public struct AsyncTryFilterSequence<Upstream>: AsyncSequence where Upstream: As
     }
     
     public mutating func next() async throws -> Upstream.Element? {
-      guard let item = await try upstreamIterator?.next() else {
+      guard let item = try await upstreamIterator?.next() else {
         return nil
       }
-      guard await try predicate(item) else {
+      guard try await predicate(item) else {
       upstreamIterator?.cancel()
       upstreamIterator = nil
       return nil

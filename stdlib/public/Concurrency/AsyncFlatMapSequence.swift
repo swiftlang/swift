@@ -37,15 +37,15 @@ public struct AsyncFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>: As
     }
     
     public mutating func next() async rethrows -> SegmentOfResult.Element? {
-      if let item = await try currentIterator?.next() {
+      if let item = try await currentIterator?.next() {
         return item
       } else {
-        guard let item = await try upstreamIterator?.next() else {
+        guard let item = try await upstreamIterator?.next() else {
           return nil
         }
         let segment = await transform(item)
         currentIterator = segment.makeAsyncIterator()
-        return await try currentIterator?.next()
+        return try await currentIterator?.next()
       }
     }
     
@@ -85,15 +85,15 @@ public struct AsyncTryFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>:
     }
     
     public mutating func next() async throws -> SegmentOfResult.Element? {
-      if let item = await try currentIterator?.next() {
+      if let item = try await currentIterator?.next() {
         return item
       } else {
-        guard let item = await try upstreamIterator?.next() else {
+        guard let item = try await upstreamIterator?.next() else {
           return nil
         }
-        let segment = await try transform(item)
+        let segment = try await transform(item)
         currentIterator = segment.makeAsyncIterator()
-        return await try currentIterator?.next()
+        return try await currentIterator?.next()
       }
     }
     

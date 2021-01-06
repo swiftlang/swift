@@ -16,7 +16,7 @@ extension AsyncSequence {
   public func count() async rethrows -> Int {
     var count = 0
     var it = makeAsyncIterator()
-    while await try it.next() != nil {
+    while try await it.next() != nil {
       count += 1
     }
     return count

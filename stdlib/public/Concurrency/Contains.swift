@@ -15,8 +15,8 @@ import Swift
 extension AsyncSequence {
   public func contains(where predicate: (Element) async throws -> Bool) async rethrows -> Bool {
     var it = makeAsyncIterator()
-    while let e = await try it.next() {
-      if await try predicate(e) {
+    while let e = try await it.next() {
+      if try await predicate(e) {
         return true
       }
     }
