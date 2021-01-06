@@ -581,10 +581,6 @@ public:
 
   SILOptFunctionBuilder &FuncBuilder;
 
-  SILOpenedArchetypesTracker &OpenedArchetypesTracker;
-
-  InstructionCloner &Cloner;
-
   DeadEndBlocks &DeadEndBBs;
 
   OwnershipFixupContext &FixupCtx;
@@ -594,16 +590,10 @@ public:
   llvm::SmallVector<ApplyInst *, 8> lazyPropertyGetters;
 
   CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
-      SILOptFunctionBuilder &FuncBuilder,
-      SILOpenedArchetypesTracker &OpenedArchetypesTracker,
-      InstructionCloner &Cloner, DeadEndBlocks &DeadEndBBs,
+      SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs,
       OwnershipFixupContext &FixupCtx)
-      : SEA(SEA), FuncBuilder(FuncBuilder),
-        OpenedArchetypesTracker(OpenedArchetypesTracker), Cloner(Cloner),
-        DeadEndBBs(DeadEndBBs), FixupCtx(FixupCtx),
-        RunsOnHighLevelSil(RunsOnHighLevelSil) {
-    Cloner.getBuilder().setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
+      : SEA(SEA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
+        FixupCtx(FixupCtx), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
@@ -843,11 +833,16 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   }
 
   // Now process candidates.
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(Inst->getFunction());
   // Register the new archetype to be used.
   OpenedArchetypesTracker.registerOpenedArchetypes(VI);
+  // Use a cloner. It makes copying the instruction and remapping of
+  // opened archetypes trivial.
+  InstructionCloner Cloner(Inst->getFunction());
   Cloner.registerOpenedExistentialRemapping(
       OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
   auto &Builder = Cloner.getBuilder();
+  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
   llvm::SmallPtrSet<SILInstruction *, 16> Processed;
   // Now clone each candidate and replace the opened archetype
@@ -1401,14 +1396,11 @@ class SILCSE : public SILFunctionTransform {
     SILOptFunctionBuilder FuncBuilder(*this);
 
     auto *Fn = getFunction();
-    SILOpenedArchetypesTracker OpenedArchetypesTracker(Fn);
-    InstructionCloner Cloner(Fn);
     DeadEndBlocks DeadEndBBs(Fn);
     JointPostDominanceSetComputer Computer(DeadEndBBs);
     InstModCallbacks callbacks;
     OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
-    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, OpenedArchetypesTracker, Cloner,
-          DeadEndBBs, FixupCtx);
+    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 
     // Perform the traditional CSE.
