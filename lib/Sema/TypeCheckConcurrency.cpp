@@ -852,8 +852,9 @@ namespace {
     }
 
   private:
-    /// If the expression is a reference to `self`, return the 'self' parameter.
-    static VarDecl *getSelfReference(Expr *expr) {
+    /// If the expression is a reference to `self`, return the context of
+    /// the 'self' parameter.
+    static DeclContext *getSelfReferenceContext(Expr *expr) {
       // Look through identity expressions and implicit conversions.
       Expr *prior;
       do {
@@ -867,13 +868,25 @@ namespace {
 
       // 'super' references always act on self.
       if (auto super = dyn_cast<SuperRefExpr>(expr))
-        return super->getSelf();
+        return super->getSelf()->getDeclContext();
 
       // Declaration references to 'self'.
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto var = dyn_cast<VarDecl>(declRef->getDecl()))
+        if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
           if (var->isSelfParameter())
-            return var;
+            return var->getDeclContext();
+
+          // If this is a 'self' capture in a capture list, recurse through
+          // the capture list entry's initializer to find the original 'self'.
+          if (var->isSelfParamCapture()) {
+            for (auto capture : var->getParentCaptureList()->getCaptureList()) {
+              if (capture.Var == var) {
+                expr = capture.Init->getInit(0);
+                return getSelfReferenceContext(expr);
+              }
+            }
+          }
+        }
       }
 
       // Not a self reference.
@@ -1250,8 +1263,8 @@ namespace {
 
       case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
-        auto selfVar = getSelfReference(base);
-        if (!selfVar) {
+        auto *selfDC = getSelfReferenceContext(base);
+        if (!selfDC) {
           // actor-isolated non-self calls are implicitly async and thus OK.
           if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
             markNearestCallAsImplicitlyAsync();
@@ -1268,8 +1281,7 @@ namespace {
         }
 
         // Check whether the context of 'self' is actor-isolated.
-        switch (auto contextIsolation = getActorIsolation(
-                   cast<ValueDecl>(selfVar->getDeclContext()->getAsDecl()))) {
+        switch (auto contextIsolation = getActorIsolationOfContext(selfDC)) {
           case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
@@ -1312,8 +1324,7 @@ namespace {
 
         // Check whether we are in a context that will not execute concurrently
         // with the context of 'self'.
-        if (mayExecuteConcurrentlyWith(
-                getDeclContext(), selfVar->getDeclContext())) {
+        if (mayExecuteConcurrentlyWith(getDeclContext(), selfDC)) {
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_concurrent_access,
               member->getDescriptiveKind(), member->getName());
@@ -1871,13 +1882,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // Default isolation for this member.
   return defaultIsolation;
-}
-
-ActorIsolation swift::getActorIsolation(ValueDecl *value) {
-  auto &ctx = value->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, ActorIsolationRequest{value},
-      ActorIsolation::forUnspecified());
 }
 
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
