@@ -520,22 +520,27 @@ importer::getNormalInvocationArguments(
     invocationArgStrs.push_back(
         "-Werror=non-modular-include-in-framework-module");
 
+  bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+
   if (LangOpts.EnableObjCInterop) {
-    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
-    invocationArgStrs.insert(
-        invocationArgStrs.end(),
-        {"-x", EnableCXXInterop ? "objective-c++" : "objective-c",
-         EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11", "-fobjc-arc"});
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-fobjc-arc"});
     // TODO: Investigate whether 7.0 is a suitable default version.
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
+
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-x", EnableCXXInterop ? "objective-c++" : "objective-c",
+    });
   } else {
-    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-x", EnableCXXInterop ? "c++" : "c",
-                              EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11"});
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-x", EnableCXXInterop ? "c++" : "c",
+    });
   }
+
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+    EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11",
+  });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
