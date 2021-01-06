@@ -102,7 +102,7 @@ class ValidateIfConfigCondition :
     return nullptr;
   }
 
-  // Support '||' and '&&' operator. The procedence of '&&' is higher than '||'.
+  // Support '||' and '&&' operator. The precedence of '&&' is higher than '||'.
   // Invalid operator and the next operand are diagnosed and removed from AST.
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
