@@ -20,6 +20,7 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/AST/DependencyCollector.h"
+#include "swift/AST/RequestCache.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -63,15 +64,14 @@ private:
   /// downstream request as well. Note that uncached requests don't appear as
   /// keys in this map; their references are charged to the innermost cached
   /// active request.
-  llvm::DenseMap<AnyRequest, std::vector<DependencyCollector::Reference>>
-      requestReferences;
+  RequestReferences requestReferences;
 
   /// Stack of references from each cached active request. When evaluating a
   /// dependency sink request, we update the innermost set of references.
   /// Upon completion of a request, we union the completed request's references
   /// with the next innermost active request.
-  std::vector<llvm::DenseSet<DependencyCollector::Reference,
-                             DependencyCollector::Reference::Info>>
+  std::vector<llvm::SmallDenseSet<DependencyCollector::Reference, 2,
+                                  DependencyCollector::Reference::Info>>
       activeRequestReferences;
 
 #ifndef NDEBUG
@@ -83,21 +83,29 @@ private:
 
 public:
   /// Push a new empty set onto the activeRequestReferences stack.
-  void beginRequest(const swift::ActiveRequest &req);
+  template<typename Request>
+  void beginRequest();
 
   /// Pop the activeRequestReferences stack, and insert recorded references
   /// into the requestReferences map, as well as the next innermost entry in
   /// activeRequestReferences.
-  void endRequest(const swift::ActiveRequest &req);
+  template<typename Request>
+  void endRequest(const Request &req);
 
   /// When replaying a request whose value has already been cached, we need
   /// to update the innermost set in the activeRequestReferences stack.
-  void replayCachedRequest(const swift::ActiveRequest &req);
+  template<typename Request>
+  void replayCachedRequest(const Request &req);
 
   /// Upon completion of a dependency source request, we update the
   /// fileReferences map.
-  void handleDependencySourceRequest(const swift::ActiveRequest &req,
+  template<typename Request>
+  void handleDependencySourceRequest(const Request &req,
                                      SourceFile *source);
+
+  /// Clear the recorded dependencies of a request, if any.
+  template<typename Request>
+  void clearRequest(const Request &req);
 
 private:
   /// Add an entry to the innermost set on the activeRequestReferences stack.
@@ -120,6 +128,76 @@ public:
   void enumerateReferencesInFile(const SourceFile *SF,
                                  ReferenceEnumerator f) const ;
 };
+
+template<typename Request>
+void evaluator::DependencyRecorder::beginRequest() {
+  if (!Request::isEverCached && !Request::isDependencySource)
+    return;
+
+  activeRequestReferences.push_back({});
+}
+
+template<typename Request>
+void evaluator::DependencyRecorder::endRequest(const Request &req) {
+  if (!Request::isEverCached && !Request::isDependencySource)
+    return;
+
+  // Grab all the dependencies we've recorded so far, and pop
+  // the stack.
+  auto recorded = std::move(activeRequestReferences.back());
+  activeRequestReferences.pop_back();
+
+  // If we didn't record anything, there is nothing to do.
+  if (recorded.empty())
+    return;
+
+  // Convert the set of dependencies into a vector.
+  std::vector<DependencyCollector::Reference>
+      vec(recorded.begin(), recorded.end());
+
+  // The recorded dependencies bubble up to the parent request.
+  if (!activeRequestReferences.empty()) {
+    activeRequestReferences.back().insert(vec.begin(),
+                                          vec.end());
+  }
+
+  // Finally, record the dependencies so we can replay them
+  // later when the request is re-evaluated.
+  requestReferences.insert<Request>(std::move(req), std::move(vec));
+}
+
+template<typename Request>
+void evaluator::DependencyRecorder::replayCachedRequest(const Request &req) {
+  assert(req.isCached());
+
+  if (activeRequestReferences.empty())
+    return;
+
+  auto found = requestReferences.find_as<Request>(req);
+  if (found == requestReferences.end<Request>())
+    return;
+
+  activeRequestReferences.back().insert(found->second.begin(),
+                                        found->second.end());
+}
+
+template<typename Request>
+void evaluator::DependencyRecorder::handleDependencySourceRequest(
+    const Request &req,
+    SourceFile *source) {
+  auto found = requestReferences.find_as<Request>(req);
+  if (found != requestReferences.end<Request>()) {
+    fileReferences[source].insert(found->second.begin(),
+                                  found->second.end());
+  }
+}
+
+template<typename Request>
+void evaluator::DependencyRecorder::clearRequest(
+    const Request &req) {
+  requestReferences.erase(req);
+}
+
 } // end namespace evaluator
 
 } // end namespace swift
