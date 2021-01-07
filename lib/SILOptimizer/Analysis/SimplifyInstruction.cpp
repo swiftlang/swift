@@ -735,31 +735,6 @@ case BuiltinValueKind::id:
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock::iterator
-swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
-                              InstModCallbacks &callbacks) {
-  assert(svi != newValue && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!svi->use_empty()) {
-    Operand *use = *svi->use_begin();
-    SILInstruction *user = use->getUser();
-    // Erase the end of scope marker.
-    if (isEndOfScopeMarker(user)) {
-      if (&*nextii == user)
-        ++nextii;
-      callbacks.deleteInst(user);
-      continue;
-    }
-    callbacks.setUseValue(use, newValue);
-  }
-
-  callbacks.deleteInst(svi);
-
-  return nextii;
-}
-
 /// Replace an instruction with a simplified result, including any debug uses,
 /// and erase the instruction. If the instruction initiates a scope, do not
 /// replace the end of its scope; it will be deleted along with its parent.
