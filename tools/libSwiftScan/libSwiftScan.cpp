@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
@@ -104,6 +105,7 @@ void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
 //=== Scanner Functions ---------------------------------------------------===//
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
+  INITIALIZE_LLVM();
   return wrap(new DependencyScanningTool());
 }
 
@@ -153,13 +155,16 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
   auto ResultGraphs = new swiftscan_dependency_graph_t[BatchScanResult.size()];
   for (size_t i = 0; i < BatchScanResult.size(); ++i) {
     auto &ResultOrErr = BatchScanResult[i];
-    if (ResultOrErr.getError())
+    if (ResultOrErr.getError()) {
       ResultGraphs[i] = nullptr;
+      continue;
+    }
 
     ResultGraphs[i] = ResultOrErr.get();
   }
 
   Result->results = ResultGraphs;
+  Result->count = BatchScanResult.size();
   return Result;
 }
 
