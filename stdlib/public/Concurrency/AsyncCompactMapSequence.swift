@@ -37,7 +37,12 @@ public struct AsyncCompactMapSequence<Upstream, ElementOfResult>: AsyncSequence 
     
     public mutating func next() async rethrows -> ElementOfResult? {
       while true {
-        guard let item = try await upstreamIterator?.next() else {
+        guard var upstreamIterator = self.upstreamIterator else {
+          return nil
+        }
+        defer { self.upstreamIterator = upstreamIterator }
+
+        guard let item = try await upstreamIterator.next() else {
           return nil
         }
         if let transformed = await transform(item) {
@@ -80,16 +85,22 @@ public struct AsyncTryCompactMapSequence<Upstream, ElementOfResult>: AsyncSequen
     
     public mutating func next() async throws -> ElementOfResult? {
       while true {
-        guard let item = try await upstreamIterator?.next() else {
+        guard var upstreamIterator = self.upstreamIterator else {
+          return nil
+        }
+
+        guard let item = try await upstreamIterator.next() else {
           return nil
         }
         do {
           if let transformed = try await transform(item) {
+            self.upstreamIterator = upstreamIterator
             return transformed
           }
+          self.upstreamIterator = upstreamIterator
         } catch {
-          upstreamIterator?.cancel()
-          upstreamIterator = nil
+          upstreamIterator.cancel()
+          self.upstreamIterator = nil
           throw error
         }
       }

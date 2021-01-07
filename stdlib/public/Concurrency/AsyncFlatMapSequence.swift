@@ -35,17 +35,34 @@ public struct AsyncFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>: As
       self.upstreamIterator = upstreamIterator
       self.transform = transform
     }
+
+    mutating func nextUpstream() async rethrows -> SegmentOfResult.Element? {
+      guard var upstreamIterator = self.upstreamIterator else {
+        return nil
+      }
+
+      guard let item = try await upstreamIterator.next() else {
+        self.upstreamIterator = upstreamIterator
+        return nil
+      }
+      let segment = await transform(item)
+      var currentIterator = segment.makeAsyncIterator()
+      self.currentIterator = currentIterator
+      self.upstreamIterator = upstreamIterator
+      return try await currentIterator.next()
+    }
     
     public mutating func next() async rethrows -> SegmentOfResult.Element? {
-      if let item = try await currentIterator?.next() {
+      guard var currentIterator = self.currentIterator else {
+        return try await nextUpstream()
+      }
+
+      if let item = try await currentIterator.next() {
+        self.currentIterator = currentIterator
         return item
       } else {
-        guard let item = try await upstreamIterator?.next() else {
-          return nil
-        }
-        let segment = await transform(item)
-        currentIterator = segment.makeAsyncIterator()
-        return try await currentIterator?.next()
+        self.currentIterator = currentIterator
+        return try await nextUpstream()
       }
     }
     
@@ -83,17 +100,34 @@ public struct AsyncTryFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>:
       self.upstreamIterator = upstreamIterator
       self.transform = transform
     }
+
+    mutating func nextUpstream() async throws -> SegmentOfResult.Element? {
+      guard var upstreamIterator = self.upstreamIterator else {
+        return nil
+      }
+
+      guard let item = try await upstreamIterator.next() else {
+        self.upstreamIterator = upstreamIterator
+        return nil
+      }
+      let segment = try await transform(item)
+      var currentIterator = segment.makeAsyncIterator()
+      self.currentIterator = currentIterator
+      self.upstreamIterator = upstreamIterator
+      return try await currentIterator.next()
+    }
     
     public mutating func next() async throws -> SegmentOfResult.Element? {
-      if let item = try await currentIterator?.next() {
+      guard var currentIterator = self.currentIterator else {
+        return try await nextUpstream()
+      }
+
+      if let item = try await currentIterator.next() {
+        self.currentIterator = currentIterator
         return item
       } else {
-        guard let item = try await upstreamIterator?.next() else {
-          return nil
-        }
-        let segment = try await transform(item)
-        currentIterator = segment.makeAsyncIterator()
-        return try await currentIterator?.next()
+        self.currentIterator = currentIterator
+        return try await nextUpstream()
       }
     }
     

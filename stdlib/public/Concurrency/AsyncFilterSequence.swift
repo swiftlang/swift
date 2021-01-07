@@ -41,14 +41,20 @@ public struct AsyncFilterSequence<Upstream>: AsyncSequence where Upstream: Async
     }
     
     public mutating func next() async rethrows -> Upstream.Element? {
-      guard let item = try await upstreamIterator?.next() else {
+      guard var upstreamIterator = self.upstreamIterator else {
+        return nil
+      }
+
+      guard let item = try await upstreamIterator.next() else {
+        self.upstreamIterator = upstreamIterator
         return nil
       }
       guard await predicate(item) else {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
-      return nil
+        upstreamIterator.cancel()
+        self.upstreamIterator = nil
+        return nil
       }
+      self.upstreamIterator = upstreamIterator
       return item
     }
     
@@ -87,14 +93,19 @@ public struct AsyncTryFilterSequence<Upstream>: AsyncSequence where Upstream: As
     }
     
     public mutating func next() async throws -> Upstream.Element? {
-      guard let item = try await upstreamIterator?.next() else {
+      guard var upstreamIterator = self.upstreamIterator else {
+        return nil
+      }
+
+      guard let item = try await upstreamIterator.next() else {
         return nil
       }
       guard try await predicate(item) else {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
-      return nil
+        upstreamIterator.cancel()
+        self.upstreamIterator = nil
+        return nil
       }
+      self.upstreamIterator = upstreamIterator
       return item
     }
     
