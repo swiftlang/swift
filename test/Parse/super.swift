@@ -34,7 +34,7 @@ class D : B {
   }
 
   func super_calls() {
-    super.foo        // expected-error {{expression resolves to an unused property}}
+    super.foo        // expected-warning {{expression resolves to an unused property}}
     super.foo.bar    // expected-error {{value of type 'Int' has no member 'bar'}}
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
@@ -42,7 +42,7 @@ class D : B {
     super.init // expected-error{{no exact matches in reference to initializer}}
     super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
     super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}} // expected-error {{missing argument label 'x:' in call}}
-    super[0]        // expected-error {{expression resolves to an unused subscript}}
+    super[0]        // expected-warning {{expression resolves to an unused subscript}}
     super
       .bar()
   }

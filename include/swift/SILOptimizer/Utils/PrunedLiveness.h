@@ -90,14 +90,6 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 
-#ifdef NDEBUG
-#define SWIFT_ASSERT_ONLY_MEMBER(X)
-#define SWIFT_ASSERT_ONLY(X) do { } while (false)
-#else
-#define SWIFT_ASSERT_ONLY_MEMBER(X) X
-#define SWIFT_ASSERT_ONLY(X) do { X; } while (false)
-#endif
-
 namespace swift {
 
 /// Discover "pruned" liveness for an arbitrary set of uses. The client builds
@@ -140,12 +132,14 @@ private:
   llvm::SmallDenseMap<SILBasicBlock *, bool, 4> liveBlocks;
 
   // Once the first use has been seen, no definitions can be added.
-  SWIFT_ASSERT_ONLY_MEMBER(bool seenUse = false);
+  SWIFT_ASSERT_ONLY_DECL(bool seenUse = false);
 
 public:
   bool empty() const { return liveBlocks.empty(); }
 
   void clear() { liveBlocks.clear(); SWIFT_ASSERT_ONLY(seenUse = false); }
+
+  unsigned numLiveBlocks() const { return liveBlocks.size(); }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
     assert(!seenUse && "cannot initialize more defs with partial liveness");
@@ -212,10 +206,17 @@ public:
     users.clear();
   }
 
+  unsigned numLiveBlocks() const { return liveBlocks.numLiveBlocks(); }
+
   void initializeDefBlock(SILBasicBlock *defBB) {
     liveBlocks.initializeDefBlock(defBB);
   }
 
+  /// For flexibility, \p lifetimeEnding is provided by the
+  /// caller. PrunedLiveness makes no assumptions about the def-use
+  /// relationships that generate liveness. For example, use->isLifetimeEnding()
+  /// cannot distinguish the end of the borrow scope that defines this extended
+  /// live range vs. a nested borrow scope within the extended live range.
   void updateForUse(Operand *use, bool lifetimeEnding);
 
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb) const {

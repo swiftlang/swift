@@ -148,13 +148,6 @@ void Evaluator::printDependencies(
     out.resetColor();
   }
 
-  // Print the cached value, if known.
-  auto cachedValue = cache.find(request);
-  if (cachedValue != cache.end()) {
-    out << " -> ";
-    printEscapedString(cachedValue->second.getAsString(), out);
-  }
-
   if (!visitedAnywhere.insert(request).second) {
     // We've already seed this node. Check whether it's part of a cycle.
     if (std::find(visitedAlongPath.begin(), visitedAlongPath.end(), request)
@@ -313,11 +306,6 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
     out << " [label=\"";
     printEscapedString(request.getAsString(), out);
 
-    auto cachedValue = cache.find(request);
-    if (cachedValue != cache.end()) {
-      out << " -> ";
-      printEscapedString(cachedValue->second.getAsString(), out);
-    }
     out << "\"";
 
     if (auto color = getColor(request)) {
@@ -368,68 +356,6 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
 
 void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
-}
-
-void evaluator::DependencyRecorder::beginRequest(
-    const swift::ActiveRequest &req) {
-  if (!req.isCached() && !req.isDependencySource())
-    return;
-
-  activeRequestReferences.push_back({});
-}
-
-void evaluator::DependencyRecorder::endRequest(
-    const swift::ActiveRequest &req) {
-  if (!req.isCached() && !req.isDependencySource())
-    return;
-
-  // Grab all the dependencies we've recorded so far, and pop
-  // the stack.
-  auto recorded = std::move(activeRequestReferences.back());
-  activeRequestReferences.pop_back();
-
-  // If we didn't record anything, there is nothing to do.
-  if (recorded.empty())
-    return;
-
-  // Convert the set of dependencies into a vector.
-  std::vector<DependencyCollector::Reference>
-      vec(recorded.begin(), recorded.end());
-
-  // The recorded dependencies bubble up to the parent request.
-  if (!activeRequestReferences.empty()) {
-    activeRequestReferences.back().insert(vec.begin(),
-                                          vec.end());
-  }
-
-  // Finally, record the dependencies so we can replay them
-  // later when the request is re-evaluated.
-  requestReferences.insert({AnyRequest(req), vec});
-}
-
-void evaluator::DependencyRecorder::replayCachedRequest(
-    const swift::ActiveRequest &req) {
-  assert(req.isCached());
-
-  if (activeRequestReferences.empty())
-    return;
-
-  auto found = requestReferences.find_as(req);
-  if (found == requestReferences.end())
-    return;
-
-  activeRequestReferences.back().insert(found->second.begin(),
-                                        found->second.end());
-}
-
-void evaluator::DependencyRecorder::handleDependencySourceRequest(
-    const swift::ActiveRequest &req,
-    SourceFile *source) {
-  auto found = requestReferences.find_as(req);
-  if (found != requestReferences.end()) {
-    fileReferences[source].insert(found->second.begin(),
-                                  found->second.end());
-  }
 }
 
 void evaluator::DependencyRecorder::recordDependency(
