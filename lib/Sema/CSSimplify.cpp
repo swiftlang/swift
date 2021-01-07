@@ -10545,6 +10545,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto defaultImpact =
         restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 2;
 
+    // Consider conversion with context to be worse
+    // by default because it means that expression
+    // as a whole couldn't get to the expected type.
+    if (auto last = locator.last()) {
+      if (last->is<LocatorPathElt::ContextualType>())
+        ++defaultImpact;
+    }
+
     auto numConversions = ImplicitValueConversions.size();
     increaseScore(SK_ImplicitValueConversion,
                   defaultImpact * (numConversions + 1));
