@@ -1,24 +1,29 @@
 module UserA {
     header "user-a.h"
     export *
+    requires cplusplus
 }
 
 module UserB {
     header "user-b.h"
     export *
+    requires cplusplus
 }
 
 module UserC {
     header "user-c.h"
     export *
+    requires cplusplus
 }
 
 module DeclA {
     header "decl-a.h"
     export *
+    requires cplusplus
 }
 
 module DeclB {
     header "decl-b.h"
     export *
+    requires cplusplus
 }
