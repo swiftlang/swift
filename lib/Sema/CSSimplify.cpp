@@ -4269,11 +4269,16 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
-      break;
-
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
+      break;
+
+    // Let's wait until both sides are of the same optionality before
+    // attempting `.rawValue` fix.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::ValueToOptional))
+      break;
+
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
       break;
 
     // If there are any restrictions here we need to wait and let
