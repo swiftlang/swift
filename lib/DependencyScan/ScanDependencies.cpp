@@ -950,6 +950,13 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // before.
       pInstance = (*subInstanceMap)[entry.arguments].first.get();
       pCache = (*subInstanceMap)[entry.arguments].second.get();
+      // We must update the search paths of this instance to instead reflect those of the current
+      // invocation's.
+      for (auto &path : invocationInstance.getASTContext().SearchPathOpts.ImportSearchPaths)
+        pInstance->getASTContext().addSearchPath(path, false, false);
+      for (auto &path : invocationInstance.getASTContext().SearchPathOpts.FrameworkSearchPaths)
+        pInstance->getASTContext().addSearchPath(path.Path, true, path.IsSystem);
+
     } else {
       // Create a new instance by the arguments and save it in the map.
       subInstanceMap->insert(
