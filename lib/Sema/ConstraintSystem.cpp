@@ -86,6 +86,8 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
       DC->getParentModule()->isMainModule()) {
     Options |= ConstraintSystemFlags::DebugConstraints;
   }
+  if (Context.LangOpts.UseClangFunctionTypes)
+    Options |= ConstraintSystemFlags::UseClangFunctionTypes;
 }
 
 ConstraintSystem::~ConstraintSystem() {
