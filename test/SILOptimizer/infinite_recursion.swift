@@ -5,6 +5,10 @@ func a() {  // expected-warning {{all paths through this function will call itse
   a()
 }
 
+func throwing_func() throws {  // expected-warning {{all paths through this function will call itself}}
+  try throwing_func()
+}
+
 func b(_ x : Int) {  // expected-warning {{all paths through this function will call itself}}
   if x != 0 {
     b(x)
