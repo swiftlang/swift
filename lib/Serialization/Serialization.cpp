@@ -4492,7 +4492,8 @@ class ClangToSwiftBasicWriter :
 
 public:
   ClangToSwiftBasicWriter(Serializer &S, SmallVectorImpl<uint64_t> &record)
-    : S(S), Record(record), Types(*this) {}
+    : swift::DataStreamBasicWriter<ClangToSwiftBasicWriter>(S.getASTContext()),
+      S(S), Record(record), Types(*this) {}
 
   void writeUInt64(uint64_t value) {
     Record.push_back(value);
