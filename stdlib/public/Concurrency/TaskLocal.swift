@@ -13,7 +13,15 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif os(Windows)
+import CRT
+#else
+#error("Unsupported platform")
+#endif
 
 /// Namespace for declaring `TaskLocalKey`s.
 public enum TaskLocalValues {}
@@ -34,6 +42,34 @@ public protocol TaskLocalKey {
   /// if the type itself does not have a good "undefined" or "zero" value that could
   /// be used here.
   static var defaultValue: Value { get }
+
+  /// Allows configuring specialized inheritance strategies for task local values.
+  ///
+  /// By default, task local values are accessible by the current or any of its
+  /// child tasks (with this rule applying recursively).
+  ///
+  /// Some, rare yet important, use-cases may require specialized inheritance
+  /// strategies, and this property allows them to configure these for their keys.
+  static var inherit: TaskLocalInheritance { get }
+}
+
+extension TaskLocalKey {
+  static var inherit: TaskLocalInheritance { .default }
+}
+
+///
+// TODO: should likely remain extensible
+public enum TaskLocalInheritance: Int {
+  /// The default inheritance strategy.
+  ///
+  /// Task local values whose keys are `default` inherited are available to the
+  /// task which declared them, as well as recursively by any child tasks
+  case `default` = 0
+
+  /// Causes task local values to never be inherited.
+  /// If the parent task has a value bound using this key, and a child task
+  /// attempts to look up a value of that key, it will return `defaultValue`.
+  case never = 1
 }
 
 extension Task {
@@ -76,7 +112,7 @@ extension Task {
     _taskLocalValuePush(task, keyType: Key.self, value: value)
   
     defer {
-      _taskLocalValuePop(task, count: 1)
+      _taskLocalValuePop(task)
     }
 
     return await body()
@@ -101,7 +137,7 @@ extension Task {
     _taskLocalValuePush(task, keyType: Key.self, value: value)
 
     defer {
-      _taskLocalValuePop(task, count: 1)
+      _taskLocalValuePop(task)
     }
 
     return try! await body()
@@ -133,26 +169,20 @@ extension AnyTaskLocalKey: Hashable {
 
 // ==== ------------------------------------------------------------------------
 
-@_silgen_name("swift_task_localValuePush")
+@_silgen_name("swift_task_local_value_push")
 public func _taskLocalValuePush<Value>(
   _ task: Builtin.NativeObject,
   keyType: Any.Type/*Key.Type*/,
   value: __owned Value
-)
+) // where Key: TaskLocalKey
 
-@_silgen_name("swift_task_localValuePop")
+@_silgen_name("swift_task_local_value_pop")
 public func _taskLocalValuePop(
-  _ task: Builtin.NativeObject,
-  count: Int
+  _ task: Builtin.NativeObject
 )
 
-@_silgen_name("swift_task_localValueGet")
+@_silgen_name("swift_task_local_value_get")
 public func _taskLocalValueGet(
   _ task: Builtin.NativeObject,
   keyType: Any.Type/*Key.Type*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocalKey
-
-@_silgen_name("swift_task_hasTaskLocalValues")
-public func _taskHasTaskLocalValues(
-  _ task: Builtin.NativeObject
-) -> Bool

@@ -55,38 +55,36 @@ void TaskLocalValuesFragment::destroy() {
 void TaskLocalValuesFragment::initializeLinkParent(AsyncTask* task,
                                                    AsyncTask* parent) {
   assert(!head && "fragment was already initialized");
-  if (parent && parent->hasTaskLocalValues()) {
+  if (parent) {
     head = TaskLocalItem::createParentLink(task, parent);
   }
 }
 
 // =============================================================================
-// ==== push / pop / get -----------------------------------------------------------
+// ==== push / pop / get -------------------------------------------------------
 
 void TaskLocalValuesFragment::pushValue(AsyncTask *task,
                                         const Metadata *keyType,
                                         /* +1 */ OpaqueValue *value,
                                         const Metadata *valueType) {
-  assert(task->hasTaskLocalValues());
   assert(value && "Task local value must not be nil");
 
   auto item = TaskLocalItem::createLink(task, keyType, valueType);
   valueType->vw_initializeWithTake(item->getStoragePtr(), value);
 
-  fprintf(stderr, "error: %s [%s:%d] bound item: task=%d item=%d -> item.next=%d keyType=%d item->getStoragePtr=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
+  fprintf(stderr, "error: %s [%s:%d] PUSH bound item: task=%d item=%d -> item.next=%d keyType=%d item->getStoragePtr=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
           task, item, item->getNext(), keyType, item->getStoragePtr());
 
   head = item;
 }
 
 void TaskLocalValuesFragment::popValue(AsyncTask *task) {
-  assert(task->hasTaskLocalValues());
   assert(head && "attempted to pop value off empty task-local stack");
   head->destroy();
   head = head->getNext();
 }
 
-OpaqueValue *TaskLocalValuesFragment::get(const Metadata *keyType) {
+OpaqueValue *TaskLocalValuesFragment::get(const Metadata *keyType, const TaskLocalInheritance inherit) {
   assert(keyType && "Task.Local key must not be null.");
 
   auto item = head;
@@ -98,6 +96,13 @@ OpaqueValue *TaskLocalValuesFragment::get(const Metadata *keyType) {
     if (item->keyType == keyType) {
       return item->getStoragePtr();
     }
+
+    // if the hey is an `inherit = .never` type, we stop our search the first
+    // time we would be jumping to a parent task to continue the search.
+    if (item->getNextLinkType() == NextLinkType::IsParent &&
+        inherit == TaskLocalInheritance::never)
+      return nullptr;
+
     item = item->getNext();
   }
 

@@ -257,8 +257,7 @@ void swift_task_localValuePush(AsyncTask* task,
                          /* +1 */ OpaqueValue *value,
                          const Metadata *valueType);
 
-/// Remove task `count` local bindings from the task local binding stack.
-/// Crashes if `count` is greater if the number of task locals stored in the task.
+/// Remove task a local binding from the task local values stack.
 ///
 /// This must be only invoked by the task itself to avoid concurrent writes.
 ///
@@ -266,22 +265,11 @@ void swift_task_localValuePush(AsyncTask* task,
 ///
 /// \code
 ///  public func _taskLocalValuePop(
-///    _ task: Builtin.NativeObject,
-///    count: Int
+///    _ task: Builtin.NativeObject
 ///  )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_localValuePop(AsyncTask* task, int count);
-
-/// Checks if task (or any of its parent tasks) has task local values.
-///
-/// \code
-/// func swift_task_hasTaskLocalValues<Key>(
-///   _ task: Builtin.NativeObject,
-/// ) -> Bool
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_hasTaskLocalValues(AsyncTask* task);
+void swift_task_localValuePop(AsyncTask* task);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {
