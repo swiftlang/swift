@@ -514,10 +514,15 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
   Type instanceType =
     actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
 
+  auto metaRepr =
+    nominal->isResilient(SGM.SwiftModule, ResilienceExpansion::Maximal)
+    ? MetatypeRepresentation::Thick
+    : MetatypeRepresentation::Thin;
+
   ManagedValue actorMetaType =
     ManagedValue::forUnmanaged(B.createMetatype(loc,
       SILType::getPrimitiveObjectType(
-        CanMetatypeType::get(actorType, MetatypeRepresentation::Thin))));
+        CanMetatypeType::get(actorType, metaRepr))));
 
   RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaType,
     actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),

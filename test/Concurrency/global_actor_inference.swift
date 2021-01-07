@@ -19,6 +19,16 @@ struct GenericGlobalActor<T> {
 }
 
 // ----------------------------------------------------------------------
+// Check that MainActor exists
+// ----------------------------------------------------------------------
+
+@MainActor protocol Aluminium {
+  func method()
+}
+@MainActor class Copper {}
+@MainActor func iron() {}
+
+// ----------------------------------------------------------------------
 // Global actor inference for protocols
 // ----------------------------------------------------------------------
 
