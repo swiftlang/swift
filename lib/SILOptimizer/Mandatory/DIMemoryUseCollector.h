@@ -298,12 +298,10 @@ struct DIMemoryUse {
 
   /// For memory objects of (potentially recursive) tuple type, this keeps
   /// track of which tuple elements are affected.
-  unsigned short FirstElement, NumElements;
+  unsigned FirstElement, NumElements;
 
   DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
       : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-    assert(FE == FirstElement && NumElements == NE &&
-           "more than 64K elements not supported yet");
   }
 
   DIMemoryUse() : Inst(nullptr) {}
