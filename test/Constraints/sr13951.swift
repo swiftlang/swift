@@ -29,8 +29,16 @@ func aTransformer(input: Int) -> TheEnum {
 func theProblem(input: Int?) {
   var enumValue: TheEnum?
 
+  func test_arg_position(_: TheEnum?) {}
+
   if let input = input {
     enumValue = aTransformer(input: input) // Ok
+    let _: TheEnum? = enumValue // Ok
+    let _: TheEnum? = aTransformer(input: input)  // Ok
+    let _: TheEnum?? = enumValue // Ok
+    let _: TheEnum?? = aTransformer(input: input)  // Ok
+    test_arg_position(aTransformer(input: input)) // Ok
+    test_arg_position(enumValue) // Ok
   }
 
   _ = enumValue // To silence the warning
