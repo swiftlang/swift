@@ -12,10 +12,13 @@
 
 #include "ScanFixture.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "gtest/gtest.h"
+#include <string>
 
 using namespace swift;
 using namespace swift::unittest;
@@ -46,19 +49,18 @@ static bool emitFileWithContents(StringRef base, StringRef name,
 }
 
 TEST_F(ScanTest, TestModuleDeps) {
-  // Create test input file
-  auto TestFilePath = TemporaryTestWorkspace;
-  llvm::sys::path::append(TestFilePath, "foo.swift");
-  std::string TestPathStr = llvm::Twine(TestFilePath).str();
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleDeps", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
 
-  ASSERT_FALSE(
-      emitFileWithContents(TemporaryTestWorkspace, "foo.swift", "import A\n"));
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n"));
+  llvm::dbgs() << "Input File: " << TestPathStr << "\n";
 
   // Create includes
-  std::string IncludeDirPath =
-      createFilename(TemporaryTestWorkspace, "include");
+  std::string IncludeDirPath = createFilename(tempDir, "include");
   ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
-
   std::string CHeadersDirPath = createFilename(IncludeDirPath, "CHeaders");
   ASSERT_FALSE(llvm::sys::fs::create_directory(CHeadersDirPath));
   std::string SwiftDirPath = createFilename(IncludeDirPath, "Swift");
@@ -155,10 +157,27 @@ export *\n\
   auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
   llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
 
-  std::string Command = TestPathStr + " -I " + SwiftDirPath + " -I " +
-                        CHeadersDirPath + " -I " + StdLibDir.str().str() +
-                        " -I " + ShimsLibDir.str().str();
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command.c_str(), {});
+  std::vector<std::string> CommandStrArr = {
+    std::string("'") + TestPathStr + std::string("'"),
+    std::string("-I ") + std::string("'") + SwiftDirPath + std::string("'"),
+    std::string("-I ") + std::string("'") + CHeadersDirPath + std::string("'"),
+    std::string("-I ") + std::string("'") + StdLibDir.str().str() + std::string("'"),
+    std::string("-I ") + std::string("'") + ShimsLibDir.str().str() + std::string("'")
+  };
+
+  // On Windows we need to add an extra escape for path separator characters because otherwise
+  // the command line tokenizer will treat them as escape characters.
+  for (size_t i = 0; i < CommandStrArr.size(); ++i) {
+    std::replace(CommandStrArr[i].begin(), CommandStrArr[i].end(), '\\', '/');
+  }
+
+  std::vector<const char*> Command;
+  llvm::dbgs() << "Compiler Command: \n";
+  for (auto &command : CommandStrArr) {
+    Command.push_back(command.c_str());
+    llvm::dbgs() << command.c_str() << "\n";
+  }
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   // TODO: Output/verify dependency graph correctness
