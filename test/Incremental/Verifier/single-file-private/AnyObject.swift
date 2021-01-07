@@ -73,16 +73,9 @@ func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyOb
 // expected-member {{Swift.CustomStringConvertible.someMethod}}
 // expected-member {{Swift.CustomDebugStringConvertible.someMethod}}
 // expected-member {{Swift.Equatable.someMember}}
-// expected-member{{Swift.CustomDebugStringConvertible.init}}
 // expected-member{{Swift.CVarArg.someMember}}
 // expected-member{{Foundation._KeyValueCodingAndObservingPublishing.someMember}}
-// expected-member{{Swift.Equatable.init}}
-// expected-member{{Swift.Hashable.init}}
-// expected-member{{Swift.CVarArg.init}}
 // expected-member{{Foundation._KeyValueCodingAndObserving.someMember}}
-// expected-member{{Foundation._KeyValueCodingAndObservingPublishing.init}}
 // expected-member{{Swift.CustomDebugStringConvertible.someMember}}
 // expected-member{{Swift.CustomStringConvertible.someMember}}
-// expected-member{{Swift.CustomStringConvertible.init}}
 // expected-member{{Swift.Hashable.someMember}}
-// expected-member{{Foundation._KeyValueCodingAndObserving.init}}
