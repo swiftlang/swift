@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -97,7 +98,7 @@ class VJPCloner::Implementation final
     return witness->getConfig();
   }
 
-  Implementation(VJPCloner &parent, ADContext &context, SILFunction *original,
+  Implementation(VJPCloner &parent, ADContext &context,
                  SILDifferentiabilityWitness *witness, SILFunction *vjp,
                  DifferentiationInvoker invoker);
 
@@ -760,12 +761,13 @@ getActivityInfoHelper(ADContext &context, SILFunction *original,
 }
 
 VJPCloner::Implementation::Implementation(VJPCloner &cloner, ADContext &context,
-                                          SILFunction *original,
                                           SILDifferentiabilityWitness *witness,
                                           SILFunction *vjp,
                                           DifferentiationInvoker invoker)
-    : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
-      cloner(cloner), context(context), original(original), witness(witness),
+    : TypeSubstCloner(*vjp, *witness->getOriginalFunction(),
+                      getSubstitutionMap(witness->getOriginalFunction(), vjp)),
+      cloner(cloner), context(context),
+      original(witness->getOriginalFunction()), witness(witness),
       vjp(vjp), invoker(invoker),
       activityInfo(getActivityInfoHelper(
           context, original, witness->getConfig(), vjp)),
@@ -778,11 +780,10 @@ VJPCloner::Implementation::Implementation(VJPCloner &cloner, ADContext &context,
   context.recordGeneratedFunction(pullback);
 }
 
-VJPCloner::VJPCloner(ADContext &context, SILFunction *original,
+VJPCloner::VJPCloner(ADContext &context,
                      SILDifferentiabilityWitness *witness, SILFunction *vjp,
                      DifferentiationInvoker invoker)
-    : impl(*new Implementation(*this, context, original, witness, vjp,
-                               invoker)) {}
+    : impl(*new Implementation(*this, context, witness, vjp, invoker)) {}
 
 VJPCloner::~VJPCloner() { delete &impl; }
 
@@ -967,12 +968,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         origParam.getConvention()));
   }
 
-  Mangle::ASTMangler mangler;
-  auto pbName = original->getASTContext()
-                    .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
-                        original->getName(), AutoDiffLinearMapKind::Pullback,
-                        witness->getConfig()))
-                    .str();
+  Mangle::DifferentiationMangler mangler;
+  auto pbName = mangler.mangleLinearMap(
+      original, AutoDiffLinearMapKind::Pullback, config);
   // Set pullback generic signature equal to VJP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.
@@ -988,8 +986,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *pullback = fb.createFunction(
-      linkage, pbName, pbType, pbGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, vjp->isSerialized(),
+      linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
+      pbGenericEnv, original->getLocation(), original->isBare(),
+      IsNotTransparent, vjp->isSerialized(),
       original->isDynamicallyReplaceable());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));

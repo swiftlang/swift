@@ -1,47 +1,59 @@
 module AccessSpecifiers {
   header "access-specifiers.h"
+  requires cplusplus
 }
 
 module TypeClassification {
   header "type-classification.h"
+  requires cplusplus
 }
 
 module Constructors {
   header "constructors.h"
+  requires cplusplus
 }
 
 module ConstructorsObjC {
   header "constructors-objc.h"
+  requires cplusplus
 }
 
 module LoadableTypes {
   header "loadable-types.h"
+  requires cplusplus
 }
 
 module MemberwiseInitializer {
   header "memberwise-initializer.h"
+  requires cplusplus
 }
 
 module MemoryLayout {
   header "memory-layout.h"
+  requires cplusplus
 }
 
 module MemberVariables {
   header "member-variables.h"
+  requires cplusplus
 }
 
 module ProtocolConformance {
   header "protocol-conformance.h"
+  requires cplusplus
 }
 
 module SynthesizedInitializers {
   header "synthesized-initializers.h"
+  requires cplusplus
 }
 
 module DebugInfo {
   header "debug-info.h"
+  requires cplusplus
 }
 
 module NestedRecords {
   header "nested-records.h"
+  requires cplusplus
 }

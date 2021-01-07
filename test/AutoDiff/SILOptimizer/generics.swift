@@ -11,7 +11,7 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // Test PullbackCloner local buffer allocation.
 // Verify that local buffers are immediately set to zero.
 
-// CHECK-SIL-LABEL: sil private @AD__identity__pullback_src_0_wrt_0_{{16_Differentiation|s}}14DifferentiableRzl
+// CHECK-SIL-LABEL: sil private @identity16_Differentiation14DifferentiableRzlTJpSpSr
 // CHECK-SIL:      [[ORIG_COTAN:%.*]] = alloc_stack $τ_0_0.TangentVector
 // CHECK-SIL-NEXT: [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
 // CHECK-SIL-NEXT: [[ORIG_COTAN_METATYPE:%.*]] = metatype $@thick τ_0_0.TangentVector.Type

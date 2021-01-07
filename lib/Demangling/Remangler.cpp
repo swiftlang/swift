@@ -2120,6 +2120,27 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   Buffer << "Ty";
 }
 
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  auto childIt = node->begin();
+  mangle(*childIt++); // original
+  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
+    mangleDependentGenericSignature(*childIt++);
+  Buffer << "TJ";
+  mangle(*childIt++); // kind
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+}
+
+void Remangler::mangleAutoDiffFunctionKind(Node *node) {
+  Buffer << (char)node->getIndex();
+}
+
+void Remangler::mangleIndexSubset(Node *node) {
+  Buffer << node->getText();
+}
+
 void Remangler::mangleReadAccessor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "r");
 }
