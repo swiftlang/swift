@@ -291,7 +291,9 @@ namespace {
     bool IsSerializable = true;
 
     ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
-      : Impl(impl) {}
+      : DataStreamBasicWriter<ClangTypeSerializationChecker>(
+          impl.getClangASTContext()),
+        Impl(impl) {}
 
     void writeUInt64(uint64_t value) {}
     void writeIdentifier(const clang::IdentifierInfo *ident) {}
