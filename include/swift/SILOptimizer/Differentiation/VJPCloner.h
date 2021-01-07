@@ -39,9 +39,8 @@ public:
   ///
   /// The parent VJP cloner stores the original function and an empty
   /// to-be-generated pullback function.
-  explicit VJPCloner(ADContext &context, SILFunction *original,
-                     SILDifferentiabilityWitness *witness, SILFunction *vjp,
-                     DifferentiationInvoker invoker);
+  explicit VJPCloner(ADContext &context, SILDifferentiabilityWitness *witness,
+                     SILFunction *vjp, DifferentiationInvoker invoker);
   ~VJPCloner();
 
   ADContext &getContext() const;

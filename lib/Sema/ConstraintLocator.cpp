@@ -66,6 +66,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::KeyPathComponent:
   case ConstraintLocator::ConditionalRequirement:
   case ConstraintLocator::TypeParameterRequirement:
+  case ConstraintLocator::ConformanceRequirement:
   case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
   case ConstraintLocator::DynamicLookupResult:
   case ConstraintLocator::ContextualType:
@@ -394,6 +395,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       auto reqElt = elt.castTo<LocatorPathElt::TypeParameterRequirement>();
       out << "type parameter requirement #" << llvm::utostr(reqElt.getIndex());
       dumpReqKind(reqElt.getRequirementKind());
+      break;
+    }
+
+    case ConformanceRequirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::ConformanceRequirement>();
+      out << "conformance requirement (";
+      reqElt.getRequirement()->dumpRef(out);
+      out << ")";
       break;
     }
 
