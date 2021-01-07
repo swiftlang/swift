@@ -762,6 +762,20 @@ public:
   }
 };
 
+class LocatorPathElt::ConformanceRequirement final
+    : public StoredPointerElement<ProtocolDecl> {
+public:
+  ConformanceRequirement(ProtocolDecl *protocol)
+      : StoredPointerElement(PathElementKind::ConformanceRequirement,
+                             protocol) {}
+
+  ProtocolDecl *getRequirement() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ConformanceRequirement;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {
