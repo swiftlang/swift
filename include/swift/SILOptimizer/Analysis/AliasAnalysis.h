@@ -113,19 +113,12 @@ private:
   /// The computeMemoryBehavior() method uses this map to cache queries.
   llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
 
-  /// The AliasAnalysis cache can't directly map a pair of ValueBase pointers
-  /// to alias results because we'd like to be able to remove deleted pointers
-  /// without having to scan the whole map. So, instead of storing pointers we
-  /// map pointers to indices and store the indices.
-  ValueEnumerator<ValueBase*> AliasValueBaseToIndex;
-  
-  /// Same as AliasValueBaseToIndex, map a pointer to the indices for
-  /// MemoryBehaviorCache.
-  ///
-  /// NOTE: we do not use the same ValueEnumerator for the alias cache, 
-  /// as when either cache is cleared, we can not clear the ValueEnumerator
-  /// because doing so could give rise to collisions in the other cache.
-  ValueEnumerator<SILNode*> MemoryBehaviorNodeToIndex;
+  /// The caches can't directly map a pair of value/instruction pointers
+  /// to results because we'd like to be able to remove deleted instruction
+  /// pointers without having to scan the whole map. So, instead of storing
+  /// pointers we map pointers to indices and store the indices.
+  ValueEnumerator<ValueBase *> ValueToIndex;
+  ValueEnumerator<SILInstruction *> InstructionToIndex;
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
@@ -138,18 +131,7 @@ private:
   /// Returns True if memory of type \p T1 and \p T2 may alias.
   bool typesMayAlias(SILType T1, SILType T2, const SILFunction &F);
 
-  virtual void handleDeleteNotification(SILNode *node) override {
-    assert(node->isRepresentativeSILNodeInObject());
-
-    // The pointer 'node' is going away.  We can't scan the whole cache
-    // and remove all of the occurrences of the pointer. Instead we remove
-    // the pointer from the cache that translates pointers to indices.
-    auto value = dyn_cast<ValueBase>(node);
-    if (!value) return;
-
-    AliasValueBaseToIndex.invalidateValue(value);
-    MemoryBehaviorNodeToIndex.invalidateValue(node);
-  }
+  virtual void handleDeleteNotification(SILNode *node) override;
 
   virtual bool needsNotifications() override { return true; }
 
@@ -262,6 +244,8 @@ public:
   virtual void invalidate() override {
     AliasCache.clear();
     MemoryBehaviorCache.clear();
+    InstructionToIndex.clear();
+    ValueToIndex.clear();
   }
 
   virtual void invalidate(SILFunction *,
