@@ -241,7 +241,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    There is also a third option, which is somewhat more involved:
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
-   the tests.
+   the tests.  **Note:** until https://bugs.swift.org/browse/SR-13635 is fixed you
+   may need to add `--skip-test-cmark` to these commands.
    - Via Ninja:
      ```sh
      utils/build-script --skip-build-benchmarks \
