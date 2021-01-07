@@ -52,8 +52,7 @@ struct OwnershipFixupContext {
   /// Namely, we do not support RAUWing values with ValueOwnershipKind::None
   /// that have uses that do not require ValueOwnershipKind::None or
   /// ValueOwnershipKind::Any.
-  static bool canFixUpOwnershipForRAUW(const SingleValueInstruction *oldValue,
-                                       SILValue newValue);
+  static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue);
 };
 
 } // namespace swift

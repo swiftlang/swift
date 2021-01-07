@@ -721,11 +721,11 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 //===----------------------------------------------------------------------===//
 //                          Ownership Fixup Context
 //===----------------------------------------------------------------------===//
-//
-// Top level entry points to RAUW code.
-//
-bool OwnershipFixupContext::canFixUpOwnershipForRAUW(
-    const SingleValueInstruction *oldValue, SILValue newValue) {
+
+// All callers of our RAUW routines must ensure that their values return true
+// from this.
+bool OwnershipFixupContext::canFixUpOwnershipForRAUW(SILValue oldValue,
+                                                     SILValue newValue) {
   auto newOwnershipKind = newValue.getOwnershipKind();
 
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
@@ -734,9 +734,26 @@ bool OwnershipFixupContext::canFixUpOwnershipForRAUW(
   if (newOwnershipKind == OwnershipKind::None)
     return true;
 
+  // First check if oldValue is SILUndef. If it is, then we know that:
+  //
+  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
+  // 2. newValue is not OwnershipKind::None due to our check above.
+  //
+  // Thus we know that we would be replacing a value with OwnershipKind::None
+  // with a value with non-None ownership. This is a case we don't support, so
+  // we can bail now.
+  if (isa<SILUndef>(oldValue))
+    return false;
+
+  // Ok, we now know that we do not have SILUndef implying that we must be able
+  // to get a module from our value since we must have an argument or an
+  // instruction.
+  auto *m = oldValue->getModule();
+  assert(m);
+
   // If we are in Raw SIL, just bail at this point. We do not support
   // ownership fixups.
-  if (oldValue->getModule().getStage() == SILStage::Raw)
+  if (m->getStage() == SILStage::Raw)
     return false;
 
   // If our old ownership kind is ValueOwnershipKind::None and our new kind is
