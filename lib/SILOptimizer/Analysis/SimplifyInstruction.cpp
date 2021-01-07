@@ -780,7 +780,7 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
-    return ctx.replaceAllUsesAndEraseFixingOwnership(svi, result);
+    return ctx.replaceAllUsesAndErase(svi, result);
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
 }

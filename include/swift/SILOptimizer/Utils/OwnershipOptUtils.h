@@ -45,8 +45,7 @@ struct OwnershipFixupContext {
         deBlocks(deBlocks), jointPostDomSetComputer(inputJPDComputer) {}
 
   SILBasicBlock::iterator
-  replaceAllUsesAndEraseFixingOwnership(SingleValueInstruction *oldValue,
-                                        SILValue newValue);
+  replaceAllUsesAndErase(SingleValueInstruction *oldValue, SILValue newValue);
 
   /// We can not RAUW all old values with new values.
   ///

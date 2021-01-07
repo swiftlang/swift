@@ -759,8 +759,8 @@ bool OwnershipFixupContext::canFixUpOwnershipForRAUW(
 }
 
 SILBasicBlock::iterator
-OwnershipFixupContext::replaceAllUsesAndEraseFixingOwnership(
-    SingleValueInstruction *oldValue, SILValue newValue) {
+OwnershipFixupContext::replaceAllUsesAndErase(SingleValueInstruction *oldValue,
+                                              SILValue newValue) {
   OwnershipRAUWUtility utility{oldValue, newValue, *this};
   return utility.perform();
 }
