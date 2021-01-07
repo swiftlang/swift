@@ -38,12 +38,7 @@ public struct AsyncMapSequence<Upstream, Transformed>: AsyncSequence where Upstr
     }
     
     public mutating func next() async rethrows -> Transformed? {
-      guard var upstreamIterator = self.upstreamIterator else {
-        return nil
-      }
-      defer { self.upstreamIterator = upstreamIterator }
-
-      guard let item = try await upstreamIterator.next() else {
+      guard let item = try await upstreamIterator?.next() else {
         return nil
       }
       return await transform(item)
@@ -84,12 +79,7 @@ public struct AsyncTryMapSequence<Upstream, Transformed>: AsyncSequence where Up
     }
     
     public mutating func next() async throws -> Transformed? {
-      guard var upstreamIterator = self.upstreamIterator else {
-        return nil
-      }
-      defer { self.upstreamIterator = upstreamIterator }
-      
-      guard let item = try await upstreamIterator.next() else {
+      guard let item = try await upstreamIterator?.next() else {
         return nil
       }
       return try await transform(item)

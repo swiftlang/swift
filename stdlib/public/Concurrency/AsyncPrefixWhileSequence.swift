@@ -36,19 +36,14 @@ public struct AsyncPrefixWhileSequence<Upstream>: AsyncSequence where Upstream: 
     }
     
     public mutating func next() async rethrows -> Element? {
-      guard var upstreamIterator = self.upstreamIterator else {
-        return nil
-      }
-
-      guard let item = try await upstreamIterator.next() else {
+      guard let item = try await upstreamIterator?.next() else {
         return nil
       }
       guard await predicate(item) else {
-        upstreamIterator.cancel()
-        self.upstreamIterator = nil
+        upstreamIterator?.cancel()
+        upstreamIterator = nil
         return nil
       }
-      self.upstreamIterator = upstreamIterator
       return item
     }
     
@@ -85,20 +80,14 @@ public struct AsyncTryPrefixWhileSequence<Upstream>: AsyncSequence where Upstrea
     }
     
     public mutating func next() async throws -> Element? {
-      guard var upstreamIterator = self.upstreamIterator else {
-        return nil
-      }
-
-      guard let item = try await upstreamIterator.next() else {
-        self.upstreamIterator = upstreamIterator
+      guard let item = try await upstreamIterator?.next() else {
         return nil
       }
       guard try await predicate(item) else {
-        upstreamIterator.cancel()
-        self.upstreamIterator = nil
+        upstreamIterator?.cancel()
+        upstreamIterator = nil
         return nil
       }
-      self.upstreamIterator = upstreamIterator
       return item
     }
     

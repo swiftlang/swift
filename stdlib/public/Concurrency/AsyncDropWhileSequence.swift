@@ -37,12 +37,7 @@ public struct AsyncDropWhileSequence<Upstream>: AsyncSequence where Upstream: As
     
     public mutating func next() async rethrows -> Upstream.Element? {
       while true {
-        guard var upstreamIterator = self.upstreamIterator else {
-          return nil
-        }
-        defer { self.upstreamIterator = upstreamIterator }
-
-        guard let item = try await upstreamIterator.next() else {
+        guard let item = try await upstreamIterator?.next() else {
           return nil
         }
         if let predicate = self.predicate {
@@ -90,29 +85,21 @@ public struct AsyncTryDropWhileSequence<Upstream>: AsyncSequence where Upstream:
     
     public mutating func next() async throws -> Upstream.Element? {
       while true {
-        guard var upstreamIterator = self.upstreamIterator else {
-          return nil
-        }
-
-        guard let item = try await upstreamIterator.next() else {
-          self.upstreamIterator = upstreamIterator
+        guard let item = try await upstreamIterator?.next() else {
           return nil
         }
         if let predicate = self.predicate {
           do {
             if !(try await predicate(item)) {
               self.predicate = nil
-              self.upstreamIterator = upstreamIterator
               return item
             }
-            self.upstreamIterator = upstreamIterator
           } catch {
-            upstreamIterator.cancel()
-            self.upstreamIterator = nil
+            upstreamIterator?.cancel()
+            upstreamIterator = nil
             throw error
           }
         } else {
-          self.upstreamIterator = upstreamIterator
           return item
         }
       }
