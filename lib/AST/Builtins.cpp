@@ -2013,6 +2013,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   switch (D.Kind) {
   case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
+  case IITDescriptor::AMX:
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
