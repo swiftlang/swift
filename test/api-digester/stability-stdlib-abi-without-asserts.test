@@ -28,6 +28,8 @@
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
 
+// REQUIRES: rdar72856256
+
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
 
