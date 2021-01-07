@@ -5091,18 +5091,36 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto anchor = locator.getLocatorParts(path);
 
         // Try implicit CGFloat conversion only if:
-        // - This is not an explicit call to a CGFloat initializer;
+        // - This is not:
+        //     - an explicit call to a CGFloat initializer;
+        //     - an explicit coercion;
+        //     - a runtime type check (via `is` expression);
+        //     - a checked or conditional cast;
         // - This is a first type such conversion is attempted for
         //   for a given path (AST element).
 
-        bool isCGFloatInit = false;
-        if (auto *call = getAsExpr<CallExpr>(anchor)) {
-          if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-            isCGFloatInit = getInstanceType(typeExpr)->isCGFloatType();
+        auto isCGFloatInit = [&](ASTNode location) {
+          if (auto *call = getAsExpr<CallExpr>(location)) {
+            if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
+              return getInstanceType(typeExpr)->isCGFloatType();
+            }
           }
-        }
+          return false;
+        };
 
-        if (!isCGFloatInit &&
+        auto isCoercionOrCast = [](ASTNode anchor,
+                                   ArrayRef<LocatorPathElt> path) {
+          // e.g. contextual conversion from coercion/cast
+          // to some other type.
+          if (!path.empty())
+            return false;
+
+          return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
+                 isExpr<ConditionalCheckedCastExpr>(anchor) ||
+                 isExpr<ForcedCheckedCastExpr>(anchor);
+        };
+
+        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path) &&
             llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
               if (auto elt =
                       rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
