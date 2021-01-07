@@ -42,6 +42,7 @@
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
@@ -117,8 +118,8 @@ public:
   /// \param serializeFunctions specifies whether generated functions should be
   ///        serialized.
   bool canonicalizeDifferentiabilityWitness(
-      SILFunction *original, SILDifferentiabilityWitness *witness,
-      DifferentiationInvoker invoker, IsSerialized_t serializeFunctions);
+      SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
+      IsSerialized_t serializeFunctions);
 
   /// Process the given `differentiable_function` instruction, filling in
   /// missing derivative functions if necessary.
@@ -604,7 +605,7 @@ emitDerivativeFunctionReference(
           derivativeConstrainedGenSig, /*jvp*/ nullptr,
           /*vjp*/ nullptr, /*isSerialized*/ false);
       if (transformer.canonicalizeDifferentiabilityWitness(
-              originalFn, minimalWitness, invoker, IsNotSerialized))
+              minimalWitness, invoker, IsNotSerialized))
         return None;
     }
     assert(minimalWitness);
@@ -765,9 +766,10 @@ emitDerivativeFunctionReference(
 // `SILDifferentiabilityWitness` processing
 //===----------------------------------------------------------------------===//
 
-static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
+static SILFunction *createEmptyVJP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
                                    IsSerialized_t isSerialized) {
+  auto original = witness->getOriginalFunction();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating VJP:\n\t";
@@ -779,13 +781,9 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
   auto config = witness->getConfig();
 
   // === Create an empty VJP. ===
-  Mangle::ASTMangler mangler;
-  auto vjpName =
-      original->getASTContext()
-          .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
-              original->getName(), AutoDiffDerivativeFunctionKind::VJP,
-              witness->getConfig()))
-          .str();
+  Mangle::DifferentiationMangler mangler;
+  auto vjpName = mangler.mangleDerivativeFunction(
+      original, AutoDiffDerivativeFunctionKind::VJP, config);
   CanGenericSignature vjpCanGenSig;
   if (auto vjpGenSig = witness->getDerivativeGenericSignature())
     vjpCanGenSig = vjpGenSig->getCanonicalSignature();
@@ -801,9 +799,10 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto *vjp = fb.createFunction(
-      witness->getLinkage(), vjpName, vjpType, vjpGenericEnv,
-      original->getLocation(), original->isBare(), IsNotTransparent,
-      isSerialized, original->isDynamicallyReplaceable());
+      witness->getLinkage(),
+      context.getASTContext().getIdentifier(vjpName).str(), vjpType,
+      vjpGenericEnv, original->getLocation(), original->isBare(),
+      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
@@ -811,9 +810,10 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
   return vjp;
 }
 
-static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
+static SILFunction *createEmptyJVP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
                                    IsSerialized_t isSerialized) {
+  auto original = witness->getOriginalFunction();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating JVP:\n\t";
@@ -824,14 +824,9 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
   auto originalTy = original->getLoweredFunctionType();
   auto config = witness->getConfig();
 
-  // === Create an empty JVP. ===
-  Mangle::ASTMangler mangler;
-  auto jvpName =
-      original->getASTContext()
-          .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
-              original->getName(), AutoDiffDerivativeFunctionKind::JVP,
-              witness->getConfig()))
-          .str();
+  Mangle::DifferentiationMangler mangler;
+  auto jvpName = mangler.mangleDerivativeFunction(
+      original, AutoDiffDerivativeFunctionKind::JVP, config);
   CanGenericSignature jvpCanGenSig;
   if (auto jvpGenSig = witness->getDerivativeGenericSignature())
     jvpCanGenSig = jvpGenSig->getCanonicalSignature();
@@ -847,9 +842,10 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto *jvp = fb.createFunction(
-      witness->getLinkage(), jvpName, jvpType, jvpGenericEnv,
-      original->getLocation(), original->isBare(), IsNotTransparent,
-      isSerialized, original->isDynamicallyReplaceable());
+      witness->getLinkage(),
+      context.getASTContext().getIdentifier(jvpName).str(), jvpType,
+      jvpGenericEnv, original->getLocation(), original->isBare(),
+      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
@@ -891,15 +887,16 @@ static void emitFatalError(ADContext &context, SILFunction *f,
 
 /// Returns true on error.
 bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
-    SILFunction *original, SILDifferentiabilityWitness *witness,
-    DifferentiationInvoker invoker, IsSerialized_t serializeFunctions) {
+    SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
+    IsSerialized_t serializeFunctions) {
   std::string traceMessage;
   llvm::raw_string_ostream OS(traceMessage);
   OS << "processing ";
   witness->print(OS);
   OS << " on";
   OS.flush();
-  PrettyStackTraceSILFunction trace(traceMessage.c_str(), original);
+  PrettyStackTraceSILFunction trace(
+      traceMessage.c_str(), witness->getOriginalFunction());
 
   assert(witness->isDefinition());
 
@@ -910,12 +907,13 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with unsupported control flow.
     if (context.getASTContext()
             .LangOpts.EnableExperimentalForwardModeDifferentiation &&
-        (diagnoseNoReturn(context, original, invoker) ||
-         diagnoseUnsupportedControlFlow(context, original, invoker)))
+        (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
+         diagnoseUnsupportedControlFlow(
+             context, witness->getOriginalFunction(), invoker)))
       return true;
 
     // Create empty JVP.
-    auto *jvp = createEmptyJVP(context, original, witness, serializeFunctions);
+    auto *jvp = createEmptyJVP(context, witness, serializeFunctions);
     witness->setJVP(jvp);
     context.recordGeneratedFunction(jvp);
 
@@ -928,14 +926,14 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
-      if (original->getBlocks().size() > 1) {
+      if (witness->getOriginalFunction()->getBlocks().size() > 1) {
         context.emitNondifferentiabilityError(
-            original->getLocation().getSourceLoc(), invoker,
-            diag::autodiff_jvp_control_flow_not_supported);
+            witness->getOriginalFunction()->getLocation().getSourceLoc(),
+            invoker, diag::autodiff_jvp_control_flow_not_supported);
         return true;
       }
       // Emit JVP function.
-      JVPCloner cloner(context, original, witness, jvp, invoker);
+      JVPCloner cloner(context, witness, jvp, invoker);
       if (cloner.run())
         return true;
     } else {
@@ -944,7 +942,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
       emitFatalError(context, jvp,
                      "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
-                 << "Generated empty JVP for " << original->getName() << ":\n"
+                 << "Generated empty JVP for "
+                 << witness->getOriginalFunction()->getName() << ":\n"
                  << *jvp);
     }
   }
@@ -954,16 +953,17 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // Diagnose:
     // - Functions with no return.
     // - Functions with unsupported control flow.
-    if (diagnoseNoReturn(context, original, invoker) ||
-        diagnoseUnsupportedControlFlow(context, original, invoker))
+    if (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
+        diagnoseUnsupportedControlFlow(
+            context, witness->getOriginalFunction(), invoker))
       return true;
 
     // Create empty VJP.
-    auto *vjp = createEmptyVJP(context, original, witness, serializeFunctions);
+    auto *vjp = createEmptyVJP(context, witness, serializeFunctions);
     witness->setVJP(vjp);
     context.recordGeneratedFunction(vjp);
     // Emit VJP function.
-    VJPCloner cloner(context, original, witness, vjp, invoker);
+    VJPCloner cloner(context, witness, vjp, invoker);
     return cloner.run();
   }
   return false;
@@ -1440,11 +1440,9 @@ void Differentiation::run() {
   // Process all invokers.
   for (auto invokerPair : context.getInvokers()) {
     auto *witness = invokerPair.first;
-    auto *original = witness->getOriginalFunction();
     auto invoker = invokerPair.second;
-
     if (transformer.canonicalizeDifferentiabilityWitness(
-            original, witness, invoker, original->isSerialized()))
+            witness, invoker, witness->getOriginalFunction()->isSerialized()))
       errorOccurred = true;
   }
 

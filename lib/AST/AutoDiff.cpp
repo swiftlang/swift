@@ -558,3 +558,23 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   // Otherwise, tangent property is valid.
   return TangentPropertyInfo(tanField);
 }
+
+Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
+    AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffDerivativeFunctionKind::JVP:
+    return Demangle::AutoDiffFunctionKind::JVP;
+  case AutoDiffDerivativeFunctionKind::VJP:
+    return Demangle::AutoDiffFunctionKind::VJP;
+  }
+}
+
+Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
+    AutoDiffLinearMapKind kind) {
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential:
+    return Demangle::AutoDiffFunctionKind::Differential;
+  case AutoDiffLinearMapKind::Pullback:
+    return Demangle::AutoDiffFunctionKind::Pullback;
+  }
+}

@@ -77,7 +77,7 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
   auto *varDecl = new (astCtx) VarDecl(
       /*IsStatic*/ false, VarDecl::Introducer::Var,
       SourceLoc(), id, nominal);
-  varDecl->setAccess(nominal->getEffectiveAccess());
+  varDecl->setAccess(AccessLevel::Private);
   if (type->hasArchetype())
     varDecl->setInterfaceType(type->mapTypeOutOfContext());
   else

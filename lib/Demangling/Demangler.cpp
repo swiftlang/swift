@@ -2261,7 +2261,7 @@ NodePointer Demangler::popProtocolConformance() {
   return Conf;
 }
 
-  NodePointer Demangler::demangleThunkOrSpecialization() {
+NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
     case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
@@ -2331,7 +2331,7 @@ NodePointer Demangler::popProtocolConformance() {
           Node::Kind::GenericSpecializationPrespecialized);
     case 'i':
       return demangleGenericSpecialization(Node::Kind::InlinedGenericFunction);
-    case'p': {
+    case 'p': {
       NodePointer Spec = demangleSpecAttributes(Node::Kind::
                                                 GenericPartialSpecialization);
       NodePointer Param = createWithChild(Node::Kind::GenericSpecializationParam,
@@ -2479,9 +2479,43 @@ NodePointer Demangler::popProtocolConformance() {
       return createNode(Node::Kind::OutlinedBridgedMethod, Params);
     }
     case 'u': return createNode(Node::Kind::AsyncFunctionPointer);
+    case 'J': {
+      auto result = createNode(Node::Kind::AutoDiffFunction);
+      auto optionalGenSig = popNode(Node::Kind::DependentGenericSignature);
+      auto original = popNode();
+      result = addChild(result, original);
+      addChild(result, optionalGenSig);
+      auto kind = demangleAutoDiffFunctionKind();
+      if (!kind)
+        return nullptr;
+      result = addChild(result, kind);
+      result = addChild(result, demangleIndexSubset());
+      if (!nextIf('p')) return nullptr;
+      result = addChild(result, demangleIndexSubset());
+      if (!nextIf('r')) return nullptr;
+      return result;
+    }
     default:
       return nullptr;
   }
+}
+
+NodePointer Demangler::demangleAutoDiffFunctionKind() {
+  char kind = nextChar();
+  if (kind != 'f' && kind != 'r' && kind != 'd' && kind != 'p')
+    return nullptr;
+  return createNode(Node::Kind::AutoDiffFunctionKind, kind);
+}
+
+NodePointer Demangler::demangleIndexSubset() {
+  std::string str;
+  for (auto c = peekChar(); c == 'S' || c == 'U'; c = peekChar()) {
+    str.push_back(c);
+    (void)nextChar();
+  }
+  if (str.empty())
+    return nullptr;
+  return createNode(Node::Kind::IndexSubset, str);
 }
 
 std::string Demangler::demangleBridgedMethodParams() {
