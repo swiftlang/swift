@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang -c %S/Inputs/extern-var.cpp -I %S/Inputs -o %t/extern-var.o
+// RUN: %target-clangxx -c %S/Inputs/extern-var.cpp -I %S/Inputs -o %t/extern-var.o
 // RUN: %target-build-swift %s -I %S/Inputs -o %t/extern-var %t/extern-var.o -Xfrontend -enable-cxx-interop
 // RUN: %target-codesign %t/extern-var
 // RUN: %target-run %t/extern-var
