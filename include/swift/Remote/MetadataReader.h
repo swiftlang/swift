@@ -1131,7 +1131,7 @@ public:
   Demangle::NodePointer
   buildContextMangling(ContextDescriptorRef descriptor,
                        Demangler &dem) {
-    auto demangling = buildContextDescriptorMangling(descriptor, dem);
+    auto demangling = buildContextDescriptorMangling(descriptor, dem, 50);
     if (!demangling)
       return nullptr;
 
@@ -2104,9 +2104,13 @@ private:
 
   Demangle::NodePointer
   buildContextDescriptorMangling(const ParentContextDescriptorRef &descriptor,
-                                 Demangler &dem) {
+                                 Demangler &dem, int recursion_limit) {
+    if (recursion_limit <= 0) {
+      return nullptr;
+    }
+
     if (descriptor.isResolved()) {
-      return buildContextDescriptorMangling(descriptor.getResolved(), dem);
+      return buildContextDescriptorMangling(descriptor.getResolved(), dem, recursion_limit - 1);
     }
     
     // Try to demangle the symbol name to figure out what context it would
@@ -2124,7 +2128,11 @@ private:
 
   Demangle::NodePointer
   buildContextDescriptorMangling(ContextDescriptorRef descriptor,
-                                 Demangler &dem) {
+                                 Demangler &dem, int recursion_limit) {
+    if (recursion_limit <= 0) {
+      return nullptr;
+    }
+
     // Read the parent descriptor.
     auto parentDescriptorResult = readParentContextDescriptor(descriptor);
 
@@ -2141,7 +2149,7 @@ private:
     Demangle::NodePointer parentDemangling = nullptr;
     if (auto parentDescriptor = *parentDescriptorResult) {
       parentDemangling =
-        buildContextDescriptorMangling(parentDescriptor, dem);
+        buildContextDescriptorMangling(parentDescriptor, dem, recursion_limit - 1);
       if (!parentDemangling && !demangledParentNode)
         return nullptr;
     }
