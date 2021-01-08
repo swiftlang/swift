@@ -673,6 +673,11 @@ SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
                                                SILValue newValue,
                                                InstModCallbacks &callbacks);
 
+/// Low level routine that replaces the current value of \p use with \p
+/// newValue.
+SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
+                                         InstModCallbacks &callbacks);
+
 } // end namespace swift
 
 #endif
