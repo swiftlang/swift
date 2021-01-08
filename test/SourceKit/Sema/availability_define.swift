@@ -4,12 +4,15 @@
 
 // REQUIRES: OS=macosx
 
-@available(_iOS8Aligned, *)
-public func onMacOS10_10() {}
-// CHECK-NOT: key.line: 7,
-
+// Should fail.
 @available(_iOS9Aligned, *)
 public func onMacOS10_11() {}
-// CHECK: key.line: 11,
-// CHECK: key.column: 26,
-// CHECK: key.description: "expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'",
+// CHECK: key.line: 8
+// CHECK: key.description: "expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'"
+// CHECK: key.line: 8
+// CHECK: key.description: "expected declaration"
+
+// Should be OK.
+@available(_iOS8Aligned, *)
+public func onMacOS10_10() {}
+// CHECK-NOT: key.line
