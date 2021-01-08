@@ -329,7 +329,10 @@ public:
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
-  std::vector<const SILDebugScope *> DebugScopeStack;
+  ///
+  /// The boolean tracks whether this is a 'guard' scope, which should be
+  /// popped automatically when we leave the innermost BraceStmt scope.
+  std::vector<llvm::PointerIntPair<const SILDebugScope *, 1>> DebugScopeStack;
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
@@ -590,23 +593,32 @@ public:
   StringRef getMagicFunctionString();
 
   /// Enter the debug scope for \p Loc, creating it if necessary.
-  void enterDebugScope(SILLocation Loc) {
+  ///
+  /// \param isGuardScope If true, this is a scope for the bindings introduced by
+  /// a 'guard' statement. This scope ends when the next innermost BraceStmt ends.
+  void enterDebugScope(SILLocation Loc, bool isGuardScope=false) {
     auto *Parent =
-        DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
+        DebugScopeStack.size() ? DebugScopeStack.back().getPointer() : F.getDebugScope();
     auto *DS = Parent;
     // Don't nest a scope for Loc under Parent unless it's actually different.
-    if (Parent->getLoc().getAsRegularLocation() != Loc.getAsRegularLocation())
-      DS = DS = new (SGM.M)
-          SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
-    DebugScopeStack.push_back(DS);
+    if (DS->getLoc().getAsRegularLocation() != Loc.getAsRegularLocation()) {
+      DS = new (SGM.M)
+          SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), DS);
+    }
+    DebugScopeStack.emplace_back(DS, isGuardScope);
     B.setCurrentDebugScope(DS);
   }
 
   /// Return to the previous debug scope.
   void leaveDebugScope() {
+    // Pop any 'guard' scopes first.
+    while (DebugScopeStack.back().getInt())
+      DebugScopeStack.pop_back();
+
+    // Pop the scope we're leaving now.
     DebugScopeStack.pop_back();
     if (DebugScopeStack.size())
-      B.setCurrentDebugScope(DebugScopeStack.back());
+      B.setCurrentDebugScope(DebugScopeStack.back().getPointer());
     // Don't reset the debug scope after leaving the outermost scope,
     // because the debugger is not expecting the function epilogue to
     // be in a different scope.

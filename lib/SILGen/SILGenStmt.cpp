@@ -724,11 +724,14 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
       SGF.B.createUnreachable(S);
   }
 
-  // Emit the condition bindings, branching to the bodyBB if they fail.  Since
-  // we didn't push a scope, the bound variables are live after this statement.
+  // Emit the condition bindings, branching to the bodyBB if they fail.
   auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
   auto NumNonTaken = SGF.loadProfilerCount(S);
   SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
+
+  // Begin a new 'guard' scope, which is popped when the next innermost debug
+  // scope ends.
+  SGF.enterDebugScope(S, /*isGuardScope=*/true);
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {

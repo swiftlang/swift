@@ -2,8 +2,18 @@
 // RUN:   %FileCheck %s --check-prefix=CHECK1
 // RUN: %target-swift-frontend %s -c -emit-ir -g -o - | \
 // RUN:   %FileCheck %s --check-prefix=CHECK2
+// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | \
+// RUN:   %FileCheck %s --check-prefix=CHECK3
 
 // UNSUPPORTED: OS=watchos
+
+// With large type optimizations the string is passed indirectly on the
+// following architectures so there is no shadow copy happening. As this
+// tests that we're emitting the DI correctly, we can skip running on them.
+// UNSUPPORTED: CPU=i386
+// UNSUPPORTED: CPU=armv7
+// UNSUPPORTED: CPU=armv7s
+// UNSUPPORTED: CPU=armv7k
 
 func use<T>(_ t: T) {}
 
@@ -25,14 +35,6 @@ public func f(_ i : Int?)
   use(val)
 }
 
-// With large type optimizations the string is passed indirectly on the
-// following architectures so there is no shadow copy happening. As this
-// tests that we're emitting the DI correctly, we can skip running on them.
-// UNSUPPORTED: CPU=i386
-// UNSUPPORTED: CPU=armv7
-// UNSUPPORTED: CPU=armv7s
-// UNSUPPORTED: CPU=armv7k
-
 public func g(_ s : String?)
 {
   // CHECK2: define {{.*}}@"$s4main1gyySSSgF"
@@ -45,4 +47,33 @@ public func g(_ s : String?)
   // CHECK2: ![[G:.*]] = distinct !DISubprogram(name: "g"
   guard let val = s else { return }
   use(val)
+}
+
+public func h(_ s : String?)
+{
+  // CHECK3: define {{.*}}@"$s4main1hyySSSgF"
+  // CHECK3: %s.debug = alloca %TSSSg
+  // CHECK3: @llvm.dbg.declare(metadata %TSSSg*
+  // CHECK3: %s.debug1 = alloca %TSS
+  // CHECK3: @llvm.dbg.declare(metadata %TSS*
+  // CHECK3: %[[BITCAST:.*]] = bitcast %TSS* %s.debug1 to i8*{{$}}
+  // CHECK3: call void @llvm.memset.{{.*}}(i8* align {{(4|8)}} %[[BITCAST]], i8 0
+  // CHECK3: ![[G:.*]] = distinct !DISubprogram(name: "h"
+  guard let s = s else { return }
+  use(s)
+}
+
+enum MyError : Error {
+  case bad
+}
+
+enum Stuff {
+  case array([Stuff])
+  case any(Any)
+  case nothing
+
+  func toArray() throws -> [Stuff] {
+    guard case .array(let array) = self else { throw MyError.bad }
+    return array
+  }
 }
