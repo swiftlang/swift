@@ -1,3 +1,8 @@
 module CxxCreateObjects {
   header "CreateObjects.h"
 }
+
+module CxxGlobalVars {
+  header "GlobalVars.h"
+  requires cplusplus
+}

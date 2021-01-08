@@ -192,6 +192,7 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
+    cxx-source/GlobalVars
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES

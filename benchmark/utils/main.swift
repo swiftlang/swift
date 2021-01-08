@@ -86,6 +86,7 @@ import FlattenList
 import FloatingPointConversion
 import FloatingPointParsing
 import FloatingPointPrinting
+import GlobalVars
 import Hanoi
 import Hash
 import Histogram
@@ -280,6 +281,7 @@ registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointConversion)
 registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
+registerBenchmark(GlobalVars)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
