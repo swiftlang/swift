@@ -637,6 +637,42 @@ static bool isAsyncCall(const ApplyExpr *call) {
   return funcType->isAsync();
 }
 
+/// Extract the correct expression for diagnosing actor state being passed inout
+///
+/// This unwraps most expression types, working toward an offending DeclRefExpr
+/// or to the LookupExpr before the DeclRef.
+///
+/// The return will either be a LookupExpr or a DeclRefExpr.
+/// If part of the sub-expression isn't interesting, returns nullptr
+static const Expr *getInoutTopExpr(const InOutExpr *arg) {
+  const Expr * currentExpr = arg->getSubExpr();
+  while (currentExpr) {
+    if (const InOutExpr *inout = dyn_cast<InOutExpr>(currentExpr)) {
+      return nullptr; // The AST walker will hit this again
+    } else if (const LookupExpr *baseArg = dyn_cast<LookupExpr>(currentExpr)) {
+      if (isa<DeclRefExpr>(baseArg->getBase()))
+        return baseArg;
+      currentExpr = baseArg->getBase();
+    } else if (const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(currentExpr))
+      return declRef;
+    else if (const BindOptionalExpr *bindingOp =
+                 dyn_cast<BindOptionalExpr>(currentExpr))
+      currentExpr = bindingOp->getSubExpr();
+    else if (const ForceValueExpr *forceOp =
+                 dyn_cast<ForceValueExpr>(currentExpr))
+      currentExpr = forceOp->getSubExpr();
+    else if (const ImplicitConversionExpr *convExpr =
+                 dyn_cast<ImplicitConversionExpr>(currentExpr))
+      currentExpr = convExpr->getSubExpr();
+    else if (const IdentityExpr *identExpr =
+                 dyn_cast<IdentityExpr>(currentExpr))
+      currentExpr = identExpr->getSubExpr();
+    else
+      return currentExpr;
+  }
+  llvm_unreachable("The current expression is a nullptr!");
+}
+
 /// Determine whether we should diagnose data races within the current context.
 ///
 /// By default, we do this only in code that makes use of concurrency
@@ -958,29 +994,20 @@ namespace {
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
                           bool isPartialApply) {
-      
       // check that the call is actually async
       if (!isAsyncCall(call))
         return false;
 
-      Expr *subArg = arg->getSubExpr();
+      const Expr *subArg = getInoutTopExpr(arg);
+      if (subArg == nullptr) // Subexpression isn't interesting
+        return false;
       ValueDecl *valueDecl = nullptr;
-      if (auto binding = dyn_cast<BindOptionalExpr>(subArg))
-        subArg = binding->getSubExpr();
-      if (LookupExpr *baseArg = dyn_cast<LookupExpr>(subArg)) {
-        while (LookupExpr *nextLayer = dyn_cast<LookupExpr>(baseArg->getBase()))
-          baseArg = nextLayer;
-        // subArg: the actual property being passed inout
-        // baseArg: the property in the actor who's property is being passed
-        // inout
-
-        valueDecl = baseArg->getMember().getDecl();
-      } else if (DeclRefExpr *declExpr = dyn_cast<DeclRefExpr>(subArg)) {
+      if (const DeclRefExpr *declExpr = dyn_cast<DeclRefExpr>(subArg))
         valueDecl = declExpr->getDecl();
-      } else {
-        llvm_unreachable("Inout argument is neither a lookup nor decl.");
-      }
-      assert(valueDecl != nullptr && "valueDecl was never set!");
+      else if (const LookupExpr * member = dyn_cast<LookupExpr>(subArg))
+        valueDecl = member->getMember().getDecl();
+      else
+        llvm_unreachable("Unhandled expression type");
       auto isolation = ActorIsolationRestriction::forDeclaration(valueDecl);
       switch (isolation) {
       case ActorIsolationRestriction::Unrestricted:
