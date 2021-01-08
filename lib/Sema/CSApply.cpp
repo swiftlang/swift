@@ -7972,12 +7972,8 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   auto stmt = forEachStmtInfo.stmt;
   auto sequenceProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
-  auto contextualLocator = solution.getConstraintLocator(
-      target.getAsExpr(),
-      {LocatorPathElt::ContextualType(),
-       LocatorPathElt::ConformanceRequirement(sequenceProto)});
-  auto sequenceConformance =
-      solution.resolveConformance(contextualLocator, sequenceProto);
+  auto sequenceConformance = TypeChecker::conformsToProtocol(
+      forEachStmtInfo.sequenceType, sequenceProto, cs.DC);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
 
