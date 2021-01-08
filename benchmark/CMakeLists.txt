@@ -27,6 +27,7 @@ include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
     single-source/Ackermann
+    single-source/ActorRing
     single-source/AngryPhonebook
     single-source/AnyHashableWithAClass
     single-source/Array2D

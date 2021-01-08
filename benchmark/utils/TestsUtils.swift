@@ -33,6 +33,9 @@ public enum BenchmarkCategory : String {
   // Algorithms are "micro" that test some well-known algorithm in isolation:
   // sorting, searching, hashing, fibonaci, crypto, etc.
   case algorithm
+  
+  /// Actor runtime benchmark
+  case actor
 
   // Miniapplications are contrived to mimic some subset of application behavior
   // in a way that can be easily measured. They are larger than micro-benchmarks,

@@ -15,6 +15,7 @@
 import TestsUtils
 import DriverUtils
 import Ackermann
+import ActorRing
 import AngryPhonebook
 import AnyHashableWithAClass
 import Array2D
@@ -206,6 +207,7 @@ private func registerBenchmark<
 }
 
 registerBenchmark(Ackermann)
+registerBenchmark(ActorRing)
 registerBenchmark(AngryPhonebook)
 registerBenchmark(AnyHashableWithAClass)
 registerBenchmark(Array2D)
