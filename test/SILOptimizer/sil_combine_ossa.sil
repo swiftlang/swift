@@ -52,7 +52,8 @@ sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 sil [ossa] @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil [ossa] @use_nativeobject_owned : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil [ossa] @use_nativeobject_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-
+sil @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+sil @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 sil [ossa] @unknown : $@convention(thin) () -> ()
 
 //////////////////////
@@ -541,9 +542,9 @@ bb0(%0 : $Builtin.Int1):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_unchecked_ref_cast_round_trip
-// XHECK: bb0
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_unchecked_ref_cast_round_trip :
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'unchecked_ref_cast_unchecked_ref_cast_round_trip'
 sil [ossa] @unchecked_ref_cast_unchecked_ref_cast_round_trip : $@convention(thin) <T_0_0, T_0_1> (@owned HeapBufferStorage<T_0_0, T_0_1>) -> @owned HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
   %1 = unchecked_ref_cast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $Builtin.NativeObject
@@ -752,15 +753,193 @@ class C1 {}
 class C2 : C1 {}
 class C3 : C2 {}
 
-// CHECK-LABEL: sil [ossa] @upcast_upcast_merge
-// XHECK: bb0
-// XHECK-NEXT: upcast
-// XHECK-NEXT: return
-sil [ossa] @upcast_upcast_merge : $@convention(thin) (@owned C3) -> @owned C1 {
+sil @use_c2_owned : $@convention(thin) (@owned C2) -> ()
+sil @use_c2_guaranteed : $@convention(thin) (@guaranteed C2) -> ()
+sil @use_c2_unowned : $@convention(thin) (C2) -> ()
+
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_owned :
+// CHECK: bb0
+// CHECK-NEXT: upcast
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'upcast_upcast_merge_owned'
+sil [ossa] @upcast_upcast_merge_owned : $@convention(thin) (@owned C3) -> @owned C1 {
 bb0(%0 : @owned $C3):
   %1 = upcast %0 : $C3 to $C2
   %2 = upcast %1 : $C2 to $C1
   return %2 : $C1
+}
+
+// We sink in this case the original upcast into bb2 before its use.
+//
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_owned_different_bb :
+// CHECK: bb0([[ARG0:%.*]] : @owned $C3,
+// CHECK-NEXT: cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   upcast [[ARG0]] : $C3 to $C1
+// CHECK:   br bb3(
+//
+// CHECK: bb2:
+// CHECK:   [[ARG0_CAST:%.*]] = upcast [[ARG0]] : $C3 to $C2
+// CHECK:   apply {{%.*}}([[ARG0_CAST]])
+// CHECK: } // end sil function 'upcast_upcast_merge_owned_different_bb'
+sil [ossa] @upcast_upcast_merge_owned_different_bb : $@convention(thin) (@owned C3, @guaranteed C1) -> @owned C1 {
+bb0(%0 : @owned $C3, %0a : @guaranteed $C1):
+  %1 = upcast %0 : $C3 to $C2
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = upcast %1 : $C2 to $C1
+  br bb3(%2 : $C1)
+
+bb2:
+  %0aCopy = copy_value %0a : $C1
+  %useC2Owned = function_ref @use_c2_owned : $@convention(thin) (@owned C2) -> ()
+  apply %useC2Owned(%1) : $@convention(thin) (@owned C2) -> ()
+  br bb3(%0aCopy : $C1)
+
+bb3(%result : @owned $C1):
+  return %result : $C1
+}
+
+// In thsi case, we only have a destroy_value,s o we just put it on %0 and
+// eliminate it, implying we should have a single upcast.
+//
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_owned_different_bb_1 :
+// CHECK: upcast
+// CHECK-NOT: upcast
+// CHECK: } // end sil function 'upcast_upcast_merge_owned_different_bb_1'
+sil [ossa] @upcast_upcast_merge_owned_different_bb_1 : $@convention(thin) (@owned C3, @guaranteed C1) -> @owned C1 {
+bb0(%0 : @owned $C3, %0a : @guaranteed $C1):
+  %1 = upcast %0 : $C3 to $C2
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = upcast %1 : $C2 to $C1
+  br bb3(%2 : $C1)
+
+bb2:
+  %0aCopy = copy_value %0a : $C1
+  destroy_value %1 : $C2
+  br bb3(%0aCopy : $C1)
+
+bb3(%result : @owned $C1):
+  return %result : $C1
+}
+
+
+// We can't eliminate the first upcast, so we do not perform this opt and break
+// up the forwarding chain. This would be a less canonical representation since
+// it has unneeded ARC traffic.
+//
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_no_erase_owned :
+// CHECK: bb0([[ARG:%.*]] : @owned $C3):
+// CHECK: [[ARG_UPCAST:%.*]] = upcast [[ARG]]
+// CHECK: upcast [[ARG_UPCAST]]
+// CHECK: } // end sil function 'upcast_upcast_merge_no_erase_owned'
+sil [ossa] @upcast_upcast_merge_no_erase_owned : $@convention(thin) (@owned C3) -> @owned C1 {
+bb0(%0 : @owned $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %f = function_ref @use_c2_guaranteed : $@convention(thin) (@guaranteed C2) -> ()
+  apply %f(%1) : $@convention(thin) (@guaranteed C2) -> ()
+  %2 = upcast %1 : $C2 to $C1
+  return %2 : $C1
+}
+
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_guaranteed :
+// CHECK: bb0
+// CHECK-NEXT: upcast
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'upcast_upcast_merge_guaranteed'
+sil [ossa] @upcast_upcast_merge_guaranteed : $@convention(thin) (@guaranteed C3) -> @owned C1 {
+bb0(%0 : @guaranteed $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %2 = upcast %1 : $C2 to $C1
+  %3 = copy_value %2 : $C1
+  return %3 : $C1
+}
+
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_guaranteed_loop :
+// CHECK: bb0
+// CHECK: upcast
+// CHECK-NOT: upcast
+// CHECK: } // end sil function 'upcast_upcast_merge_guaranteed_loop'
+sil [ossa] @upcast_upcast_merge_guaranteed_loop : $@convention(thin) (@guaranteed C3, @owned C1) -> @owned C1 {
+bb0(%0 : @guaranteed $C3, %0b : @owned $C1):
+  %1 = upcast %0 : $C3 to $C2
+  br bb1
+
+bb1:
+  br bb2(%0b : $C1)
+
+bb2(%2a : @owned $C1):
+  cond_br undef, bb3, bb4
+
+bb3:
+  %3 = upcast %1 : $C2 to $C1
+  %4 = copy_value %3 : $C1
+  destroy_value %2a : $C1
+  br bb2(%4 : $C1)
+
+bb4:
+  return %2a : $C1
+}
+
+// We can't eliminate the first upcast, so we RAUW but have to do a copy.
+//
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_no_erase_guaranteed :
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C3):
+// CHECK:   [[OLD_UPCAST:%.*]] = upcast [[ARG]]
+// CHECK:   [[FUNC:%.*]] = function_ref @use_c2_guaranteed : $@convention(thin) (@guaranteed C2) -> ()
+// CHECK:   apply [[FUNC]]([[OLD_UPCAST]])
+// CHECK:   [[RESULT:%.*]] = upcast [[ARG]]
+// CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]]
+// CHECK:   return [[RESULT_COPY]]
+// CHECK: } // end sil function 'upcast_upcast_merge_no_erase_guaranteed'
+sil [ossa] @upcast_upcast_merge_no_erase_guaranteed : $@convention(thin) (@guaranteed C3) -> @owned C1 {
+bb0(%0 : @guaranteed $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %f = function_ref @use_c2_guaranteed : $@convention(thin) (@guaranteed C2) -> ()
+  apply %f(%1) : $@convention(thin) (@guaranteed C2) -> ()
+  %2 = upcast %1 : $C2 to $C1
+  %3 = copy_value %2 : $C1
+  return %3 : $C1
+}
+
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_unowned :
+// CHECK: bb0
+// CHECK-NEXT: upcast
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'upcast_upcast_merge_unowned'
+sil [ossa] @upcast_upcast_merge_unowned : $@convention(thin) (C3) -> @owned C1 {
+bb0(%0 : @unowned $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %2 = upcast %1 : $C2 to $C1
+  %3 = copy_value %2 : $C1
+  return %3 : $C1
+}
+
+// We can't eliminate the first upcast.
+//
+// CHECK-LABEL: sil [ossa] @upcast_upcast_merge_no_erase_unowned :
+// CHECK: bb0([[ARG:%.*]] : @unowned $C3):
+// CHECK:   [[OLD_UPCAST:%.*]] = upcast [[ARG]]
+// CHECK:   [[FUNC:%.*]] = function_ref @use_c2_unowned : $@convention(thin) (C2) -> ()
+// CHECK:   apply [[FUNC]]([[OLD_UPCAST]])
+// CHECK:   [[RESULT:%.*]] = upcast [[ARG]]
+// CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]]
+// CHECK:   return [[RESULT_COPY]]
+// CHECK: } // end sil function 'upcast_upcast_merge_no_erase_unowned'
+sil [ossa] @upcast_upcast_merge_no_erase_unowned : $@convention(thin) (C3) -> @owned C1 {
+bb0(%0 : @unowned $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %f = function_ref @use_c2_unowned : $@convention(thin) (C2) -> ()
+  apply %f(%1) : $@convention(thin) (C2) -> ()
+  %2 = upcast %1 : $C2 to $C1
+  %3 = copy_value %2 : $C1
+  return %3 : $C1
 }
 
 // CHECK-LABEL: sil [ossa] @dead_upcast
@@ -1178,10 +1357,9 @@ bb3:
   return %7 : $()
 }
 
-// (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_round_trip : $@convention(thin) (@owned B) -> @owned B {
-// XHECK: bb0
-// XHECK-NEXT: return
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'unchecked_ref_cast_round_trip'
 sil [ossa] @unchecked_ref_cast_round_trip : $@convention(thin) (@owned B) -> @owned B {
 bb0(%0 : @owned $B):
   %1 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
@@ -1191,8 +1369,9 @@ bb0(%0 : @owned $B):
 
 // (upcast X2->X (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x))) -> x
 // CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_round_trip : $@convention(thin) (@owned E) -> @owned E {
-// XHECK: bb0
-// XHECK-NEXT: return
+// CHECK-NOT: upcast
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'upcast_unchecked_ref_cast_round_trip'
 sil [ossa] @upcast_unchecked_ref_cast_round_trip : $@convention(thin) (@owned E) -> @owned E {
 bb0(%0 : @owned $E):
   %1 = upcast %0 : $E to $B
@@ -1277,9 +1456,9 @@ bb0(%0 : $*Builtin.NativeObject):
 class F : E {}
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_forwarding : $@convention(thin) (@owned B) -> @owned F {
-// XHECK: bb0([[INPUT_REF:%[0-9]+]] : @owned $B):
-// XHECK-NEXT: [[CAST_REF:%[0-9]+]] = unchecked_ref_cast [[INPUT_REF]] : $B to $F
-// XHECK-NEXT: return
+// CHECK: bb0([[INPUT_REF:%[0-9]+]] : @owned $B):
+// CHECK-NEXT: [[CAST_REF:%[0-9]+]] = unchecked_ref_cast [[INPUT_REF]] : $B to $F
+// CHECK-NEXT: return
 sil [ossa] @unchecked_ref_cast_forwarding : $@convention(thin) (@owned B) -> @owned F {
 bb0(%0 : @owned $B):
   %1 = unchecked_ref_cast %0 : $B to $E
@@ -1304,8 +1483,9 @@ bb0(%0 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_roundtrip : $@convention(thin) (@owned B) -> @owned B {
-// XHECK: bb0(
-// XHECK-NEXT: return
+// CHECK-NOT: unchecked_ref_cast
+// CHECK-NOT: upcast
+// CHECK: } // end sil function 'upcast_unchecked_ref_cast_roundtrip'
 sil [ossa] @upcast_unchecked_ref_cast_roundtrip : $@convention(thin) (@owned B) -> @owned B {
 bb0(%0 : @owned $B):
   %1 = unchecked_ref_cast %0 : $B to $E
@@ -1314,8 +1494,9 @@ bb0(%0 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_upcast_roundtrip : $@convention(thin) (@owned E) -> @owned E {
-// XHECK: bb0
-// XHECK-NEXT: return
+// CHECK-NOT: upcast
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'unchecked_ref_cast_upcast_roundtrip'
 sil [ossa] @unchecked_ref_cast_upcast_roundtrip : $@convention(thin) (@owned E) -> @owned E {
 bb0(%0 : @owned $E):
   %1 = upcast %0 : $E to $B
@@ -1324,8 +1505,9 @@ bb0(%0 : @owned $E):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_open_existential_ref : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
-// XHECK: bb0(%0 : @owned $AnyObject):
-// XHECK-NEXT: return %0 : $AnyObject
+// CHECK-NOT: open_existential_ref
+// CHECK-NOT: unchecked_ref_cast
+// CHECK: } // end sil function 'unchecked_ref_cast_open_existential_ref'
 sil [ossa] @unchecked_ref_cast_open_existential_ref : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
 bb0(%0 : @owned $AnyObject):
   %1 = open_existential_ref %0 : $AnyObject to $@opened("F06A1466-8414-11E5-81D5-685B35C48C83") AnyObject
@@ -1334,9 +1516,9 @@ bb0(%0 : @owned $AnyObject):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_upcast_combine : $@convention(thin) (@owned E) -> @owned Builtin.NativeObject {
-// XHECK: bb0
-// XHECK-NEXT: unchecked_ref_cast
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: return
 sil [ossa] @unchecked_ref_cast_upcast_combine : $@convention(thin) (@owned E) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $E):
   %1 = upcast %0 : $E to $B
@@ -1434,12 +1616,12 @@ bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
 } // end sil function 'do_not_peephole_convert_function'
 
 // CHECK-LABEL: sil [ossa] @upcast_formation : $@convention(thin) (@inout E, @owned E, @inout B) -> @owned B {
-// XHECK: bb0
-// XHECK-NEXT: upcast
-// XHECK-NEXT: load
-// XHECK-NEXT: upcast
-// XHECK-NEXT: store
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: upcast
+// CHECK-NEXT: load
+// CHECK-NEXT: upcast
+// CHECK-NEXT: store
+// CHECK-NEXT: return
 // CHECK: } // end sil function 'upcast_formation'
 sil [ossa] @upcast_formation : $@convention(thin) (@inout E, @owned E, @inout B) -> @owned B {
 bb0(%0 : $*E, %1 : @owned $E, %2 : $*B):
@@ -1798,8 +1980,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @bitcast_round_trips : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (Builtin.NativeObject, Builtin.RawPointer) {
-// XHECK-NOT: unchecked_ref_cast
-// XHECK-NOT: unchecked_trivial_bit_cast
+// CHECK-NOT: unchecked_ref_cast
+// CHECK-NOT: unchecked_trivial_bit_cast
+// CHECK: } // end sil function 'bitcast_round_trips'
 sil [ossa] @bitcast_round_trips : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (Builtin.NativeObject, Builtin.RawPointer) {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
   %2 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
@@ -1811,10 +1994,11 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 }
 
 // CHECK-LABEL: sil [ossa] @bitcast_combines : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (B, Optional<Builtin.Word>) {
-// XHECK: unchecked_ref_cast
-// XHECK-NOT: unchecked_bit_cast
+// CHECK: unchecked_ref_cast
+// CHECK-NOT: unchecked_bit_cast
 // XHECK: unchecked_trivial_bit_cast
 // XHECK-NOT: unchecked_trivial_bit_cast
+// CHECK: } // end sil function 'bitcast_combines'
 sil [ossa] @bitcast_combines : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (B, Optional<Builtin.Word>) {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
   %2 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
@@ -2360,12 +2544,12 @@ bb0(%0 : @guaranteed $B, %1 : @guaranteed $@sil_unowned B, %2 : @guaranteed $Any
   return %9999 : $(B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject)
 }
 
-// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast
-// XHECK:       bb0([[Ref:%.*]] : @guaranteed $MyClass):
-// XHECK-NOT:     init_existential_ref
-// XHECK-NOT:     open_existential_ref
-// XHECK:         unchecked_ref_cast [[Ref]]
-
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast :
+// CHECK:       bb0([[Ref:%.*]] : @guaranteed $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         unchecked_ref_cast [[Ref]]
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast'
 sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (@guaranteed MyClass) -> @owned Builtin.NativeObject {
 bb0(%0 : @guaranteed $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
@@ -2375,12 +2559,96 @@ bb0(%0 : @guaranteed $MyClass):
   return %3a : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_ref_to_raw_pointer
-// XHECK:       bb0([[Ref:%.*]] : @guaranteed $MyClass):
-// XHECK-NOT:     init_existential_ref
-// XHECK-NOT:     open_existential_ref
-// XHECK:         ref_to_raw_pointer [[Ref]]
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned :
+// CHECK:       bb0([[Ref:%.*]] : @owned $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         unchecked_ref_cast [[Ref]]
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned'
+sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned : $@convention(thin) (@owned MyClass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $MyClass):
+  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
 
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_diff_blocks_1 :
+// CHECK:       bb0([[Ref:%.*]] : @owned $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         unchecked_ref_cast [[Ref]]
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned_diff_blocks_1'
+sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_diff_blocks_1 : $@convention(thin) (@owned MyClass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $MyClass):
+  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
+  br bb1
+
+bb1:
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_diff_blocks_2 :
+// CHECK:       bb0([[Ref:%.*]] : @owned $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         unchecked_ref_cast [[Ref]]
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned_diff_blocks_2'
+sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_diff_blocks_2 : $@convention(thin) (@owned MyClass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $MyClass):
+  %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
+  br bb1
+
+bb1:
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  br bb2
+
+bb2:
+  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail :
+// CHECK:       bb0(
+// CHECK:     init_existential_ref
+// CHECK:     open_existential_ref
+// CHECK:         unchecked_ref_cast
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail'
+sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
+  %f = function_ref @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+  apply %f(%1) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail_2 :
+// CHECK:       bb0(
+// CHECK:     init_existential_ref
+// CHECK:     open_existential_ref
+// CHECK:         unchecked_ref_cast
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail_2'
+sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %f = function_ref @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  apply %f<@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject>(%2) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_ref_to_raw_pointer
+// CHECK:       bb0([[Ref:%.*]] : @guaranteed $MyClass):
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         ref_to_raw_pointer [[Ref]]
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_ref_to_raw_pointer'
 sil [ossa] @collapse_existential_pack_unpack_ref_to_raw_pointer : $@convention(thin) (@guaranteed MyClass) -> () {
 bb0(%0 : @guaranteed $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject

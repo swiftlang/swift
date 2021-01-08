@@ -194,6 +194,12 @@ public:
     return Worklist.replaceInstUsesWith(I, V);
   }
 
+  /// Perform use->set(value) and add use->user to the worklist.
+  void setUseValue(Operand *use, SILValue value) {
+    use->set(value);
+    Worklist.add(use->getUser());
+  }
+
   // This method is to be used when a value is found to be dead,
   // replaceable with another preexisting expression. Here we add all
   // uses of oldValue to the worklist, replace all uses of oldValue
@@ -347,9 +353,26 @@ public:
   bool optimizeIdentityCastComposition(ApplyInst *FInverse,
                                        StringRef FInverseName, StringRef FName);
 
-private:
+  /// Let \p user and \p value be two forwarding single value instructions with
+  /// the property that \p user, through potentially a chain of forwarding
+  /// instructions.
+  ///
+  /// Let \p user and \p value be two forwarding single value instructions  with
+  /// the property that \p value is the value that \p user forwards. In this
+  /// case, this helper routine will eliminate \p value if it can rewrite user
+  /// in terms of \p newValue. This is intended to handle cases where we have
+  /// completely different types so we need to actually create a new instruction
+  /// with a different result type.
+  ///
+  /// \param newValueGenerator Generator that produces the new value to
+  /// use. Conditionally called if we can perform the optimization.
+  SILInstruction *tryFoldComposedUnaryForwardingInstChain(
+      SingleValueInstruction *user, SingleValueInstruction *value,
+      function_ref<SILValue()> newValueGenerator);
+
   InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
 
+private:
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);

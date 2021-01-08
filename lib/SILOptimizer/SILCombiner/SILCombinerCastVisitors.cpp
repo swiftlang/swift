@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -95,16 +96,120 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
-  if (UCI->getFunction()->hasOwnership())
-    return nullptr;
+namespace {
 
-  // Ref to raw pointer consumption of other ref casts.
+/// A folder object for sequences of forwarding instructions that forward owned
+/// ownership. Is used to detect if we can delete the intermediate forwarding
+/// instructions without ownership issues and then allows the user to either
+/// delete all of the rest of the forwarding instructions and then replace front
+/// with a new value or set front's operand to a new value.
+class SingleBlockOwnedForwardingInstFolder {
+  SmallVector<SingleValueInstruction *, 4> rest;
+  SILCombiner &SC;
+  SingleValueInstruction *front;
+
+public:
+  SingleBlockOwnedForwardingInstFolder(
+      SILCombiner &SC, SingleValueInstruction *instructionToFold)
+      : SC(SC), front(instructionToFold) {
+    // If our initial instruction to fold isn't owned, set it to nullptr to
+    // indicate invalid.
+    if (SILValue(instructionToFold).getOwnershipKind() != OwnershipKind::Owned)
+      front = nullptr;
+  }
+
+  bool isValid() const { return bool(front); }
+
+  bool add(SingleValueInstruction *next) {
+    assert(isValid());
+    if (SILValue(next).getOwnershipKind() != OwnershipKind::Owned)
+      return false;
+
+    if (next->getSingleUse()) {
+      rest.push_back(next);
+      return true;
+    }
+
+    if (front->getParent() != next->getParent()) {
+      return false;
+    }
+
+    // Otherwise, since the two values are in the same block and we want to
+    // optimize only if our original value doesn't have any non-debug uses, we
+    // know that our value can only have a single non-debug use, the consuming
+    // user. So if we are not in that situation, bail.
+    if (!hasOneNonDebugUse(next))
+      return false;
+
+    rest.push_back(next);
+    return true;
+  }
+
+  /// Delete all forwarding uses and then RAUW front with newValue.
+  SingleValueInstruction *optimizeWithReplacement(SILValue newValue) && {
+    // NOTE: Even though after running cleanup rest, front now has its
+    // forwarding operand set to Undef, we haven't touched its result. So it is
+    // safe to RAUW.
+    cleanupRest();
+    SC.replaceValueUsesWith(front, newValue);
+    return nullptr;
+  }
+
+  /// Delete all forwarding uses and then set front's first operand to be \p
+  /// newValue.
+  SingleValueInstruction *optimizeWithSetValue(SILValue newValue) && {
+    cleanupRest();
+    assert(isa<SILUndef>(front->getOperand(0)));
+    front->setOperand(0, newValue);
+    SC.setUseValue(&front->getOperandRef(0), newValue);
+    return nullptr;
+  }
+
+private:
+  /// From backwards -> forwards, for each instruction in rest, delete all of
+  /// its debug uses and then set its single remaining use to be SILUndef.
+  ///
+  /// This means that after this runs front's forwarding operand is now
+  /// SILUndef.
+  void cleanupRest() & {
+    // We process backwards -> forwards. This cleans up everything but the front
+    // value.
+    while (!rest.empty()) {
+      auto *inst = rest.pop_back_val();
+      deleteAllDebugUses(inst, SC.getInstModCallbacks());
+      auto *next = inst->getSingleUse();
+      assert(next);
+      assert(rest.empty() || bool(next->getUser() == rest.back()));
+      next->set(SILUndef::get(next->get()->getType(), inst->getModule()));
+      SC.eraseInstFromFunction(*inst);
+    }
+  }
+};
+
+} // namespace
+
+SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
+  auto operand = uci->getOperand();
+
+  // %operandUpcast = upcast %0 : $X->Y
+  // %upcastInst = upcast %operandUpcast : $Y->Z
   //
-  // (upcast (upcast x)) -> (upcast x)
-  if (auto *Op = dyn_cast<UpcastInst>(UCI->getOperand())) {
-    UCI->setOperand(Op->getOperand());
-    return Op->use_empty() ? eraseInstFromFunction(*Op) : nullptr;
+  // %operandUpcast = upcast %0 : $X->Y
+  // %1 = upcast %0 : $X->Z
+  //
+  // If operandUpcast does not have any further uses, we delete it.
+  if (auto *operandAsUpcast = dyn_cast<UpcastInst>(operand)) {
+    if (operand.getOwnershipKind() != OwnershipKind::Owned) {
+      uci->setOperand(operandAsUpcast->getOperand());
+      return operandAsUpcast->use_empty()
+                 ? eraseInstFromFunction(*operandAsUpcast)
+                 : nullptr;
+    }
+    SingleBlockOwnedForwardingInstFolder folder(*this, uci);
+    if (folder.add(operandAsUpcast)) {
+      return std::move(folder).optimizeWithSetValue(
+          operandAsUpcast->getOperand());
+    }
   }
 
   return nullptr;
@@ -282,35 +387,92 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 }
 
 SILInstruction *
-SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
-  if (URCI->getFunction()->hasOwnership())
-    return nullptr;
+SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
+  // %0 = unchecked_ref_cast %x : $X->Y
+  // %1 = unchecked_ref_cast %0 : $Y->Z
+  //
+  // ->
+  //
+  // %0 = unchecked_ref_cast %x : $X->Y
+  // %1 = unchecked_ref_cast %x : $X->Z
+  //
+  // NOTE: For owned values, we only perform this optimization if we can
+  // guarantee that we can eliminate the initial unchecked_ref_cast.
+  if (auto *otherURCI = dyn_cast<UncheckedRefCastInst>(urci->getOperand())) {
+    SILValue otherURCIOp = otherURCI->getOperand();
+    if (otherURCIOp.getOwnershipKind() != OwnershipKind::Owned) {
+      return Builder.createUncheckedRefCast(urci->getLoc(), otherURCIOp,
+                                            urci->getType());
+    }
+    SingleBlockOwnedForwardingInstFolder folder(*this, urci);
+    if (folder.add(otherURCI)) {
+      auto *newValue = Builder.createUncheckedRefCast(
+          urci->getLoc(), otherURCIOp, urci->getType());
+      return std::move(folder).optimizeWithReplacement(newValue);
+    }
+  }
 
-  // (unchecked-ref-cast (unchecked-ref-cast x X->Y) Y->Z)
-  //   ->
-  // (unchecked-ref-cast x X->Z)
-  if (auto *OtherURCI = dyn_cast<UncheckedRefCastInst>(URCI->getOperand()))
-    return Builder.createUncheckedRefCast(URCI->getLoc(),
-                                          OtherURCI->getOperand(),
-                                          URCI->getType());
+  // %0 = upcast %x : $X->Y
+  // %1 = unchecked_ref_cast %0 : $Y->Z
+  //
+  // ->
+  //
+  // %0 = upcast %x : $X->Y
+  // %1 = unchecked_ref_cast %x : $X->Z
+  //
+  // NOTE: For owned values, we only perform this optimization if we can
+  // guarantee that we can eliminate the upcast.
+  if (auto *ui = dyn_cast<UpcastInst>(urci->getOperand())) {
+    SILValue uiOp = ui->getOperand();
 
-  // (unchecked_ref_cast (upcast x X->Y) Y->Z) -> (unchecked_ref_cast x X->Z)
-  if (auto *UI = dyn_cast<UpcastInst>(URCI->getOperand()))
-    return Builder.createUncheckedRefCast(URCI->getLoc(),
-                                              UI->getOperand(),
-                                              URCI->getType());
+    if (uiOp.getOwnershipKind() != OwnershipKind::Owned) {
+      return Builder.createUncheckedRefCast(urci->getLoc(), uiOp,
+                                            urci->getType());
+    }
 
-  if (URCI->getType() != URCI->getOperand()->getType() &&
-      URCI->getType().isExactSuperclassOf(URCI->getOperand()->getType()))
-    return Builder.createUpcast(URCI->getLoc(), URCI->getOperand(),
-                                URCI->getType());
+    SingleBlockOwnedForwardingInstFolder folder(*this, urci);
+    if (folder.add(ui)) {
+      auto *newValue =
+          Builder.createUncheckedRefCast(urci->getLoc(), uiOp, urci->getType());
+      return std::move(folder).optimizeWithReplacement(newValue);
+    }
+  }
 
-  // (unchecked_ref_cast (open_existential_ref (init_existential_ref X))) ->
-  // (unchecked_ref_cast X)
-  if (auto *OER = dyn_cast<OpenExistentialRefInst>(URCI->getOperand()))
-    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
-      return Builder.createUncheckedRefCast(URCI->getLoc(), IER->getOperand(),
-                                            URCI->getType());
+  // This is an exact transform where we are replacing urci with an upcast on
+  // the same value. So from an ownership perspective because both instructions
+  // are forwarding and we are eliminating urci, we are safe.
+  if (urci->getType() != urci->getOperand()->getType() &&
+      urci->getType().isExactSuperclassOf(urci->getOperand()->getType()))
+    return Builder.createUpcast(urci->getLoc(), urci->getOperand(),
+                                urci->getType());
+
+  // %0 = init_existential_ref %x : $X -> Existential
+  // %1 = open_existential_ref %0 : $Existential -> @opened() Existential
+  // %2 = unchecked_ref_cast %1
+  //
+  // ->
+  //
+  // %0 = init_existential_ref %x : $X -> Existential
+  // %1 = open_existential_ref %0 : $Existential -> @opened() Existential
+  // %2 = unchecked_ref_cast %x
+  //
+  // NOTE: When we have an owned value, we only perform this optimization if we
+  // can remove both the open_existential_ref and the init_existential_ref.
+  if (auto *oer = dyn_cast<OpenExistentialRefInst>(urci->getOperand())) {
+    if (auto *ier = dyn_cast<InitExistentialRefInst>(oer->getOperand())) {
+      if (ier->getOwnershipKind() != OwnershipKind::Owned) {
+        return Builder.createUncheckedRefCast(urci->getLoc(), ier->getOperand(),
+                                              urci->getType());
+      }
+
+      SingleBlockOwnedForwardingInstFolder folder(*this, urci);
+      if (folder.add(oer) && folder.add(ier)) {
+        auto *newValue = Builder.createUncheckedRefCast(
+            urci->getLoc(), ier->getOperand(), urci->getType());
+        return std::move(folder).optimizeWithReplacement(newValue);
+      }
+    }
+  }
 
   return nullptr;
 }
