@@ -88,22 +88,24 @@
 //      alloc_stack %stack
 //      %elem1borrow = begin_borrow %elem1copy
 //      store_borrow %elem1borrow to %stack
-//      end_borrow %elem1borrow
 //      try_apply %body(%stack) normal normalbb1, error errbb1
 //
 //    errbb1(%error : @owned $Error):
-//       br bb2(%error)
+//      end_borrow %elem1borrow
+//      br bb2(%error)
 //
 //    normalbb1(%res : $()):
+//      end_borrow %elem1borrow
 //      %elem2borrow = begin_borrow %elem2copy
 //      store_borrow %elem2borrow to %stack
-//      end_borrow %elem2borrow
 //      try_apply %body(%stack) normal bb1, error errbb2
 //
 //    errbb2(%error : @owned $Error):
-//       br bb2(%error)
+//      end_borrow %elem2borrow
+//      br bb2(%error)
 //
 //    bb1(%res : $()):
+//      end_borrow %elem2borrow
 //      dealloc_stack %stack
 //      ...
 //    bb2(%error : @owned $Error):
@@ -499,12 +501,16 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   // A generator for creating a basic block for use as the target of the
   // "error" branch of a try_apply. The error block created here will always
   // jump to the error target of the original forEach.
-  auto errorTargetGenerator = [&](SILBasicBlock *insertionBlock) {
+  auto errorTargetGenerator = [&](SILBasicBlock *insertionBlock,
+                                  SILValue borrowedElem ) {
     SILBasicBlock *newErrorBB = fun->createBasicBlockBefore(insertionBlock);
     SILValue argument = newErrorBB->createPhiArgument(
         errorArgument->getType(), errorArgument->getOwnershipKind());
     // Make the errorBB jump to the error target of the original forEach.
     SILBuilderWithScope builder(newErrorBB, forEachCall);
+    if (borrowedElem) {
+      builder.createEndBorrow(forEachLoc, borrowedElem);
+    }
     builder.createBranch(forEachLoc, errorBB, argument);
     return newErrorBB;
   };
@@ -525,9 +531,12 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   //     error blocks jump to the error target of the original forEach call.
   for (uint64_t num = arrayInfo.getNumElements(); num > 0; --num) {
     SILValue elementCopy = elementCopies[num - 1];
+    // Creating the next normal block ends the borrow scope for borrowedElem
+    // from the previous iteration.
     SILBasicBlock *currentBB = num > 1 ? normalTargetGenerator(nextNormalBB)
                                        : forEachCall->getParentBlock();
     SILBuilderWithScope unrollBuilder(currentBB, forEachCall);
+    SILValue borrowedElem;
     if (arrayElementType.isTrivial(*fun)) {
       unrollBuilder.createStore(forEachLoc, elementCopy, allocStack,
                                 StoreOwnershipQualifier::Trivial);
@@ -535,18 +544,21 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
       // Borrow the elementCopy and store it in the allocStack. Note that the
       // element's copy is guaranteed to be alive until the array is alive.
       // Therefore it is okay to use a borrow here.
-      SILValue borrowedElem =
-          unrollBuilder.createBeginBorrow(forEachLoc, elementCopy);
+      borrowedElem = unrollBuilder.createBeginBorrow(forEachLoc, elementCopy);
       unrollBuilder.createStoreBorrow(forEachLoc, borrowedElem, allocStack);
-      unrollBuilder.createEndBorrow(forEachLoc, borrowedElem);
+
+      SILBuilderWithScope(&nextNormalBB->front(), forEachCall)
+        .createEndBorrow(forEachLoc, borrowedElem);
     }
-    SILBasicBlock *errorTarget = errorTargetGenerator(nextNormalBB);
+
+    SILBasicBlock *errorTarget =
+      errorTargetGenerator(nextNormalBB, borrowedElem);
     // Note that the substitution map must be empty as we are not supporting
     // elements of address-only type. All elements in the array are guaranteed
     // to be loadable. TODO: generalize this to address-only types.
     unrollBuilder.createTryApply(forEachLoc, forEachBodyClosure,
-                                 SubstitutionMap(), allocStack, nextNormalBB,
-                                 errorTarget);
+                                 SubstitutionMap(), allocStack,
+                                 nextNormalBB, errorTarget);
     nextNormalBB = currentBB;
   }
 
