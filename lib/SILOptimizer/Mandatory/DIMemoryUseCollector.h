@@ -98,11 +98,8 @@ public:
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
   SingleValueInstruction *getUninitializedValue() const {
-    if (auto *mui = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
-      if (auto *pbi = mui->getSingleUserOfType<ProjectBoxInst>()) {
-        return pbi;
-      }
-    }
+    if (auto *pbi = MemoryInst->getSingleUserOfType<ProjectBoxInst>())
+      return pbi;
     return MemoryInst;
   }
 
