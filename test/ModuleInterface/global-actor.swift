@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// REQUIRES: concurrency
 
 import MeowActor
 
