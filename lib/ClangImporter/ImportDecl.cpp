@@ -45,6 +45,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 
 #include "clang/AST/ASTContext.h"
@@ -7737,6 +7738,32 @@ static bool isObjCMethodLikelyAsyncHandler(
   return false;
 }
 
+unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(
+    StringRef attributeText) {
+  auto known = ClangSwiftAttrSourceBuffers.find(attributeText);
+  if (known != ClangSwiftAttrSourceBuffers.end())
+    return known->second;
+
+  // Create a new buffer with a copy of the attribute text, so we don't need to
+  // rely on Clang keeping it around.
+  auto &sourceMgr = SwiftContext.SourceMgr;
+  auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
+  ClangSwiftAttrSourceBuffers.insert({attributeText, bufferID});
+  return bufferID;
+}
+
+SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
+    ModuleDecl &module) {
+  auto known = ClangSwiftAttrSourceFiles.find(&module);
+  if (known != ClangSwiftAttrSourceFiles.end())
+    return *known->second;
+
+  auto sourceFile = new (SwiftContext) SourceFile(
+      module, SourceFileKind::Library, None);
+  ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
+  return *sourceFile;
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -7888,6 +7915,41 @@ void ClangImporter::Implementation::importAttributes(
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
+    }
+
+    // __attribute__((swift_attr("attribute")))
+    //
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
+      // Dig out a buffer with the attribute text.
+      unsigned bufferID = getClangSwiftAttrSourceBuffer(
+          swiftAttr->getAttribute());
+
+      // Dig out a source file we can use for parsing.
+      auto &sourceFile = getClangSwiftAttrSourceFile(
+          *MappedDecl->getDeclContext()->getParentModule());
+
+      // Spin up a parser.
+      swift::Parser parser(
+          bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
+      // Prime the lexer.
+      parser.consumeTokenWithoutFeedingReceiver();
+
+
+      SourceLoc atLoc;
+      if (parser.consumeIf(tok::at_sign, atLoc)) {
+        (void)parser.parseDeclAttribute(MappedDecl->getAttrs(), atLoc);
+      } else {
+        // Complain about the missing '@'.
+        auto &clangSrcMgr = getClangASTContext().getSourceManager();
+        ClangSourceBufferImporter &bufferImporter =
+          getBufferImporterForDiagnostics();
+        SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
+          clangSrcMgr, swiftAttr->getLocation());
+        SwiftContext.Diags.diagnose(
+              attrLoc, diag::clang_swift_attr_without_at,
+              swiftAttr->getAttribute());
+      }
+      continue;
     }
   }
 

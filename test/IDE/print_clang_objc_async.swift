@@ -34,3 +34,9 @@
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, willAddItem item: Any)
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didRemoveItem item: Any) -> Bool
 // CHECK-NEXT: {{^[}]$}}
+
+// CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
+// CHECK-NEXT: @actorIndependent func independentMethod()
+// CHECK-NEXT: @asyncHandler func asyncHandlerMethod()
+// CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
+// CHECK-NEXT: {{^[}]$}}
