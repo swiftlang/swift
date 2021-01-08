@@ -66,12 +66,6 @@ class SolutionApplicationTarget;
 
 } // end namespace constraints
 
-namespace unittest {
-
-class SemaTest;
-
-} // end namespace unittest
-
 // Forward declare some TypeChecker related functions
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
@@ -2025,8 +2019,6 @@ enum class SolutionApplicationToFunctionResult {
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
   ASTContext &Context;
-
-  friend class swift::unittest::SemaTest;
 
 public:
   DeclContext *DC;
@@ -4625,7 +4617,8 @@ public:
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
 
-private:
+public: // binding inference logic is public for unit testing.
+
   /// The kind of bindings that are permitted.
   enum class AllowedBindingKind : uint8_t {
     /// Only the exact type.
@@ -4700,6 +4693,8 @@ private:
       return BindingSource.get<ConstraintLocator *>();
     }
 
+    Constraint *getSource() const { return BindingSource.get<Constraint *>(); }
+
     PotentialBinding withType(Type type) const {
       return {type, Kind, BindingSource};
     }
@@ -4721,6 +4716,50 @@ private:
     }
   };
 
+  struct LiteralRequirement {
+    /// The source of the literal requirement.
+    Constraint *Source;
+    /// The default type associated with this literal (if any).
+    Type DefaultType;
+    /// Determines whether this literal is a direct requirement
+    /// of the current type variable.
+    bool IsDirectRequirement;
+
+    /// If the literal is covered by existing type binding,
+    /// this points to the source of the binding.
+    mutable Constraint *CoveredBy = nullptr;
+
+    LiteralRequirement(Constraint *source, Type defaultTy, bool isDirect)
+        : Source(source), DefaultType(defaultTy),
+          IsDirectRequirement(isDirect) {}
+
+    Constraint *getSource() const { return Source; }
+
+    ProtocolDecl *getProtocol() const { return Source->getProtocol(); }
+
+    bool isCovered() const { return bool(CoveredBy); }
+
+    bool isDirectRequirement() const { return IsDirectRequirement; }
+
+    bool hasDefaultType() const { return bool(DefaultType); }
+
+    Type getDefaultType() const {
+      assert(hasDefaultType());
+      return DefaultType;
+    }
+
+    void setCoveredBy(Constraint *coveredBy) {
+      assert(!isCovered());
+      CoveredBy = coveredBy;
+    }
+
+    bool isCoveredBy(Type type, DeclContext *useDC) const;
+
+    /// Determines whether literal protocol associated with this
+    /// meta-information is viable for inclusion as a defaultable binding.
+    bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
+  };
+
   struct PotentialBindings {
     using BindingScore =
         std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -4740,6 +4779,14 @@ private:
     /// subtype/conversion/equivalence relations with other type variables.
     Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
+    /// The set of unique literal protocol requirements placed on this
+    /// type variable or inferred transitively through subtype chains.
+    ///
+    /// Note that ordering is important when it comes to bindings, we'd
+    /// like to add any "direct" default types first to attempt them
+    /// before transitive ones.
+    llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+
     /// The set of constraints which would be used to infer default types.
     llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
@@ -4756,9 +4803,6 @@ private:
 
     ASTNode AssociatedCodeCompletionToken = ASTNode();
 
-    /// Whether this type variable has literal bindings.
-    LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
-
     /// A set of all not-yet-resolved type variables this type variable
     /// is a subtype of, supertype of or is equivalent to. This is used
     /// to determine ordering inside of a chain of subtypes to help infer
@@ -4772,8 +4816,13 @@ private:
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
-      return !Bindings.empty() || !Defaults.empty() || isDirectHole();
+      return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
+             !Defaults.empty() || isDirectHole();
     }
+
+    /// Determines whether this type variable could be `nil`,
+    /// which means that all of its bindings should be optional.
+    bool canBeNil() const;
 
     /// Determine whether attempting this type variable should be
     /// delayed until the rest of the constraint system is considered
@@ -4822,8 +4871,8 @@ private:
       if (!CS.shouldAttemptFixes())
         return false;
 
-      return Bindings.empty() && Defaults.empty() &&
-             TypeVar->getImpl().canBindToHole();
+      return Bindings.empty() && getNumViableLiteralBindings() == 0 &&
+             Defaults.empty() && TypeVar->getImpl().canBindToHole();
     }
 
     /// Determine if the bindings only constrain the type variable from above
@@ -4838,6 +4887,8 @@ private:
                binding.Kind == AllowedBindingKind::Subtypes;
       });
     }
+
+    unsigned getNumViableLiteralBindings() const;
 
     unsigned getNumViableDefaultableBindings() const {
       if (isDirectHole())
@@ -4875,16 +4926,19 @@ private:
       // It's considered to be non-default for purposes of
       // ranking because we'd like to prioritize resolving
       // closures to gain more information from their bodies.
-      auto numNonDefaultableBindings =
-          !b.Bindings.empty() ? b.Bindings.size()
-                              : b.TypeVar->getImpl().isClosureType() ? 1 : 0;
+      unsigned numBindings =
+          b.Bindings.size() + b.getNumViableLiteralBindings();
+      auto numNonDefaultableBindings = numBindings > 0 ? numBindings
+                                       : b.TypeVar->getImpl().isClosureType()
+                                           ? 1
+                                           : 0;
 
       return std::make_tuple(b.isHole(),
                              numNonDefaultableBindings == 0,
                              b.isDelayed(),
                              b.isSubtypeOfExistentialType(),
                              b.involvesTypeVariables(),
-                             static_cast<unsigned char>(b.LiteralBinding),
+                             static_cast<unsigned char>(b.getLiteralKind()),
                              -numNonDefaultableBindings);
     }
 
@@ -4928,26 +4982,27 @@ private:
       return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
     }
 
-    void foundLiteralBinding(ProtocolDecl *proto) {
-      switch (*proto->getKnownProtocolKind()) {
-      case KnownProtocolKind::ExpressibleByDictionaryLiteral:
-      case KnownProtocolKind::ExpressibleByArrayLiteral:
-      case KnownProtocolKind::ExpressibleByStringInterpolation:
-        LiteralBinding = LiteralBindingKind::Collection;
-        break;
-
-      case KnownProtocolKind::ExpressibleByFloatLiteral:
-        LiteralBinding = LiteralBindingKind::Float;
-        break;
-
-      default:
-        if (LiteralBinding != LiteralBindingKind::Collection)
-          LiteralBinding = LiteralBindingKind::Atom;
-        break;
-      }
-    }
+    LiteralBindingKind getLiteralKind() const;
 
     void addDefault(Constraint *constraint);
+
+    void addLiteral(Constraint *constraint);
+
+    /// Determines whether the given literal protocol is "covered"
+    /// by the given binding - type of the binding could either be
+    /// equal (in canonical sense) to the protocol's default type,
+    /// or conform to a protocol.
+    ///
+    /// \param literal The literal protocol requirement to check.
+    ///
+    /// \param binding The binding to check for coverage.
+    ///
+    /// \param canBeNil The flag that determines whether given type
+    /// variable requires all of its bindings to be optional.
+    ///
+    /// \returns true if binding covers given literal protocol.
+    bool isLiteralCoveredBy(const LiteralRequirement &literal,
+                            PotentialBinding &binding, bool canBeNil) const;
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
@@ -5008,11 +5063,6 @@ private:
                             ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
-    /// Infer bindings based on any protocol conformances that have default
-    /// types.
-    void inferDefaultTypes(ConstraintSystem &cs,
-                           llvm::SmallPtrSetImpl<CanType> &existingTypes);
-
 public:
     bool infer(ConstraintSystem &cs,
                llvm::SmallPtrSetImpl<CanType> &exactTypes,
@@ -5036,8 +5086,9 @@ public:
         out << "delayed ";
       if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
-      if (LiteralBinding != LiteralBindingKind::None)
-        out << "literal=" << static_cast<int>(LiteralBinding) << " ";
+      auto literalKind = getLiteralKind();
+      if (literalKind != LiteralBindingKind::None)
+        out << "literal=" << static_cast<int>(literalKind) << " ";
       if (involvesTypeVariables())
         out << "involves_type_vars ";
 
@@ -5102,7 +5153,6 @@ public:
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
 
-public:
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
   PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
