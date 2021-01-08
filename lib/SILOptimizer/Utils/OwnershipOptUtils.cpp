@@ -28,6 +28,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 
 using namespace swift;
@@ -167,39 +168,48 @@ namespace {
 struct OwnershipLifetimeExtender {
   OwnershipFixupContext &ctx;
 
-  /// Lifetime extend newValue over owned oldValue assuming that our copy will
-  /// have its lifetime ended by oldValue's lifetime ending uses after RAUWing.
-  CopyValueInst *
-  copyAndExtendForLifetimeEndingRAUW(SILValue value,
-                                     SILInstruction *consumingPoint);
+  /// Create a new copy of \p value assuming that our caller will clean up the
+  /// copy along all paths that go through consuming point. Operationally this
+  /// means that the API will insert compensating destroy_value on the copy
+  /// along all paths that do not go through consuming point.
+  ///
+  /// DISCUSSION: If \p consumingPoint is an instruction that forwards \p value,
+  /// calling this and then RAUWing with \p value guarantee that \p value will
+  /// be consumed by the forwarding instruction's results consuming uses.
+  CopyValueInst *createPlusOneCopy(SILValue value,
+                                   SILInstruction *consumingPoint);
 
-  CopyValueInst *
-  copyAndExtendForNonLifetimeEndingRAUW(SILValue value,
-                                        ArrayRef<Operand *> range) {
-    return copyAndExtendForNonLifetimeEndingRAUW<ArrayRef<Operand *>>(value,
-                                                                      range);
+  /// Create a copy of \p value that covers all of \p range and insert all
+  /// needed destroy_values. We assume that no uses in \p range consume \p
+  /// value.
+  CopyValueInst *createPlusZeroCopy(SILValue value, ArrayRef<Operand *> range) {
+    return createPlusZeroCopy<ArrayRef<Operand *>>(value, range);
   }
 
+  /// Create a copy of \p value that covers all of \p range and insert all
+  /// needed destroy_values. We assume that all uses in \p range do not consume
+  /// \p value.
+  ///
+  /// We return our copy_value to the user at +0 to show that they do not need
+  /// to insert cleanup destroys.
   template <typename RangeTy>
-  CopyValueInst *copyAndExtendForNonLifetimeEndingRAUW(SILValue value,
-                                                       const RangeTy &range);
+  CopyValueInst *createPlusZeroCopy(SILValue value, const RangeTy &range);
 
+  /// Create a new borrow scope for \p newValue that contains all uses in \p
+  /// useRange. We assume that \p useRange does not contain any lifetime ending
+  /// uses.
   template <typename RangeTy>
-  BeginBorrowInst *copyBorrowAndExtendForRAUW(SILValue newValue,
-                                              RangeTy useRange);
-
-  /// We are copy/borrowing new value to be over the same lifetime as old
-  /// value. We know that oldValue is dominated by newValue.
-  BeginBorrowInst *copyBorrowAndExtendForLifetimeEndingRAUW(SILValue newValue,
-                                                            SILValue oldValue);
+  BeginBorrowInst *createPlusZeroBorrow(SILValue newValue, RangeTy useRange);
 };
 
 } // end anonymous namespace
 
-/// Lifetime extend newValue over owned oldValue assuming that our copy will
-/// have its lifetime ended by oldValue's lifetime ending uses after RAUWing.
-CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForLifetimeEndingRAUW(
-    SILValue value, SILInstruction *consumingPoint) {
+// Lifetime extend newValue over owned oldValue assuming that our copy will have
+// its lifetime ended by oldValue's lifetime ending uses after RAUWing by our
+// caller.
+CopyValueInst *
+OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
+                                             SILInstruction *consumingPoint) {
   auto *newValInsertPt = value->getDefiningInsertionPoint();
   assert(newValInsertPt);
   CopyValueInst *copy;
@@ -242,9 +252,12 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForLifetimeEndingRAUW(
   return result;
 }
 
+// A copy_value that we lifetime extend with destroy_value over range. We assume
+// all instructions passed into range do not consume value.
 template <typename RangeTy>
-CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForNonLifetimeEndingRAUW(
-    SILValue value, const RangeTy &range) {
+CopyValueInst *
+OwnershipLifetimeExtender::createPlusZeroCopy(SILValue value,
+                                              const RangeTy &range) {
   auto *newValInsertPt = value->getDefiningInsertionPoint();
   assert(newValInsertPt);
 
@@ -281,8 +294,8 @@ CopyValueInst *OwnershipLifetimeExtender::copyAndExtendForNonLifetimeEndingRAUW(
 
 template <typename RangeTy>
 BeginBorrowInst *
-OwnershipLifetimeExtender::copyBorrowAndExtendForRAUW(SILValue newValue,
-                                                      RangeTy useRange) {
+OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
+                                                RangeTy useRange) {
   auto *newValInsertPt = newValue->getDefiningInsertionPoint();
   assert(newValInsertPt);
 
@@ -320,52 +333,6 @@ OwnershipLifetimeExtender::copyBorrowAndExtendForRAUW(SILValue newValue,
     auto *ebi = frontierBuilder.createEndBorrow(loc, borrow);
     auto *dvi = frontierBuilder.createDestroyValue(loc, copy);
     callbacks.createdNewInst(ebi);
-    callbacks.createdNewInst(dvi);
-  }
-
-  return borrow;
-}
-
-/// We are copy/borrowing new value to be over the same lifetime as old
-/// value. We know that oldValue is dominated by newValue.
-BeginBorrowInst *
-OwnershipLifetimeExtender::copyBorrowAndExtendForLifetimeEndingRAUW(
-    SILValue newValue, SILValue oldValue) {
-  auto *newValInsertPt = newValue->getDefiningInsertionPoint();
-  assert(newValInsertPt);
-
-  CopyValueInst *copy = nullptr;
-  if (!isa<SILArgument>(newValue)) {
-    SILBuilderWithScope::insertAfter(newValInsertPt, [&](SILBuilder &builder) {
-      auto loc = builder.getInsertionPointLoc();
-      copy = builder.createCopyValue(loc, newValue);
-    });
-  } else {
-    SILBuilderWithScope builder(newValInsertPt);
-    auto loc = newValInsertPt->getLoc();
-    copy = builder.createCopyValue(loc, newValue);
-  }
-
-  // Then insert the begin_borrow at the old value point. We are going to RAUW
-  // this in our caller.
-  auto *oldValInsertPt = oldValue->getDefiningInsertionPoint();
-  assert(oldValInsertPt);
-  auto *borrow = SILBuilderWithScope(oldValInsertPt)
-                     .createBeginBorrow(oldValInsertPt->getLoc(), copy);
-
-  auto &callbacks = ctx.callbacks;
-  callbacks.createdNewInst(borrow);
-
-  ValueLifetimeAnalysis lifetimeAnalysis(copy, oldValue->getUses());
-  decltype(lifetimeAnalysis)::Frontier frontier;
-  bool result = lifetimeAnalysis.computeFrontier(
-      frontier, ValueLifetimeAnalysis::DontModifyCFG, &ctx.deBlocks);
-  assert(result);
-
-  while (!frontier.empty()) {
-    auto *insertPt = frontier.pop_back_val();
-    SILBuilderWithScope frontierBuilder(insertPt);
-    auto *dvi = frontierBuilder.createDestroyValue(insertPt->getLoc(), copy);
     callbacks.createdNewInst(dvi);
   }
 
@@ -577,7 +544,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     }
     auto extender = getLifetimeExtender();
     SILValue borrow =
-        extender.copyBorrowAndExtendForRAUW(newValue, oldValue->getUses());
+        extender.createPlusZeroBorrow(newValue, oldValue->getUses());
     SILBuilderWithScope builder(oldValue);
     auto *newInst = builder.createUncheckedOwnershipConversion(
         oldValue->getLoc(), borrow, OwnershipKind::Unowned);
@@ -608,8 +575,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
       }
     }
     auto extender = getLifetimeExtender();
-    SILValue copy = extender.copyAndExtendForNonLifetimeEndingRAUW(
-        newValue, oldValue->getUses());
+    SILValue copy = extender.createPlusZeroCopy(newValue, oldValue->getUses());
     SILBuilderWithScope builder(oldValue);
     auto *newInst = builder.createUncheckedOwnershipConversion(
         oldValue->getLoc(), copy, OwnershipKind::Unowned);
@@ -644,8 +610,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
 
   auto extender = getLifetimeExtender();
   SILValue newBorrowedValue =
-      extender.copyBorrowAndExtendForRAUW<ArrayRef<Operand *>>(newValue,
-                                                               usePoints);
+      extender.createPlusZeroBorrow<ArrayRef<Operand *>>(newValue, usePoints);
 
   // Now we need to handle reborrows by eliminating the reborrows from any
   // borrowing operands that use old value as well as from oldvalue itself. We
@@ -706,8 +671,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
     // lifetimeEnding RAUW, then RAUW the value, and insert a destroy_value on
     // the original value.
     auto extender = getLifetimeExtender();
-    SILValue copy =
-        extender.copyAndExtendForLifetimeEndingRAUW(newValue, oldValue);
+    SILValue copy = extender.createPlusOneCopy(newValue, oldValue);
     cleanupOperandsBeforeDeletion(oldValue, ctx.callbacks);
     auto result = replaceAllUsesAndErase(oldValue, copy, ctx.callbacks);
     return result;
