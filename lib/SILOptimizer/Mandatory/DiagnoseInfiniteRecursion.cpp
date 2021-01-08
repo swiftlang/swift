@@ -39,76 +39,66 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
-static bool hasRecursiveCallInBlock(SILBasicBlock &Block,
-                                    SILFunction *Target) {
+static bool isRecursiveCall(SILInstruction *inst, SILFunction *target) {
+  FullApplySite FAI = FullApplySite::isa(inst);
+  if (!FAI)
+    return false;
+
+  if (SILFunction *calledFn = FAI.getReferencedFunctionOrNull())
+    return calledFn == target;
+
+  // Don't touch dynamic dispatch.
+  const auto callee = FAI.getCallee();
+  if (isa<SuperMethodInst>(callee) ||
+      isa<ObjCSuperMethodInst>(callee) ||
+      isa<ObjCMethodInst>(callee)) {
+    return false;
+  }
+
+  if (auto *CMI = dyn_cast<ClassMethodInst>(callee)) {
+
+    // FIXME: If we're not inside the module context of the method,
+    // we may have to deserialize vtables.  If the serialized tables
+    // are damaged, the pass will crash.
+    //
+    // Though, this has the added bonus of not looking into vtables
+    // outside the current module.  Because we're not doing IPA, let
+    // alone cross-module IPA, this is all well and good.
+    SILModule &module = target->getModule();
+    CanType classType = CMI->getOperand()->getType().getASTType();
+    ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+    if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
+      return false;
+
+    if (!calleesAreStaticallyKnowable(module, CMI->getMember()))
+      return false;
+
+    // The "statically knowable" check just means that we have all the
+    // callee candidates available for analysis. We still need to check
+    // if the current function has a known override point.
+    auto *methodDecl = CMI->getMember().getAbstractFunctionDecl();
+    if (methodDecl->isOverridden())
+      return false;
+
+    SILFunction *method = getTargetClassMethod(module, classDecl, CMI);
+    return method == target;
+  }
+
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
+    auto funcAndTable = target->getModule().lookUpFunctionInWitnessTable(
+        WMI->getConformance(), WMI->getMember());
+    return funcAndTable.first == target;
+  }
+  return false;
+}
+
+static bool hasRecursiveCallInBlock(SILBasicBlock &block, SILFunction *target) {
   // Process all instructions in the block to find applies that reference
   // the parent function.  Also looks through vtables for statically
   // dispatched (witness) methods.
-  for (auto &I : Block) {
-    FullApplySite FAI = FullApplySite::isa(&I);
-    if (!FAI)
-      continue;
-
-    if (SILFunction *calledFn = FAI.getReferencedFunctionOrNull()) {
-      if (calledFn == Target)
-        return true;
-      continue;
-    }
-
-    // Don't touch dynamic dispatch.
-    const auto callee = FAI.getCallee();
-    if (isa<SuperMethodInst>(callee) ||
-        isa<ObjCSuperMethodInst>(callee) ||
-        isa<ObjCMethodInst>(callee)) {
-      continue;
-    }
-
-    auto &M = FAI.getModule();
-    if (auto *CMI = dyn_cast<ClassMethodInst>(callee)) {
-      auto ClassType = CMI->getOperand()->getType().getASTType();
-
-      // FIXME: If we're not inside the module context of the method,
-      // we may have to deserialize vtables.  If the serialized tables
-      // are damaged, the pass will crash.
-      //
-      // Though, this has the added bonus of not looking into vtables
-      // outside the current module.  Because we're not doing IPA, let
-      // alone cross-module IPA, this is all well and good.
-      auto *CD = ClassType.getClassOrBoundGenericClass();
-      if (CD && CD->getModuleContext() != Target->getModule().getSwiftModule()) {
-        continue;
-      }
-
-      if (!calleesAreStaticallyKnowable(FAI.getModule(), CMI->getMember())) {
-        continue;
-      }
-
-      // The "statically knowable" check just means that we have all the
-      // callee candidates available for analysis. We still need to check
-      // if the current function has a known override point.
-      auto *method = CMI->getMember().getAbstractFunctionDecl();
-      if (method->isOverridden()) {
-        continue;
-      }
-
-      auto *F = getTargetClassMethod(M, CD, CMI);
-      if (F == Target)
-        return true;
-
-      continue;
-    }
-
-    if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
-      SILFunction *F;
-      SILWitnessTable *WT;
-
-      std::tie(F, WT) = M.lookUpFunctionInWitnessTable(
-          WMI->getConformance(), WMI->getMember());
-      if (F == Target)
-        return true;
-
-      continue;
-    }
+  for (auto &inst : block) {
+    if (isRecursiveCall(&inst, target))
+      return true;
   }
   return false;
 }
