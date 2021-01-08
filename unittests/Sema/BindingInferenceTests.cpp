@@ -13,6 +13,7 @@
 #include "SemaFixture.h"
 #include "swift/AST/Expr.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -36,14 +37,110 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
           ->getDeclaredInterfaceType(),
       cs.getConstraintLocator(intLiteral));
 
-  auto bindings = cs.inferBindingsFor(literalTy);
+  auto intTy = getStdlibType("Int");
 
-  ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
+  {
+    auto bindings = cs.inferBindingsFor(literalTy);
 
-  const auto &binding = bindings.Bindings.front();
+    ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
-  ASSERT_TRUE(binding.BindingType->isEqual(getStdlibType("Int")));
-  ASSERT_TRUE(binding.hasDefaultedLiteralProtocol());
+    const auto &literal = bindings.Literals.front().second;
+
+    ASSERT_TRUE(literal.hasDefaultType());
+    ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
+    ASSERT_FALSE(literal.isCovered());
+  }
+
+  // Make sure that coverage by direct bindings works as expected.
+
+  // First, let's attempt a binding which would match default type
+  // of the literal.
+
+  cs.addConstraint(ConstraintKind::Conversion, literalTy, intTy,
+                   cs.getConstraintLocator(intLiteral));
+
+  {
+    auto bindings = cs.inferBindingsFor(literalTy);
+
+    ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
+    ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
+
+    ASSERT_TRUE(bindings.Bindings[0].BindingType->isEqual(intTy));
+
+    const auto &literal = bindings.Literals.front().second;
+    ASSERT_TRUE(literal.isCovered());
+    ASSERT_TRUE(literal.isDirectRequirement());
+    ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
+  }
+
+  // Now let's use non-default type that conforms to
+  // `ExpressibleByIntegerLiteral` protocol.
+
+  auto *floatLiteralTy =
+      cs.createTypeVariable(cs.getConstraintLocator(intLiteral),
+                            /*options=*/0);
+
+  auto floatTy = getStdlibType("Float");
+
+  // $T_float <conforms to> ExpressibleByIntegerLiteral
+  cs.addConstraint(
+      ConstraintKind::LiteralConformsTo, floatLiteralTy,
+      Context.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)
+          ->getDeclaredInterfaceType(),
+      cs.getConstraintLocator(intLiteral));
+
+  // Float <covertible> $T_float
+  cs.addConstraint(ConstraintKind::Conversion, floatTy, floatLiteralTy,
+                   cs.getConstraintLocator(intLiteral));
+
+  {
+    auto bindings = cs.inferBindingsFor(floatLiteralTy);
+
+    ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
+    ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
+
+    ASSERT_TRUE(bindings.Bindings[0].BindingType->isEqual(floatTy));
+
+    const auto &literal = bindings.Literals.front().second;
+    ASSERT_TRUE(literal.isCovered());
+    ASSERT_TRUE(literal.isDirectRequirement());
+    ASSERT_FALSE(literal.getDefaultType()->isEqual(floatTy));
+  }
+
+  // Let's test transitive literal requirement coverage,
+  // literal requirements are prepagated up the subtype chain.
+
+  auto *otherTy = cs.createTypeVariable(cs.getConstraintLocator({}),
+                                        /*options=*/0);
+
+  cs.addConstraint(ConstraintKind::Subtype, floatLiteralTy, otherTy,
+                   cs.getConstraintLocator({}));
+
+  {
+    auto bindings = cs.inferBindingsFor(otherTy, /*finalize=*/false);
+
+    // Make sure that there are no direct bindings or protocol requirements.
+
+    ASSERT_EQ(bindings.Bindings.size(), (unsigned)0);
+    ASSERT_EQ(bindings.Literals.size(), (unsigned)0);
+
+    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+        env;
+    env.insert({floatLiteralTy, cs.inferBindingsFor(floatLiteralTy)});
+
+    bindings.finalize(cs, env);
+
+    // Inferred a single transitive binding through `$T_float`.
+    ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
+    // Inferred literal requirement through `$T_float` as well.
+    ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
+
+    const auto &literal = bindings.Literals.front().second;
+
+    ASSERT_TRUE(literal.isCovered());
+    ASSERT_FALSE(literal.isDirectRequirement());
+    ASSERT_FALSE(literal.getDefaultType()->isEqual(floatTy));
+  }
 }
 
 // Given a set of inferred protocol requirements, make sure that
