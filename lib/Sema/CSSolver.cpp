@@ -2288,11 +2288,27 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     return;
 
   auto bindings = cs.inferBindingsFor(typeVar);
-  if (bindings.isHole() || bindings.involvesTypeVariables() ||
-      bindings.Bindings.size() != 1)
+
+  auto numBindings =
+      bindings.Bindings.size() + bindings.getNumViableLiteralBindings();
+  if (bindings.isHole() || bindings.involvesTypeVariables() || numBindings != 1)
     return;
 
-  auto conversionType = bindings.Bindings[0].BindingType;
+  Type conversionType;
+
+  // There is either a single direct/transitive binding, or
+  // a single literal default.
+  if (!bindings.Bindings.empty()) {
+    conversionType = bindings.Bindings[0].BindingType;
+  } else {
+    for (const auto &literal : bindings.Literals) {
+      if (literal.second.viableAsBinding()) {
+        conversionType = literal.second.getDefaultType();
+        break;
+      }
+    }
+  }
+
   auto constraints = cs.CG.gatherConstraints(
       typeVar,
       ConstraintGraph::GatheringKind::EquivalenceClass,

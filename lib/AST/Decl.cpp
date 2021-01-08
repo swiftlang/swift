@@ -7976,6 +7976,25 @@ void ClassDecl::setSuperclass(Type superclass) {
     true);
 }
 
+ActorIsolation swift::getActorIsolation(ValueDecl *value) {
+  auto &ctx = value->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, ActorIsolationRequest{value},
+      ActorIsolation::forUnspecified());
+}
+
+ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
+  if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
+    return getActorIsolation(vd);
+
+  if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
+    if (auto *var = init->getBinding()->getSingleVar())
+      return getActorIsolation(var);
+  }
+
+  return ActorIsolation::forUnspecified();
+}
+
 ClangNode Decl::getClangNodeImpl() const {
   assert(Bits.Decl.FromClang);
   void * const *ptr = nullptr;
