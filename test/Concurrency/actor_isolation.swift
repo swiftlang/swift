@@ -367,3 +367,43 @@ func checkLocalFunctions() async {
 
   print(k)
 }
+
+// ----------------------------------------------------------------------
+// Lazy properties with initializers referencing 'self'
+// ----------------------------------------------------------------------
+
+actor class LazyActor {
+    var v: Int = 0
+    // expected-note@-1 5 {{mutable state is only available within the actor instance}}
+
+    let l: Int = 0
+
+    lazy var l11: Int = { v }()
+    lazy var l12: Int = v
+    lazy var l13: Int = { self.v }()
+    lazy var l14: Int = self.v
+    lazy var l15: Int = { [unowned self] in self.v }()
+
+    lazy var l21: Int = { l }()
+    lazy var l22: Int = l
+    lazy var l23: Int = { self.l }()
+    lazy var l24: Int = self.l
+    lazy var l25: Int = { [unowned self] in self.l }()
+
+    @actorIndependent lazy var l31: Int = { v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l32: Int = v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l33: Int = { self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l34: Int = self.v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l35: Int = { [unowned self] in self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+
+    @actorIndependent lazy var l41: Int = { l }()
+    @actorIndependent lazy var l42: Int = l
+    @actorIndependent lazy var l43: Int = { self.l }()
+    @actorIndependent lazy var l44: Int = self.l
+    @actorIndependent lazy var l45: Int = { [unowned self] in self.l }()
+}
