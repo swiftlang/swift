@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-//import TestsUtils
+import TestsUtils
 
 // Based on Joe Armstrong's task from the Programming Erlang book:
 // > Write a ring benchmark.
@@ -21,15 +21,16 @@
 // This benchmark measures how much time it takes to send messages around such "ring",
 // it involves waking up multiple actors and as such also shows the efficiency of the scheduling.
 
-//public let RingTests = [
+public let ActorRing: [BenchmarkInfo] = [
 //  BenchmarkInfo(
-//    name: "RingBenchmarks.bench_ring_m100_n10",
-//    runFunction: { bench_ring() },
+//    name: "ActorRing.bench_ring_m100_n10",
+//    runFunction: bench_ring,
 //    tags: [.actor],
 //    setUpFunction: { spawnRingActors(m: 100, n: 10) },
 //    tearDownFunction: { loopInit = nil }
 //  ),
-//]
+  // TODO: bigger rings too
+]
 
 // === -------------------------------------------------------------------------
 //private let q = LinkedBlockingQueue<Int>()
@@ -51,7 +52,6 @@ struct Token {
 }
 
 protocol LoopMember {
-  // var id: Int { get }
   func tell(_ token: Token) async
 }
 
@@ -64,11 +64,6 @@ actor class TokenLoopActor: LoopMember {
     self.id = id
     self.next = next
     self.token = token
-
-//    if id == 1 {
-//      // I am the leader and shall create the ring
-//      self.spawnActorRing()
-//    }
   }
 
   func tell(_ token: Token) async {
@@ -105,7 +100,7 @@ actor class LoopInitActor: LoopMember {
     // print("START RING SEND... \(Timer().getTime())")
 
     // print("Send \(m) \(context.myself.path.name) >>> \(loopRef.path.name)")
-    await next?.tell(token)
+    await next!.tell(token)
 
     // self.token = token
     // return loopMember(id: 1, next: loopRef, token: token)
@@ -114,23 +109,25 @@ actor class LoopInitActor: LoopMember {
 
 //private let mutex = _Mutex()
 
-var loopInit: LoopInitActor! = nil
+var loopInit: LoopInitActor? = nil
 
 func spawnRingActors(m messages: Int, n actors: Int) {
   loopInit = LoopInitActor()
   runAsyncAndBlock {
-    await loopInit.spawnRingActors(m: messages, n: actors)
+    await loopInit!.spawnRingActors(m: messages, n: actors)
   }
 }
 
 // === -----------------------------------------------------------------------------------------------------------------
 
-//@inline(never)
-//func bench_ring() {
-//  //  ringStart.store(Timer().getTimeAsInt())
-//  loopInit.tell(Token(100_000))
+@inline(never)
+func bench_ring(i: Int) {
+//  runAsyncAndBlock {
+//    //  ringStart.store(Timer().getTimeAsInt())
+//    await loopInit!.tell(Token(100_000))
 //
-//  //  _ = q.poll(.seconds(20))
-//  //  print("    Spawning           : \((spawnStop.load() - spawnStart.load()).milliseconds) ms")
-//  //  print("    Sending around Ring: \((ringStop.load() - ringStart.load()).milliseconds) ms")
-//}
+//    //  _ = q.poll(.seconds(20))
+//    //  print("    Spawning           : \((spawnStop.load() - spawnStart.load()).milliseconds) ms")
+//    //  print("    Sending around Ring: \((ringStop.load() - ringStart.load()).milliseconds) ms")
+//  }
+}
