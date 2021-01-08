@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init
+
+// Test that implicit closures don't count as use of the whole self and only
+// actual uses inside the closures are taken into account.
+
+// Check that no errors are generated. No FileCheck needed.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct SimpleStruct {
+  @_hasStorage let x: Bool
+  @_hasStorage let y: Bool
+  init()
+}
+
+class SimpleClass {
+  @_hasStorage final let x: Bool
+  @_hasStorage final let y: Bool
+  init()
+}
+
+sil [ossa] @$s4test1SVACycfC : $@convention(method) (Bool) -> SimpleStruct {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $SimpleStruct, var, name "self"
+  %2 = mark_uninitialized [rootself] %1 : $*SimpleStruct
+  %7 = begin_access [modify] [static] %2 : $*SimpleStruct
+  %8 = struct_element_addr %7 : $*SimpleStruct, #SimpleStruct.x
+  assign %0 to %8 : $*Bool
+  end_access %7 : $*SimpleStruct
+  %16 = function_ref @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error)
+  %17 = partial_apply [callee_guaranteed] %16(%2) : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error)
+  destroy_value %17 : $@callee_guaranteed () -> (Bool, @error Error)
+  %23 = begin_access [modify] [static] %2 : $*SimpleStruct
+  %24 = struct_element_addr %23 : $*SimpleStruct, #SimpleStruct.y
+  assign %0 to %24 : $*Bool
+  end_access %23 : $*SimpleStruct
+  %27 = load [trivial] %2 : $*SimpleStruct
+  dealloc_stack %1 : $*SimpleStruct
+  return %27 : $SimpleStruct
+}
+
+sil private [transparent] [ossa] @implicit_closure_struct : $@convention(thin) (@inout_aliasable SimpleStruct) -> (Bool, @error Error) {
+bb0(%0 : $*SimpleStruct):
+  debug_value_addr %0 : $*SimpleStruct, var, name "self", argno 2
+  %3 = begin_access [read] [static] %0 : $*SimpleStruct
+  %4 = struct_element_addr %3 : $*SimpleStruct, #SimpleStruct.x
+  %5 = load [trivial] %4 : $*Bool
+  end_access %3 : $*SimpleStruct
+  return %5 : $Bool
+}
+
+sil [ossa] @$s4test11SimpleClassC1bACSb_tcfc : $@convention(method) (Bool, @owned SimpleClass) -> @owned SimpleClass {
+bb0(%0 : $Bool, %1 : @owned $SimpleClass):
+  %4 = mark_uninitialized [rootself] %1 : $SimpleClass
+  %5 = begin_borrow %4 : $SimpleClass
+  %6 = ref_element_addr %5 : $SimpleClass, #SimpleClass.x
+  assign %0 to %6 : $*Bool
+  end_borrow %5 : $SimpleClass
+  %9 = begin_borrow %4 : $SimpleClass
+  %11 = function_ref @implicit_closure_class : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error Error)
+  %12 = copy_value %4 : $SimpleClass
+  %13 = partial_apply [callee_guaranteed] %11(%12) : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error Error)
+  destroy_value %13 : $@callee_guaranteed () -> (Bool, @error Error)
+  %19 = ref_element_addr %9 : $SimpleClass, #SimpleClass.y
+  assign %0 to %19 : $*Bool
+  end_borrow %9 : $SimpleClass
+  return %4 : $SimpleClass
+}
+
+sil private [transparent] [ossa] @implicit_closure_class : $@convention(thin) (@guaranteed SimpleClass) -> (Bool, @error Error) {
+bb0(%0 : @guaranteed $SimpleClass):
+  debug_value %0 : $SimpleClass, let, name "self", argno 2
+  %3 = ref_element_addr %0 : $SimpleClass, #SimpleClass.x
+  %4 = load [trivial] %3 : $*Bool
+  return %4 : $Bool
+}
