@@ -196,8 +196,9 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
-        if (defaultType->getAnyNominal() != type->getAnyNominal())
+        if (defaultType->getAnyNominal() != type->getAnyNominal()) {
           increaseScore(SK_NonDefaultLiteral);
+        }
       }
     }
   }
@@ -5331,12 +5332,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
 TypeVarBindingProducer::TypeVarBindingProducer(
     ConstraintSystem::PotentialBindings &bindings)
     : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
-      TypeVar(bindings.TypeVar),
-      CanBeNil(llvm::any_of(bindings.Protocols, [](Constraint *constraint) {
-        auto *protocol = constraint->getProtocol();
-        return protocol->isSpecificProtocol(
-            KnownProtocolKind::ExpressibleByNilLiteral);
-      })) {
+      TypeVar(bindings.TypeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token
@@ -5355,18 +5351,37 @@ TypeVarBindingProducer::TypeVarBindingProducer(
   // A binding to `Any` which should always be considered as a last resort.
   Optional<Binding> Any;
 
-  for (const auto &binding : bindings.Bindings) {
-    auto type = binding.BindingType;
-
+  auto addBinding = [&](const Binding &binding) {
     // Adjust optionality of existing bindings based on presence of
     // `ExpressibleByNilLiteral` requirement.
     if (requiresOptionalAdjustment(binding)) {
-      Bindings.push_back(binding.withType(OptionalType::get(type)));
-    } else if (type->isAny()) {
+      Bindings.push_back(
+          binding.withType(OptionalType::get(binding.BindingType)));
+    } else if (binding.BindingType->isAny()) {
       Any.emplace(binding);
     } else {
       Bindings.push_back(binding);
     }
+  };
+
+  for (const auto &binding : bindings.Bindings) {
+    addBinding(binding);
+  }
+
+  // Infer defaults based on "uncovered" literal protocol requirements.
+  for (const auto &info : bindings.Literals) {
+    const auto &literal = info.second;
+
+    if (!literal.viableAsBinding())
+      continue;
+
+    // We need to figure out whether this is a direct conformance
+    // requirement or inferred transitive one to identify binding
+    // kind correctly.
+    addBinding({literal.getDefaultType(),
+                literal.isDirectRequirement() ? BindingKind::Subtypes
+                                              : BindingKind::Supertypes,
+                literal.getSource()});
   }
 
   // Let's always consider `Any` to be a last resort binding because
