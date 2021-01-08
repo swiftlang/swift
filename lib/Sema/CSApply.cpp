@@ -8382,34 +8382,6 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   return result;
 }
 
-ProtocolConformanceRef Solution::resolveConformance(
-    ConstraintLocator *locator, ProtocolDecl *proto) {
-  auto conformance = llvm::find_if(Conformances, [&locator](const auto &elt) {
-    return elt.first == locator;
-  });
-
-  if (conformance == Conformances.end())
-    return ProtocolConformanceRef::forInvalid();
-
-  // If the conformance doesn't require substitution, return it immediately.
-  auto conformanceRef = conformance->second;
-  if (conformanceRef.isAbstract())
-    return conformanceRef;
-
-  auto concrete = conformanceRef.getConcrete();
-  auto conformingType = concrete->getType();
-  if (!conformingType->hasTypeVariable())
-    return conformanceRef;
-
-  // Substitute into the conformance type, then look for a conformance
-  // again.
-  // FIXME: Should be able to perform the substitution using the Solution
-  // itself rather than another conforms-to-protocol check.
-  Type substConformingType = simplifyType(conformingType);
-  return TypeChecker::conformsToProtocol(substConformingType, proto,
-                                         constraintSystem->DC);
-}
-
 bool Solution::hasType(ASTNode node) const {
   auto result = nodeTypes.find(node);
   if (result != nodeTypes.end())

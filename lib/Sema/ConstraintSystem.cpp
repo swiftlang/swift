@@ -2903,8 +2903,7 @@ size_t Solution::getTotalMemory() const {
          ConstraintRestrictions.getMemorySize() +
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
-         (DefaultedConstraints.size() * sizeof(void *)) +
-         Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
+         (DefaultedConstraints.size() * sizeof(void *));
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
