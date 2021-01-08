@@ -3,6 +3,88 @@ import Swift
 @_silgen_name("swift_continuation_logFailedCheck")
 internal func logFailedCheck(_ message: UnsafeRawPointer)
 
+/// Implementation class that holds the `UnsafeContinuation` instance for
+/// a `CheckedContinuation`.
+internal final class CheckedContinuationCanary {
+  // The instance state is stored in tail-allocated raw memory, so that
+  // we can atomically check the continuation state.
+
+  private init() { fatalError("must use create") }
+
+  private static func _create(continuation: UnsafeRawPointer, function: String)
+      -> Self {
+    let instance = Builtin.allocWithTailElems_1(self,
+      1._builtinWordValue,
+      (UnsafeRawPointer?, String).self)
+
+    instance._continuationPtr.initialize(to: continuation)
+    instance._functionPtr.initialize(to: function)
+    return instance
+  }
+
+  private var _continuationPtr: UnsafeMutablePointer<UnsafeRawPointer?> {
+    return UnsafeMutablePointer<UnsafeRawPointer?>(
+      Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
+  }
+  private var _functionPtr: UnsafeMutablePointer<String> {
+    let tailPtr = UnsafeMutableRawPointer(
+      Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
+
+    let functionPtr = tailPtr 
+        + MemoryLayout<(UnsafeRawPointer?, String)>.offset(of: \(UnsafeRawPointer?, String).1)!
+
+    return functionPtr.assumingMemoryBound(to: String.self)
+  }
+
+  internal static func create<T>(continuation: UnsafeContinuation<T>,
+                                 function: String) -> Self {
+    return _create(
+        continuation: unsafeBitCast(continuation, to: UnsafeRawPointer.self),
+        function: function)
+  }
+
+  internal static func create<T>(continuation: UnsafeThrowingContinuation<T>,
+                                 function: String) -> Self {
+    return _create(
+        continuation: unsafeBitCast(continuation, to: UnsafeRawPointer.self),
+        function: function)
+  }
+
+  internal var function: String {
+    return _functionPtr.pointee
+  }
+
+  // Take the continuation away from the container, or return nil if it's
+  // already been taken.
+  private func _takeContinuation() -> UnsafeRawPointer? {
+    // Atomically exchange the current continuation value with a null pointer.
+    let rawContinuationPtr = unsafeBitCast(_continuationPtr,
+      to: Builtin.RawPointer.self)
+    let rawOld = Builtin.atomicrmw_xchg_seqcst_Word(rawContinuationPtr,
+      0._builtinWordValue)
+
+    return unsafeBitCast(rawOld, to: UnsafeRawPointer?.self)
+  }
+
+  internal func takeContinuation<T>() -> UnsafeContinuation<T>? {
+    return unsafeBitCast(_takeContinuation(),
+      to: UnsafeContinuation<T>.self)
+  }
+  internal func takeThrowingContinuation<T>() -> UnsafeThrowingContinuation<T>? {
+    return unsafeBitCast(_takeContinuation(),
+      to: UnsafeThrowingContinuation<T>.self)
+  }
+
+  deinit {
+    _functionPtr.deinitialize(count: 1)
+    // Log if the continuation was never consumed before the instance was
+    // destructed.
+    if _continuationPtr.pointee != nil {
+      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) leaked its continuation!\n")
+    }
+  }
+}
+
 /// A wrapper class for `UnsafeContinuation` that logs misuses of the
 /// continuation, logging a message if the continuation is resumed
 /// multiple times, or if an object is destroyed without its continuation
@@ -27,9 +109,8 @@ internal func logFailedCheck(_ message: UnsafeRawPointer)
 /// Changing a call of `withUnsafeContinuation` into a call of
 /// `withCheckedContinuation` should be enough to obtain the extra checking
 /// without further source modification in most circumstances.
-public final class CheckedContinuation<T> {
-  var continuation: UnsafeContinuation<T>?
-  var function: String
+public struct CheckedContinuation<T> {
+  let canary: CheckedContinuationCanary
   
   /// Initialize a `CheckedContinuation` wrapper around an
   /// `UnsafeContinuation`.
@@ -46,8 +127,9 @@ public final class CheckedContinuation<T> {
   ///     source for the continuation, used to identify the continuation in
   ///     runtime diagnostics related to misuse of this continuation.
   public init(continuation: UnsafeContinuation<T>, function: String = #function) {
-    self.continuation = continuation
-    self.function = function
+    canary = CheckedContinuationCanary.create(
+      continuation: continuation,
+      function: function)
   }
   
   /// Resume the task awaiting the continuation by having it return normally
@@ -57,19 +139,10 @@ public final class CheckedContinuation<T> {
   /// already been resumed through this object, then the attempt to resume
   /// the continuation again will be logged, but otherwise have no effect.
   public func resume(returning x: __owned T) {
-    if let c = continuation {
+    if let c: UnsafeContinuation<T> = canary.takeContinuation() {
       c.resume(returning: x)
-      // Clear out the continuation so we don't try to resume again
-      continuation = nil
     } else {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) tried to resume its continuation more than once, returning \(x)!\n")
-    }
-  }
-  
-  /// Log if the object is deallocated before its continuation is resumed.
-  deinit {
-    if continuation != nil {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) leaked its continuation!\n")
+      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
     }
   }
 }
@@ -107,9 +180,8 @@ public func withCheckedContinuation<T>(
 /// Changing a call of `withUnsafeThrowingContinuation` into a call of
 /// `withCheckedThrowingContinuation` should be enough to obtain the extra checking
 /// without further source modification in most circumstances.
-public final class CheckedThrowingContinuation<T> {
-  var continuation: UnsafeThrowingContinuation<T>?
-  var function: String
+public struct CheckedThrowingContinuation<T> {
+  let canary: CheckedContinuationCanary
   
   /// Initialize a `CheckedThrowingContinuation` wrapper around an
   /// `UnsafeThrowingContinuation`.
@@ -126,8 +198,9 @@ public final class CheckedThrowingContinuation<T> {
   ///     source for the continuation, used to identify the continuation in
   ///     runtime diagnostics related to misuse of this continuation.
   public init(continuation: UnsafeThrowingContinuation<T>, function: String = #function) {
-    self.continuation = continuation
-    self.function = function
+    canary = CheckedContinuationCanary.create(
+      continuation: continuation,
+      function: function)
   }
   
   /// Resume the task awaiting the continuation by having it return normally
@@ -138,12 +211,10 @@ public final class CheckedThrowingContinuation<T> {
   /// or by `resume(throwing:)`, then the attempt to resume
   /// the continuation again will be logged, but otherwise have no effect.
   public func resume(returning x: __owned T) {
-    if let c = continuation {
+    if let c: UnsafeThrowingContinuation<T> = canary.takeThrowingContinuation() {
       c.resume(returning: x)
-      // Clear out the continuation so we don't try to resume again
-      continuation = nil
     } else {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) tried to resume its continuation more than once, returning \(x)!\n")
+      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
     }
   }
   
@@ -155,19 +226,10 @@ public final class CheckedThrowingContinuation<T> {
   /// or by `resume(throwing:)`, then the attempt to resume
   /// the continuation again will be logged, but otherwise have no effect.
   public func resume(throwing x: __owned Error) {
-    if let c = continuation {
+    if let c: UnsafeThrowingContinuation<T> = canary.takeThrowingContinuation() {
       c.resume(throwing: x)
-      // Clear out the continuation so we don't try to resume again
-      continuation = nil
     } else {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) tried to resume its continuation more than once, throwing \(x)!\n")
-    }
-  }
-  
-  /// Log if the object is deallocated before its continuation is resumed.
-  deinit {
-    if continuation != nil {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) leaked its continuation!\n")
+      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
     }
   }
 }
@@ -176,7 +238,7 @@ public func withCheckedThrowingContinuation<T>(
     function: String = #function,
     _ body: (CheckedThrowingContinuation<T>) -> Void
 ) async throws -> T {
-  return await try withUnsafeThrowingContinuation {
+  return try await withUnsafeThrowingContinuation {
     body(CheckedThrowingContinuation(continuation: $0, function: function))
   }
 }
