@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,8 +21,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "Dependencies.h"
-#include "ScanDependencies.h"
 #include "TBD.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -1134,10 +1134,17 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 static bool performScanDependencies(CompilerInstance &Instance) {
   auto batchScanInput =
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+  ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
-    return scanDependencies(Instance);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::prescanDependencies(Instance);
+    else
+      return dependencies::scanDependencies(Instance);
   } else {
-    return batchScanModuleDependencies(Instance, batchScanInput);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::batchPrescanDependencies(Instance, batchScanInput);
+    else
+      return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 
@@ -1224,8 +1231,6 @@ static bool performAction(CompilerInstance &Instance,
   // MARK: Dependency Scanning Actions
   case FrontendOptions::ActionType::ScanDependencies:
     return performScanDependencies(Instance);
-  case FrontendOptions::ActionType::ScanClangDependencies:
-    return scanClangDependencies(Instance);
 
   // MARK: General Compilation Actions
   case FrontendOptions::ActionType::Parse:
