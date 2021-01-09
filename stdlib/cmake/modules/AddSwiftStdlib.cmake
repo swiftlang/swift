@@ -265,26 +265,11 @@ function(_add_target_variant_c_compile_flags)
   # uses a spin lock for this, so to get reasonable behavior we have to
   # implement it ourselves using _InterlockedCompareExchange128.
   # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
-  if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
+  if(CFLAGS_ARCH STREQUAL x86_64)
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result /clang:-mcx16)
     else()
       list(APPEND result -mcx16)
-    endif()
-  endif()
-
-  if(${CFLAGS_SDK} STREQUAL ANDROID)
-    if(${CFLAGS_ARCH} STREQUAL x86_64)
-      # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
-      # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
-      # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
-      # in Clang.  This is being fixed in the current master Clang and will
-      # hopefully make it into Clang 9.0.  In the mean time, workaround this in
-      # the build.
-      if(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION
-          VERSION_LESS 9.0.0)
-        list(APPEND result -mcx16)
-      endif()
     endif()
   endif()
 
