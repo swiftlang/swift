@@ -53,7 +53,7 @@ func test_unsafeContinuations() async {
   }
 }
 
-func test_unsafeThrowingContinuations() async {
+func test_unsafeThrowingContinuations() async throws {
   let _: String = try await withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
   }

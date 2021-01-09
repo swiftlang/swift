@@ -67,7 +67,7 @@ Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
     : diags(diags),
       debugDumpCycles(opts.DebugDumpCycles),
       buildDependencyGraph(opts.BuildRequestDependencyGraph),
-      recorder{} {}
+      recorder(opts.RecordRequestReferences) {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;

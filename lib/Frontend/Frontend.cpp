@@ -205,6 +205,11 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     return false;
   }
 
+  // For the time being, we only need to record dependencies in batch mode
+  // and single file builds.
+  Invocation.getLangOptions().RecordRequestReferences
+    = !isWholeModuleCompilation();
+
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSearchPathOptions(),
