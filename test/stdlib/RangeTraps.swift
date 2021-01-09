@@ -116,23 +116,26 @@ RangeTraps.test("throughNaN")
   _ = ...Double.nan
 }
 
-RangeTraps.test("UncheckedHalfOpen")
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // Debug check was introduced in https://github.com/apple/swift/pull/34961
+  RangeTraps.test("UncheckedHalfOpen")
   .xfail(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "assertions are disabled in Release and Unchecked mode"))
+      { !_isDebugAssertConfiguration() },
+      reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
     expectCrashLater()
     var range = Range(uncheckedBounds: (lower: 1, upper: 0))
   }
 
-RangeTraps.test("UncheckedClosed")
+  RangeTraps.test("UncheckedClosed")
   .xfail(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "assertions are disabled in Release and Unchecked mode"))
+      { !_isDebugAssertConfiguration() },
+      reason: "assertions are disabled in Release and Unchecked mode"))
   .code {
     expectCrashLater()
     var range = ClosedRange(uncheckedBounds: (lower: 1, upper: 0))
   }
+}
 
 runAllTests()
 
