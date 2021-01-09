@@ -78,7 +78,7 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
   assert(K != ArrayCallKind::kNone);
 
   if (K < ArrayCallKind::kMakeMutable) {
-    auto LI = dyn_cast<LoadInst>(Array);
+    auto LI = dyn_cast<LoadInst>(lookThroughCopyValueInsts(Array));
     if (!LI) {
       return Array;
     }
@@ -107,20 +107,15 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
 
   // TODO: What else.
   if (isa<StrongRetainInst>(I) || isa<RetainValueInst>(I) ||
-      isa<CondFailInst>(I) || isa<DeallocStackInst>(I) ||
-      isa<AllocationInst>(I))
+      isa<CopyValueInst>(I) || isa<CondFailInst>(I) ||
+      isa<DeallocStackInst>(I) || isa<AllocationInst>(I))
     return ArrayBoundsEffect::kNone;
 
-  // A retain on an arbitrary class can have sideeffects because of the deinit
+  // A release on an arbitrary class can have sideeffects because of the deinit
   // function.
-  if (auto SR = dyn_cast<StrongReleaseInst>(I))
-    return isReleaseSafeArrayReference(SR->getOperand(),
-                                       ReleaseSafeArrayReferences, RCIA)
-               ? ArrayBoundsEffect::kNone
-               : ArrayBoundsEffect::kMayChangeAny;
-
-  if (auto RV = dyn_cast<ReleaseValueInst>(I))
-    return isReleaseSafeArrayReference(RV->getOperand(),
+  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+      isa<DestroyValueInst>(I))
+    return isReleaseSafeArrayReference(I->getOperand(0),
                                        ReleaseSafeArrayReferences, RCIA)
                ? ArrayBoundsEffect::kNone
                : ArrayBoundsEffect::kMayChangeAny;
@@ -148,11 +143,21 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   // A store to an alloc_stack can't possibly store to the array size which is
   // stored in a runtime allocated object sub field of an alloca.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
+    if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
+      // store [assign] can call a destructor with unintended effects
+      return ArrayBoundsEffect::kMayChangeAny;
+    }
     auto Ptr = SI->getDest();
     return isa<AllocStackInst>(Ptr) || isAddressOfArrayElement(SI->getDest())
                ? ArrayBoundsEffect::kNone
                : ArrayBoundsEffect::kMayChangeAny;
   }
+
+  if (isa<LoadInst>(I))
+    return ArrayBoundsEffect::kNone;
+
+  if (isa<BeginBorrowInst>(I) || isa<EndBorrowInst>(I))
+    return ArrayBoundsEffect::kNone;
 
   return ArrayBoundsEffect::kMayChangeAny;
 }
@@ -260,7 +265,7 @@ private:
         mayChangeArraySize(Inst, K, Array, ReleaseSafeArrayReferences, RCIA);
 
     if (BoundsEffect == ArrayBoundsEffect::kMayChangeAny) {
-      LLVM_DEBUG(llvm::dbgs() << " no safe because kMayChangeAny " << *Inst);
+      LLVM_DEBUG(llvm::dbgs() << " not safe because kMayChangeAny " << *Inst);
       allArraysInMemoryAreUnsafe = true;
       // No need to store specific arrays in this case.
       UnsafeArrays.clear();
@@ -420,7 +425,7 @@ static BuiltinValueKind invertCmpID(BuiltinValueKind ID) {
 }
 
 /// Checks if Start to End is the range of 0 to the count of an array.
-/// Returns the array is this is the case.
+/// Returns the array if this is the case.
 static SILValue getZeroToCountArray(SILValue Start, SILValue End) {
   auto *IL = dyn_cast<IntegerLiteralInst>(Start);
   if (!IL || IL->getValue() != 0)
@@ -433,7 +438,6 @@ static SILValue getZeroToCountArray(SILValue Start, SILValue End) {
   ArraySemanticsCall SemCall(SEI->getOperand());
   if (SemCall.getKind() != ArrayCallKind::kGetCount)
     return SILValue();
-  
   return SemCall.getSelf();
 }
 
@@ -740,9 +744,9 @@ public:
     return nullptr;
   }
 
-  /// Returns true if the loop iterates from 0 until count of \p Array.
-  bool isZeroToCount(SILValue Array) {
-    return getZeroToCountArray(Ind->Start, Ind->End) == Array;
+  /// Returns true if the loop iterates from 0 until count of \p ArrayVal.
+  bool isZeroToCount(SILValue ArrayVal) {
+    return getZeroToCountArray(Ind->Start, Ind->End) == ArrayVal;
   }
 
   /// Hoists the necessary check for beginning and end of the induction
@@ -901,11 +905,6 @@ public:
       return;
 
     SILFunction *F = getFunction();
-
-    // FIXME: Update for ownership.
-    if (F->hasOwnership())
-      return;
-
     LI = PM->getAnalysis<SILLoopAnalysis>()->get(F);
     DT = PM->getAnalysis<DominanceAnalysis>()->get(F);
     IVs = PM->getAnalysis<IVAnalysis>()->get(F);
@@ -917,6 +916,8 @@ public:
       reportBoundsChecks(F);
     }
 #endif
+    LLVM_DEBUG(llvm::dbgs()
+               << "ArrayBoundsCheckOpts on function: " << F->getName() << "\n");
     // Collect all arrays in this function. A release is only 'safe' if we know
     // its deinitializer does not have sideeffects that could cause memory
     // safety issues. A deinit could deallocate array or put a different array
@@ -931,6 +932,7 @@ public:
           // that is not calling a deinit function.
           if (DestAnalysis->mayStoreToMemoryOnDestruction(rcRoot->getType()))
             continue;
+          LLVM_DEBUG(llvm::dbgs() << "ReleaseSafeArray: " << rcRoot << "\n");
           ReleaseSafeArrays.insert(rcRoot);
           ReleaseSafeArrays.insert(
               getArrayStructPointer(ArrayCallKind::kCheckIndex, rcRoot));
