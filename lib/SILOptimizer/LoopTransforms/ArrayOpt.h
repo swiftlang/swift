@@ -125,6 +125,9 @@ public:
     if (!ElementAddressUsers.empty())
       return false;
     for (SILInstruction *user : StructAddressUsers) {
+      // ignore load users
+      if (isa<LoadInst>(user))
+        continue;
       if (user != use1 && user != use2)
         return false;
     }
@@ -184,6 +187,7 @@ protected:
         // Found a use of the struct at the given access path.
         if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
           StructLoads.push_back(LoadI);
+          StructAddressUsers.push_back(LoadI);
           continue;
         }
 
