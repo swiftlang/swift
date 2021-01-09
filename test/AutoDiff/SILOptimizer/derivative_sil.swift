@@ -42,7 +42,7 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @fooTJdSpSr : $@convention(thin) (Float, @owned _AD__foo_bb0__DF__src_0_wrt_0) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooTJdSpSr : $@convention(thin) (Float, @owned _AD__foo_bb0__DF__src_0_wrt_0) -> Float {
 // CHECK-SIL: bb0([[DX:%.*]] : $Float, [[DF_STRUCT:%.*]] : @owned $_AD__foo_bb0__DF__src_0_wrt_0):
 // CHECK-SIL:   [[ADD_DF:%.*]] = destructure_struct [[DF_STRUCT]] : $_AD__foo_bb0__DF__src_0_wrt_0
 // CHECK-SIL:   [[DY:%.*]] = apply [[ADD_DF]]([[DX]], [[DX]]) : $@callee_guaranteed (Float, Float) -> Float
@@ -99,7 +99,7 @@ struct ExampleStruct {
 
 // CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJfSUpSr  : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJdSUpSr : $@convention(thin) (Float, @owned _AD__fooMethod_bb0__DF__src_0_wrt_0) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJdSUpSr : $@convention(thin) (Float, @owned _AD__fooMethod_bb0__DF__src_0_wrt_0) -> Float {
 
 // CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJrSUpSr : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 

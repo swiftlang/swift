@@ -1702,7 +1702,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
+  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *differential = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
       diffGenericEnv, original->getLocation(), original->isBare(),
