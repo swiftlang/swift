@@ -27,7 +27,7 @@ class NominalTypeDecl;
 
 namespace evaluator {
 
-struct DependencyRecorder;
+class DependencyRecorder;
 
 /// A \c DependencyCollector defines an abstract write-only buffer of
 /// \c Reference objects. References are added to a collector during the write
