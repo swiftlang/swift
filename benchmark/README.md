@@ -140,7 +140,7 @@ The benchmark suite can be built with swiftpm/llbuild without needing any help
 from build-script by invoking swift build in the benchmark directory:
 
 ```
-swift-source/swift/benchmark$ swift build -configuration release
+swift-source/swift/benchmark$ swift build --configuration release
 swift-source/swift/benchmark$ .build/release/SwiftBench
 #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
 1,Ackermann,1,169,169,169,0,169
