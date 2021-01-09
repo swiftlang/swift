@@ -5,6 +5,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
 // CHECK-DAG:     func doSomethingSlow(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
@@ -38,5 +39,6 @@
 // CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
 // CHECK-NEXT: @actorIndependent func independentMethod()
 // CHECK-NEXT: @asyncHandler func asyncHandlerMethod()
+// CHECK-NEXT: @MainActor func mainActorMethod()
 // CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}

@@ -1038,10 +1038,12 @@ public:
                                                       SourceLoc Loc);
 
   /// Parse a specific attribute.
-  ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
+  ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
+                                  bool isFromClangAttribute = false);
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
-                             DeclAttrKind DK);
+                             DeclAttrKind DK,
+                             bool isFromClangAttribute = false);
 
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.

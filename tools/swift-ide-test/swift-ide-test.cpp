@@ -2613,6 +2613,14 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     return 1;
   }
 
+  // If needed, load _Concurrency library so that the Clang importer can use it.
+  if (Context.LangOpts.EnableExperimentalConcurrency) {
+    if (!getModuleByFullName(Context, Context.Id_Concurrency)) {
+      llvm::errs() << "Failed loading _Concurrency library\n";
+      return 1;
+    }
+  }
+
   int ExitCode = 0;
 
   std::unique_ptr<ASTPrinter> Printer;

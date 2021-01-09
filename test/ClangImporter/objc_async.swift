@@ -69,7 +69,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 func globalAsync() async { }
 
 actor class MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
-  func syncMethod() { } // expected-note{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
+  func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {
     syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from an '@actorIndependent' context}}
@@ -77,5 +77,9 @@ actor class MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
   func asyncHandlerMethod() {
     await globalAsync() // okay because we infer @asyncHandler from the protocol
+  }
+
+  func mainActorMethod() {
+    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from context of global actor 'MainActor'}}
   }
 }
