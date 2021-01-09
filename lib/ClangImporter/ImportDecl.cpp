@@ -45,6 +45,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 
 #include "clang/AST/ASTContext.h"
@@ -7737,6 +7738,61 @@ static bool isObjCMethodLikelyAsyncHandler(
   return false;
 }
 
+Type ClangImporter::Implementation::getMainActorType() {
+  if (MainActorType)
+    return *MainActorType;
+
+  auto finish = [&](Type type) -> Type {
+    MainActorType = type;
+    return type;
+  };
+
+  if (!SwiftContext.LangOpts.EnableExperimentalConcurrency) {
+    return finish(Type());
+  }
+
+  auto module = SwiftContext.getLoadedModule(SwiftContext.Id_Concurrency);
+  if (!module)
+    return finish(Type());
+
+  SmallVector<ValueDecl *, 1> decls;
+  module->lookupValue(
+    SwiftContext.getIdentifier("MainActor"),
+    NLKind::QualifiedLookup, decls);
+  for (auto decl : decls) {
+    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
+      return finish(typeDecl->getDeclaredInterfaceType());
+  }
+
+  return finish(Type());
+}
+
+unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(
+    StringRef attributeText) {
+  auto known = ClangSwiftAttrSourceBuffers.find(attributeText);
+  if (known != ClangSwiftAttrSourceBuffers.end())
+    return known->second;
+
+  // Create a new buffer with a copy of the attribute text, so we don't need to
+  // rely on Clang keeping it around.
+  auto &sourceMgr = SwiftContext.SourceMgr;
+  auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
+  ClangSwiftAttrSourceBuffers.insert({attributeText, bufferID});
+  return bufferID;
+}
+
+SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
+    ModuleDecl &module) {
+  auto known = ClangSwiftAttrSourceFiles.find(&module);
+  if (known != ClangSwiftAttrSourceFiles.end())
+    return *known->second;
+
+  auto sourceFile = new (SwiftContext) SourceFile(
+      module, SourceFileKind::Library, None);
+  ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
+  return *sourceFile;
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -7888,6 +7944,53 @@ void ClangImporter::Implementation::importAttributes(
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
+    }
+
+    // __attribute__((swift_attr("attribute")))
+    //
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
+      // FIXME: Hard-core @MainActor, because we don't have a point at which to
+      // do name lookup for imported entities.
+      if (swiftAttr->getAttribute() == "@MainActor") {
+        if (Type mainActorType = getMainActorType()) {
+          auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
+          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+          MappedDecl->getAttrs().add(attr);
+        }
+
+        continue;
+      }
+
+      // Dig out a buffer with the attribute text.
+      unsigned bufferID = getClangSwiftAttrSourceBuffer(
+          swiftAttr->getAttribute());
+
+      // Dig out a source file we can use for parsing.
+      auto &sourceFile = getClangSwiftAttrSourceFile(
+          *MappedDecl->getDeclContext()->getParentModule());
+
+      // Spin up a parser.
+      swift::Parser parser(
+          bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
+      // Prime the lexer.
+      parser.consumeTokenWithoutFeedingReceiver();
+
+      SourceLoc atLoc;
+      if (parser.consumeIf(tok::at_sign, atLoc)) {
+        (void)parser.parseDeclAttribute(
+          MappedDecl->getAttrs(), atLoc, /*isFromClangAttribute=*/true);
+      } else {
+        // Complain about the missing '@'.
+        auto &clangSrcMgr = getClangASTContext().getSourceManager();
+        ClangSourceBufferImporter &bufferImporter =
+          getBufferImporterForDiagnostics();
+        SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
+          clangSrcMgr, swiftAttr->getLocation());
+        SwiftContext.Diags.diagnose(
+              attrLoc, diag::clang_swift_attr_without_at,
+              swiftAttr->getAttribute());
+      }
+      continue;
     }
   }
 

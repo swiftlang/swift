@@ -273,12 +273,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
                                   "performUnqualifedLookup",
                                   DC->getParentSourceFile());
 
-  if (Loc.isValid()) {
+  if (Loc.isValid() && DC->getParentSourceFile()) {
     // Operator lookup is always global, for the time being.
     if (!Name.isOperator())
       lookInASTScopes();
   } else {
-    assert(DC->isModuleScopeContext() &&
+    assert((DC->isModuleScopeContext() || !DC->getParentSourceFile()) &&
            "Unqualified lookup without a source location must start from "
            "a module-scope context");
 
