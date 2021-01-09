@@ -45,11 +45,6 @@ extension ${Self}: Differentiable {
   public mutating func move(along direction: TangentVector) {
     self += direction
   }
-
-  @inlinable
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    { 0 }
-  }
 }
 
 //===----------------------------------------------------------------------===//
