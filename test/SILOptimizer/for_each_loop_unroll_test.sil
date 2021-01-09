@@ -117,16 +117,15 @@ bb2(%39 : @owned $Error):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK: [[ELEM1BORROW:%[0-9]+]] = begin_borrow [[ELEM1]]
 // CHECK: store_borrow [[ELEM1BORROW]] to [[STACK]]
-// CHECK: end_borrow [[ELEM1BORROW]]
 // CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 
 // CHECK: [[ERROR]]([[ERRPARAM:%[0-9]+]] : @owned $Error):
 // CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM]] : $Error)
 
 // CHECK: [[NORMAL]](%{{.*}} : $()):
+// CHECK: end_borrow [[ELEM1BORROW]]
 // CHECK: [[ELEM2BORROW:%[0-9]+]] = begin_borrow [[ELEM2]]
 // CHECK: store_borrow [[ELEM2BORROW]] to [[STACK]]
-// CHECK: end_borrow [[ELEM2BORROW]]
 // CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL2:bb[0-9]+]], error [[ERROR2:bb[0-9]+]]
 
 // CHECK: [[ERROR2]]([[ERRPARAM2:%[0-9]+]] : @owned $Error):
@@ -134,6 +133,7 @@ bb2(%39 : @owned $Error):
 
 // CHECK: [[NORMAL2]](%{{.*}} : $()):
 // CHECK: dealloc_stack [[STACK]]
+// CHECK: end_borrow [[ELEM2BORROW]]
 // Note that the temporary alloc_stack of the array created for the forEach call
 // will be cleaned up when the forEach call is removed.
 // CHECK: destroy_value

@@ -205,6 +205,11 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     return false;
   }
 
+  // For the time being, we only need to record dependencies in batch mode
+  // and single file builds.
+  Invocation.getLangOptions().RecordRequestReferences
+    = !isWholeModuleCompilation();
+
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSearchPathOptions(),
@@ -321,21 +326,10 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-void CompilerInstance::setUpModuleDependencyCacheIfNeeded() {
-  const auto &Invocation = getInvocation();
-  const auto &opts = Invocation.getFrontendOptions();
-  if (opts.RequestedAction == FrontendOptions::ActionType::ScanDependencies ||
-      opts.RequestedAction == FrontendOptions::ActionType::ScanClangDependencies) {
-    ModDepCache = std::make_unique<ModuleDependenciesCache>();
-  }
-}
-
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
   setupDependencyTrackerIfNeeded();
-
-  setUpModuleDependencyCacheIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.

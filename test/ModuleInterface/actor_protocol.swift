@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
 // RUN: %FileCheck --check-prefix CHECK-EXTENSION %s <%t/Library.swiftinterface
 // RUN: %FileCheck --check-prefix CHECK %s <%t/Library.swiftinterface
+// REQUIRES: concurrency
 
 /// This test ensures that, when generating a swiftinterface file,
 /// the actor class decl itself is what may conform to the Actor protocol,
