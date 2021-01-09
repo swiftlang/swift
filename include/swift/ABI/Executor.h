@@ -19,12 +19,17 @@
 
 #include <inttypes.h>
 #include "swift/ABI/HeapObject.h"
+#include "swift/Runtime/Casting.h"
 
 namespace swift {
 class AsyncContext;
 class AsyncTask;
 class DefaultActor;
 class Job;
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+Metadata* MainActorMetadata;
 
 /// An ExecutorRef isn't necessarily just a pointer to an executor
 /// object; it may have other bits set.
@@ -45,6 +50,13 @@ public:
     return ExecutorRef(0);
   }
 
+  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+  /// NOTE: I didn't go with Executor::forMainActor(DefaultActor*) because
+  /// __swift_run_job_main_executor can't take more than one argument.
+  constexpr static ExecutorRef mainExecutor() {
+    return ExecutorRef(2);
+  }
+
   /// Given a pointer to a default actor, return an executor reference
   /// for it.
   static ExecutorRef forDefaultActor(DefaultActor *actor) {
@@ -55,6 +67,20 @@ public:
   /// Is this the generic executor reference?
   bool isGeneric() const {
     return Value == 0;
+  }
+
+  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+  bool isMainExecutor() const {
+    if (Value == ExecutorRef::mainExecutor().Value)
+      return true;
+
+    HeapObject *heapObj = reinterpret_cast<HeapObject*>(Value & ~PointerMask);
+
+    if (heapObj == nullptr || MainActorMetadata == nullptr)
+      return false;
+
+    Metadata const* metadata = swift_getObjectType(heapObj);
+    return metadata == MainActorMetadata;
   }
 
   /// Is this a default-actor executor reference?
@@ -77,10 +103,12 @@ public:
   }
 
   bool operator==(ExecutorRef other) const {
-    return Value == other.Value;
+    return Value == other.Value
+    /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+          || (isMainExecutor() && other.isMainExecutor());
   }
   bool operator!=(ExecutorRef other) const {
-    return Value != other.Value;
+    return !(*this == other);
   }
 };
 

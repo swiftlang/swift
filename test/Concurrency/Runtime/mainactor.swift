@@ -3,9 +3,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// REQUIRES: rdar72105129
-
-// XFAIL: *
 
 #if canImport(Darwin)
 import Darwin
@@ -17,15 +14,17 @@ import Foundation
 
 // CHECK: starting
 // CHECK-NOT: ERROR
-// CHECK: hello from main actor!
+// CHECK: launched
 // CHECK-NOT: ERROR
-// CHECK: ending
+// CHECK: hello from main actor!
 
-@MainActor func helloMainActor() {
+@MainActor func helloMainActor() -> Never {
   if Thread.isMainThread {
     print("hello from main actor!")
+    exit(EXIT_SUCCESS)
   } else {
     print("ERROR: not on correct thread!")
+    exit(EXIT_FAILURE)
   }
 }
 
@@ -33,13 +32,7 @@ func someFunc() async {
   await helloMainActor()
 }
 
-runAsyncAndBlock {
-  print("starting")
-  let handle = Task.runDetached(operation: someFunc)
-  do {
-    try await handle.get()
-  } catch {
-    print("ERROR: exception was thrown while waiting for task to complete")
-  }
-  print("ending")
-}
+print("starting")
+let _ = Task.runDetached(operation: someFunc)
+print("launched")
+dispatchMain() // give up the main queue.

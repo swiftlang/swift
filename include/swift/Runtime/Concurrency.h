@@ -299,6 +299,14 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueMainExecutor(Job *job);
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_MainActor_register(HeapObject *actor);
+
 /// A hook to take over global enqueuing.
 /// TODO: figure out a better abstraction plan than this.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

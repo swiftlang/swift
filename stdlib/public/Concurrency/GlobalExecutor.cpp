@@ -114,6 +114,15 @@ static void __swift_run_job(void *_job) {
   Job *job = (Job*) _job;
   job->run(ExecutorRef::generic());
 }
+
+/// A specialized version of __swift_run_job to execute the job on the main
+/// executor.
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+static void __swift_run_job_main_executor(void *_job) {
+  Job *job = (Job*) _job;
+  job->run(ExecutorRef::mainExecutor());
+}
+
 #endif
 
 void swift::swift_task_enqueueGlobal(Job *job) {
@@ -166,4 +175,26 @@ void swift::swift_task_enqueueGlobal(Job *job) {
 
   dispatch_async_f(queue, dispatchContext, dispatchFunction);
 #endif
+}
+
+
+/// Enqueues a task on the main executor.
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+void swift::swift_task_enqueueMainExecutor(Job *job) {
+  assert(job && "no job provided");
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  insertIntoJobQueue(job);
+#else
+
+  dispatch_function_t dispatchFunction = &__swift_run_job_main_executor;
+  void *dispatchContext = job;
+
+  // TODO: cache this to avoid the extra call
+  auto mainQueue = dispatch_get_main_queue();
+
+  dispatch_async_f(mainQueue, dispatchContext, dispatchFunction);
+
+#endif
+
 }
