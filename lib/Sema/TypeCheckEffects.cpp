@@ -1584,10 +1584,22 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
+    void preserveDiagnoseErrorOnTryFlag() {
+      // The "DiagnoseErrorOnTry" flag is a bit of mutable state
+      // in the Context itself, used to postpone diagnostic emission
+      // to a parent "try" expression. If something was diagnosed
+      // during this ContextScope, the flag may have been set, and
+      // we need to preseve its value when restoring the old Context.
+      bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
+      OldContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
+    }
+
     void preserveCoverageFromAwaitOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::throwFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+
+      preserveDiagnoseErrorOnTryFlag();
     }
 
     void preserveCoverageFromTryOperand() {
@@ -1606,6 +1618,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::HasAnyAsyncSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+
+      preserveDiagnoseErrorOnTryFlag();
     }
 
     bool wasTopLevelDebuggerFunction() const {
@@ -1613,15 +1627,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
 
     ~ContextScope() {
-      // The "DiagnoseErrorOnTry" flag is a bit of mutable state
-      // in the Context itself, used to postpone diagnostic emission
-      // to a parent "try" expression. If something was diagnosed
-      // during this ContextScope, the flag may have been set, and
-      // we need to preseve its value when restoring the old Context.
-      bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
       Self.CurContext = OldContext;
-      Self.CurContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
-
       Self.RethrowsDC = OldRethrowsDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;

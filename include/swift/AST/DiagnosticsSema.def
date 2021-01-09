@@ -2628,7 +2628,7 @@ WARNING(duplicate_anyobject_class_inheritance,none,
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
 WARNING(anyobject_class_inheritance_deprecated,none,
-  "using 'class' keyword for protocol inheritance is deprecated; "
+  "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))

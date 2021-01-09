@@ -491,8 +491,6 @@ public:
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
-  ModuleDependenciesCache *getModuleDependencyCache() { return ModDepCache.get(); }
-
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
 
   /// Retrieve the main module containing the files being compiled.
@@ -558,7 +556,6 @@ private:
   bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
-  void setUpModuleDependencyCacheIfNeeded();
   bool setUpModuleLoaders();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
