@@ -207,6 +207,7 @@ extension _StringObject {
   internal init(
     object: AnyObject, discriminator: UInt64, countAndFlags: CountAndFlags
   ) {
+    defer { _fixLifetime(object) }
     let builtinRawObject: Builtin.Int64 = Builtin.reinterpretCast(object)
     let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
