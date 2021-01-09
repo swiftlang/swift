@@ -139,6 +139,11 @@ module WinSDK [system] {
     }
   }
 
+  module ActiveX {
+    header "OCIdl.h"
+    export *
+  }
+
   module Controls {
     module CommCtrl {
       header "CommCtrl.h"
