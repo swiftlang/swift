@@ -379,8 +379,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_scan_dependencies))
     return FrontendOptions::ActionType::ScanDependencies;
-  if (Opt.matches(OPT_scan_clang_dependencies))
-    return FrontendOptions::ActionType::ScanClangDependencies;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))

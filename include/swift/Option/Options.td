@@ -1121,10 +1121,6 @@ def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
-  HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
 def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
