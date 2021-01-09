@@ -834,7 +834,7 @@ namespace {
         }
       }
 
-      // The children of #selector expressions are not evaluation, so we do not
+      // The children of #selector expressions are not evaluated, so we do not
       // need to do isolation checking there. This is convenient because such
       // expressions tend to violate restrictions on the use of instance
       // methods.
