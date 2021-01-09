@@ -2,6 +2,8 @@
 // RUN: %target-sil-opt -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-DEBUG
 // RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -debug-only=copy-propagation %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK-TRACE
 
+// REQUIRES: asserts
+
 sil_stage canonical
 
 import Builtin
