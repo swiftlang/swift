@@ -47,10 +47,13 @@ using DependencySource = swift::NullablePtr<SourceFile>;
 
 /// A \c DependencyRecorder is an aggregator of named references discovered in a
 /// particular \c DependencyScope during the course of request evaluation.
-struct DependencyRecorder {
+class DependencyRecorder {
   friend DependencyCollector;
 
-private:
+  /// Whether we are performing an incremental build and should therefore
+  /// record request references.
+  bool shouldRecord;
+
   /// References recorded while evaluating a dependency source request for each
   /// source file. This map is updated upon completion of a dependency source
   /// request, and includes all references from each downstream request as well.
@@ -82,6 +85,8 @@ private:
 #endif
 
 public:
+  DependencyRecorder(bool shouldRecord) : shouldRecord(shouldRecord) {}
+
   /// Push a new empty set onto the activeRequestReferences stack.
   template<typename Request>
   void beginRequest();
@@ -131,6 +136,9 @@ public:
 
 template<typename Request>
 void evaluator::DependencyRecorder::beginRequest() {
+  if (!shouldRecord)
+    return;
+
   if (!Request::isEverCached && !Request::isDependencySource)
     return;
 
@@ -139,6 +147,9 @@ void evaluator::DependencyRecorder::beginRequest() {
 
 template<typename Request>
 void evaluator::DependencyRecorder::endRequest(const Request &req) {
+  if (!shouldRecord)
+    return;
+
   if (!Request::isEverCached && !Request::isDependencySource)
     return;
 
@@ -169,6 +180,9 @@ void evaluator::DependencyRecorder::endRequest(const Request &req) {
 template<typename Request>
 void evaluator::DependencyRecorder::replayCachedRequest(const Request &req) {
   assert(req.isCached());
+
+  if (!shouldRecord)
+    return;
 
   if (activeRequestReferences.empty())
     return;
