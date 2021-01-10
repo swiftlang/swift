@@ -645,7 +645,8 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
-  for (auto &section : T.SectionsToScan.snapshot()) {
+  auto snapshot = T.SectionsToScan.snapshot(); // Workaround C++ lifetime rules
+  for (auto &section : snapshot) {
     for (const auto &record : section) {
       if (auto context = record.getContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(context, node)) {
@@ -846,7 +847,8 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        NodePointer node) {
-  for (auto &section : C.SectionsToScan.snapshot()) {
+  auto snapshot = C.SectionsToScan.snapshot(); // Workaround C++ lifetime rules
+  for (auto &section : snapshot) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
         if (_contextDescriptorMatchesMangling(protocol, node))

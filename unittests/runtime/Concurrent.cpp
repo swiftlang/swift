@@ -26,7 +26,8 @@ TEST(ConcurrentReadableArrayTest, SingleThreaded) {
   };
   auto check = [&]{
     size_t i = 0;
-    for (auto element : array.snapshot()) {
+    auto snapshot = array.snapshot(); // Workaround C++ lifetime rules
+    for (auto element : snapshot) {
       ASSERT_EQ(element, i);
       i++;
     }
@@ -70,7 +71,8 @@ TEST(ConcurrentReadableArrayTest, MultiThreaded) {
     while (!done) {
       for (int i = 0; i < writerCount; i++)
         maxByThread[i] = -1;
-      for (auto element : array.snapshot()) {
+      auto snapshot = array.snapshot(); // Workaround C++ lifetime rules
+      for (auto element : snapshot) {
         ASSERT_LT(element.threadNumber, writerCount);
         // Each element we see must be larger than the maximum element we've
         // previously seen for that writer thread, otherwise that means that

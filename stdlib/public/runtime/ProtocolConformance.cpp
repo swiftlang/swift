@@ -291,7 +291,8 @@ void ConformanceState::verify() const {
   // Iterate over all of the sections and verify all of the protocol
   // descriptors.
   auto &Self = const_cast<ConformanceState &>(*this);
-  for (const auto &Section : Self.SectionsToScan.snapshot()) {
+  auto snapshot = Self.SectionsToScan.snapshot(); // Workaround C++ lifetime rules
+  for (const auto &Section : snapshot) {
     for (const auto &Record : Section) {
       Record.get()->verify();
     }
@@ -513,7 +514,8 @@ const ContextDescriptor *
 swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
-  for (auto &section : C.SectionsToScan.snapshot()) {
+  auto snapshot = C.SectionsToScan.snapshot(); // Workaround C++ lifetime rules
+  for (auto &section : snapshot) {
     for (const auto &record : section) {
       if (auto ntd = record->getTypeDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node))
