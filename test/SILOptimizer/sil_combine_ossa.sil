@@ -759,9 +759,9 @@ bb0(%0 : @owned $C3):
 }
 
 // CHECK-LABEL: sil [ossa] @dead_upcast
-// XHECK: bb0
-// XHECK-NEXT: copy_value
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: return
 sil [ossa] @dead_upcast : $@convention(thin) (@guaranteed C2) -> @owned C2 {
 bb0(%0 : @guaranteed $C2):
   %1 = upcast %0 : $C2 to $C1
@@ -770,9 +770,9 @@ bb0(%0 : @guaranteed $C2):
 }
 
 // CHECK-LABEL: sil [ossa] @dead_unchecked_ref_cast
-// XHECK: bb0
-// XHECK-NEXT: copy_value
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: return
 sil [ossa] @dead_unchecked_ref_cast : $@convention(thin) (@guaranteed C1) -> @owned C1 {
 bb0(%0 : @guaranteed $C1):
   %1 = unchecked_ref_cast %0 : $C1 to $C2
