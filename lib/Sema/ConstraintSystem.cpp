@@ -2903,8 +2903,7 @@ size_t Solution::getTotalMemory() const {
          ConstraintRestrictions.getMemorySize() +
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
-         (DefaultedConstraints.size() * sizeof(void *)) +
-         Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
+         (DefaultedConstraints.size() * sizeof(void *));
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
@@ -5181,22 +5180,12 @@ static Optional<Requirement> getRequirement(ConstraintSystem &cs,
     return None;
 
   if (reqLoc->isConditionalRequirement()) {
-    auto path = reqLocator->getPath();
-    auto *conformanceLoc =
-        cs.getConstraintLocator(reqLocator->getAnchor(), path.drop_back());
+    auto conformanceRef =
+        reqLocator->findLast<LocatorPathElt::ConformanceRequirement>();
+    assert(conformanceRef && "Invalid locator for a conditional requirement");
 
-    auto conformances = cs.getCheckedConformances();
-    auto result = llvm::find_if(
-        conformances,
-        [&conformanceLoc](
-            const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-                &conformance) { return conformance.first == conformanceLoc; });
-    assert(result != conformances.end());
-
-    auto conformance = result->second;
-    assert(conformance.isConcrete());
-
-    return conformance.getConditionalRequirements()[reqLoc->getIndex()];
+    auto conformance = conformanceRef->getConformance();
+    return conformance->getConditionalRequirements()[reqLoc->getIndex()];
   }
 
   if (auto openedGeneric =
