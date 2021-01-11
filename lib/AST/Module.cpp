@@ -1514,6 +1514,17 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   return nullptr;
 }
 
+void ModuleDecl::collectSourceFileNames(
+    llvm::function_ref<void(StringRef)> callback) {
+  for (FileUnit *fileUnit : getFiles()) {
+    if (SourceFile *SF = dyn_cast<SourceFile>(fileUnit)) {
+      callback(SF->getFilename());
+    } else if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
+      serialized->collectSourceFileNames(callback);
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//

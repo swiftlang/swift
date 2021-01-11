@@ -289,6 +289,9 @@ private:
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
 
+  /// A blob of source file list.
+  StringRef SourceFileListData;
+
   /// An array of fixed size source location data for each USR appearing in
   /// \c DeclUSRsTable.
   StringRef BasicDeclLocsData;

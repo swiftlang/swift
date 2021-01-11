@@ -2519,6 +2519,9 @@ static void printModuleMetadata(ModuleDecl *MD) {
     OS << "link library: " << lib.getName()
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
   });
+  MD->collectSourceFileNames([&](StringRef filename) {
+    OS << filename << "\n";
+  });
 }
 
 static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,

@@ -959,6 +959,24 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
+void ModuleFile::collectSourceFileNames(
+    llvm::function_ref<void(StringRef)> callback) const {
+  if (Core->SourceFileListData.empty())
+    return;
+  assert(!Core->SourceLocsTextData.empty());
+
+  auto *Cursor = Core->SourceFileListData.bytes_begin();
+  auto *End = Core->SourceFileListData.bytes_end();
+  while (Cursor < End) {
+    auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
+    assert(fileID < Core->SourceLocsTextData.size());
+    auto filePath = Core->SourceLocsTextData.substr(fileID);
+    size_t terminatorOffset = filePath.find('\0');
+    filePath = filePath.slice(0, terminatorOffset);
+    callback(filePath);
+  }
+}
+
 Optional<BasicDeclLocs>
 ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   assert(D);

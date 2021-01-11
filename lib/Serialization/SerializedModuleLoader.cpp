@@ -1327,3 +1327,8 @@ SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   assert(!discriminator.empty() && "no discriminator found for value");
   return discriminator;
 }
+
+void SerializedASTFile::collectSourceFileNames(
+    llvm::function_ref<void(StringRef)> callback) const {
+  File.collectSourceFileNames(callback);
+}

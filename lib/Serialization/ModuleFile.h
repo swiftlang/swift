@@ -694,6 +694,7 @@ public:
   Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+  void collectSourceFileNames(llvm::function_ref<void(StringRef)> callback) const;
 
 
   // MARK: Deserialization interface
