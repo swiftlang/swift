@@ -1533,15 +1533,35 @@ void ASTContext::addModuleInterfaceChecker(
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate) {
-  for (auto &loader : getImpl().ModuleLoaders) {
-    if (isUnderlyingClangModule &&
-        loader.get() != getImpl().TheClangModuleLoader)
-      continue;
+    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
+    bool cacheOnly) {
+  // Retrieve the dependencies for this module.
+  if (cacheOnly) {
+    // Check whether we've cached this result.
+    if (!isUnderlyingClangModule) {
+      if (auto found = cache.findDependencies(moduleName,
+                                              ModuleDependenciesKind::SwiftTextual))
+        return found;
+      if (auto found = cache.findDependencies(moduleName,
+                                              ModuleDependenciesKind::SwiftTextual))
+        return found;
+      if (auto found = cache.findDependencies(moduleName,
+                                              ModuleDependenciesKind::SwiftPlaceholder))
+        return found;
+    }
+    if (auto found = cache.findDependencies(moduleName,
+                                            ModuleDependenciesKind::Clang))
+      return found;
+  } else {
+    for (auto &loader : getImpl().ModuleLoaders) {
+      if (isUnderlyingClangModule &&
+          loader.get() != getImpl().TheClangModuleLoader)
+        continue;
 
-    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
-                                                          delegate))
-      return dependencies;
+      if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                            delegate))
+        return dependencies;
+    }
   }
 
   return None;
