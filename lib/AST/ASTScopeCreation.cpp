@@ -209,8 +209,8 @@ void ASTScope::
 }
 
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
-  auto *const SF = AFD->getParentSourceFile();
-  SF->getScope().expandFunctionBodyImpl(AFD);
+  if (auto *const SF = AFD->getParentSourceFile())
+    SF->getScope().expandFunctionBodyImpl(AFD);
 }
 
 void ASTScope::expandFunctionBodyImpl(AbstractFunctionDecl *AFD) {

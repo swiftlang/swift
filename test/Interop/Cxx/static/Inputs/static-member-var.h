@@ -26,9 +26,15 @@ public:
   const static int definedOutOfLine;
 };
 
+constexpr float getFloatValue() { return 42; }
+constexpr float getIntValue(int arg) { return 40 + arg; }
+
 class WithConstexprStaticMember {
 public:
   constexpr static int definedInline = 139;
+  constexpr static int definedInlineWithArg = getIntValue(2);
+  constexpr static float definedInlineFloat = 139;
+  constexpr static float definedInlineFromMethod = getFloatValue();
 };
 
 class ClassA {
