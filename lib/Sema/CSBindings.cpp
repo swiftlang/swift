@@ -283,7 +283,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
 }
 
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+    ConstraintSystem &cs,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -343,13 +343,10 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
       if (type->isHole())
         continue;
 
-      if (!existingTypes.insert(type->getCanonicalType()).second)
-        continue;
-
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addPotentialBinding(
+      (void)addPotentialBinding(
           binding.withSameSource(type, BindingKind::Supertypes));
     }
   }
@@ -359,14 +356,8 @@ void ConstraintSystem::PotentialBindings::finalize(
     ConstraintSystem &cs,
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         &inferredBindings) {
-  // We need to make sure that there are no duplicate bindings in the
-  // set, otherwise solver would produce multiple identical solutions.
-  llvm::SmallPtrSet<CanType, 4> existingTypes;
-  for (const auto &binding : Bindings)
-    existingTypes.insert(binding.BindingType->getCanonicalType());
-
   inferTransitiveProtocolRequirements(cs, inferredBindings);
-  inferTransitiveBindings(cs, existingTypes, inferredBindings);
+  inferTransitiveBindings(cs, inferredBindings);
 }
 
 Optional<ConstraintSystem::PotentialBindings>
@@ -500,8 +491,8 @@ bool ConstraintSystem::LiteralRequirement::isCoveredBy(
   return bool(TypeChecker::conformsToProtocol(type, getProtocol(), useDC));
 }
 
-bool ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
-    const LiteralRequirement &literal, PotentialBinding &binding,
+std::pair<bool, Type> ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
+    const LiteralRequirement &literal, const PotentialBinding &binding,
     bool canBeNil) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
@@ -516,29 +507,24 @@ bool ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
   }
 
   if (type->isTypeVariableOrMember() || type->isHole())
-    return false;
+    return std::make_pair(false, Type());
 
   bool requiresUnwrap = false;
   do {
     if (literal.isCoveredBy(type, CS.DC)) {
-      // FIXME: Side-effect like this is not great (to say the least),
-      // but this is an artifact of the binding collection which could
-      // be fixed separately.
-      if (requiresUnwrap)
-        binding.BindingType = type;
-      return true;
+      return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
     }
 
     // Can't unwrap optionals if there is `ExpressibleByNilLiteral`
     // conformance requirement placed on the type variable.
     if (canBeNil)
-      return false;
+      return std::make_pair(false, Type());
 
     // If this literal protocol is not a direct requirement it
     // would not be possible to change optionality while inferring
     // bindings for a supertype, so this hack doesn't apply.
     if (!literal.isDirectRequirement())
-      return false;
+      return std::make_pair(false, Type());
 
     // If we're allowed to bind to subtypes, look through optionals.
     // FIXME: This is really crappy special case of computing a reasonable
@@ -551,13 +537,16 @@ bool ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
       }
     }
 
-    return false;
+    return std::make_pair(false, Type());
   } while (true);
 }
 
-void ConstraintSystem::PotentialBindings::addPotentialBinding(
+bool ConstraintSystem::PotentialBindings::addPotentialBinding(
     PotentialBinding binding, bool allowJoinMeet) {
   assert(!binding.BindingType->is<ErrorType>());
+
+  if (Bindings.count(binding))
+    return false;
 
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
@@ -585,7 +574,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
     // If new binding has been joined with at least one of existing
     // bindings, there is no reason to include it into the set.
     if (joined)
-      return;
+      return false;
   }
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -596,7 +585,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   }
 
   if (!isViable(binding))
-    return;
+    return false;
 
   // Check whether the given binding covers any of the literal protocols
   // associated with this type variable.
@@ -614,13 +603,24 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
 
       auto &info = literal.second;
 
-      if (info.viableAsBinding() &&
-          isLiteralCoveredBy(info, binding, allowsNil))
-        info.setCoveredBy(binding.getSource());
+      if (!info.viableAsBinding())
+        continue;
+
+      bool isCovered = false;
+      Type adjustedTy;
+
+      std::tie(isCovered, adjustedTy) =
+          isLiteralCoveredBy(info, binding, allowsNil);
+
+      if (!isCovered)
+        continue;
+
+      binding = binding.withType(adjustedTy);
+      info.setCoveredBy(binding.getSource());
     }
   }
 
-  Bindings.push_back(std::move(binding));
+  return Bindings.insert(std::move(binding));
 }
 
 void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
@@ -675,15 +675,33 @@ void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
   LiteralRequirement literal(
       constraint, TypeChecker::getDefaultType(protocol, CS.DC), isDirect);
 
-  {
+  if (literal.viableAsBinding()) {
     bool allowsNil = canBeNil();
 
-    for (auto &binding : Bindings) {
-      if (!literal.isCovered() &&
-          isLiteralCoveredBy(literal, binding, allowsNil)) {
-        literal.setCoveredBy(binding.getSource());
-        break;
+    for (auto binding = Bindings.begin(); binding != Bindings.end();
+         ++binding) {
+      bool isCovered = false;
+      Type adjustedTy;
+
+      std::tie(isCovered, adjustedTy) =
+        isLiteralCoveredBy(literal, *binding, allowsNil);
+
+      // No luck here, let's try next literal requirement.
+      if (!isCovered)
+        continue;
+
+      // If the type has been adjusted, we need to re-insert
+      // the binding but skip all of the previous checks.
+      //
+      // It's okay to do this here since iteration stops after
+      // first covering binding has been found.
+      if (adjustedTy) {
+        Bindings.erase(binding);
+        Bindings.insert(binding->withType(adjustedTy));
       }
+
+      literal.setCoveredBy(binding->getSource());
+      break;
     }
   }
 
@@ -756,10 +774,8 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
   auto constraints = CG.gatherConstraints(
       typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
 
-  llvm::SmallPtrSet<CanType, 4> exactTypes;
-
   for (auto *constraint : constraints) {
-    bool failed = bindings.infer(*this, exactTypes, constraint);
+    bool failed = bindings.infer(*this, constraint);
 
     // Upon inference failure let's produce an empty set of bindings.
     if (failed)
@@ -979,9 +995,8 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-bool ConstraintSystem::PotentialBindings::infer(
-    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
-    Constraint *constraint) {
+bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
+                                                Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -998,9 +1013,7 @@ bool ConstraintSystem::PotentialBindings::infer(
       break;
 
     auto type = binding->BindingType;
-    if (exactTypes.insert(type->getCanonicalType()).second) {
-      addPotentialBinding(*binding);
-
+    if (addPotentialBinding(*binding)) {
       // Determines whether this type variable represents an object
       // of the optional type extracted by force unwrap.
       if (auto *locator = TypeVar->getImpl().getLocator()) {
@@ -1014,7 +1027,7 @@ bool ConstraintSystem::PotentialBindings::infer(
         // delaying bindings for as long as possible.
         if (isExpr<ForceValueExpr>(anchor) &&
             TypeVar->getImpl().canBindToLValue() && !type->is<LValueType>()) {
-          addPotentialBinding(binding->withType(LValueType::get(type)));
+          (void)addPotentialBinding(binding->withType(LValueType::get(type)));
           DelayedBy.push_back(constraint);
         }
 
@@ -1025,10 +1038,9 @@ bool ConstraintSystem::PotentialBindings::infer(
         // helps to avoid creating a thunk to support it.
         auto voidType = cs.getASTContext().TheEmptyTupleType;
         if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
-            binding->Kind == AllowedBindingKind::Supertypes &&
-            exactTypes.insert(voidType).second) {
-          addPotentialBinding({voidType, binding->Kind, constraint},
-                              /*allowJoinMeet=*/false);
+            binding->Kind == AllowedBindingKind::Supertypes) {
+          (void)addPotentialBinding({voidType, binding->Kind, constraint},
+                                    /*allowJoinMeet=*/false);
         }
       }
     }

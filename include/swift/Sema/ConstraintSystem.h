@@ -4623,7 +4623,10 @@ public: // binding inference logic is public for unit testing.
   /// bindings, e.g., the supertypes of a given type.
   struct PotentialBinding {
     /// The type to which the type variable can be bound.
-    Type BindingType;
+    ///
+    /// Note that the type is mutable since it could be
+    /// adjusted as a result of type-join operation.
+    mutable Type BindingType;
 
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;
@@ -4756,7 +4759,7 @@ public: // binding inference logic is public for unit testing.
     TypeVariableType *TypeVar;
 
     /// The set of potential bindings.
-    SmallVector<PotentialBinding, 4> Bindings;
+    llvm::SmallSetVector<PotentialBinding, 4> Bindings;
 
     /// The set of protocol requirements placed on this type variable.
     llvm::SmallVector<Constraint *, 4> Protocols;
@@ -4986,13 +4989,21 @@ public: // binding inference logic is public for unit testing.
     /// \param canBeNil The flag that determines whether given type
     /// variable requires all of its bindings to be optional.
     ///
-    /// \returns true if binding covers given literal protocol.
-    bool isLiteralCoveredBy(const LiteralRequirement &literal,
-                            PotentialBinding &binding, bool canBeNil) const;
+    /// \returns a pair of bool and a type:
+    ///    - bool, true if binding covers given literal protocol;
+    ///    - type, non-null if binding type has to be adjusted
+    ///      to cover given literal protocol;
+    std::pair<bool, Type> isLiteralCoveredBy(const LiteralRequirement &literal,
+                                             const PotentialBinding &binding,
+                                             bool canBeNil) const;
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
-    void addPotentialBinding(PotentialBinding binding,
+    ///
+    /// \returns true if this binding has been added to the set,
+    /// false otherwise (e.g. because binding with this type is
+    /// already in the set).
+    bool addPotentialBinding(PotentialBinding binding,
                              bool allowJoinMeet = true);
 
     /// Check if this binding is viable for inclusion in the set.
@@ -5035,7 +5046,6 @@ private:
     /// variables in the workset.
     void inferTransitiveBindings(
         ConstraintSystem &cs,
-        llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
@@ -5050,9 +5060,7 @@ private:
             &inferredBindings);
 
 public:
-    bool infer(ConstraintSystem &cs,
-               llvm::SmallPtrSetImpl<CanType> &exactTypes,
-               Constraint *constraint);
+    bool infer(ConstraintSystem &cs, Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
@@ -6252,7 +6260,8 @@ struct DenseMapInfo<swift::constraints::ConstraintSystem::PotentialBinding> {
   }
 
   static unsigned getHashValue(const Binding &Val) {
-    return DenseMapInfo<swift::Type>::getHashValue(Val.BindingType);
+    return DenseMapInfo<swift::Type>::getHashValue(
+        Val.BindingType->getCanonicalType());
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
