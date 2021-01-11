@@ -32,6 +32,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"

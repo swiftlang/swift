@@ -418,7 +418,7 @@ protected:
     HasNestedTypeDeclarations : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1+1+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -437,6 +437,12 @@ protected:
     /// Backing bits for 'self' access kind.
     SelfAccess : 2,
 
+    /// Whether we've computed the IsAsyncHandlerRequest.
+    IsAsyncHandlerComputed : 1,
+
+    /// The value of IsAsyncHandlerRequest.
+    IsAsyncHandler : 1,
+
     /// Whether this is a top-level function which should be treated
     /// as if it were in local context for the purposes of capture
     /// analysis.
@@ -444,14 +450,15 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
-                        /// The kind of accessor this is.
-                        AccessorKind : 4,
+    /// The kind of accessor this is.
+    AccessorKind : 4,
 
-                        /// Whether the accessor is transparent.
-                        IsTransparent : 1,
+    /// Whether the accessor is transparent.
+    IsTransparent : 1,
 
-                        /// Whether we have computed the above.
-                        IsTransparentComputed : 1);
+    /// Whether we have computed the above.
+    IsTransparentComputed : 1
+  );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 1+1,
     /// Whether this constructor can fail, by building an Optional type.
@@ -5926,6 +5933,7 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
   friend class ResultTypeRequest;
+  friend class IsAsyncHandlerRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -5957,6 +5965,8 @@ protected:
     Bits.FuncDecl.SelfAccessComputed = false;
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
+    Bits.FuncDecl.IsAsyncHandlerComputed = false;
+    Bits.FuncDecl.IsAsyncHandler = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
   }
 
@@ -5985,6 +5995,18 @@ private:
       return Bits.FuncDecl.IsStatic;
 
     return None;
+  }
+
+  Optional<bool> getCachedIsAsyncHandler() const {
+    if (Bits.FuncDecl.IsAsyncHandlerComputed)
+      return Bits.FuncDecl.IsAsyncHandler;
+
+    return None;
+  }
+
+  void setIsAsyncHandler(bool value) {
+    Bits.FuncDecl.IsAsyncHandlerComputed = true;
+    Bits.FuncDecl.IsAsyncHandler = value;
   }
 
 public:

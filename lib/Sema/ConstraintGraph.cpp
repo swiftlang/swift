@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintGraphScope.h"

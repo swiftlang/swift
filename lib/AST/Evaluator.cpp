@@ -23,6 +23,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include <vector>
 
 using namespace swift;
 
@@ -66,7 +67,7 @@ Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
     : diags(diags),
       debugDumpCycles(opts.DebugDumpCycles),
       buildDependencyGraph(opts.BuildRequestDependencyGraph),
-      recorder{} {}
+      recorder(opts.RecordRequestReferences) {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -145,13 +146,6 @@ void Evaluator::printDependencies(
   // Turn off the highlight.
   if (isHighlighted) {
     out.resetColor();
-  }
-
-  // Print the cached value, if known.
-  auto cachedValue = cache.find(request);
-  if (cachedValue != cache.end()) {
-    out << " -> ";
-    printEscapedString(cachedValue->second.getAsString(), out);
   }
 
   if (!visitedAnywhere.insert(request).second) {
@@ -312,11 +306,6 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
     out << " [label=\"";
     printEscapedString(request.getAsString(), out);
 
-    auto cachedValue = cache.find(request);
-    if (cachedValue != cache.end()) {
-      out << " -> ";
-      printEscapedString(cachedValue->second.getAsString(), out);
-    }
     out << "\"";
 
     if (auto color = getColor(request)) {
@@ -369,126 +358,48 @@ void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
 }
 
-void evaluator::DependencyRecorder::realize(
+void evaluator::DependencyRecorder::recordDependency(
     const DependencyCollector::Reference &ref) {
-  auto *source = getActiveDependencySourceOrNull().get();
-  if (!source->isPrimary()) {
+  if (activeRequestReferences.empty())
     return;
-  }
-  fileReferences[source].insert(ref);
+
+  activeRequestReferences.back().insert(ref);
+}
+
+evaluator::DependencyCollector::DependencyCollector(
+    evaluator::DependencyRecorder &parent) : parent(parent) {
+#ifndef NDEBUG
+  assert(!parent.isRecording &&
+         "Probably not a good idea to allow nested recording");
+  parent.isRecording = true;
+#endif
+}
+
+evaluator::DependencyCollector::~DependencyCollector() {
+#ifndef NDEBUG
+  assert(parent.isRecording &&
+         "Should have been recording this whole time");
+  parent.isRecording = false;
+#endif
 }
 
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
-  scratch.insert(Reference::usedMember(subject, name));
-  return parent.realize(Reference::usedMember(subject, name));
+  return parent.recordDependency(Reference::usedMember(subject, name));
 }
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
-  scratch.insert(Reference::potentialMember(subject));
-  return parent.realize(Reference::potentialMember(subject));
+  return parent.recordDependency(Reference::potentialMember(subject));
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
-  scratch.insert(Reference::topLevel(name));
-  return parent.realize(Reference::topLevel(name));
+  return parent.recordDependency(Reference::topLevel(name));
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
-  scratch.insert(Reference::dynamic(name));
-  return parent.realize(Reference::dynamic(name));
+  return parent.recordDependency(Reference::dynamic(name));
 }
-
-void evaluator::DependencyRecorder::record(
-    const llvm::SetVector<swift::ActiveRequest> &stack,
-    llvm::function_ref<void(DependencyCollector &)> rec) {
-  assert(!isRecording && "Probably not a good idea to allow nested recording");
-  auto source = getActiveDependencySourceOrNull();
-  if (source.isNull() || !source.get()->isPrimary()) {
-    return;
-  }
-
-  llvm::SaveAndRestore<bool> restore(isRecording, true);
-
-  DependencyCollector collector{*this};
-  rec(collector);
-  if (collector.empty()) {
-    return;
-  }
-
-  return unionNearestCachedRequest(stack.getArrayRef(), collector.scratch);
-}
-
-void evaluator::DependencyRecorder::replay(
-    const llvm::SetVector<swift::ActiveRequest> &stack,
-    const swift::ActiveRequest &req) {
-  assert(!isRecording && "Probably not a good idea to allow nested recording");
-
-  auto source = getActiveDependencySourceOrNull();
-  if (source.isNull() || !source.get()->isPrimary()) {
-    return;
-  }
-
-  if (!req.isCached()) {
-    return;
-  }
-
-  auto entry = requestReferences.find_as(req);
-  if (entry == requestReferences.end()) {
-    return;
-  }
-
-  for (const auto &ref : entry->second) {
-    realize(ref);
-  }
-
-  // N.B. This is a particularly subtle detail of the replay unioning step. The
-  // evaluator does not push cached requests onto the active request stack,
-  // so it is possible (and, in fact, quite likely) we'll wind up with an
-  // empty request stack. The remaining troublesome case is when we have a
-  // cached request being run through the uncached path - take the
-  // InterfaceTypeRequest, which involves many component requests, most of which
-  // are themselves cached. In such a case, the active stack will look like
-  //
-  // -> TypeCheckSourceFileRequest
-  // -> ...
-  // -> InterfaceTypeRequest
-  // -> ...
-  // -> UnderlyingTypeRequest
-  //
-  // We want the UnderlyingTypeRequest to union its names into the
-  // InterfaceTypeRequest, and if we were to just start searching the active
-  // stack backwards for a cached request we would find...
-  // the UnderlyingTypeRequest! So, we'll just drop it from consideration.
-  //
-  // We do *not* have to consider this during the recording step because none
-  // of the name lookup requests (or any dependency sinks in general) are
-  // cached. Should this change in the future, we will need to sink this logic
-  // into the union step itself.
-  const size_t d = (!stack.empty() && req == stack.back()) ? 1 : 0;
-  return unionNearestCachedRequest(stack.getArrayRef().drop_back(d),
-                                   entry->second);
-}
-
-void evaluator::DependencyRecorder::unionNearestCachedRequest(
-    ArrayRef<swift::ActiveRequest> stack,
-    const DependencyCollector::ReferenceSet &scratch) {
-  auto nearest = std::find_if(stack.rbegin(), stack.rend(),
-                              [](const auto &req){ return req.isCached(); });
-  if (nearest == stack.rend()) {
-    return;
-  }
-
-  auto entry = requestReferences.find_as(*nearest);
-  if (entry == requestReferences.end()) {
-    requestReferences.insert({AnyRequest(*nearest), scratch});
-  } else {
-    entry->second.insert(scratch.begin(), scratch.end());
-  }
-}
-
-using namespace swift;
 
 void evaluator::DependencyRecorder::enumerateReferencesInFile(
     const SourceFile *SF, ReferenceEnumerator f) const {

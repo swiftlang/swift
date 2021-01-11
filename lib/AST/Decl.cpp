@@ -45,6 +45,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -5908,6 +5909,11 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
   if (getDeclContext()->isTypeContext())
+    return;
+
+  // Avoid request evaluator overhead in the common case where there's
+  // no wrapper.
+  if (!getAttrs().hasAttribute<CustomAttr>())
     return;
 
   if (auto *backingVar = getPropertyWrapperBackingProperty())

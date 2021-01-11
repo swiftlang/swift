@@ -350,30 +350,6 @@ public:
   void cacheResult(GenericParamList *value) const;
 };
 
-/// Expand the given ASTScope. Requestified to detect recursion.
-class ExpandASTScopeRequest
-    : public SimpleRequest<ExpandASTScopeRequest,
-                           ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
-                                                     ast_scope::ScopeCreator *),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  ast_scope::ASTScopeImpl *
-  evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
-           ast_scope::ScopeCreator *) const;
-
-public:
-  // Separate caching.
-  bool isCached() const;
-  Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
-  void cacheResult(ast_scope::ASTScopeImpl *) const {}
-};
-
 /// The input type for an unqualified lookup request.
 class UnqualifiedLookupDescriptor {
   using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -430,7 +406,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           LookupResult res) const;
+                           const LookupResult &res) const;
 };
 
 using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
@@ -458,7 +434,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           QualifiedLookupResult l) const;
+                           const QualifiedLookupResult &l) const;
 };
 
 /// Perform \c AnyObject lookup for a given member.
@@ -481,7 +457,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           QualifiedLookupResult l) const;
+                           const QualifiedLookupResult &l) const;
 };
 
 class ModuleQualifiedLookupRequest
@@ -506,7 +482,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           QualifiedLookupResult lookupResult) const;
+                           const QualifiedLookupResult &lookupResult) const;
 };
 
 class QualifiedLookupRequest
@@ -579,7 +555,7 @@ private:
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           TinyPtrVector<ValueDecl *> result) const;
+                           const TinyPtrVector<ValueDecl *> &result) const;
 };
 
 class OperatorLookupDescriptor final {
@@ -660,7 +636,7 @@ private:
 public:
   // Incremental dependencies.
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           TinyPtrVector<OperatorDecl *> ops) const;
+                           const TinyPtrVector<OperatorDecl *> &ops) const;
 };
 
 /// Looks up an precedencegroup in a given file or module without looking
@@ -683,7 +659,7 @@ private:
 public:
   // Incremental dependencies.
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           TinyPtrVector<PrecedenceGroupDecl *> groups) const;
+                           const TinyPtrVector<PrecedenceGroupDecl *> &groups) const;
 };
 
 class LookupConformanceDescriptor final {

@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
@@ -2144,14 +2145,6 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
-/// Whether the declaration is considered 'async'.
-static bool isDeclAsync(ValueDecl *value) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return func->isAsyncContext();
-
-  return false;
-}
-
 /// Walk a closure AST to determine its effects.
 ///
 /// \returns a function's extended info describing the effects, as
@@ -2374,7 +2367,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
 
 bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
-    return isDeclAsync(func);
+    return func->isAsyncContext();
 
   if (auto closure = dyn_cast<ClosureExpr>(dc))
     return closureEffects(closure).isAsync();
@@ -2708,8 +2701,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (auto *decl = choice.getDeclOrNull()) {
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
-    if (isAsynchronousContext(useDC) != isDeclAsync(decl))
-      increaseScore(SK_AsyncSyncMismatch);
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (func->isAsyncContext() != isAsynchronousContext(useDC))
+        increaseScore(SK_AsyncSyncMismatch);
+    }
 
     // If we're binding to an init member, the 'throws' need to line up
     // between the bound and reference types.
@@ -5095,6 +5090,20 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   if (D->getAttrs().isUnavailable(ctx))
     return true;
 
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  if (!DC->getParentSourceFile()) {
+    // We only check availability if this reference is in a source file; we do
+    // not check in other kinds of FileUnits.
+    return false;
+  }
+
+  AvailabilityContext safeRangeUnderApprox{
+      AvailabilityInference::availableRange(D, ctx)};
+  if (safeRangeUnderApprox.isAlwaysAvailable())
+    return false;
+
   SourceLoc loc;
 
   if (locator) {
@@ -5102,10 +5111,15 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  // If not, let's check contextual unavailability.
-  ExportContext where = ExportContext::forFunctionBody(DC, loc);
-  auto result = TypeChecker::checkDeclarationAvailability(D, where);
-  return result.hasValue();
+  AvailabilityContext runningOSOverApprox =
+      TypeChecker::overApproximateAvailabilityAtLocation(loc, DC);
+
+  // The reference is safe if an over-approximation of the running OS
+  // versions is fully contained within an under-approximation
+  // of the versions on which the declaration is available. If this
+  // containment cannot be guaranteed, we say the reference is
+  // not available.
+  return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -5119,24 +5133,7 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
   if (ext == nullptr)
     return false;
 
-  auto &ctx = getASTContext();
-
-  // First check whether this declaration is universally unavailable.
-  if (ext->getAttrs().isUnavailable(ctx))
-    return true;
-
-  SourceLoc loc;
-
-  if (locator) {
-    if (auto anchor = locator->getAnchor())
-      loc = getLoc(anchor);
-  }
-
-  // If not, let's check contextual unavailability.
-  ExportContext where = ExportContext::forFunctionBody(DC, loc);
-  auto result = TypeChecker::checkConformanceAvailability(
-      rootConf, ext, where);
-  return result.hasValue();
+  return isDeclUnavailable(ext, locator);
 }
 
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
