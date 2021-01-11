@@ -1325,23 +1325,6 @@ namespace {
             wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue())
           return false;
 
-        // If we have a nonmutating setter on a value type, the call
-        // captures all of 'self' and we cannot rewrite an assignment
-        // into an initialization.
-
-        // Unless this is an assignment to a self parameter inside a
-        // constructor, in which case we would like to still emit a
-        // assign_by_wrapper because the setter will be deleted by lowering
-        // anyway.
-        if (!isAssignmentToSelfParamInInit &&
-            !VD->isSetterMutating() &&
-            VD->getDeclContext()->getSelfNominalTypeDecl() &&
-            VD->isInstanceMember() &&
-            !VD->getDeclContext()->getDeclaredInterfaceType()
-                ->hasReferenceSemantics()) {
-          return false;
-        }
-
         // If this property wrapper uses autoclosure in it's initializer,
         // the argument types of the setter and initializer shall be
         // different, so we don't rewrite an assignment into an
@@ -1490,7 +1473,9 @@ namespace {
         }
 
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
-        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+        auto substSetterTy = setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
+                                                        SGF.getTypeExpansionContext());
+        SILFunctionConventions setterConv(substSetterTy, SGF.SGM.M);
 
         // Emit captures for the setter
         SmallVector<SILValue, 4> capturedArgs;
@@ -1509,19 +1494,17 @@ namespace {
 
           if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
             capturedBase = base.getValue();
+          } else if (base.getType().isAddress() &&
+                     base.getType().getObjectType() ==
+                     setterConv.getSILArgumentType(argIdx,
+                                                   SGF.getTypeExpansionContext())) {
+            // If the base is a reference and the setter expects a value, emit a
+            // load. This pattern is emitted for property wrappers with a
+            // nonmutating setter, for example.
+            capturedBase = SGF.B.createTrivialLoadOr(
+                loc, base.getValue(), LoadOwnershipQualifier::Copy);
           } else {
             capturedBase = base.copy(SGF, loc).forward(SGF);
-          }
-
-          // If the base is a reference and the setter expects a value, emit a
-          // load. This pattern is emitted for property wrappers with a
-          // nonmutating setter, for example.
-          if (base.getType().isAddress() &&
-              base.getType().getObjectType() ==
-                  setterConv.getSILArgumentType(argIdx,
-                                                SGF.getTypeExpansionContext())) {
-            capturedBase = SGF.B.createTrivialLoadOr(
-                loc, capturedBase, LoadOwnershipQualifier::Take);
           }
 
           capturedArgs.push_back(capturedBase);
@@ -1538,8 +1521,6 @@ namespace {
         assert(value.isRValue());
         ManagedValue Mval = std::move(value).asKnownRValue(SGF).
                               getAsSingleValue(SGF, loc);
-        auto substSetterTy = setterTy->substGenericArgs(SGF.SGM.M, Substitutions,
-                                                        SGF.getTypeExpansionContext());
         auto param = substSetterTy->getParameters()[0];
         SILType loweredSubstArgType = Mval.getType();
         if (param.isIndirectInOut()) {

@@ -211,3 +211,21 @@ actor class Actor4 {
     set { time = newValue }
   }
 }
+
+actor class SomeActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+
+@SomeGlobalActor
+class NormalClass {
+  var bar: String = ""
+
+  @actorIndependent(unsafe)
+  var unsafeBar: String { bar }
+
+  @actorIndependent(unsafe)
+  func getUnsafeBar() -> String { bar }
+}
