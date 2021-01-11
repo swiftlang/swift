@@ -94,6 +94,10 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(Differentiation)
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL)
+    add_subdirectory(Structural)
+  endif()
+
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     add_subdirectory(Concurrency)
   endif()

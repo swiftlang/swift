@@ -79,6 +79,10 @@ option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
 
+option(SWIFT_ENABLE_EXPERIMENTAL_STRUCTURAL
+  "Enable experimental Swift structural generic programming features"
+  FALSE)
+
 #
 # End of user-configurable options.
 #
