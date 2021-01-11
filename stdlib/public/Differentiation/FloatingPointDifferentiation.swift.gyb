@@ -282,4 +282,28 @@ where
     let y = squareRoot()
     return (y, { v in v / (2 * y) })
   }
+
+  @inlinable
+  @derivative(of: minimum)
+  static func _vjpMinimum(_ x: Self, _ y: Self) -> (
+    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
+  ) {
+    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
+      if x <= y || y.isNaN { return (v, .zero) }
+      return (.zero, v)
+    }
+    return (value: Self.minimum(x, y), pullback: pullback)
+  }
+
+  @inlinable
+  @derivative(of: maximum)
+  static func _vjpMaximum(_ x: Self, _ y: Self) -> (
+    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
+  ) {
+    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
+      if x > y || y.isNaN { return (v, .zero) }
+      return (.zero, v)
+    }
+    return (value: Self.maximum(x, y), pullback: pullback)
+  }
 }
