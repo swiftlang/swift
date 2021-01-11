@@ -965,6 +965,8 @@ namespace {
 
       Expr *subArg = arg->getSubExpr();
       ValueDecl *valueDecl = nullptr;
+      if (auto binding = dyn_cast<BindOptionalExpr>(subArg))
+        subArg = binding->getSubExpr();
       if (LookupExpr *baseArg = dyn_cast<LookupExpr>(subArg)) {
         while (LookupExpr *nextLayer = dyn_cast<LookupExpr>(baseArg->getBase()))
           baseArg = nextLayer;

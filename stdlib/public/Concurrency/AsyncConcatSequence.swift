@@ -27,27 +27,25 @@ public struct AsyncConcatSequence<Prefix, Suffix>: AsyncSequence where Prefix: A
   public typealias AsyncIterator = Iterator
   
   public struct Iterator: AsyncIteratorProtocol {
-    var prefixIterator: Prefix.AsyncIterator?
-    var suffixIterator: Suffix.AsyncIterator?
+    var prefixIterator: _OptionalAsyncIterator<Prefix.AsyncIterator>
+    var suffixIterator: _OptionalAsyncIterator<Suffix.AsyncIterator>
     
     init(_ prefixIterator: Prefix.AsyncIterator, _ suffixIterator: Suffix.AsyncIterator) {
-      self.prefixIterator = prefixIterator
-      self.suffixIterator = suffixIterator
+      self.prefixIterator = _OptionalAsyncIterator(prefixIterator)
+      self.suffixIterator = _OptionalAsyncIterator(suffixIterator)
     }
     
     public mutating func next() async rethrows -> Prefix.Element? {
-      if let item = try await prefixIterator?.next() {
+      if let item = try await prefixIterator.next() {
         return item
       }
-      prefixIterator = nil
-      return try await suffixIterator?.next()
+      prefixIterator = .none
+      return try await suffixIterator.next()
     }
     
     public mutating func cancel() {
-      prefixIterator?.cancel()
-      prefixIterator = nil
-      suffixIterator?.cancel()
-      suffixIterator = nil
+      prefixIterator.cancel()
+      suffixIterator.cancel()
     }
   }
   

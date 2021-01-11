@@ -18,3 +18,32 @@ public protocol AsyncIteratorProtocol {
   mutating func next() async throws -> Element?
   mutating func cancel()
 }
+
+internal enum _OptionalAsyncIterator<AsyncIterator: AsyncIteratorProtocol>: AsyncIteratorProtocol {
+  case none
+  case some(AsyncIterator)
+
+  init(_ iterator: AsyncIterator) {
+    self = .some(iterator)
+  }
+
+  mutating func next() async rethrows -> AsyncIterator.Element? {
+    switch self {
+    case .some(var iterator):
+      defer { self = .some(iterator) }
+      return try await iterator.next()
+    default:
+      return nil
+    }
+  }
+
+  mutating func cancel() {
+    switch self {
+    case .some(var iterator):
+      iterator.cancel()
+      self = .none
+    default:
+      break
+    }
+  }
+}

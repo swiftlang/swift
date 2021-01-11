@@ -4054,6 +4054,8 @@ NOTE(because_rethrows_argument_throws,none,
 NOTE(because_rethrows_default_argument_throws,none,
      "call is to 'rethrows' function, but a defaulted argument function"
      " can throw", ())
+NOTE(because_rethrows_default_conformance_throws,none,
+     "call is to 'rethrows' function, but a conformance can throw", ())
 
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "call can throw, but it is executed in a non-throwing "

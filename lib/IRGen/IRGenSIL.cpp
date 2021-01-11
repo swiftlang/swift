@@ -4360,7 +4360,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
         break;
     }
     assert(llvm::isa<llvm::Argument>(Storage) &&
-           "arg expected to be load from inside %swift.context");
+           "arg expected to be load from inside swift.context");
 #endif
     Indirection = CoroIndirectValue;
   }

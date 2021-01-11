@@ -30,31 +30,29 @@ public struct AsyncFilterSequence<Upstream>: AsyncSequence where Upstream: Async
   public let predicate: (Element) async -> Bool
   
   public struct Iterator: AsyncIteratorProtocol {
-    var upstreamIterator: Upstream.AsyncIterator?
+    var upstreamIterator: _OptionalAsyncIterator<Upstream.AsyncIterator>
     let predicate: (Element) async -> Bool
     
     init(_ upstreamIterator: Upstream.AsyncIterator,
          predicate: @escaping (Element) async -> Bool
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.upstreamIterator = _OptionalAsyncIterator(upstreamIterator)
       self.predicate = predicate
     }
     
     public mutating func next() async rethrows -> Upstream.Element? {
-      guard let item = try await upstreamIterator?.next() else {
+      guard let item = try await upstreamIterator.next() else {
         return nil
       }
       guard await predicate(item) else {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
-      return nil
+        upstreamIterator.cancel()
+        return nil
       }
       return item
     }
     
     public mutating func cancel() {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
+      upstreamIterator.cancel()
     }
   }
   
@@ -76,31 +74,29 @@ public struct AsyncTryFilterSequence<Upstream>: AsyncSequence where Upstream: As
   public let predicate: (Element) async throws -> Bool
   
   public struct Iterator: AsyncIteratorProtocol {
-    var upstreamIterator: Upstream.AsyncIterator?
+    var upstreamIterator: _OptionalAsyncIterator<Upstream.AsyncIterator>
     let predicate: (Element) async throws -> Bool
     
     init(_ upstreamIterator: Upstream.AsyncIterator,
          predicate: @escaping (Element) async throws -> Bool
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.upstreamIterator = _OptionalAsyncIterator(upstreamIterator)
       self.predicate = predicate
     }
     
     public mutating func next() async throws -> Upstream.Element? {
-      guard let item = try await upstreamIterator?.next() else {
+      guard let item = try await upstreamIterator.next() else {
         return nil
       }
       guard try await predicate(item) else {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
-      return nil
+        upstreamIterator.cancel()
+        return nil
       }
       return item
     }
     
     public mutating func cancel() {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
+      upstreamIterator.cancel()
     }
   }
   

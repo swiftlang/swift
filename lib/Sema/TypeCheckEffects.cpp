@@ -309,6 +309,10 @@ public:
     /// The function is 'rethrows', and it was passed a default
     /// argument that was not rethrowing-only in this context.
     CallRethrowsWithDefaultThrowingArgument,
+
+    /// The the function is 'rethrows', and it is a member that
+    /// is a conformance to a rethrowing protocol.
+    CallRethrowsWithConformance,
   };
 
   static StringRef kindToString(Kind k) {
@@ -320,6 +324,8 @@ public:
         return "CallRethrowsWithExplicitThrowingArgument";
       case Kind::CallRethrowsWithDefaultThrowingArgument: 
         return "CallRethrowsWithDefaultThrowingArgument";
+      case Kind::CallRethrowsWithConformance:
+        return "CallRethrowsWithConformance";
     }
   }
 
@@ -337,6 +343,11 @@ public:
   static PotentialThrowReason forDefaultArgument() {
     return PotentialThrowReason(Kind::CallRethrowsWithDefaultThrowingArgument);
   }
+  static PotentialThrowReason forRethrowsConformance(Expr *E) {
+    PotentialThrowReason result(Kind::CallRethrowsWithConformance);
+    result.TheExpression = E;
+    return result;
+  }
   static PotentialThrowReason forThrowingApply() {
     return PotentialThrowReason(Kind::CallThrows);
   }
@@ -353,7 +364,8 @@ public:
   bool isThrow() const { return getKind() == Kind::Throw; }
   bool isRethrowsCall() const {
     return (getKind() == Kind::CallRethrowsWithExplicitThrowingArgument ||
-            getKind() == Kind::CallRethrowsWithDefaultThrowingArgument);
+            getKind() == Kind::CallRethrowsWithDefaultThrowingArgument ||
+            getKind() == Kind::CallRethrowsWithConformance);
   }
 
   /// If this was built with forRethrowsArgument, return the expression.
@@ -576,7 +588,7 @@ public:
       auto substitutions = fnRef.getDeclRef().getSubstitutions();
       if (classifyWitnessAsThrows(fnRef.getModuleContext(), substitutions)) {
         return Classification::forRethrowingOnly(
-          PotentialThrowReason::forThrowingApply(), isAsync);
+          PotentialThrowReason::forRethrowsConformance(E), isAsync);
       }
     } else if (fnRef.isBodyRethrows() && 
                fnRef.getRethrowingKind() == FunctionRethrowingKind::Throws) {
@@ -1255,6 +1267,9 @@ public:
       return;
     case PotentialThrowReason::Kind::CallRethrowsWithDefaultThrowingArgument:
       Diags.diagnose(loc, diag::because_rethrows_default_argument_throws);
+      return;
+    case PotentialThrowReason::Kind::CallRethrowsWithConformance:
+      Diags.diagnose(loc, diag::because_rethrows_default_conformance_throws);
       return;
     }
     llvm_unreachable("bad reason kind");

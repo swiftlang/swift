@@ -27,26 +27,25 @@ public struct AsyncMapSequence<Upstream, Transformed>: AsyncSequence where Upstr
   public typealias Element = Transformed
   
   public struct Iterator: AsyncIteratorProtocol {
-    var upstreamIterator: Upstream.AsyncIterator?
+    var upstreamIterator: _OptionalAsyncIterator<Upstream.AsyncIterator>
     let transform: (Upstream.Element) async -> Transformed
     
     init(_ upstreamIterator: Upstream.AsyncIterator,
          transform: @escaping (Upstream.Element) async -> Transformed
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.upstreamIterator = _OptionalAsyncIterator(upstreamIterator)
       self.transform = transform
     }
     
     public mutating func next() async rethrows -> Transformed? {
-      guard let item = try await upstreamIterator?.next() else {
+      guard let item = try await upstreamIterator.next() else {
         return nil
       }
       return await transform(item)
     }
     
     public mutating func cancel() {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
+      upstreamIterator.cancel()
     }
   }
   
@@ -68,26 +67,25 @@ public struct AsyncTryMapSequence<Upstream, Transformed>: AsyncSequence where Up
   public typealias Element = Transformed
   
   public struct Iterator: AsyncIteratorProtocol {
-    var upstreamIterator: Upstream.AsyncIterator?
+    var upstreamIterator: _OptionalAsyncIterator<Upstream.AsyncIterator>
     let transform: (Upstream.Element) async throws -> Transformed
     
     init(_ upstreamIterator: Upstream.AsyncIterator,
          transform: @escaping (Upstream.Element) async throws -> Transformed
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.upstreamIterator = _OptionalAsyncIterator(upstreamIterator)
       self.transform = transform
     }
     
     public mutating func next() async throws -> Transformed? {
-      guard let item = try await upstreamIterator?.next() else {
+      guard let item = try await upstreamIterator.next() else {
         return nil
       }
       return try await transform(item)
     }
     
     public mutating func cancel() {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
+      upstreamIterator.cancel()
     }
   }
   

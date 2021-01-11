@@ -27,33 +27,31 @@ public struct AsyncFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>: As
   public typealias AsyncIterator = Iterator
   
   public struct Iterator: AsyncIteratorProtocol {
-    var upstreamIterator: Upstream.AsyncIterator?
+    var upstreamIterator: _OptionalAsyncIterator<Upstream.AsyncIterator>
     let transform: (Upstream.Element) async -> SegmentOfResult
-    var currentIterator: SegmentOfResult.AsyncIterator?
+    var currentIterator: _OptionalAsyncIterator<SegmentOfResult.AsyncIterator> = .none
     
     init(_ upstreamIterator: Upstream.AsyncIterator, transform: @escaping (Upstream.Element) async -> SegmentOfResult) {
-      self.upstreamIterator = upstreamIterator
+      self.upstreamIterator = _OptionalAsyncIterator(upstreamIterator)
       self.transform = transform
     }
     
     public mutating func next() async rethrows -> SegmentOfResult.Element? {
-      if let item = try await currentIterator?.next() {
+      if let item = try await currentIterator.next() {
         return item
       } else {
-        guard let item = try await upstreamIterator?.next() else {
+        guard let item = try await upstreamIterator.next() else {
           return nil
         }
         let segment = await transform(item)
-        currentIterator = segment.makeAsyncIterator()
-        return try await currentIterator?.next()
+        currentIterator = _OptionalAsyncIterator(segment.makeAsyncIterator())
+        return try await currentIterator.next()
       }
     }
     
     public mutating func cancel() {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
-      currentIterator?.cancel()
-      currentIterator = nil
+      upstreamIterator.cancel()
+      currentIterator.cancel()
     }
   }
   
@@ -75,33 +73,31 @@ public struct AsyncTryFlatMapSequence<Upstream, SegmentOfResult: AsyncSequence>:
   public typealias AsyncIterator = Iterator
   
   public struct Iterator: AsyncIteratorProtocol {
-    var upstreamIterator: Upstream.AsyncIterator?
+    var upstreamIterator: _OptionalAsyncIterator<Upstream.AsyncIterator>
     let transform: (Upstream.Element) async throws -> SegmentOfResult
-    var currentIterator: SegmentOfResult.AsyncIterator?
+    var currentIterator: _OptionalAsyncIterator<SegmentOfResult.AsyncIterator> = .none
     
     init(_ upstreamIterator: Upstream.AsyncIterator, transform: @escaping (Upstream.Element) async throws -> SegmentOfResult) {
-      self.upstreamIterator = upstreamIterator
+      self.upstreamIterator = _OptionalAsyncIterator(upstreamIterator)
       self.transform = transform
     }
     
     public mutating func next() async throws -> SegmentOfResult.Element? {
-      if let item = try await currentIterator?.next() {
+      if let item = try await currentIterator.next() {
         return item
       } else {
-        guard let item = try await upstreamIterator?.next() else {
+        guard let item = try await upstreamIterator.next() else {
           return nil
         }
         let segment = try await transform(item)
-        currentIterator = segment.makeAsyncIterator()
-        return try await currentIterator?.next()
+        currentIterator = _OptionalAsyncIterator(segment.makeAsyncIterator())
+        return try await currentIterator.next()
       }
     }
     
     public mutating func cancel() {
-      upstreamIterator?.cancel()
-      upstreamIterator = nil
-      currentIterator?.cancel()
-      currentIterator = nil
+      upstreamIterator.cancel()
+      currentIterator.cancel()
     }
   }
   
