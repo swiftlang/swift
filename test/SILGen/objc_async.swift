@@ -58,6 +58,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   let _: String = await slowServer.findAnswerNullably("foo")
   let _: String = try await slowServer.doSomethingDangerousNullably("foo")
+
+  let _: NSObject? = try await slowServer.stopRecording()
 }
 
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]
@@ -77,8 +79,9 @@ func testSlowServer(slowServer: SlowServer) async throws {
 // CHECK:   switch_enum [[ERROR_IN_B]] : {{.*}}, case #Optional.some!enumelt: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[RESUME_BB:bb[0-9]+]]
 // CHECK: [[RESUME_BB]]:
 // CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $String
+// CHECK:   [[RESUME_CP:%.*]] = copy_value [[RESUME_IN]]
 // CHECK:   [[BRIDGE:%.*]] = function_ref @{{.*}}unconditionallyBridgeFromObjectiveC
-// CHECK:   [[BRIDGED_RESULT:%.*]] = apply [[BRIDGE]]([[RESUME_IN]]
+// CHECK:   [[BRIDGED_RESULT:%.*]] = apply [[BRIDGE]]([[RESUME_CP]]
 // CHECK:   store [[BRIDGED_RESULT]] to [init] [[RESULT_BUF]]
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeUnsafeThrowingContinuation
 // CHECK:   apply [[RESUME]]<String>([[CONT]], [[RESULT_BUF]])
