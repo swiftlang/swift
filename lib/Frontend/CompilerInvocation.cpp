@@ -589,8 +589,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
 
-  Opts.WarnForceUnwrap = Args.hasArg(OPT_warn_force_unwrap);
-
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   std::string TargetArgScratch;
@@ -699,6 +697,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (FrontendOpts.AllowModuleWithCompilerErrors) {
     Opts.AllowModuleWithCompilerErrors = true;
+  }
+
+  for (const Arg *A : Args.filtered(OPT_W)) {
+    Diags.ActiveLints[A->getValue()] = true;
+    A->claim();
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;

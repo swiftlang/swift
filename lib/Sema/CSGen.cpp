@@ -3000,9 +3000,8 @@ namespace {
             CS, CS.getConstraintLocator(nilLiteral)));
       }
 
-      auto &ctx = CS.getASTContext();
-      if (ctx.LangOpts.WarnForceUnwrap)
-        ctx.Diags.diagnose(expr->getLoc(), diag::warn_force_unwrap);
+      CS.getASTContext().Diags.diagnose(expr->getLoc(),
+                                        diag::force_unwrap_usage);
 
       // The result is the object type of the optional subexpression.
       CS.addConstraint(ConstraintKind::OptionalObject, CS.getType(valueExpr),

@@ -243,6 +243,9 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
+def W : JoinedOrSeparate<["-"], "W">, Flags<[FrontendOption]>,
+  HelpText<"Opt into linting warning">;
+
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
@@ -569,11 +572,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
-
-def warn_force_unwrap : Flag<["-"],
-    "warn-force-unwrap">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Audit code for force-unwrap usage">;
 
 def disable_fuzzy_forward_scan_trailing_closure_matching : Flag<["-"],
     "disable-fuzzy-forward-scan-trailing-closure-matching">,
