@@ -333,6 +333,12 @@ public:
   bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
                                   KeyPathInst *kp);
 
+  /// Sinks owned forwarding instructions to their uses if they do not have
+  /// non-debug non-consuming uses. Deletes any debug_values and destroy_values
+  /// when this is done. Returns true if we deleted svi and thus we should not
+  /// try to visit it.
+  bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);

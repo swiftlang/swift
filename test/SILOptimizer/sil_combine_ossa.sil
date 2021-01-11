@@ -9,6 +9,9 @@ import Builtin
 import Swift
 
 class Klass {}
+
+sil @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+
 class RawBuffer {}
 class HeapBufferStorage<T, U> : RawBuffer {}
 
@@ -47,6 +50,8 @@ struct MyInt {
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil [ossa] @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil [ossa] @use_nativeobject_owned : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil [ossa] @use_nativeobject_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
 sil [ossa] @unknown : $@convention(thin) () -> ()
 
@@ -4110,4 +4115,98 @@ bb0(%0 : @owned $Klass):
   %2 = copy_value %1 : $Optional<Klass>
   destroy_value %0 : $Klass
   return %2 : $Optional<Klass>
+}
+
+// We do not sink if the forwarding inst is in the same block as the consuming use.
+//
+// CHECK-LABEL: sil [ossa] @sink_forwarding_owned_uses_no_sink_same_block : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Builtin.NativeObject {
+// CHECK: bb0(
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: function_ref
+// CHECK: } // end sil function 'sink_forwarding_owned_uses_no_sink_same_block'
+sil [ossa] @sink_forwarding_owned_uses_no_sink_same_block : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Builtin.NativeObject {
+bb0(%0a : @owned $Klass, %0b : @guaranteed $Klass):
+  %1 = unchecked_ref_cast %0a : $Klass to $Builtin.NativeObject
+  %2 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %2(%0b) : $@convention(thin) (@guaranteed Klass) -> ()
+  return %1 : $Builtin.NativeObject
+}
+
+// In this case, since we have different blocks, we sink.
+//
+// CHECK-LABEL: sil [ossa] @sink_forwarding_owned_uses_sink_diff_block_single_use : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Builtin.NativeObject {
+// CHECK: bb0(
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'sink_forwarding_owned_uses_sink_diff_block_single_use'
+sil [ossa] @sink_forwarding_owned_uses_sink_diff_block_single_use : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Builtin.NativeObject {
+bb0(%0a : @owned $Klass, %0b : @guaranteed $Klass):
+  %1 = unchecked_ref_cast %0a : $Klass to $Builtin.NativeObject
+  br bb1
+
+bb1:
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @sink_forwarding_owned_uses_sink_diff_block_single_use_noopt : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Builtin.NativeObject {
+// CHECK: bb0(
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'sink_forwarding_owned_uses_sink_diff_block_single_use_noopt'
+sil [ossa] @sink_forwarding_owned_uses_sink_diff_block_single_use_noopt : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Builtin.NativeObject {
+bb0(%0a : @owned $Klass, %0b : @guaranteed $Klass):
+  %1 = unchecked_ref_cast %0a : $Klass to $Builtin.NativeObject
+  %f = function_ref @use_nativeobject_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  br bb1
+
+bb1:
+  return %1 : $Builtin.NativeObject
+}
+
+// In this case, since we have different blocks, we sink.
+//
+// CHECK-LABEL: sil [ossa] @sink_forwarding_owned_uses_sink_diff_block_single_use_destroy : $@convention(thin) (@owned Klass, @guaranteed Klass) -> () {
+// CHECK: bb0(
+// CHECK-NEXT: cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: apply
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'sink_forwarding_owned_uses_sink_diff_block_single_use_destroy'
+sil [ossa] @sink_forwarding_owned_uses_sink_diff_block_single_use_destroy : $@convention(thin) (@owned Klass, @guaranteed Klass) -> () {
+bb0(%0a : @owned $Klass, %0b : @guaranteed $Klass):
+  %1 = unchecked_ref_cast %0a : $Klass to $Builtin.NativeObject
+  cond_br undef, bb1a, bb1b
+
+bb1a:
+  %f = function_ref @use_nativeobject_owned : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb1
+
+bb1b:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %9999 = tuple()
+  return %9999 : $()
 }
