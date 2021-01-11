@@ -936,37 +936,51 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   return OverApproximateContext;
 }
 
-Optional<UnavailabilityReason>
-TypeChecker::checkDeclarationAvailability(const Decl *D,
-                                          const ExportContext &where) {
-  auto *referenceDC = where.getDeclContext();
+bool TypeChecker::isDeclarationUnavailable(
+    const Decl *D, const DeclContext *referenceDC,
+    llvm::function_ref<AvailabilityContext()> getAvailabilityContext) {
   ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
-    return None;
+    return false;
   }
 
   if (!referenceDC->getParentSourceFile()) {
     // We only check availability if this reference is in a source file; we do
     // not check in other kinds of FileUnits.
-    return None;
+    return false;
   }
-
-  AvailabilityContext runningOSOverApprox =
-      where.getAvailabilityContext();
 
   AvailabilityContext safeRangeUnderApprox{
       AvailabilityInference::availableRange(D, Context)};
+
+  if (safeRangeUnderApprox.isAlwaysAvailable())
+    return false;
+
+  AvailabilityContext runningOSOverApprox = getAvailabilityContext();
 
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation
   // of the versions on which the declaration is available. If this
   // containment cannot be guaranteed, we say the reference is
   // not available.
-  if (runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
-    return None;
+  return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
+}
 
-  VersionRange version = safeRangeUnderApprox.getOSVersion();
-  return UnavailabilityReason::requiresVersionRange(version);
+Optional<UnavailabilityReason>
+TypeChecker::checkDeclarationAvailability(const Decl *D,
+                                          const ExportContext &Where) {
+  if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
+        return Where.getAvailabilityContext();
+      })) {
+    auto &Context = Where.getDeclContext()->getASTContext();
+    AvailabilityContext safeRangeUnderApprox{
+        AvailabilityInference::availableRange(D, Context)};
+
+    VersionRange version = safeRangeUnderApprox.getOSVersion();
+    return UnavailabilityReason::requiresVersionRange(version);
+  }
+
+  return None;
 }
 
 Optional<UnavailabilityReason>
