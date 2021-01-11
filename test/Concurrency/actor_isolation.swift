@@ -407,3 +407,19 @@ actor class LazyActor {
     @actorIndependent lazy var l44: Int = self.l
     @actorIndependent lazy var l45: Int = { [unowned self] in self.l }()
 }
+
+// Infer global actors from context only for instance members.
+@MainActor
+class SomeClassInActor {
+  enum ID: String { case best }
+
+  func inActor() { } // expected-note{{calls to instance method 'inActor()' from outside of its actor context are implicitly asynchronous}}
+}
+
+extension SomeClassInActor.ID {
+  func f(_ object: SomeClassInActor) { // expected-note{{add '@MainActor' to make instance method 'f' part of global actor 'MainActor'}}
+    // expected-note@-1{{add 'async' to function 'f' to make it asynchronous}}
+    // expected-note@-2{{add '@asyncHandler' to function 'f' to create an implicit asynchronous context}}
+    object.inActor() // expected-error{{'async' in a function that does not support concurrency}}
+  }
+}
