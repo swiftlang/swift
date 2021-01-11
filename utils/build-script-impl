@@ -457,17 +457,35 @@ function set_build_options_for_host() {
     SWIFT_HOST_VARIANT_ARCH=$architecture
 
     case ${host} in
-        android-aarch64)
-            SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
-            llvm_target_arch="AArch64"
-            ;;
-        android-armv7)
-            SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
-            llvm_target_arch="ARM"
-            ;;
-        android-x86_64)
-            SWIFT_HOST_TRIPLE="x86_64-unknown-linux-android${ANDROID_API_LEVEL}"
-            llvm_target_arch="X86"
+        android-*)
+            # Clang uses a different sysroot natively on Android in the Termux
+            # app, which the Termux build scripts pass in through a $PREFIX
+            # variable.
+            if [[ "${PREFIX}" ]] ; then
+                llvm_cmake_options+=(
+                    -DDEFAULT_SYSROOT:STRING="$(dirname ${PREFIX})"
+                )
+            fi
+            # Android doesn't support building all of compiler-rt yet.
+            if [[ ! $(is_cross_tools_host "${host}") ]] ; then
+                llvm_cmake_options+=(
+                    -DCOMPILER_RT_INCLUDE_TESTS:BOOL=FALSE
+                )
+            fi
+            case ${host} in
+                android-aarch64)
+                    SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
+                    llvm_target_arch="AArch64"
+                    ;;
+                android-armv7)
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
+                    llvm_target_arch="ARM"
+                    ;;
+                android-x86_64)
+                    SWIFT_HOST_TRIPLE="x86_64-unknown-linux-android${ANDROID_API_LEVEL}"
+                    llvm_target_arch="X86"
+                    ;;
+            esac
             ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
@@ -1761,7 +1779,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
+                if [[ ! "${SKIP_BUILD_ANDROID}" ]] ||
+                   [[ $(is_cross_tools_host ${host}) && "${host}" == "android-"* ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
@@ -2459,6 +2478,8 @@ for host in "${ALL_HOSTS[@]}"; do
             elif [[ "$(uname -s)" == "Haiku" ]] ; then
               HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
             elif [[ "${ANDROID_DATA}" ]] ; then
+              # This means we're building natively on Android in the Termux
+              # app, which supplies the $PREFIX variable.
               HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
             else # Linux
               HOST_CXX_HEADERS_DIR="/usr/include/c++"

@@ -1141,8 +1141,11 @@ namespace {
         return true;
       }
 
-      case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
+        // Allow unrestricted use of something in a global actor.
+        return false;
+
+      case ActorIsolation::Independent:
         if (inspectForImplicitlyAsync())
           return false;
 
@@ -1168,8 +1171,8 @@ namespace {
           }
           noteIsolatedActorMember(value);
         };
-        
-        if (AbstractFunctionDecl const* fn = 
+
+        if (AbstractFunctionDecl const* fn =
             dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
           bool isAsyncContext = fn->isAsyncContext();
 
