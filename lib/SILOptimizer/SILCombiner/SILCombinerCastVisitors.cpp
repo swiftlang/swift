@@ -259,20 +259,20 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
-  if (UADCI->getFunction()->hasOwnership())
-    return nullptr;
+  // These are always safe to perform due to interior pointer ownership
+  // requirements being transitive along addresses.
 
   Builder.setCurrentDebugScope(UADCI->getDebugScope());
 
-  // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
+  // (unchecked_addr_cast (unchecked_addr_cast x X->Y) Y->Z)
   //   ->
-  // (unchecked-addr-cast x X->Z)
+  // (unchecked_addr_cast x X->Z)
   if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
     return Builder.createUncheckedAddrCast(UADCI->getLoc(),
                                            OtherUADCI->getOperand(),
                                            UADCI->getType());
 
-  // (unchecked-addr-cast cls->superclass) -> (upcast cls->superclass)
+  // (unchecked_addr_cast cls->superclass) -> (upcast cls->superclass)
   if (UADCI->getType() != UADCI->getOperand()->getType() &&
       UADCI->getType().isExactSuperclassOf(UADCI->getOperand()->getType()))
     return Builder.createUpcast(UADCI->getLoc(), UADCI->getOperand(),

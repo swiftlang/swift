@@ -1254,11 +1254,12 @@ bb0(%0 : $*Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
-// XHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// XHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
-// XHECK-NEXT: debug_value [[ADDR_CAST]]
-// XHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [trivial] [[ADDR_CAST]] : $*Builtin.Word
-// XHECK-NEXT: return [[RETURN_VALUE]]
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
+// CHECK-NEXT: debug_value [[ADDR_CAST]]
+// CHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [trivial] [[ADDR_CAST]] : $*Builtin.Word
+// CHECK-NEXT: return [[RETURN_VALUE]]
+// CHECK: } // end sil function 'unchecked_addr_cast_forwarding'
 sil [ossa] @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
@@ -1434,6 +1435,7 @@ bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
 // XHECK-NEXT: upcast
 // XHECK-NEXT: store
 // XHECK-NEXT: return
+// CHECK: } // end sil function 'upcast_formation'
 sil [ossa] @upcast_formation : $@convention(thin) (@inout E, @owned E, @inout B) -> @owned B {
 bb0(%0 : $*E, %1 : @owned $E, %2 : $*B):
   %3 = unchecked_addr_cast %0 : $*E to $*B
@@ -1444,10 +1446,13 @@ bb0(%0 : $*E, %1 : @owned $E, %2 : $*B):
 }
 
 // CHECK-LABEL: sil [ossa] @dont_form_upcast_when_casts_are_identity : $@convention(thin) (@inout E, @owned E, @inout E) -> @owned E {
-// XHECK: bb0
-// XHECK-NEXT: load
-// XHECK-NEXT: store
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: load
+// CHECK-NEXT: store
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'dont_form_upcast_when_casts_are_identity'
 sil [ossa] @dont_form_upcast_when_casts_are_identity : $@convention(thin) (@inout E, @owned E, @inout E) -> @owned E {
 bb0(%0 : $*E, %1 : @owned $E, %2 : $*E):
   %3 = unchecked_addr_cast %0 : $*E to $*E
