@@ -1620,9 +1620,6 @@ public:
   /// Add the swiftself attribute.
   void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
-  void addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
-                                      unsigned argIndex);
-
   /// Add the swifterror attribute.
   void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
