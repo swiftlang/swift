@@ -36,6 +36,7 @@ endif()
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Actor.cpp
   Actor.swift
+  CheckedContinuation.swift
   GlobalExecutor.cpp
   PartialAsyncTask.swift
   Task.cpp
