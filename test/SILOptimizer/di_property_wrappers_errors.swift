@@ -23,22 +23,22 @@ struct IntStructWithClassWrapper {
   @ClassWrapper var wrapped: Int
 
   init() {
-    wrapped = 42 // expected-error{{variable 'self.wrapped' used before being initialized}}
+    wrapped = 42
   }
 
   init(conditional b: Bool) {
      if b {
        self._wrapped = ClassWrapper(wrappedValue: 32)
      } else {
-       wrapped = 42 // expected-error{{variable 'self.wrapped' used before being initialized}}
+       wrapped = 42
      }
   }
 
   init(dynamic b: Bool) {
     if b {
-      wrapped = 42 // expected-error{{variable 'self.wrapped' used before being initialized}}
+      wrapped = 42
     }
-    wrapped = 27 // expected-error{{variable 'self.wrapped' used before being initialized}}
+    wrapped = 27
   }
 }
 
