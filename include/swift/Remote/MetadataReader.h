@@ -2110,7 +2110,7 @@ private:
     }
 
     if (descriptor.isResolved()) {
-      return buildContextDescriptorMangling(descriptor.getResolved(), dem, recursion_limit - 1);
+      return buildContextDescriptorMangling(descriptor.getResolved(), dem, recursion_limit);
     }
     
     // Try to demangle the symbol name to figure out what context it would
