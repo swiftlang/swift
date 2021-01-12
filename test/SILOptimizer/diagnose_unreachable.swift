@@ -258,7 +258,7 @@ class r20097963MyClass {
   }
 }
 
-func die() -> Never { die() } // expected-warning {{all paths through this function will call itself}}
+func die() -> Never { die() } // expected-warning {{function call causes an infinite recursion}}
 
 func testGuard(_ a : Int) {
   guard case 4 = a else {  }  // expected-error {{'guard' body must not fall through, consider using a 'return' or 'throw'}}
