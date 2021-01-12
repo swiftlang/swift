@@ -2557,51 +2557,49 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
   auto &Context = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
-  if (!dc->getParentSourceFile()) {
-    auto members = idc->getMembers();
-    result.append(members.begin(), members.end());
-    return Context.AllocateCopy(result);
-  }
+  // Esnure that we add any synthesized members.
+  if (dc->getParentSourceFile()) {
+    auto nominal = dyn_cast<NominalTypeDecl>(idc);
 
-  auto nominal = dyn_cast<NominalTypeDecl>(idc);
+    if (nominal) {
+      // We need to add implicit initializers because they
+      // affect vtable layout.
+      TypeChecker::addImplicitConstructors(nominal);
+    }
 
-  if (nominal) {
-    // We need to add implicit initializers because they
-    // affect vtable layout.
-    TypeChecker::addImplicitConstructors(nominal);
-  }
+    // Force any derivable conformances in this context. This ensures that any
+    // synthesized members will approach in the member list.
+    for (auto conformance : idc->getLocalConformances()) {
+      if (conformance->getState() == ProtocolConformanceState::Incomplete &&
+          conformance->getProtocol()->getKnownDerivableProtocolKind())
+        TypeChecker::checkConformance(conformance->getRootNormalConformance());
+    }
 
-  // Force any derivable conformances in this context. This ensures that any
-  // synthesized members will approach in the member list.
-  for (auto conformance : idc->getLocalConformances()) {
-    if (conformance->getState() == ProtocolConformanceState::Incomplete &&
-        conformance->getProtocol()->getKnownDerivableProtocolKind())
-      TypeChecker::checkConformance(conformance->getRootNormalConformance());
-  }
+    // If the type conforms to Encodable or Decodable, even via an extension,
+    // the CodingKeys enum is synthesized as a member of the type itself.
+    // Force it into existence.
+    if (nominal) {
+      (void) evaluateOrDefault(
+        Context.evaluator,
+        ResolveImplicitMemberRequest{nominal,
+                   ImplicitMemberAction::ResolveCodingKeys},
+        {});
+    }
 
-  // If the type conforms to Encodable or Decodable, even via an extension,
-  // the CodingKeys enum is synthesized as a member of the type itself.
-  // Force it into existence.
-  if (nominal) {
-    (void) evaluateOrDefault(Context.evaluator,
-                             ResolveImplicitMemberRequest{nominal,
-                                        ImplicitMemberAction::ResolveCodingKeys},
-                             {});
-  }
+    // If the decl has a @main attribute, we need to force synthesis of the
+    // $main function.
+    (void) evaluateOrDefault(
+        Context.evaluator,
+        SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
+        nullptr);
 
-  // If the decl has a @main attribute, we need to force synthesis of the
-  // $main function.
-  (void) evaluateOrDefault(
-      Context.evaluator,
-      SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
-      nullptr);
-
-  for (auto *member : idc->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member)) {
-      // The projected storage wrapper ($foo) might have dynamically-dispatched
-      // accessors, so force them to be synthesized.
-      if (var->hasAttachedPropertyWrapper())
-        (void) var->getPropertyWrapperBackingProperty();
+    for (auto *member : idc->getMembers()) {
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        // The projected storage wrapper ($foo) might have
+        // dynamically-dispatched accessors, so force them to be synthesized.
+        if (var->hasAttachedPropertyWrapper())
+          (void) var->getPropertyWrapperBackingProperty();
+      }
     }
   }
 
