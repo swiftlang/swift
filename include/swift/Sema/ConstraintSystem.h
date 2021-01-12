@@ -5040,12 +5040,9 @@ private:
     ///
     /// Which gives us a new (superclass A) binding for T2 as well as T1.
     ///
-    /// \param cs The constraint system this type variable is associated with.
-    ///
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        ConstraintSystem &cs,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
@@ -5054,18 +5051,16 @@ private:
     /// between two type variables and attempt to propagate protocol
     /// requirements down the subtype or equivalence chain.
     void inferTransitiveProtocolRequirements(
-        const ConstraintSystem &cs,
         llvm::SmallDenseMap<TypeVariableType *,
                             ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
 public:
-    bool infer(ConstraintSystem &cs, Constraint *constraint);
+    bool infer(Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
-    void finalize(ConstraintSystem &cs,
-                  llvm::SmallDenseMap<TypeVariableType *,
+    void finalize(llvm::SmallDenseMap<TypeVariableType *,
                                       ConstraintSystem::PotentialBindings>
                       &inferredBindings);
 

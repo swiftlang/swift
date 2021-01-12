@@ -152,7 +152,6 @@ bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
 }
 
 void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
-    const ConstraintSystem &cs,
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         &inferredBindings) {
   if (TransitiveProtocols)
@@ -283,7 +282,6 @@ void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
 }
 
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    ConstraintSystem &cs,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -353,11 +351,10 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 }
 
 void ConstraintSystem::PotentialBindings::finalize(
-    ConstraintSystem &cs,
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         &inferredBindings) {
-  inferTransitiveProtocolRequirements(cs, inferredBindings);
-  inferTransitiveBindings(cs, inferredBindings);
+  inferTransitiveProtocolRequirements(inferredBindings);
+  inferTransitiveBindings(inferredBindings);
 }
 
 Optional<ConstraintSystem::PotentialBindings>
@@ -411,7 +408,7 @@ ConstraintSystem::determineBestBindings() {
     // produce a default type.
     bool isViable = isViableForRanking(bindings);
 
-    bindings.finalize(*this, cache);
+    bindings.finalize(cache);
 
     if (!bindings || !isViable)
       continue;
@@ -775,7 +772,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
       typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
 
   for (auto *constraint : constraints) {
-    bool failed = bindings.infer(*this, constraint);
+    bool failed = bindings.infer(constraint);
 
     // Upon inference failure let's produce an empty set of bindings.
     if (failed)
@@ -786,7 +783,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
     llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
         inferred;
 
-    bindings.finalize(*this, inferred);
+    bindings.finalize(inferred);
   }
 
   return bindings;
@@ -995,8 +992,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
-                                                Constraint *constraint) {
+bool ConstraintSystem::PotentialBindings::infer(Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -1008,7 +1004,7 @@ bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OptionalObject: {
     auto binding =
-        cs.getPotentialBindingForRelationalConstraint(*this, constraint);
+        CS.getPotentialBindingForRelationalConstraint(*this, constraint);
     if (!binding)
       break;
 
@@ -1036,7 +1032,7 @@ bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
         // let's have it try `Void` as well because there is an
         // implicit conversion `() -> T` to `() -> Void` and this
         // helps to avoid creating a thunk to support it.
-        auto voidType = cs.getASTContext().TheEmptyTupleType;
+        auto voidType = CS.getASTContext().TheEmptyTupleType;
         if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
             binding->Kind == AllowedBindingKind::Supertypes) {
           (void)addPotentialBinding({voidType, binding->Kind, constraint},
@@ -1053,7 +1049,7 @@ bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
     // we try to bind the key path type first, which can allow us to discover
     // additional bindings for the result type.
     SmallPtrSet<TypeVariableType *, 4> typeVars;
-    findInferableTypeVars(cs.simplifyType(constraint->getThirdType()),
+    findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
                           typeVars);
     if (typeVars.count(TypeVar)) {
       DelayedBy.push_back(constraint);
@@ -1092,7 +1088,7 @@ bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
   case ConstraintKind::Defaultable:
   case ConstraintKind::DefaultClosureType:
     // Do these in a separate pass.
-    if (cs.getFixedTypeRecursive(constraint->getFirstType(), true)
+    if (CS.getFixedTypeRecursive(constraint->getFirstType(), true)
             ->getAs<TypeVariableType>() == TypeVar) {
       addDefault(constraint);
     }
@@ -1133,9 +1129,9 @@ bool ConstraintSystem::PotentialBindings::infer(ConstraintSystem &cs,
     // and if so it would be beneficial to bind member to a hole
     // early to propagate that information down to arguments,
     // result type of a call that references such a member.
-    if (cs.shouldAttemptFixes() && TypeVar->getImpl().canBindToHole()) {
+    if (CS.shouldAttemptFixes() && TypeVar->getImpl().canBindToHole()) {
       if (ConstraintSystem::typeVarOccursInType(
-              TypeVar, cs.simplifyType(constraint->getSecondType())))
+              TypeVar, CS.simplifyType(constraint->getSecondType())))
         break;
     }
 
