@@ -523,3 +523,8 @@ void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *erro
 bool swift::swift_task_isCancelled(AsyncTask *task) {
   return task->isCancelled();
 }
+
+SWIFT_CC(swift)
+void swift::swift_continuation_logFailedCheck(const char *message) {
+  swift_reportError(0, message);
+}

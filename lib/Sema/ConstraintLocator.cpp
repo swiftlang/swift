@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
@@ -399,9 +400,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     }
 
     case ConformanceRequirement: {
-      auto reqElt = elt.castTo<LocatorPathElt::ConformanceRequirement>();
+      auto *conformance =
+          elt.castTo<LocatorPathElt::ConformanceRequirement>().getConformance();
       out << "conformance requirement (";
-      reqElt.getRequirement()->dumpRef(out);
+      conformance->getProtocol()->dumpRef(out);
       out << ")";
       break;
     }

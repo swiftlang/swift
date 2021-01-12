@@ -628,11 +628,6 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
 }
 
 ASTContext::~ASTContext() {
-  // Emit evaluator dependency graph if requested.
-  auto graphPath = LangOpts.RequestEvaluatorGraphVizPath;
-  if (!graphPath.empty()) {
-    evaluator.emitRequestEvaluatorGraphViz(graphPath);
-  }
   getImpl().~Implementation();
 }
 
