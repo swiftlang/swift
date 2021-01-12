@@ -209,6 +209,8 @@ void ASTScope::
 }
 
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
+  // There is no source file associated with C++ decl contexts, so there will
+  // be no parent source file if AFD is a C++ function.
   if (auto *const SF = AFD->getParentSourceFile())
     SF->getScope().expandFunctionBodyImpl(AFD);
 }
