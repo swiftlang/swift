@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -array-property-opt
+// RUN: %target-sil-opt -enable-sil-verify-all %s -array-property-opt | %FileCheck %s
 
 sil_stage canonical
 
@@ -20,6 +20,18 @@ enum MyBool{
 
 class MyClass {
 }
+
+// CHECK-LABEL: sil @clone_switch_enum_exit : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb11, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'clone_switch_enum_exit'
 
 /// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
 /// after cloning.
@@ -55,6 +67,13 @@ bb6:
 protocol AProtocol : class {
 }
 
+// CHECK-LABEL: sil @cant_handle_open_existential_use_outside_loop : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK-NOT: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK-NOT: apply [[FUNC2]]
+// CHECK-LABEL: } // end sil function 'cant_handle_open_existential_use_outside_loop'
 sil @cant_handle_open_existential_use_outside_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool, @owned AProtocol) -> MyBool {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool, %10 : $AProtocol):
   %3 = load %0 : $*MyArray<MyClass>
@@ -95,6 +114,17 @@ bb0(%0: $MyArray<MyClass>):
 
 sil @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
 
+// CHECK-LABEL: sil @clone_try_apply_exit : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb10, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'clone_try_apply_exit'
 sil @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error Error) {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load %0 : $*MyArray<MyClass>
@@ -122,6 +152,17 @@ bb6(%9 : $Error):
   throw %9 : $Error
 }
 
+// CHECK-LABEL: sil @dominator_update_outside_non_exit_block : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb16, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block'
 sil @dominator_update_outside_non_exit_block : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
   %3 = load %0 : $*MyArray<MyClass>
@@ -163,6 +204,17 @@ bb10:
   return %4 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @dominator_update_outside_non_exit_block_2 : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb17, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block_2'
 sil @dominator_update_outside_non_exit_block_2 : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
   %3 = load %0 : $*MyArray<MyClass>

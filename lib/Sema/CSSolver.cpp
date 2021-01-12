@@ -185,9 +185,6 @@ Solution ConstraintSystem::finalize() {
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
 
-  for (auto &e : CheckedConformances)
-    solution.Conformances.push_back({e.first, e.second});
-
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
   }
@@ -272,10 +269,6 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     if (!getCaseLabelItemInfo(info.first))
       setCaseLabelItemInfo(info.first, info.second);
   }
-
-  // Register the conformances checked along the way to arrive to solution.
-  for (auto &conformance : solution.Conformances)
-    CheckedConformances.push_back(conformance);
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
     resultBuilderTransformed.push_back(transformed);
@@ -477,7 +470,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
-  numCheckedConformances = cs.CheckedConformances.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numResultBuilderTransformed = cs.resultBuilderTransformed.size();
@@ -554,9 +546,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
       cs.NodeTypes.erase(node);
   }
   truncate(cs.addedNodeTypes, numAddedNodeTypes);
-
-  // Remove any conformances checked along the current path.
-  truncate(cs.CheckedConformances, numCheckedConformances);
 
   /// Remove any builder transformed closures.
   truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
