@@ -22,14 +22,13 @@ import TestsUtils
 // it involves waking up multiple actors and as such also shows the efficiency of the scheduling.
 
 public let ActorRing: [BenchmarkInfo] = [
-//  BenchmarkInfo(
-//    name: "ActorRing.bench_ring_m100_n10",
-//    runFunction: bench_ring,
-//    tags: [.actor],
-//    setUpFunction: { spawnRingActors(m: 100, n: 10) },
-//    tearDownFunction: { loopInit = nil }
-//  ),
-  // TODO: bigger rings too
+  BenchmarkInfo(
+    name: "ActorRing",
+    runFunction: bench_ring,
+    tags: [.actor],
+    setUpFunction: { spawnRingActors(m: 100, n: 10) },
+    tearDownFunction: { loopInit = nil }
+  ),
 ]
 
 // === -------------------------------------------------------------------------
@@ -69,8 +68,9 @@ actor class TokenLoopActor: LoopMember {
   func tell(_ token: Token) async {
     switch token.payload {
     case 1:
-      //      ringStop.store(Timer().getTimeAsInt())
+      print("Ring done: \(token)")
       // stop. this actor could "stop" now
+      // ringStop.store(Timer().getTimeAsInt())
       // q.enqueue(0) // done
       break;
 
@@ -84,26 +84,25 @@ actor class LoopInitActor: LoopMember {
   let id = 0
   var next: LoopMember?
 
+  init() {
+    print("  Spawned, initial: ID:\(id)")
+  }
+
   func spawnRingActors(m messages: Int, n actors: Int) {
-    // TIME spawning
     //  spawnStart.store(Timer().getTimeAsInt())
 
     var next: LoopMember = self
-    for i in (1 ..< actors).reversed() {
+    for i in (1 ..< actors) {
       next = TokenLoopActor(id: i, next: next, token: Token(messages))
     }
+    self.next = next
     //  spawnStop.store(Timer().getTimeAsInt())
   }
 
 
   func tell(_ token: Token) async {
-    // print("START RING SEND... \(Timer().getTime())")
-
-    // print("Send \(m) \(context.myself.path.name) >>> \(loopRef.path.name)")
-    await next!.tell(token)
-
-    // self.token = token
-    // return loopMember(id: 1, next: loopRef, token: token)
+    // print("Actor(\(id)) [\(token)]; token -> \(next)")
+    await next?.tell(token)
   }
 }
 
@@ -112,22 +111,21 @@ actor class LoopInitActor: LoopMember {
 var loopInit: LoopInitActor? = nil
 
 func spawnRingActors(m messages: Int, n actors: Int) {
+  print("setup: start")
   loopInit = LoopInitActor()
   runAsyncAndBlock {
     await loopInit!.spawnRingActors(m: messages, n: actors)
   }
+  print("setup: done")
 }
 
 // === -----------------------------------------------------------------------------------------------------------------
 
 @inline(never)
 func bench_ring(i: Int) {
-//  runAsyncAndBlock {
-//    //  ringStart.store(Timer().getTimeAsInt())
-//    await loopInit!.tell(Token(100_000))
-//
-//    //  _ = q.poll(.seconds(20))
-//    //  print("    Spawning           : \((spawnStop.load() - spawnStart.load()).milliseconds) ms")
-//    //  print("    Sending around Ring: \((ringStop.load() - ringStart.load()).milliseconds) ms")
-//  }
+  runAsyncAndBlock {
+    print("run: go!!!")
+    await loopInit!.tell(Token(100_000))
+    print("run: done")
+  }
 }
