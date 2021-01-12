@@ -79,7 +79,7 @@ bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
       if (ti->isTransformationTerminator()) {
-        assert(isa<OwnershipForwardingInst>(ti));
+        assert(OwnershipForwardingMixin::isa(ti));
         return true;
       }
 
@@ -87,7 +87,7 @@ bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   bool result = isGuaranteedForwardingValueKind(node->getKind());
   if (result) {
     assert(!isa<OwnedFirstArgForwardingSingleValueInst>(node));
-    assert(isa<OwnershipForwardingInst>(node));
+    assert(OwnershipForwardingMixin::isa(node));
   }
   return result;
 }
@@ -98,7 +98,7 @@ bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
   bool result = isOwnershipForwardingValueKind(SILNodeKind(kind));
   if (result) {
     assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(user));
-    assert(isa<OwnershipForwardingInst>(user));
+    assert(OwnershipForwardingMixin::isa(user));
   }
   return result;
 }
@@ -118,14 +118,14 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   if (auto *arg = dyn_cast<SILPhiArgument>(value))
     if (auto *predTerm = arg->getSingleTerminator())
       if (predTerm->isTransformationTerminator()) {
-        assert(isa<OwnershipForwardingInst>(predTerm));
+        assert(OwnershipForwardingMixin::isa(predTerm));
         return true;
       }
   auto *node = value->getRepresentativeSILNodeInObject();
   bool result = isOwnedForwardingValueKind(node->getKind());
   if (result) {
     assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(node));
-    assert(isa<OwnershipForwardingInst>(node));
+    assert(OwnershipForwardingMixin::isa(node));
   }
   return result;
 }
@@ -135,7 +135,7 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto kind = SILNodeKind(user->getKind());
   bool result = isOwnershipForwardingValueKind(kind);
   if (result) {
-    assert(isa<OwnershipForwardingInst>(user));
+    assert(OwnershipForwardingMixin::isa(user));
   }
   return result;
 }
@@ -873,7 +873,7 @@ Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
   if (use->isTypeDependent())
     return None;
 
-  if (!isa<OwnershipForwardingInst>(use->getUser())) {
+  if (!OwnershipForwardingMixin::isa(use->getUser())) {
     return None;
   }
 #ifndef NDEBUG

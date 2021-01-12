@@ -1136,7 +1136,7 @@ public:
       }
     }
 
-    if (isa<OwnershipForwardingInst>(I)) {
+    if (OwnershipForwardingMixin::isa(I)) {
       checkOwnershipForwardingInst(I);
     }
   }
