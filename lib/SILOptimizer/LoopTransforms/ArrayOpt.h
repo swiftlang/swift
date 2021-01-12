@@ -31,7 +31,7 @@ namespace swift {
 /// Projections over the aggregate that do not access the struct are ignored.
 ///
 /// StructLoads records loads of the struct value.
-/// StructAddressUsers records other uses of the struct address.
+/// StructAddressUsers records all uses of the struct address.
 /// StructValueUsers records direct uses of the loaded struct.
 ///
 /// Projections of the struct over its elements are all similarly recorded in
