@@ -26,6 +26,11 @@ module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
+module ConflictingNames {
+  header "ConflictingNames.h"
+  export *
+}
+
 module CoreData {
   header "NSManagedObject.h"
   export *
