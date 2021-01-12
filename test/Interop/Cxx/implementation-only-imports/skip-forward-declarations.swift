@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-frontend -emit-module -o %t/FortyTwo.swiftmodule -I %S/Inputs -enable-cxx-interop %s 2>&1 | %FileCheck %s
+// RUN: not %target-swiftxx-frontend -emit-module -o %t/FortyTwo.swiftmodule -I %S/Inputs %s 2>&1 | %FileCheck %s
 
 // This test checks that forward declarations are not considered
 // when determining the visibility of the decl.
