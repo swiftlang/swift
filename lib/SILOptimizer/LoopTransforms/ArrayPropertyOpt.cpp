@@ -223,7 +223,7 @@ private:
   /// Strip the struct load and the address projection to the location
   /// holding the array struct.
   SILValue stripArrayStructLoad(SILValue V) {
-    if (auto LI = dyn_cast<LoadInst>(V)) {
+    if (auto LI = dyn_cast<LoadInst>(lookThroughCopyValueInsts(V))) {
       auto Val = LI->getOperand();
       // We could have two arrays in a surrounding container so we can only
       // strip off the 'array struct' project.
@@ -752,10 +752,6 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
   void run() override {
     auto *Fn = getFunction();
 
-    // FIXME: Add support for ownership.
-    if (Fn->hasOwnership())
-      return;
-
     // Don't hoist array property calls at Osize.
     if (Fn->optimizeForSize())
       return;
@@ -789,7 +785,6 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
 
     // Specialize the identified loop nest based on the 'array.props' calls.
     if (HasChanged) {
-      LLVM_DEBUG(getFunction()->viewCFG());
       DominanceInfo *DT = DA->get(getFunction());
 
       // Process specialized loop-nests in loop-tree post-order (bottom-up).
@@ -801,8 +796,6 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
 
       // Verify that no illegal critical edges were created.
       getFunction()->verifyCriticalEdges();
-
-      LLVM_DEBUG(getFunction()->viewCFG());
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.
