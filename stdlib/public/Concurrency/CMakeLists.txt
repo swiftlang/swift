@@ -50,7 +50,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Contains.swift
   Count.swift
   First.swift
-  MinMax.Swift
+  MinMax.swift
   Reduce.swift
   PartialAsyncTask.swift
   Task.cpp
