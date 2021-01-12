@@ -4623,10 +4623,7 @@ public: // binding inference logic is public for unit testing.
   /// bindings, e.g., the supertypes of a given type.
   struct PotentialBinding {
     /// The type to which the type variable can be bound.
-    ///
-    /// Note that the type is mutable since it could be
-    /// adjusted as a result of type-join operation.
-    mutable Type BindingType;
+    Type BindingType;
 
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;

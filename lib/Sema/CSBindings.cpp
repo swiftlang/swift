@@ -549,28 +549,36 @@ bool ConstraintSystem::PotentialBindings::addPotentialBinding(
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
   if (binding.isViableForJoin() && allowJoinMeet) {
-    bool joined = false;
-
     auto isAcceptableJoin = [](Type type) {
       return !type->isAny() && (!type->getOptionalObjectType() ||
                                 !type->getOptionalObjectType()->isAny());
     };
 
-    for (auto &existingBinding : Bindings) {
-      if (!existingBinding.isViableForJoin())
-        continue;
+    SmallVector<PotentialBinding, 4> joined;
+    for (auto existingBinding = Bindings.begin();
+         existingBinding != Bindings.end();) {
+      if (existingBinding->isViableForJoin()) {
+        auto join =
+            Type::join(existingBinding->BindingType, binding.BindingType);
 
-      auto join = Type::join(existingBinding.BindingType, binding.BindingType);
-
-      if (join && isAcceptableJoin(*join)) {
-        existingBinding.BindingType = *join;
-        joined = true;
+        if (join && isAcceptableJoin(*join)) {
+          joined.push_back(existingBinding->withType(*join));
+          // Remove existing binding from the set.
+          // It has to be re-introduced later, since its type has been changed.
+          existingBinding = Bindings.erase(existingBinding);
+          continue;
+        }
       }
+
+      ++existingBinding;
     }
+
+    for (const auto &binding : joined)
+      (void)Bindings.insert(binding);
 
     // If new binding has been joined with at least one of existing
     // bindings, there is no reason to include it into the set.
-    if (joined)
+    if (!joined.empty())
       return false;
   }
 
