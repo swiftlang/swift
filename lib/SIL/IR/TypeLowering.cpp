@@ -414,8 +414,15 @@ namespace {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
-    Type getConcreteReferenceStorageReferent(Type type) {
+    Type getConcreteReferenceStorageReferent(Type type,
+                                             AbstractionPattern origType) {
       if (type->isTypeParameter()) {
+        auto genericSig = origType.getGenericSignature();
+        if (auto concreteType = genericSig->getConcreteType(type))
+          return concreteType;
+        if (auto superclassType = genericSig->getSuperclassBound(type))
+          return superclassType;
+        assert(genericSig->requiresClass(type));
         return TC.Context.getAnyObjectType();
       }
 
@@ -460,7 +467,7 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) { \
       auto referentType = \
         type->getReferentType()->lookThroughSingleOptionalType(); \
-      auto concreteType = getConcreteReferenceStorageReferent(referentType); \
+      auto concreteType = getConcreteReferenceStorageReferent(referentType, origType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
         return asImpl().visitLoadable##Name##StorageType(type, origType, \
