@@ -2798,8 +2798,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     increaseScore(SK_DisfavoredOverload);
   }
 
-  if (choice.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional &&
-      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+  if (choice.isFallbackMemberOnUnwrappedBase()) {
     increaseScore(SK_UnresolvedMemberViaOptional);
   }
 }
