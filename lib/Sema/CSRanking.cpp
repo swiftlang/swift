@@ -110,9 +110,6 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       return;
     default:
       break;
-    case SK_ImplicitValueConversion:
-      llvm::errs() << "implicit value conversion";
-      break;
     }
   }
 
