@@ -39,19 +39,19 @@ Download the sources with the [Getting Started](/docs/HowToGuides/GettingStarted
 {
   "ssh-clone-pattern": "git@github.com:%s.git",
   "https-clone-pattern": "https://github.com/%s.git",
-  "default-branch-scheme": "master",
+  "default-branch-scheme": "main",
   "repos": {
     "cmark": { "remote": { "id": "apple/swift-cmark" } },
     "llvm-project": { "remote": { "id": "apple/llvm-project" } },
     "swift": { "remote": { "id": "apple/swift" } }
   },
   "branch-schemes": {
-    "master": {
-      "aliases": [ "master", "swift/master" ],
+    "main": {
+      "aliases": [ "main", "swift/main" ],
       "repos": {
-        "cmark": "master",
-        "llvm-project": "swift/master",
-        "swift": "master"
+        "cmark": "main",
+        "llvm-project": "swift/main",
+        "swift": "main"
       }
     }
   }
