@@ -1996,8 +1996,8 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 // CHECK-LABEL: sil [ossa] @bitcast_combines : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (B, Optional<Builtin.Word>) {
 // CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_bit_cast
-// XHECK: unchecked_trivial_bit_cast
-// XHECK-NOT: unchecked_trivial_bit_cast
+// CHECK: unchecked_trivial_bit_cast
+// CHECK-NOT: unchecked_trivial_bit_cast
 // CHECK: } // end sil function 'bitcast_combines'
 sil [ossa] @bitcast_combines : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (B, Optional<Builtin.Word>) {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
