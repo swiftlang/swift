@@ -499,15 +499,24 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
 }
 
 SILInstruction *
-SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
-  if (BORI->getFunction()->hasOwnership())
-    return nullptr;
+SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *bori) {
   // Fold noop casts through Builtin.BridgeObject.
+  //
   // (bridge_object_to_ref (unchecked-ref-cast x BridgeObject) y)
   //  -> (unchecked-ref-cast x y)
-  if (auto URC = dyn_cast<UncheckedRefCastInst>(BORI->getOperand()))
-    return Builder.createUncheckedRefCast(BORI->getLoc(), URC->getOperand(),
-                                          BORI->getType());
+  if (auto *urc = dyn_cast<UncheckedRefCastInst>(bori->getOperand())) {
+    if (SILValue(urc).getOwnershipKind() != OwnershipKind::Owned) {
+      return Builder.createUncheckedRefCast(
+          bori->getLoc(), urc->getOperand(), bori->getType());
+    }
+    SingleBlockOwnedForwardingInstFolder folder(*this, bori);
+    if (folder.add(urc)) {
+      auto *newValue = Builder.createUncheckedRefCast(
+          bori->getLoc(), urc->getOperand(), bori->getType());
+      return std::move(folder).optimizeWithReplacement(newValue);
+    }
+  }
+
   return nullptr;
 }
 
