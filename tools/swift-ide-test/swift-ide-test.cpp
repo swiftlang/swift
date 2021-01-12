@@ -3293,8 +3293,8 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   StreamPrinter Printer(llvm::outs());
   std::string Error;
   std::string TypeName;
-  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer,
-                         TypeName, Error)) {
+  if (printTypeInterface(SemaT.ValueD->getDeclContext()->getParentModule(),
+                         SemaT.Ty, Printer, TypeName, Error)) {
     llvm::errs() << Error;
     return 1;
   }

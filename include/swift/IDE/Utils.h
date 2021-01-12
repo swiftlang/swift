@@ -161,7 +161,6 @@ struct ResolvedCursorInfo {
   bool IsRef = true;
   bool IsKeywordArgument = false;
   Type Ty;
-  DeclContext *DC = nullptr;
   Type ContainerType;
   Stmt *TrailingStmt = nullptr;
   Expr *TrailingExpr = nullptr;
@@ -187,7 +186,6 @@ struct ResolvedCursorInfo {
     this->ExtTyRef = ExtTyRef;
     this->IsRef = IsRef;
     this->Ty = Ty;
-    this->DC = ValueD->getDeclContext();
     this->ContainerType = ContainerType;
   }
   void setModuleRef(ModuleEntity Mod) {
