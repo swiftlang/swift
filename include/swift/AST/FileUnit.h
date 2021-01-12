@@ -402,8 +402,8 @@ public:
     return false;
   }
 
-  virtual void
-  collectSourceFileNames(llvm::function_ref<void(StringRef)> callback) const {}
+  virtual void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {}
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||

@@ -446,8 +446,8 @@ public:
 
   StringRef getTargetTriple() const;
 
-  virtual void collectSourceFileNames(
-      llvm::function_ref<void(StringRef)>) const override;
+  virtual void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)>) const override;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;

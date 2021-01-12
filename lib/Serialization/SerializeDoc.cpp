@@ -793,29 +793,39 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
     llvm::SmallString<1024> Buffer;
     llvm::StringSet<> seenFilenames;
 
-    void emitFilename(StringRef filename) {
-      if (filename.empty())
-        return;
-      llvm::SmallString<128> absolutePath = filename;
+    void emitSourceFileInfo(const BasicSourceFileInfo &info) {
+      // Make 'FilePath' absolute for serialization;
+      SmallString<128> absolutePath = info.FilePath;
       llvm::sys::fs::make_absolute(absolutePath);
-      if (!seenFilenames.insert(absolutePath).second)
+
+      // Don't emit duplicated files.
+      if (!seenFilenames.insert(info.FilePath).second)
         return;
 
       auto fileID = FWriter.getTextOffset(absolutePath);
+      auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(info.LastModified.time_since_epoch()).count();
+
       llvm::raw_svector_ostream out(Buffer);
       endian::Writer writer(out, little);
       writer.write<uint32_t>(fileID);
+      out << info.InterfaceHash.getRawValue();
+      writer.write<uint64_t>(timestamp);
+      writer.write<uint64_t>(info.FileSize);
     }
 
     SourceFileListWriter(StringWriter &FWriter) : FWriter(FWriter) {}
   } writer(FWriter);
 
   if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
-    writer.emitFilename(SF->getFilename());
+    BasicSourceFileInfo info;
+    SmallString<128> stash;
+    if (info.populate(SF))
+      return;
+    writer.emitSourceFileInfo(info);
   } else {
     auto *M = MSF.get<ModuleDecl *>();
-    M->collectSourceFileNames(
-        [&](StringRef filename) { writer.emitFilename(filename); });
+    M->collectBasicSourceFileInfo(
+        [&](const BasicSourceFileInfo &info) { writer.emitSourceFileInfo(info); });
   }
 
   const decl_locs_block::SourceFileListLayout FileList(Out);

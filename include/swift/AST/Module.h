@@ -728,7 +728,8 @@ public:
     return ReverseFullNameIterator(this);
   }
 
-  void collectSourceFileNames(llvm::function_ref<void(StringRef)> callback);
+  void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback);
 
   SourceRange getSourceRange() const { return SourceRange(); }
 

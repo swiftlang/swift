@@ -1538,13 +1538,16 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   return nullptr;
 }
 
-void ModuleDecl::collectSourceFileNames(
-    llvm::function_ref<void(StringRef)> callback) {
+void ModuleDecl::collectBasicSourceFileInfo(
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) {
   for (FileUnit *fileUnit : getFiles()) {
     if (SourceFile *SF = dyn_cast<SourceFile>(fileUnit)) {
-      callback(SF->getFilename());
+      BasicSourceFileInfo info;
+      if (info.populate(SF))
+        continue;
+      callback(info);
     } else if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
-      serialized->collectSourceFileNames(callback);
+      serialized->collectBasicSourceFileInfo(callback);
     }
   }
 }

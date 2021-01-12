@@ -959,8 +959,8 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-void ModuleFile::collectSourceFileNames(
-    llvm::function_ref<void(StringRef)> callback) const {
+void ModuleFile::collectBasicSourceFileInfo(
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   if (Core->SourceFileListData.empty())
     return;
   assert(!Core->SourceLocsTextData.empty());
@@ -969,11 +969,23 @@ void ModuleFile::collectSourceFileNames(
   auto *End = Core->SourceFileListData.bytes_end();
   while (Cursor < End) {
     auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
+    auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
+                           Fingerprint::DIGEST_LENGTH};
+    Cursor += Fingerprint::DIGEST_LENGTH;
+    auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    auto fileSize = endian::readNext<uint64_t, little, unaligned>(Cursor);
+
     assert(fileID < Core->SourceLocsTextData.size());
     auto filePath = Core->SourceLocsTextData.substr(fileID);
     size_t terminatorOffset = filePath.find('\0');
     filePath = filePath.slice(0, terminatorOffset);
-    callback(filePath);
+
+    BasicSourceFileInfo info;
+    info.FilePath = filePath;
+    info.InterfaceHash = Fingerprint::fromString(fpStr);
+    info.LastModified = llvm::sys::TimePoint<>(std::chrono::seconds(timestamp));
+    info.FileSize = fileSize;
+    callback(info);
   }
 }
 
