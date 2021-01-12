@@ -243,7 +243,7 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
-def W : JoinedOrSeparate<["-"], "W">, Flags<[FrontendOption]>,
+def lint : JoinedOrSeparate<["-"], "lint">, Flags<[FrontendOption]>,
   HelpText<"Opt into linting warning">;
 
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption, ArgumentIsPath]>,

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Wforce_unwrap_usage -typecheck -verify -c %s
+// RUN: %target-swift-frontend -lint force_unwrap_usage -typecheck -verify -c %s
 
 var a: String?
 
