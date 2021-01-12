@@ -7967,12 +7967,8 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   auto stmt = forEachStmtInfo.stmt;
   auto sequenceProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
-  auto contextualLocator = solution.getConstraintLocator(
-      target.getAsExpr(),
-      {LocatorPathElt::ContextualType(),
-       LocatorPathElt::ConformanceRequirement(sequenceProto)});
-  auto sequenceConformance =
-      solution.resolveConformance(contextualLocator, sequenceProto);
+  auto sequenceConformance = TypeChecker::conformsToProtocol(
+      forEachStmtInfo.sequenceType, sequenceProto, cs.DC);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
 
@@ -8043,13 +8039,13 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   // Convert that Optional<Element> value to the type of the pattern.
   auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
   if (!optPatternType->isEqual(nextResultType)) {
-    OpaqueValueExpr *elementExpr =
-        new (ctx) OpaqueValueExpr(stmt->getInLoc(), nextResultType,
-                                  /*isPlaceholder=*/true);
+    OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
+        stmt->getInLoc(), nextResultType->getOptionalObjectType(),
+        /*isPlaceholder=*/true);
     Expr *convertElementExpr = elementExpr;
     if (TypeChecker::typeCheckExpression(
             convertElementExpr, dc,
-            /*contextualInfo=*/{optPatternType, CTP_CoerceOperand})
+            /*contextualInfo=*/{forEachStmtInfo.initType, CTP_CoerceOperand})
             .isNull()) {
       return None;
     }
@@ -8379,34 +8375,6 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   setExprTypes(result);
   rewriter.finalize();
   return result;
-}
-
-ProtocolConformanceRef Solution::resolveConformance(
-    ConstraintLocator *locator, ProtocolDecl *proto) {
-  auto conformance = llvm::find_if(Conformances, [&locator](const auto &elt) {
-    return elt.first == locator;
-  });
-
-  if (conformance == Conformances.end())
-    return ProtocolConformanceRef::forInvalid();
-
-  // If the conformance doesn't require substitution, return it immediately.
-  auto conformanceRef = conformance->second;
-  if (conformanceRef.isAbstract())
-    return conformanceRef;
-
-  auto concrete = conformanceRef.getConcrete();
-  auto conformingType = concrete->getType();
-  if (!conformingType->hasTypeVariable())
-    return conformanceRef;
-
-  // Substitute into the conformance type, then look for a conformance
-  // again.
-  // FIXME: Should be able to perform the substitution using the Solution
-  // itself rather than another conforms-to-protocol check.
-  Type substConformingType = simplifyType(conformingType);
-  return TypeChecker::conformsToProtocol(substConformingType, proto,
-                                         constraintSystem->DC);
 }
 
 bool Solution::hasType(ASTNode node) const {

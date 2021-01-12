@@ -2903,8 +2903,7 @@ size_t Solution::getTotalMemory() const {
          ConstraintRestrictions.getMemorySize() +
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
-         (DefaultedConstraints.size() * sizeof(void *)) +
-         Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
+         (DefaultedConstraints.size() * sizeof(void *));
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
@@ -5085,42 +5084,20 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
-  auto &ctx = getASTContext();
-
   // First check whether this declaration is universally unavailable.
-  if (D->getAttrs().isUnavailable(ctx))
+  if (D->getAttrs().isUnavailable(getASTContext()))
     return true;
 
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return false;
+  return TypeChecker::isDeclarationUnavailable(D, DC, [&] {
+    SourceLoc loc;
 
-  if (!DC->getParentSourceFile()) {
-    // We only check availability if this reference is in a source file; we do
-    // not check in other kinds of FileUnits.
-    return false;
-  }
+    if (locator) {
+      if (auto anchor = locator->getAnchor())
+        loc = getLoc(anchor);
+    }
 
-  AvailabilityContext safeRangeUnderApprox{
-      AvailabilityInference::availableRange(D, ctx)};
-  if (safeRangeUnderApprox.isAlwaysAvailable())
-    return false;
-
-  SourceLoc loc;
-
-  if (locator) {
-    if (auto anchor = locator->getAnchor())
-      loc = getLoc(anchor);
-  }
-
-  AvailabilityContext runningOSOverApprox =
-      TypeChecker::overApproximateAvailabilityAtLocation(loc, DC);
-
-  // The reference is safe if an over-approximation of the running OS
-  // versions is fully contained within an under-approximation
-  // of the versions on which the declaration is available. If this
-  // containment cannot be guaranteed, we say the reference is
-  // not available.
-  return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
+    return TypeChecker::overApproximateAvailabilityAtLocation(loc, DC);
+  });
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -5181,22 +5158,12 @@ static Optional<Requirement> getRequirement(ConstraintSystem &cs,
     return None;
 
   if (reqLoc->isConditionalRequirement()) {
-    auto path = reqLocator->getPath();
-    auto *conformanceLoc =
-        cs.getConstraintLocator(reqLocator->getAnchor(), path.drop_back());
+    auto conformanceRef =
+        reqLocator->findLast<LocatorPathElt::ConformanceRequirement>();
+    assert(conformanceRef && "Invalid locator for a conditional requirement");
 
-    auto conformances = cs.getCheckedConformances();
-    auto result = llvm::find_if(
-        conformances,
-        [&conformanceLoc](
-            const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-                &conformance) { return conformance.first == conformanceLoc; });
-    assert(result != conformances.end());
-
-    auto conformance = result->second;
-    assert(conformance.isConcrete());
-
-    return conformance.getConditionalRequirements()[reqLoc->getIndex()];
+    auto conformance = conformanceRef->getConformance();
+    return conformance->getConditionalRequirements()[reqLoc->getIndex()];
   }
 
   if (auto openedGeneric =

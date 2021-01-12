@@ -834,7 +834,7 @@ namespace {
         }
       }
 
-      // The children of #selector expressions are not evaluation, so we do not
+      // The children of #selector expressions are not evaluated, so we do not
       // need to do isolation checking there. This is convenient because such
       // expressions tend to violate restrictions on the use of instance
       // methods.
@@ -1886,20 +1886,23 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // If the declaration is in an extension that has one of the isolation
-  // attributes, use that.
-  if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
-    if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-      return inferredIsolation(*isolationFromAttr);
+  // Instance members can infer isolation from their context.
+  if (value->isInstanceMember()) {
+    // If the declaration is in an extension that has one of the isolation
+    // attributes, use that.
+    if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
+      if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
+        return inferredIsolation(*isolationFromAttr);
+      }
     }
-  }
 
-  // If the declaration is in a nominal type (or extension thereof) that
-  // has isolation, use that.
-  if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
-    auto selfTypeIsolation = getActorIsolation(selfTypeDecl);
-    if (!selfTypeIsolation.isUnspecified()) {
-      return inferredIsolation(selfTypeIsolation);
+    // If the declaration is in a nominal type (or extension thereof) that
+    // has isolation, use that.
+    if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto selfTypeIsolation = getActorIsolation(selfTypeDecl);
+      if (!selfTypeIsolation.isUnspecified()) {
+        return inferredIsolation(selfTypeIsolation);
+      }
     }
   }
 
