@@ -726,7 +726,8 @@ public:
 /// \endcode
 class ForEachStmt : public LabeledStmt {
   SourceLoc ForLoc;
-  bool IsAsync;
+  SourceLoc TryLoc;
+  SourceLoc AwaitLoc;
   Pattern *Pat;
   SourceLoc InLoc;
   Expr *Sequence;
@@ -742,12 +743,12 @@ class ForEachStmt : public LabeledStmt {
   Expr *convertElementExpr = nullptr;
 
 public:
-  ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, bool IsAsync, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+  ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc, SourceLoc AwaitLoc, 
+              Pattern *Pat, SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
               Expr *WhereExpr, BraceStmt *Body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
-      ForLoc(ForLoc), IsAsync(IsAsync), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
+      ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
       WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
@@ -780,7 +781,8 @@ public:
   /// getWhereLoc - Retrieve the location of the 'where' keyword.
   SourceLoc getWhereLoc() const { return WhereLoc; }
 
-  bool isAsync() const { return IsAsync; }
+  SourceLoc getAwaitLoc() const { return AwaitLoc; }
+  SourceLoc getTryLoc() const { return TryLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.

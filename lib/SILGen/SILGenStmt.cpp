@@ -1198,7 +1198,7 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
-  if (S->isAsync()) {
+  if (S->getAwaitLoc().isValid()) {
     visitAsyncForEachStmt(S);
     return;
   }
