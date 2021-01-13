@@ -644,18 +644,21 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 }
 
 SILInstruction *
-SILCombiner::
-visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
-  if (RawToRef->getFunction()->hasOwnership())
-    return nullptr;
-
+SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
+  // In these situations, generally, the user is asking us to extend the
+  // lifetime of a value. We use the ownership RAUW utility.
+  //
   // (raw_pointer_to_ref (ref_to_raw_pointer x X->Y) Y->Z)
   //   ->
   // (unchecked_ref_cast X->Z)
-  if (auto *RefToRaw = dyn_cast<RefToRawPointerInst>(RawToRef->getOperand())) {
-    return Builder.createUncheckedRefCast(RawToRef->getLoc(),
-                                          RefToRaw->getOperand(),
-                                          RawToRef->getType());
+  if (auto *refToRaw = dyn_cast<RefToRawPointerInst>(rawToRef->getOperand())) {
+    if (OwnershipFixupContext::canFixUpOwnershipForRAUW(
+            rawToRef, refToRaw->getOperand())) {
+      auto *newInst = Builder.createUncheckedRefCast(
+          rawToRef->getLoc(), refToRaw->getOperand(), rawToRef->getType());
+      ownershipRAUWHelper.replaceAllUsesAndErase(rawToRef, newInst);
+      return nullptr;
+    }
   }
 
   return nullptr;

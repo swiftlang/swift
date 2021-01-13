@@ -1466,19 +1466,30 @@ bb0(%0 : @owned $B):
   return %2 : $F
 }
 
-// We do not support this in OSSA today.
-//
-// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation : $@convention(thin) (@owned B) -> @owned F {
-// XHECK: bb0([[INPUT_REF:%[0-9]+]] : @owned $B):
-// XHECK: ref_to_raw_pointer
-// XHECK: raw_pointer_to_ref
-// XHECK: } // end sil function 'unchecked_ref_cast_formation'
-sil [ossa] @unchecked_ref_cast_formation : $@convention(thin) (@owned B) -> @owned F {
+// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
+// CHECK: bb0([[INPUT_REF:%[0-9]+]] : @owned $B):
+// CHECK-NOT: ref_to_raw_pointer
+// CHECK-NOT: raw_pointer_to_ref
+// CHECK: } // end sil function 'unchecked_ref_cast_formation_owned'
+sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
 bb0(%0 : @owned $B):
   %1 = ref_to_raw_pointer %0 : $B to $Builtin.RawPointer
   %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
   %3 = copy_value %2 : $F
   destroy_value %0 : $B
+  return %3 : $F
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@owned B) -> @owned F {
+// CHECK: bb0([[INPUT_REF:%[0-9]+]] : @guaranteed $B):
+// CHECK-NOT: ref_to_raw_pointer
+// CHECK-NOT: raw_pointer_to_ref
+// CHECK: } // end sil function 'unchecked_ref_cast_formation_owned'
+sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
+bb0(%0 : @guaranteed $B):
+  %1 = ref_to_raw_pointer %0 : $B to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
+  %3 = copy_value %2 : $F
   return %3 : $F
 }
 
