@@ -19,12 +19,10 @@ import Swift
 // Transpose
 
 @inlinable
-public func transpose<T, R>(
+public func _transpose<T, R>(
   of body: @escaping @differentiable(linear) (T) -> R
 ) -> @differentiable(linear) (R) -> T {
-  let original = body as (T) -> R
-  let transpose = { x in Builtin.applyTranspose_arity1(body, x) }
-  return Builtin.linearFunction_arity1(transpose, original)
+  fatalError("Transpose is unimplemented and unsupported")
 }
 
 // Value with differential

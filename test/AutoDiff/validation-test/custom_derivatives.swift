@@ -30,26 +30,6 @@ func binary(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   return x
 }
 
-CustomDerivativesTests.testWithLeakChecking("differentiableFunction-unary") {
-  let diffableUnary = differentiableFunction { x in
-    (value: unary(x), pullback: { v in v * x * 2 })
-  }
-  expectEqual(20, gradient(at: 10, in: diffableUnary))
-  // Test differentiation of @differentiable function.
-  expectEqual(20, gradient(at: 10, in: { diffableUnary($0) }))
-  expectEqual(40, gradient(at: 10, in: { diffableUnary($0) * 2 }))
-}
-
-CustomDerivativesTests.testWithLeakChecking("differentiableFunction-binary") {
-  let diffableBinary = differentiableFunction { (x, y) in
-    (value: binary(x, y), pullback: { v in (v * y, v * x) })
-  }
-  expectEqual((10, 5), gradient(at: 5, 10, in: diffableBinary))
-  // Test differentiation of @differentiable function.
-  expectEqual((10, 5), gradient(at: 5, 10, in: { diffableBinary($0, $1) }))
-  expectEqual((20, 10), gradient(at: 5, 10, in: { diffableBinary($0, $1) * 2 }))
-}
-
 CustomDerivativesTests.testWithLeakChecking("SumOfGradPieces") {
   var grad: Tracked<Float> = 0
   func addToGrad(_ x: inout Tracked<Float>) { grad += x }
