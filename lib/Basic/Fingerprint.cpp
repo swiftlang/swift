@@ -41,6 +41,11 @@ Fingerprint Fingerprint::fromString(StringRef value) {
     std::istringstream s(value.drop_front(Fingerprint::DIGEST_LENGTH/2).str());
     s >> std::hex >> fp.core.second;
   }
+  if (value != fp.getRawValue()) {
+    llvm::errs() << "Fingerprint conversion failed; perhaps '" << value << "' is not a hex number";
+    llvm::errs().flush();
+    exit(1);
+  }
   return fp;
 }
 
@@ -49,6 +54,5 @@ llvm::SmallString<Fingerprint::DIGEST_LENGTH> Fingerprint::getRawValue() const {
   llvm::raw_svector_ostream Res(Str);
   Res << llvm::format_hex_no_prefix(core.first, 16);
   Res << llvm::format_hex_no_prefix(core.second, 16);
-  assert(*this == Fingerprint::fromString(Str));
   return Str;
 }
