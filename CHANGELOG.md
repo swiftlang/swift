@@ -526,7 +526,7 @@ Swift 5.1
   Duplicate tuple element labels are no longer allowed, because it leads
   to incorrect behavior. For example:
 
-  ```
+  ```swift
   let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
 
   enum Foo { case bar(x: Int, x: Int) }
@@ -538,7 +538,7 @@ Swift 5.1
   Note: You can still use duplicate argument labels when declaring functions and
   subscripts, as long as the internal parameter names are different. For example:
 
-  ```
+  ```swift
   func foo(bar x: Int, bar y: Int) {}
   subscript(a x: Int, a y: Int) -> Int {}
   ```
@@ -548,7 +548,7 @@ Swift 5.1
   Functions can now hide their concrete return type by declaring what protocols
   it conforms to instead of specifying the exact return type:
 
-  ```
+  ```swift
   func makeMeACollection() -> some Collection {
     return [1, 2, 3]
   }
@@ -6755,7 +6755,7 @@ Swift 1.0
 
 * A `map` method with the semantics of Haskell's `fmap` was added to
   `Array<T>`.  Map applies a function `f: T->U` to the values stored in
-  the array and returns an Array<U>.  So,
+  the array and returns an `Array<U>`.  So,
 
     ```swift
     (swift) func names(x: Int[]) -> String[] {
