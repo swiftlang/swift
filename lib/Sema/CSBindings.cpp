@@ -13,6 +13,7 @@
 // This file implements selection of bindings for type variables.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Sema/CSBindings.h"
 #include "TypeChecker.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -21,6 +22,7 @@
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
 
 bool ConstraintSystem::PotentialBindings::canBeNil() const {
   auto &ctx = CS.getASTContext();
@@ -28,7 +30,7 @@ bool ConstraintSystem::PotentialBindings::canBeNil() const {
       ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral));
 }
 
-bool ConstraintSystem::PotentialBinding::isViableForJoin() const {
+bool PotentialBinding::isViableForJoin() const {
   return Kind == AllowedBindingKind::Supertypes &&
          !BindingType->hasLValueType() &&
          !BindingType->hasUnresolvedType() &&
@@ -285,7 +287,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
-  using BindingKind = ConstraintSystem::AllowedBindingKind;
+  using BindingKind = AllowedBindingKind;
 
   for (const auto &entry : SupertypeOf) {
     auto relatedBindings = inferredBindings.find(entry.first);
@@ -797,7 +799,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
   return bindings;
 }
 
-Optional<ConstraintSystem::PotentialBinding>
+Optional<PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint) const {
   assert(constraint->getClassification() ==
@@ -1191,8 +1193,7 @@ bool ConstraintSystem::PotentialBindings::infer(Constraint *constraint) {
   return false;
 }
 
-ConstraintSystem::LiteralBindingKind
-ConstraintSystem::PotentialBindings::getLiteralKind() const {
+LiteralBindingKind ConstraintSystem::PotentialBindings::getLiteralKind() const {
   LiteralBindingKind kind = LiteralBindingKind::None;
 
   for (const auto &literal : Literals) {

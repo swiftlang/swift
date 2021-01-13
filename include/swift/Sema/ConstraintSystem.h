@@ -34,6 +34,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "swift/Sema/SolutionResult.h"
@@ -4600,107 +4601,6 @@ public:
 
 public: // binding inference logic is public for unit testing.
 
-  /// The kind of bindings that are permitted.
-  enum class AllowedBindingKind : uint8_t {
-    /// Only the exact type.
-    Exact,
-    /// Supertypes of the specified type.
-    Supertypes,
-    /// Subtypes of the specified type.
-    Subtypes
-  };
-
-  /// The kind of literal binding found.
-  enum class LiteralBindingKind : uint8_t {
-    None,
-    Collection,
-    Float,
-    Atom,
-  };
-
-  /// A potential binding from the type variable to a particular type,
-  /// along with information that can be used to construct related
-  /// bindings, e.g., the supertypes of a given type.
-  struct PotentialBinding {
-    /// The type to which the type variable can be bound.
-    Type BindingType;
-
-    /// The kind of bindings permitted.
-    AllowedBindingKind Kind;
-
-  protected:
-    /// The source of the type information.
-    ///
-    /// Determines whether this binding represents a "hole" in
-    /// constraint system. Such bindings have no originating constraint
-    /// because they are synthetic, they have a locator instead.
-    PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
-
-    PotentialBinding(Type type, AllowedBindingKind kind,
-                     PointerUnion<Constraint *, ConstraintLocator *> source)
-        : BindingType(type), Kind(kind), BindingSource(source) {}
-
-  public:
-    PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
-        : PotentialBinding(
-              type->getWithoutParens(), kind,
-              PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
-
-    bool isDefaultableBinding() const {
-      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
-        return constraint->getKind() == ConstraintKind::Defaultable;
-      // If binding source is not constraint - it's a hole, which is
-      // a last resort default binding for a type variable.
-      return true;
-    }
-
-    bool hasDefaultedLiteralProtocol() const {
-      return bool(getDefaultedLiteralProtocol());
-    }
-
-    ProtocolDecl *getDefaultedLiteralProtocol() const {
-      auto *constraint = BindingSource.dyn_cast<Constraint *>();
-      if (!constraint)
-        return nullptr;
-
-      return constraint->getKind() == ConstraintKind::LiteralConformsTo
-                 ? constraint->getProtocol()
-                 : nullptr;
-    }
-
-    ConstraintLocator *getLocator() const {
-      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
-        return constraint->getLocator();
-      return BindingSource.get<ConstraintLocator *>();
-    }
-
-    Constraint *getSource() const { return BindingSource.get<Constraint *>(); }
-
-    PotentialBinding withType(Type type) const {
-      return {type, Kind, BindingSource};
-    }
-
-    PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
-      return {type, kind, BindingSource};
-    }
-
-    /// Determine whether this binding could be a viable candidate
-    /// to be "joined" with some other binding. It has to be at least
-    /// a non-default r-value supertype binding with no type variables.
-    bool isViableForJoin() const;
-
-    static PotentialBinding forHole(TypeVariableType *typeVar,
-                                    ConstraintLocator *locator) {
-      return {HoleType::get(typeVar->getASTContext(), typeVar),
-              AllowedBindingKind::Exact,
-              /*source=*/locator};
-    }
-
-    static PotentialBinding forPlaceholder(Type placeholderTy) {
-      return {placeholderTy, AllowedBindingKind::Exact,
-              PointerUnion<Constraint *, ConstraintLocator *>()};
-    }
-  };
 
   struct LiteralRequirement {
     /// The source of the literal requirement.
@@ -4756,7 +4656,7 @@ public: // binding inference logic is public for unit testing.
     TypeVariableType *TypeVar;
 
     /// The set of potential bindings.
-    llvm::SmallSetVector<PotentialBinding, 4> Bindings;
+    llvm::SmallSetVector<inference::PotentialBinding, 4> Bindings;
 
     /// The set of protocol requirements placed on this type variable.
     llvm::SmallVector<Constraint *, 4> Protocols;
@@ -4868,10 +4768,11 @@ public: // binding inference logic is public for unit testing.
       if (Bindings.empty())
         return false;
 
-      return llvm::all_of(Bindings, [](const PotentialBinding &binding) {
-        return binding.BindingType->isExistentialType() &&
-               binding.Kind == AllowedBindingKind::Subtypes;
-      });
+      return llvm::all_of(
+          Bindings, [](const inference::PotentialBinding &binding) {
+            return binding.BindingType->isExistentialType() &&
+                   binding.Kind == inference::AllowedBindingKind::Subtypes;
+          });
     }
 
     unsigned getNumViableLiteralBindings() const;
@@ -4891,8 +4792,8 @@ public: // binding inference logic is public for unit testing.
 
       // Defaultable constraint is unviable if its type is covered by
       // an existing direct or transitive binding.
-      auto unviable =
-          llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      auto unviable = llvm::count_if(
+          Bindings, [&](const inference::PotentialBinding &binding) {
             auto type = binding.BindingType->getCanonicalType();
             auto def = Defaults.find(type);
             return def != Defaults.end()
@@ -4968,7 +4869,7 @@ public: // binding inference logic is public for unit testing.
       return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
     }
 
-    LiteralBindingKind getLiteralKind() const;
+    inference::LiteralBindingKind getLiteralKind() const;
 
     void addDefault(Constraint *constraint);
 
@@ -4990,9 +4891,10 @@ public: // binding inference logic is public for unit testing.
     ///    - bool, true if binding covers given literal protocol;
     ///    - type, non-null if binding type has to be adjusted
     ///      to cover given literal protocol;
-    std::pair<bool, Type> isLiteralCoveredBy(const LiteralRequirement &literal,
-                                             const PotentialBinding &binding,
-                                             bool canBeNil) const;
+    std::pair<bool, Type>
+    isLiteralCoveredBy(const LiteralRequirement &literal,
+                       const inference::PotentialBinding &binding,
+                       bool canBeNil) const;
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
@@ -5000,11 +4902,11 @@ public: // binding inference logic is public for unit testing.
     /// \returns true if this binding has been added to the set,
     /// false otherwise (e.g. because binding with this type is
     /// already in the set).
-    bool addPotentialBinding(PotentialBinding binding,
+    bool addPotentialBinding(inference::PotentialBinding binding,
                              bool allowJoinMeet = true);
 
     /// Check if this binding is viable for inclusion in the set.
-    bool isViable(PotentialBinding &binding) const;
+    bool isViable(inference::PotentialBinding &binding) const;
 
     bool isGenericParameter() const {
       if (auto *locator = TypeVar->getImpl().getLocator()) {
@@ -5073,7 +4975,7 @@ public:
       if (isSubtypeOfExistentialType())
         out << "subtype_of_existential ";
       auto literalKind = getLiteralKind();
-      if (literalKind != LiteralBindingKind::None)
+      if (literalKind != inference::LiteralBindingKind::None)
         out << "literal=" << static_cast<int>(literalKind) << " ";
       if (involvesTypeVariables())
         out << "involves_type_vars ";
@@ -5085,17 +4987,17 @@ public:
       PrintOptions PO;
       PO.PrintTypesForDebugging = true;
 
-      auto printBinding = [&](const PotentialBinding &binding) {
+      auto printBinding = [&](const inference::PotentialBinding &binding) {
         auto type = binding.BindingType;
         switch (binding.Kind) {
-        case AllowedBindingKind::Exact:
+        case inference::AllowedBindingKind::Exact:
           break;
 
-        case AllowedBindingKind::Subtypes:
+        case inference::AllowedBindingKind::Subtypes:
           out << "(subtypes of) ";
           break;
 
-        case AllowedBindingKind::Supertypes:
+        case inference::AllowedBindingKind::Supertypes:
           out << "(supertypes of) ";
           break;
         }
@@ -5112,8 +5014,9 @@ public:
         out << " defaults={";
         for (const auto &entry : Defaults) {
           auto *constraint = entry.second;
-          PotentialBinding binding{constraint->getSecondType(),
-                                   AllowedBindingKind::Exact, constraint};
+          inference::PotentialBinding binding{
+              constraint->getSecondType(), inference::AllowedBindingKind::Exact,
+              constraint};
           printBinding(binding);
         }
         out << "}";
@@ -5145,7 +5048,7 @@ public:
                                      bool finalize = true);
 
 private:
-  Optional<ConstraintSystem::PotentialBinding>
+  Optional<inference::PotentialBinding>
   getPotentialBindingForRelationalConstraint(PotentialBindings &result,
                                              Constraint *constraint) const;
 
@@ -5856,11 +5759,11 @@ private:
 
 class TypeVariableBinding {
   TypeVariableType *TypeVar;
-  ConstraintSystem::PotentialBinding Binding;
+  inference::PotentialBinding Binding;
 
 public:
   TypeVariableBinding(TypeVariableType *typeVar,
-                      ConstraintSystem::PotentialBinding &binding)
+                      inference::PotentialBinding &binding)
       : TypeVar(typeVar), Binding(binding) {}
 
   bool isDefaultable() const { return Binding.isDefaultableBinding(); }
@@ -5909,8 +5812,8 @@ public:
 };
 
 class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
-  using BindingKind = ConstraintSystem::AllowedBindingKind;
-  using Binding = ConstraintSystem::PotentialBinding;
+  using BindingKind = inference::AllowedBindingKind;
+  using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
   llvm::SmallVector<Binding, 8> Bindings;
@@ -6237,55 +6140,6 @@ struct DenseMapInfo<swift::constraints::SolutionApplicationTargetsKey> {
     return a == b;
   }
 };
-
-template <>
-struct DenseMapInfo<swift::constraints::ConstraintSystem::PotentialBinding> {
-  using Binding = swift::constraints::ConstraintSystem::PotentialBinding;
-
-  static Binding getEmptyKey() {
-    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
-  }
-
-  static Binding getTombstoneKey() {
-    return placeholderKey(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(const Binding &Val) {
-    return DenseMapInfo<swift::Type>::getHashValue(
-        Val.BindingType->getCanonicalType());
-  }
-
-  static bool isEqual(const Binding &LHS, const Binding &RHS) {
-    auto lhsTy = LHS.BindingType.getPointer();
-    auto rhsTy = RHS.BindingType.getPointer();
-
-    // Fast path: pointer equality.
-    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
-      return true;
-
-    // If either side is empty or tombstone, let's use pointer equality.
-    {
-      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
-      auto tombstoneTy =
-          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
-
-      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-
-      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-    }
-
-    // Otherwise let's drop the sugar and check.
-    return LHS.BindingType->isEqual(RHS.BindingType);
-  }
-
-private:
-  static Binding placeholderKey(swift::Type type) {
-    return Binding::forPlaceholder(type);
-  }
-};
-}
+} // end namespace llvm
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H

@@ -566,7 +566,7 @@ protected:
 
 class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   using BindingContainer = ConstraintSystem::PotentialBindings;
-  using Binding = ConstraintSystem::PotentialBinding;
+  using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
 

@@ -38,6 +38,7 @@
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
@@ -5406,7 +5407,7 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
   return false;
 }
 
-ConstraintSystem::PotentialBinding
+PotentialBinding
 TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
   assert(constraint->getKind() == ConstraintKind::Defaultable ||
          constraint->getKind() == ConstraintKind::DefaultClosureType);
