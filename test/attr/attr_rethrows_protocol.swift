@@ -2,7 +2,7 @@
 
 @rethrows
 protocol RethrowingProtocol {
-  func source() rethrows
+  func source() throws
 }
 
 struct Rethrows<Source: RethrowingProtocol>: RethrowingProtocol {
@@ -29,12 +29,11 @@ struct NonThrowsWithSource<Source: RethrowingProtocol>: RethrowingProtocol {
 }
 
 protocol InvalidRethrowingProtocol {
-  func source() rethrows // expected-note{{}}
+  func source() throws
 }
 
 struct InvalidRethrows : InvalidRethrowingProtocol {
-  // expected-error@-1{{type 'InvalidRethrows' does not conform to protocol 'InvalidRethrowingProtocol'}}
-  func source() rethrows { } // expected-note{{}}
+  func source() rethrows { }
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
 }
 
@@ -53,7 +52,7 @@ try rethrowingFromThrows.source()
 protocol HasAssociatedRethrowerWithEnclosedRethrow {
   associatedtype Rethrower: RethrowingProtocol
 
-  func source() rethrows
+  func source() throws
 }
 
 @rethrows
@@ -65,6 +64,7 @@ protocol HasAssociatedRethrower {
 
 func freeFloatingRethrowing<R: HasAssociatedRethrower>(_ r: R) rethrows { }
 
+@rethrows
 protocol InheritsRethrowing: RethrowingProtocol {}
 
 func freeFloatingInheritedRethrowingFunction<I: InheritsRethrowing>(_ r: I) rethrows { }
