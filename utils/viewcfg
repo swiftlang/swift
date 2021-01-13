@@ -59,8 +59,9 @@ class Block(object):
         if self.content is None:
             self.content = ""
         escaped_text = re.sub(r'([\\<>{}"|])', r'\\\1', text[0:80]).rstrip()
-        self.content += escaped_text + '\\l'
-        self.last_line = text
+        if len(escaped_text) > 0:
+            self.content += escaped_text + '\\l'
+            self.last_line = text
 
     def get_succs(self):
         if self.succs is None:
