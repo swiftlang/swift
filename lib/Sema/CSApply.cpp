@@ -8039,13 +8039,13 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   // Convert that Optional<Element> value to the type of the pattern.
   auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
   if (!optPatternType->isEqual(nextResultType)) {
-    OpaqueValueExpr *elementExpr =
-        new (ctx) OpaqueValueExpr(stmt->getInLoc(), nextResultType,
-                                  /*isPlaceholder=*/true);
+    OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
+        stmt->getInLoc(), nextResultType->getOptionalObjectType(),
+        /*isPlaceholder=*/true);
     Expr *convertElementExpr = elementExpr;
     if (TypeChecker::typeCheckExpression(
             convertElementExpr, dc,
-            /*contextualInfo=*/{optPatternType, CTP_CoerceOperand})
+            /*contextualInfo=*/{forEachStmtInfo.initType, CTP_CoerceOperand})
             .isNull()) {
       return None;
     }

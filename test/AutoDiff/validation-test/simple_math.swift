@@ -138,18 +138,6 @@ SimpleMathTests.test("CaptureGlobal") {
   expectEqual(30, gradient(at: 0, in: foo))
 }
 
-var foo_diffable: @differentiable (Float) -> (Float)
-  = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
-SimpleMathTests.test("GlobalDiffableFunc") {
-  expectEqual(2, gradient(at: 1, in: foo_diffable))
-  expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
-  expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
-    foo_diffable = { x in x + 1 }
-    return foo_diffable(x)
-  }))
-  expectEqual(1, gradient(at: 1, in: foo_diffable))
-}
-
 SimpleMathTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x

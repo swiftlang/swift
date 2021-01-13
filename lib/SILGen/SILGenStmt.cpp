@@ -724,11 +724,14 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
       SGF.B.createUnreachable(S);
   }
 
-  // Emit the condition bindings, branching to the bodyBB if they fail.  Since
-  // we didn't push a scope, the bound variables are live after this statement.
+  // Emit the condition bindings, branching to the bodyBB if they fail.
   auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
   auto NumNonTaken = SGF.loadProfilerCount(S);
   SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
+
+  // Begin a new 'guard' scope, which is popped when the next innermost debug
+  // scope ends.
+  SGF.enterDebugScope(S, /*isGuardScope=*/true);
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
@@ -969,20 +972,18 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // to hold the results.  This will be initialized on every entry into the loop
   // header and consumed by the loop body. On loop exit, the terminating value
   // will be in the buffer.
-  CanType optTy;
-  if (S->getConvertElementExpr()) {
-    optTy = S->getConvertElementExpr()->getType()->getCanonicalType();
-  } else {
-    optTy = OptionalType::get(S->getSequenceConformance().getTypeWitnessByName(
-                                  S->getSequence()->getType(),
-                                  SGF.getASTContext().Id_Element))
-                ->getCanonicalType();
-  }
+  CanType optTy =
+      OptionalType::get(
+          S->getSequenceConformance().getTypeWitnessByName(
+              S->getSequence()->getType(), SGF.getASTContext().Id_Element))
+          ->getCanonicalType();
   auto &optTL = SGF.getTypeLowering(optTy);
-  SILValue addrOnlyBuf;
-  ManagedValue nextBufOrValue;
 
-  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
+  SILValue addrOnlyBuf;
+  bool nextResultTyIsAddressOnly =
+      optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses();
+
+  if (nextResultTyIsAddressOnly)
     addrOnlyBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
 
   // Create a new basic block and jump into it.
@@ -1025,25 +1026,22 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
                                 SGFContext().withFollowingSideEffects()));
   };
 
+  bool hasElementConversion = S->getElementExpr();
   auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
     RValue result;
     result = SGF.emitApplyMethod(
         loc, iteratorNextRef, buildArgumentSource(),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
-        S->getElementExpr() ? SGFContext() : ctx);
-    if (S->getElementExpr()) {
-      SILGenFunction::OpaqueValueRAII pushOpaqueValue(
-          SGF, S->getElementExpr(),
-          std::move(result).getAsSingleValue(SGF, loc));
-      result = SGF.emitRValue(S->getConvertElementExpr(), ctx);
-    }
+        hasElementConversion ? SGFContext() : ctx);
     return result;
   };
+
+  ManagedValue nextBufOrElement;
   // Then emit the loop destination block.
   //
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
-  if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+  if (nextResultTyIsAddressOnly) {
     // Create the initialization outside of the innerForScope so that the
     // innerForScope doesn't clean it up.
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
@@ -1058,16 +1056,23 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       }
       innerForScope.pop();
     }
-    nextBufOrValue = nextInit->getManagedAddress();
+    nextBufOrElement = nextInit->getManagedAddress();
   } else {
     ArgumentScope innerForScope(SGF, SILLocation(S));
-    nextBufOrValue = innerForScope.popPreservingValue(
+    nextBufOrElement = innerForScope.popPreservingValue(
         buildElementRValue(SILLocation(S), SGFContext())
             .getAsSingleValue(SGF, SILLocation(S)));
   }
 
   SILBasicBlock *failExitingBlock = createBasicBlock();
-  SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
+  SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrElement);
+
+  auto convertElementRValue = [&](ManagedValue inputValue, SGFContext ctx) -> ManagedValue {
+    SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, S->getElementExpr(),
+                                                    inputValue);
+    return SGF.emitRValue(S->getConvertElementExpr(), ctx)
+        .getAsSingleValue(SGF, SILLocation(S));
+  };
 
   switchEnumBuilder.addOptionalSomeCase(
       createBasicBlock(), loopDest.getBlock(),
@@ -1093,13 +1098,22 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           //
           // *NOTE* If we do not have an address only value, then inputValue is
           // *already properly unwrapped.
-          if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+          SGFContext loopVarCtx{initLoopVars.get()};
+          if (nextResultTyIsAddressOnly) {
             inputValue = SGF.emitUncheckedGetOptionalValueFrom(
-                S, inputValue, optTL, SGFContext(initLoopVars.get()));
+                S, inputValue, optTL,
+                hasElementConversion ? SGFContext() : loopVarCtx);
           }
 
+          CanType optConvertedTy = optTy;
+          if (hasElementConversion) {
+            inputValue = convertElementRValue(inputValue, loopVarCtx);
+            optConvertedTy =
+                OptionalType::get(S->getConvertElementExpr()->getType())
+                    ->getCanonicalType();
+          }
           if (!inputValue.isInContext())
-            RValue(SGF, S, optTy.getOptionalObjectType(), inputValue)
+            RValue(SGF, S, optConvertedTy.getOptionalObjectType(), inputValue)
                 .forwardInto(SGF, S, initLoopVars.get());
 
           // Now that the pattern has been initialized, check any where

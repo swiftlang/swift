@@ -112,7 +112,7 @@ enum class NodeMatchReason: uint8_t {
   // a type declaration.
   Sequential,
 
-  // The first node is a function and it chanaged to a propery as the second
+  // The first node is a function and it chanaged to a property as the second
   // node.
   FuncToProperty,
 

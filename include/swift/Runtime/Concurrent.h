@@ -527,7 +527,12 @@ public:
       
       storage = newStorage;
       Capacity = newCapacity;
-      Elements.store(storage, std::memory_order_release);
+
+      // Use seq_cst here to ensure that the subsequent load of ReaderCount is
+      // ordered after this store. If ReaderCount is loaded first, then a new
+      // reader could come in between that load and this store, and then we
+      // could end up freeing the old storage pointer while it's still in use.
+      Elements.store(storage, std::memory_order_seq_cst);
     }
     
     new(&storage->data()[count]) ElemTy(elem);
@@ -866,7 +871,11 @@ private:
       FreeListNode::add(&FreeList, elements);
     }
 
-    Elements.store(newElements, std::memory_order_release);
+    // Use seq_cst here to ensure that the subsequent load of ReaderCount is
+    // ordered after this store. If ReaderCount is loaded first, then a new
+    // reader could come in between that load and this store, and then we
+    // could end up freeing the old elements pointer while it's still in use.
+    Elements.store(newElements, std::memory_order_seq_cst);
     return newElements;
   }
 
@@ -900,7 +909,11 @@ private:
       newIndices.storeIndexAt(nullptr, index, newI, std::memory_order_relaxed);
     }
 
-    Indices.store(newIndices.Value, std::memory_order_release);
+    // Use seq_cst here to ensure that the subsequent load of ReaderCount is
+    // ordered after this store. If ReaderCount is loaded first, then a new
+    // reader could come in between that load and this store, and then we
+    // could end up freeing the old indices pointer while it's still in use.
+    Indices.store(newIndices.Value, std::memory_order_seq_cst);
 
     if (auto *ptr = indices.pointer())
       FreeListNode::add(&FreeList, ptr);
