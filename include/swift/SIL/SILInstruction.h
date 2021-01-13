@@ -468,13 +468,6 @@ public:
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
 
-  /// Return the ith operand of this instruction.
-  ///
-  /// Equivalent to performing getAllOperands()[index];
-  const Operand &getOperandRef(unsigned index) const {
-    return getAllOperands()[index];
-  }
-
   /// Return the array of type dependent operands for this instruction.
   ///
   /// Type dependent operands are hidden operands, i.e. not part of the SIL
@@ -503,11 +496,6 @@ public:
 
   /// Return the array of mutable operands for this instruction.
   MutableArrayRef<Operand> getAllOperands();
-
-  /// Return the ith mutable operand of this instruction.
-  ///
-  /// Equivalent to performing getAllOperands()[index];
-  Operand &getOperandRef(unsigned index) { return getAllOperands()[index]; }
 
   /// Return the array of mutable type dependent operands for this instruction.
   MutableArrayRef<Operand> getTypeDependentOperands();
@@ -553,7 +541,19 @@ public:
   SILValue getOperand(unsigned Num) const {
     return getAllOperands()[Num].get();
   }
-  Operand &getOperandRef(unsigned Num) { return getAllOperands()[Num]; }
+
+  /// Return the ith mutable operand of this instruction.
+  ///
+  /// Equivalent to performing getAllOperands()[index];
+  Operand &getOperandRef(unsigned index) { return getAllOperands()[index]; }
+
+  /// Return the ith operand of this instruction.
+  ///
+  /// Equivalent to performing getAllOperands()[index];
+  const Operand &getOperandRef(unsigned index) const {
+    return getAllOperands()[index];
+  }
+
   void setOperand(unsigned Num, SILValue V) { getAllOperands()[Num].set(V); }
   void swapOperands(unsigned Num1, unsigned Num2) {
     getAllOperands()[Num1].swap(getAllOperands()[Num2]);
