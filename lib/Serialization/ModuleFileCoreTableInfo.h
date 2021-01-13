@@ -604,7 +604,7 @@ public:
                                Fingerprint::DIGEST_LENGTH};
     if (auto fp = Fingerprint::fromString(str))
       return fp.getValue();
-    llvm::errs() << "Unconvertable fingerprint\n";
+    llvm::errs() << "Unconvertable fingerprint '" << str << "'\n";
     abort();
   }
 };
