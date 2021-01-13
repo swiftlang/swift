@@ -2077,27 +2077,28 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
   }
 }
 
-/// Populates the \c found vector with the indices of the given constraints
-/// that are arithmetic operator choices in the best order to attempt based on
-/// the argument function type that the operator is applied to.
-static void takeArithmeticOperators(ConstraintSystem &CS, const FunctionType *argFnType,
-                                    ArrayRef<Constraint *> constraints,
-                                    SmallVectorImpl<unsigned> &found,
-                                    ConstraintSystem::ConstraintMatchLoop forEachChoice) {
+void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constraints,
+                                                 SmallVectorImpl<unsigned>::iterator first,
+                                                 SmallVectorImpl<unsigned>::iterator last,
+                                                 ConstraintLocator *locator) {
+  auto *argFnType = AppliedDisjunctions[locator];
+  if (!isOperatorBindOverload(constraints[0]) || !argFnType)
+    return;
+
   auto operatorName = constraints[0]->getOverloadChoice().getName();
   if (!operatorName.getBaseIdentifier().isArithmeticOperator())
     return;
 
+  SmallVector<unsigned, 4> concreteOverloads;
   SmallVector<unsigned, 4> numericOverloads;
   SmallVector<unsigned, 4> sequenceOverloads;
-  SmallVector<unsigned, 4> simdOverloads;
   SmallVector<unsigned, 4> otherGenericOverloads;
 
   auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, KnownProtocolKind kind) -> bool {
     if (!nominal)
       return false;
 
-    auto *protocol = TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
+    auto *protocol = TypeChecker::getProtocol(getASTContext(), SourceLoc(), kind);
 
     if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
       return refined->inheritsFrom(protocol);
@@ -2106,19 +2107,13 @@ static void takeArithmeticOperators(ConstraintSystem &CS, const FunctionType *ar
                                                  nominal->getDeclContext());
   };
 
-  // Gather concrete, Numeric, Sequence, and SIMD overloads into separate buckets.
-  forEachChoice(constraints, [&](unsigned index, Constraint *constraint) -> bool {
-    auto *decl = constraint->getOverloadChoice().getDecl();
-
-    if (isSIMDOperator(decl)) {
-      simdOverloads.push_back(index);
-      return true;
-    }
-
+  // Gather Numeric and Sequence overloads into separate buckets.
+  for (auto iter = first; iter != last; ++iter) {
+    unsigned index = *iter;
+    auto *decl = constraints[index]->getOverloadChoice().getDecl();
     auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
     if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
-      // Concrete overloads should always be attempted first.
-      found.push_back(index);
+      concreteOverloads.push_back(index);
     } else if (refinesOrConformsTo(nominal, KnownProtocolKind::AdditiveArithmetic)) {
       numericOverloads.push_back(index);
     } else if (refinesOrConformsTo(nominal, KnownProtocolKind::Sequence)) {
@@ -2126,9 +2121,7 @@ static void takeArithmeticOperators(ConstraintSystem &CS, const FunctionType *ar
     } else {
       otherGenericOverloads.push_back(index);
     }
-
-    return true;
-  });
+  }
 
   auto sortPartition = [&](SmallVectorImpl<unsigned> &partition) {
     llvm::sort(partition, [&](unsigned lhs, unsigned rhs) -> bool {
@@ -2144,6 +2137,9 @@ static void takeArithmeticOperators(ConstraintSystem &CS, const FunctionType *ar
   // subsequent choices that the successful choice is a refinement of.
   sortPartition(sequenceOverloads);
 
+  // Attempt concrete overloads first.
+  first = std::copy(concreteOverloads.begin(), concreteOverloads.end(), first);
+
   // Check if any of the known argument types conform to one of the standard
   // arithmetic protocols. If so, the sovler should attempt the corresponding
   // overload choices first.
@@ -2152,34 +2148,27 @@ static void takeArithmeticOperators(ConstraintSystem &CS, const FunctionType *ar
     if (!argType || argType->hasTypeVariable())
       continue;
 
-    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::AdditiveArithmetic)) {
-      found.append(numericOverloads.begin(), numericOverloads.end());
+    if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::AdditiveArithmetic)) {
+      first = std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::Sequence)) {
-      found.append(sequenceOverloads.begin(), sequenceOverloads.end());
+    if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::Sequence)) {
+      first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();
-      break;
-    }
-
-    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::SIMD)) {
-      found.append(simdOverloads.begin(), simdOverloads.end());
-      simdOverloads.clear();
       break;
     }
   }
 
-  found.append(otherGenericOverloads.begin(), otherGenericOverloads.end());
-  found.append(numericOverloads.begin(), numericOverloads.end());
-  found.append(sequenceOverloads.begin(), sequenceOverloads.end());
-  found.append(simdOverloads.begin(), simdOverloads.end());
+  first = std::copy(otherGenericOverloads.begin(), otherGenericOverloads.end(), first);
+  first = std::copy(numericOverloads.begin(), numericOverloads.end(), first);
+  first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
 }
 
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
-    SmallVectorImpl<unsigned> &PartitionBeginning, ConstraintLocator *locator) {
+    SmallVectorImpl<unsigned> &PartitionBeginning) {
   // Apply a special-case rule for favoring one generic function over
   // another.
   if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
@@ -2252,11 +2241,8 @@ void ConstraintSystem::partitionDisjunction(
     });
   }
 
-  // Gather arithmetic and SIMD operators.
+  // Partition SIMD operators.
   if (isOperatorBindOverload(Choices[0])) {
-    if (auto *argFnType = AppliedDisjunctions[locator])
-      takeArithmeticOperators(*this, argFnType, Choices, everythingElse, forEachChoice);
-
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (!isOperatorBindOverload(constraint))
         return false;

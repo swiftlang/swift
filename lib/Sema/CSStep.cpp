@@ -510,8 +510,15 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
     auto score = getBestScore(Solutions);
 
     if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
-      if (!BestNonGenericScore || score < BestNonGenericScore)
+      if (!BestNonGenericScore || score < BestNonGenericScore) {
         BestNonGenericScore = score;
+        if (shouldSkipGenericOperators()) {
+          // The disjunction choice producer shouldn't do the work
+          // to partition the generic operator choices if generic
+          // operators are going to be skipped.
+          Producer.setNeedsGenericOperatorOrdering(false);
+        }
+      }
     }
 
     AnySolved = true;
@@ -673,16 +680,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   //        already have a solution involving non-generic operators,
   //        but continue looking for a better non-generic operator
   //        solution.
-  if (BestNonGenericScore && choice.isGenericOperator()) {
-    auto &score = BestNonGenericScore->Data;
-    // Let's skip generic overload choices only in case if
-    // non-generic score indicates that there were no forced
-    // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
-      return skip("generic");
+  if (shouldSkipGenericOperators() && choice.isGenericOperator()) {
+    return skip("generic");
   }
 
   return false;

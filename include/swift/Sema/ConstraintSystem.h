@@ -5464,8 +5464,15 @@ public:
   // have to visit all of the options.
   void partitionDisjunction(ArrayRef<Constraint *> Choices,
                             SmallVectorImpl<unsigned> &Ordering,
-                            SmallVectorImpl<unsigned> &PartitionBeginning,
-                            ConstraintLocator *locator);
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  /// Partition the choices in the range \c first to \c last into groups and
+  /// order the groups in the best order to attempt based on the argument
+  /// function type that the operator is applied to.
+  void partitionGenericOperators(ArrayRef<Constraint *> Choices,
+                                 SmallVectorImpl<unsigned>::iterator first,
+                                 SmallVectorImpl<unsigned>::iterator last,
+                                 ConstraintLocator *locator);
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
@@ -5975,7 +5982,11 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
 
   bool IsExplicitConversion;
 
+  Constraint *Disjunction;
+
   unsigned Index = 0;
+
+  bool needsGenericOperatorOrdering = true;
 
 public:
   using Element = DisjunctionChoice;
@@ -5985,22 +5996,17 @@ public:
                                 ? disjunction->getLocator()
                                 : nullptr),
         Choices(disjunction->getNestedConstraints()),
-        IsExplicitConversion(disjunction->isExplicitConversion()) {
+        IsExplicitConversion(disjunction->isExplicitConversion()),
+        Disjunction(disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
     // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning, disjunction->getLocator());
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
   }
 
-  DisjunctionChoiceProducer(ConstraintSystem &cs,
-                            ArrayRef<Constraint *> choices,
-                            ConstraintLocator *locator, bool explicitConversion)
-      : BindingProducer(cs, locator), Choices(choices),
-        IsExplicitConversion(explicitConversion) {
-
-    // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning, locator);
+  void setNeedsGenericOperatorOrdering(bool flag) {
+    needsGenericOperatorOrdering = flag;
   }
 
   Optional<Element> operator()() override {
@@ -6014,6 +6020,20 @@ public:
       ++PartitionIndex;
 
     ++Index;
+
+    auto choice = DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
+                                    IsExplicitConversion, isBeginningOfPartition);
+    // Partition the generic operators before producing the first generic
+    // operator disjunction choice.
+    if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
+      unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
+                                     PartitionBeginning[PartitionIndex] : Ordering.size());
+      CS.partitionGenericOperators(Choices,
+                                   Ordering.begin() + currIndex,
+                                   Ordering.begin() + nextPartitionIndex,
+                                   Disjunction->getLocator());
+      needsGenericOperatorOrdering = false;
+    }
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
