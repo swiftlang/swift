@@ -520,7 +520,6 @@ public:
   InteriorPointerOperandKind(Kind newValue) : value(newValue) {}
 
   operator Kind() const {
-    assert(isValid());
     return value;
   }
 
