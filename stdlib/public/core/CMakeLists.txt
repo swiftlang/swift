@@ -60,7 +60,6 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
-  EitherSequence.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
