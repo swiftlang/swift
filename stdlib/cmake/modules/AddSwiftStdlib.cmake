@@ -105,20 +105,6 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
-
-    set(add_explicit_version TRUE)
-
-    # iOS-like and zippered libraries get their deployment version from the
-    # target triple
-    if(maccatalyst_build_flavor STREQUAL "ios-like" OR
-        maccatalyst_build_flavor STREQUAL "zippered")
-      set(add_explicit_version FALSE)
-    endif()
-
-    if(add_explicit_version)
-      list(APPEND result
-        "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
-     endif()
   endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
