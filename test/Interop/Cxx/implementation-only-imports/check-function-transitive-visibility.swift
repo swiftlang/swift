@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir %t/use_module_a %t/use_module_b
-// RUN: %target-swift-frontend -enable-library-evolution -swift-version 5 -emit-module -o %t/use_module_a/UseModuleA.swiftmodule %S/Inputs/use-module-a.swift -I %S/Inputs -enable-cxx-interop
-// RUN: %target-swift-frontend -enable-library-evolution -swift-version 5 -emit-module -o %t/use_module_b/UseModuleB.swiftmodule %S/Inputs/use-module-b.swift -I %S/Inputs -enable-cxx-interop
+// RUN: %target-swiftxx-frontend -enable-library-evolution -swift-version 5 -emit-module -o %t/use_module_a/UseModuleA.swiftmodule %S/Inputs/use-module-a.swift -I %S/Inputs
+// RUN: %target-swiftxx-frontend -enable-library-evolution -swift-version 5 -emit-module -o %t/use_module_b/UseModuleB.swiftmodule %S/Inputs/use-module-b.swift -I %S/Inputs
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -I %t/use_module_a -I %t/use_module_b -I %S/Inputs -enable-cxx-interop %s
+// RUN: %target-swiftxx-frontend -typecheck -swift-version 5 -I %t/use_module_a -I %t/use_module_b -I %S/Inputs %s
 
 
 // Swift should consider all sources for a decl and recognize that the

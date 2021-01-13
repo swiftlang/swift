@@ -1,15 +1,26 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
-func a() {  // expected-warning {{all paths through this function will call itself}}
-  a()
+func a() {
+  a()  // expected-warning {{function call causes an infinite recursion}}
 }
 
-func b(_ x : Int) {  // expected-warning {{all paths through this function will call itself}}
+func throwing_func() throws {
+  try throwing_func()  // expected-warning {{function call causes an infinite recursion}}
+}
+
+func b(_ x : Int) {
   if x != 0 {
-    b(x)
+    b(x)  // expected-warning {{function call causes an infinite recursion}}
   } else {
-    b(x+1)
+    b(x+1)  // expected-warning {{function call causes an infinite recursion}}
+  }
+}
+
+func noInvariantArgs(_ x : Int) {
+  if x != 0 {
+    noInvariantArgs(x-1)  // expected-warning {{function call causes an infinite recursion}}
+  } else {
+    noInvariantArgs(x+1)  // expected-warning {{function call causes an infinite recursion}}
   }
 }
 
@@ -19,12 +30,108 @@ func c(_ x : Int) {
   }
 }
 
-func d(_ x : Int) {  // expected-warning {{all paths through this function will call itself}}
+func invariantArgCondition(_ x : Int) {
+  if x != 0 {
+    invariantArgCondition(x)  // expected-warning {{function call causes an infinite recursion}}
+  }
+}
+
+func invariantLoopCondition(_ x : Int) {
+  while x != 0 {
+    invariantLoopCondition(x)  // expected-warning {{function call causes an infinite recursion}}
+  }
+}
+
+final class ClassWithInt {
+  var i: Int = 0
+}
+
+func invariantMemCondition(_ c: ClassWithInt) {
+  if c.i > 0 {
+    invariantMemCondition(c)  // expected-warning {{function call causes an infinite recursion}}
+  }
+}
+
+func variantMemCondition(_ c: ClassWithInt) {
+  if c.i > 0 {
+    c.i -= 1
+    invariantMemCondition(c)  // no warning
+  }
+}
+
+func nestedInvariantCondition(_ x : Int, _ y: Int) {
+  if x > 0 {
+    if y != 0 {
+      if x == 0 {
+        nestedInvariantCondition(x, y)  // expected-warning {{function call causes an infinite recursion}}
+      }
+    }
+  }
+}
+
+func nestedVariantCondition(_ x : Int, _ y: Int) {
+  if x > 0 {
+    if y != 0 {
+      if x == 0 {
+        nestedVariantCondition(x, y - 1) // no warning
+      }
+    }
+  }
+}
+
+func multipleArgs1(_ x : Int, _ y : Int) {
+  if y > 0 {
+    multipleArgs1(x - 1, y)  // expected-warning {{function call causes an infinite recursion}}
+  } else if x > 10 {
+    multipleArgs1(x - 2, y)
+  }
+}
+
+func multipleArgs2(_ x : Int, _ y : Int) {
+  if y > 0 {
+    multipleArgs2(x, y - 1)  // expected-warning {{function call causes an infinite recursion}}
+  } else if x > 10 {
+    multipleArgs2(x, y - 2)  // expected-warning {{function call causes an infinite recursion}}
+  }
+}
+
+func multipleArgsNoWarning(_ x : Int, _ y : Int) {
+  if y > 0 {
+    multipleArgsNoWarning(x, y - 1)
+  } else if x > 10 {
+    multipleArgsNoWarning(x - 1, y)
+  }
+}
+
+struct Str {
+  var x = 27
+
+  mutating func writesMemory() {
+    if x > 0 {
+      x -= 1
+      writesMemory() // no warning
+    }
+  }
+
+  mutating func doesNotWriteMem() {
+    if x > 0 {
+      doesNotWriteMem()  // expected-warning {{function call causes an infinite recursion}}
+    }
+  }
+
+  func nonMutating() {
+    if x > 0 {
+      nonMutating()  // expected-warning {{function call causes an infinite recursion}}
+    }
+  }
+}
+
+func d(_ x : Int) {
   var x = x
   if x != 0 {
     x += 1
   }
-  return d(x)
+  return d(x)  // expected-warning {{function call causes an infinite recursion}}
 }
 
 // Doesn't warn on mutually recursive functions
@@ -32,9 +139,9 @@ func d(_ x : Int) {  // expected-warning {{all paths through this function will 
 func e() { f() }
 func f() { e() }
 
-func g() { // expected-warning {{all paths through this function will call itself}}
+func g() {
   while true { // expected-note {{condition always evaluates to true}}
-    g()
+    g() // expected-warning {{function call causes an infinite recursion}}
   }
 
   g() // expected-warning {{will never be executed}}
@@ -46,20 +153,20 @@ func h(_ x : Int) {
   }
 }
 
-func i(_ x : Int) {  // expected-warning {{all paths through this function will call itself}}
+func i(_ x : Int) {
   var x = x
   while (x < 5) {
     x -= 1
   }
-  i(0)
+  i(0)  // expected-warning {{function call causes an infinite recursion}}
 }
 
-func j() -> Int {  // expected-warning {{all paths through this function will call itself}}
-  return 5 + j()
+func j() -> Int {
+  return 5 + j()  // expected-warning {{function call causes an infinite recursion}}
 }
 
-func k() -> Any {  // expected-warning {{all paths through this function will call itself}}
-  return type(of: k())
+func k() -> Any {
+  return type(of: k())  // expected-warning {{function call causes an infinite recursion}}
 }
 
 @_silgen_name("exit") func exit(_: Int32) -> Never
@@ -71,17 +178,17 @@ func l() {
   l()
 }
 
-func m() { // expected-warning {{all paths through this function will call itself}}
+func m() {
   guard Bool.random() else {
     fatalError() // we _do_ warn here, because fatalError is a programtermination_point
   }
-  m()
+  m() // expected-warning {{function call causes an infinite recursion}}
 }
 
 enum MyNever {}
 
-func blackHole() -> MyNever { // expected-warning {{all paths through this function will call itself}}
-  blackHole()
+func blackHole() -> MyNever {
+  blackHole() // expected-warning {{function call causes an infinite recursion}}
 }
 
 @_semantics("programtermination_point")
@@ -105,22 +212,22 @@ func o() -> MyNever {
 
 func mayHaveSideEffects() {}
 
-func p() { // expected-warning {{all paths through this function will call itself}}
+func p() {
   if Bool.random() {
     mayHaveSideEffects() // presence of side-effects doesn't alter the check for the programtermination_point apply
     fatalError()
   }
-  p()
+  p() // expected-warning {{function call causes an infinite recursion}}
 }
 
 class S {
-  convenience init(a: Int) { // expected-warning {{all paths through this function will call itself}}
-    self.init(a: a)
+  convenience init(a: Int) {
+    self.init(a: a) // expected-warning {{function call causes an infinite recursion}}
   }
   init(a: Int?) {}
 
-  static func a() { // expected-warning {{all paths through this function will call itself}}
-    return a()
+  static func a() {
+    return a() // expected-warning {{function call causes an infinite recursion}}
   }
 
   func b() { // No warning - has a known override.
@@ -148,28 +255,31 @@ class T: S {
     get {
       return super.bar
     }
-    set { // expected-warning {{all paths through this function will call itself}}
-      self.bar = newValue
+    set {
+      self.bar = newValue // expected-warning {{function call causes an infinite recursion}}
     }
   }
 }
 
-func == (l: S?, r: S?) -> Bool { // expected-warning {{all paths through this function will call itself}}
-  if l == nil && r == nil { return true }
+func == (l: S?, r: S?) -> Bool {
+  if l == nil && r == nil { return true } // expected-warning {{function call causes an infinite recursion}}
   guard let l = l, let r = r else { return false }
   return l === r
 }
 
-public func == <Element>(lhs: Array<Element>, rhs: Array<Element>) -> Bool { // expected-warning {{all paths through this function will call itself}}
-  return lhs == rhs
+public func == <Element>(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
+  return lhs == rhs // expected-warning {{function call causes an infinite recursion}}
 }
 
-func factorial(_ n : UInt) -> UInt { // expected-warning {{all paths through this function will call itself}}
-  return (n != 0) ? factorial(n - 1) * n : factorial(1)
+func factorial(_ n : UInt) -> UInt {
+  return (n != 0) ? factorial(n - 1) * n : factorial(1) // expected-warning {{function call causes an infinite recursion}}
+                                                        // expected-warning @-1 {{function call causes an infinite recursion}}
+
 }
 
-func tr(_ key: String) -> String { // expected-warning {{all paths through this function will call itself}}
+func tr(_ key: String) -> String {
   return tr(key) ?? key // expected-warning {{left side of nil coalescing operator '??' has non-optional type}}
+                        // expected-warning @-1 {{function call causes an infinite recursion}}
 }
 
 class Node {
