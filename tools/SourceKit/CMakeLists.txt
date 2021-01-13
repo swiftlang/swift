@@ -63,7 +63,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   # Sadly there are two OS naming conventions.
   # xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
-  # -mOS-version-min: macosx ios      ios-simulator
+  # triple name:      macosx ios      ios-simulator
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^iphoneos")
     set(version_min_os "ios")
@@ -89,10 +89,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     endif()
-  else()
-    add_compile_options(-m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET})
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
   endif()
 endif()
 

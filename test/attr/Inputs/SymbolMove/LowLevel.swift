@@ -51,3 +51,8 @@ open class Vehicle {
     public init() {}
     public var currentSpeed = 40.0
 }
+
+// =================== Move from macro ======================= //
+@available(OSX 10.7, iOS 7.0, *)
+@_originallyDefinedIn(module: "HighLevel", _iOS13Aligned)
+public func funcMacro () { print("Macro from LowLevel") }

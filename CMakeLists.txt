@@ -655,9 +655,10 @@ endif()
 #
 
 if(XCODE)
-  # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
-  # insists on passing -mmacosx-version-min to the compiler, and we need
-  # to pass -mios-version-min.  Clang sees both options and complains.
+  # FIXME: It used to be the case that Xcode would force
+  # -m${platform}-version-min flags that would conflict with those computed
+  # by build-script. version-min flags are deprecated in favor of -target since
+  # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
 endif()
 

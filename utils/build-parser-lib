@@ -105,7 +105,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS=" + deployment_version,
             ]
-            llvm_c_flags += " -mios-simulator-version-min=" + deployment_version
+            llvm_c_flags += " -target " + host_triple
 
         elif self.host == "iphoneos":
             deployment_version = "10.0"
@@ -115,7 +115,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS=" + deployment_version,
             ]
-            llvm_c_flags += " -miphoneos-version-min=" + deployment_version
+            llvm_c_flags += " -target " + host_triple
 
         elif self.host == "appletvsimulator":
             deployment_version = "10.0"
@@ -125,7 +125,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS=" + deployment_version,
             ]
-            llvm_c_flags += " -mtvos-simulator-version-min=" + deployment_version
+            llvm_c_flags += " -target " + host_triple
 
         elif self.host == "appletvos":
             deployment_version = "10.0"
@@ -135,7 +135,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS=" + deployment_version,
             ]
-            llvm_c_flags += " -mtvos-version-min=" + deployment_version
+            llvm_c_flags += " -target " + host_triple
 
         elif self.host == "watchsimulator":
             deployment_version = "3.0"
@@ -148,7 +148,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS=" + deployment_version,
             ]
-            llvm_c_flags += " -mwatchos-simulator-version-min=" + deployment_version
+            llvm_c_flags += " -target " + host_triple
 
         elif self.host == "watchos":
             deployment_version = "3.0"
@@ -158,7 +158,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS=" + deployment_version,
             ]
-            llvm_c_flags += " -mwatchos-version-min=" + deployment_version
+            llvm_c_flags += " -target " + host_triple
 
         assert host_triple
         assert host_sdk

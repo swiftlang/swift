@@ -2042,7 +2042,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
       PlatformAndVersions;
 
-    StringRef AttrName = "@_originalDefinedIn";
+    StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
@@ -2084,9 +2084,53 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
         if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
-            (peekToken().is(tok::floating_literal) ||
-             peekToken().is(tok::integer_literal))) {
+            (peekToken().isAny(tok::integer_literal, tok::floating_literal) ||
+             peekAvailabilityMacroName())) {
+
           PlatformKind Platform;
+
+          if (peekAvailabilityMacroName()) {
+            // Handle availability macros first.
+            //
+            // The logic to search for macros and platform name could
+            // likely be handled by parseAvailabilitySpecList
+            // if we don't rely on parseList here.
+            SmallVector<AvailabilitySpec *, 4> Specs;
+            ParserStatus MacroStatus = parseAvailabilityMacro(Specs);
+            if (MacroStatus.isError())
+              return MacroStatus;
+
+            for (auto *Spec : Specs) {
+              if (auto *PlatformVersionSpec =
+                   dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+                auto Platform = PlatformVersionSpec->getPlatform();
+                auto Version = PlatformVersionSpec->getVersion();
+                if (Version.getSubminor().hasValue() ||
+                    Version.getBuild().hasValue()) {
+                  diagnose(Tok.getLoc(), diag::originally_defined_in_major_minor_only);
+                }
+                PlatformAndVersions.emplace_back(Platform, Version);
+
+              } else if (auto *PlatformAgnostic =
+                  dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+                diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
+                         PlatformAgnostic->isLanguageVersionSpecific() ?
+                           diag::originally_defined_in_swift_version :
+                           diag::originally_defined_in_package_description);
+
+              } else if (auto *OtherPlatform =
+                         dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
+                diagnose(OtherPlatform->getStarLoc(),
+                         diag::originally_defined_in_missing_platform_name);
+
+              } else {
+                llvm_unreachable("Unexpected AvailabilitySpec kind.");
+              }
+            }
+
+            return makeParserSuccess();
+          }
+
           // Parse platform name.
           auto Plat = platformFromString(Tok.getText());
           if (!Plat.hasValue()) {

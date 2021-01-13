@@ -446,7 +446,7 @@ final class TestRunner {
   /// of context switches.
   ///
   /// This method of estimating memory usage is valid only for executing single
-  /// benchmark. That's why we don't worry about reseting the `baseline` in
+  /// benchmark. That's why we don't worry about resetting the `baseline` in
   /// `resetMeasurements`.
   ///
   /// FIXME: This current implementation doesn't work on Linux. It is disabled
