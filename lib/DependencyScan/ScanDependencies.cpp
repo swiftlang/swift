@@ -156,7 +156,8 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
                           InterfaceSubContextDelegate &ASTDelegate) {
   auto &ctx = instance.getASTContext();
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
-  auto isSwift = knownDependencies.isSwiftTextualModule();
+  auto isSwiftInterface = knownDependencies.isSwiftTextualModule();
+  auto isSwift = isSwiftInterface || knownDependencies.isSwiftBinaryModule();
 
   // Find the dependencies of every module this module directly depends on.
   std::set<ModuleDependencyID> result;
@@ -171,7 +172,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
     }
   }
 
-  if (isSwift) {
+  if (isSwiftInterface) {
     // A record of all of the Clang modules referenced from this Swift module.
     std::vector<std::string> allClangModules;
     llvm::StringSet<> knownModules;
