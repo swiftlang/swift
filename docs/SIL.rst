@@ -5371,7 +5371,7 @@ presence or value of the ``enum_extensibility`` Clang attribute.
 
 (See `SE-0192`__ for more information about non-frozen enums.)
 
-__ https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md
+__ https://github.com/apple/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md
 
 enum
 ````

@@ -188,9 +188,6 @@ class Evaluator {
   /// Whether to dump detailed debug info for cycles.
   bool debugDumpCycles;
 
-  /// Whether we're building a request dependency graph.
-  bool buildDependencyGraph;
-
   /// Used to report statistics about which requests were evaluated, if
   /// non-null.
   UnifiedStatsReporter *stats = nullptr;
@@ -213,17 +210,6 @@ class Evaluator {
 
   /// A cache that stores the results of requests.
   evaluator::RequestCache cache;
-
-  /// Track the dependencies of each request.
-  ///
-  /// This is an adjacency-list representation expressing, for each known
-  /// request, the requests that it directly depends on. It is populated
-  /// lazily while the request is being evaluated.
-  ///
-  /// In a well-formed program, the graph should be a directed acycle graph
-  /// (DAG). However, cyclic dependencies will be recorded within this graph,
-  /// so all clients must cope with cycles.
-  llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
 
   evaluator::DependencyRecorder recorder;
 
@@ -363,11 +349,6 @@ private:
           std::make_unique<CyclicalRequestError<Request>>(request, *this));
     }
 
-    // Clear out the dependencies on this request; we're going to recompute
-    // them now anyway.
-    if (buildDependencyGraph)
-      dependencies.find_as(request)->second.clear();
-
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
     // Trace and/or count statistics.
@@ -470,45 +451,12 @@ private:
       recorder.handleDependencySourceRequest(r, source.get());
     }
   }
-
-public:
-  /// Print the dependencies of the given request as a tree.
-  ///
-  /// This is the core printing operation; most callers will want to use
-  /// the other overload.
-  void printDependencies(const AnyRequest &request,
-                         llvm::raw_ostream &out,
-                         llvm::DenseSet<AnyRequest> &visitedAnywhere,
-                         llvm::SmallVectorImpl<AnyRequest> &visitedAlongPath,
-                         ArrayRef<AnyRequest> highlightPath,
-                         std::string &prefixStr,
-                         bool lastChild) const;
-
-  /// Print the dependencies of the given request as a tree.
-  template <typename Request>
-  void printDependencies(const Request &request, llvm::raw_ostream &out) const {
-    std::string prefixStr;
-    llvm::DenseSet<AnyRequest> visitedAnywhere;
-    llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
-    printDependencies(AnyRequest(request), out, visitedAnywhere,
-                      visitedAlongPath, { }, prefixStr, /*lastChild=*/true);
-  }
-
-  /// Dump the dependencies of the given request to the debugging stream
-  /// as a tree.
-  SWIFT_DEBUG_DUMPER(dumpDependencies(const AnyRequest &request));
-
-  /// Print all dependencies known to the evaluator as a single Graphviz
-  /// directed graph.
-  void printDependenciesGraphviz(llvm::raw_ostream &out) const;
-
-  SWIFT_DEBUG_DUMPER(dumpDependenciesGraphviz());
 };
 
 template <typename Request>
 void CyclicalRequestError<Request>::log(llvm::raw_ostream &out) const {
   out << "Cycle detected:\n";
-  evaluator.printDependencies(request, out);
+  simple_display(out, request);
   out << "\n";
 }
 

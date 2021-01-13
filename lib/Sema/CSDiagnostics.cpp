@@ -205,23 +205,14 @@ const Requirement &RequirementFailure::getRequirement() const {
 
 ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     ConstraintLocator *locator) {
-  auto &solution = getSolution();
   auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
   if (!reqElt.isConditionalRequirement())
     return nullptr;
 
-  auto path = locator->getPath();
-  auto *conformanceLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
-
-  auto result = llvm::find_if(
-      solution.Conformances,
-      [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-              &conformance) { return conformance.first == conformanceLoc; });
-  assert(result != solution.Conformances.end());
-
-  auto conformance = result->second;
-  assert(conformance.isConcrete());
-  return conformance.getConcrete();
+  auto conformanceRef =
+    locator->findLast<LocatorPathElt::ConformanceRequirement>();
+  assert(conformanceRef && "Invalid locator for a conditional requirement");
+  return conformanceRef->getConformance();
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
