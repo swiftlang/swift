@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// Remove with rdar://problem/72439642
+// UNSUPPORTED: asan
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
