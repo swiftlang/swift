@@ -415,7 +415,7 @@ extension MyActor {
     _ = await super[0]
 
     // Accesses on other actors can only reference immutable data or
-    // call asychronous methods
+    // call asynchronous methods
     _ = otherActor.immutable // okay
     _ = otherActor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
     _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}

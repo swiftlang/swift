@@ -273,6 +273,170 @@ public:
   void visitDerivativeAttr(DerivativeAttr *attr);
   void visitTransposeAttr(TransposeAttr *attr);
 
+  void visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+    auto func = dyn_cast<FuncDecl>(D);
+    if (!func) {
+      diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
+      return;
+    }
+
+    // Trigger the request to check for @asyncHandler.
+    (void)func->isAsyncHandler();
+  }
+
+  void visitActorAttr(ActorAttr *attr) {
+    auto classDecl = dyn_cast<ClassDecl>(D);
+    if (!classDecl)
+      return; // already diagnosed
+
+    (void)classDecl->isActor();
+  }
+
+  void visitActorIndependentAttr(ActorIndependentAttr *attr) {
+    // @actorIndependent can be applied to global and static/class variables
+    // that do not have storage.
+    auto dc = D->getDeclContext();
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      // @actorIndependent is meaningless on a `let`.
+      if (var->isLet()) {
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_let);
+        return;
+      }
+
+      // @actorIndependent can not be applied to stored properties, unless if
+      // the 'unsafe' option was specified
+      if (var->hasStorage()) {
+        switch (attr->getKind()) {
+          case ActorIndependentKind::Safe:
+            diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
+            return;
+
+          case ActorIndependentKind::Unsafe:
+            break;
+        }
+      }
+
+      // @actorIndependent can not be applied to local properties.
+      if (dc->isLocalContext()) {
+        diagnoseAndRemoveAttr(attr, diag::actorindependent_local_var);
+        return;
+      }
+
+      // If this is a static or global variable, we're all set.
+      if (dc->isModuleScopeContext() ||
+          (dc->isTypeContext() && var->isStatic())) {
+        return;
+      }
+    }
+
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      (void)getActorIsolation(VD);
+    }
+  }
+
+  void visitDistributedActorAttr(DistributedActorAttr *attr) {
+    auto dc = D->getDeclContext();
+
+    // @distributed can be applied to actor class definitions and async functions
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      // @distributed can not be applied to stored properties
+      diagnoseAndRemoveAttr(attr, diag::distributedactor_let);
+      return;
+    }
+
+    // @distributed can only be declared on an `actor class`
+    if (auto classDecl = dyn_cast<ClassDecl>(D)) {
+      if (!classDecl->isActor()) {
+        diagnoseAndRemoveAttr(attr, diag::distributedactor_not_actor);
+        return;
+      } else {
+        // good: `@distributed actor class`
+        return;
+      }
+    } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
+      diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);
+      return;
+    }
+
+    if (auto funcDecl = dyn_cast<FuncDecl>(D)) {
+      // @distributed func must be `async throws`
+      if (!funcDecl->hasAsync() || !funcDecl->hasThrows()) {
+        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_async_throws);
+        return;
+      }
+
+      // @distributed functions must not be static
+      if (funcDecl->isStatic()) {
+        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_static);
+        return;
+      }
+
+      // @distributed func must be declared inside an distibuted actor
+      if (dc->getSelfClassDecl() &&
+          !dc->getSelfClassDecl()->isDistributedActor()) {
+        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);
+        return;
+      } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
+        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);
+        return;
+      }
+    }
+
+    //    auto VD = cast<ValueDecl>(D);
+//    if (!VD->isInstanceMember()) {
+//      diagnoseAndRemoveAttr(attr, diag::distributedactor_not_actor_func);
+//      return;
+//    }
+//
+//    (void)getActorIsolation(VD);
+  }
+
+
+  void visitGlobalActorAttr(GlobalActorAttr *attr) {
+    auto nominal = dyn_cast<NominalTypeDecl>(D);
+    if (!nominal)
+      return; // already diagnosed
+
+    (void)nominal->isGlobalActor();
+  }
+
+  void visitAsyncAttr(AsyncAttr *attr) {
+    auto var = dyn_cast<VarDecl>(D);
+    if (!var)
+      return;
+
+    auto patternBinding = var->getParentPatternBinding();
+    if (!patternBinding)
+      return; // already diagnosed
+
+    // "Async" modifier can only be applied to local declarations.
+    if (!patternBinding->getDeclContext()->isLocalContext()) {
+      diagnoseAndRemoveAttr(attr, diag::async_let_not_local);
+      return;
+    }
+
+    // Check each of the pattern binding entries.
+    bool diagnosedVar = false;
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      auto pattern = patternBinding->getPattern(index);
+
+      // Look for variables bound by this pattern.
+      bool foundAnyVariable = false;
+      bool isLet = true;
+      pattern->forEachVariable([&](VarDecl *var) {
+        if (!var->isLet())
+          isLet = false;
+        foundAnyVariable = true;
+      });
+
+      // Each entry must bind at least one named variable, so that there is
+      // something to "await".
+      if (!foundAnyVariable) {
+        diagnose(pattern->getLoc(), diag::async_let_no_variables);
+        attr->setInvalid();
+        return;
+      }
+
   void visitAsyncHandlerAttr(AsyncHandlerAttr *attr);
   void visitActorAttr(ActorAttr *attr);
   void visitActorIndependentAttr(ActorIndependentAttr *attr);

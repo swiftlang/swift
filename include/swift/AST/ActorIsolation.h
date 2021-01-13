@@ -44,6 +44,10 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
+    /// The declaration is isolated to a (potentially) distributed actor.
+    /// Distributed actors may access _their_ state (same as 'ActorInstance')
+    /// however others may not access any properties on other distributed actors.
+    DistributedActorInstance,
     /// The declaration is explicitly specified to be independent of any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
@@ -102,6 +106,10 @@ public:
         unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
   }
 
+  static ActorIsolation forDistributedActorInstance(ClassDecl *actor) {
+    return ActorIsolation(DistributedActorInstance, actor);
+  }
+
   Kind getKind() const { return kind; }
 
   operator Kind() const { return getKind(); }
@@ -109,7 +117,7 @@ public:
   bool isUnspecified() const { return kind == Unspecified; }
 
   ClassDecl *getActor() const {
-    assert(getKind() == ActorInstance);
+    assert(getKind() == ActorInstance || getKind() == DistributedActorInstance);
     return actor;
   }
 
@@ -141,6 +149,8 @@ public:
       return true;
 
     case ActorInstance:
+      return lhs.actor == rhs.actor;
+    case DistributedActorInstance:
       return lhs.actor == rhs.actor;
 
     case GlobalActor:

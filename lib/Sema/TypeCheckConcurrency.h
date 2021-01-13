@@ -96,6 +96,10 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
+
+    /// References to declarations that are part of a distributed actor are
+    /// only permitted if they are async.
+    DistributedActor, // TODO: should it be DistributedActorSelf? Self things are the same as a local actor hmm
   };
 
 private:
@@ -125,7 +129,9 @@ public:
 
   /// Retrieve the actor class that the declaration is within.
   ClassDecl *getActorClass() const {
-    assert(kind == ActorSelf || kind == CrossActorSelf);
+    assert(kind == ActorSelf || 
+           kind == CrossActorSelf || 
+           kind == DistributedActor);
     return data.actorClass;
   }
 

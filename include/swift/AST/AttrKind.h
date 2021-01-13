@@ -90,6 +90,15 @@ enum class ActorIndependentKind : uint8_t {
 enum : unsigned { NumActorIndependentKindBits =
   countBitsUsed(static_cast<unsigned>(ActorIndependentKind::Last_InlineKind)) };
 
+/// More information about a distributed actor decl
+enum class DistributedActorKind : uint8_t {
+    Default = 0,
+};
+
+enum : unsigned { NumDistributedActorKindBits =
+    countBitsUsed(static_cast<unsigned>(DistributedActorKind::Default)) };
+
+
 /// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
 /// so please do not reorder existing values.

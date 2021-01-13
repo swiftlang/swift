@@ -784,6 +784,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Effects:
   case DAK_Optimize:
   case DAK_ActorIndependent:
+  case DAK_DistributedActor:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
     } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
@@ -1165,6 +1166,13 @@ StringRef DeclAttribute::getAttrName() const {
       return "actorIndependent(unsafe)";
     }
     llvm_unreachable("Invalid actorIndependent kind");
+  }
+  case DAK_DistributedActor: {
+    switch (cast<DistributedActorAttr>(this)->getKind()) {
+      case DistributedActorKind::Default:
+        return "distributed";
+    }
+    llvm_unreachable("Invalid distributed actor kind");
   }
   case DAK_Optimize: {
     switch (cast<OptimizeAttr>(this)->getMode()) {

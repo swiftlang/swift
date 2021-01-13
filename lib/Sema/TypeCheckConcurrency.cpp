@@ -131,6 +131,61 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
   return false;
 }
 
+/// Check whether the function is a proper distributed function
+///
+/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
+///
+/// \returns \c true if there was a problem with adding the attribute, \c false
+/// otherwise.
+static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
+  if (!func->hasThrows()) {
+    if (diagnose) {
+//      func->diagnose(diag::asynchandler_throws)
+//          .fixItRemove(func->getThrowsLoc());
+      printf("TODO: diagnose that distributed function must be 'async throws'"); // FIXME
+    }
+
+    return true;
+  }
+
+  if (!func->hasAsync()) {
+    if (diagnose) {
+//      func->diagnose(diag::asynchandler_async)
+//          .fixItRemove(func->getAsyncLoc());
+      printf("TODO: diagnose that distributed function must be 'async'"); // FIXME
+    }
+
+    return true;
+  }
+
+  if (auto attr = func->getAttrs().getAttribute<DistributedActorAttr>()) {
+    for (auto param : *func->getParameters()) {
+      if (auto t = param->getInterfaceType()) {
+        // FIXME: Codable parameters checks
+        func->diagnose(
+            diag::distributed_actor_func_param_not_codable,
+            param->getArgumentName().str(),
+            t
+        );
+
+        return true;
+      }
+    }
+  }
+
+  //  if (!func->getResultInterfaceType()->isVoid()) {
+  //    // FIXME: check that return type conforms to 'Codable'
+  //  }
+
+  // RELATED SNIPPET to check if Codable:
+  //     auto target =
+  //        conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
+  //    if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
+  //            .isInvalid()) {
+
+  return false;
+}
+
 void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   assert(func);
   if (!isa<DestructorDecl>(func)) {
@@ -292,6 +347,31 @@ bool IsDefaultActorRequest::evaluate(
     return false;
 
   return true;
+}
+
+bool IsDistributedActorRequest::evaluate(
+    Evaluator &evaluator, ClassDecl *classDecl) const {
+  // If concurrency is not enabled, we don't have actors.
+  auto distributedAttr = classDecl->getAttrs()
+      .getAttribute<DistributedActorAttr>();
+
+  // NOTE: that we DO NOT infer @distributed even if the parent class was distributed.
+
+  return distributedAttr != nullptr;
+}
+
+bool IsDistributedFuncRequest::evaluate(
+    Evaluator &evaluator, FuncDecl *func) const {
+  // Check whether the attribute was explicitly specified.
+  if (auto attr = func->getAttrs().getAttribute<DistributedActorAttr>()) {
+    // Check for well-formedness.
+    if (checkDistributedFunc(func, /*diagnose=*/true)) {
+      attr->setInvalid();
+      return false;
+    }
+
+    return true;
+  }
 }
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
@@ -551,6 +631,25 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
   case DeclKind::Param:
   case DeclKind::Var:
+    switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
+      case ActorIsolation::DistributedActorInstance:
+        // Accessing properties on a distributed actor is only allowed when
+        // accessing 'self'; this includes `let` properties as well,
+        // unlike local actors
+        return forDistributedActorSelf(isolation.getActor());
+
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::GlobalActor:
+        // for local actors 'let' declarations are immutable,
+        // so there are no restrictions on their access.
+        if (cast<VarDecl>(decl)->isLet())
+          return forUnrestricted();
+        LLVM_FALLTHROUGH;
+    }
+
   case DeclKind::Accessor:
   case DeclKind::Constructor:
   case DeclKind::Func:
@@ -559,7 +658,12 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     if (cast<ValueDecl>(decl)->isLocalCapture())
       return forUnrestricted();
 
-    // 'let' declarations are immutable, so they can be accessed across
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::GlobalActor:
+    // local 'let' declarations are immutable, so they can be accessed across
     // actors.
     bool isAccessibleAcrossActors = false;
     if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -585,6 +689,10 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       // Protected actor instance members can only be accessed on 'self'.
       return forActorSelf(isolation.getActor(),
           isAccessibleAcrossActors || isa<ConstructorDecl>(decl));
+
+    case ActorIsolation::DistributedActorInstance:
+      // Only distributed functions can be called externally on a distributed actor.
+      return forDistributedActorSelf(isolation.getActor());
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
@@ -1433,7 +1541,8 @@ namespace {
           break;
         }
         case ActorIsolationRestriction::CrossActorSelf:
-        case ActorIsolationRestriction::ActorSelf: {
+        case ActorIsolationRestriction::ActorSelf:
+        case ActorIsolationRestriction::DistributedActor: {
           if (isPartialApply) {
             // The partially applied InoutArg is a property of actor. This
             // can really only happen when the property is a struct with a
@@ -1485,6 +1594,7 @@ namespace {
       auto getActorIsolation = [constDC](ValueDecl *value) {
         switch (auto isolation = swift::getActorIsolation(value)) {
         case ActorIsolation::ActorInstance:
+        case ActorIsolation::DistributedActorInstance:
         case ActorIsolation::Independent:
         case ActorIsolation::IndependentUnsafe:
         case ActorIsolation::Unspecified:
@@ -1880,6 +1990,7 @@ namespace {
 
       case ActorIsolationRestriction::CrossActorSelf:
       case ActorIsolationRestriction::ActorSelf:
+      case ActorIsolationRestriction::DistributedActor: // TODO: is it DistributedActorSelf?
         llvm_unreachable("non-member reference into an actor");
 
       case ActorIsolationRestriction::GlobalActorUnsafe:
@@ -1969,6 +2080,47 @@ namespace {
             ConcurrentReferenceKind::CrossActor);
       }
 
+      case ActorIsolationRestriction::DistributedActor: {
+        // distributed actor isolation is more strict;
+        // we do not allow any property access, or synchronous access at all.
+        // TODO: special case some "unsafe version"?
+
+        // Must reference distributed actor-isolated state on 'self'.
+        auto *selfDC = getSelfReferenceContext(base);
+        if (!selfDC) {
+          // invocation on not-'self', is only okey if this is a @distributed func
+          if (auto func = dyn_cast<FuncDecl>(member)) {
+            if (!func->isDistributed()) {
+              ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
+              noteIsolatedActorMember(member);
+              return true;
+            } else {
+              // distributed func, excellent
+              return false;
+            }
+          }
+
+          // no value declaration may be accessed directly on distributed actor
+//            ctx.Diags.diagnose(
+//                memberLoc, diag::distributed_actor_isolated_non_self_reference,
+//                member->getDescriptiveKind(),
+//                member->getName(),
+//                isolation.getActorClass() ==
+//                getNearestEnclosingActorContext(getDeclContext()));
+          ctx.Diags.diagnose(
+              memberLoc, diag::distributed_actor_isolated_non_self_reference,
+              member->getDescriptiveKind(),
+              member->getName());
+          noteIsolatedActorMember(member);
+          return true;
+//          }
+        }
+
+        // continue checking as if it was actor self isolated
+        // LLVM_FALLTHROUGH;
+        return false;
+      }
+
       case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
         auto *selfVar = getReferencedSelf(base);
@@ -1999,6 +2151,7 @@ namespace {
         auto curDC = const_cast<DeclContext *>(getDeclContext());
         switch (auto contextIsolation = getActorIsolationOfContext(curDC)) {
           case ActorIsolation::ActorInstance:
+          case ActorIsolation::DistributedActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
             if (isEscapingPartialApply) {
@@ -2144,7 +2297,8 @@ namespace {
         return ClosureActorIsolation::forGlobalActor(globalActorType);
       }
 
-      case ActorIsolation::ActorInstance: {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance: {
         SmallVector<CapturedValue, 2> localCaptures;
         closure->getCaptureInfo().getLocalCaptures(localCaptures);
         for (const auto &localCapture : localCaptures) {
@@ -2351,6 +2505,7 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
     auto isolation = std::get<1>(isolated);
     switch (isolation) {
       case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance:
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Independent:
@@ -2426,7 +2581,11 @@ ActorIsolation ActorIsolationRequest::evaluate(
   auto classDecl = value->getDeclContext()->getSelfClassDecl();
   if (classDecl && classDecl->isActor() &&
       (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
-    defaultIsolation = ActorIsolation::forActorInstance(classDecl);
+    if (classDecl->isDistributedActor()) {
+      defaultIsolation = ActorIsolation::forDistributedActorInstance(classDecl);
+    } else { 
+      defaultIsolation = ActorIsolation::forActorInstance(classDecl);
+     }
   }
 
   // Function used when returning an inferred isolation.
@@ -2462,6 +2621,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
 
     case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Unspecified:
       // Nothing to do.
       break;

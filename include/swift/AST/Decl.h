@@ -3711,6 +3711,9 @@ public:
 
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
+  
+  /// Whether the class is an distributed actor.
+  bool isDistributedActor() const;
 
   /// Does this class explicitly declare any of the methods that
   /// would prevent it from being a default actor?
@@ -5761,6 +5764,10 @@ public:
 
   /// Returns if the function is 'rethrows' or 'reasync'.
   bool hasPolymorphicEffect(EffectKind kind) const;
+
+  /// Returns 'true' if the function is @distributed.
+  // TODO: now we also check that it is a well formed distributed (i.e. also async, should we just check the annotation presence?)
+  bool isDistributed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 

@@ -485,6 +485,11 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
         break;
       }
 
+      case ActorIsolation::DistributedActorInstance: {
+        // TODO: perhaps here we can emit our special handling to make a message?
+        LLVM_FALLTHROUGH;
+      }
+
       case ActorIsolation::GlobalActor:
         actor = emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
         break;
