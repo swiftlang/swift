@@ -68,11 +68,11 @@ internal final class CheckedContinuationCanary {
 
   internal func takeContinuation<T>() -> UnsafeContinuation<T>? {
     return unsafeBitCast(_takeContinuation(),
-      to: UnsafeContinuation<T>.self)
+      to: UnsafeContinuation<T>?.self)
   }
   internal func takeThrowingContinuation<T>() -> UnsafeThrowingContinuation<T>? {
     return unsafeBitCast(_takeContinuation(),
-      to: UnsafeThrowingContinuation<T>.self)
+      to: UnsafeThrowingContinuation<T>?.self)
   }
 
   deinit {
@@ -137,12 +137,16 @@ public struct CheckedContinuation<T> {
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will be logged, but otherwise have no effect.
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
   public func resume(returning x: __owned T) {
     if let c: UnsafeContinuation<T> = canary.takeContinuation() {
       c.resume(returning: x)
     } else {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
+      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
     }
   }
 }
@@ -207,14 +211,17 @@ public struct CheckedThrowingContinuation<T> {
   /// from its suspension point.
   ///
   /// A continuation must be resumed exactly once. If the continuation has
-  /// already been resumed through this object, whether by `resume(returning:)`
-  /// or by `resume(throwing:)`, then the attempt to resume
-  /// the continuation again will be logged, but otherwise have no effect.
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
   public func resume(returning x: __owned T) {
     if let c: UnsafeThrowingContinuation<T> = canary.takeThrowingContinuation() {
       c.resume(returning: x)
     } else {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
+      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
     }
   }
   
@@ -222,14 +229,17 @@ public struct CheckedThrowingContinuation<T> {
   /// from its suspension point.
   ///
   /// A continuation must be resumed exactly once. If the continuation has
-  /// already been resumed through this object, whether by `resume(returning:)`
-  /// or by `resume(throwing:)`, then the attempt to resume
-  /// the continuation again will be logged, but otherwise have no effect.
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
   public func resume(throwing x: __owned Error) {
     if let c: UnsafeThrowingContinuation<T> = canary.takeThrowingContinuation() {
       c.resume(throwing: x)
     } else {
-      logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
+      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
     }
   }
 }
