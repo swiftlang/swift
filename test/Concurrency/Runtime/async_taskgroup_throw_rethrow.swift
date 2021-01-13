@@ -4,6 +4,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 
+// Remove with rdar://problem/73154198
+// UNSUPPORTED: asan
+
 import Dispatch
 
 struct Boom: Error {}
