@@ -5721,18 +5721,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
-    auto *conformanceLoc = getConstraintLocator(
-        loc, LocatorPathElt::ConformanceRequirement(protocol));
-    // Record the conformance.
-    CheckedConformances.push_back({conformanceLoc, conformance});
-
-    if (isConformanceUnavailable(conformance, conformanceLoc))
+    if (isConformanceUnavailable(conformance, loc))
       increaseScore(SK_Unavailable);
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
       unsigned index = 0;
+      auto *conformanceLoc = getConstraintLocator(
+          loc,
+          LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
+
       for (const auto &req : conformance.getConditionalRequirements()) {
         addConstraint(
             req, getConstraintLocator(conformanceLoc,

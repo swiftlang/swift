@@ -233,7 +233,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                            IsNotDynamic);
   
   if (F->empty()) {
-    // TODO: Emit the implementation.
+    // Emit the implementation.
     SILGenFunction SGF(*this, *F, SwiftModule);
     {
       Scope scope(SGF, loc);
@@ -310,7 +310,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           // Convert the ObjC argument to the bridged Swift representation we
           // want.
           ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(loc,
-                                       arg,
+                                       arg.copy(SGF, loc),
                                        arg.getType().getASTType(),
                                        // FIXME: pass down formal type
                                        destBuf->getType().getASTType(),

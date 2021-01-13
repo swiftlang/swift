@@ -39,6 +39,7 @@ class TypeLoc;
 class VarDecl;
 class Pattern;
 class SourceManager;
+class ProtocolConformance;
 
 namespace constraints {
 
@@ -763,13 +764,13 @@ public:
 };
 
 class LocatorPathElt::ConformanceRequirement final
-    : public StoredPointerElement<ProtocolDecl> {
+    : public StoredPointerElement<ProtocolConformance> {
 public:
-  ConformanceRequirement(ProtocolDecl *protocol)
+  ConformanceRequirement(ProtocolConformance *conformance)
       : StoredPointerElement(PathElementKind::ConformanceRequirement,
-                             protocol) {}
+                             conformance) {}
 
-  ProtocolDecl *getRequirement() const { return getStoredPointer(); }
+  ProtocolConformance *getConformance() const { return getStoredPointer(); }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ConformanceRequirement;

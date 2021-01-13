@@ -1887,7 +1887,7 @@ the complex number type defined in the
 differentiable.
 [The full implementation is here](https://github.com/tensorflow/swift-apis/blob/main/Sources/third_party/Experimental/Complex.swift).
 The implementation adopts the
-[Autograd convention](https://github.com/HIPS/autograd/blob/master/docs/tutorial.md#complex-numbers)
+[Autograd convention](https://github.com/HIPS/autograd/blob/main/docs/tutorial.md#complex-numbers)
 for derivatives of functions with complex arguments or results, so that we can
 define derivatives for non-holomorphic primitives.
 
@@ -2106,7 +2106,7 @@ func foo<T: Differentiable, U, V: Differentiable>(
 ##### Examples
 
 The `ElementaryFunctions` protocol introduced in
-[SE-0246](https://github.com/apple/swift-evolution/blob/master/proposals/0246-mathable.md)
+[SE-0246](https://github.com/apple/swift-evolution/blob/main/proposals/0246-mathable.md)
 defines generic elementary functions, which are non-linear. By defining
 derivatives using the `@derivative` attribute for these protocol
 requirements in an extension, all conforming types now have differentiable
@@ -3202,7 +3202,7 @@ Parker Schuh, and Dimitrios Vytiniotis.
 [Bart Chrzaszcz]: https://github.com/bartchr808
 
 [swift-numerics]: https://github.com/apple/swift-numerics
-[SE-0229]: https://github.com/apple/swift-evolution/blob/master/proposals/0229-simd.md
-[SE-0233]: https://github.com/apple/swift-evolution/blob/master/proposals/0233-additive-arithmetic-protocol.md
-[SE-0246]: https://github.com/apple/swift-evolution/blob/master/proposals/0246-mathable.md
-[SE-0251]: https://github.com/apple/swift-evolution/blob/master/proposals/0251-simd-additions.md
+[SE-0229]: https://github.com/apple/swift-evolution/blob/main/proposals/0229-simd.md
+[SE-0233]: https://github.com/apple/swift-evolution/blob/main/proposals/0233-additive-arithmetic-protocol.md
+[SE-0246]: https://github.com/apple/swift-evolution/blob/main/proposals/0246-mathable.md
+[SE-0251]: https://github.com/apple/swift-evolution/blob/main/proposals/0251-simd-additions.md

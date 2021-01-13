@@ -221,15 +221,8 @@ namespace swift {
     /// Whether to record request references for incremental builds.
     bool RecordRequestReferences = true;
 
-    /// The path to which we should emit GraphViz output for the complete
-    /// request-evaluator graph.
-    std::string RequestEvaluatorGraphVizPath;
-    
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
-
-    /// Whether to build a request dependency graph for debugging.
-    bool BuildRequestDependencyGraph = false;
 
     /// Enable SIL type lowering
     bool EnableSubstSILFunctionTypesForFunctionValues = true;

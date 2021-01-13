@@ -1177,9 +1177,6 @@ public:
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
 
-  std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
-      Conformances;
-
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -1254,11 +1251,6 @@ public:
       return known->second;
     return None;
   }
-
-  /// Retrieve a fully-resolved protocol conformance at the given locator
-  /// and with the given protocol.
-  ProtocolConformanceRef resolveConformance(ConstraintLocator *locator,
-                                            ProtocolDecl *proto);
 
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
                                       bool lookThroughApply = true) const;
@@ -2209,9 +2201,6 @@ private:
   /// each node had before introducing this type.
   llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
 
-  std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
-      CheckedConformances;
-
   /// The set of functions that have been transformed by a result builder.
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
       resultBuilderTransformed;
@@ -2674,8 +2663,6 @@ public:
     unsigned numDefaultedConstraints;
 
     unsigned numAddedNodeTypes;
-
-    unsigned numCheckedConformances;
 
     unsigned numDisabledConstraints;
 
@@ -3884,12 +3871,6 @@ public:
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
-
-  /// Retrieve a list of conformances established along the current solver path.
-  ArrayRef<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
-  getCheckedConformances() const {
-    return CheckedConformances;
-  }
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) along the current path.

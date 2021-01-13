@@ -11,6 +11,8 @@
 // UNSUPPORTED: CPU=arm64e
 // UNSUPPORTED: OS=windows-msvc
 
+// REQUIRES: rdar72893124
+
 // Currently this test just checks if nothing crashes.
 // TODO: also check if the current executor is the correct one.
 

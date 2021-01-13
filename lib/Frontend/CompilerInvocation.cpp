@@ -503,13 +503,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
-  if (Args.getLastArg(OPT_build_request_dependency_graph))
-    Opts.BuildRequestDependencyGraph = true;
-
-  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
-    Opts.RequestEvaluatorGraphVizPath = A->getValue();
-  }
-
   if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
     Opts.RequireExplicitAvailability = true;
     if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {

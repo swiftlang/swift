@@ -20,7 +20,7 @@ We use two spaces as the unit of indentation. We don't use tabs.
 
 #### Core Standard Library
 
-All new public API additions to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/master/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
+All new public API additions to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/main/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
 
 All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
 
