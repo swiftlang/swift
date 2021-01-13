@@ -83,6 +83,22 @@ FloatingPointDerivativeTests.test("${Self}.addingProduct") {
   expectEqual((1, 2, 3), gradient(at: ${Self}(10), 3, 2, in: { $0.addingProduct($1, $2) }))
 }
 
+FloatingPointDerivativeTests.test("${Self}.minimum") {
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(2), in : { ${Self}.minimum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(1), in : { ${Self}.minimum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(2), ${Self}(1), in : { ${Self}.minimum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), .nan, in : { ${Self}.minimum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), in : { ${Self}.minimum($0, $1) }))
+}
+
+FloatingPointDerivativeTests.test("${Self}.maximum") {
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(1), ${Self}(2), in : { ${Self}.maximum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(1), ${Self}(1), in : { ${Self}.maximum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(2), ${Self}(1), in : { ${Self}.maximum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), .nan, in : { ${Self}.maximum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), in : { ${Self}.maximum($0, $1) }))
+}
+
 %if Self == 'Float80':
 #endif
 %end
