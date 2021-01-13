@@ -170,6 +170,8 @@ public:
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
+
+  bool classifyAsThrows(ModuleDecl *module);
 };
 
 } // end namespace swift

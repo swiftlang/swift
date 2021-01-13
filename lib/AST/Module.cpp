@@ -835,6 +835,20 @@ void ModuleDecl::getPrecedenceGroups(
   FORWARD(getPrecedenceGroups, (results));
 }
 
+bool ModuleDecl::classifyWitnessAsThrows(SubstitutionMap substitutions) {
+  for (auto conformanceRef : substitutions.getConformances()) {
+    if (!conformanceRef.isConcrete()) {
+      return true;
+    }
+    
+    if (conformanceRef.classifyAsThrows(this)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void SourceFile::getPrecedenceGroups(
        SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
   getCache().getPrecedenceGroups(results);

@@ -185,6 +185,65 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   return getConcrete()->getWitnessDeclRef(requirement);
 }
 
+
+static bool classifyRequirement(ModuleDecl *module, 
+                         ProtocolConformance *reqConformance, 
+                         ValueDecl *requiredFn) {
+  auto DC = reqConformance->getDeclContext();
+  auto reqTy = reqConformance->getType();
+  auto declRef = reqConformance->getWitnessDeclRef(requiredFn);
+  auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
+  switch (witnessDecl->getRethrowingKind()) {
+    case FunctionRethrowingKind::ByConformance:
+      if (module->classifyWitnessAsThrows( 
+        reqTy->getContextSubstitutionMap(module, DC))) {
+        return true;
+      }
+      break;
+    case FunctionRethrowingKind::None:
+      break;
+    case FunctionRethrowingKind::Throws:
+      return true;
+    default:
+      return true;
+  }
+  return false;
+}
+
+static bool classifyTypeRequirement(ModuleDecl *module, Type protoType, 
+                             ValueDecl *requiredFn, 
+                             ProtocolConformance *conformance,
+                             ProtocolDecl *requiredProtocol) {
+  auto reqProtocol = cast<ProtocolDecl>(requiredFn->getDeclContext());
+  ProtocolConformance *reqConformance;
+
+  if(protoType->isEqual(reqProtocol->getSelfInterfaceType()) && 
+     requiredProtocol == reqProtocol) {
+    reqConformance = conformance;
+  } else {
+    auto reqConformanceRef = 
+    conformance->getAssociatedConformance(protoType, reqProtocol);
+    if (!reqConformanceRef.isConcrete()) {
+      return true;
+    }
+    reqConformance = reqConformanceRef.getConcrete();
+  }
+
+  return classifyRequirement(module, reqConformance, requiredFn);
+}
+
+bool ProtocolConformanceRef::classifyAsThrows(ModuleDecl *module) {
+  auto conformance = getConcrete();
+  auto requiredProtocol = getRequirement();
+  for (auto req : requiredProtocol->getRethrowingRequirements()) {
+    if (classifyTypeRequirement(module, req.first, req.second, 
+                                conformance, requiredProtocol)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {

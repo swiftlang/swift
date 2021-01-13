@@ -493,74 +493,6 @@ public:
   DeclContext *RethrowsDC = nullptr;
   bool inRethrowsContext() const { return RethrowsDC != nullptr; }
 
-  bool classifyRequirement(ModuleDecl *module, 
-                           ProtocolConformance *reqConformance, 
-                           ValueDecl *requiredFn) {
-    auto DC = reqConformance->getDeclContext();
-    auto reqTy = reqConformance->getType();
-    auto declRef = reqConformance->getWitnessDeclRef(requiredFn);
-    auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
-    switch (witnessDecl->getRethrowingKind()) {
-      case FunctionRethrowingKind::ByConformance:
-        if (classifyWitnessAsThrows(module, 
-          reqTy->getContextSubstitutionMap(module, DC))) {
-          return true;
-        }
-        break;
-      case FunctionRethrowingKind::None:
-        break;
-      case FunctionRethrowingKind::Throws:
-        return true;
-      default:
-        return true;
-    }
-    return false;
-  }
-
-  bool classifyTypeRequirement(ModuleDecl *module, Type protoType, 
-                               ValueDecl *requiredFn, 
-                               ProtocolConformance *conformance,
-                               ProtocolDecl *requiredProtocol) {
-    auto reqProtocol = cast<ProtocolDecl>(requiredFn->getDeclContext());
-    ProtocolConformance *reqConformance;
-
-    if(protoType->isEqual(reqProtocol->getSelfInterfaceType()) && 
-       requiredProtocol == reqProtocol) {
-      reqConformance = conformance;
-    } else {
-      auto reqConformanceRef = 
-      conformance->getAssociatedConformance(protoType, reqProtocol);
-      if (!reqConformanceRef.isConcrete()) {
-        return true;
-      }
-      reqConformance = reqConformanceRef.getConcrete();
-    }
-
-    return classifyRequirement(module, reqConformance, requiredFn);
-  }
-
-  bool classifyWitnessAsThrows(ModuleDecl *module, 
-                               SubstitutionMap substitutions) {
-
-
-    for (auto conformanceRef : substitutions.getConformances()) {
-      if (!conformanceRef.isConcrete()) {
-        return true;
-      }
-      auto conformance = conformanceRef.getConcrete();
-      
-      auto requiredProtocol = conformanceRef.getRequirement();
-      for (auto req : requiredProtocol->getRethrowingRequirements()) {
-        if (classifyTypeRequirement(module, req.first, req.second, 
-                                    conformance, requiredProtocol)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
@@ -586,7 +518,7 @@ public:
 
     if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
       auto substitutions = fnRef.getDeclRef().getSubstitutions();
-      if (classifyWitnessAsThrows(fnRef.getModuleContext(), substitutions)) {
+      if (fnRef.getModuleContext()->classifyWitnessAsThrows(substitutions)) {
         return Classification::forRethrowingOnly(
           PotentialThrowReason::forRethrowsConformance(E), isAsync);
       }

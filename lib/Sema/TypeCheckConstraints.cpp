@@ -589,6 +589,23 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckExpression(target))
     return failed();
 
+  // check to see if the sequence expr is throwing (and async), if so require the stmt to have a try loc
+  if (stmt->getAwaitLoc().isValid()) {
+    auto Ty = sequence->getType();
+    if (Ty.isNull()) { return failed(); }
+    auto context = sequence->getType()->getNominalOrBoundGenericNominal();
+    if (!context) { return failed(); }
+    auto module = context->getParentModule();
+    auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
+    
+    if (conformanceRef.classifyAsThrows(module) && stmt->getTryLoc().isInvalid()) {
+      auto &diags = dc->getASTContext().Diags;
+      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled);
+
+      return failed();
+    }
+  }
+
   return false;
 }
 
