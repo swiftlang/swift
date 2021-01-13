@@ -16,6 +16,8 @@
 
 // UNSUPPORTED: use_os_stdlib
 
+// REQUIRES: rdar73049300
+
 import Accelerate
 import Foundation
 import StdlibUnittest
