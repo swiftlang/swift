@@ -534,7 +534,7 @@ SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
 
 DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
   OnNominalType | OnFunc | OnVar | OnExtension | UserInaccessible |
-  AllowMultipleAttributes |
+  AllowMultipleAttributes | LongAttribute |
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   96)
 

@@ -1489,6 +1489,14 @@ WARNING(originally_defined_in_major_minor_only,none,
 WARNING(originally_defined_in_missing_platform_name,none,
         "* as platform name has no effect", ())
 
+WARNING(originally_defined_in_swift_version, none,
+        "Swift language version checks has no effect "
+        "in @_originallyDefinedIn", ())
+
+WARNING(originally_defined_in_package_description, none,
+        "PackageDescription version checks has no effect "
+        "in @_originallyDefinedIn", ())
+
 // convention
 ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())
