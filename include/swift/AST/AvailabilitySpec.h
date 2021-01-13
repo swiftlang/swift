@@ -201,6 +201,8 @@ public:
       : AvailabilitySpec(AvailabilitySpecKind::OtherPlatform),
         StarLoc(StarLoc) {}
 
+  SourceLoc getStarLoc() const { return StarLoc; }
+
   SourceRange getSourceRange() const { return SourceRange(StarLoc, StarLoc); }
 
   void print(raw_ostream &OS, unsigned Indent) const;

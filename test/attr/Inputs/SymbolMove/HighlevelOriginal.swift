@@ -47,3 +47,5 @@ open class Vehicle {
     public init() {}
     public var currentSpeed = -40.0
 }
+
+public func funcMacro() { print("Macro from HighLevel") }
