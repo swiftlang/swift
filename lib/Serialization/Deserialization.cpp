@@ -2742,7 +2742,7 @@ public:
                                           StringRef blobData) {
     DeclContextID contextID;
     bool isIUO, isFailable;
-    bool isImplicit, isObjC, hasStubImplementation, throws;
+    bool isImplicit, isObjC, hasStubImplementation, throws, async;
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
@@ -2753,7 +2753,7 @@ public:
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                isFailable, isIUO, isImplicit,
                                                isObjC, hasStubImplementation,
-                                               throws, storedInitKind,
+                                               async, throws, storedInitKind,
                                                genericSigID,
                                                overriddenID,
                                                rawAccessLevel,
@@ -2808,6 +2808,8 @@ public:
 
     auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
                                                /*FailabilityLoc=*/SourceLoc(),
+                                               /*Async=*/async,
+                                               /*AsyncLoc=*/SourceLoc(),
                                                /*Throws=*/throws,
                                                /*ThrowsLoc=*/SourceLoc(),
                                                /*BodyParams=*/nullptr,

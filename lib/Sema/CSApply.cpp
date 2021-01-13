@@ -141,9 +141,11 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   if (isa<ConstructorDecl>(oldDecl)) {
     DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
     auto newCtorDecl = ConstructorDecl::createImported(
-        ctx, specialized, ctorName, oldDecl->getLoc(), /*failable=*/false,
-        /*failabilityLoc=*/SourceLoc(), /*throws=*/false,
-        /*throwsLoc=*/SourceLoc(), newParamList, /*genericParams=*/nullptr,
+        ctx, specialized, ctorName, oldDecl->getLoc(), 
+        /*failable=*/false, /*failabilityLoc=*/SourceLoc(),
+        /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+        /*throws=*/false, /*throwsLoc=*/SourceLoc(), 
+        newParamList, /*genericParams=*/nullptr,
         oldDecl->getDeclContext());
     return ConcreteDeclRef(newCtorDecl);
   }

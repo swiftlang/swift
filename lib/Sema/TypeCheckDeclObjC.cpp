@@ -682,7 +682,7 @@ bool swift::isRepresentableInObjC(
     // information into a completion handler.
     auto FD = dyn_cast<FuncDecl>(AFD);
     if (!FD) {
-      AFD->diagnose(diag::not_objc_function_async)
+      AFD->diagnose(diag::not_objc_function_async, AFD->getDescriptiveKind())
         .highlight(AFD->getAsyncLoc())
         .limitBehavior(behavior);
       describeObjCReason(AFD, Reason);
