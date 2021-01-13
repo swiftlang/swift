@@ -786,4 +786,8 @@ def experimental_allow_module_with_compiler_errors:
   Flags<[HelpHidden]>,
   HelpText<"Attempt to output .swiftmodule, regardless of compilation errors">;
 
+def bad_file_descriptor_retry_count:
+  Separate<["-"], "bad-file-descriptor-retry-count">,
+  HelpText<"Number of retrying opening a file if previous open returns a bad "
+           "file descriptor error.">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

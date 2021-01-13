@@ -89,6 +89,16 @@ bool ArgsToFrontendOptionsConverter::convert(
         IntermoduleDepTrackingMode::IncludeSystem;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_bad_file_descriptor_retry_count)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    Opts.BadFileDescriptorRetryCount = limit;
+  }
+
   Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);

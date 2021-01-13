@@ -668,8 +668,13 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
-                                                          input.getFileName());
+  FileOrError inputFileOrErr =
+    swift::vfs::getFileOrSTDIN(getFileSystem(), input.getFileName(),
+                              /*FileSize*/-1,
+                              /*RequiresNullTerminator*/true,
+                              /*IsVolatile*/false,
+      /*Bad File Descriptor Retry*/getInvocation().getFrontendOptions()
+                               .BadFileDescriptorRetryCount);
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                          input.getFileName(),
