@@ -288,11 +288,8 @@ where
   static func _vjpMinimum(_ x: Self, _ y: Self) -> (
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
-    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
-      if x <= y || y.isNaN { return (v, .zero) }
-      return (.zero, v)
-    }
-    return (value: Self.minimum(x, y), pullback: pullback)
+    if x <= y || y.isNaN { return (x, { v in (v, .zero) }) }
+    return (y, { v in (.zero, v) })
   }
 
   @inlinable
@@ -300,10 +297,7 @@ where
   static func _vjpMaximum(_ x: Self, _ y: Self) -> (
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
-    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
-      if x > y || y.isNaN { return (v, .zero) }
-      return (.zero, v)
-    }
-    return (value: Self.maximum(x, y), pullback: pullback)
+    if x > y || y.isNaN { return (x, { v in (v, .zero) }) }
+    return (y, { v in (.zero, v) })
   }
 }
