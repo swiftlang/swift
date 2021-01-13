@@ -75,14 +75,14 @@ namespace decl_locs_block {
     SOURCE_FILE_LIST,
   };
 
+  using SourceFileListLayout = BCRecordLayout<
+    SOURCE_FILE_LIST, // record ID
+    BCBlob            // An array of fixed size 'BasicSourceFileInfo' data.
+  >;
+
   using BasicDeclLocsLayout = BCRecordLayout<
     BASIC_DECL_LOCS, // record ID
     BCBlob           // an array of fixed size location data
-  >;
-
-  using SourceFileListLayout = BCRecordLayout<
-    SOURCE_FILE_LIST, // record ID
-    BCBlob            // An array of string offsets in TextDataLayout
   >;
 
   using DeclUSRSLayout = BCRecordLayout<

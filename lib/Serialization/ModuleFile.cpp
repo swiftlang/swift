@@ -968,11 +968,15 @@ void ModuleFile::collectBasicSourceFileInfo(
   auto *Cursor = Core->SourceFileListData.bytes_begin();
   auto *End = Core->SourceFileListData.bytes_end();
   while (Cursor < End) {
+    // FilePath (byte offset in 'SourceLocsTextData').
     auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
+    // InterfaceHash (fixed length string).
     auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
                            Fingerprint::DIGEST_LENGTH};
     Cursor += Fingerprint::DIGEST_LENGTH;
+    // LastModified (seconds since epoch).
     auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    // FileSize (num of bytes).
     auto fileSize = endian::readNext<uint64_t, little, unaligned>(Cursor);
 
     assert(fileID < Core->SourceLocsTextData.size());
