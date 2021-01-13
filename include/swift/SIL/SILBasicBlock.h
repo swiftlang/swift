@@ -314,6 +314,10 @@ public:
   const_succblock_iterator succblock_end() const {
     return getTerminator()->succblock_end();
   }
+  
+  unsigned getNumSuccessors() const {
+    return getTerminator()->getNumSuccessors();
+  }
 
   SILBasicBlock *getSingleSuccessorBlock() {
     return getTerminator()->getSingleSuccessorBlock();
