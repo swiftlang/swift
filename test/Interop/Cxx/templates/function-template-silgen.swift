@@ -13,12 +13,12 @@ import FunctionTemplates
 // CHECK:   [[PASS_THROUGH_FN:%.*]] = function_ref @{{_Z11passThroughIiET_S0_|\?\?\$passThrough@H@@YAHH@Z}} : $@convention(c) (Int32) -> Int32
 // CHECK:   [[B:%.*]] = apply [[PASS_THROUGH_FN]](%0) : $@convention(c) (Int32) -> Int32
 
-// CHECK:   [[ADD_TWO_FN:%.*]] = function_ref @{{_Z15addTwoTemplatesIiiET_S0_T0_|\?\?\$addTwoTemplates@HH@@YAHHH@Z}} : $@convention(c) (Int32, Int32) -> Int32
+// CHECK:   [[ADD_TWO_FN:%.*]] = function_ref @{{_Z18addMixedTypeParamsIiiET_S0_T0_|\?\?\$addMixedTypeParams@HH@@YAHHH@Z}} : $@convention(c) (Int32, Int32) -> Int32
 // CHECK:   [[C:%.*]] = apply [[ADD_TWO_FN]]([[A]], [[B]]) : $@convention(c) (Int32, Int32) -> Int32
 
 // CHECK:   [[C_32_ADDR:%.*]] = alloc_stack $Int32
 // CHECK:   [[C_32:%.*]] = load [[C_32_ADDR]] : $*Int32
-// CHECK:   [[ADD_FN:%.*]] = function_ref @{{_Z3addIiET_S0_S0_|\?\?\$add@H@@YAHHH@Z}} : $@convention(c) (Int32, Int32) -> Int32
+// CHECK:   [[ADD_FN:%.*]] = function_ref @{{_Z17addSameTypeParamsIiET_S0_S0_|\?\?\$addSameTypeParams@H@@YAHHH@Z}} : $@convention(c) (Int32, Int32) -> Int32
 // CHECK:   [[OUT:%.*]] = apply [[ADD_FN]]([[B]], [[C_32]]) : $@convention(c) (Int32, Int32) -> Int32
 // CHECK:   return [[OUT]] : $Int32
 
@@ -26,6 +26,6 @@ import FunctionTemplates
 public func test(x: Int32) -> Int32 {
   let a = passThroughConst(Int32(0))
   let b = passThrough(x)
-  let c = addTwoTemplates(a, b)
-  return add(b, Int32(c))
+  let c = addMixedTypeParams(a, b)
+  return addSameTypeParams(b, Int32(c))
 }

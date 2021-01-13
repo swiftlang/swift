@@ -228,7 +228,7 @@ public:
                                  SubstitutionMap subst) = 0;
 };
 
-/// Used to describe a template instantiation error.
+/// Describes a C++ template instantiation error.
 struct TemplateInstantiationError {
   /// Generic types that could not be converted to QualTypes using the
   /// ClangTypeConverter.
