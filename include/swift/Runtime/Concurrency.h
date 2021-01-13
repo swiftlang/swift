@@ -349,6 +349,11 @@ void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
 extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);
 
+/// Drain the queue
+/// If the binary links CoreFoundation, uses CFRunLoopRun
+/// Otherwise it uses dispatchMain.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueue();
 }
 
 #endif

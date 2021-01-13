@@ -1936,7 +1936,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   Expr *returnedExpr;
 
   if (mainFunction->hasAsync()) {
-    // Pass main into _runAsyncMain(_ asyncFunc: () async -> ())
+    // Pass main into _runAsyncMain(_ asyncFunc: () async throws -> ())
     // Resulting $main looks like:
     // $main() { _runAsyncMain(main) }
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);

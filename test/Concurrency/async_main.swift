@@ -21,7 +21,7 @@ func asyncFunc() async { }
 // CHECK-AST-NEXT:    (return_stmt implicit
 // CHECK-AST-NEXT:      (call_expr implicit type='()'
 // CHECK-AST-NEXT:        (declref_expr implicit
-// CHECK-AST-SAME:             type='(() async throws -> ()) -> ()'
+// CHECK-AST-SAME:             type='(@escaping () async throws -> ()) -> ()'
 // CHECK-AST-SAME:             decl=_Concurrency.(file)._runAsyncMain
 // CHECK-AST-SAME:             function_ref=single
 // CHECK-AST-NEXT:        (paren_expr implicit type='(() async throws -> ())'

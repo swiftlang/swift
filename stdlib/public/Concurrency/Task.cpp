@@ -22,6 +22,10 @@
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
 
+#include <dispatch/dispatch.h>
+
+#include <dlfcn.h>
+
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using GroupFragment = AsyncTask::GroupFragment;
@@ -527,4 +531,13 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
+}
+
+void swift::swift_task_asyncMainDrainQueue() {
+  auto runLoop =
+      reinterpret_cast<void (*)(void)>(dlsym(RTLD_SELF, "CFRunLoopRun"));
+  if (runLoop)
+    runLoop();
+  else
+    dispatch_main();
 }
