@@ -69,7 +69,12 @@ template <> struct ScalarTraits<swift::Fingerprint> {
     os << fp.getRawValue();
   }
   static StringRef input(StringRef s, void *, swift::Fingerprint &fp) {
-    fp = swift::Fingerprint::fromString(s);
+    if (auto convertedFP = swift::Fingerprint::fromString(s))
+      fp = convertedFP.getValue();
+    else {
+      llvm::errs() << "Failed to convert fingerprint '" << s << "'\n";
+      exit(1);
+    }
     return StringRef();
   }
   static QuotingType mustQuote(StringRef S) { return needsQuotes(S); }

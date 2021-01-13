@@ -71,22 +71,12 @@ public:
   explicit Fingerprint(Fingerprint::Core value) : core(value) {}
 
   /// Creates a fingerprint value from the given input string that is known to
-  /// be a 32-byte hash value.
+  /// be a 32-byte hash value, i.e. that represent a valid 32-bit hex integer.
   ///
-  /// In +asserts builds, strings that violate this invariant will crash. If a
-  /// fingerprint value is needed to represent an "invalid" state, use a
-  /// vocabulary type like \c Optional<Fingerprint> instead.
-  static Fingerprint fromString(llvm::StringRef value);
+  /// Strings that violate this invariant will return a null optional.
+  static llvm::Optional<Fingerprint> fromString(llvm::StringRef value);
 
-  /// Creates a fingerprint value from the given input string literal.
-  template <std::size_t N>
-  explicit Fingerprint(const char (&literal)[N])
-    : Fingerprint{Fingerprint::fromString({literal, N-1}).core} {
-      static_assert(N == Fingerprint::DIGEST_LENGTH + 1,
-                    "String literal must be 32 bytes in length!");
-    }
-
-  /// Creates a fingerprint value by consuming the given \c MD5Result from LLVM.
+ /// Creates a fingerprint value by consuming the given \c MD5Result from LLVM.
   explicit Fingerprint(llvm::MD5::MD5Result &&MD5Value)
       : core{MD5Value.words()} {}
 
