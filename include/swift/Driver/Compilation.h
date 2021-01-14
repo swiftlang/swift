@@ -102,53 +102,6 @@ public:
     }
   };
 
-  class IncrementalSchemeComparator {
-    const bool EnableIncrementalBuildWhenConstructed;
-    const bool &EnableIncrementalBuild;
-    const bool EnableSourceRangeDependencies;
-
-    /// If not empty, the path to use to log the comparison.
-    const StringRef CompareIncrementalSchemesPath;
-
-    const unsigned SwiftInputCount;
-
-  public:
-    std::string WhyIncrementalWasDisabled = "";
-
-  private:
-    DiagnosticEngine &Diags;
-
-    CommandSet JobsWithoutRanges;
-    CommandSet JobsWithRanges;
-
-    unsigned CompileStagesWithoutRanges = 0;
-    unsigned CompileStagesWithRanges = 0;
-
-  public:
-    IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
-                                bool EnableSourceRangeDependencies,
-                                const StringRef CompareIncrementalSchemesPath,
-                                unsigned SwiftInputCount,
-                                DiagnosticEngine &Diags)
-        : EnableIncrementalBuildWhenConstructed(EnableIncrementalBuild),
-          EnableIncrementalBuild(EnableIncrementalBuild),
-          EnableSourceRangeDependencies(EnableSourceRangeDependencies),
-          CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
-          SwiftInputCount(SwiftInputCount), Diags(Diags) {}
-
-    /// Record scheduled jobs in support of the
-    /// -compare-incremental-schemes[-path] options
-    void update(const CommandSet &withoutRangeJobs,
-                const CommandSet &withRangeJobs);
-
-    /// Write the information for the -compare-incremental-schemes[-path]
-    /// options
-    void outputComparison() const;
-
-  private:
-    void outputComparison(llvm::raw_ostream &) const;
-  };
-
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -311,10 +264,6 @@ private:
 
   /// (experimental) Enable cross-module incremental build scheduling.
   const bool EnableCrossModuleIncrementalBuild;
-
-public:
-  /// Will contain a comparator if an argument demands it.
-  Optional<IncrementalSchemeComparator> IncrementalComparator;
 
 private:
   template <typename T>

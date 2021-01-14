@@ -2287,67 +2287,6 @@ void Compilation::disableIncrementalBuild(Twine why) {
     IncrementalComparator->WhyIncrementalWasDisabled = why.str();
 }
 
-void Compilation::IncrementalSchemeComparator::update(
-    const CommandSet &jobsWithoutRanges, const CommandSet &jobsWithRanges) {
-  for (const auto *cmd : jobsWithoutRanges)
-    JobsWithoutRanges.insert(cmd);
-  for (const auto *cmd : jobsWithRanges)
-    JobsWithRanges.insert(cmd);
-
-  if (!jobsWithoutRanges.empty())
-    ++CompileStagesWithoutRanges;
-  if (!jobsWithRanges.empty())
-    ++CompileStagesWithRanges;
-}
-
-void Compilation::IncrementalSchemeComparator::outputComparison() const {
-  if (CompareIncrementalSchemesPath.empty()) {
-    outputComparison(llvm::outs());
-    return;
-  }
-
-  std::error_code EC;
-  using namespace llvm::sys::fs;
-  llvm::raw_fd_ostream OS(CompareIncrementalSchemesPath, EC, CD_OpenAlways,
-                          FA_Write, OF_Append | OF_Text);
-
-  if (EC) {
-    Diags.diagnose(SourceLoc(), diag::unable_to_open_incremental_comparison_log,
-                   CompareIncrementalSchemesPath);
-    return;
-  }
-  outputComparison(OS);
-}
-
-void Compilation::IncrementalSchemeComparator::outputComparison(
-    llvm::raw_ostream &out) const {
-  if (!EnableIncrementalBuildWhenConstructed) {
-    out << "*** Incremental build was not enabled in the command line ***\n";
-    return;
-  }
-  if (!EnableIncrementalBuild) {
-    // No stats will have been gathered
-    assert(!WhyIncrementalWasDisabled.empty() && "Must be a reason");
-    out << "*** Incremental build disabled because "
-        << WhyIncrementalWasDisabled << ", cannot compare ***\n";
-    return;
-  }
-  unsigned countWithoutRanges = JobsWithoutRanges.size();
-  unsigned countWithRanges = JobsWithRanges.size();
-
-  const int rangeBenefit = countWithoutRanges - countWithRanges;
-  const int rangeStageBenefit =
-      CompileStagesWithoutRanges - CompileStagesWithRanges;
-
-  out << "*** "
-      << "Range benefit: " << rangeBenefit << " compilations, "
-      << rangeStageBenefit << " stages, "
-      << "without ranges: " << countWithoutRanges << ", "
-      << "with ranges: " << countWithRanges << ", "
-      << (EnableSourceRangeDependencies ? "used" : "did not use") << " ranges, "
-      << "total: " << SwiftInputCount << " ***\n";
-}
-
 unsigned Compilation::countSwiftInputs() const {
   unsigned inputCount = 0;
   for (const auto &p : InputFilesWithTypes)
