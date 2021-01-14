@@ -155,14 +155,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitFineGrainedDependencyDotFileAfterEveryImport),
     EnableSourceRangeDependencies(EnableSourceRangeDependencies),
     EnableCrossModuleIncrementalBuild(EnableCrossModuleIncrementalBuild)
-    {
-    if (CompareIncrementalSchemes)
-      IncrementalComparator.emplace(
-      // Ensure the references are to inst vars, NOT arguments
-      this->EnableIncrementalBuild,
-      EnableSourceRangeDependencies,
-      CompareIncrementalSchemesPath, countSwiftInputs(), getDiags());
-};
+    { };
 // clang-format on
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -307,32 +300,16 @@ namespace driver {
     DriverTimers;
 
     void noteBuilding(const Job *cmd, const bool willBeBuilding,
-                      const bool isTentative, const bool forRanges,
-                      StringRef reason) const {
+                      const bool isTentative, StringRef reason) const {
       if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
         return;
-      if (!Comp.getEnableSourceRangeDependencies() &&
-          !Comp.IncrementalComparator && !willBeBuilding)
-        return; // preserve legacy behavior
-      const bool isHypothetical =
-          Comp.getEnableSourceRangeDependencies() != forRanges;
-      llvm::outs() << (isHypothetical ? "Hypothetically: " : "")
-                   << (isTentative ? "(tentatively) " : "")
-                   << (willBeBuilding ? "Queuing " : "Skipping ")
-                   << (forRanges ? "<With ranges> "
-                                 : Comp.getEnableSourceRangeDependencies()
-                                       ? "<Without ranges> "
-                                       : "")
-                   << reason << ": " << LogJob(cmd) << "\n";
-
-      getFineGrainedDepGraph(forRanges).printPath(llvm::outs(), cmd);
     }
 
     template <typename JobsCollection>
     void noteBuildingJobs(const JobsCollection &unsortedJobsArg,
-                          const bool forRanges, const StringRef reason) const {
+                          const StringRef reason) const {
       if (!Comp.getShowIncrementalBuildDecisions() &&
           !Comp.getShowJobLifecycle())
         return;
@@ -343,8 +320,7 @@ namespace driver {
       llvm::SmallVector<const Job *, 16> sortedJobs;
       Comp.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
       for (const Job *j : sortedJobs)
-        noteBuilding(j, /*willBeBuilding=*/true, /*isTentative=*/false,
-                     forRanges, reason);
+        noteBuilding(j, /*willBeBuilding=*/true, /*isTentative=*/false, reason);
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
@@ -707,39 +683,9 @@ namespace driver {
         return unpackAndFinishBatch(ReturnCode, Output, Errors,
                                     static_cast<const BatchJob *>(FinishedCmd));
       }
-      const bool useRangesForScheduling =
-          Comp.getEnableSourceRangeDependencies();
-      const bool isComparing = Comp.IncrementalComparator.hasValue();
 
-      CommandSet DependentsWithoutRanges, DependentsWithRanges;
-      if (useRangesForScheduling || isComparing)
-        DependentsWithRanges =
-            subsequentJobsNeeded(FinishedCmd, ReturnCode, /*forRanges=*/true);
-      if (!useRangesForScheduling || isComparing)
-        DependentsWithoutRanges =
+      CommandSet DependentsInEffect =
             subsequentJobsNeeded(FinishedCmd, ReturnCode, /*forRanges=*/false);
-
-      if (isComparing)
-        Comp.IncrementalComparator->update(DependentsWithoutRanges,
-                                           DependentsWithRanges);
-
-      if (Comp.getShowIncrementalBuildDecisions() && isComparing &&
-          useRangesForScheduling &&
-          (!DependentsWithoutRanges.empty() || !DependentsWithRanges.empty())) {
-        llvm::outs() << "\nAfter completion of " << LogJob(FinishedCmd)
-                     << ": \n";
-        for (auto const *Cmd : DependentsWithoutRanges)
-          llvm::outs() << "- Dependencies would now schedule: " << LogJob(Cmd)
-                       << "\n";
-        for (auto const *Cmd : DependentsWithRanges)
-          llvm::outs() << "- Source ranges will now schedule: " << LogJob(Cmd)
-                       << "\n";
-        if (DependentsWithoutRanges.size() > 1 ||
-            DependentsWithRanges.size() > 1)
-          llvm::outs() << "For an additional " << DependentsWithoutRanges.size()
-                       << " (deps) vs " << DependentsWithRanges.size()
-                       << " (ranges)\n";
-      }
 
       if (ReturnCode != EXIT_SUCCESS)
         return taskFailed(FinishedCmd, ReturnCode);
@@ -747,10 +693,6 @@ namespace driver {
       // When a task finishes, we need to reevaluate the other commands that
       // might have been blocked.
       markFinished(FinishedCmd);
-
-      const CommandSet &DependentsInEffect = useRangesForScheduling
-                                                 ? DependentsWithRanges
-                                                 : DependentsWithoutRanges;
 
       noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
                        "because of dependencies discovered later");
@@ -949,22 +891,7 @@ namespace driver {
     /// Figure out the best strategy and return those jobs. May return
     /// duplicates.
     CommandSet computeFirstRoundCompileJobsForIncrementalCompilation() {
-      const bool useRangesForScheduling =
-          Comp.getEnableSourceRangeDependencies();
-      const bool isComparing = Comp.IncrementalComparator.hasValue();
-
-      CommandSet jobsWithRanges, jobsWithoutRanges;
-      if (useRangesForScheduling || isComparing)
-        jobsWithRanges =
-            computeDependenciesAndGetNeededCompileJobs(/*useRanges=*/true);
-      if (!useRangesForScheduling || isComparing)
-        jobsWithoutRanges =
-            computeDependenciesAndGetNeededCompileJobs(/*useRanges=*/false);
-
-      if (isComparing)
-        Comp.IncrementalComparator->update(jobsWithoutRanges, jobsWithRanges);
-
-      return useRangesForScheduling ? jobsWithRanges : jobsWithoutRanges;
+      return computeDependenciesAndGetNeededCompileJobs(/*useRanges=*/false);
     }
 
     /// Return jobs to run if using dependencies, may include duplicates.
@@ -2243,9 +2170,6 @@ Compilation::Result Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
 
   auto result = performJobsImpl(std::move(TQ));
 
-  if (IncrementalComparator)
-    IncrementalComparator->outputComparison();
-
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
       if (!result.hadAbnormalExit || pathPair.getValue() == PreserveOnSignal::No)
@@ -2283,8 +2207,6 @@ void Compilation::disableIncrementalBuild(Twine why) {
     llvm::outs() << "Disabling incremental build: " << why << "\n";
 
   EnableIncrementalBuild = false;
-  if (IncrementalComparator)
-    IncrementalComparator->WhyIncrementalWasDisabled = why.str();
 }
 
 unsigned Compilation::countSwiftInputs() const {
