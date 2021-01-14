@@ -4969,7 +4969,18 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);
   auto subs = declRef.getSubstitutions();
-
+  bool throws;
+  bool markedAsRethrows = call->getAttrs().hasAttribute<swift::RethrowsAttr>();
+  FunctionRethrowingKind rethrowingKind = call->getRethrowingKind();
+  if (rethrowingKind == FunctionRethrowingKind::ByConformance) {
+    throws = call->getModuleContext()->classifyWitnessAsThrows(subs);  
+  } else if (markedAsRethrows && 
+             rethrowingKind == FunctionRethrowingKind::Throws) {
+    throws = true;
+  } else {
+    throws = false;
+  }
+  
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5002,7 +5013,7 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   // Form the call emission.
   CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
   emission.addSelfParam(loc, std::move(self), substFormalType.getParams()[0]);
-  emission.addCallSite(loc, std::move(args), /*throws*/ false);
+  emission.addCallSite(loc, std::move(args), throws);
 
   return emission.apply(C);
 }

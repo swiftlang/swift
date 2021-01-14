@@ -274,6 +274,8 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
+    } else if (auto forEach = dyn_cast<ForEachStmt>(S)) {
+      recurse = asImpl().checkForEach(forEach);
     }
     return {bool(recurse), S};
   }
@@ -286,6 +288,10 @@ public:
       asImpl().checkCatch(clause, bodyResult);
     }
     return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkForEach(ForEachStmt *S) {
+    return ShouldRecurse;
   }
 };
 
@@ -2081,6 +2087,16 @@ private:
 
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkForEach(ForEachStmt *S) {
+    if (S->getTryLoc().isValid() && 
+        !Flags.has(ContextFlags::IsTryCovered)) {
+      checkThrowAsyncSite(S, /*requiresTry*/ false,
+                        Classification::forThrow(PotentialThrowReason::forThrow(),
+                                                 /*async*/false));
+    }
+    return ShouldRecurse;
   }
 };
 

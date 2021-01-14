@@ -979,12 +979,12 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
         SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
     SILLocation loc = SILLocation(S->getSequence());
 
-    // Compute the reference to the AsyncSequence's makeGenerator().
+    // Compute the reference to the AsyncSequence's makeAsyncSequence().
     FuncDecl *makeGeneratorReq = 
       SGF.getASTContext().getAsyncSequenceMakeAsyncIterator();
     ConcreteDeclRef makeGeneratorRef(makeGeneratorReq, sequenceSubs);
 
-    // Call makeGenerator().
+    // Call makeAsyncSequence().
     RValue result = SGF.emitApplyMethod(
         loc, makeGeneratorRef, ArgumentSource(S->getSequence()),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
@@ -1182,10 +1182,7 @@ void StmtEmitter::visitAsyncForEachStmt(ForEachStmt *S) {
       createBasicBlock(), failExitingBlock,
       [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
-        // cancelCleanup.setState(SGF, CleanupState::Dormant);
-
         SGF.Cleanups.forwardCleanup(cancelCleanup);
-
         scope.exitAndBranch(S);
       },
       SGF.loadProfilerCount(S));
