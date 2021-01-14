@@ -600,6 +600,7 @@ public:
   enum NotRecommendedReason {
     Redundant,
     Deprecated,
+    InvalidContext,
     NoReason,
   };
 

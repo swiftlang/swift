@@ -319,28 +319,6 @@ SILFunction *Operand::getParentFunction() const {
   return self->getUser()->getFunction();
 }
 
-/// Return true if this use can accept Unowned values.
-static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
-  switch (operandOwnership) {
-  case OperandOwnership::NonUse:
-  case OperandOwnership::UnownedInstantaneousUse:
-  case OperandOwnership::ForwardingUnowned:
-  case OperandOwnership::PointerEscape:
-  case OperandOwnership::BitwiseEscape:
-    return true;
-  case OperandOwnership::TrivialUse:
-  case OperandOwnership::InstantaneousUse:
-  case OperandOwnership::Borrow:
-  case OperandOwnership::DestroyingConsume:
-  case OperandOwnership::ForwardingConsume:
-  case OperandOwnership::InteriorPointer:
-  case OperandOwnership::ForwardingBorrow:
-  case OperandOwnership::EndBorrow:
-  case OperandOwnership::Reborrow:
-    return false;
-  }
-}
-
 bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
   auto operandOwnership = getOperandOwnership();
   auto constraint = operandOwnership.getOwnershipConstraint();
