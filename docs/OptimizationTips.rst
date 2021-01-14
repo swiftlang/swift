@@ -263,6 +263,7 @@ end of the callee. This means that if one writes a function like the following:
 ::
 
   func append_one(_ a: [Int]) -> [Int] {
+    var a = a
     a.append(1)
     return a
   }
