@@ -4907,8 +4907,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
       expression.propertyWrapper.hasInitialWrappedValue = true;
     }
     // Form init(wrappedValue:) call(s).
-    Expr *wrappedInitializer = buildPropertyWrapperWrappedValueCall(
-        singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false,
+    Expr *wrappedInitializer = buildPropertyWrapperInitCall(
+        singleVar, Type(), initializer, PropertyWrapperInitKind::WrappedValue,
         [&](ApplyExpr *innermostInit) {
           expression.propertyWrapper.innermostWrappedValueInit = innermostInit;
         });

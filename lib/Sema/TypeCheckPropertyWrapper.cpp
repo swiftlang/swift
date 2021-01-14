@@ -25,17 +25,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 using namespace swift;
 
-/// The kind of property initializer to look for
-enum class PropertyWrapperInitKind {
-  /// An initial-value initializer (i.e. `init(initialValue:)`), which is
-  /// deprecated.
-  InitialValue,
-  /// An wrapped-value initializer (i.e. `init(wrappedValue:)`)
-  WrappedValue,
-  /// An default-value initializer (i.e. `init()` or `init(defaultArgs...)`)
-  Default
-};
-
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
                                           NominalTypeDecl *parent) {
   return decl->getFormalAccess() <
@@ -120,6 +109,9 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
   case PropertyWrapperInitKind::WrappedValue:
     argumentLabel = ctx.Id_wrappedValue;
     break;
+  case PropertyWrapperInitKind::ProjectedValue:
+    argumentLabel = ctx.Id_projectedValue;
+    break;
   case PropertyWrapperInitKind::Default:
     break;
   }
@@ -176,7 +168,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     }
 
     // Additional checks for initial-value and wrapped-value initializers
-    if (initKind != PropertyWrapperInitKind::Default) {
+    if (initKind == PropertyWrapperInitKind::WrappedValue ||
+        initKind == PropertyWrapperInitKind::InitialValue) {
       auto paramType = argumentParam->getInterfaceType();
       if (paramType->is<ErrorType>())
         continue;
@@ -588,8 +581,9 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
   return wrappedValueType;
 }
 
-Expr *swift::buildPropertyWrapperWrappedValueCall(
-    const VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+Expr *swift::buildPropertyWrapperInitCall(
+    const VarDecl *var, Type backingStorageType, Expr *value,
+    PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
@@ -617,17 +611,22 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     // If there were no arguments provided for the attribute at this level,
     // call `init(wrappedValue:)` directly.
     auto attr = wrapperAttrs[i];
-    if (!attr->getArg() || ignoreAttributeArgs) {
+    if (!attr->getArg()) {
       Identifier argName;
-      switch (var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
-      case PropertyWrapperTypeInfo::HasInitialValueInit:
-        argName = ctx.Id_initialValue;
-        break;
+      if (initKind == PropertyWrapperInitKind::ProjectedValue) {
+        argName = ctx.Id_projectedValue;
+      } else {
+        assert(initKind == PropertyWrapperInitKind::WrappedValue);
+        switch (var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
+        case PropertyWrapperTypeInfo::HasInitialValueInit:
+          argName = ctx.Id_initialValue;
+          break;
 
-      case PropertyWrapperTypeInfo::HasWrappedValueInit:
-      case PropertyWrapperTypeInfo::NoWrappedValueInit:
-        argName = ctx.Id_wrappedValue;
-        break;
+        case PropertyWrapperTypeInfo::HasWrappedValueInit:
+        case PropertyWrapperTypeInfo::NoWrappedValueInit:
+          argName = ctx.Id_wrappedValue;
+          break;
+        }
       }
 
       auto endLoc = initializer->getEndLoc();

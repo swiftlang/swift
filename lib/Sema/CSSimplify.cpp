@@ -289,10 +289,13 @@ static bool matchCallArgumentsImpl(
     assert(argNumber != numArgs && "Must have a valid index to claim");
     assert(!claimedArgs[argNumber] && "Argument already claimed");
 
+    auto argLabel = args[argNumber].getLabel();
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (args[argNumber].getLabel() != expectedName && !ignoreNameClash) {
+    } else if (argLabel != expectedName && !ignoreNameClash &&
+               !(argLabel.str().startswith("$") &&
+                 argLabel.str().drop_front() == expectedName.str())) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -340,7 +343,9 @@ static bool matchCallArgumentsImpl(
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       auto argLabel = args[i].getLabel();
 
-      if (argLabel != paramLabel) {
+      if (argLabel != paramLabel &&
+          !(argLabel.str().startswith("$") &&
+            argLabel.str().drop_front() == paramLabel.str())) {
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
@@ -1417,8 +1422,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
       if (auto *param = paramInfo.getPropertyWrapperParam(argIdx)) {
         return cs.matchPropertyWrapperArgument(
-            /*wrapperType=*/paramTy, /*wrappedValueType=*/argTy, param,
-            subKind, loc);
+            /*wrapperType=*/paramTy, /*argumentType=*/argTy, param,
+            argInfo->Labels[argIdx], subKind, loc);
       }
 
       // If argument comes for declaration it should loose
@@ -1443,9 +1448,10 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 }
 
 ConstraintSystem::TypeMatchResult
-ConstraintSystem::matchPropertyWrapperArgument(Type wrapperType, Type wrappedValueArgumentType,
-                                               const ParamDecl *param, ConstraintKind matchKind,
-                                               ConstraintLocatorBuilder locator) {
+ConstraintSystem::matchPropertyWrapperArgument(
+    Type wrapperType, Type argumentType, const ParamDecl *param,
+    Identifier argLabel, ConstraintKind matchKind,
+    ConstraintLocatorBuilder locator) {
   auto anchor = simplifyLocatorToAnchor(getConstraintLocator(locator));
   if (!anchor)
     return getTypeMatchFailure(locator);
@@ -1454,9 +1460,17 @@ ConstraintSystem::matchPropertyWrapperArgument(Type wrapperType, Type wrappedVal
   // argument expression again.
   auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
       getASTContext(), param->getSourceRange(), Type(), /*wrappedValue=*/nullptr);
-  setType(placeholder, wrappedValueArgumentType);
-  auto initializer = buildPropertyWrapperWrappedValueCall(param, wrapperType, placeholder,
-                                                          /*ignoreAttributeArgs=*/false);
+  setType(placeholder, argumentType);
+
+  PropertyWrapperInitKind initKind;
+  if (!argLabel.empty() && argLabel.str().startswith("$")) {
+    initKind = PropertyWrapperInitKind::ProjectedValue;
+  } else {
+    initKind = PropertyWrapperInitKind::WrappedValue;
+  }
+
+  auto initializer = buildPropertyWrapperInitCall(
+      param, wrapperType, placeholder, initKind);
   auto *arg = getAsExpr(anchor);
   appliedPropertyWrappers[arg] = initializer;
 

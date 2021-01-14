@@ -4647,7 +4647,8 @@ public:
   /// expression.
   TypeMatchResult matchPropertyWrapperArgument(
       Type wrapperType, Type wrappedValueArgumentType, const ParamDecl *param,
-      ConstraintKind matchKind, ConstraintLocatorBuilder locator);
+      Identifier argLabel, ConstraintKind matchKind,
+      ConstraintLocatorBuilder locator);
 
   Optional<BindingSet> determineBestBindings();
 

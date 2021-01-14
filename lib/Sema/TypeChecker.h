@@ -26,6 +26,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
@@ -1248,12 +1249,15 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
 
-/// Build a call to the init(wrappedValue:) initializers of the property
-/// wrappers, filling in the given \c value as the original value. Optionally
-/// pass a callback that will get invoked with the innermost init(wrappedValue:)
-/// call.
-Expr *buildPropertyWrapperWrappedValueCall(
-    const VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+/// Build a call to the init(wrappedValue:) or init(projectedValue:)
+/// initializer of the property wrapper, filling in the given \c value
+/// as the wrapped or projected value argument.
+///
+/// Optionally pass a callback that will get invoked with the innermost init
+/// apply expression.
+Expr *buildPropertyWrapperInitCall(
+    const VarDecl *var, Type backingStorageType, Expr *value,
+    PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
 
 /// Whether an overriding declaration requires the 'override' keyword.

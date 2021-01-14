@@ -29,6 +29,19 @@ class Expr;
 class VarDecl;
 class OpaqueValueExpr;
 
+/// The kind of property initializer to look for
+enum class PropertyWrapperInitKind {
+  /// An initial-value initializer (i.e. `init(initialValue:)`), which is
+  /// deprecated.
+  InitialValue,
+  /// An wrapped-value initializer (i.e. `init(wrappedValue:)`)
+  WrappedValue,
+  /// A projected-value initializer (i.e. `init(projectedValue:)`)
+  ProjectedValue,
+  /// An default-value initializer (i.e. `init()` or `init(defaultArgs...)`)
+  Default
+};
+
 /// Describes a property wrapper type.
 struct PropertyWrapperTypeInfo {
   /// The property through which access that uses this wrapper type is
