@@ -803,7 +803,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Consequently, OperandOwnership kinds that are allowed to take either Owned
 /// or Guaranteed values map to an OwnershipKind::Any constraint.
 ///
-/// Unowned values are more restricted than then Owned or Guaranteed values in
+/// Unowned values are more restricted than Owned or Guaranteed values in
 /// terms of their valid uses, which helps limit the situations where the
 /// implementation needs to consider this special case. This additional
 /// restriction is validated by `canAcceptUnownedValue`.
