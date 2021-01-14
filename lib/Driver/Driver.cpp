@@ -2356,7 +2356,7 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
 
   // TODO: perform some preflight checks to ensure the file exists.
   llvm::Expected<OutputFileMap> OFM = OutputFileMap::loadFromPath(
-      A->getValue(), workingDirectory, addEntriesForSourceFileDependencies);
+      A->getValue(), workingDirectory);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
                    llvm::toString(std::move(Err)), A->getValue());

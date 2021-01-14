@@ -686,7 +686,7 @@ namespace driver {
       // might have been blocked.
       markFinished(FinishedCmd);
 
-      noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
+      noteBuildingJobs(DependentsInEffect,
                        "because of dependencies discovered later");
 
       scheduleCommandsInSortedOrder(DependentsInEffect);
@@ -875,7 +875,7 @@ namespace driver {
     /// Figure out the best strategy and return those jobs. May return
     /// duplicates.
     CommandSet computeFirstRoundCompileJobsForIncrementalCompilation() {
-      return computeDependenciesAndGetNeededCompileJobs(/*useRanges=*/false);
+      return computeDependenciesAndGetNeededCompileJobs();
     }
 
     /// Return jobs to run if using dependencies, may include duplicates.
