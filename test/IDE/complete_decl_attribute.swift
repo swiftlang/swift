@@ -287,6 +287,7 @@ func dummy2() {}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       inlinable[#Declaration Attribute#]; name=inlinable{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       rethrows[#Declaration Attribute#]; name=rethrows{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
