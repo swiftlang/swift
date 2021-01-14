@@ -448,7 +448,7 @@ void PotentialBindings::finalize(
       // func foo<T: P>(_: T) {}
       // foo(.bar) <- `.bar` should be a static member of `P`.
       // \endcode
-      if (Bindings.empty() && TransitiveProtocols.hasValue()) {
+      if (!hasViableBindings() && TransitiveProtocols.hasValue()) {
         for (auto *constraint : *TransitiveProtocols) {
           auto protocolTy = constraint->getSecondType();
           addPotentialBinding(
@@ -457,29 +457,25 @@ void PotentialBindings::finalize(
       }
     }
 
-    if (cs.shouldAttemptFixes() &&
+    if (CS.shouldAttemptFixes() &&
         locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
-      // Let's see whether this chain is valid, is it isn't then to avoid
+      // Let's see whether this chain is valid, if it isn't then to avoid
       // diagnosing the same issue multiple different ways, let's infer
       // result of the chain to be a hole.
       auto *resultExpr =
           castToExpr<UnresolvedMemberChainResultExpr>(locator->getAnchor());
-      auto *baseLocator = cs.getConstraintLocator(
+      auto *baseLocator = CS.getConstraintLocator(
           resultExpr->getChainBase(), ConstraintLocator::UnresolvedMember);
 
-      if (cs.hasFixFor(
+      if (CS.hasFixFor(
               baseLocator,
               FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype)) {
-        cs.recordPotentialHole(TypeVar);
-        // Clear all of the previously inferred bindings which are inferred
+        CS.recordPotentialHole(TypeVar);
+        // Clear all of the previously collected bindings which are inferred
         // from inside of a member chain.
-        Bindings.erase(
-            llvm::remove_if(
-                Bindings,
-                [](const ConstraintSystem::PotentialBinding &binding) {
-                  return binding.Kind == AllowedBindingKind::Supertypes;
-                }),
-            Bindings.end());
+        Bindings.remove_if([](const PotentialBinding &binding) {
+          return binding.Kind == AllowedBindingKind::Supertypes;
+        });
       }
     }
   }
