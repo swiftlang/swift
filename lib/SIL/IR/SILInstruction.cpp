@@ -1134,7 +1134,6 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case SILInstructionKind::DestroyValueInst:
-    assert(!SILModuleConventions(getModule()).useLoweredAddresses());
     return true;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
