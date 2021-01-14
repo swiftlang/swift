@@ -305,8 +305,7 @@ public:
   /// Construct the OutputFileMap for the driver from the given arguments.
   Optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
-                     StringRef workingDirectory,
-                     bool addEntriesForSourceRangeDependencies) const;
+                     StringRef workingDirectory) const;
 
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
   /// OutputInfo.
