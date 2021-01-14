@@ -239,6 +239,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       inlinable[#Declaration Attribute#]; name=inlinable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers
 // ON_MEMBER_LAST-DAG: Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain
+// ON_MEMBER_LAST-DAG: Keyword/None:                       rethrows[#Declaration Attribute#]; name=rethrows
 // ON_MEMBER_LAST-DAG: Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // ON_MEMBER_LAST-DAG: Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline
 // ON_MEMBER_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
