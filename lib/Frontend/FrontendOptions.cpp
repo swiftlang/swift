@@ -392,14 +392,6 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   llvm_unreachable("unhandled action");
 }
 
-bool FrontendOptions::canActionEmitSwiftRanges(ActionType action) {
-  return canActionEmitReferenceDependencies(action);
-}
-
-bool FrontendOptions::canActionEmitCompiledSource(ActionType action) {
-  return canActionEmitReferenceDependencies(action);
-}
-
 bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:

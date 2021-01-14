@@ -654,43 +654,6 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
   }
 }
-static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::emit_swift_ranges_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &swiftRangesFilePath =
-        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
-    if (!swiftRangesFilePath.empty()) {
-      (void)Instance.emitSwiftRanges(Instance.getDiags(), SF,
-                                     swiftRangesFilePath);
-    }
-  }
-}
-static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
-    CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasCompiledSourcePath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::emit_compiled_source_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &compiledSourceFilePath =
-        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
-    if (!compiledSourceFilePath.empty()) {
-      (void)Instance.emitCompiledSource(Instance.getDiags(), SF,
-                                        compiledSourceFilePath);
-    }
-  }
-}
 
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -1057,10 +1020,6 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
-
-  // Emit information about the parsed primaries.
-  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
-  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {
