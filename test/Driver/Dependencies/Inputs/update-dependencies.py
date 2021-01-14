@@ -48,9 +48,9 @@ if '-primary-file' in sys.argv \
                                   "--input-filename=" + primaryFile,
                                   "--output-filename=" + depsFile])
     if returncode != 0:
-        shutil.rmtree(depsFile, True)
-        print("Failed to convert", os.path.basename(primaryFile))
-        exit(1)
+        # If the input is not valid YAML, just copy it over verbatim;
+        # we're testing a case where we produced a corrupted output file.
+        shutil.copyfile(primaryFile, depsFile)
 else:
     primaryFile = None
 

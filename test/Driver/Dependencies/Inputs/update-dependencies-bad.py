@@ -41,10 +41,10 @@ if (os.path.basename(primaryFile) == 'bad.swift' or
         returncode = subprocess.call([sys.argv[1], "--from-yaml",
                                       "--input-filename=" + primaryFile,
                                       "--output-filename=" + depsFile])
+        # If the input is not valid YAML, just copy it over verbatim;
+        # we're testing a case where we produced a corrupted output file.
         if returncode != 0:
-            shutil.rmtree(depsFile, True)
-            print("Failed to convert", os.path.basename(primaryFile))
-            exit(1)
+            shutil.copyfile(primaryFile, depsFile)
     except ValueError:
         pass
 
