@@ -43,7 +43,7 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
 // General utilities <stdlib.h>
 // Memory management functions
 static inline void _swift_stdlib_free(void *_Nullable ptr) {
-  extern void free(void *);
+  extern void free(void *_Nullable);
   free(ptr);
 }
 
