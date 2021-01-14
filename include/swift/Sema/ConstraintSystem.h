@@ -4638,13 +4638,13 @@ public: // binding inference logic is public for unit testing.
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      PointerUnion<Constraint *, ConstraintLocator *> source)
-        : BindingType(type->getWithoutParens()), Kind(kind),
-          BindingSource(source) {}
+        : BindingType(type), Kind(kind), BindingSource(source) {}
 
   public:
     PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
-        : BindingType(type->getWithoutParens()), Kind(kind),
-          BindingSource(source) {}
+        : PotentialBinding(
+              type->getWithoutParens(), kind,
+              PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
 
     bool isDefaultableBinding() const {
       if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
@@ -4694,6 +4694,11 @@ public: // binding inference logic is public for unit testing.
       return {HoleType::get(typeVar->getASTContext(), typeVar),
               AllowedBindingKind::Exact,
               /*source=*/locator};
+    }
+
+    static PotentialBinding forPlaceholder(Type placeholderTy) {
+      return {placeholderTy, AllowedBindingKind::Exact,
+              PointerUnion<Constraint *, ConstraintLocator *>()};
     }
   };
 
@@ -4751,7 +4756,7 @@ public: // binding inference logic is public for unit testing.
     TypeVariableType *TypeVar;
 
     /// The set of potential bindings.
-    SmallVector<PotentialBinding, 4> Bindings;
+    llvm::SmallSetVector<PotentialBinding, 4> Bindings;
 
     /// The set of protocol requirements placed on this type variable.
     llvm::SmallVector<Constraint *, 4> Protocols;
@@ -4981,13 +4986,21 @@ public: // binding inference logic is public for unit testing.
     /// \param canBeNil The flag that determines whether given type
     /// variable requires all of its bindings to be optional.
     ///
-    /// \returns true if binding covers given literal protocol.
-    bool isLiteralCoveredBy(const LiteralRequirement &literal,
-                            PotentialBinding &binding, bool canBeNil) const;
+    /// \returns a pair of bool and a type:
+    ///    - bool, true if binding covers given literal protocol;
+    ///    - type, non-null if binding type has to be adjusted
+    ///      to cover given literal protocol;
+    std::pair<bool, Type> isLiteralCoveredBy(const LiteralRequirement &literal,
+                                             const PotentialBinding &binding,
+                                             bool canBeNil) const;
 
     /// Add a potential binding to the list of bindings,
     /// coalescing supertype bounds when we are able to compute the meet.
-    void addPotentialBinding(PotentialBinding binding,
+    ///
+    /// \returns true if this binding has been added to the set,
+    /// false otherwise (e.g. because binding with this type is
+    /// already in the set).
+    bool addPotentialBinding(PotentialBinding binding,
                              bool allowJoinMeet = true);
 
     /// Check if this binding is viable for inclusion in the set.
@@ -5024,13 +5037,9 @@ private:
     ///
     /// Which gives us a new (superclass A) binding for T2 as well as T1.
     ///
-    /// \param cs The constraint system this type variable is associated with.
-    ///
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        ConstraintSystem &cs,
-        llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
@@ -5039,20 +5048,16 @@ private:
     /// between two type variables and attempt to propagate protocol
     /// requirements down the subtype or equivalence chain.
     void inferTransitiveProtocolRequirements(
-        const ConstraintSystem &cs,
         llvm::SmallDenseMap<TypeVariableType *,
                             ConstraintSystem::PotentialBindings>
             &inferredBindings);
 
 public:
-    bool infer(ConstraintSystem &cs,
-               llvm::SmallPtrSetImpl<CanType> &exactTypes,
-               Constraint *constraint);
+    bool infer(Constraint *constraint);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
-    void finalize(ConstraintSystem &cs,
-                  llvm::SmallDenseMap<TypeVariableType *,
+    void finalize(llvm::SmallDenseMap<TypeVariableType *,
                                       ConstraintSystem::PotentialBindings>
                       &inferredBindings);
 
@@ -6233,6 +6238,54 @@ struct DenseMapInfo<swift::constraints::SolutionApplicationTargetsKey> {
   }
 };
 
+template <>
+struct DenseMapInfo<swift::constraints::ConstraintSystem::PotentialBinding> {
+  using Binding = swift::constraints::ConstraintSystem::PotentialBinding;
+
+  static Binding getEmptyKey() {
+    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
+  }
+
+  static Binding getTombstoneKey() {
+    return placeholderKey(
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const Binding &Val) {
+    return DenseMapInfo<swift::Type>::getHashValue(
+        Val.BindingType->getCanonicalType());
+  }
+
+  static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    auto lhsTy = LHS.BindingType.getPointer();
+    auto rhsTy = RHS.BindingType.getPointer();
+
+    // Fast path: pointer equality.
+    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
+      return true;
+
+    // If either side is empty or tombstone, let's use pointer equality.
+    {
+      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
+      auto tombstoneTy =
+          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
+
+      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
+        return lhsTy == rhsTy;
+
+      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
+        return lhsTy == rhsTy;
+    }
+
+    // Otherwise let's drop the sugar and check.
+    return LHS.BindingType->isEqual(RHS.BindingType);
+  }
+
+private:
+  static Binding placeholderKey(swift::Type type) {
+    return Binding::forPlaceholder(type);
+  }
+};
 }
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
