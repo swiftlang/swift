@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -87,6 +88,20 @@ class SILCombiner :
   /// Centralized InstModCallback that we use for certain utility methods.
   InstModCallbacks instModCallbacks;
 
+  /// Dead end blocks cache. SILCombine is already not allowed to mess with CFG
+  /// edges so it is safe to use this here.
+  DeadEndBlocks deBlocks;
+
+  /// A utility struct used by OwnershipFixupContext to map sets of partially
+  /// post-dominating blocks to a full jointly post-dominating set.
+  JointPostDominanceSetComputer jPostDomComputer;
+
+  /// A utility that we use to perform erase+RAUW that fixes up ownership for us
+  /// afterwards by lifetime extending/copy values as appropriate. We rely on
+  /// later optimizations to chew through this traffic. This ensures we can use
+  /// one code base for both OSSA and non-OSSA.
+  OwnershipFixupContext ownershipRAUWHelper;
+
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
@@ -117,7 +132,9 @@ public:
             [&](Operand *use, SILValue newValue) {
               use->set(newValue);
               Worklist.add(use->getUser());
-            }) {}
+            }),
+        deBlocks(&B.getFunction()), jPostDomComputer(deBlocks),
+        ownershipRAUWHelper(instModCallbacks, deBlocks, jPostDomComputer) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -175,6 +192,12 @@ public:
   // so that the combiner will know that I was modified.
   void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
     return Worklist.replaceInstUsesWith(I, V);
+  }
+
+  /// Perform use->set(value) and add use->user to the worklist.
+  void setUseValue(Operand *use, SILValue value) {
+    use->set(value);
+    Worklist.add(use->getUser());
   }
 
   // This method is to be used when a value is found to be dead,
@@ -316,6 +339,12 @@ public:
   bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
                                   KeyPathInst *kp);
 
+  /// Sinks owned forwarding instructions to their uses if they do not have
+  /// non-debug non-consuming uses. Deletes any debug_values and destroy_values
+  /// when this is done. Returns true if we deleted svi and thus we should not
+  /// try to visit it.
+  bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
@@ -324,9 +353,26 @@ public:
   bool optimizeIdentityCastComposition(ApplyInst *FInverse,
                                        StringRef FInverseName, StringRef FName);
 
-private:
+  /// Let \p user and \p value be two forwarding single value instructions with
+  /// the property that \p user, through potentially a chain of forwarding
+  /// instructions.
+  ///
+  /// Let \p user and \p value be two forwarding single value instructions  with
+  /// the property that \p value is the value that \p user forwards. In this
+  /// case, this helper routine will eliminate \p value if it can rewrite user
+  /// in terms of \p newValue. This is intended to handle cases where we have
+  /// completely different types so we need to actually create a new instruction
+  /// with a different result type.
+  ///
+  /// \param newValueGenerator Generator that produces the new value to
+  /// use. Conditionally called if we can perform the optimization.
+  SILInstruction *tryFoldComposedUnaryForwardingInstChain(
+      SingleValueInstruction *user, SingleValueInstruction *value,
+      function_ref<SILValue()> newValueGenerator);
+
   InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
 
+private:
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);

@@ -82,29 +82,24 @@ class ForwardingOperand {
 public:
   static Optional<ForwardingOperand> get(Operand *use);
 
-  Operand *getUse() const { return use; }
   OwnershipConstraint getOwnershipConstraint() const {
     // We use a force unwrap since a ForwardingOperand should always have an
     // ownership constraint.
     return use->getOwnershipConstraint();
   }
+
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
-  const OwnershipForwardingInst *operator->() const {
-    return cast<OwnershipForwardingInst>(use->getUser());
-  }
-  OwnershipForwardingInst *operator->() {
-    return cast<OwnershipForwardingInst>(use->getUser());
-  }
-  const OwnershipForwardingInst &operator*() const {
-    return *cast<OwnershipForwardingInst>(use->getUser());
-  }
-  OwnershipForwardingInst &operator*() {
-    return *cast<OwnershipForwardingInst>(use->getUser());
-  }
+  const Operand *operator->() const { return use; }
+
+  Operand *operator->() { return use; }
+
+  const Operand &operator*() const { return *use; }
+
+  Operand &operator*() { return *use; }
 
   /// Call \p visitor with each value that contains the final forwarded
   /// ownership of. E.x.: result of a unchecked_ref_cast, phi arguments of a
@@ -473,6 +468,13 @@ struct BorrowedValue {
     return foundAnyReborrows;
   }
 
+  // Helpers to allow a BorrowedValue to easily be used as a SILValue
+  // programatically.
+  SILValue operator->() { return value; }
+  SILValue operator->() const { return value; }
+  SILValue operator*() { return value; }
+  SILValue operator*() const { return value; }
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
@@ -505,6 +507,7 @@ Optional<BorrowedValue> getSingleBorrowIntroducingValue(SILValue inputValue);
 class InteriorPointerOperandKind {
 public:
   enum Kind : uint8_t {
+    Invalid=0,
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
@@ -516,18 +519,38 @@ private:
 public:
   InteriorPointerOperandKind(Kind newValue) : value(newValue) {}
 
-  operator Kind() const { return value; }
+  operator Kind() const {
+    return value;
+  }
 
-  static Optional<InteriorPointerOperandKind> get(Operand *use) {
+  bool isValid() const { return value != Kind::Invalid; }
+
+  static InteriorPointerOperandKind get(Operand *use) {
     switch (use->getUser()->getKind()) {
     default:
-      return None;
+      return Kind::Invalid;
     case SILInstructionKind::RefElementAddrInst:
-      return InteriorPointerOperandKind(RefElementAddr);
+      return Kind::RefElementAddr;
     case SILInstructionKind::RefTailAddrInst:
-      return InteriorPointerOperandKind(RefTailAddr);
+      return Kind::RefTailAddr;
     case SILInstructionKind::OpenExistentialBoxInst:
-      return InteriorPointerOperandKind(OpenExistentialBox);
+      return Kind::OpenExistentialBox;
+    }
+  }
+
+  /// Given a \p value that is a result of an instruction with an interior
+  /// pointer operand, return the interior pointer operand kind that would be
+  /// appropriate for that operand.
+  static InteriorPointerOperandKind inferFromResult(SILValue value) {
+    switch (value->getKind()) {
+    default:
+      return Kind::Invalid;
+    case ValueKind::RefElementAddrInst:
+      return Kind::RefElementAddr;
+    case ValueKind::RefTailAddrInst:
+      return Kind::RefTailAddr;
+    case ValueKind::OpenExistentialBoxInst:
+      return Kind::OpenExistentialBox;
     }
   }
 
@@ -544,14 +567,42 @@ struct InteriorPointerOperand {
   InteriorPointerOperandKind kind;
 
   InteriorPointerOperand(Operand *op)
-      : operand(op), kind(*InteriorPointerOperandKind::get(op)) {}
+      : operand(op), kind(InteriorPointerOperandKind::get(op)) {
+    assert(kind.isValid());
+  }
 
-  /// If value is a borrow introducer return it after doing some checks.
+  /// If \p op has a user that is an interior pointer, return a valid
+  /// value. Otherwise, return None.
   static Optional<InteriorPointerOperand> get(Operand *op) {
     auto kind = InteriorPointerOperandKind::get(op);
     if (!kind)
       return None;
-    return InteriorPointerOperand(op, *kind);
+    return InteriorPointerOperand(op, kind);
+  }
+
+  /// If \p val is a result of an instruction that is an interior pointer,
+  /// return an interor pointer operand based off of the base value operand of
+  /// the instruction.
+  static Optional<InteriorPointerOperand>
+  inferFromResult(SILValue resultValue) {
+    auto kind = InteriorPointerOperandKind::inferFromResult(resultValue);
+
+    // NOTE: We use an exhaustive switch here to allow for further interior
+    // pointer operand having instructions to make the interior pointer
+    // operand's argument index arbitrary.
+    switch (kind) {
+    case InteriorPointerOperandKind::Invalid:
+      // We do not have a valid instruction, so return None.
+      return None;
+    case InteriorPointerOperandKind::RefElementAddr:
+    case InteriorPointerOperandKind::RefTailAddr:
+    case InteriorPointerOperandKind::OpenExistentialBox: {
+      // Ok, we have a valid instruction. Return the relevant operand.
+      auto *op =
+          &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
+      return InteriorPointerOperand(op, kind);
+    }
+    }
   }
 
   /// Return the end scope of all borrow introducers of the parent value of this
@@ -569,8 +620,15 @@ struct InteriorPointerOperand {
     return true;
   }
 
+  /// Return the base BorrowedValue of the incoming value's operand.
+  Optional<BorrowedValue> getSingleBaseValue() const {
+    return getSingleBorrowIntroducingValue(operand->get());
+  }
+
   SILValue getProjectedAddress() const {
     switch (kind) {
+    case InteriorPointerOperandKind::Invalid:
+      llvm_unreachable("Calling method on invalid?!");
     case InteriorPointerOperandKind::RefElementAddr:
       return cast<RefElementAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::RefTailAddr:
@@ -590,6 +648,11 @@ struct InteriorPointerOperand {
   /// points.
   bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
                        std::function<void(Operand *)> *onError = nullptr);
+
+  Operand *operator->() { return operand; }
+  const Operand *operator->() const { return operand; }
+  Operand *operator*() { return operand; }
+  const Operand *operator*() const { return operand; }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand
