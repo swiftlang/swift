@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
+#define TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
+
 template <class T> T add(T a, T b) { return a + b; }
 
 template <class A, class B> A addTwoTemplates(A a, B b) { return a + b; }
@@ -20,6 +23,11 @@ template <class R, class T, class U> R returns_template(T a, U b) {
 
 // Same here:
 template <class T> void cannot_infer_template() {}
+
+struct HasVariadicMemeber {
+  void test1(...) {}
+  void test2(int, ...) {}
+};
 
 // TODO: We should support these types. Until then, make sure we don't crash when importing.
 template<class... Ts>
@@ -52,3 +60,33 @@ template <class T> void lvalueReference(T &ref) { ref = 42; }
 template <class T> void constLvalueReference(const T &) {}
 
 template <class T> void forwardingReference(T &&) {}
+
+namespace Orbiters {
+
+template<class T>
+void galileo(T) { }
+
+template<class T, class U>
+void cassini(T, U) { }
+
+template<class T>
+void magellan(T&) { }
+
+} // namespace Orbiters
+
+// We can't import these (and may never be able to in the case of "_Atomic"),
+// but don't crash while trying.
+namespace Unimportable {
+
+template <class> struct Dependent {};
+template <class T> void takesDependent(Dependent<T> d) {}
+
+void takesAtomic(_Atomic(int) a) {}
+
+struct HasImposibleMember {
+  void memberTakesAtomic(_Atomic(int) a) {}
+};
+
+} // namespace Unimportable
+
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H

@@ -243,6 +243,8 @@ namespace {
     IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
+    IMPL(BuiltinRawUnsafeContinuation, Trivial)
+    IMPL(BuiltinJob, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinVector, Trivial)
@@ -256,6 +258,15 @@ namespace {
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive});
+    }
+
+    RetTy visitBuiltinDefaultActorStorageType(
+                                         CanBuiltinDefaultActorStorageType type,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
@@ -412,8 +423,15 @@ namespace {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
-    Type getConcreteReferenceStorageReferent(Type type) {
+    Type getConcreteReferenceStorageReferent(Type type,
+                                             AbstractionPattern origType) {
       if (type->isTypeParameter()) {
+        auto genericSig = origType.getGenericSignature();
+        if (auto concreteType = genericSig->getConcreteType(type))
+          return concreteType;
+        if (auto superclassType = genericSig->getSuperclassBound(type))
+          return superclassType;
+        assert(genericSig->requiresClass(type));
         return TC.Context.getAnyObjectType();
       }
 
@@ -458,7 +476,7 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) { \
       auto referentType = \
         type->getReferentType()->lookThroughSingleOptionalType(); \
-      auto concreteType = getConcreteReferenceStorageReferent(referentType); \
+      auto concreteType = getConcreteReferenceStorageReferent(referentType, origType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
         return asImpl().visitLoadable##Name##StorageType(type, origType, \
@@ -1076,7 +1094,7 @@ namespace {
         return;
       }
 
-      B.emitReleaseValueAndFold(loc, aggValue);
+      B.createReleaseValue(loc, aggValue, B.getDefaultAtomicity());
     }
 
     void
@@ -1254,7 +1272,7 @@ namespace {
         B.createDestroyValue(loc, value);
         return;
       }
-      B.emitReleaseValueAndFold(loc, value);
+      B.createReleaseValue(loc, value, B.getDefaultAtomicity());
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
@@ -1415,7 +1433,7 @@ namespace {
         B.createDestroyValue(loc, value);
         return;
       }
-      B.emitStrongReleaseAndFold(loc, value);
+      B.createStrongRelease(loc, value, B.getDefaultAtomicity());
     }
   };
 
@@ -1501,13 +1519,13 @@ namespace {
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       if (!isTrivial())
-        B.emitDestroyAddrAndFold(loc, addr);
+        B.createDestroyAddr(loc, addr);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       if (!isTrivial())
-        B.emitDestroyAddrAndFold(loc, value);
+        B.createDestroyAddr(loc, value);
     }
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
@@ -3014,6 +3032,10 @@ TypeConverter::checkForABIDifferences(SILModule &M,
   // trivial.
   if (auto fnTy1 = type1.getAs<SILFunctionType>()) {
     if (auto fnTy2 = type2.getAs<SILFunctionType>()) {
+      // Async/synchronous conversions always need a thunk.
+      if (fnTy1->isAsync() != fnTy2->isAsync())
+        return ABIDifference::NeedsThunk;
+
       // @convention(block) is a single retainable pointer so optionality
       // change is allowed.
       if (optionalityChange)

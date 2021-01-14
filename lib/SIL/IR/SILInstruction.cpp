@@ -372,6 +372,14 @@ namespace {
       return true;
     }
 
+    bool visitDestructureStructInst(const DestructureStructInst *RHS) {
+      return true;
+    }
+
+    bool visitDestructureTupleInst(const DestructureTupleInst *RHS) {
+      return true;
+    }
+
     bool visitAllocRefInst(const AllocRefInst *RHS) {
       auto *LHSInst = cast<AllocRefInst>(LHS);
       auto LHSTypes = LHSInst->getTailAllocatedTypes();
@@ -1029,6 +1037,36 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
                              MemoryBehavior::MayHaveSideEffects;
   }
 
+  if (auto *li = dyn_cast<LoadInst>(this)) {
+    switch (li->getOwnershipQualifier()) {
+    case LoadOwnershipQualifier::Unqualified:
+    case LoadOwnershipQualifier::Trivial:
+      return MemoryBehavior::MayRead;
+    case LoadOwnershipQualifier::Take:
+      // Take deinitializes the underlying memory. Until we separate notions of
+      // memory writing from deinitialization (since a take doesn't actually
+      // write to the memory), lets be conservative and treat it as may read
+      // write.
+      return MemoryBehavior::MayReadWrite;
+    case LoadOwnershipQualifier::Copy:
+      return MemoryBehavior::MayHaveSideEffects;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  if (auto *si = dyn_cast<StoreInst>(this)) {
+    switch (si->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+    case StoreOwnershipQualifier::Trivial:
+    case StoreOwnershipQualifier::Init:
+      return MemoryBehavior::MayWrite;
+    case StoreOwnershipQualifier::Assign:
+      // For the release.
+      return MemoryBehavior::MayHaveSideEffects;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   switch (getKind()) {
 #define FULL_INST(CLASS, TEXTUALNAME, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)  \
   case SILInstructionKind::CLASS:                                              \
@@ -1074,6 +1112,11 @@ bool SILInstruction::mayRelease() const {
   switch (getKind()) {
   default:
     llvm_unreachable("Unhandled releasing instruction!");
+
+  case SILInstructionKind::GetAsyncContinuationInst:
+  case SILInstructionKind::GetAsyncContinuationAddrInst:
+  case SILInstructionKind::AwaitAsyncContinuationInst:
+    return false;
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
@@ -1138,6 +1181,18 @@ bool SILInstruction::mayRelease() const {
     }
     return true;
   }
+  case SILInstructionKind::StoreInst:
+    switch (cast<StoreInst>(this)->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+    case StoreOwnershipQualifier::Init:
+    case StoreOwnershipQualifier::Trivial:
+      return false;
+    case StoreOwnershipQualifier::Assign:
+      // Assign destroys the old value that was in the memory location before we
+      // write the new value into the location.
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 }
 
@@ -1262,6 +1317,12 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // dynamic_method_br is not duplicatable because IRGen does not support phi
   // nodes of objc_method type.
   if (isa<DynamicMethodBranchInst>(this))
+    return false;
+
+  // Can't duplicate get/await_async_continuation.
+  if (isa<AwaitAsyncContinuationInst>(this) ||
+      isa<GetAsyncContinuationAddrInst>(this) ||
+      isa<GetAsyncContinuationInst>(this))
     return false;
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.

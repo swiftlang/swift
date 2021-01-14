@@ -100,7 +100,7 @@ enum class ConcurrencyRequest {
 };
 
 struct ConcurrencyControl {
-  Mutex Lock;
+  ConditionVariable::Mutex Lock;
   ConditionVariable Queue;
 
   ConcurrencyControl() = default;

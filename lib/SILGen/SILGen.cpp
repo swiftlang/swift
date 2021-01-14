@@ -327,6 +327,84 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
+                                            Optional<FuncDecl*> &cache,
+                                            StringRef name) {
+  if (cache)
+    return *cache;
+  
+  auto *module = C.getLoadedModule(C.Id_Concurrency);
+  if (!module) {
+    cache = nullptr;
+    return nullptr;
+  }
+  
+  SmallVector<ValueDecl *, 1> decls;
+  module->lookupQualified(module,
+                     DeclNameRef(C.getIdentifier(name)),
+                     NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                     decls);
+
+  if (decls.size() != 1) {
+    cache = nullptr;
+    return nullptr;
+  }
+  auto func = dyn_cast<FuncDecl>(decls[0]);
+  cache = func;
+  return func;
+}
+
+FuncDecl *
+SILGenModule::getRunChildTask() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunChildTask,
+                                    "_runChildTask");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGet,
+                                    "_taskFutureGet");
+}
+
+FuncDecl *
+SILGenModule::getTaskFutureGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    TaskFutureGetThrowing,
+                                    "_taskFutureGetThrowing");
+}
+
+FuncDecl *
+SILGenModule::getResumeUnsafeContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeContinuation,
+                                    "_resumeUnsafeContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeUnsafeThrowingContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuation,
+                                    "_resumeUnsafeThrowingContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeUnsafeThrowingContinuationWithError,
+                                  "_resumeUnsafeThrowingContinuationWithError");
+}
+FuncDecl *
+SILGenModule::getRunTaskForBridgedAsyncMethod() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    RunTaskForBridgedAsyncMethod,
+                                    "_runTaskForBridgedAsyncMethod");
+}
+FuncDecl *
+SILGenModule::getRunAsyncHandler() {
+  return lookupConcurrencyIntrinsic(getASTContext(), RunAsyncHandler,
+                                    "_runAsyncHandler");
+}
+
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)
     return *NSErrorConformanceToError;
@@ -704,7 +782,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
+    // If the native function is async, then the foreign entry point is not,
+    // so it needs to spawn a detached task in which to run the native
+    // implementation, so the actual thunk logic needs to go into a closure
+    // implementation function.
+    if (constant.hasAsync()) {
+      f = SILGenFunction(*this, *f, dc).emitNativeAsyncToForeignThunk(constant);
+    }
+
     SILGenFunction(*this, *f, dc).emitNativeToForeignThunk(constant);
+
     postEmitFunction(constant, f);
     return;
   }
@@ -1113,7 +1200,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto setDerivativeInDifferentiabilityWitness =
       [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
         auto derivativeThunk = getOrCreateCustomDerivativeThunk(
-            derivative, originalFunction, silConfig, kind);
+            originalAFD, originalFunction, derivative, silConfig, kind);
         // Check for existing same derivative.
         // TODO(TF-835): Remove condition below and simplify assertion to
         // `!diffWitness->getDerivative(kind)` after `@derivative` attribute
@@ -1808,7 +1895,7 @@ public:
         if (SGF.B.hasValidInsertionPoint())
           SGF.B.createBranch(returnLoc, returnBB, returnValue);
         returnValue =
-            returnBB->createPhiArgument(returnType, ValueOwnershipKind::Owned);
+            returnBB->createPhiArgument(returnType, OwnershipKind::Owned);
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1952,6 +2039,11 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   if (desc.opts.SkipFunctionBodies == FunctionBodySkipping::All)
     return silMod;
 
+  // Skip emitting SIL if there's been any compilation errors
+  if (silMod->getASTContext().hadError() &&
+      silMod->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+    return silMod;
+
   SILGenModuleRAII scope(*silMod);
 
   // Emit a specific set of SILDeclRefs if needed.
@@ -1997,54 +2089,60 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
 
 static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
                                                Decl *d) {
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(d)) {
-    for (auto ad : asd->getAllAccessors()) {
-      transferSpecializeAttributeTargets(SGM, M, ad);
+  auto *vd = cast<AbstractFunctionDecl>(d);
+  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+    auto *SA = cast<SpecializeAttr>(A);
+    // Filter _spi.
+    auto spiGroups = SA->getSPIGroups();
+    auto hasSPIGroup = !spiGroups.empty();
+    if (hasSPIGroup) {
+      if (vd->getModuleContext() != M.getSwiftModule() &&
+          !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
+        continue;
+      }
     }
-  } else if (auto *vd = dyn_cast<AbstractFunctionDecl>(d)) {
-    for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
-      // Filter _spi.
-      auto spiGroups = SA->getSPIGroups();
-      auto hasSPIGroup = !spiGroups.empty();
+    if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
+      auto target = SILDeclRef(targetFunctionDecl);
+      auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      Identifier spiGroupIdent;
       if (hasSPIGroup) {
-        if (vd->getModuleContext() != M.getSwiftModule() &&
-            !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
-          continue;
-        }
+        spiGroupIdent = spiGroups[0];
       }
-      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-        auto target = SILDeclRef(targetFunctionDecl);
-        auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
-        auto kind = SA->getSpecializationKind() ==
-                            SpecializeAttr::SpecializationKind::Full
-                        ? SILSpecializeAttr::SpecializationKind::Full
-                        : SILSpecializeAttr::SpecializationKind::Partial;
-        Identifier spiGroupIdent;
-        if (hasSPIGroup) {
-          spiGroupIdent = spiGroups[0];
-        }
-        targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-            M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-            spiGroupIdent, vd->getModuleContext()));
-      }
+      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+          spiGroupIdent, vd->getModuleContext()));
     }
   }
 }
 
 void SILGenModule::visitImportDecl(ImportDecl *import) {
+  // Importing `@_specializet(targetFunction: otherFunc)` only supported in
+  // experimental pre-specialization mode.
+  if (!getASTContext().LangOpts.EnableExperimentalPrespecialization)
+    return;
+
+  // TODO: this horrible full AST deserializing walk should be replaced by a
+  // 'single place' to lookup those declarations in the module
+  // E.g
+  // prespecializations {
+  //    extension Array {
+  //       @_specialize(exported: true, targetFunction: other(_:), T == Int)
+  //       func prespecialzie_other() {}
+  //    }
+  // }
   auto *module = import->getModule();
   if (module->isNonSwiftModule())
     return;
 
-  SmallVector<Decl*, 16> topLevelDecls;
-  module->getTopLevelDecls(topLevelDecls);
-  for (auto *t : topLevelDecls) {
-    if (auto *vd = dyn_cast<AbstractFunctionDecl>(t)) {
+  SmallVector<Decl*, 16> prespecializations;
+  module->getExportedPrespecializations(prespecializations);
+  for (auto *p : prespecializations) {
+    if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
       transferSpecializeAttributeTargets(*this, M, vd);
-    } else if (auto *extension = dyn_cast<ExtensionDecl>(t)) {
-      for (auto *d : extension->getMembers())
-        transferSpecializeAttributeTargets(*this, M, d);
     }
   }
 }

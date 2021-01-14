@@ -195,6 +195,9 @@ CUSTOM_LOCATOR_PATH_ELT(ArgumentAttribute)
 /// The result of a chain of member accesses off an UnresolvedMemberExpr
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMemberChainResult)
 
+/// The conformance requirement associated with a type.
+CUSTOM_LOCATOR_PATH_ELT(ConformanceRequirement)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

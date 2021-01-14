@@ -48,12 +48,12 @@ struct ExpectedTypeContext {
   ///
   /// Since the input may be incomplete, we take into account that the types are
   /// only a hint.
-  bool isSingleExpressionBody = false;
+  bool isImplicitSingleExpressionReturn = false;
   bool preferNonVoid = false;
 
   bool empty() const { return possibleTypes.empty(); }
   bool requiresNonVoid() const {
-    if (isSingleExpressionBody)
+    if (isImplicitSingleExpressionReturn)
       return false;
     if (preferNonVoid)
       return true;
@@ -65,9 +65,9 @@ struct ExpectedTypeContext {
   }
 
   ExpectedTypeContext() = default;
-  ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)
+  ExpectedTypeContext(ArrayRef<Type> types, bool isImplicitSingleExprReturn)
       : possibleTypes(types.begin(), types.end()),
-        isSingleExpressionBody(isSingleExpressionBody) {}
+        isImplicitSingleExpressionReturn(isImplicitSingleExprReturn) {}
 };
 
 class CodeCompletionResultBuilder {
@@ -226,8 +226,19 @@ public:
 
   void addThrows() {
     addChunkWithTextNoCopy(
-       CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword,
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " throws");
+  }
+
+  void addAnnotatedAsync() {
+    addAsync();
+    getLastChunk().setIsAnnotation();
+  }
+
+  void addAsync() {
+    addChunkWithTextNoCopy(
+       CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+       " async");
   }
 
   void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
@@ -242,7 +253,8 @@ public:
 
   void addRethrows() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword, " rethrows");
+        CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
+        " rethrows");
   }
 
   void addAnnotatedLeftParen() {

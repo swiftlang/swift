@@ -1139,6 +1139,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 /// result in exposing opportunities for CFG simplification.
 bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   bool Simplified = false;
+  InstModCallbacks callbacks;
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
@@ -1149,7 +1150,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
       // unreachable block. In this case it can reference itself as operand.
       if (Result && Result != I) {
         LLVM_DEBUG(llvm::dbgs() << "simplify branch operand " << *I);
-        replaceAllSimplifiedUsesAndErase(I, Result);
+        replaceAllSimplifiedUsesAndErase(I, Result, callbacks);
         Simplified = true;
       }
     }
@@ -2994,8 +2995,7 @@ bool ArgumentSplitter::createNewArguments() {
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
     auto *NewArg = ParentBB->createPhiArgument(
-        P.getType(Ty, Mod, TypeExpansionContext(*F)),
-        ValueOwnershipKind::Owned);
+        P.getType(Ty, Mod, TypeExpansionContext(*F)), OwnershipKind::Owned);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
     //
@@ -3779,7 +3779,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
   A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
   auto *NewArg =
-      BB->replacePhiArgument(i, proj->getType(), ValueOwnershipKind::Owned);
+      BB->replacePhiArgument(i, proj->getType(), OwnershipKind::Owned);
   proj->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.

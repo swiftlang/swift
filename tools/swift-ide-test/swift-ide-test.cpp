@@ -397,6 +397,11 @@ DisableObjCAttrRequiresFoundationModule(
     llvm::cl::cat(Category),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> EnableExperimentalPrespecialization(
+    "enable-experimental-prespecialization",
+    llvm::cl::desc("Enable experimental prespecialization"),
+    llvm::cl::cat(Category), llvm::cl::init(false));
+
 static llvm::cl::opt<bool>
 PrintStats("print-stats",
            llvm::cl::desc("Print statistics"),
@@ -736,11 +741,6 @@ static llvm::cl::opt<bool>
     EnableCxxInterop("enable-cxx-interop",
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
-
-static llvm::cl::opt<std::string>
-GraphVisPath("output-request-graphviz",
-             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
-             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
@@ -2608,6 +2608,14 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     return 1;
   }
 
+  // If needed, load _Concurrency library so that the Clang importer can use it.
+  if (Context.LangOpts.EnableExperimentalConcurrency) {
+    if (!getModuleByFullName(Context, Context.Id_Concurrency)) {
+      llvm::errs() << "Failed loading _Concurrency library\n";
+      return 1;
+    }
+  }
+
   int ExitCode = 0;
 
   std::unique_ptr<ASTPrinter> Printer;
@@ -3822,8 +3830,6 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
-  InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
-    options::GraphVisPath;
   InitInvok.getLangOptions().EnableCrossImportOverlays =
     options::EnableCrossImportOverlays;
   if (options::DisableObjCInterop) {
@@ -3903,6 +3909,8 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
+  InitInvok.getLangOptions().EnableExperimentalPrespecialization =
+      options::EnableExperimentalPrespecialization;
   InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
   InitInvok.getTypeCheckerOptions().DebugConstraintSolver =

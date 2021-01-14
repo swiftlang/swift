@@ -94,8 +94,11 @@ DerivativeRegistrationTests.testWithLeakChecking("InstanceMethod") {
 
 extension Wrapper {
   subscript(_ x: Tracked<Float>) -> Tracked<Float> {
+    @differentiable
     @_semantics("autodiff.opaque")
     get { float * x }
+
+    @differentiable
     set {}
   }
 
@@ -117,7 +120,10 @@ DerivativeRegistrationTests.testWithLeakChecking("SubscriptGetter") {
 
 extension Wrapper {
   subscript() -> Tracked<Float> {
+    @differentiable
     get { float }
+
+    @differentiable
     set { float = newValue }
   }
 
@@ -211,6 +217,7 @@ DerivativeRegistrationTests.testWithLeakChecking("DerivativeGenericSignature") {
   expectEqual(1000, dx)
 }
 
+#if REQUIRES_SRxxxx
 // When non-canonicalized generic signatures are used to compare derivative configurations, the
 // `@differentiable` and `@derivative` attributes create separate derivatives, and we get a
 // duplicate symbol error in TBDGen.
@@ -230,6 +237,7 @@ DerivativeRegistrationTests.testWithLeakChecking("NonCanonicalizedGenericSignatu
   // give a gradient of 1).
   expectEqual(0, dx)
 }
+#endif
 
 // Test derivatives of default implementations.
 protocol HasADefaultImplementation {

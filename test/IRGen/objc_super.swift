@@ -4,6 +4,7 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 import gizmo
 
@@ -136,5 +137,5 @@ class GenericRuncer<T> : Gizmo {
 }
 
 // CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself %0) {{.*}} {
-// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFxAFXEfU_"
+// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFxAFXEfU_yt_Tgq5"
 // CHECK: }

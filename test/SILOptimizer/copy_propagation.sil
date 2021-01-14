@@ -1,9 +1,29 @@
-// RUN: %target-sil-opt -copy-propagation -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-DEBUG
+// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -debug-only=copy-propagation %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK-TRACE
+
+// REQUIRES: asserts
 
 sil_stage canonical
 
 import Builtin
 import Swift
+
+sil [ossa] @takeOwned : $@convention(thin) <T> (@in T) -> ()
+sil [ossa] @takeMultipleOwned : $@convention(thin) <T> (@in T, @in T) -> ()
+sil [ossa] @takeGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @takeGuaranteedAndOwnedArg : $@convention(thin) <T> (@in_guaranteed T, @in T) -> ()
+
+class B { }
+
+class C {
+  var a: Int64
+}
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
 
 // Once Mem2Reg supports ownership, it will leave behind extra copies as
 // seen in the SIL test below for simple assignment:
@@ -17,8 +37,8 @@ import Swift
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK-NOT: destroy
 // CHECK:   [[CPY:%.*]] = copy_value %0 : $T
-// CHECK-NOT: destroy
-// CHECK:   return [[CPY]] : $T
+// CHECK_CHECK-NOT: destroy
+// CHECK_CHECK:   return [[CPY]] : $T
 // CHECK-LABEL: } // end sil function 'testVarAssign'
 sil [ossa] @testVarAssign : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : @guaranteed $T):
@@ -28,16 +48,16 @@ bb0(%0 : @guaranteed $T):
   return %2 : $T
 }
 
-// CHECK: sil [ossa] @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+// CHECK-LABEL: sil [ossa] @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK-NOT: destroy
 // CHECK:   [[CPY1:%.*]] = copy_value %0 : $T
-// CHECK-NOT: destroy
-// CHECK:   [[CPY2:%.*]] = copy_value %0 : $T
-// CHECK-NOT: destroy
-// CHECK:   [[R:%.*]] = tuple ([[CPY1]] : $T, [[CPY2]] : $T)
-// CHECK-NOT: destroy
-// CHECK:   return [[R]] : $(T, T)
+// CHECK_CHECK-NOT: destroy
+// CHECK_CHECK:   [[CPY2:%.*]] = copy_value %0 : $T
+// CHECK_CHECK-NOT: destroy
+// CHECK_CHECK:   [[R:%.*]] = tuple ([[CPY1]] : $T, [[CPY2]] : $T)
+// CHECK_CHECK-NOT: destroy
+// CHECK_CHECK:   return [[R]] : $(T, T)
 // CHECK-LABEL: } // end sil function 'multiReturnValue'
 sil [ossa] @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
 bb0(%0 : @guaranteed $T):
@@ -51,12 +71,12 @@ bb0(%0 : @guaranteed $T):
 
 // CHECK-LABEL: sil [ossa] @multiCallResult : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @guaranteed $T):
-// CHECK-NEXT: // function_ref multiReturnValue
-// CHECK-NEXT: [[F:%.*]] = function_ref @multiReturnValue : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
-// CHECK-NEXT: [[CALL:%.*]] = apply [[F]]<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
-// CHECK-NEXT: ([[D1:%.*]], [[D2:%.*]]) = destructure_tuple [[CALL]] : $(T, T)
-// CHECK-NEXT: destroy_value [[D2]] : $T
-// CHECK-NEXT: return [[D1]] : $T
+// CHECK_CHECK-NEXT: // function_ref multiReturnValue
+// CHECK_CHECK-NEXT: [[F:%.*]] = function_ref @multiReturnValue : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
+// CHECK_CHECK-NEXT: [[CALL:%.*]] = apply [[F]]<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
+// CHECK_CHECK-NEXT: ([[D1:%.*]], [[D2:%.*]]) = destructure_tuple [[CALL]] : $(T, T)
+// CHECK_CHECK-NEXT: destroy_value [[D2]] : $T
+// CHECK_CHECK-NEXT: return [[D1]] : $T
 // CHECK-LABEL: } // end sil function 'multiCallResult'
 sil [ossa] @multiCallResult : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : @guaranteed $T):
@@ -75,19 +95,19 @@ bb0(%0 : @guaranteed $T):
 
 // CHECK-LABEL: sil [ossa] @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
 // CHECK: bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Bool):
-// CHECK-NEXT: %3 = struct_extract %2 : $Bool, #Bool._value
-// CHECK-NEXT: cond_br %3, bb1, bb2
+// CHECK_CHECK-NEXT: struct_extract %2 : $Bool, #Bool._value
+// CHECK_CHECK-NEXT: cond_br %{{.*}}, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK-NEXT: %5 = copy_value %0 : $T
-// CHECK-NEXT: br bb3(%5 : $T)
+// CHECK_CHECK-NEXT: copy_value %0 : $T
+// CHECK_CHECK-NEXT: br bb3(%
 //
 // CHECK: bb2:
-// CHECK-NEXT: %7 = copy_value %1 : $T
-// CHECK-NEXT: br bb3(%7 : $T)
+// CHECK_CHECK-NEXT: copy_value %1 : $T
+// CHECK_CHECK-NEXT: br bb3(%
 //
-// CHECK: bb3(%9 : @owned $T):
-// CHECK-NEXT: return %9 : $T
+// CHECK: bb3(%
+// CHECK_CHECK-NEXT: return
 // CHECK-LABEL: } // end sil function 'testPhi'
 sil [ossa] @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
 bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Bool):
@@ -113,23 +133,22 @@ bb3(%11 : @owned $T):
 // CHECK-LABEL: sil [ossa] @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
 // CHECK: bb0(%0 : @owned $T, %1 : $*T):
 //
-// The original copy_value is deleted.
-// CHECK-NEXT:   debug_value %0 : $T
+// Mandatory opt reuses the original copy for the consuming store.
+// CHECK-DEBUG-NEXT:   [[STOREVAL:%.*]] = copy_value %0 : $T
 //
-// A new copy_value is inserted before the consuming store.
-// CHECK-NEXT:   %3 = copy_value %0 : $T
-// CHECK-NEXT:   store %3 to [assign] %1 : $*T
+// CHECK-NEXT:   debug_value %0 : $T
+// CHECK-DEBUG-NEXT: store [[STOREVAL]] to [assign] %1 : $*T
+// CHECK-OPT-NEXT:   store %0 to [assign] %1 : $*T
 //
 // The non-consuming use now uses the original value.
-// CHECK-NEXT:   debug_value %0 : $T
+// CHECK-DEBUG-NEXT:   debug_value %0 : $T
 //
-// A new destroy is inserted after the last use.
-// CHECK-NEXT:   destroy_value %0 : $T
 // CHECK-NEXT:   debug_value_addr %1 : $*T
 //
-// The original destroy is deleted.
-// CHECK-NEXT:   %8 = tuple ()
-// CHECK-NEXT:   return %8 : $()
+// The original destroy is deleted with optimizations enabled.
+// CHECK-DEBUG-NEXT:   destroy_value %0 : $T
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
 // CHECK-LABEL: // end sil function 'testConsume'
 sil [ossa] @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
 bb0(%arg : @owned $T, %addr : $*T):
@@ -143,29 +162,29 @@ bb0(%arg : @owned $T, %addr : $*T):
   return %v : $()
 }
 
-// CHECK-LABEL: sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
-// CHECK: bb0(%0 : @owned $T, %1 : $*T, %2 : $Builtin.Int1):
-// CHECK-NEXT:   cond_br %2, bb2, bb1
+// CHECK-LABEL: sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+// CHECK: bb0(%0 : @owned $T, %1 : $Builtin.Int1):
+// CHECK-OPT-NEXT:   destroy_value %0 : $T
+// CHECK-DEBUG-NEXT: cond_br %1, bb2, bb1
 //
 // CHECK: bb1:
-//
-// The critical edge is split.
-// CHECK-NEXT:   destroy_value %0 : $T
-// CHECK-NEXT:   br bb3
+// Debug build inserts a new destroy
+// CHECK-DEBUG-NEXT: destroy_value %0 : $T
+// CHECK-NEXT:     br bb3
 //
 // CHECK: bb2:
-// The original copy is deleted.
-// CHECK-NEXT:   debug_value %0 : $T
-// CHECK-NEXT:   destroy_value %0 : $T
+// The original copy is deleted in both cases.
+// CHECK-DEBUG-NEXT:   debug_value %0 : $T
+// CHECK-DEBUG-NEXT:   destroy_value %0 : $T
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
-// The original destroy is deleted.
-// CHECK-NEXT:   %9 = tuple ()
-// CHECK-NEXT:   return %9 : $()
+// The original destroy is deleted in both cases.
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
 // CHECK-LABEL: } // end sil function 'testDestroyEdge'
-sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
-bb0(%arg : @owned $T, %addr : $*T, %z : $Builtin.Int1):
+sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%arg : @owned $T, %z : $Builtin.Int1):
   cond_br %z, bb2, bb1
 
 bb1:
@@ -183,16 +202,14 @@ bb3:
   return %10 : $()
 }
 
-sil [ossa] @takeGuaranteedAndOwnedArg : $@convention(thin) <T> (@in_guaranteed T, @in T) -> ()
-
 // Test the same user instruction with both @guaranteed and @owned operands taking the same copied value.
 // We need to keep the value alive to the end of the instruction.
 //
 // CHECK-LABEL: sil [ossa] @testGuaranteedAndOwnedArg : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : @owned $T):
+// CHECK-NEXT: [[CPY:%.*]] = copy_value %0 : $T
 // CHECK-NEXT: // function_ref takeGuaranteedAndOwnedArg
 // CHECK-NEXT: function_ref @takeGuaranteedAndOwnedArg : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in τ_0_0) -> ()
-// CHECK-NEXT: [[CPY:%.*]] = copy_value %0 : $T
 // CHECK-NEXT: apply %{{.*}}<T>(%0, [[CPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in τ_0_0) -> ()
 // CHECK-NEXT: destroy_value %0 : $T
 // CHECK-NEXT: return %{{.*}} : $()
@@ -204,4 +221,447 @@ bb(%0 : @owned $T):
   %call = apply %f<T>(%0, %copy) : $@convention(thin) <T> (@in_guaranteed T, @in T) -> ()
   destroy_value %0 : $T
   return %call : $()
+}
+
+// Reuse one of the copies for the apply. Eliminate the other copy and destroy.
+// Which copy is reused is unfortunately sensitive to the use list order.
+//
+// CHECK-TRACE-LABEL: CopyPropagation: testCopy2OperReuse
+// CHECK-TRACE:  Removing   destroy_value %0 : $T
+// CHECK-TRACE:  Removing   %{{.*}} = copy_value %0 : $T
+// CHECK-TRACE-NOT:  Removing
+//
+// CHECK-LABEL: sil [ossa] @testCopy2OperReuse : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0(%0 : @owned $T):
+// CHECK-NEXT:  [[CP:%.*]] = copy_value %0 : $T
+// CHECK-NEXT:  // function_ref takeMultipleOwned
+// CHECK-NEXT:  function_ref @takeMultipleOwned : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
+// CHECK-NEXT:  apply %{{.*}}<T>(%0, [[CP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-LABEL: } // end sil function 'testCopy2OperReuse'
+sil [ossa] @testCopy2OperReuse : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : @owned $T):
+  %copy1 = copy_value %arg : $T
+  %copy2 = copy_value %arg : $T
+  %f = function_ref @takeMultipleOwned : $@convention(thin) <T> (@in T, @in T) -> ()
+  %call = apply %f<T>(%copy1, %copy2) : $@convention(thin) <T> (@in T, @in T) -> ()
+  destroy_value %arg : $T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Reuse one copy and eliminate the other copy and destroy.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testCopy2CallReuse
+// CHECK-TRACE:  Removing   destroy_value %0 : $T
+// CHECK-TRACE:  Removing   %{{.*}} = copy_value %0 : $T
+// CHECK-TRACE-NOT:  Removing
+//
+// CHECK-LABEL: sil [ossa] @testCopy2CallReuse : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0(%0 : @owned $T):
+// CHECK-NEXT:  [[CP:%.*]] = copy_value %0 : $T
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  function_ref
+// CHECK-NEXT:  apply %{{.*}}<T>([[CP]])
+// CHECK-NEXT:  apply %{{.*}}<T>(%0)
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+// CHECK-LABEL: } // end sil function 'testCopy2CallReuse'
+sil [ossa] @testCopy2CallReuse : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : @owned $T):
+  %copy1 = copy_value %arg : $T
+  %copy2 = copy_value %arg : $T
+  %f = function_ref @takeOwned : $@convention(thin) <T> (@in T) -> ()
+  %call1 = apply %f<T>(%copy1) : $@convention(thin) <T> (@in T) -> ()
+  %call2 = apply %f<T>(%copy2) : $@convention(thin) <T> (@in T) -> ()
+  destroy_value %arg : $T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// bb1 has a consuming instruction but is also live-out. Reuse the copy in bb1.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: liveoutConsume
+// CHECK-TRACE:  Removing   destroy_value %0 : $T
+// CHECK-TRACE:  Removing   %{{.*}} = copy_value %0 : $T
+// CHECK-TRACE-NOT:  Removing
+//
+// CHECK-LABEL: sil [ossa] @liveoutConsume : $@convention(thin) <T> (@owned T, Builtin.Int1) -> () {
+// CHECK: bb0(%0 : @owned $T, %1 : $Builtin.Int1):
+// CHECK-NOT: copy_value
+// CHECK: cond_br %1, bb2, bb1
+// CHECK: bb1:
+// CHECK: copy_value %0 : $T
+// CHECK: apply
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK-NOT: copy_value
+// CHECK: apply
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'liveoutConsume'
+sil [ossa] @liveoutConsume : $@convention(thin) <T> (@owned T, Builtin.Int1) -> () {
+bb0(%arg : @owned $T, %z : $Builtin.Int1):
+  %copy1 = copy_value %arg : $T
+  cond_br %z, bb2, bb1
+
+bb1:
+  %copy2 = copy_value %arg : $T
+  %f1 = function_ref @takeOwned : $@convention(thin) <T> (@in T) -> ()
+  %call1 = apply %f1<T>(%copy2) : $@convention(thin) <T> (@in T) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %f2 = function_ref @takeOwned : $@convention(thin) <T> (@in T) -> ()
+  %call2 = apply %f2<T>(%copy1) : $@convention(thin) <T> (@in T) -> ()
+  destroy_value %arg : $T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// The LiveWithin block has a destroy, but it's before the first use.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testDestroyBeforeUse
+// CHECK-TRACE:  Removing   destroy_value %1 : $T
+// CHECK-TRACE:  Removing   %{{.*}} = copy_value %0 : $T
+//
+// CHECK-LABEL: sil [ossa] @testDestroyBeforeUse : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0(%0 : @owned $T):
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: apply
+// CHECK-NOT: destroy_value
+// CHECK: return
+// CHECK-LABEL: } // end sil function 'testDestroyBeforeUse'
+sil [ossa] @testDestroyBeforeUse : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : @owned $T):
+  %copy = copy_value %arg : $T
+  destroy_value %copy : $T
+  %f = function_ref @takeOwned : $@convention(thin) <T> (@in T) -> ()
+  %call2 = apply %f<T>(%arg) : $@convention(thin) <T> (@in T) -> ()
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// The LiveWithin block has a destroy, but it's after an unrelated call.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testDestroyAfterCall
+// CHECK-TRACE-NOT: Removing
+//
+// CHECK-LABEL: sil [ossa] @testDestroyAfterCall : $@convention(thin) <T> (@in T, @in T) -> () {
+// CHECK: bb0(%0 : @owned $T, %1 : @owned $T):
+// CHECK: apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+// CHECK: destroy_value %1 : $T
+// CHECK-LABEL: } // end sil function 'testDestroyAfterCall'
+sil [ossa] @testDestroyAfterCall : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%arg1 : @owned $T, %arg2 : @owned $T):
+  %f = function_ref @takeOwned : $@convention(thin) <T> (@in T) -> ()
+  %call = apply %f<T>(%arg1) : $@convention(thin) <T> (@in T) -> ()
+  destroy_value %arg2 : $T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// A copy may have multiple uses
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testSharedCopy
+// CHECK-TRACE:  Removing   destroy_value %0 : $T
+// CHECK-TRACE:  Removing   %1 = copy_value %0 : $T
+// CHECK-TRACE-NOT: Removing
+//
+// CHECK-LABEL: sil [ossa] @testSharedCopy : $@convention(thin) <T> (@in T) -> () {
+// CHECK-NOT: copy_value
+// CHECK: apply
+// CHECK: apply
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'testSharedCopy'
+sil [ossa] @testSharedCopy : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : @owned $T):
+  %copy = copy_value %arg : $T
+  %f1 = function_ref @takeGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %call1 = apply %f1<T>(%copy) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %f2 = function_ref @takeOwned : $@convention(thin) <T> (@in T) -> ()
+  %call2 = apply %f2<T>(%copy) : $@convention(thin) <T> (@in T) -> ()
+  destroy_value %arg : $T
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// A copy within a borrow scope is not handled by CopyPropagation. An
+// earlier pass should have hoisted the copy outside of the borrow
+// scope.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testBorrowCopy
+// CHECK-TRACE:  Outer copy          [[OUTERCOPY:%.*]] = copy_value %0 : $T
+// CHECK-TRACE:  Use of outer copy   destroy_value
+// CHECK-TRACE:  Removing   %{{.*}} = copy_value
+// CHECK-TRACE:  Removing   destroy_value [[OUTERCOPY]] : $T
+// CHECK-TRACE:  Removing   [[OUTERCOPY]] = copy_value %0 : $T
+//
+// CHECK-LABEL: sil [ossa] @testBorrowCopy : $@convention(thin) <T> (@in T) -> () {
+// CHECK-LABEL: bb0(%0 : @owned $T):
+// CHECK-NEXT:   begin_borrow %0 : $T
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   destroy_value %0 : $T
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK-LABEL: }
+sil [ossa] @testBorrowCopy : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  %3 = begin_borrow %0 : $T
+  %4 = copy_value %3 : $T
+  end_borrow %3 : $T
+  destroy_value %4 : $T
+  destroy_value %0 : $T
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testCopyBorrow
+// CHECK-TRACE:  Removing   destroy_value %1 : $T
+// CHECK-TRACE:  Removing   %{{.*}} = copy_value %0 : $T
+// CHECK-TRACE-NOT: Removing
+//
+// CHECK-LABEL: sil [ossa] @testCopyBorrow : $@convention(thin) <T> (@in T) -> () {
+// CHECK:       bb0(%0 : @owned $T):
+// CHECK-NEXT:  %1 = begin_borrow %0 : $T
+// CHECK-NEXT:  end_borrow %1 : $T
+// CHECK-NEXT:  destroy_value %0 : $T
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+// CHECK-LABEL: } // end sil function 'testCopyBorrow'
+sil [ossa] @testCopyBorrow : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  %1 = copy_value %0 : $T
+  %2 = begin_borrow %1 : $T
+  end_borrow %2 : $T
+  destroy_value %1 : $T
+  destroy_value %0 : $T
+  %17 = tuple ()
+  return %17 : $()
+}
+
+sil @testThrows : $@convention(thin) <τ_0_0> (τ_0_0) -> (@error Error)
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testTryApply
+//
+// CHECK-LABEL: sil [ossa] @testTryApply : $@convention(thin) <T> (@in T) -> @error Error {
+// CHECK: bb0(%0 : @owned $T):
+// CHECK:   function_ref @testThrows : $@convention(thin) <τ_0_0> (τ_0_0) -> @error Error
+// CHECK:   try_apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (τ_0_0) -> @error Error, normal bb1, error bb2
+// CHECK: bb1(%3 : $()):
+// CHECK:   destroy_value %0 : $T
+// CHECK:   br bb3
+// CHECK: bb2(%{{.*}} : @owned $Error):
+// CHECK:   destroy_value %0 : $T
+// CHECK:   destroy_value %{{.*}} : $Error
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK-NOT: destroy
+// CHECK:   return
+// CHECK-LABEL: } // end sil function 'testTryApply'
+sil [ossa] @testTryApply : $@convention(thin) <T> (@in T) -> (@error Error) {
+bb0(%0 : @owned $T):
+  %1 = copy_value %0 : $T
+  destroy_value %0 : $T
+  %f = function_ref @testThrows : $@convention(thin) <τ_0_0> (τ_0_0) -> (@error Error)
+  try_apply %f<T>(%1) : $@convention(thin) <τ_0_0> (τ_0_0) -> (@error Error), normal bb1, error bb2
+
+bb1(%returnval : $()):
+  br bb3
+
+bb2(%error : @owned $Error):
+  destroy_value %error : $Error
+  br bb3
+
+bb3:
+  destroy_value %1 : $T
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// -----------------------------------------------------------------------------
+// Test that convert_escape_to_noescape is a PointerEscape
+
+sil @closure : $@convention(thin) <T> (@thick T.Type) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <T, T>
+
+sil @takeClosure : $@convention(thin) <T> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>) -> (@owned AnyObject, @error Error)
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testConvertFunction
+//
+// CHECK-LABEL: sil [ossa] @testConvertFunction : $@convention(thin) <T> (@in_guaranteed T) -> @owned AnyObject {
+// CHECK: bb0(%0 : @guaranteed $T):
+// CHECK: [[CLOSURE:%.*]] = apply %{{.*}}<T>(%{{.*}}) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+// CHECK: [[CONVERT:%.*]] = convert_function [[CLOSURE]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <T, T> to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK: [[COPY:%.*]] = copy_value [[CONVERT]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK: [[NOESCAPE:%.*]] = convert_escape_to_noescape [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK: try_apply %{{.*}}<T>([[NOESCAPE]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <τ_0_0, τ_0_0>) -> (@owned AnyObject, @error Error), normal bb1, error bb2
+// CHECK: bb1
+// CHECK:   destroy_value [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK:   destroy_value [[CONVERT]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK:   return
+// CHECK: bb2
+// CHECK:   destroy_value [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testConvertFunction'
+sil [ossa] @testConvertFunction : $@convention(thin) <T> (@in_guaranteed T) -> @owned AnyObject {
+bb0(%0 : @guaranteed $T):
+  %2 = metatype $@thick T.Type
+  %3 = function_ref @closure : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+  %4 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+  %5 = convert_function %4 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <T, T> to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  %6 = copy_value %5 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  %7 = convert_escape_to_noescape %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  %8 = function_ref @takeClosure : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <τ_0_0, τ_0_0>) -> (@owned AnyObject, @error Error)
+  try_apply %8<T>(%7) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <τ_0_0, τ_0_0>) -> (@owned AnyObject, @error Error), normal bb1, error bb2
+
+bb1(%10 : @owned $AnyObject):
+  destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  destroy_value %5 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  return %10 : $AnyObject
+
+bb2(%14 : @owned $Error):
+  destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  unreachable
+}
+
+// -----------------------------------------------------------------------------
+// Test end_apply
+
+struct Struct {
+  var st: Int
+}
+
+sil @swift_modifyAtWritableKeyPath : $@yield_once @convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @guaranteed WritableKeyPath<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
+sil @modifyInt : $@convention(thin) (@inout Int) -> ()
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testBeginApply
+//
+// CHECK-LABEL: sil hidden [ossa] @testBeginApply : $@convention(thin) (@inout Struct) -> () {
+// CHECK: begin_apply
+// CHECK-NOT: destroy
+// CHECK: apply
+// CHECK-NOT: destroy
+// CHECK: end_apply
+// CHECK-NOT: destroy
+// CHECK: destroy_value %{{.*}} : $WritableKeyPath<Struct, Int>
+// CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function 'testBeginApply'
+sil hidden [ossa] @testBeginApply : $@convention(thin) (@inout Struct) -> () {
+bb0(%0 : $*Struct):
+  %2 = keypath $WritableKeyPath<Struct, Int>, (root $Struct; stored_property #Struct.st : $Int)
+  debug_value %2 : $WritableKeyPath<Struct, Int>, let, name "kp"
+  %4 = copy_value %2 : $WritableKeyPath<Struct, Int>
+  %5 = function_ref @swift_modifyAtWritableKeyPath : $@yield_once @convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @guaranteed WritableKeyPath<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
+  (%6, %7) = begin_apply %5<Struct, Int>(%0, %4) : $@yield_once @convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @guaranteed WritableKeyPath<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
+  %8 = function_ref @modifyInt : $@convention(thin) (@inout Int) -> ()
+  %9 = apply %8(%6) : $@convention(thin) (@inout Int) -> ()
+  end_apply %7
+  destroy_value %4 : $WritableKeyPath<Struct, Int>
+  destroy_value %2 : $WritableKeyPath<Struct, Int>
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// FIXME: project_box is currently a PointerEscape, so box live ranges are not canonicalized.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testProjectBox
+//
+// CHECK-LABEL: sil [ossa] @testProjectBox : $@convention(thin) (@owned B) -> @owned B {
+// CHECK: copy_value
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'testProjectBox'
+sil [ossa] @testProjectBox : $@convention(thin) (@owned B) -> @owned B {
+bb0(%0 : @owned $B):
+  %box = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %boxadr = project_box %box : $<τ_0_0> { var τ_0_0 } <B>, 0
+  store %0 to [init] %boxadr : $*B
+  %load = load [copy] %boxadr : $*B
+  %copy = copy_value %box : $<τ_0_0> { var τ_0_0 } <B>
+  destroy_value %box : $<τ_0_0> { var τ_0_0 } <B>
+  destroy_value %copy : $<τ_0_0> { var τ_0_0 } <B>
+  return %load : $B
+}
+
+// FIXME: mark_dependence is currently a PointerEscape, so dependent live ranges are not canonicalized.
+//
+// CHECK-TRACE-LABEL: *** CopyPropagation: testMarkDependence
+//
+// CHECK-LABEL: sil [ossa] @testMarkDependence : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+// CHECK: copy_value
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'testMarkDependence'
+sil [ossa] @testMarkDependence : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
+  %ptr = mark_dependence %0 : $*Builtin.Int64 on %1 : $B
+  %val = load [trivial] %ptr : $*Builtin.Int64
+  %copy = copy_value %1 : $B
+  destroy_value %1 : $B
+  destroy_value %copy : $B
+  return %val : $Builtin.Int64
+}
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testBitwiseEscape
+//
+// CHECK-LABEL: sil [ossa] @testBitwiseEscape : $@convention(thin) (@guaranteed C) -> Builtin.RawPointer {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'testBitwiseEscape'
+sil [ossa] @testBitwiseEscape : $@convention(thin) (@guaranteed C) -> Builtin.RawPointer {
+bb0(%0 : @guaranteed $C):
+  %raw = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %copy = copy_value %0 : $C
+  destroy_value %copy : $C
+  return %raw : $Builtin.RawPointer
+}
+
+// CHECK-TRACE-LABEL: *** CopyPropagation: testInteriorPointer
+//
+// CHECK-LABEL: sil [ossa] @testInteriorPointer : $@convention(thin) (@guaranteed C) -> Int64 {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK-NEXT: begin_borrow
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function 'testInteriorPointer'
+sil [ossa] @testInteriorPointer : $@convention(thin) (@guaranteed C) -> Int64 {
+bb0(%0 : @guaranteed $C):
+  %copy1 = copy_value %0 : $C
+  %borrow = begin_borrow %copy1 : $C
+  %adr = ref_element_addr %borrow : $C, #C.a
+  %val = load [trivial] %adr : $*Int64
+  %copy2 = copy_value %borrow : $C
+  end_borrow %borrow : $C
+  destroy_value %copy1 : $C
+  destroy_value %copy2 : $C
+  return %val : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @testExtract : $@convention(thin) (@guaranteed NativeObjectPair) -> @owned Builtin.NativeObject {
+// CHECK: bb0(%0 : @guaranteed $NativeObjectPair):
+// CHECK-NEXT:  [[B:%.*]] = begin_borrow %0 : $NativeObjectPair
+// CHECK-NEXT:  [[E:%.*]] = struct_extract [[B]] : $NativeObjectPair, #NativeObjectPair.obj1
+// CHECK-NEXT:  [[C:%.*]] = copy_value [[E]] : $Builtin.NativeObject
+// CHECK-NEXT:  end_borrow
+// CHECK-NEXT:  return [[C]] : $Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'testExtract'
+sil [ossa] @testExtract : $@convention(thin) (@guaranteed NativeObjectPair) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %copy1 = copy_value %0 : $NativeObjectPair
+  %borrow = begin_borrow %copy1 : $NativeObjectPair
+  %copy2 = copy_value %borrow : $NativeObjectPair
+  %val = struct_extract %borrow : $NativeObjectPair, #NativeObjectPair.obj1
+  %copy3 = copy_value %val : $Builtin.NativeObject
+  end_borrow %borrow : $NativeObjectPair
+  %copy4 = copy_value %copy3 : $Builtin.NativeObject
+  destroy_value %copy1 : $NativeObjectPair
+  destroy_value %copy2 : $NativeObjectPair
+  destroy_value %copy3 : $Builtin.NativeObject
+  return %copy4 : $Builtin.NativeObject
 }

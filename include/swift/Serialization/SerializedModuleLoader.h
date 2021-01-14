@@ -373,6 +373,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const override;
+
   virtual void
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,
@@ -394,6 +397,9 @@ public:
   void collectAllGroups(std::vector<StringRef> &Names) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void getExportedPrespecializations(
+      SmallVectorImpl<Decl *> &results) const override;
 
   virtual void
   getTopLevelDeclsWhereAttributesMatch(

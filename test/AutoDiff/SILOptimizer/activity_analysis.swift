@@ -16,7 +16,7 @@ func testNoDerivativeStructProjection(_ s: HasNoDerivativeProperty) -> Float {
   return tmp.x
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testNoDerivativeStructProjection{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testNoDerivativeStructProjection{{.*}} at parameter indices (0) and result indices (0):
 // CHECK: [ACTIVE] %0 = argument of bb0 : $HasNoDerivativeProperty
 // CHECK: [ACTIVE]   %2 = alloc_stack $HasNoDerivativeProperty, var, name "tmp"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*HasNoDerivativeProperty
@@ -39,7 +39,7 @@ func testNondifferentiableTupleElementAddr<T>(_ x: T) -> T {
   return tuple.2.0
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testNondifferentiableTupleElementAddr{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testNondifferentiableTupleElementAddr{{.*}} at parameter indices (0) and result indices (0):
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*T
 // CHECK: [ACTIVE]   %3 = alloc_stack $(Int, Int, (T, Int), Int), var, name "tuple"
@@ -73,7 +73,7 @@ func TF_781(_ x: Float, _ y: Float) -> Float {
   return result
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_781{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_781{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL] %1 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %4 = alloc_stack $Float, var, name "result"
@@ -100,7 +100,7 @@ func TF_954(_ x: Float) -> Float {
   return outer
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_954{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_954{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "outer"
@@ -135,7 +135,7 @@ func checked_cast_branch(_ x: Float) -> Float {
   return x * x
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_branch{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_branch{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [NONE]   %2 = metatype $@thin Int.Type
@@ -173,7 +173,7 @@ func checked_cast_addr_nonactive_result<T: Differentiable>(_ x: T) -> T {
   return x
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_addr_nonactive_result{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_addr_nonactive_result{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*T
@@ -208,7 +208,7 @@ func checked_cast_addr_active_result<T: Differentiable>(x: T) -> T {
   return x
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_addr_active_result{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_addr_active_result{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*T
@@ -243,7 +243,7 @@ func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
   return [x, y]
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsic{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsic{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
@@ -262,7 +262,7 @@ func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
   return [x, y]
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicGeneric{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicGeneric{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*T
 // CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
@@ -283,7 +283,7 @@ func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
   result = result * y
   return [result, result]
 }
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicAddress{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicAddress{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %4 = alloc_stack $Float, var, name "result"
@@ -310,7 +310,7 @@ func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
 func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [Float] {
   return [x * y, x * y]
 }
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicFunctionResult{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicFunctionResult{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
@@ -335,7 +335,7 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
   let array = [x, y]
   return [array[0], array[1]]
 }
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicNested{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicNested{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
@@ -347,31 +347,29 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
 // CHECK: [ACTIVE]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %15 = apply %14<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   [[ARRAY:%.*]] = apply %14<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 // CHECK: [USEFUL]   %17 = integer_literal $Builtin.Word, 2
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
 // CHECK: [ACTIVE]   %19 = apply %18<Float>(%17) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**%20**, %21) = destructure_tuple %19 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] (%20, **%21**) = destructure_tuple %19 : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [ACTIVE]   %22 = pointer_to_address %21 : $Builtin.RawPointer to [strict] $*Float
-// CHECK: [ACTIVE]   %23 = begin_borrow %15 : $Array<Float>
-// CHECK: [USEFUL]   %24 = integer_literal $Builtin.IntLiteral, 0
-// CHECK: [USEFUL]   %25 = metatype $@thin Int.Type
+// CHECK: [USEFUL]   %23 = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [USEFUL]   %24 = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %27 = apply %26(%24, %25) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   %26 = apply %25(%23, %24) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %29 = apply %28<Float>(%22, %27, %23) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
-// CHECK: [VARIED]   %30 = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   %31 = index_addr %22 : $*Float, %30 : $Builtin.Word
-// CHECK: [ACTIVE]   %32 = begin_borrow %15 : $Array<Float>
-// CHECK: [USEFUL]   %33 = integer_literal $Builtin.IntLiteral, 1
-// CHECK: [USEFUL]   %34 = metatype $@thin Int.Type
+// CHECK: [NONE]   %28 = apply %27<Float>(%22, %26, %15) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [VARIED]   %29 = integer_literal $Builtin.Word, 1
+// CHECK: [ACTIVE]   %30 = index_addr %22 : $*Float, %29 : $Builtin.Word
+// CHECK: [USEFUL]   %31 = integer_literal $Builtin.IntLiteral, 1
+// CHECK: [USEFUL]   %32 = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %36 = apply %35(%33, %34) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   %34 = apply %33(%31, %32) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %38 = apply %37<Float>(%31, %36, %32) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [NONE]   %36 = apply %35<Float>(%30, %34, %15) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %40 = apply %39<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   %38 = apply %37<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-978: Test array literal initialized with `apply` indirect results.
 struct Wrapper<T: Differentiable>: Differentiable {
@@ -381,7 +379,7 @@ struct Wrapper<T: Differentiable>: Differentiable {
 func testArrayUninitializedIntrinsicApplyIndirectResult<T>(_ x: T, _ y: T) -> [Wrapper<T>] {
   return [Wrapper(value: x), Wrapper(value: y)]
 }
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicApplyIndirectResult{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicApplyIndirectResult{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*T
 // CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
@@ -413,7 +411,7 @@ extension Mut {
   mutating func mutatingMethod(_ x: Mut) {}
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}3MutV14mutatingMethodyyACF at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}3MutV14mutatingMethodyyACF at parameter indices (0) and result indices (0)
 // CHECK: [VARIED] %0 = argument of bb0 : $Mut
 // CHECK: [USEFUL] %1 = argument of bb0 : $*Mut
 
@@ -425,7 +423,7 @@ func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = x
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}17nonActiveInoutArgyyAA3MutVz_ADtF at (parameters=(1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}17nonActiveInoutArgyyAA3MutVz_ADtF at parameter indices (1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %4 = begin_access [modify] [static] %0 : $*Mut
@@ -440,7 +438,7 @@ func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
   return result
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}28activeInoutArgMutatingMethodyAA3MutVADF at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}28activeInoutArgMutatingMethodyAA3MutVADF at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %2 = alloc_stack $Mut, var, name "result"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*Mut
@@ -479,7 +477,7 @@ func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = result.0
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}33activeInoutArgMutatingMethodTupleyyAA3MutVz_ADtF at (parameters=(1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}33activeInoutArgMutatingMethodTupleyyAA3MutVz_ADtF at parameter indices (1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %4 = alloc_stack $(Mut, Mut), var, name "result"
@@ -507,7 +505,7 @@ func activeInoutArg(_ x: Float) -> Float {
   return result
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArg{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArg{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "result"
 // CHECK: [ACTIVE]   %5 = begin_access [modify] [static] %2 : $*Float
@@ -523,7 +521,7 @@ func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
   return result
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArgNonactiveInitialResult{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArgNonactiveInitialResult{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "result"
 // CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
@@ -550,7 +548,7 @@ func testTryApply(_ x: Float) -> Float {
 }
 
 // TF-433: differentiation diagnoses `try_apply` before activity info is printed.
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testTryApply{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testTryApply{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [NONE]   // function_ref closure #1 in testTryApply(_:)
@@ -586,7 +584,7 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
   return x
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testAccessorCoroutines{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testAccessorCoroutines{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $HasCoroutineAccessors
 // CHECK: [ACTIVE]   %2 = alloc_stack $HasCoroutineAccessors, var, name "x"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*HasCoroutineAccessors
@@ -618,7 +616,7 @@ func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
   return array[0]
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveInoutArgument{{.*}} at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveInoutArgument{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Array<Float>
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %4 = alloc_stack $Array<Float>, var, name "array"
@@ -656,7 +654,7 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
   return array[0]
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveButInitiallyNonactiveInoutArgument{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveButInitiallyNonactiveInoutArgument{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %2 = alloc_stack $Array<Float>, var, name "array"
 // CHECK: [USEFUL]   %3 = integer_literal $Builtin.Word, 1
@@ -707,7 +705,7 @@ class C: Differentiable {
     x * float
   }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}1CC6methodyS2fF at (parameters=(0 1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}1CC6methodyS2fF at parameter indices (0, 1) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $C
@@ -726,23 +724,20 @@ func testClassModifyAccessor(_ c: inout C) {
 }
 
 // FIXME(TF-1176): Some values are incorrectly not marked as active: `%16`, etc.
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testClassModifyAccessor{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testClassModifyAccessor{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*C
 // CHECK: [NONE]   %2 = metatype $@thin Float.Type
 // CHECK: [ACTIVE]   %3 = begin_access [read] [static] %0 : $*C
 // CHECK: [VARIED]   %4 = load [copy] %3 : $*C
 // CHECK: [ACTIVE]   %6 = begin_access [read] [static] %0 : $*C
 // CHECK: [VARIED]   %7 = load [copy] %6 : $*C
-// CHECK: [VARIED]   %9 = begin_borrow %7 : $C
-// CHECK: [VARIED]   %10 = class_method %9 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
-// CHECK: [VARIED]   %11 = apply %10(%9) : $@convention(method) (@guaranteed C) -> Float
-// CHECK: [VARIED]   %14 = begin_borrow %4 : $C
-// CHECK: [VARIED]   %15 = class_method %14 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
-// CHECK: [VARIED] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
-// CHECK: [VARIED] (%16, **%17**) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED]   %9 = class_method %7 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %10 = apply %9(%7) : $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %12 = class_method %4 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (**%13**, %14) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED] (%13, **%14**) = begin_apply %12(%4) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [NONE]   // function_ref static Float.*= infix(_:_:)
-// CHECK: [NONE]   %19 = apply %18(%16, %11, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
-// CHECK: [NONE]   %23 = tuple ()
+// CHECK: [NONE]   %16 = apply %15(%13, %10, %2) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
 
 //===----------------------------------------------------------------------===//
 // Enum differentiation
@@ -758,7 +753,7 @@ func testActiveOptional(_ x: Float) -> Float {
   return maybe!
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveOptional{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveOptional{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %2 = alloc_stack $Optional<Float>, var, name "maybe"
@@ -801,7 +796,7 @@ func testActiveEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
   }
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumValue{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumValue{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $DirectEnum
 // CHECK: [USEFUL] %1 = argument of bb0 : $Float
@@ -842,7 +837,7 @@ func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
   }
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumAddr{{.*}} at (parameters=(0) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testActiveEnumAddr{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*T
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*IndirectEnum<T>

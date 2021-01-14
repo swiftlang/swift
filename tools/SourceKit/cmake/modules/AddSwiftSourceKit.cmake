@@ -333,7 +333,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   endif()
 
   set(XPCSERVICE_NAME ${name})
-  set(XPCSERVICE_IDENTIFIER "com.apple.${name}.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_PLATFORM_NAME}")
+  set(XPCSERVICE_IDENTIFIER "com.apple.${name}.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_TOOLCHAIN_NAME}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
   configure_file(
@@ -363,11 +363,10 @@ macro(add_sourcekit_xpc_service name framework_target)
 
   add_dependencies(${framework_target} ${name})
 
-  # This is necessary to avoid having an rpath with an absolute build directory.
-  # Without this, such an rpath is added during build time and preserved at install time.
+  # Add rpath for sourcekitdInProc
   set_target_properties(${name} PROPERTIES
                         BUILD_WITH_INSTALL_RPATH On
-                        INSTALL_RPATH "@loader_path/../lib"
+                        INSTALL_RPATH "@loader_path/../../../../../../.."
                         INSTALL_NAME_DIR "@rpath")
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")

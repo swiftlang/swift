@@ -25,12 +25,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-mandatory-combiner"
+
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
@@ -54,6 +57,55 @@ static bool areAllValuesTrivial(Values values, SILFunction &function) {
 }
 
 //===----------------------------------------------------------------------===//
+//      CanonicalizeInstruction subclass for use in Mandatory Combiner.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class MandatoryCombineCanonicalize final : CanonicalizeInstruction {
+public:
+  using Worklist = SmallSILInstructionWorklist<256>;
+
+private:
+  Worklist &worklist;
+  bool changed = false;
+
+public:
+  MandatoryCombineCanonicalize(Worklist &worklist, DeadEndBlocks &deadEndBlocks)
+      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks), worklist(worklist) {
+  }
+
+  void notifyNewInstruction(SILInstruction *inst) override {
+    worklist.add(inst);
+    worklist.addUsersOfAllResultsToWorklist(inst);
+    changed = true;
+  }
+
+  // Just delete the given 'inst' and record its operands. The callback isn't
+  // allowed to mutate any other instructions.
+  void killInstruction(SILInstruction *inst) override {
+    worklist.eraseSingleInstFromFunction(*inst,
+                                         /*AddOperandsToWorklist*/ true);
+    changed = true;
+  }
+
+  void notifyHasNewUsers(SILValue value) override {
+    if (worklist.size() < 10000) {
+      worklist.addUsersToWorklist(value);
+    }
+    changed = true;
+  }
+
+  bool tryCanonicalize(SILInstruction *inst) {
+    changed = false;
+    canonicalize(inst);
+    return changed;
+  }
+};
+
+} // anonymous namespace
+
+//===----------------------------------------------------------------------===//
 //                        MandatoryCombiner Interface
 //===----------------------------------------------------------------------===//
 
@@ -61,6 +113,8 @@ namespace {
 
 class MandatoryCombiner final
     : public SILInstructionVisitor<MandatoryCombiner, SILInstruction *> {
+
+  bool compilingWithOptimization;
 
   using Worklist = SmallSILInstructionWorklist<256>;
 
@@ -80,20 +134,26 @@ class MandatoryCombiner final
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
   SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
+  DeadEndBlocks &deadEndBlocks;
 
 public:
-  MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
-      : worklist("MC"), madeChange(false), iteration(0),
+  MandatoryCombiner(bool optimized,
+                    SmallVectorImpl<SILInstruction *> &createdInstructions,
+                    DeadEndBlocks &deadEndBlocks)
+      : compilingWithOptimization(optimized), worklist("MC"), madeChange(false),
+        iteration(0),
         instModCallbacks(
             [&](SILInstruction *instruction) {
               worklist.erase(instruction);
               instructionsPendingDeletion.push_back(instruction);
             },
             [&](SILInstruction *instruction) { worklist.add(instruction); },
-            [this](SILValue oldValue, SILValue newValue) {
-              worklist.replaceValueUsesWith(oldValue, newValue);
+            [this](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              worklist.add(use->getUser());
             }),
-        createdInstructions(createdInstructions){};
+        createdInstructions(createdInstructions),
+        deadEndBlocks(deadEndBlocks){};
 
   void addReachableCodeToWorklist(SILFunction &function);
 
@@ -137,6 +197,13 @@ public:
 //               MandatoryCombiner Non-Visitor Utility Methods
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
+    "sil-mandatory-combine-enable-canon-and-simple-dce", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("An option for compiler developers that cause the Mandatory "
+                   "Combiner to be more aggressive at eliminating trivially "
+                   "dead code and canonicalizing SIL"));
+
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
   SmallVector<SILBasicBlock *, 32> blockWorklist;
   SmallPtrSet<SILBasicBlock *, 32> blockAlreadyAddedToWorklist;
@@ -156,6 +223,12 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       ++iterator;
 
       if (isInstructionTriviallyDead(instruction)) {
+        if (EnableCanonicalizationAndTrivialDCE) {
+          if (compilingWithOptimization) {
+            instruction->replaceAllUsesOfAllResultsWithUndef();
+            instruction->eraseFromParent();
+          }
+        }
         continue;
       }
 
@@ -177,11 +250,27 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
+  MandatoryCombineCanonicalize mcCanonicialize(worklist, deadEndBlocks);
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
     if (instruction == nullptr) {
       continue;
+    }
+
+    if (EnableCanonicalizationAndTrivialDCE) {
+      if (compilingWithOptimization) {
+        if (isInstructionTriviallyDead(instruction)) {
+          worklist.eraseInstFromFunction(*instruction);
+          madeChange = true;
+          continue;
+        }
+      }
+
+      if (mcCanonicialize.tryCanonicalize(instruction)) {
+        madeChange = true;
+        continue;
+      }
     }
 
 #ifndef NDEBUG
@@ -294,8 +383,11 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 namespace {
 
 class MandatoryCombine final : public SILFunctionTransform {
-
+  bool optimized;
   SmallVector<SILInstruction *, 64> createdInstructions;
+
+public:
+  MandatoryCombine(bool optimized) : optimized(optimized) {}
 
   void run() override {
     auto *function = getFunction();
@@ -306,7 +398,8 @@ class MandatoryCombine final : public SILFunctionTransform {
       return;
     }
 
-    MandatoryCombiner combiner(createdInstructions);
+    DeadEndBlocks deadEndBlocks(function);
+    MandatoryCombiner combiner(optimized, createdInstructions, deadEndBlocks);
     bool madeChange = combiner.runOnFunction(*function);
 
     if (madeChange) {
@@ -314,6 +407,7 @@ class MandatoryCombine final : public SILFunctionTransform {
     }
   }
 
+protected:
   void handleDeleteNotification(SILNode *node) override {
     // Remove instructions that were both created and deleted from the list of
     // created instructions which will eventually be added to the worklist.
@@ -336,4 +430,10 @@ class MandatoryCombine final : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createMandatoryCombine() { return new MandatoryCombine(); }
+SILTransform *swift::createMandatoryCombine() {
+  return new MandatoryCombine(/*optimized*/ false);
+}
+
+SILTransform *swift::createOptimizedMandatoryCombine() {
+  return new MandatoryCombine(/*optimized*/ true);
+}

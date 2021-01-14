@@ -32,39 +32,47 @@ class DeadEndBlocks;
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
 
-/// These operations forward both owned and guaranteed ownership.
-bool isOwnershipForwardingValueKind(SILNodeKind kind);
-
-/// Is this an instruction that can forward both owned and guaranteed ownership
-/// kinds.
-bool isOwnershipForwardingInst(SILInstruction *i);
-
-/// Is this an instruction that can forward guaranteed ownership.
-bool isGuaranteedForwardingInst(SILInstruction *i);
-
-/// These operations forward guaranteed ownership, but don't necessarily forward
-/// owned values.
-bool isGuaranteedForwardingValueKind(SILNodeKind kind);
-
-/// Is this a value that is the result of an operation that forwards owned
-/// ownership.
-bool isGuaranteedForwardingValue(SILValue value);
-
-/// Is this a node kind that can forward owned ownership, but may not be able to
-/// forward guaranteed ownership.
-bool isOwnedForwardingValueKind(SILNodeKind kind);
-
-/// Does this SILInstruction 'forward' owned ownership, but may not be able to
-/// forward guaranteed ownership.
-bool isOwnedForwardingInstruction(SILInstruction *inst);
-
-/// Does this value 'forward' owned ownership, but may not be able to forward
-/// guaranteed ownership.
+/// Is the opcode that produces \p value capable of forwarding guaranteed
+/// values?
 ///
-/// This will be either a multiple value instruction resuilt, a single value
-/// instruction that forwards or an argument that forwards the ownership from a
-/// previous terminator.
-bool isOwnedForwardingValue(SILValue value);
+/// This may be true even if the current instance of the instruction is not a
+/// ForwardingBorrow. If true, then the operation may be trivially rewritten
+/// with Guaranteed ownership.
+bool canOpcodeForwardGuaranteedValues(SILValue value);
+
+/// Is the opcode that consumes \p use capable of forwarding guaranteed values?
+///
+/// This may be true even if \p use is not a ForwardingBorrow. If true, then the
+/// operation may be trivially rewritten with Guaranteed ownership.
+bool canOpcodeForwardGuaranteedValues(Operand *use);
+
+// This is the use-def equivalent of use->getOperandOwnership() ==
+// OperandOwnership::ForwardingBorrow.
+inline bool isForwardingBorrow(SILValue value) {
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  return canOpcodeForwardGuaranteedValues(value);
+}
+
+/// Is the opcode that produces \p value capable of forwarding owned values?
+///
+/// This may be true even if the current instance of the instruction is not a
+/// ForwardingConsume. If true, then the operation may be trivially rewritten
+/// with Owned ownership.
+bool canOpcodeForwardOwnedValues(SILValue value);
+
+/// Is this opcode that consumes \p use capable of forwarding owned values?
+///
+/// This may be true even if the current instance of the instruction is not a
+/// ForwardingConsume. If true, then the operation may be trivially rewritten
+/// with Owned ownership.
+bool canOpcodeForwardOwnedValues(Operand *use);
+
+// This is the use-def equivalent of use->getOperandOwnership() ==
+// OperandOwnership::ForwardingConsume.
+inline bool isForwardingConsume(SILValue value) {
+  assert(value.getOwnershipKind() == OwnershipKind::Owned);
+  return canOpcodeForwardOwnedValues(value);
+}
 
 class ForwardingOperand {
   Operand *use;
@@ -74,10 +82,34 @@ class ForwardingOperand {
 public:
   static Optional<ForwardingOperand> get(Operand *use);
 
+  OwnershipConstraint getOwnershipConstraint() const {
+    // We use a force unwrap since a ForwardingOperand should always have an
+    // ownership constraint.
+    return use->getOwnershipConstraint();
+  }
+
   ValueOwnershipKind getOwnershipKind() const;
   void setOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
+
+  const Operand *operator->() const { return use; }
+
+  Operand *operator->() { return use; }
+
+  const Operand &operator*() const { return *use; }
+
+  Operand &operator*() { return *use; }
+
+  /// Call \p visitor with each value that contains the final forwarded
+  /// ownership of. E.x.: result of a unchecked_ref_cast, phi arguments of a
+  /// switch_enum.
+  bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
+
+  /// If statically this forwarded operand has a single forwarded value that the
+  /// operand forwards ownership into, return that value. Return false
+  /// otherwise.
+  SILValue getSingleForwardedValue() const;
 };
 
 /// Returns true if the instruction is a 'reborrow'.
@@ -89,6 +121,9 @@ public:
     BeginBorrow,
     BeginApply,
     Branch,
+    Apply,
+    TryApply,
+    Yield,
   };
 
 private:
@@ -109,6 +144,12 @@ public:
       return BorrowingOperandKind(BeginApply);
     case SILInstructionKind::BranchInst:
       return BorrowingOperandKind(Branch);
+    case SILInstructionKind::ApplyInst:
+      return BorrowingOperandKind(Apply);
+    case SILInstructionKind::TryApplyInst:
+      return BorrowingOperandKind(TryApply);
+    case SILInstructionKind::YieldInst:
+      return BorrowingOperandKind(Yield);
     }
   }
 
@@ -142,7 +183,17 @@ struct BorrowingOperand {
     return *this;
   }
 
-  /// If value is a borrow introducer return it after doing some checks.
+  // A set of operators so that a BorrowingOperand can be used like a normal
+  // operand in a light weight way.
+  operator const Operand *() const { return op; }
+  operator Operand *() { return op; }
+  const Operand *operator*() const { return op; }
+  Operand *operator*() { return op; }
+  const Operand *operator->() const { return op; }
+  Operand *operator->() { return op; }
+
+  /// If \p op is a borrow introducing operand return it after doing some
+  /// checks.
   static Optional<BorrowingOperand> get(Operand *op) {
     auto *user = op->getUser();
     auto kind = BorrowingOperandKind::get(user->getKind());
@@ -151,30 +202,38 @@ struct BorrowingOperand {
     return BorrowingOperand(*kind, op);
   }
 
-  void visitLocalEndScopeInstructions(function_ref<void(Operand *)> func) const;
+  /// If \p op is a borrow introducing operand return it after doing some
+  /// checks.
+  static Optional<BorrowingOperand> get(const Operand *op) {
+    return get(const_cast<Operand *>(op));
+  }
+
+  /// If this borrowing operand results in the underlying value being borrowed
+  /// over a region of code instead of just for a single instruction, visit
+  /// those uses.
+  ///
+  /// Example: An apply performs an instantaneous recursive borrow of a
+  /// guaranteed value but a begin_apply borrows the value over the entire
+  /// region of code corresponding to the coroutine.
+  ///
+  /// NOTE: Return false from func to stop iterating. Returns false if the
+  /// closure requested to stop early.
+  bool visitLocalEndScopeUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
-  bool consumesGuaranteedValues() const {
+  ///
+  /// TODO: tuple, struct, destructure_tuple, destructure_struct.
+  bool isReborrow() const {
     switch (kind) {
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
+    case BorrowingOperandKind::Yield:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
-
-  /// Is this a borrow scope operand that can open new borrow scopes
-  /// for owned values.
-  bool canAcceptOwnedValues() const {
-    switch (kind) {
-    case BorrowingOperandKind::BeginBorrow:
-    case BorrowingOperandKind::BeginApply:
-      return true;
-    case BorrowingOperandKind::Branch:
-      return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -189,6 +248,9 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Branch:
       return true;
     case BorrowingOperandKind::BeginApply:
+    case BorrowingOperandKind::Apply:
+    case BorrowingOperandKind::TryApply:
+    case BorrowingOperandKind::Yield:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -253,7 +315,7 @@ private:
 
 public:
   static Optional<BorrowedValueKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
       return None;
     switch (value->getKind()) {
     default:
@@ -366,7 +428,7 @@ struct BorrowedValue {
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool areUsesWithinScope(ArrayRef<Operand *> instructions,
+  bool areUsesWithinScope(ArrayRef<Operand *> uses,
                           SmallVectorImpl<Operand *> &scratchSpace,
                           SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                           DeadEndBlocks &deadEndBlocks) const;
@@ -387,6 +449,31 @@ struct BorrowedValue {
   /// interior pointer uses. Returns false otherwise.
   bool visitInteriorPointerOperands(
       function_ref<void(const InteriorPointerOperand &)> func) const;
+
+  /// Visit all immediate uses of this borrowed value and if any of them are
+  /// reborrows, place them in BorrowingOperand form into \p
+  /// foundReborrows. Returns true if we appended any such reborrows to
+  /// foundReborrows... false otherwise.
+  bool
+  gatherReborrows(SmallVectorImpl<BorrowingOperand> &foundReborrows) const {
+    bool foundAnyReborrows = false;
+    for (auto *op : value->getUses()) {
+      if (auto borrowingOperand = BorrowingOperand::get(op)) {
+        if (borrowingOperand->isReborrow()) {
+          foundReborrows.push_back(*borrowingOperand);
+          foundAnyReborrows = true;
+        }
+      }
+    }
+    return foundAnyReborrows;
+  }
+
+  // Helpers to allow a BorrowedValue to easily be used as a SILValue
+  // programatically.
+  SILValue operator->() { return value; }
+  SILValue operator->() const { return value; }
+  SILValue operator*() { return value; }
+  SILValue operator*() const { return value; }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand
@@ -420,6 +507,7 @@ Optional<BorrowedValue> getSingleBorrowIntroducingValue(SILValue inputValue);
 class InteriorPointerOperandKind {
 public:
   enum Kind : uint8_t {
+    Invalid=0,
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
@@ -431,18 +519,38 @@ private:
 public:
   InteriorPointerOperandKind(Kind newValue) : value(newValue) {}
 
-  operator Kind() const { return value; }
+  operator Kind() const {
+    return value;
+  }
 
-  static Optional<InteriorPointerOperandKind> get(Operand *use) {
+  bool isValid() const { return value != Kind::Invalid; }
+
+  static InteriorPointerOperandKind get(Operand *use) {
     switch (use->getUser()->getKind()) {
     default:
-      return None;
+      return Kind::Invalid;
     case SILInstructionKind::RefElementAddrInst:
-      return InteriorPointerOperandKind(RefElementAddr);
+      return Kind::RefElementAddr;
     case SILInstructionKind::RefTailAddrInst:
-      return InteriorPointerOperandKind(RefTailAddr);
+      return Kind::RefTailAddr;
     case SILInstructionKind::OpenExistentialBoxInst:
-      return InteriorPointerOperandKind(OpenExistentialBox);
+      return Kind::OpenExistentialBox;
+    }
+  }
+
+  /// Given a \p value that is a result of an instruction with an interior
+  /// pointer operand, return the interior pointer operand kind that would be
+  /// appropriate for that operand.
+  static InteriorPointerOperandKind inferFromResult(SILValue value) {
+    switch (value->getKind()) {
+    default:
+      return Kind::Invalid;
+    case ValueKind::RefElementAddrInst:
+      return Kind::RefElementAddr;
+    case ValueKind::RefTailAddrInst:
+      return Kind::RefTailAddr;
+    case ValueKind::OpenExistentialBoxInst:
+      return Kind::OpenExistentialBox;
     }
   }
 
@@ -459,14 +567,42 @@ struct InteriorPointerOperand {
   InteriorPointerOperandKind kind;
 
   InteriorPointerOperand(Operand *op)
-      : operand(op), kind(*InteriorPointerOperandKind::get(op)) {}
+      : operand(op), kind(InteriorPointerOperandKind::get(op)) {
+    assert(kind.isValid());
+  }
 
-  /// If value is a borrow introducer return it after doing some checks.
+  /// If \p op has a user that is an interior pointer, return a valid
+  /// value. Otherwise, return None.
   static Optional<InteriorPointerOperand> get(Operand *op) {
     auto kind = InteriorPointerOperandKind::get(op);
     if (!kind)
       return None;
-    return InteriorPointerOperand(op, *kind);
+    return InteriorPointerOperand(op, kind);
+  }
+
+  /// If \p val is a result of an instruction that is an interior pointer,
+  /// return an interor pointer operand based off of the base value operand of
+  /// the instruction.
+  static Optional<InteriorPointerOperand>
+  inferFromResult(SILValue resultValue) {
+    auto kind = InteriorPointerOperandKind::inferFromResult(resultValue);
+
+    // NOTE: We use an exhaustive switch here to allow for further interior
+    // pointer operand having instructions to make the interior pointer
+    // operand's argument index arbitrary.
+    switch (kind) {
+    case InteriorPointerOperandKind::Invalid:
+      // We do not have a valid instruction, so return None.
+      return None;
+    case InteriorPointerOperandKind::RefElementAddr:
+    case InteriorPointerOperandKind::RefTailAddr:
+    case InteriorPointerOperandKind::OpenExistentialBox: {
+      // Ok, we have a valid instruction. Return the relevant operand.
+      auto *op =
+          &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
+      return InteriorPointerOperand(op, kind);
+    }
+    }
   }
 
   /// Return the end scope of all borrow introducers of the parent value of this
@@ -484,8 +620,15 @@ struct InteriorPointerOperand {
     return true;
   }
 
+  /// Return the base BorrowedValue of the incoming value's operand.
+  Optional<BorrowedValue> getSingleBaseValue() const {
+    return getSingleBorrowIntroducingValue(operand->get());
+  }
+
   SILValue getProjectedAddress() const {
     switch (kind) {
+    case InteriorPointerOperandKind::Invalid:
+      llvm_unreachable("Calling method on invalid?!");
     case InteriorPointerOperandKind::RefElementAddr:
       return cast<RefElementAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::RefTailAddr:
@@ -505,6 +648,11 @@ struct InteriorPointerOperand {
   /// points.
   bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
                        std::function<void(Operand *)> *onError = nullptr);
+
+  Operand *operator->() { return operand; }
+  const Operand *operator->() const { return operand; }
+  Operand *operator*() { return operand; }
+  const Operand *operator*() const { return operand; }
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand
@@ -571,7 +719,7 @@ private:
 
 public:
   static Optional<OwnedValueIntroducerKind> get(SILValue value) {
-    if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
+    if (value.getOwnershipKind() != OwnershipKind::Owned)
       return None;
 
     switch (value->getKind()) {

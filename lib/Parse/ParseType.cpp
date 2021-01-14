@@ -252,8 +252,7 @@ ParserResult<TypeRepr> Parser::parseType() {
 }
 
 ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
-                                               const TypeAttributes &attrs,
-                                               Optional<Scope> &GenericsScope) {
+                                               const TypeAttributes &attrs) {
   auto LBraceLoc = consumeToken(tok::l_brace);
   
   SmallVector<SILBoxTypeRepr::Field, 4> Fields;
@@ -286,11 +285,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   }
   
   auto RBraceLoc = consumeToken(tok::r_brace);
-  
-  // The generic arguments are taken from the enclosing scope. Pop the
-  // box layout's scope now.
-  GenericsScope.reset();
-  
+
   SourceLoc LAngleLoc, RAngleLoc;
   SmallVector<TypeRepr*, 4> Args;
   if (startsWithLess(Tok)) {
@@ -339,28 +334,19 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   TypeAttributes attrs;
   parseTypeAttributeList(specifier, specifierLoc, attrs);
 
-  Optional<Scope> GenericsScope;
-  Optional<Scope> patternGenericsScope;
-
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
   SourceLoc substitutedLoc;
   GenericParamList *patternGenerics = nullptr;
   if (isInSILMode()) {
-    // If this is part of a sil function decl, generic parameters are visible in
-    // the function body; otherwise, they are visible when parsing the type.
-    if (!IsSILFuncDecl)
-      GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
     
     if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
       consumeToken(tok::at_sign);
       substitutedLoc = consumeToken(tok::identifier);
-      patternGenericsScope.emplace(this, ScopeKind::Generics);
       patternGenerics = maybeParseGenericParams().getPtrOrNull();
       if (!patternGenerics) {
         diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
-        patternGenericsScope.reset();
       }
     }
   }
@@ -369,9 +355,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   if (isInSILMode() && Tok.is(tok::l_brace)) {
     if (patternGenerics) {
       diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
-      patternGenericsScope.reset();
     }
-    return parseSILBoxType(generics, attrs, GenericsScope);
+    return parseSILBoxType(generics, attrs);
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
@@ -380,48 +365,22 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   auto tyR = ty.get();
   auto status = ParserStatus(ty);
 
-  // Parse an async specifier.
+  // Parse effects specifiers.
+  // Don't consume them, if there's no following '->', so we can emit a more
+  // useful diagnostic when parsing a function decl.
   SourceLoc asyncLoc;
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
-    asyncLoc = consumeToken();
-  }
-
-  // Parse a throws specifier.
-  // Don't consume 'throws', if the next token is not '->' or 'async', so we
-  // can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
-      (peekToken().is(tok::arrow) ||
-       (shouldParseExperimentalConcurrency() &&
-        peekToken().isContextualKeyword("async")))) {
-    if (Tok.isAny(tok::kw_rethrows, tok::kw_throw, tok::kw_try)) {
-      // 'rethrows' is only allowed on function declarations for now.
-      // 'throw' or 'try' are probably typos for 'throws'.
-      Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
-        diag::rethrowing_function_type : diag::throw_in_function_type;
-      diagnose(Tok.getLoc(), DiagID)
-        .fixItReplace(Tok.getLoc(), "throws");
-    }
-    throwsLoc = consumeToken();
-
-    // 'async' must preceed 'throws'; accept this but complain.
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async")) {
-      asyncLoc = consumeToken();
-
-      diagnose(asyncLoc, diag::async_after_throws, false)
-        .fixItRemove(asyncLoc)
-        .fixItInsert(throwsLoc, "async ");
-    }
+  if (isAtFunctionTypeArrow()) {
+    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                                     /*rethrows=*/nullptr);
   }
 
+  // Handle type-function if we have an arrow.
   if (Tok.is(tok::arrow)) {
-    // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
 
     // Handle async/throws in the wrong place.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
@@ -519,10 +478,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       // Parse pattern substitutions.  These must exist if we had pattern
       // generics above.
       if (patternGenerics) {
-        // These substitutions are outside of the scope of the
-        // pattern generics.
-        patternGenericsScope.reset();
-
         auto result = parseSubstitutions(patternSubsTypes);
         if (!result || patternSubsTypes.empty()) {
           diagnose(Tok, diag::sil_function_subst_expected_subs);
@@ -533,10 +488,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
 
       if (generics) {
-        // These substitutions are outside of the scope of the
-        // invocation generics.
-        GenericsScope.reset();
-
         if (auto result = parseSubstitutions(invocationSubsTypes))
           if (!*result) return makeParserError();
       }
@@ -555,8 +506,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
-    GenericsScope.reset();
-    patternGenericsScope.reset();
 
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {
@@ -772,12 +721,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 
   IdentTypeRepr *ITR = nullptr;
   if (!ComponentsR.empty()) {
-    // Lookup element #0 through our current scope chains in case it is some
-    // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
-      if (auto *TD = dyn_cast<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(TD, nullptr);
-
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
 
@@ -1519,39 +1462,18 @@ bool Parser::canParseType() {
     break;
   }
 
-  // Handle type-function if we have an 'async'.
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
+  if (!isAtFunctionTypeArrow())
+    return true;
+
+  // Handle type-function if we have an '->' with optional
+  // 'async' and/or 'throws'.
+  while (isEffectsSpecifier(Tok))
     consumeToken();
 
-    // 'async' isn't a valid type without being followed by throws/rethrows
-    // or a return.
-    if (!Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::arrow))
-      return false;
-  }
-
-  // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
-    consumeToken();
-
-    // Allow 'async' here even though it is ill-formed, so we can provide
-    // a better error.
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async"))
-      consumeToken();
-
-    // "throws" or "rethrows" isn't a valid type without being followed by
-    // a return. We also accept 'async' here so we can provide a better
-    // error.
-    if (!Tok.is(tok::arrow))
-      return false;
-  }
+  if (!consumeIf(tok::arrow))
+    return false;
   
-  if (consumeIf(tok::arrow)) {
-    return canParseType();
-  }
-
-  return true;
+  return canParseType();
 }
 
 bool Parser::canParseTypeIdentifierOrTypeComposition() {
@@ -1690,4 +1612,31 @@ bool Parser::canParseTypeTupleBody() {
   }
   
   return consumeIf(tok::r_paren);
+}
+
+bool Parser::isAtFunctionTypeArrow() {
+  if (Tok.is(tok::arrow))
+    return true;
+
+  if (isEffectsSpecifier(Tok)) {
+    if (peekToken().is(tok::arrow))
+      return true;
+    if (isEffectsSpecifier(peekToken())) {
+      BacktrackingScope backtrack(*this);
+      consumeToken();
+      consumeToken();
+      return isAtFunctionTypeArrow();
+    }
+    // Don't look for '->' in code completion. The user may write it later.
+    if (peekToken().is(tok::code_complete) && !peekToken().isAtStartOfLine())
+      return true;
+
+    return false;
+  }
+
+  // Don't look for '->' in code completion. The user may write it later.
+  if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine())
+    return true;
+
+  return false;
 }

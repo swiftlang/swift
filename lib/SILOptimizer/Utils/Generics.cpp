@@ -19,6 +19,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DebugUtils.h"
@@ -683,6 +684,9 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   TrivialArgs.resize(NumArgs);
 
   SILFunctionConventions substConv(SubstitutedType, M);
+  TypeExpansionContext resilienceExp = getResilienceExpansion();
+  TypeExpansionContext minimalExp(ResilienceExpansion::Minimal,
+                                  TargetModule, isWholeModule);
 
   if (SubstitutedType->getNumDirectFormalResults() == 0) {
     // The original function has no direct result yet. Try to convert the first
@@ -693,18 +697,15 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     for (SILResultInfo RI : SubstitutedType->getIndirectFormalResults()) {
       assert(RI.isFormalIndirect());
 
-      auto ResultTy = substConv.getSILType(RI, getResilienceExpansion());
-      ResultTy = Callee->mapTypeIntoContext(ResultTy);
-      auto &TL = M.Types.getTypeLowering(ResultTy,
-                                         getResilienceExpansion());
-
-      if (TL.isLoadable() &&
-          !RI.getReturnValueType(M, SubstitutedType, getResilienceExpansion())
-               ->isVoid() &&
-          shouldExpand(M, ResultTy)) {
+      TypeCategory tc = getReturnTypeCategory(RI, substConv, resilienceExp);
+      if (tc != NotLoadable) {
         Conversions.set(IdxForResult);
-        if (TL.isTrivial())
+        if (tc == LoadableAndTrivial)
           TrivialArgs.set(IdxForResult);
+        if (resilienceExp != minimalExp &&
+            getReturnTypeCategory(RI, substConv, minimalExp) == NotLoadable) {
+          hasConvertedResilientParams = true;
+        }
         break;
       }
       ++IdxForResult;
@@ -717,21 +718,20 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     auto IdxToInsert = IdxForParam;
     ++IdxForParam;
 
-    auto ParamTy = substConv.getSILType(PI, getResilienceExpansion());
-    ParamTy = Callee->mapTypeIntoContext(ParamTy);
-    auto &TL = M.Types.getTypeLowering(ParamTy,
-                                       getResilienceExpansion());
-
-    if (!TL.isLoadable()) {
+    TypeCategory tc = getParamTypeCategory(PI, substConv, resilienceExp);
+    if (tc == NotLoadable)
       continue;
-    }
 
     switch (PI.getConvention()) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
       Conversions.set(IdxToInsert);
-      if (TL.isTrivial())
+      if (tc == LoadableAndTrivial)
         TrivialArgs.set(IdxToInsert);
+      if (resilienceExp != minimalExp &&
+          getParamTypeCategory(PI, substConv, minimalExp) == NotLoadable) {
+        hasConvertedResilientParams = true;
+      }
       break;
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
@@ -747,6 +747,43 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   // the parameters/results passing conventions adjusted according
   // to the conversions selected above.
   SpecializedType = createSpecializedType(SubstitutedType, M);
+}
+
+ReabstractionInfo::TypeCategory ReabstractionInfo::
+getReturnTypeCategory(const SILResultInfo &RI,
+                  const SILFunctionConventions &substConv,
+                  TypeExpansionContext typeExpansion) {
+  auto &M = Callee->getModule();
+  auto ResultTy = substConv.getSILType(RI, typeExpansion);
+  ResultTy = Callee->mapTypeIntoContext(ResultTy);
+  auto &TL = M.Types.getTypeLowering(ResultTy, typeExpansion);
+
+  if (!TL.isLoadable())
+    return NotLoadable;
+    
+  if (RI.getReturnValueType(M, SubstitutedType, typeExpansion)
+        ->isVoid())
+    return NotLoadable;
+
+  if (!shouldExpand(M, ResultTy))
+    return NotLoadable;
+  
+  return TL.isTrivial() ? LoadableAndTrivial : Loadable;
+}
+
+ReabstractionInfo::TypeCategory ReabstractionInfo::
+getParamTypeCategory(const SILParameterInfo &PI,
+                  const SILFunctionConventions &substConv,
+                  TypeExpansionContext typeExpansion) {
+  auto &M = Callee->getModule();
+  auto ParamTy = substConv.getSILType(PI, typeExpansion);
+  ParamTy = Callee->mapTypeIntoContext(ParamTy);
+  auto &TL = M.Types.getTypeLowering(ParamTy, typeExpansion);
+
+  if (!TL.isLoadable())
+    return NotLoadable;
+    
+  return TL.isTrivial() ? LoadableAndTrivial : Loadable;
 }
 
 /// Create a new substituted type with the updated signature.
@@ -1818,9 +1855,13 @@ GenericFuncSpecializer::GenericFuncSpecializer(
     ClonedName = Mangler.mangle();
   } else {
     Mangle::GenericSpecializationMangler Mangler(
-        GenericFunc, ParamSubs, ReInfo.isSerialized(), /*isReAbstracted*/ true,
-        /*isInlined*/ false, ReInfo.isPrespecialized());
-    ClonedName = Mangler.mangle();
+        GenericFunc, ReInfo.isSerialized());
+    if (ReInfo.isPrespecialized()) {
+      ClonedName = Mangler.manglePrespecialized(ParamSubs);
+    } else {
+      ClonedName = Mangler.mangleReabstracted(ParamSubs,
+                                              ReInfo.needAlternativeMangling());
+    }
   }
   LLVM_DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 }
@@ -1964,7 +2005,7 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
                                            LoadOwnershipQualifier::Take);
     } else {
       Val = Builder.emitLoadBorrowOperation(Loc, InputValue);
-      if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+      if (Val.getOwnershipKind() == OwnershipKind::Guaranteed)
         ArgAtIndexNeedsEndBorrow.push_back(Arguments.size());
     }
 
@@ -2041,7 +2082,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
       fixUsedVoidType(resultBlock->getArgument(0), loc, builder);
 
       SILArgument *arg = resultBlock->replacePhiArgument(
-          0, resultOut->getType().getObjectType(), ValueOwnershipKind::Owned);
+          0, resultOut->getType().getObjectType(), OwnershipKind::Owned);
       // Store the direct result to the original result address.
       builder.emitStoreValueOperation(loc, arg, resultOut,
                                       StoreOwnershipQualifier::Init);
@@ -2140,11 +2181,9 @@ public:
         SpecializedFunc(SpecializedFunc), ReInfo(ReInfo), OrigPAI(OrigPAI),
         Loc(RegularLocation::getAutoGeneratedLocation()) {
     if (!ReInfo.isPartialSpecialization()) {
-      Mangle::GenericSpecializationMangler Mangler(
-          OrigF, ReInfo.getCalleeParamSubstitutionMap(), ReInfo.isSerialized(),
-          /*isReAbstracted*/ false);
-
-      ThunkName = Mangler.mangle();
+      Mangle::GenericSpecializationMangler Mangler(OrigF, ReInfo.isSerialized());
+      ThunkName = Mangler.mangleNotReabstracted(
+          ReInfo.getCalleeParamSubstitutionMap());
     } else {
       Mangle::PartialSpecializationMangler Mangler(
           OrigF, ReInfo.getSpecializedType(), ReInfo.isSerialized(),
@@ -2249,13 +2288,13 @@ FullApplySite ReabstractionThunkGenerator::createReabstractionThunkApply(
   auto *ErrorVal = ErrorBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(
           specConv.getSILErrorType(Builder.getTypeExpansionContext())),
-      ValueOwnershipKind::Owned);
+      OwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
   NormalBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(
           specConv.getSILResultType(Builder.getTypeExpansionContext())),
-      ValueOwnershipKind::Owned);
+      OwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);
   return FullApplySite(TAI);
 }
@@ -2337,7 +2376,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
         Arguments.push_back(argVal);
       } else {
         SILValue argVal = Builder.emitLoadBorrowOperation(Loc, NewArg);
-        if (argVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+        if (argVal.getOwnershipKind() == OwnershipKind::Guaranteed)
           ArgsThatNeedEndBorrow.push_back(Arguments.size());
         Arguments.push_back(argVal);
       }
@@ -2462,14 +2501,14 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
     if (specializedReInfo.getSpecializedType() != reInfo.getSpecializedType())
       continue;
 
-    Mangle::GenericSpecializationMangler mangler(
-        refF, reInfo.getCalleeParamSubstitutionMap(), reInfo.isSerialized(),
-        /*isReAbstracted*/ true, /*isInlined*/ false,
-        reInfo.isPrespecialized());
+    SubstitutionMap subs = reInfo.getCalleeParamSubstitutionMap();
+    Mangle::GenericSpecializationMangler mangler(refF, reInfo.isSerialized());
+    std::string name = reInfo.isPrespecialized() ?
+        mangler.manglePrespecialized(subs) :
+        mangler.mangleReabstracted(subs, reInfo.needAlternativeMangling());
 
     prespecializedReInfo = reInfo;
-    return lookupOrCreatePrespecialization(funcBuilder, refF, mangler.mangle(),
-                                           reInfo);
+    return lookupOrCreatePrespecialization(funcBuilder, refF, name, reInfo);
   }
   return nullptr;
 }

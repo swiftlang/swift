@@ -795,4 +795,90 @@ CastsTests.test("AnyObject.Type -> AnyObject") {
 }
 #endif
 
+protocol Fruit {}
+CastsTests.test("Generic type validation [SR-13812]") {
+  func check<A, B>(a: A.Type, b: B.Type) -> Bool {
+    return (a is B.Type)
+  }
+  struct Apple: Fruit {}
+  expectFalse(check(a: Apple.self, b: Fruit.self))
+  expectFalse(Apple.self is Fruit.Protocol)
+  expectTrue(Apple.self is Fruit.Type)
+}
+
+CastsTests.test("Cast failure for Any! holding Error struct [SR-8964]") {
+  struct MyError: Error {}
+  let a: Any! = MyError()
+  let b: Any = a
+  expectTrue(b is Error)
+}
+
+CastsTests.test("Cannot cast from Any? to Existential [SR-1999]") {
+  let a = Float(1) as Any as? Float
+  expectNotNil(a)
+
+  let b = Float(1) as Any as? CustomStringConvertible
+  expectNotNil(b)
+
+  let c = Optional.some(Float(1)) as Any as? Float
+  expectNotNil(c)
+
+  let d = Optional.some(Float(1)) as Any as? CustomStringConvertible
+  expectNotNil(d)
+}
+
+protocol A {}
+CastsTests.test("Failing cast from Any to Optional<Protocol> [SR-6279]") {
+  struct B: A {}
+
+  // If we have an optional instance, stored as an `Any`
+  let b: A? = B()
+  let c = b as Any
+
+  // This fails to cast, should succeed.
+  let d = c as? A
+  expectNotNil(d)
+
+  // There is a workaround, but not ideal.
+  func cast<T, U>(_ t: T, to: U.Type) -> U? {
+    return t as? U
+  }
+  let f = cast(c, to: Any?.self) as? A
+  expectNotNil(f)
+}
+
+protocol SuperProtocol{}
+CastsTests.test("Casting Objects retained from KeyPaths to Protocols is not working properly") {
+  // This is the simplified reproduction from rdar://59844232 which doesn't
+  // actually use KeyPaths
+  class SubClass : SuperProtocol{}
+  let value = SubClass() as Any? as Any
+
+  expectNotNil(value as? SubClass)
+  expectNotNil(value as? SuperProtocol)
+}
+
+#if _runtime(_ObjC)
+// Known to still be broken, but we can document the issue here
+public protocol SomeProtocol {}
+extension NSString: SomeProtocol {}
+CastsTests.test("NSDictionary -> Dictionary casting [SR-12025]") {
+  // Create NSDictionary with one entry
+  var a = NSMutableDictionary()
+  a[NSString("key")] = NSString("value")
+
+  let v = NSString("value")
+  let v2 = v as? SomeProtocol
+  expectNotNil(v2)
+
+  // Test casting of the dictionary
+  let b = a as? [String:SomeProtocol]
+  expectFailure { expectNotNil(b) } // Expect non-nil, but see nil
+  let c = a as? [String:Any]
+  expectNotNil(c)  // Non-nil (as expected)
+  let d = c as? [String:SomeProtocol]
+  expectNotNil(d) // Non-nil (as expected)
+}
+#endif
+
 runAllTests()

@@ -134,7 +134,7 @@ public:
   /// Returns the number of bit words used to store the index subset.
   // Note: Use `getCapacity()` to get the total index subset capacity.
   // This is public only for unit testing
-  // (in unittests/AST/SILAutoDiffIndices.cpp).
+  // (in unittests/AST/IndexSubsetTests.cpp).
   unsigned getNumBitWords() const {
     return numBitWords;
   }

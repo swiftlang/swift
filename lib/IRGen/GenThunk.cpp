@@ -18,9 +18,11 @@
 
 #include "Callee.h"
 #include "ClassMetadataVisitor.h"
+#include "ConstantBuilder.h"
 #include "Explosion.h"
-#include "GenDecl.h"
+#include "GenCall.h"
 #include "GenClass.h"
+#include "GenDecl.h"
 #include "GenHeap.h"
 #include "GenOpaque.h"
 #include "GenPointerAuth.h"
@@ -30,7 +32,9 @@
 #include "MetadataLayout.h"
 #include "ProtocolInfo.h"
 #include "Signature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "llvm/IR/Function.h"
 
 using namespace swift;
@@ -60,31 +64,64 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
 static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
   auto expansionContext = IGF.IGM.getMaximalTypeExpansionContext();
   auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
+  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(
+      expansionContext, declRef);
+
+  auto getAsyncContextLayout = [&]() {
+    auto originalType = funcTy;
+    auto forwardingSubstitutionMap =
+        decl->getGenericEnvironment()
+            ? decl->getGenericEnvironment()->getForwardingSubstitutionMap()
+            : SubstitutionMap();
+    auto substitutedType = originalType->substGenericArgs(
+        IGF.IGM.getSILModule(), forwardingSubstitutionMap,
+        IGF.IGM.getMaximalTypeExpansionContext());
+    auto layout = irgen::getAsyncContextLayout(
+        IGF.IGM, originalType, substitutedType, forwardingSubstitutionMap);
+    return layout;
+  };
 
   // Protocol case.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {
     // Find the witness table.
-    llvm::Value *wtable = (IGF.CurFn->arg_end() - 1);
+    llvm::Value *wtable;
+    if (funcTy->isAsync()) {
+      auto layout = getAsyncContextLayout();
+      assert(layout.hasTrailingWitnesses());
+      auto context = layout.emitCastTo(IGF, IGF.getAsyncContext());
+      auto wtableAddr =
+          layout.getSelfWitnessTableLayout().project(IGF, context, llvm::None);
+      wtable = IGF.Builder.CreateLoad(wtableAddr);
+    } else {
+      wtable = (IGF.CurFn->arg_end() - 1);
+    }
 
     // Find the witness we're interested in.
     return emitWitnessMethodValue(IGF, wtable, declRef);
   }
 
   // Class case.
-  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(
-      expansionContext, declRef);
 
   // Load the metadata, or use the 'self' value if we have a static method.
   llvm::Value *self;
 
-  // Non-throwing class methods always have the 'self' parameter at the end.
-  // Throwing class methods have 'self' right before the error parameter.
-  //
-  // FIXME: Should find a better way of expressing this.
-  if (funcTy->hasErrorResult())
-    self = (IGF.CurFn->arg_end() - 2);
-  else
-    self = (IGF.CurFn->arg_end() - 1);
+  if (funcTy->isAsync()) {
+    auto layout = getAsyncContextLayout();
+    assert(layout.hasLocalContext());
+    auto context = layout.emitCastTo(IGF, IGF.getAsyncContext());
+    auto localContextAddr =
+        layout.getLocalContextLayout().project(IGF, context, llvm::None);
+    self = IGF.Builder.CreateLoad(localContextAddr);
+  } else {
+    // Non-throwing class methods always have the 'self' parameter at the end.
+    // Throwing class methods have 'self' right before the error parameter.
+    //
+    // FIXME: Should find a better way of expressing this.
+    if (funcTy->hasErrorResult())
+      self = (IGF.CurFn->arg_end() - 2);
+    else
+      self = (IGF.CurFn->arg_end() - 1);
+  }
 
   auto selfTy = funcTy->getSelfParameter().getSILStorageType(
       IGF.IGM.getSILModule(), funcTy, IGF.IGM.getMaximalTypeExpansionContext());
@@ -107,19 +144,49 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   }
 
   IRGenFunction IGF(*this, f);
+  if (declRef.getAbstractFunctionDecl()->hasAsync())
+    IGF.setupAsync();
 
   // Look up the method.
   auto fn = lookupMethod(IGF, declRef);
 
   // Call the witness, forwarding all of the parameters.
   auto params = IGF.collectParameters();
-  auto result = IGF.Builder.CreateCall(fn, params.claimAll());
+  auto result =
+      IGF.Builder.CreateCall(fn.getAsFunction(IGF), params.claimAll());
 
   // Return the result, if we have one.
   if (result->getType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
   else
     IGF.Builder.CreateRet(result);
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfAsyncFunctionPointer(SILFunction *function) {
+  (void)getAddrOfSILFunction(function, NotForDefinition);
+  auto entity = LinkEntity::forAsyncFunctionPointer(function);
+  return getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::defineAsyncFunctionPointer(SILFunction *function,
+                                                        ConstantInit init) {
+  auto entity = LinkEntity::forAsyncFunctionPointer(function);
+  auto *var = cast<llvm::GlobalVariable>(
+      getAddrOfLLVMVariable(entity, init, DebugTypeInfo()));
+  setTrueConstGlobal(var);
+  return var;
+}
+
+SILFunction *
+IRGenModule::getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp) {
+  for (auto &entry : GlobalVars) {
+    if (entry.getSecond() == afp) {
+      auto entity = entry.getFirst();
+      return entity.getSILFunction();
+    }
+  }
+  return nullptr;
 }
 
 llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,

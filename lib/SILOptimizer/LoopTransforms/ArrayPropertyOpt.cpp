@@ -254,12 +254,15 @@ private:
   /// new array onto it.
   bool checkSafeArrayAddressUses(UserList &AddressUsers) {
     for (auto *UseInst : AddressUsers) {
-
       if (UseInst->isDebugInstruction())
         continue;
 
       if (isa<DeallocStackInst>(UseInst)) {
         // Handle destruction of a local array.
+        continue;
+      }
+
+      if (isa<LoadInst>(UseInst)) {
         continue;
       }
 

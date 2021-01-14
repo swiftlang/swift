@@ -35,7 +35,7 @@ func testing(obj: C) {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=complete -pos=29:14 %s -- %s -module-name MyModule == \
-// RUN:   -req=conformingmethods -pos=29:14 -req-opts=expectedtypes='$s8MyModule7Target2PD;$s8MyModule7Target1PD' %s -- %s -module-name MyModule == \
+// RUN:   -req=conformingmethods -pos=29:14 -req-opts=expectedtypes='[$s8MyModule7Target2PD;$s8MyModule7Target1PD]' %s -- %s -module-name MyModule == \
 // RUN:   -req=typecontextinfo -pos=32:33 %s -- %s -module-name MyModule == \
 // RUN:   -req=complete -pos=29:14 %s -- %s -module-name MyModule > %t.response
 // RUN: %diff -u %s.response %t.response

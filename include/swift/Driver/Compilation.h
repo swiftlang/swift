@@ -24,6 +24,7 @@
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
+#include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/StringRef.h"
@@ -78,6 +79,29 @@ using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
 class Compilation {
 public:
+  struct Result {
+    /// Set to true if any job exits abnormally (i.e. crashes).
+    bool hadAbnormalExit;
+    /// The exit code of this driver process.
+    int exitCode;
+    /// The dependency graph built up during the compilation of this module.
+    ///
+    /// This data is used for cross-module module dependencies.
+    fine_grained_dependencies::ModuleDepGraph depGraph;
+
+    Result(const Result &) = delete;
+    Result &operator=(const Result &) = delete;
+
+    Result(Result &&) = default;
+    Result &operator=(Result &&) = default;
+
+    /// Construct a \c Compilation::Result from just an exit code.
+    static Result code(int code) {
+      return Compilation::Result{false, code,
+                                 fine_grained_dependencies::ModuleDepGraph()};
+    }
+  };
+
   class IncrementalSchemeComparator {
     const bool EnableIncrementalBuildWhenConstructed;
     const bool &EnableIncrementalBuild;
@@ -484,13 +508,24 @@ public:
   /// \sa types::isPartOfSwiftCompilation
   const char *getAllSourcesPath() const;
 
+  /// Retrieve the path to the external swift deps file.
+  ///
+  /// For cross-module incremental builds, this file contains the dependencies
+  /// from all the modules integrated over the prior build.
+  ///
+  /// Currently this patch is relative to the build record, but we may want
+  /// to allow the output file map to customize this at some point.
+  std::string getExternalSwiftDepsFilePath() const {
+    return CompilationRecordPath + ".external";
+  }
+
   /// Asks the Compilation to perform the Jobs which it knows about.
   ///
   /// \param TQ The TaskQueue used to schedule jobs for execution.
   ///
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
-  int performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
+  Compilation::Result performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
   /// to a frontend job.
@@ -534,13 +569,11 @@ private:
 private:
   /// Perform all jobs.
   ///
-  /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
-  /// crashes).
   /// \param TQ The task queue on which jobs will be scheduled.
   ///
   /// \returns exit code of the first failed Job, or 0 on success. If a Job
   /// crashes during execution, a negative value will be returned.
-  int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
+  Compilation::Result performJobsImpl(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Performs a single Job by executing in place, if possible.
   ///
@@ -550,7 +583,7 @@ private:
   /// will no longer exist, or it will call exit() if the program was
   /// successfully executed. In the event of an error, this function will return
   /// a negative value indicating a failure to execute.
-  int performSingleCommand(const Job *Cmd);
+  Compilation::Result performSingleCommand(const Job *Cmd);
 };
 
 } // end namespace driver

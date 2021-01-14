@@ -2955,7 +2955,7 @@ public:
     declOrOffset = param;
 
     auto paramTy = MF.getType(interfaceTypeID);
-    if (paramTy->hasError()) {
+    if (paramTy->hasError() && !MF.isAllowModuleWithCompilerErrorsEnabled()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
       DC->printContext(llvm::errs());
@@ -3952,7 +3952,7 @@ public:
     auto extendedType = MF.getType(extendedTypeID);
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               std::move(extendedType));
-    auto nominal = dyn_cast<NominalTypeDecl>(MF.getDecl(extendedNominalID));
+    auto nominal = dyn_cast_or_null<NominalTypeDecl>(MF.getDecl(extendedNominalID));
     ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
                               std::move(nominal));
 
@@ -3969,7 +3969,9 @@ public:
       encodeLazyConformanceContextData(numConformances,
                                        MF.DeclTypeCursor.GetCurrentBitNo()));
 
-    nominal->addExtension(extension);
+    if (nominal) {
+      nominal->addExtension(extension);
+    }
 
 #ifndef NDEBUG
     if (outerParams) {
@@ -5670,6 +5672,23 @@ public:
 
     return UnboundGenericType::get(genericDecl, parentTy, ctx);
   }
+
+  Expected<Type> deserializeErrorType(ArrayRef<uint64_t> scratch,
+                                      StringRef blobData) {
+    if (!MF.isAllowModuleWithCompilerErrorsEnabled())
+      MF.fatal();
+
+    TypeID origID;
+    decls_block::ErrorTypeLayout::readRecord(scratch, origID);
+
+    auto origTy = MF.getTypeChecked(origID);
+    if (!origTy)
+      return origTy.takeError();
+
+    if (!origTy.get())
+      return ErrorType::get(ctx);
+    return ErrorType::get(origTy.get());
+  }
 };
 }
 
@@ -5693,7 +5712,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError()) {
+  if (typeOrOffset.get()->hasError() &&
+      !isAllowModuleWithCompilerErrorsEnabled()) {
     typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
@@ -5753,6 +5773,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(Dictionary)
   CASE(Optional)
   CASE(UnboundGeneric)
+  CASE(Error)
 
 #undef CASE
 
@@ -6157,7 +6178,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
     };
-    if (conformanceCount != llvm::count_if(proto->getRequirementSignature(),
+    if (!isAllowModuleWithCompilerErrorsEnabled() &&
+        conformanceCount != llvm::count_if(proto->getRequirementSignature(),
                                            isConformanceReq)) {
       fatal(llvm::make_error<llvm::StringError>(
           "serialized conformances do not match requirement signature",

@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_SEMANTICARC_CONTEXT_H
 
 #include "OwnershipLiveRange.h"
+#include "SemanticARCOpts.h"
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -30,6 +31,7 @@ namespace semanticarc {
 
 struct LLVM_LIBRARY_VISIBILITY Context {
   SILFunction &fn;
+  ARCTransformKind transformKind = ARCTransformKind::All;
   Optional<DeadEndBlocks> deadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   SmallMultiMapCache<SILValue, Operand *> addressToExhaustiveWriteListCache;
@@ -62,7 +64,44 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   /// our LiveRange can not see through joined live ranges, we know that we
   /// should only be able to have a single owned value introducer for each
   /// consumed operand.
-  FrozenMultiMap<SILValue, Operand *> joinedOwnedIntroducerToConsumedOperands;
+  ///
+  /// NOTE: To work around potential invalidation of our consuming operands when
+  /// adding values to edges on the CFG, we store our Operands as a
+  /// SILBasicBlock and an operand number. We only add values to edges and never
+  /// remove/modify edges so the operand number should be safe.
+  struct ConsumingOperandState {
+    PointerUnion<SILBasicBlock *, SILInstruction *> parent;
+    unsigned operandNumber;
+
+    ConsumingOperandState() : parent(nullptr), operandNumber(UINT_MAX) {}
+
+    ConsumingOperandState(Operand *op)
+        : parent(), operandNumber(op->getOperandNumber()) {
+      if (auto *ti = dyn_cast<TermInst>(op->getUser())) {
+        parent = ti->getParent();
+      } else {
+        parent = op->getUser();
+      }
+    }
+
+    ConsumingOperandState(const ConsumingOperandState &other) :
+        parent(other.parent), operandNumber(other.operandNumber) {}
+
+    ConsumingOperandState &operator=(const ConsumingOperandState &other) {
+      parent = other.parent;
+      operandNumber = other.operandNumber;
+      return *this;
+    }
+
+    ~ConsumingOperandState() = default;
+
+    operator bool() const {
+      return bool(parent) && operandNumber != UINT_MAX;
+    }
+  };
+
+  FrozenMultiMap<SILValue, ConsumingOperandState>
+      joinedOwnedIntroducerToConsumedOperands;
 
   /// If set to true, then we should only run cheap optimizations that do not
   /// build up data structures or analyze code in depth.
@@ -90,6 +129,25 @@ struct LLVM_LIBRARY_VISIBILITY Context {
         onlyGuaranteedOpts(onlyGuaranteedOpts), instModCallbacks(callbacks) {}
 
   void verify() const;
+
+  bool shouldPerform(ARCTransformKind testKind) const {
+    // When asserts are enabled, we allow for specific arc transforms to be
+    // turned on/off via LLVM args. So check that if we have asserts, perform
+    // all optimizations otherwise.
+#ifndef NDEBUG
+    if (transformKind == ARCTransformKind::Invalid)
+      return false;
+    return bool(testKind & transformKind);
+#else
+    return true;
+#endif
+  }
+
+  void reset() {
+    lifetimeFrontier.clear();
+    addressToExhaustiveWriteListCache.clear();
+    joinedOwnedIntroducerToConsumedOperands.reset();
+  }
 
 private:
   static bool

@@ -18,10 +18,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "SemanticARCOptVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/DebugUtils.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
+
+bool SemanticARCOptVisitor::optimizeWithoutFixedPoint() {
+  bool madeChange = false;
+
+  // First process the worklist until we reach a fixed point.
+  madeChange |= processWorklist();
+
+  return madeChange;
+}
 
 bool SemanticARCOptVisitor::optimize() {
   bool madeChange = false;

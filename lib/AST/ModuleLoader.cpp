@@ -180,12 +180,18 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
   // Mimic getModuleDefiningPath() for Swift and Clang module.
   if (auto *swiftDep = getAsSwiftTextualModule()) {
-    // Prefer interface path to binary module path if we have it.
-    modulePath = swiftDep->swiftInterfaceFile;
-    assert(modulePath.hasValue());
-    StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
-    if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
-      modulePath = parentDir.str();
+    if (swiftDep->swiftInterfaceFile.hasValue()) {
+      // Prefer interface path to binary module path if we have it.
+      modulePath = swiftDep->swiftInterfaceFile;
+      assert(modulePath.hasValue());
+      StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
+      if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
+        modulePath = parentDir.str();
+      }
+    } else {
+      // This must be a module compiled from source-code
+      assert(!swiftDep->sourceFiles.empty());
+      return result;
     }
   } else if (auto *swiftBinaryDep = getAsSwiftBinaryModule()) {
     modulePath = swiftBinaryDep->compiledModulePath;

@@ -486,6 +486,18 @@ bb0(%0 : $@callee_owned () -> @out U):
   return %8 : $()
 }
 
+sil [transparent] [serialized] @mightApplyGuaranteed : $@convention(thin) <U where U : P> (@guaranteed @callee_guaranteed () -> @out U) -> () {
+bb0(%0 : $@callee_guaranteed () -> @out U):
+  debug_value %0 : $@callee_guaranteed () -> @out U
+  %3 = alloc_stack $U
+  %4 = apply %0(%3) : $@callee_guaranteed () -> @out U
+  destroy_addr %3 : $*U
+  dealloc_stack %3 : $*U
+  %8 = tuple ()
+  return %8 : $()
+}
+
+
 // CHECK-LABEL: sil @callWithAutoclosure
 sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
@@ -512,6 +524,37 @@ bb0(%0 : $*T):
   // CHECK: return
   return %9 : $()
 }
+
+
+// CHECK-LABEL: sil @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
+sil @callWithAutoclosure_2 : $@convention(thin) <T where T : P> (@in T) -> () {
+// CHECK: bb0
+bb0(%0 : $*T):
+  // CHECK: debug_value_addr
+  debug_value_addr %0 : $*T
+  // CHECK: function_ref @mightApply
+  %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  // CHECK-NOT: alloc_box
+  // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <T>
+  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
+  copy_addr %0 to [initialization] %4a : $*T
+  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
+  // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
+  %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  // CHECK: destroy_addr [[STACK]] : $*T
+  // CHECK: dealloc_stack [[STACK]] : $*T
+  destroy_addr %0 : $*T
+  strong_release %4 : $<τ_0_0> { var τ_0_0 } <T>
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+// CHECK: } // end sil function 'callWithAutoclosure_2'
 
 // CHECK-LABEL: sil private @$s21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
 sil private @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {

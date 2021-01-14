@@ -8,6 +8,9 @@ func initStaticVars() -> CInt {
     + staticConstexprNonTrivial.val
 }
 
+// Constexpr globals should be inlined and removed.
+// CHECK-NOT: sil_global public_external [let] @staticConstexpr : $Int32
+
 // CHECK: // clang name: staticVar
 // CHECK: sil_global public_external @staticVar : $Int32
 // CHECK: // clang name: staticVarInit
@@ -20,8 +23,6 @@ func initStaticVars() -> CInt {
 // CHECK: sil_global public_external [let] @staticConstInit : $Int32
 // CHECK: // clang name: staticConstInlineInit
 // CHECK: sil_global public_external [let] @staticConstInlineInit : $Int32
-// CHECK: // clang name: staticConstexpr
-// CHECK: sil_global public_external [let] @staticConstexpr : $Int32
 // CHECK: // clang name: staticNonTrivial
 // CHECK: sil_global public_external @staticNonTrivial : $NonTrivial
 // CHECK: // clang name: staticConstNonTrivial

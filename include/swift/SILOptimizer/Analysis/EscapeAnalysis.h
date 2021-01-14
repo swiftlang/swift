@@ -1158,6 +1158,10 @@ public:
   /// Note that if \p RI is a retain-instruction always false is returned.
   bool canEscapeTo(SILValue V, RefCountingInst *RI);
 
+  /// Returns true if the value \p V can escape to the destroy_value instruction
+  /// \p DVI.
+  bool canEscapeTo(SILValue V, DestroyValueInst *DVI);
+
   /// Return true if \p releasedReference deinitialization may release memory
   /// pointed to by \p accessedAddress.
   bool mayReleaseContent(SILValue releasedReference, SILValue accessedAddress);

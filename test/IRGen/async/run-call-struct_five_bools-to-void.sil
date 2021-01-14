@@ -1,0 +1,78 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+
+import Builtin
+import Swift
+import PrintShims
+import _Concurrency
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+struct Pack {
+  public let a: Bool
+  public let b: Bool
+  public let c: Bool
+  public let d: Bool
+  public let e: Bool
+}
+
+// CHECK-LL: @test_caseTu =
+
+sil @structPackToVoid : $@async @convention(thin) (Pack) -> () {
+entry(%pack : $Pack):
+  %pack_addr = alloc_stack $Pack
+  store %pack to %pack_addr : $*Pack
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %printGeneric_result1 = apply %printGeneric<Pack>(%pack_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () //CHECK: Pack(a: true, b: false, c: true, d: false, e: true)
+  dealloc_stack %pack_addr : $*Pack
+  
+  return %printGeneric_result1 : $()
+}
+
+// Defined in _Concurrency
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_case(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+sil @test_case : $@async @convention(thin) () -> () {
+  
+  %a_literal = integer_literal $Builtin.Int1, -1
+  %a = struct $Bool (%a_literal : $Builtin.Int1)
+  %b_literal = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%b_literal : $Builtin.Int1)
+  %c_literal = integer_literal $Builtin.Int1, -1
+  %c = struct $Bool (%c_literal : $Builtin.Int1)
+  %d_literal = integer_literal $Builtin.Int1, 0
+  %d = struct $Bool (%d_literal : $Builtin.Int1)
+  %e_literal = integer_literal $Builtin.Int1, -1
+  %e = struct $Bool (%a_literal : $Builtin.Int1)
+
+  %pack = struct $Pack (%a : $Bool, %b : $Bool, %c : $Bool, %d : $Bool, %e : $Bool)
+
+  %structPackToVoid = function_ref @structPackToVoid : $@async @convention(thin) (Pack) -> ()
+  %result = apply %structPackToVoid(%pack) : $@async @convention(thin) (Pack) -> ()
+  return %result : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
+}

@@ -9,6 +9,7 @@ module SwiftShims {
   header "MetadataSections.h"
   header "Random.h"
   header "RefCount.h"
+  header "Reflection.h"
   header "RuntimeShims.h"
   header "RuntimeStubs.h"
   header "SwiftStdbool.h"

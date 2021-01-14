@@ -498,11 +498,19 @@ BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 /// applyTranspose
 BUILTIN_SIL_OPERATION(ApplyTranspose, "applyTranspose", Special)
 
-/// differentiableFunction
-BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
+/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> T
+///
+/// Unsafely capture the current continuation and pass it to the given
+/// function value. Returns a value of type T when the continuation is
+/// resumed.
+BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 
-/// linearFunction
-BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
+/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> T
+///
+/// Unsafely capture the current continuation and pass it to the given
+/// function value. Returns a value of type T or throws an error when
+/// the continuation is resumed.
+BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
 #undef BUILTIN_SIL_OPERATION
 
@@ -607,6 +615,11 @@ BUILTIN_MISC_OPERATION(AtomicStore, "atomicstore", "", Special)
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T.
 BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", "", IntegerOrRawPointer)
 
+/// convertTaskToJob : (Builtin.NativePointer) -> Builtin.Job
+///
+/// Convert a task pointer into a job pointer.
+BUILTIN_MISC_OPERATION(ConvertTaskToJob, "convertTaskToJob", "n", Special)
+
 /// ExtractElement has type (Vector<N, T>, Int32) -> T
 BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 
@@ -704,6 +717,12 @@ BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n"
 //  int_instrprof_increment has type (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ().
 BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Special)
 
+/// Initialize the default-actor instance in a default actor object.
+BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Special)
+
+/// Destroy the default-actor instance in a default actor object.
+BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
@@ -736,12 +755,30 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Speci
 /// a function to execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Special)
 
+/// createAsyncTaskFuture(): (
+///     Int, Builtin.NativeObject?, @escaping () async throws -> T
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, an (optional) parent
+/// task and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
+    "createAsyncTaskFuture", "", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
 /// does not read any memory (note that even though it reads from a string, it
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
+
+// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "n", Special)
+
+// autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
+
+// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

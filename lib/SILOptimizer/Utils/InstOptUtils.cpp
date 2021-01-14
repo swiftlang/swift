@@ -48,30 +48,9 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-// Defined here to avoid repeatedly paying the price of template instantiation.
-const std::function<void(SILInstruction *)>
-    InstModCallbacks::defaultDeleteInst
-        = [](SILInstruction *inst) {
-          inst->eraseFromParent();
-        };
-const std::function<void(SILInstruction *)>
-    InstModCallbacks::defaultCreatedNewInst
-        = [](SILInstruction *) {};
-const std::function<void(SILValue, SILValue)>
-    InstModCallbacks::defaultReplaceValueUsesWith
-        = [](SILValue oldValue, SILValue newValue) {
-          oldValue->replaceAllUsesWith(newValue);
-        };
-const std::function<void(SingleValueInstruction *, SILValue)>
-    InstModCallbacks::defaultEraseAndRAUWSingleValueInst
-        = [](SingleValueInstruction *i, SILValue newValue) {
-          i->replaceAllUsesWith(newValue);
-          i->eraseFromParent();
-        };
-
 Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
-  if (isa<SingleValueInstruction>(val)) {
-    return std::next(cast<SingleValueInstruction>(val)->getIterator());
+  if (auto *inst = val->getDefiningInstruction()) {
+    return std::next(inst->getIterator());
   }
   if (isa<SILArgument>(val)) {
     return cast<SILArgument>(val)->getParentBlock()->begin();
@@ -138,6 +117,12 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
   return builder.createReleaseValue(loc, ptr, builder.getDefaultAtomicity());
 }
 
+static bool isOSSAEndScopeWithNoneOperand(SILInstruction *i) {
+  if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
+    return false;
+  return i->getOperand(0).getOwnershipKind() == OwnershipKind::None;
+}
+
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -176,6 +161,15 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(inst))
+    return true;
+
+  // An ossa end scope instruction is trivially dead if its operand has
+  // OwnershipKind::None. This can occur after CFG simplification in the
+  // presence of non-payloaded or trivial payload cases of non-trivial enums.
+  //
+  // Examples of ossa end_scope instructions: end_borrow, destroy_value.
+  if (inst->getFunction()->hasOwnership() &&
+      isOSSAEndScopeWithNoneOperand(inst))
     return true;
 
   if (!inst->mayHaveSideEffects())
@@ -406,7 +400,7 @@ static void destroyConsumedOperandOfDeadInst(Operand &operand) {
   if (operand.isLifetimeEnding()) {
     // Since deadInst cannot be an end-of-scope instruction (asserted above),
     // this must be a consuming use of an owned value.
-    assert(operandValue.getOwnershipKind() == ValueOwnershipKind::Owned);
+    assert(operandValue.getOwnershipKind() == OwnershipKind::Owned);
     SILBuilderWithScope builder(deadInst);
     builder.emitDestroyValueOperation(deadInst->getLoc(), operandValue);
   }
@@ -1000,7 +994,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     auto *curBB = builder->getInsertionPoint()->getParent();
 
     auto *contBB = curBB->split(builder->getInsertionPoint());
-    contBB->createPhiArgument(destTy, ValueOwnershipKind::Owned);
+    contBB->createPhiArgument(destTy, OwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
     caseBBs.push_back(std::make_pair(someDecl, someBB));
@@ -1454,6 +1448,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
 bool swift::simplifyUsers(SingleValueInstruction *inst) {
   bool changed = false;
+  InstModCallbacks callbacks;
 
   for (auto ui = inst->use_begin(), ue = inst->use_end(); ui != ue;) {
     SILInstruction *user = ui->getUser();
@@ -1467,7 +1462,7 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
     if (!S)
       continue;
 
-    replaceAllSimplifiedUsesAndErase(svi, S);
+    replaceAllSimplifiedUsesAndErase(svi, S, callbacks);
     changed = true;
   }
 
@@ -1888,4 +1883,83 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   }
   }
   llvm_unreachable("Unhandled case?!");
+}
+
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
+                              InstModCallbacks &callbacks) {
+  assert(svi != newValue && "Cannot RAUW a value with itself");
+  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
+
+  // Only SingleValueInstructions are currently simplified.
+  while (!svi->use_empty()) {
+    Operand *use = *svi->use_begin();
+    SILInstruction *user = use->getUser();
+    // Erase the end of scope marker.
+    if (isEndOfScopeMarker(user)) {
+      if (&*nextii == user)
+        ++nextii;
+      callbacks.deleteInst(user);
+      continue;
+    }
+    callbacks.setUseValue(use, newValue);
+  }
+
+  callbacks.deleteInst(svi);
+
+  return nextii;
+}
+
+/// Given that we are going to replace use's underlying value, if the use is a
+/// lifetime ending use, insert an end scope scope use for the underlying value
+/// before we RAUW.
+static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
+                                         SILLocation loc,
+                                         InstModCallbacks &callbacks) {
+  if (!use->isLifetimeEnding()) {
+    return;
+  }
+
+  switch (use->get().getOwnershipKind()) {
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid ownership for value");
+  case OwnershipKind::Owned: {
+    auto *dvi = builder.createDestroyValue(loc, use->get());
+    callbacks.createdNewInst(dvi);
+    return;
+  }
+  case OwnershipKind::Guaranteed: {
+    // Should only happen once we model destructures as true reborrows.
+    auto *ebi = builder.createEndBorrow(loc, use->get());
+    callbacks.createdNewInst(ebi);
+    return;
+  }
+  case OwnershipKind::None:
+    return;
+  case OwnershipKind::Unowned:
+    llvm_unreachable("Unowned object can never be consumed?!");
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
+SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
+                                                InstModCallbacks &callbacks) {
+  auto oldValue = use->get();
+  assert(oldValue != newValue && "Cannot RAUW a value with itself");
+
+  auto *user = use->getUser();
+  auto nextII = std::next(user->getIterator());
+
+  // If we have an end of scope marker, just return next. We are done.
+  if (isEndOfScopeMarker(user)) {
+    return nextII;
+  }
+
+  // Otherwise, first insert clean up our use's value if we need to and then set
+  // use to have a new value.
+  SILBuilderWithScope builder(user);
+  cleanupUseOldValueBeforeRAUW(use, builder, user->getLoc(), callbacks);
+  callbacks.setUseValue(use, newValue);
+
+  return nextII;
 }

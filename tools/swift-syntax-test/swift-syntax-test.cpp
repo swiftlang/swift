@@ -95,6 +95,11 @@ Action(llvm::cl::desc("Action (required):"),
                    "of the EOF token, and dump the buffer from the start of the"
                    "file to the EOF token")));
 
+static llvm::cl::opt<bool> EnableExperimentalPrespecialization(
+    "enable-experimental-prespecialization",
+    llvm::cl::desc("Enable experimental prespecialization"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
                     llvm::cl::desc("Path to the input .swift file"));
@@ -218,10 +223,6 @@ Visual("v",
        llvm::cl::cat(Category),
        llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
-GraphVisPath("output-request-graphviz",
-             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
-             llvm::cl::cat(Category));
 } // end namespace options
 
 namespace {
@@ -608,8 +609,9 @@ int parseFile(
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().ParseForSyntaxTreeOnly = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
-  Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
+  Invocation.getLangOptions().EnableExperimentalPrespecialization =
+      options::EnableExperimentalPrespecialization;
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
 

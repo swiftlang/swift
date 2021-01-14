@@ -138,18 +138,6 @@ SimpleMathTests.test("CaptureGlobal") {
   expectEqual(30, gradient(at: 0, in: foo))
 }
 
-var foo_diffable: @differentiable (Float) -> (Float)
-  = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
-SimpleMathTests.test("GlobalDiffableFunc") {
-  expectEqual(2, gradient(at: 1, in: foo_diffable))
-  expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
-  expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
-    foo_diffable = { x in x + 1 }
-    return foo_diffable(x)
-  }))
-  expectEqual(1, gradient(at: 1, in: foo_diffable))
-}
-
 SimpleMathTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x
@@ -448,7 +436,7 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
   expectEqual(2.0, grads.stored)
 }
 
-// CHECK-LABEL: sil private [ossa] @AD__${{.*}}doubled{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
+// CHECK-LABEL: sil private [ossa] @${{.*}}doubled{{.*}}TJp{{.*}} : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
 // CHECK: bb0([[DX:%.*]] : $Float, [[PB_STRUCT:%.*]] : {{.*}}):
 // CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
 // CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)

@@ -298,7 +298,7 @@ public:
           case ActorIndependentKind::Safe:
             diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
             return;
-            
+
           case ActorIndependentKind::Unsafe:
             break;
         }
@@ -315,26 +315,11 @@ public:
           (dc->isTypeContext() && var->isStatic())) {
         return;
       }
-
-      // Otherwise, fall through to make sure we're in an appropriate
-      // context.
     }
 
-    // @actorIndependent only makes sense on an actor instance member.
-    if (!dc->getSelfClassDecl() ||
-        !dc->getSelfClassDecl()->isActor()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_not_actor_member);
-      return;
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      (void)getActorIsolation(VD);
     }
-
-    auto VD = cast<ValueDecl>(D);
-    if (!VD->isInstanceMember()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::actorindependent_not_actor_instance_member);
-      return;
-    }
-
-    (void)getActorIsolation(VD);
   }
 
   void visitGlobalActorAttr(GlobalActorAttr *attr) {
@@ -1030,6 +1015,21 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
       }
     }
   }
+
+  if (auto ID = dyn_cast<ImportDecl>(D)) {
+    auto importedModule = ID->getModule();
+    if (importedModule) {
+      auto path = importedModule->getModuleFilename();
+      if (llvm::sys::path::extension(path) == ".swiftinterface" &&
+          !path.endswith(".private.swiftinterface")) {
+        // If the module was built from the public swiftinterface, it can't
+        // have any SPI.
+        diagnose(attr->getLocation(),
+                 diag::spi_attribute_on_import_of_public_module,
+                 importedModule->getName(), path);
+      }
+    }
+  }
 }
 
 static bool checkObjCDeclContext(Decl *D) {
@@ -1051,25 +1051,25 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
     return;
 
   auto &ctx = SF->getASTContext();
-  if (ctx.LangOpts.EnableObjCInterop) {
-    // Don't diagnose in a SIL file.
-    if (SF->Kind == SourceFileKind::SIL)
-      return;
 
-    // Don't diagnose for -disable-objc-attr-requires-foundation-module.
-    if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
-      return;
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+      .fixItRemove(attr->getRangeWithAt());
+    return;
   }
+
+  // Don't diagnose in a SIL file.
+  if (SF->Kind == SourceFileKind::SIL)
+    return;
+
+  // Don't diagnose for -disable-objc-attr-requires-foundation-module.
+  if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+    return;
 
   // If we have the Foundation module, @objc is okay.
   auto *foundation = ctx.getLoadedModule(ctx.Id_Foundation);
   if (foundation && ctx.getImportCache().isImportedBy(foundation, SF))
     return;
-
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt());
-  }
 
   ctx.Diags.diagnose(attr->getLocation(),
                      diag::attr_used_without_required_module, attr,
@@ -1937,14 +1937,14 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
 
   if (mainFunction->hasThrows()) {
     auto *tryExpr = new (context) TryExpr(
-        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
+        callExpr->getLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
     returnedExpr = tryExpr;
   } else {
     returnedExpr = callExpr;
   }
 
   auto *returnStmt =
-      new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
+      new (context) ReturnStmt(SourceLoc(), returnedExpr, /*Implicit=*/true);
 
   SmallVector<ASTNode, 1> stmts;
   stmts.push_back(returnStmt);
@@ -4310,11 +4310,10 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
     }
   }
   // Non-`get` accessors are not yet supported: `set`, `read`, and `modify`.
-  // TODO(TF-129): Enable `set` when differentiation supports inout parameters.
   // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
   // coroutines.
   if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
-    if (!accessor->isGetter())
+    if (!accessor->isGetter() && !accessor->isSetter())
       original = nullptr;
   // Diagnose if original `AbstractFunctionDecl` could not be resolved.
   if (!original) {

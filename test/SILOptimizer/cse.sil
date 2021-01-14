@@ -1244,6 +1244,32 @@ bb3:
   return %20 : $()
 }
 
+// This test is not a repro but used to show why we need a local Cloner object in CSE::processOpenExistentialRef.
+// Discussion:
+// Since the CSE pass can delete instructions and allocate instructions whose state can be cached in the Cloner, we have to use local Cloner object so that we don't accidentally refer to stale state 
+// In this test users of %9 are all cloned and original instructions are deleted. Users of %13 are similarly cloned and original instructions are deleted so the types can be remapped.
+// Instructions can further get deleted in the main CSE pass as well as during SimplifyInstruction.
+// For some heap allocation patterns newly allocated instructions can get the same address of a previously allocated instruction, and can end up referring to a stale state in the Cloner.
+//
+// CHECK-LABEL: sil @cse_open_existential_ref_local_cloner :
+// CHECK: open_existential_ref
+// CHECK-NOT: open_existential_ref
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_local_cloner'
+sil @cse_open_existential_ref_local_cloner : $@convention(thin) (@guaranteed Proto, Bool) -> () {
+bb0(%0 : $Proto, %1 : $Bool):
+  %4 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto
+  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %9 = open_existential_ref %0 : $Proto to $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto
+  %10 = witness_method $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThat, %9 : $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %13 = open_existential_ref %0 : $Proto to $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto
+  %14 = witness_method $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %13 : $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto>(%13) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
 // Check that we don't CSE open_existential_ref if they are not compeltely equal.
 // CHECK-LABEL: sil @dont_cse_open_existential_ref
 // CHECK: open_existential_ref

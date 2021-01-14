@@ -64,8 +64,8 @@ ConditionalValue::ConditionalValue(SILGenFunction &SGF, SGFContext C,
   } else {
     // Otherwise, add a BB arg to the continuation block to receive loadable
     // result.
-    result = contBB->createPhiArgument(tl.getLoweredType(),
-                                       ValueOwnershipKind::Owned);
+    result =
+        contBB->createPhiArgument(tl.getLoweredType(), OwnershipKind::Owned);
   }
 }
 

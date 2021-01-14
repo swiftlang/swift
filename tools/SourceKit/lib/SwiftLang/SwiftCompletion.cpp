@@ -271,12 +271,6 @@ static void getResultStructure(
     if (C.is(ChunkKind::BraceStmtWithCursor))
       break;
 
-    if (C.is(ChunkKind::ThrowsKeyword) ||
-        C.is(ChunkKind::RethrowsKeyword)) {
-      structure.throwsRange.begin = textSize;
-      structure.throwsRange.end = textSize + C.getText().size();
-    }
-
     if (C.is(ChunkKind::CallParameterBegin)) {
       CodeCompletionInfo::ParameterStructure param;
 

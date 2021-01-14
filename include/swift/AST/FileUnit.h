@@ -110,6 +110,9 @@ public:
                             const ModuleDecl *importedModule,
                             SmallSetVector<Identifier, 4> &spiGroups) const {};
 
+  virtual Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const { return None; }
+
 protected:
   /// Look up an operator declaration. Do not call directly, use
   /// \c DirectOperatorLookupRequest instead.
@@ -179,6 +182,9 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+
+  virtual void
+  getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}
 
   /// Finds top-level decls in this file filtered by their attributes.
   ///

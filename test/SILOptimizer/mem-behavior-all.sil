@@ -244,3 +244,45 @@ bb0(%0 : $*C, %1 : $*C, %2: $*C):
   return %6 : $()
 }
 
+// CHECK-LABEL: @test_destroy_value
+// CHECK: PAIR #0.
+// CHECK-NEXT:     %1 = load [copy] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=0
+// CHECK: PAIR #2.
+// CHECK-NEXT:     destroy_value %1 : $C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+// CHECK: PAIR #3.
+// CHECK-NEXT:     destroy_value %1 : $C
+// CHECK-NEXT:     %1 = load [copy] %0 : $*C
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_destroy_value : $@convention(thin) (@in C) -> () {
+bb0 (%0 : $*C):
+  %1 = load [copy] %0 : $*C
+  destroy_value %1 : $C
+  destroy_addr %0 : $*C
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: @test_copy_value
+// CHECK: PAIR #3.
+// CHECK-NEXT:     %2 = copy_value %1 : $C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+// CHECK: PAIR #4.
+// CHECK-NEXT:     %2 = copy_value %1 : $C
+// CHECK-NEXT:     %1 = load [copy] %0 : $*C
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_copy_value : $@convention(thin) (@in C) -> () {
+bb0 (%0 : $*C):
+  %1 = load [copy] %0 : $*C
+  %2 = copy_value %1 : $C
+  destroy_value %1 : $C
+  destroy_value %2 : $C
+  destroy_addr %0 : $*C
+  %3 = tuple()
+  return %3 : $()
+}
+

@@ -335,6 +335,17 @@ public:
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
+/// Describes how a custom name was provided for 'async' import.
+enum class CustomAsyncName {
+  /// No custom name was provided.
+  None,
+  /// A custom swift_name (but not swift_async_name) was provided.
+  SwiftName,
+  /// A custom swift_async_name was provided, which won't have a completion
+  /// handler argument label.
+  SwiftAsyncName,
+};
+
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
@@ -458,7 +469,9 @@ private:
                       StringRef baseName,
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
-                      bool isInitializer, bool hasCustomName,
+                      bool isInitializer,
+                      Optional<unsigned> explicitCompletionHandlerParamIndex,
+                      CustomAsyncName customName,
                       Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,

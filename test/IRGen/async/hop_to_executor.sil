@@ -1,0 +1,49 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
+
+// REQUIRES: concurrency
+
+// This test fails on 32bit archs.
+// UNSUPPORTED: PTRSIZE=32
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Concurrency
+
+final actor class MyActor {
+}
+
+// CHECK-LABEL: define{{.*}} void @test_simple(%swift.task* %0, %swift.executor* %1, %swift.context* %2)
+// CHECK: [[TASK_LOC:%[0-9]+]] = alloca %swift.task*
+// CHECK: [[CTX:%[0-9]+]] = bitcast %swift.context* %2
+// CHECK: [[ACTOR_ADDR:%[0-9]+]] = getelementptr {{.*}} [[CTX]], i32 0, i32 6
+// CHECK: [[ACTOR:%[0-9]+]] = load %T4test7MyActorC*, %T4test7MyActorC** [[ACTOR_ADDR]]
+// CHECK: [[RESUME:%[0-9]+]] = call i8* @llvm.coro.async.resume()
+// CHECK: [[TASK:%[0-9]+]] = load %swift.task*, %swift.task** [[TASK_LOC]]
+// CHECK-arm64e: [[RESUME_ADDR:%[0-9]+]]     = getelementptr inbounds %swift.task, %swift.task* [[TASK]], i32 0, i32 4
+// CHECK-arm64e: [[RESUME_ADDR_INT:%[0-9]+]] = ptrtoint i8** [[RESUME_ADDR]] to i64
+// CHECK-arm64e: [[PTRAUTH_BLEND:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[RESUME_ADDR_INT]], i64 11330)
+// CHECK-arm64e: [[RESUME_INT:%[0-9]+]]      = ptrtoint i8* [[RESUME]] to i64
+// CHECK-arm64e: [[SIGNED_INT:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[RESUME_INT]], i32 0, i64 [[PTRAUTH_BLEND]])
+// CHECK-arm64e: [[SIGNED_RESUME:%[0-9]+]]   = inttoptr i64 [[SIGNED_INT]] to i8*
+// CHECK: [[CAST_ACTOR:%[0-9]+]] = bitcast %T4test7MyActorC* [[ACTOR]] to %swift.executor*
+// CHECK-x86_64: call {{.*}} @llvm.coro.suspend.async(i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.task*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.task* [[TASK]], %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}})
+// CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async(i8* [[SIGNED_RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.task*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[SIGNED_RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.task* [[TASK]], %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}})
+sil @test_simple : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : $MyActor):
+  hop_to_executor %0 : $MyActor
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define internal void @__swift_suspend_point(i8* %0, %swift.executor* %1, %swift.task* %2, %swift.executor* %3, %swift.context* %4)
+// CHECK:    [[RESUME_ADDR:%[0-9]+]] = getelementptr inbounds %swift.task, %swift.task* %2, i32 0, i32 4
+// CHECK:    store i8* %0, i8** [[RESUME_ADDR]]
+// CHECK:    [[CTXT_ADDR:%[0-9]+]] = getelementptr inbounds %swift.task, %swift.task* %2, i32 0, i32 5
+// CHECK:    store %swift.context* %4, %swift.context** [[CTXT_ADDR]]
+// CHECK:    tail call swiftcc void @swift_task_switch(%swift.task* %2, %swift.executor* %3, %swift.executor* %1)
+// CHECK:    ret void
+
+sil_vtable MyActor {
+}

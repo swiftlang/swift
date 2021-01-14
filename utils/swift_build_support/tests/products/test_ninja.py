@@ -99,9 +99,9 @@ class NinjaTestCase(unittest.TestCase):
         if platform.system() == "Darwin":
             expect_env = (
                 "env "
-                "'CFLAGS=-isysroot {sysroot} -mmacosx-version-min=10.9' "
+                "'CFLAGS=-isysroot {sysroot}' "
                 "CXX={cxx} "
-                "'LDFLAGS=-isysroot {sysroot} -mmacosx-version-min=10.9' "
+                "'LDFLAGS=-isysroot {sysroot}' "
             ).format(
                 cxx=self.toolchain.cxx,
                 sysroot=xcrun.sdk_path('macosx')

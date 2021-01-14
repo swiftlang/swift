@@ -208,6 +208,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinRawUnsafeContinuation:
+  case TypeKind::BuiltinJob:
+  case TypeKind::BuiltinDefaultActorStorage:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
@@ -809,13 +812,16 @@ Type TypeBase::getWithoutParens() {
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
-    if (auto objectType = getOptionalObjectType()) {
+    bool isLValue = is<LValueType>();
+
+    auto loadedTy = getWithoutSpecifierType();
+    if (auto objectType = loadedTy->getOptionalObjectType()) {
       assert(!newResultType->getOptionalObjectType());
-      return OptionalType::get(
+      newResultType = OptionalType::get(
           objectType->replaceCovariantResultType(newResultType, uncurryLevel));
     }
 
-    return newResultType;
+    return isLValue ? LValueType::get(newResultType) : newResultType;
   }
 
   // Determine the input and result types of this function.
@@ -4925,7 +4931,7 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
 }
 
 static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
-  return (theClass->checkAncestry(AncestryFlags::ClangImported)
+  return (theClass->usesObjCObjectModel()
           ? ReferenceCounting::ObjC
           : ReferenceCounting::Native);
 }
@@ -5000,6 +5006,9 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinRawUnsafeContinuation:
+  case TypeKind::BuiltinJob:
+  case TypeKind::BuiltinDefaultActorStorage:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:

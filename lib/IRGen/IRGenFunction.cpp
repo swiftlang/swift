@@ -14,7 +14,7 @@
 //  performs IR generation for function bodies.
 //
 //===----------------------------------------------------------------------===//
-
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/IRGen/Linking.h"
@@ -23,6 +23,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Callee.h"
 #include "Explosion.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -308,6 +309,24 @@ void IRGenFunction::emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
 }
 
 llvm::Value *
+IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
+                                         llvm::PointerType *expectedType,
+                                         const llvm::Twine &name) {
+  llvm::Value *value = Builder.CreateLoad(addr);
+  assert(value->getType() ==
+         (isFar ? IGM.FarRelativeAddressTy : IGM.RelativeAddressTy));
+  if (!isFar) {
+    value = Builder.CreateSExt(value, IGM.IntPtrTy);
+  }
+  auto *addrInt = Builder.CreatePtrToInt(addr.getAddress(), IGM.IntPtrTy);
+  auto *uncastPointerInt = Builder.CreateAdd(addrInt, value);
+  auto *uncastPointer = Builder.CreateIntToPtr(uncastPointerInt, IGM.Int8PtrTy);
+  auto uncastPointerAddress = Address(uncastPointer, IGM.getPointerAlignment());
+  auto pointer = Builder.CreateBitCast(uncastPointerAddress, expectedType);
+  return pointer.getAddress();
+}
+
+llvm::Value *
 IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
                                                 bool isFar,
                                                 llvm::PointerType *expectedType,
@@ -471,4 +490,247 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
   Builder.CreateNonMergeableTrap(IGM, failureMessage);
   if (EmitUnreachable)
     Builder.CreateUnreachable();
+}
+
+Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
+  auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {getAsyncTask(), size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+  auto address = Address(call, alignment);
+  return address;
+}
+
+void IRGenFunction::emitTaskDealloc(Address address) {
+  auto *call = Builder.CreateCall(IGM.getTaskDeallocFn(),
+                                  {getAsyncTask(), address.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+}
+
+llvm::Value *IRGenFunction::alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val) {
+  auto *alignMask = llvm::ConstantInt::get(sizeTy, MaximumAlignment - 1);
+  auto *invertedMask = Builder.CreateNot(alignMask);
+  return Builder.CreateAnd(Builder.CreateAdd(val, alignMask), invertedMask);
+}
+
+/// Returns the current task \p currTask as a Builtin.RawUnsafeContinuation at +1.
+static llvm::Value *unsafeContinuationFromTask(IRGenFunction &IGF,
+                                               llvm::Value *currTask) {
+  auto &IGM = IGF.IGM;
+  auto &Builder = IGF.Builder;
+
+  auto &rawPointerTI = IGM.getRawUnsafeContinuationTypeInfo();
+  return Builder.CreateBitOrPointerCast(currTask, rawPointerTI.getStorageType());
+}
+
+void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
+                                             StackAddress resultAddr,
+                                             Explosion &out) {
+  // Create the continuation.
+  // void current_sil_function(AsyncTask *currTask, Executor *currExecutor,
+  //                           AsyncContext *currCtxt) {
+  //
+  // A continuation is the current AsyncTask 'currTask' with:
+  //   currTask->ResumeTask = @llvm.coro.async.resume();
+  //   currTask->ResumeContext = &continuation_context;
+  //
+  // Where:
+  //
+  // struct {
+  //   AsyncContext *resumeCtxt;
+  //   void *awaitSynchronization;
+  //   SwiftError *errResult;
+  //   Result *result;
+  //   ExecutorRef *resumeExecutor;
+  // } continuation_context; // local variable of current_sil_function
+  //
+  // continuation_context.resumeCtxt = currCtxt;
+  // continuation_context.errResult = nulllptr;
+  // continuation_context.result = ... // local alloca.
+  // continuation_context.resumeExecutor = .. // current executor
+
+  auto currTask = getAsyncTask();
+  auto unsafeContinuation = unsafeContinuationFromTask(*this, currTask);
+
+  // Create and setup the continuation context.
+  // continuation_context.resumeCtxt = currCtxt;
+  // continuation_context.errResult = nulllptr;
+  // continuation_context.result = ... // local alloca T
+  auto pointerAlignment = IGM.getPointerAlignment();
+  auto continuationContext =
+      createAlloca(IGM.AsyncContinuationContextTy, pointerAlignment);
+  AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
+  // TODO: add lifetime with matching lifetime in await_async_continuation
+  auto contResumeAddr =
+      Builder.CreateStructGEP(continuationContext.getAddress(), 0);
+  Builder.CreateStore(getAsyncContext(),
+                      Address(contResumeAddr, pointerAlignment));
+  auto contErrResultAddr =
+      Builder.CreateStructGEP(continuationContext.getAddress(), 2);
+  Builder.CreateStore(
+      llvm::Constant::getNullValue(
+          contErrResultAddr->getType()->getPointerElementType()),
+      Address(contErrResultAddr, pointerAlignment));
+  auto contResultAddr =
+      Builder.CreateStructGEP(continuationContext.getAddress(), 3);
+  if (!resultAddr.getAddress().isValid()) {
+    auto &resumeTI = getTypeInfo(resumeTy);
+    auto resultAddr =
+        resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
+    Builder.CreateStore(Builder.CreateBitOrPointerCast(
+                            resultAddr.getAddress().getAddress(),
+                            contResultAddr->getType()->getPointerElementType()),
+                        Address(contResultAddr, pointerAlignment));
+  } else {
+    Builder.CreateStore(Builder.CreateBitOrPointerCast(
+                            resultAddr.getAddress().getAddress(),
+                            contResultAddr->getType()->getPointerElementType()),
+                        Address(contResultAddr, pointerAlignment));
+  }
+  // continuation_context.resumeExecutor = // current executor
+  auto contExecutorRefAddr =
+      Builder.CreateStructGEP(continuationContext.getAddress(), 4);
+  Builder.CreateStore(
+      Builder.CreateBitOrPointerCast(
+          getAsyncExecutor(),
+          contExecutorRefAddr->getType()->getPointerElementType()),
+      Address(contExecutorRefAddr, pointerAlignment));
+
+  // Fill the current task (i.e the continuation) with the continuation
+  // information.
+  // currTask->ResumeTask = @llvm.coro.async.resume();
+  assert(currTask->getType() == IGM.SwiftTaskPtrTy);
+  auto currTaskResumeTaskAddr = Builder.CreateStructGEP(currTask, 4);
+  auto coroResume =
+      Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+
+  assert(AsyncCoroutineCurrentResume == nullptr &&
+         "Don't support nested get_async_continuation");
+  AsyncCoroutineCurrentResume = coroResume;
+  Builder.CreateStore(
+      Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy),
+      Address(currTaskResumeTaskAddr, pointerAlignment));
+  // currTask->ResumeContext = &continuation_context;
+  auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 5);
+  Builder.CreateStore(
+      Builder.CreateBitOrPointerCast(continuationContext.getAddress(),
+                                     IGM.SwiftContextPtrTy),
+      Address(currTaskResumeCtxtAddr, pointerAlignment));
+
+  // Publish all the writes.
+  // continuation_context.awaitSynchronization =(atomic release) nullptr;
+  auto contAwaitSyncAddr =
+      Builder.CreateStructGEP(continuationContext.getAddress(), 1);
+  auto null = llvm::ConstantInt::get(
+      contAwaitSyncAddr->getType()->getPointerElementType(), 0);
+  auto atomicStore =
+      Builder.CreateStore(null, Address(contAwaitSyncAddr, pointerAlignment));
+  atomicStore->setAtomic(llvm::AtomicOrdering::Release,
+                         llvm::SyncScope::System);
+  out.add(unsafeContinuation);
+}
+
+void IRGenFunction::emitAwaitAsyncContinuation(
+    SILType resumeTy, bool isIndirectResult,
+    Explosion &outDirectResult, llvm::BasicBlock *&normalBB,
+    llvm::PHINode *&optionalErrorResult, llvm::BasicBlock *&optionalErrorBB) {
+  assert(AsyncCoroutineCurrentContinuationContext && "no active continuation");
+  auto pointerAlignment = IGM.getPointerAlignment();
+
+  // First check whether the await reached this point first. Meaning we still
+  // have to wait for the continuation result. If the await reaches first we
+  // abort the control flow here (resuming the continuation will execute the
+  // remaining control flow).
+  auto contAwaitSyncAddr =
+      Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 1);
+  auto null = llvm::ConstantInt::get(
+      contAwaitSyncAddr->getType()->getPointerElementType(), 0);
+  auto one = llvm::ConstantInt::get(
+      contAwaitSyncAddr->getType()->getPointerElementType(), 1);
+  auto results = Builder.CreateAtomicCmpXchg(
+      contAwaitSyncAddr, null, one,
+      llvm::AtomicOrdering::Release /*success ordering*/,
+      llvm::AtomicOrdering::Acquire /* failure ordering */,
+      llvm::SyncScope::System);
+  auto firstAtAwait = Builder.CreateExtractValue(results, 1);
+  auto contBB = createBasicBlock("await.async.maybe.resume");
+  auto abortBB = createBasicBlock("await.async.abort");
+  Builder.CreateCondBr(firstAtAwait, abortBB, contBB);
+  Builder.emitBlock(abortBB);
+  {
+    // We are first to the sync point. Abort. The continuation's result is not
+    // available yet.
+    emitCoroutineOrAsyncExit();
+  }
+
+  auto contBB2 = createBasicBlock("await.async.resume");
+  Builder.emitBlock(contBB);
+  {
+    // Setup the suspend point.
+    SmallVector<llvm::Value *, 8> arguments;
+    arguments.push_back(AsyncCoroutineCurrentResume);
+    auto resumeProjFn = getOrCreateResumePrjFn();
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+    // The dispatch function just calls the resume point.
+    auto resumeFnPtr =
+        getFunctionPointerForResumeIntrinsic(AsyncCoroutineCurrentResume);
+    arguments.push_back(Builder.CreateBitOrPointerCast(
+        createAsyncDispatchFn(resumeFnPtr,
+                              {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy}),
+        IGM.Int8PtrTy));
+    arguments.push_back(AsyncCoroutineCurrentResume);
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(getAsyncTask(), IGM.Int8PtrTy));
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(getAsyncExecutor(), IGM.Int8PtrTy));
+    arguments.push_back(Builder.CreateBitOrPointerCast(
+        AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
+    emitSuspendAsyncCall(arguments);
+
+    auto results = Builder.CreateAtomicCmpXchg(
+        contAwaitSyncAddr, null, one,
+        llvm::AtomicOrdering::Release /*success ordering*/,
+        llvm::AtomicOrdering::Acquire /* failure ordering */,
+        llvm::SyncScope::System);
+    // Again, are we first at the wait (can only reach that state after
+    // continuation.resume/abort is called)? If so abort to wait for the end of
+    // the await point to be reached.
+    auto firstAtAwait = Builder.CreateExtractValue(results, 1);
+    Builder.CreateCondBr(firstAtAwait, abortBB, contBB2);
+  }
+
+  Builder.emitBlock(contBB2);
+  auto contBB3 = createBasicBlock("await.async.normal");
+  if (optionalErrorBB) {
+    auto contErrResultAddr = Address(
+        Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 2),
+        pointerAlignment);
+    auto errorRes = Builder.CreateLoad(contErrResultAddr);
+    auto nullError = llvm::Constant::getNullValue(errorRes->getType());
+    auto hasError = Builder.CreateICmpNE(errorRes, nullError);
+    optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+    Builder.CreateCondBr(hasError, optionalErrorBB, contBB3);
+  } else {
+    Builder.CreateBr(contBB3);
+  }
+
+  Builder.emitBlock(contBB3);
+  if (!isIndirectResult) {
+    auto contResultAddrAddr =
+        Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 3);
+    auto resultAddrVal =
+        Builder.CreateLoad(Address(contResultAddrAddr, pointerAlignment));
+    // Take the result.
+    auto &resumeTI = cast<LoadableTypeInfo>(getTypeInfo(resumeTy));
+    auto resultStorageTy = resumeTI.getStorageType();
+    auto resultAddr =
+        Address(Builder.CreateBitOrPointerCast(resultAddrVal,
+                                               resultStorageTy->getPointerTo()),
+                resumeTI.getFixedAlignment());
+    resumeTI.loadAsTake(*this, resultAddr, outDirectResult);
+  }
+  Builder.CreateBr(normalBB);
+  AsyncCoroutineCurrentResume = nullptr;
+  AsyncCoroutineCurrentContinuationContext = nullptr;
 }

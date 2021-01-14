@@ -110,6 +110,12 @@ extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
+// If this returns `true`, then we will call `fatalError` when we encounter a
+// null reference in a storage locaation whose type does not allow null.
+static bool unexpectedNullIsFatal() {
+  return true;  // Placeholder for an upcoming check.
+}
+
 static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
                                         const Metadata *srcType,
                                         const Metadata *destType) {
@@ -120,12 +126,21 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  swift::fatalError(/* flags = */ 0,
-                    "Found unexpected null pointer value"
+  const char *msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
-                    " to '%s' (%p)\n",
-                    srcTypeName.c_str(), srcType,
-                    destTypeName.c_str(), destType);
+                    " to '%s' (%p)%s\n";
+  if (unexpectedNullIsFatal()) {
+    swift::fatalError(/* flags = */ 0, msg,
+                      srcTypeName.c_str(), srcType,
+                      destTypeName.c_str(), destType,
+                      "");
+  } else {
+    swift::warning(/* flags = */ 0, msg,
+                   srcTypeName.c_str(), srcType,
+                   destTypeName.c_str(), destType,
+                   ": Continuing with null object, but expect problems later.");
+  }
+  return object;
 }
 
 /******************************************************************************/
@@ -709,15 +724,33 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
-  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
-  if (hashableConformance) {
-    _swift_convertToAnyHashableIndirect(srcValue, destLocation,
-                                        srcType, hashableConformance);
-    return DynamicCastResult::SuccessViaCopy;
-  } else {
-    return DynamicCastResult::Failure;
+  switch (srcType->getKind()) {
+  case MetadataKind::ForeignClass: // CF -> String
+  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+#if SWIFT_OBJC_INTEROP
+    // TODO: Implement a fast path for NSString->AnyHashable casts.
+    // These are incredibly common because an NSDictionary with
+    // NSString keys is bridged by default to [AnyHashable:Any].
+    // Until this is implemented, fall through to the default case
+    SWIFT_FALLTHROUGH;
+#else
+    // If no Obj-C interop, just fall through to the default case.
+    SWIFT_FALLTHROUGH;
+#endif
   }
+  default: {
+    auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+    if (hashableConformance) {
+      _swift_convertToAnyHashableIndirect(srcValue, destLocation,
+                                          srcType, hashableConformance);
+      return DynamicCastResult::SuccessViaCopy;
+    } else {
+      return DynamicCastResult::Failure;
+    }
+  }
+  }
+  return DynamicCastResult::Failure;
 }
 
 static DynamicCastResult
@@ -2152,17 +2185,6 @@ tryCast(
 /****************************** Main Entrypoint *******************************/
 /******************************************************************************/
 
-// XXX REMOVE ME XXX TODO XXX
-// Declare the old entrypoint
-SWIFT_RUNTIME_EXPORT
-bool
-swift_dynamicCast_OLD(OpaqueValue *destLocation,
-                      OpaqueValue *srcValue,
-                      const Metadata *srcType,
-                      const Metadata *destType,
-                      DynamicCastFlags flags);
-// XXX REMOVE ME XXX TODO XXX
-
 /// ABI: Perform a dynamic cast to an arbitrary type.
 static bool
 swift_dynamicCastImpl(OpaqueValue *destLocation,
@@ -2171,30 +2193,6 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
                       const Metadata *destType,
                       DynamicCastFlags flags)
 {
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-  // Support switching to the old implementation while the new one
-  // is still settling.  Once the new implementation is stable,
-  // I'll rip the old one entirely out.
-  static bool useOldImplementation = false; // Default: NEW Implementation
-  static swift_once_t Predicate;
-  swift_once(
-    &Predicate,
-    [](void *) {
-      // Define SWIFT_OLD_DYNAMIC_CAST_RUNTIME=1 to use the old runtime
-      // dynamic cast logic.
-      auto useOld = getenv("SWIFT_OLD_DYNAMIC_CAST_RUNTIME");
-      if (useOld) {
-        useOldImplementation = true;
-      }
-    }, nullptr);
-  if (useOldImplementation) {
-    return swift_dynamicCast_OLD(destLocation, srcValue,
-                                 srcType, destType, flags);
-  }
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-  // XXX REMOVE ME XXX TODO XXX TRANSITION SHIM
-
   // If the compiler has asked for a "take", we can
   // move pointers without ref-counting overhead.
   bool takeOnSuccess = flags & DynamicCastFlags::TakeOnSuccess;

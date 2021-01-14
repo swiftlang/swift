@@ -9,5 +9,5 @@
 import def_async
 
 func testDoSomethingBig() {
-  let _: () -> Int = doSomethingBig // expected-error{{cannot convert value of type '() async -> Int' to specified type '() -> Int'}}
+  let _: () -> Int = doSomethingBig // expected-error{{invalid conversion from 'async' function of type '() async -> Int' to synchronous function type '() -> Int'}}
 }

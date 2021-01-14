@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
-var mutableGlobal: String = "can't touch this" // expected-note 2{{var declared here}}
+var mutableGlobal: String = "can't touch this" // expected-note 3{{var declared here}}
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
@@ -19,7 +19,7 @@ func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
 actor class MySuperActor {
   var superState: Int = 25 // expected-note {{mutable state is only available within the actor instance}}
 
-  func superMethod() { } // expected-note 3 {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func superMethod() { } // expected-note 3 {{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
   func superAsyncMethod() async { }
 
   subscript (index: Int) -> String { // expected-note 3{{subscript declared here}}
@@ -34,7 +34,7 @@ actor class MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 21{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -44,6 +44,7 @@ extension MyActor {
     set { }
   }
 
+  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}} {{none}}
   @actorIndependent func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
     _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from an '@actorIndependent' context}}
@@ -64,7 +65,8 @@ extension MyActor {
     otherActor.actorIndependentVar = 17
 
     // Global actors
-    syncGlobalActorFunc() /// expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' context}}
+    syncGlobalActorFunc() /// expected-error{{'async' in a function that does not support concurrency}}
+    _ = syncGlobalActorFunc // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' context}}
 
     // Global data is okay if it is immutable.
     _ = immutableGlobal
@@ -102,9 +104,9 @@ extension MyActor {
     _ = super[0]
 
     // Accesses on other actors can only reference immutable data or
-    // call asychronous methods
+    // call methods
     _ = otherActor.immutable // okay
-    _ = otherActor.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    _ = otherActor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0] // expected-error{{actor-isolated property 'text' can only be referenced on 'self'}}
 
@@ -120,7 +122,7 @@ extension MyActor {
     Self.synchronousStatic()
 
     // Global actors
-    syncGlobalActorFunc() // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from actor 'MyActor'}}
+    syncGlobalActorFunc() // expected-error{{call is 'async' but is not marked with 'await'}}
     await asyncGlobalActorFunc()
 
     // Closures.
@@ -160,6 +162,11 @@ extension MyActor {
       }
     }
 
+    acceptEscapingClosure {
+      localFn1()
+      localFn2()
+    }
+
     localVar = 0
 
     // Partial application
@@ -197,15 +204,22 @@ struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
 }
 
-@SomeGlobalActor func syncGlobalActorFunc() { } // expected-note 3{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
-@SomeGlobalActor func asyncGlobalActorFunc() async { }
+@SomeGlobalActor func syncGlobalActorFunc() { syncGlobalActorFunc() } // expected-note{{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
+@SomeGlobalActor func asyncGlobalActorFunc() async { await asyncGlobalActorFunc() }
 
-@SomeOtherGlobalActor func syncOtherGlobalActorFunc() { } // expected-note {{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+@SomeOtherGlobalActor func syncOtherGlobalActorFunc() { }
 
 @SomeOtherGlobalActor func asyncOtherGlobalActorFunc() async {
-  syncGlobalActorFunc() // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'SomeOtherGlobalActor'}}
+  await syncGlobalActorFunc()
   await asyncGlobalActorFunc()
 }
+
+// test global actor funcs that are marked asyncHandler
+@SomeGlobalActor func goo1() async {
+  let _ = goo2
+  goo2()
+}
+@asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
 
 extension MyActor {
   @SomeGlobalActor func onGlobalActor(otherActor: MyActor) async {
@@ -213,8 +227,8 @@ extension MyActor {
     syncGlobalActorFunc()
     await asyncGlobalActorFunc()
 
-    // Other global actors are not okay
-    syncOtherGlobalActorFunc() // expected-error{{global function 'syncOtherGlobalActorFunc()' isolated to global actor 'SomeOtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+    // Other global actors are ok if marked with 'await'
+    await syncOtherGlobalActorFunc()
     await asyncOtherGlobalActorFunc()
 
     _ = immutable
@@ -238,21 +252,25 @@ extension MyActor {
     // Accesses on other actors can only reference immutable data or
     // call asychronous methods
     _ = otherActor.immutable // okay
-    _ = otherActor.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    _ = otherActor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
+    _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0] // expected-error{{actor-isolated property 'text' can only be referenced on 'self'}}
   }
 }
 
 struct GenericStruct<T> {
-  @GenericGlobalActor<T> func f() { } // expected-note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'?}}
+  @GenericGlobalActor<T> func f() { } // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> func g() {
     f() // okay
   }
 
+  // expected-note@+2 {{add '@asyncHandler' to function 'h()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
+  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}} {{none}}
   @GenericGlobalActor<String> func h() {
-    f() // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
+    f() // expected-error{{'async' in a function that does not support concurrency}}
+    _ = f // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
   }
 }
 
@@ -276,8 +294,9 @@ func testGlobalRestrictions(actor: MyActor) async {
   _ = await actor.asynchronous()
   _ = actor.immutable
 
-  // Synchronous operations and mutable state references are not.
-  _ = actor.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced inside the actor}}
+  // Synchronous operations are ok, mutable state references are not.
+  _ = actor.synchronous // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced inside the actor}}
+  _ = actor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
   _ = actor.text[0] // expected-error{{actor-isolated property 'text' can only be referenced inside the actor}}
   _ = actor[0] // expected-error{{actor-isolated subscript 'subscript(_:)' can only be referenced inside the actor}}
 
@@ -289,4 +308,118 @@ func testGlobalRestrictions(actor: MyActor) async {
   // Operations on non-instances are permitted.
   MyActor.synchronousStatic()
   MyActor.synchronousClass()
+
+  // Global mutable state cannot be accessed.
+  _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+
+  // Local mutable variables cannot be accessed from concurrently-executing
+  // code.
+  var i = 17 // expected-note{{var declared here}}
+  acceptEscapingClosure {
+    i = 42 // expected-warning{{local var 'i' is unsafe to reference in code that may execute concurrently}}
+  }
+  print(i)
+}
+
+// ----------------------------------------------------------------------
+// Local function isolation restrictions
+// ----------------------------------------------------------------------
+func checkLocalFunctions() async {
+  var i = 0
+  var j = 0 // expected-note{{var declared here}}
+
+  func local1() {
+    i = 17
+  }
+
+  func local2() {
+    j = 42 // expected-warning{{local var 'j' is unsafe to reference in code that may execute concurrently}}
+  }
+
+  // Okay to call locally.
+  local1()
+  local2()
+
+  // Non-concurrent closures don't cause problems.
+  acceptClosure {
+    local1()
+    local2()
+  }
+
+  // Escaping closures can make the local function execute concurrently.
+  acceptEscapingClosure {
+    local2()
+  }
+
+  print(i)
+  print(j)
+
+  var k = 17 // expected-note{{var declared here}}
+  func local4() {
+    acceptEscapingClosure {
+      local3()
+    }
+  }
+
+  func local3() {
+    k = 25 // expected-warning{{local var 'k' is unsafe to reference in code that may execute concurrently}}
+  }
+
+  print(k)
+}
+
+// ----------------------------------------------------------------------
+// Lazy properties with initializers referencing 'self'
+// ----------------------------------------------------------------------
+
+actor class LazyActor {
+    var v: Int = 0
+    // expected-note@-1 5 {{mutable state is only available within the actor instance}}
+
+    let l: Int = 0
+
+    lazy var l11: Int = { v }()
+    lazy var l12: Int = v
+    lazy var l13: Int = { self.v }()
+    lazy var l14: Int = self.v
+    lazy var l15: Int = { [unowned self] in self.v }()
+
+    lazy var l21: Int = { l }()
+    lazy var l22: Int = l
+    lazy var l23: Int = { self.l }()
+    lazy var l24: Int = self.l
+    lazy var l25: Int = { [unowned self] in self.l }()
+
+    @actorIndependent lazy var l31: Int = { v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l32: Int = v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l33: Int = { self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l34: Int = self.v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l35: Int = { [unowned self] in self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+
+    @actorIndependent lazy var l41: Int = { l }()
+    @actorIndependent lazy var l42: Int = l
+    @actorIndependent lazy var l43: Int = { self.l }()
+    @actorIndependent lazy var l44: Int = self.l
+    @actorIndependent lazy var l45: Int = { [unowned self] in self.l }()
+}
+
+// Infer global actors from context only for instance members.
+@MainActor
+class SomeClassInActor {
+  enum ID: String { case best }
+
+  func inActor() { } // expected-note{{calls to instance method 'inActor()' from outside of its actor context are implicitly asynchronous}}
+}
+
+extension SomeClassInActor.ID {
+  func f(_ object: SomeClassInActor) { // expected-note{{add '@MainActor' to make instance method 'f' part of global actor 'MainActor'}}
+    // expected-note@-1{{add 'async' to function 'f' to make it asynchronous}}
+    // expected-note@-2{{add '@asyncHandler' to function 'f' to create an implicit asynchronous context}}
+    object.inActor() // expected-error{{'async' in a function that does not support concurrency}}
+  }
 }

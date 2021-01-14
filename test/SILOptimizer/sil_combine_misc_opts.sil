@@ -1,0 +1,184 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+
+// This file tests routines in SILCombinerMiscVisitors.cpp
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+sil @nativeobject_guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+///////////
+// Tests //
+///////////
+
+// We test both the ossa and non-ossa variants.
+//
+// CHECK-LABEL: sil [ossa] @fix_lifetime_promotion_ossa : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   [[BORROW:%.*]] = load_borrow [[STACK]]
+// CHECK:   fix_lifetime [[BORROW]]
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function 'fix_lifetime_promotion_ossa'
+sil [ossa] @fix_lifetime_promotion_ossa : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  fix_lifetime %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @fix_lifetime_promotion : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG]] to [[STACK]]
+// CHECK:   [[BORROW:%.*]] = load [[STACK]]
+// CHECK:   fix_lifetime [[BORROW]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function 'fix_lifetime_promotion'
+sil @fix_lifetime_promotion : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to %1 : $*Klass
+  fix_lifetime %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Unused alloc-ref elim
+
+// CHECK-LABEL: sil @remove_unused_alloc_ref :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref'
+sil @remove_unused_alloc_ref : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $Klass
+  dealloc_ref %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_ossa :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref_ossa'
+sil [ossa] @remove_unused_alloc_ref_ossa : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $Klass
+  dealloc_ref %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @remove_unused_alloc_ref_stack :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref_stack'
+sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_stack_ossa :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK: } // end sil function 'remove_unused_alloc_ref_stack_ossa'
+sil [ossa] @remove_unused_alloc_ref_stack_ossa : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @remove_unused_alloc_ref_fixlifetime :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK-NOT: fix_lifetime
+// CHECK: } // end sil function 'remove_unused_alloc_ref_fixlifetime'
+sil @remove_unused_alloc_ref_fixlifetime : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  fix_lifetime %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_fixlifetime_ossa :
+// CHECK-NOT: alloc_ref
+// CHECK-NOT: set_deallocating
+// CHECK-NOT: dealloc_ref
+// CHECK-NOT: fix_lifetime
+// CHECK: } // end sil function 'remove_unused_alloc_ref_fixlifetime_ossa'
+sil [ossa] @remove_unused_alloc_ref_fixlifetime_ossa : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $Klass
+  set_deallocating %1 : $Klass
+  fix_lifetime %1 : $Klass
+  dealloc_ref [stack] %1 : $Klass
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// We should have a single load [copy] here.
+//
+// CHECK-LABEL: sil [ossa] @remove_loadcopy_with_only_destroy_users : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'remove_loadcopy_with_only_destroy_users'
+sil [ossa] @remove_loadcopy_with_only_destroy_users : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = load [copy] %0 : $*Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %2 = load [copy] %0 : $*Builtin.NativeObject
+  %f = function_ref @nativeobject_guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %f(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We should have a single load_borrow here.
+//
+// CHECK-LABEL: sil [ossa] @remove_loadborrow_with_only_destroy_users : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+// CHECK: load_borrow
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'remove_loadborrow_with_only_destroy_users'
+sil [ossa] @remove_loadborrow_with_only_destroy_users : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  %2 = load_borrow %0 : $*Builtin.NativeObject
+  %f = function_ref @nativeobject_guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %f(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

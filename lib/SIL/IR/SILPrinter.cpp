@@ -548,7 +548,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::None) {
+    if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -1451,7 +1451,7 @@ public:
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
-    switch (MU->getKind()) {
+    switch (MU->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  *this << "[rootself] "; break;
     case MarkUninitializedInst::CrossModuleRootSelf:
@@ -1466,7 +1466,7 @@ public:
       *this << "[delegatingselfallocated] ";
       break;
     }
-    
+
     *this << getIDAndType(MU->getOperand());
   }
 
@@ -2077,13 +2077,13 @@ public:
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
-    *this << '$' << GI->getFormalResumeType();
+    *this << GI->getFormalResumeType();
   }
 
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
-    *this << '$' << GI->getFormalResumeType()
+    *this << GI->getFormalResumeType()
           << ", " << getIDAndType(GI->getOperand());
   }
   

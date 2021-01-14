@@ -1,0 +1,249 @@
+// REQUIRES: rdar72627921
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-ownership-conversion-elim -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+typealias AnyObject = Builtin.AnyObject
+
+enum MyNever {}
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [ossa] @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil [ossa] @unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil [ossa] @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+sil [ossa] @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+sil [ossa] @inout_user : $@convention(thin) (@inout FakeOptional<NativeObjectPair>) -> ()
+sil [ossa] @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
+sil [ossa] @get_object_pair : $@convention(thin) () -> @owned NativeObjectPair
+
+struct FakeOptionalNativeObjectPairPair {
+  var pair1 : FakeOptional<NativeObjectPair>
+  var pair2 : FakeOptional<NativeObjectPair>
+}
+sil [ossa] @inout_user2 : $@convention(thin) (@inout FakeOptionalNativeObjectPairPair) -> ()
+
+sil [ossa] @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+sil [ossa] @consume_nativeobject_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+protocol MyFakeAnyObject : Klass {
+  func myFakeMethod()
+}
+
+final class Klass {
+  var base: Klass
+  let baseLet: Klass
+}
+
+extension Klass : MyFakeAnyObject {
+  func myFakeMethod()
+}
+sil [ossa] @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+sil [ossa] @unowned_klass_user : $@convention(thin) (Klass) -> ()
+sil [ossa] @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+sil [ossa] @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+struct StructWithDataAndOwner {
+  var data : Builtin.Int32
+  var owner : Klass
+}
+
+struct StructMemberTest {
+  var c : Klass
+  var s : StructWithDataAndOwner
+  var t : (Builtin.Int32, StructWithDataAndOwner)
+}
+
+class ClassLet {
+  @_hasStorage let aLet: Klass
+  @_hasStorage var aVar: Klass
+  @_hasStorage let aLetTuple: (Klass, Klass)
+  @_hasStorage let anOptionalLet: FakeOptional<Klass>
+
+  @_hasStorage let anotherLet: ClassLet
+}
+
+class SubclassLet: ClassLet {}
+
+sil_global [let] @a_let_global : $Klass
+sil_global @a_var_global : $Klass
+
+enum EnumWithIndirectCase {
+case first
+indirect case second(Builtin.NativeObject)
+}
+
+struct StructWithEnumWithIndirectCaseField {
+  var i: Builtin.Int23
+  var field : EnumWithIndirectCase
+}
+
+sil [ossa] @get_fakeoptional_nativeobject : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject>
+
+struct NativeObjectWrapper {
+  var innerWrapper : Builtin.NativeObject
+}
+
+sil @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_unowned_positive_1 : $@convention(thin) (@owned Klass) -> () {
+// CHECK-NOT: unchecked_ownership_conversion
+// CHECK: } // end sil function 'guaranteed_to_unowned_positive_1'
+sil [ossa] @guaranteed_to_unowned_positive_1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @guaranteed to @unowned
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  end_borrow %1 : $Klass
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_unowned_unreachable : $@convention(thin) (@owned Klass) -> () {
+// CHECK: begin_borrow
+// CHECK-NOT: unchecked_ownership_conversion
+// CHECK: } // end sil function 'guaranteed_to_unowned_unreachable'
+sil [ossa] @guaranteed_to_unowned_unreachable : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @guaranteed to @unowned
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_to_unowned_unreachable_2 : $@convention(thin) (@owned Klass) -> () {
+// CHECK-NOT: unchecked_ownership_conversion
+// CHECK: } // end sil function 'guaranteed_to_unowned_unreachable_2'
+sil [ossa] @guaranteed_to_unowned_unreachable_2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @guaranteed to @unowned
+  cond_br undef, bb1, bb2
+
+bb1:
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  end_borrow %1 : $Klass
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Borrow scope is too small, we fail.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_to_unowned_negative_1 : $@convention(thin) (@owned Klass) -> () {
+// CHECK: unchecked_ownership_conversion
+// CHECK: } // end sil function 'guaranteed_to_unowned_negative_1'
+sil [ossa] @guaranteed_to_unowned_negative_1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @guaranteed to @unowned
+  end_borrow %1 : $Klass
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+/////////////////
+// Owned Tests //
+/////////////////
+
+// CHECK-LABEL: sil [ossa] @owned_to_unowned_positive_1 : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: unchecked_ownership_conversion
+// CHECK: } // end sil function 'owned_to_unowned_positive_1'
+sil [ossa] @owned_to_unowned_positive_1 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @owned to @unowned
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  destroy_value %1 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @owned_to_unowned_unreachable : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: copy_value
+// CHECK-NOT: unchecked_ownership_conversion
+// CHECK: } // end sil function 'owned_to_unowned_unreachable'
+sil [ossa] @owned_to_unowned_unreachable : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @owned to @unowned
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @owned_to_unowned_unreachable_2 : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: unchecked_ownership_conversion
+// CHECK: } // end sil function 'owned_to_unowned_unreachable_2'
+sil [ossa] @owned_to_unowned_unreachable_2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @owned to @unowned
+  cond_br undef, bb1, bb2
+
+bb1:
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  destroy_value %1 : $Klass
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Borrow scope is too small, we fail.
+//
+// CHECK-LABEL: sil [ossa] @owned_to_unowned_negative_1 : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: unchecked_ownership_conversion
+// CHECK: } // end sil function 'owned_to_unowned_negative_1'
+sil [ossa] @owned_to_unowned_negative_1 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = unchecked_ownership_conversion %1 : $Klass, @owned to @unowned
+  destroy_value %1 : $Klass
+  %func = function_ref @unowned_klass_user : $@convention(thin) (Klass) -> ()
+  apply %func(%2) : $@convention(thin) (Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -1,0 +1,327 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// REQUIRES: objc_interop
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+@objc(XX) protocol XX {
+}
+
+// CHECK-LABEL: sil [ossa] @cse_objc_protocol :
+// CHECK: objc_protocol #XX : $Protocol
+// CHECK-NOT: objc_protocol
+// CHECK: tuple (%0 : $Protocol, %0 : $Protocol)
+// CHECK-LABEL: } // end sil function 'cse_objc_protocol'
+sil [ossa] @cse_objc_protocol : $@convention(thin) () -> (Protocol, Protocol) {
+bb0:
+  %0 = objc_protocol #XX : $Protocol
+  %1 = objc_protocol #XX : $Protocol
+  %2 = tuple (%0: $Protocol, %1: $Protocol)
+  return %2 : $(Protocol, Protocol)
+}
+
+@objc protocol Walkable {
+   func walk()
+}
+
+ class Bar : NSObject, Walkable {
+   override init()
+   func walk()
+   deinit
+}
+
+func trytowalk(f: Walkable)
+
+// test.Bar.init (test.Bar.Type)() -> test.Bar
+sil hidden [ossa] @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar {
+bb0(%0 : @owned $Bar):
+  %1 = alloc_stack $Bar, let, name "sf"
+  %copy1 = copy_value %0 : $Bar 
+  %copy2 = copy_value %0 : $Bar 
+  store %0 to [init] %1 : $*Bar
+  %3 = upcast %copy1 : $Bar to $NSObject
+  %4 = objc_super_method %copy2 : $Bar, #NSObject.init!initializer.foreign : (NSObject.Type) -> () -> NSObject, $@convention(objc_method) (@owned NSObject) -> @owned NSObject
+  %7 = apply %4(%3) : $@convention(objc_method) (@owned NSObject) -> @owned NSObject
+  %8 = unchecked_ref_cast %7 : $NSObject to $Bar
+  destroy_value %copy2 : $Bar
+  destroy_addr %1 : $*Bar
+  dealloc_stack %1 : $*Bar
+  return %8 : $Bar
+}
+
+// test.Bar.__allocating_init (test.Bar.Type)() -> test.Bar
+sil hidden [ossa] @_TFC4test3BarCfMS0_FT_S0_ : $@convention(thin) (@thick Bar.Type) -> @owned Bar {
+bb0(%0 : $@thick Bar.Type):
+  %1 = alloc_ref [objc] $Bar
+  // function_ref test.Bar.init (test.Bar.Type)() -> test.Bar
+  %2 = function_ref @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar
+  %3 = apply %2(%1) : $@convention(method) (@owned Bar) -> @owned Bar
+  return %3 : $Bar
+}
+
+// @objc test.Bar.init (test.Bar.Type)() -> test.Bar
+sil hidden [ossa] @_TToFC4test3BarcfMS0_FT_S0_ : $@convention(objc_method) (@owned Bar) -> @owned Bar {
+bb0(%0 : @owned $Bar):
+  // function_ref test.Bar.init (test.Bar.Type)() -> test.Bar
+  %1 = function_ref @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar
+  %2 = apply %1(%0) : $@convention(method) (@owned Bar) -> @owned Bar
+  return %2 : $Bar
+}
+
+// test.Bar.walk (test.Bar)() -> ()
+sil hidden [ossa] @_TFC4test3Bar4walkfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> () {
+bb0(%0 : @guaranteed $Bar):
+  debug_value %0 : $Bar, let, name "self"
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// test.Bar.__deallocating_deinit
+sil hidden [ossa] @_TFC4test3BarD : $@convention(method) (@owned Bar) -> () {
+bb0(%0 : @owned $Bar):
+  debug_value %0 : $Bar, let, name "self"
+  %2 = objc_super_method %0 : $Bar, #NSObject.deinit!deallocator.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()
+  %3 = upcast %0 : $Bar to $NSObject
+  %4 = apply %2(%3) : $@convention(objc_method) (NSObject) -> ()
+  destroy_value %3 : $NSObject
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ :
+// CHECK:           bb0(%0 : @owned $Walkable):
+// CHECK-NEXT:      {{%.*}} = open_existential_ref
+// CHECK-NEXT:      {{%.*}} = objc_method
+// CHECK-NEXT:      {{%.*}} = apply
+// CHECK-NEXT:      {{%.*}} = objc_method
+// CHECK-NEXT:      {{%.*}} = apply
+// CHECK-NEXT:      destroy_value 
+// CHECK-NEXT:      {{%.*}} = tuple
+// test.trytowalk (test.Walkable) -> ()
+// CHECK-LABEL: } // end sil function '_TF4test9trytowalkFPS_8Walkable_T_'
+sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ : $@convention(thin) (@owned Walkable) -> () {
+bb0(%0 : @owned $Walkable):
+  %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable
+  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  destroy_value %2 :  $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// TODO: open_existential_ref is not handled in OSSA currently
+// This is because it is not trivial to ownership rauw copy_value users of a redundant open_existential_ref.
+// Suppose we have an `open_existential_ref` and we are trying to replace it with another `open_existential_ref` with different type.
+// If one of the users of the old `open_existential_ref` is a `copy_value`, we cannot just replace the use.
+// Because `copy_value`'s result type will be referring to the old type as well. So we have to clone it in order to fix the type after rauw.
+//
+// In all other places in the compiler where such rauw needs to be handled, a remapping type is initialized and cloning the instruction before providing to the rauw would fix the type issue.
+// But since copy_value does not have type dependent operands, we cannot handle it in a similar way. 
+//
+// This is currently a TODO until we can implement a clean way to fix this issue before calling into ownership rauw. 
+
+// Check that the open_existential_ref is CSEed not only in instructions, but also in the types
+// of BB arguments. The type of BB2 argument should use the same opened existential as the
+// one opened in the entry block.
+
+// CHECK-LABEL: sil [ossa] @cse_open_existential_in_bbarg1 : $@convention(thin) (@owned AnyObject) -> ()
+// TODOCHECK: open_existential_ref %0 : $AnyObject to $[[OPENED:@opened\(.*\) AnyObject]]
+// TODOCHECK: bb1(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
+// TODOCHECK-NOT: open_existential_ref
+// TODOCHECK: bb3(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
+// TODOCHECK-NOT: open_existential_ref
+// CHECK-LABEL: } // end sil function 'cse_open_existential_in_bbarg1'
+sil [ossa] @cse_open_existential_in_bbarg1 : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %copy0 = copy_value %0 : $AnyObject
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
+
+bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+  %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
+  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb3, bb4
+
+bb2:
+  destroy_value %copy0 : $AnyObject
+  destroy_value %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb5
+
+bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+  %copy7 = copy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  %10 = partial_apply %9(%copy7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+  %11 = apply %10() : $@callee_owned () -> @owned Optional<NSString>
+  destroy_value %6 : $Optional<NSString>
+  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %11 : $Optional<NSString>
+  br bb5
+
+bb4:
+  destroy_value %6 : $Optional<NSString>
+  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb5
+
+bb5:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_open_existential_in_bbarg2 : $@convention(thin) (@owned AnyObject) -> ()
+// TODOCHECK: open_existential_ref %0 :
+// TODOCHECK-NOT: open_existential_ref
+// CHECK-LABEL: } // end sil function 'cse_open_existential_in_bbarg2'
+sil [ossa] @cse_open_existential_in_bbarg2 : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %copy0 = copy_value %0 : $AnyObject
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
+
+bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+  %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
+  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb3(%7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject)
+
+bb2:
+  destroy_value %copy0 : $AnyObject
+  destroy_value %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb5
+
+bb3(%9 : @owned $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject):
+  %copy9 = copy_value %9 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %6 : $Optional<NSString>
+  destroy_value %9 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %copy9 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb5
+
+bb4:
+  destroy_value %6 : $Optional<NSString>
+  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb5
+
+bb5:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_value_metatype :
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'cse_value_metatype'
+sil [ossa] @cse_value_metatype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : @owned $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  destroy_value %0 : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+// CHECK-LABEL: sil [ossa] @cse_existential_metatype :
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'cse_existential_metatype'
+sil [ossa] @cse_existential_metatype : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : @owned $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  destroy_value %0 : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}
+
+class B {}
+
+// CHECK-LABEL: sil [ossa] @nocse_existential_metatype_addr :
+// CHECK: store
+// CHECK: existential_metatype $@thick Any.Type
+// CHECK: store
+// CHECK: existential_metatype $@thick Any.Type
+// CHECK-LABEL: } // end sil function 'nocse_existential_metatype_addr'
+sil [ossa] @nocse_existential_metatype_addr : $@convention(thin) (@owned B, @owned B) -> (@thick Any.Type, @thick Any.Type) {
+bb0(%0 : @owned $B, %1 : @owned $B):
+  %2 = alloc_stack $Any
+  %3 = init_existential_addr %2 : $*Any, $B
+  store %0 to [init] %3 : $*B
+  %5 = existential_metatype $@thick Any.Type, %2 : $*Any
+  store %1 to [assign] %3 : $*B
+  %7 = existential_metatype $@thick Any.Type, %2 : $*Any
+  %99 = tuple (%5 : $@thick Any.Type, %7 : $@thick Any.Type)
+  dealloc_stack %2 : $*Any
+  return %99 : $(@thick Any.Type, @thick Any.Type)
+}
+
+
+// CHECK-LABEL: sil [ossa] @cse_objc_metatype_to_object :
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK-NOT: objc_metatype_to_object
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'cse_objc_metatype_to_object'
+sil [ossa] @cse_objc_metatype_to_object : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : @owned $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  destroy_value %0 : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+
+// CHECK-LABEL: sil [ossa] @cse_objc_existential_metatype_to_object :
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK-NOT: objc_existential_metatype_to_object
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'cse_objc_existential_metatype_to_object'
+sil [ossa] @cse_objc_existential_metatype_to_object : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : @owned $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  destroy_value %0 : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}
+
+@objc
+class XXX {
+}
+
+// CHECK-LABEL: sil [ossa] @cse_objc_to_thick_metatype :
+// CHECK: objc_to_thick_metatype
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK: tuple
+// CHECK-LABEL: } // end sil function 'cse_objc_to_thick_metatype'
+sil [ossa] @cse_objc_to_thick_metatype : $@convention(thin) (@objc_metatype XXX.Type) -> (@thick XXX.Type, @thick XXX.Type) {
+bb0(%0 : $@objc_metatype XXX.Type):
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
+  %2 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
+  %3 = tuple (%1: $@thick XXX.Type, %2: $@thick XXX.Type)
+  return %3: $(@thick XXX.Type, @thick XXX.Type)
+}
+
+sil_vtable Bar {
+  #Bar.init!initializer: @_TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
+  #Bar.walk: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
+  #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
+}
+

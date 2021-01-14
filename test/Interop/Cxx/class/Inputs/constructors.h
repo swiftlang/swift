@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
+#define TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
+
 struct ExplicitDefaultConstructor {
   ExplicitDefaultConstructor() : x(42) {}
   int x;
@@ -44,8 +47,26 @@ struct IntWrapper {
   int x;
 };
 
+struct TemplatedConstructor {
+  ArgType value;
+
+  template<class T>
+  TemplatedConstructor(T value) : value(value) { }
+};
+
+struct TemplatedConstructorWithExtraArg {
+  template<class T>
+  TemplatedConstructorWithExtraArg(int, T value) { }
+  template<class T>
+  TemplatedConstructorWithExtraArg(T value, int) { }
+  template<class T, class U>
+  TemplatedConstructorWithExtraArg(T value, U other) { }
+};
+
 // TODO: we should be able to import this constructor correctly. Until we can,
 // make sure not to crash.
 struct UsingBaseConstructor : ConstructorWithParam {
   using ConstructorWithParam::ConstructorWithParam;
 };
+
+#endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H

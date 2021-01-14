@@ -32,6 +32,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
@@ -107,12 +108,21 @@ Solution::computeSubstitutions(GenericSignature sig,
 }
 
 static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
-    ASTContext &ctx, FuncDecl *oldDecl, SubstitutionMap subst,
+    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
     clang::FunctionDecl *specialized) {
   // Create a new ParameterList with the substituted type.
   auto oldFnType =
       cast<GenericFunctionType>(oldDecl->getInterfaceType().getPointer());
   auto newFnType = oldFnType->substGenericArgs(subst);
+  // The constructor type is a function type as follows:
+  //   (CType.Type) -> (Generic) -> CType
+  // And a method's function type is as follows:
+  //   (inout CType) -> (Generic) -> Void
+  // In either case, we only want the result of that function type because that
+  // is the function type with the generic params that need to be substituted:
+  //   (Generic) -> CType
+  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember())
+    newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
   SmallVector<ParamDecl *, 4> newParams;
   unsigned i = 0;
   for (auto paramTy : newFnType->getParams()) {
@@ -125,6 +135,16 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   }
   auto *newParamList =
       ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
+
+  if (isa<ConstructorDecl>(oldDecl)) {
+    DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
+    auto newCtorDecl = ConstructorDecl::createImported(
+        ctx, specialized, ctorName, oldDecl->getLoc(), /*failable=*/false,
+        /*failabilityLoc=*/SourceLoc(), /*throws=*/false,
+        /*throwsLoc=*/SourceLoc(), newParamList, /*genericParams=*/nullptr,
+        oldDecl->getDeclContext());
+    return ConcreteDeclRef(newCtorDecl);
+  }
 
   // Generate a name for the specialized function.
   std::string newNameStr;
@@ -139,9 +159,10 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
 
   auto newFnDecl = FuncDecl::createImported(
       ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
-      /*Async*/ false, oldDecl->hasThrows(), newParamList,
-      newFnType->getResult(), /*GenericParams*/ nullptr,
+      /*Async=*/false, oldDecl->hasThrows(), newParamList,
+      newFnType->getResult(), /*GenericParams=*/nullptr,
       oldDecl->getDeclContext(), specialized);
+  newFnDecl->setSelfAccessKind(cast<FuncDecl>(oldDecl)->getSelfAccessKind());
   return ConcreteDeclRef(newFnDecl);
 }
 
@@ -168,7 +189,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
                     cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
                 subst);
     return generateDeclRefForSpecializedCXXFunctionTemplate(
-        decl->getASTContext(), cast<FuncDecl>(decl), subst, newFn);
+        decl->getASTContext(), cast<AbstractFunctionDecl>(decl), subst, newFn);
   }
 
   return ConcreteDeclRef(decl, subst);
@@ -2842,105 +2863,9 @@ namespace {
       if (!result)
         return nullptr;
 
-      // Check for ambiguous member if the base is an Optional
-      if (baseTy->getOptionalObjectType()) {
-        diagnoseAmbiguousNominalMember(baseTy, result);
-      }
-
       return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
     }
-    
-    /// Diagnose if the base type is optional, we're referring to a nominal
-    /// type member via the dot syntax and the member name matches
-    /// Optional<T>.{member name}
-    void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
-      if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
-        // Return if the base type doesn't have a nominal type decl
-        if (!baseTyUnwrapped->getNominalOrBoundGenericNominal()) {
-          return;
-        }
-        
-        // Otherwise, continue digging
-        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
-          auto calledValue = DSCE->getCalledValue();
-          auto isOptional = false;
-          Identifier memberName;
-          
-          // Try cast the assigned value to an enum case
-          //
-          // This will always succeed if the base is Optional<T> & the
-          // assigned case comes from Optional<T>
-          if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
-            isOptional = EED->getParentEnum()->isOptionalDecl();
-            memberName = EED->getBaseIdentifier();
-          }
-          
-          // Return if the enum case doesn't come from Optional<T>
-          if (!isOptional) {
-            return;
-          }
-          
-          // Look up the enum case in the unwrapped type to check if it exists
-          // as a member
-          auto baseTyNominalDecl = baseTyUnwrapped
-                                   ->getNominalOrBoundGenericNominal();
-          auto results = TypeChecker::lookupMember(
-              baseTyNominalDecl->getModuleContext(), baseTyUnwrapped,
-              DeclNameRef(memberName), defaultMemberLookupOptions);
 
-          // Filter out any functions, instance members, enum cases with
-          // associated values or variables whose type does not match the
-          // contextual type.
-          results.filter([&](const LookupResultEntry entry, bool isOuter) {
-            if (auto member = entry.getValueDecl()) {
-              if (isa<FuncDecl>(member))
-                return false;
-              if (member->isInstanceMember())
-                return false;
-              if (auto EED = dyn_cast<EnumElementDecl>(member)) {
-                return !EED->hasAssociatedValues();
-              }
-              if (auto VD = dyn_cast<VarDecl>(member)) {
-                auto baseType = DSCE->getType()->lookThroughAllOptionalTypes();
-                return VD->getInterfaceType()->isEqual(baseType);
-              }
-            }
-
-            // Filter out anything that's not one of the above. We don't care
-            // if we have a typealias named 'none' or a struct/class named
-            // 'none'.
-            return false;
-          });
-
-          if (results.empty()) {
-            return;
-          }
-
-          auto &de = cs.getASTContext().Diags;
-          if (auto member = results.front().getValueDecl()) {
-            // Emit a diagnostic with some fix-its
-            auto baseTyName = baseTy->getCanonicalType().getString();
-            auto baseTyUnwrappedName = baseTyUnwrapped->getString();
-            auto loc = DSCE->getLoc();
-            auto startLoc = DSCE->getStartLoc();
-            de.diagnoseWithNotes(
-                de.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                            baseTyName, baseTyUnwrappedName, memberName.str()),
-                [&]() {
-                  de.diagnose(loc,
-                              swift::diag::optional_fixit_ambiguous_case_ref)
-                      .fixItInsert(startLoc, "Optional");
-                  de.diagnose(
-                        loc,
-                        swift::diag::type_fixit_optional_ambiguous_case_ref,
-                        baseTyUnwrappedName, memberName.str())
-                      .fixItInsert(startLoc, baseTyUnwrappedName);
-                });
-          }
-        }
-      }
-    }
-    
   private:
     /// A list of "suspicious" optional injections that come from
     /// forced downcasts.
@@ -6903,26 +6828,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   llvm_unreachable("Unhandled coercion");
 }
 
-/// Detect if the expression is an assignment to a `self` wrapped property that
-/// has a nonmutating setter, inside a constructor.
-///
-/// We use this to decide when to produce an inout_expr instead of a load_expr
-/// for the sake of emitting a reference required by the assign_by_wrapper
-/// instruction.
-static bool isNonMutatingSetterPWAssignInsideInit(Expr *baseExpr,
-                                                  ValueDecl *member,
-                                                  DeclContext *UseDC) {
-  // Setter is mutating
-  if (cast<AbstractStorageDecl>(member)->isSetterMutating())
-    return false;
+/// Detect whether an assignment to \c baseExpr.member in the given
+/// decl context can potentially be initialization of a property wrapper.
+static bool isPotentialPropertyWrapperInit(Expr *baseExpr,
+                                           ValueDecl *member,
+                                           DeclContext *UseDC) {
   // Member is not a wrapped property
   auto *VD = dyn_cast<VarDecl>(member);
   if (!(VD && VD->hasAttachedPropertyWrapper()))
     return false;
-  // This is not an expression inside a constructor
+
+  // Assignment to a wrapped property can only be re-written to
+  // initialization in an init.
   auto *CD = dyn_cast<ConstructorDecl>(UseDC);
   if (!CD)
     return false;
+
   // This is not an assignment on self
   if (!baseExpr->isSelfExprOf(CD))
     return false;
@@ -6962,15 +6883,14 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
   bool isSettableFromHere =
       SD->isSettable(UseDC) && SD->isSetterAccessibleFrom(UseDC);
 
-  // If neither the property's getter nor its setter are mutating, and
-  // this is not a nonmutating property wrapper setter,
-  // the base can be an rvalue.
-  // With the exception of assignments to a wrapped property inside a
-  // constructor, where we need to produce a reference to be used on
-  // the assign_by_wrapper instruction. 
-  if (!SD->isGetterMutating() && 
+  // If neither the property's getter nor its setter are mutating,
+  // the base can be an rvalue unless the assignment is potentially
+  // initializing a property wrapper. If the assignment can be re-
+  // written to property wrapper initialization, the base type should
+  // be an lvalue.
+  if (!SD->isGetterMutating() &&
       (!isSettableFromHere || !SD->isSetterMutating()) &&
-      !isNonMutatingSetterPWAssignInsideInit(baseExpr, member, UseDC))
+      !isPotentialPropertyWrapperInit(baseExpr, member, UseDC))
     return baseObjectTy;
 
   if (isa<SubscriptDecl>(member))
@@ -8047,10 +7967,8 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   auto stmt = forEachStmtInfo.stmt;
   auto sequenceProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
-  auto contextualLocator = cs.getConstraintLocator(
-      target.getAsExpr(), LocatorPathElt::ContextualType());
-  auto sequenceConformance = solution.resolveConformance(
-      contextualLocator, sequenceProto);
+  auto sequenceConformance = TypeChecker::conformsToProtocol(
+      forEachStmtInfo.sequenceType, sequenceProto, cs.DC);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
 
@@ -8121,13 +8039,13 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   // Convert that Optional<Element> value to the type of the pattern.
   auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
   if (!optPatternType->isEqual(nextResultType)) {
-    OpaqueValueExpr *elementExpr =
-        new (ctx) OpaqueValueExpr(stmt->getInLoc(), nextResultType,
-                                  /*isPlaceholder=*/true);
+    OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
+        stmt->getInLoc(), nextResultType->getOptionalObjectType(),
+        /*isPlaceholder=*/true);
     Expr *convertElementExpr = elementExpr;
     if (TypeChecker::typeCheckExpression(
             convertElementExpr, dc,
-            /*contextualInfo=*/{optPatternType, CTP_CoerceOperand})
+            /*contextualInfo=*/{forEachStmtInfo.initType, CTP_CoerceOperand})
             .isNull()) {
       return None;
     }
@@ -8457,36 +8375,6 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   setExprTypes(result);
   rewriter.finalize();
   return result;
-}
-
-ProtocolConformanceRef Solution::resolveConformance(
-    ConstraintLocator *locator, ProtocolDecl *proto) {
-  for (const auto &conformance : Conformances) {
-    if (conformance.first != locator)
-      continue;
-    if (conformance.second.getRequirement() != proto)
-      continue;
-
-    // If the conformance doesn't require substitution, return it immediately.
-    auto conformanceRef = conformance.second;
-    if (conformanceRef.isAbstract())
-      return conformanceRef;
-
-    auto concrete = conformanceRef.getConcrete();
-    auto conformingType = concrete->getType();
-    if (!conformingType->hasTypeVariable())
-      return conformanceRef;
-
-    // Substitute into the conformance type, then look for a conformance
-    // again.
-    // FIXME: Should be able to perform the substitution using the Solution
-    // itself rather than another conforms-to-protocol check.
-    Type substConformingType = simplifyType(conformingType);
-    return TypeChecker::conformsToProtocol(
-        substConformingType, proto, constraintSystem->DC);
-  }
-
-  return ProtocolConformanceRef::forInvalid();
 }
 
 bool Solution::hasType(ASTNode node) const {

@@ -650,6 +650,24 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   }
 }
 
+Optional<Fingerprint>
+ModuleFile::loadFingerprint(const IterableDeclContext *IDC) const {
+  PrettyStackTraceDecl trace("loading fingerprints for", IDC->getDecl());
+
+  assert(IDC->wasDeserialized());
+  assert(IDC->getDeclID() != 0);
+
+  if (!Core->DeclFingerprints) {
+    return None;
+  }
+
+  auto it = Core->DeclFingerprints->find(IDC->getDeclID());
+  if (it == Core->DeclFingerprints->end()) {
+    return None;
+  }
+  return *it;
+}
+
 TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {
@@ -839,6 +857,20 @@ void ModuleFile::getTopLevelDecls(
         continue;
       }
 
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      consumeError(declOrError.takeError());
+      continue;
+    }
+    results.push_back(declOrError.get());
+  }
+}
+
+void ModuleFile::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &results) {
+  for (DeclID entry : Core->ExportedPrespecializationDecls) {
+    Expected<Decl *> declOrError = getDeclChecked(entry);
+    if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
       consumeError(declOrError.takeError());

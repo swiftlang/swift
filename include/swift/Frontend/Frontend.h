@@ -416,6 +416,10 @@ class CompilerInstance {
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
 
+  /// A cache describing the set of inter-module dependencies that have been queried.
+  /// Null if not present.
+  std::unique_ptr<ModuleDependenciesCache> ModDepCache;
+
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
   /// If there is no stats output directory by the time the
@@ -565,7 +569,9 @@ private:
   /// Return the buffer ID if it is not already compiled, or None if so.
   /// Set failed on failure.
 
-  Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
+  Optional<unsigned> getRecordedBufferID(const InputFile &input,
+                                         const bool shouldRecover,
+                                         bool &failed);
 
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.

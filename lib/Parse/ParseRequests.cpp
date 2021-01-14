@@ -19,6 +19,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/SyntaxArena.h"
@@ -39,7 +40,7 @@ namespace swift {
 void swift::simple_display(llvm::raw_ostream &out,
                            const FingerprintAndMembers &value) {
   if (value.fingerprint)
-    simple_display(out, value.fingerprint.getValue());
+    simple_display(out, *value.fingerprint);
   else
     out << "<no fingerprint>";
   out << ", ";
@@ -62,7 +63,11 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    return FingerprintAndMembers{None, ctx.AllocateCopy(members)};
+    Optional<Fingerprint> fp = None;
+    if (!idc->getDecl()->isImplicit()) {
+      fp = idc->getDecl()->getModuleContext()->loadFingerprint(idc);
+    }
+    return FingerprintAndMembers{fp, ctx.AllocateCopy(members)};
   }
 
   unsigned bufferID = *sf->getBufferID();

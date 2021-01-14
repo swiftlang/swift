@@ -36,6 +36,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
@@ -434,6 +435,45 @@ namespace {
       }
     }
   };
+
+  // Side table information for serializing the table keyed under
+  // \c DeclFingerprintsLayout.
+  class DeclFingerprintsTableInfo {
+  public:
+    using key_type = DeclID;
+    using key_type_ref = const key_type &;
+    using data_type = Fingerprint;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return llvm::hash_value(static_cast<uint32_t>(key));
+    }
+
+    std::pair<unsigned, unsigned>
+    EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+      endian::Writer writer(out, little);
+      // No need to write the key or value length; they're both constant.
+      const unsigned valueLen = Fingerprint::DIGEST_LENGTH;
+      return {sizeof(uint32_t), valueLen};
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == sizeof(uint32_t));
+      endian::Writer writer(out, little);
+      writer.write<uint32_t>(key);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      assert(len == Fingerprint::DIGEST_LENGTH);
+      endian::Writer writer(out, little);
+      out << data;
+    }
+  };
 } // end anonymous namespace
 
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
@@ -588,7 +628,8 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
 serialization::TypeID Serializer::addTypeRef(Type ty) {
 #ifndef NDEBUG
   PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
-  assert((!ty || !ty->hasError()) && "Serializing error type");
+  assert(M->getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
+         !ty || !ty->hasError() && "serializing type with an error");
 #endif
 
   return TypesToSerialize.addRef(ty);
@@ -755,6 +796,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_TESTABLE);
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
+  BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -797,7 +839,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
   BLOCK_RECORD(index_block, DECL_MEMBER_NAMES);
+  BLOCK_RECORD(index_block, DECL_FINGERPRINTS);
   BLOCK_RECORD(index_block, ORDERED_TOP_LEVEL_DECLS);
+  BLOCK_RECORD(index_block, EXPORTED_PRESPECIALIZATION_DECLS);
 
   BLOCK(DECL_MEMBER_TABLES_BLOCK);
   BLOCK_RECORD(decl_member_tables_block, DECL_MEMBERS);
@@ -932,6 +976,12 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
         options_block::ResilienceStrategyLayout Strategy(Out);
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
+      }
+
+      if (getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+        options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
+            AllowErrors(Out);
+        AllowErrors.emit(ScratchRecord);
       }
 
       if (options.SerializeOptionsForDebugging) {
@@ -1347,7 +1397,8 @@ void Serializer::writeASTBlockEntity(
   using namespace decls_block;
 
   // The conformance must be complete, or we can't serialize it.
-  assert(conformance->isComplete());
+  assert(conformance->isComplete() ||
+         getASTContext().LangOpts.AllowModuleWithCompilerErrors);
   assert(NormalConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
@@ -1533,6 +1584,8 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
+    if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+      return false;
     llvm_unreachable("decl should never be a member");
 
   case DeclKind::MissingMember:
@@ -2172,8 +2225,8 @@ static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
 class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   Serializer &S;
   DeclID id;
+  SmallVectorImpl<DeclID> &exportedPrespecializationDecls;
   bool didVerifyAttrs = false;
-
   template <typename DeclKind>
   void verifyAttrSerializable(const DeclKind *D) {
     ::verifyAttrSerializable(D);
@@ -2554,8 +2607,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           storage->hasPrivateAccessor()));
 
     if (shouldEmitFilenameForPrivate || shouldEmitPrivateDiscriminator) {
-      auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
-      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+      auto topLevelSubcontext = value->getDeclContext()->getModuleScopeContext();
+      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelSubcontext)) {
         if (shouldEmitPrivateDiscriminator) {
           Identifier discriminator =
               enclosingFile->getDiscriminatorForPrivateValue(value);
@@ -2712,6 +2765,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     // Retrieve the type of the pattern.
     auto getPatternType = [&] {
+      if (!pattern->hasType()) {
+        if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+          return ErrorType::get(S.getASTContext());
+        llvm_unreachable("all nodes should have types");
+      }
+
       Type type = pattern->getType();
 
       // If we have a contextual type, map out to an interface type.
@@ -2864,7 +2923,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 
 public:
-  DeclSerializer(Serializer &S, DeclID id) : S(S), id(id) {}
+  DeclSerializer(Serializer &S, DeclID id,
+                 SmallVectorImpl<DeclID> &exportedPrespecializationDecls)
+      : S(S), id(id),
+        exportedPrespecializationDecls(exportedPrespecializationDecls) {}
   ~DeclSerializer() {
     assert(didVerifyAttrs);
   }
@@ -2877,7 +2939,22 @@ public:
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      noteUseOfExportedPrespecialization(afd);
+    }
+
     DeclVisitor<DeclSerializer>::visit(const_cast<Decl *>(D));
+  }
+
+  void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
+    for (auto *A : afd->getAttrs().getAttributes<SpecializeAttr>()) {
+      auto *SA = cast<SpecializeAttr>(A);
+      if (!SA->isExported())
+        continue;
+      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(afd)) {
+        exportedPrespecializationDecls.push_back(S.addDeclRef(afd));
+      }
+    }
   }
 
   /// If this gets referenced, we forgot to handle a decl.
@@ -3438,7 +3515,8 @@ public:
         getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
-    if (interfaceType->hasError()) {
+    if (interfaceType->hasError() &&
+        !S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
       param->getDeclContext()->printContext(llvm::errs());
       interfaceType->dump(llvm::errs());
       llvm_unreachable("error in interface type of parameter");
@@ -3797,7 +3875,8 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
-  assert(!D->isInvalid() && "cannot create a module with an invalid decl");
+  assert(getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
+         !D->isInvalid() && "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -3805,7 +3884,9 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
 
   assert(!D->hasClangNode() && "imported decls should use cross-references");
 
-  DeclSerializer(*this, DeclsToSerialize.addRef(D)).visit(D);
+  DeclSerializer(*this, DeclsToSerialize.addRef(D),
+                 exportedPrespecializationDecls)
+      .visit(D);
 }
 
 #define SIMPLE_CASE(TYPENAME, VALUE) \
@@ -3968,16 +4049,23 @@ public:
   /// If this gets referenced, we forgot to handle a type.
   void visitType(const TypeBase *) = delete;
 
-  void visitErrorType(const ErrorType *) {
-    llvm_unreachable("should not serialize an invalid type");
+  void visitErrorType(const ErrorType *ty) {
+    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      using namespace decls_block;
+      unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorTypeLayout::Code];
+      ErrorTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  S.addTypeRef(ty->getOriginalType()));
+      return;
+    }
+    llvm_unreachable("should not serialize an ErrorType");
   }
 
   void visitUnresolvedType(const UnresolvedType *) {
-    llvm_unreachable("should not serialize an invalid type");
+    llvm_unreachable("should not serialize an UnresolvedType");
   }
 
   void visitHoleType(const HoleType *) {
-    llvm_unreachable("should not serialize an invalid type");
+    llvm_unreachable("should not serialize a HoleType");
   }
 
   void visitModuleType(const ModuleType *) {
@@ -4520,6 +4608,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+  registerDeclTypeAbbr<ErrorTypeLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
 
@@ -4782,6 +4871,27 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
   mems.emit(scratch, tableOffset, hashTableBlob);
 }
 
+static void
+writeDeclFingerprintsTable(const index_block::DeclFingerprintsLayout &fpl,
+                           const Serializer::DeclFingerprintsTable &table) {
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<DeclFingerprintsTableInfo> generator;
+    for (auto &entry : table) {
+      generator.insert(entry.first, entry.second);
+    }
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::write<uint32_t>(blobStream, 0, little);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  fpl.emit(scratch, tableOffset, hashTableBlob);
+}
+
 namespace {
   /// Used to serialize the on-disk Objective-C method hash table.
   class ObjCMethodTableInfo {
@@ -5026,7 +5136,9 @@ static void collectInterestingNestedDeclarations(
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
           nominalParent = DC->getSelfNominalTypeDecl();
-          assert(nominalParent && "parent context is not a type or extension");
+          assert(nominalParent ||
+                 nestedType->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+                 "parent context is not a type or extension");
         }
         nestedTypeDecls[nestedType->getName()].push_back({
           S.addDeclRef(nominalParent),
@@ -5054,6 +5166,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
   UniquedDerivativeFunctionConfigTable uniquedDerivativeConfigs;
+  DeclFingerprintsTable declFingerprints;
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
@@ -5091,8 +5204,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         const NominalTypeDecl *extendedNominal = ED->getExtendedNominal();
-        extensionDecls[extendedNominal->getName()]
-          .push_back({ extendedNominal, addDeclRef(D) });
+        if (extendedNominal) {
+          extensionDecls[extendedNominal->getName()]
+            .push_back({ extendedNominal, addDeclRef(D) });
+        }
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getFixity()), addDeclRef(D) });
@@ -5113,6 +5228,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       // derived conformance (for example, ==), force them to be
       // serialized.
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
+        if (auto bodyFP = IDC->getBodyFingerprint()) {
+          declFingerprints.insert({addDeclRef(D), *bodyFP});
+        }
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
@@ -5143,6 +5261,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       localTypeGenerator.insert(MangledName, addDeclRef(TD));
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
+        if (auto bodyFP = IDC->getBodyFingerprint()) {
+          declFingerprints.insert({addDeclRef(TD), *bodyFP});
+        }
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
@@ -5201,12 +5322,22 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     OrderedDecls.emit(ScratchRecord, index_block::ORDERED_TOP_LEVEL_DECLS,
                       orderedTopLevelDecls);
 
+    index_block::OrderedDeclsLayout ExportedPrespecializationDecls(Out);
+    ExportedPrespecializationDecls.emit(
+        ScratchRecord, index_block::EXPORTED_PRESPECIALIZATION_DECLS,
+        exportedPrespecializationDecls);
+
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
 
     if (!nestedTypeDecls.empty()) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
+    }
+
+    if (!declFingerprints.empty()) {
+      index_block::DeclFingerprintsLayout DeclsFingerprints(Out);
+      writeDeclFingerprintsTable(DeclsFingerprints, declFingerprints);
     }
 
     // Convert uniqued derivative function config table to serialization-

@@ -126,20 +126,26 @@ ParserResult<Expr> Parser::parseExprAs() {
 ///     'async'? 'throws'? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
   SourceLoc asyncLoc, throwsLoc, arrowLoc;
+  ParserStatus status;
 
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                                   /*rethrows=*/nullptr);
+  if (status.hasCodeCompletion() && !CodeCompletion) {
+    // Trigger delayed parsing, no need to continue.
+    return status;
+  }
 
   if (Tok.isNot(tok::arrow)) {
     assert(throwsLoc.isValid() || asyncLoc.isValid());
     diagnose(throwsLoc.isValid() ? throwsLoc : asyncLoc,
              diag::async_or_throws_in_wrong_position,
-             throwsLoc.isValid() ? 0 : 2);
+             throwsLoc.isValid() ? "throws" : "async");
     return nullptr;
   }
 
   arrowLoc = consumeToken(tok::arrow);
 
-  parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
 
   auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
   return makeParserResult(arrow);
@@ -393,16 +399,29 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (shouldParseExperimentalConcurrency() && Tok.isContextualKeyword("await")) {
-    SourceLoc awaitLoc = consumeToken();
-    ParserResult<Expr> sub =
-      parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
-    if (!sub.hasCodeCompletion() && !sub.isNull()) {
-      ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
-      sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
-    }
+  if (Tok.isContextualKeyword("await")) {
+    if (shouldParseExperimentalConcurrency()) {
+      SourceLoc awaitLoc = consumeToken();
+      ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
+      if (!sub.hasCodeCompletion() && !sub.isNull()) {
+        if (auto anyTry = dyn_cast<AnyTryExpr>(sub.get())) {
+          // "try" must precede "await".
+          diagnose(awaitLoc, diag::await_before_try)
+            .fixItRemove(awaitLoc)
+            .fixItInsert(anyTry->getSubExpr()->getStartLoc(), "await ");
+        }
 
-    return sub;
+        ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
+        sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+      }
+
+      return sub;
+    } else {
+      // warn that future versions of Swift will parse this token differently.
+      diagnose(Tok.getLoc(), diag::warn_await_keyword)
+        .fixItReplace(Tok.getLoc(), "`await`");
+    }
   }
 
   SourceLoc tryLoc;
@@ -1500,7 +1519,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       DeferringContextRAII Deferring(*SyntaxContext);
       Identifier name;
-      SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
+      SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
       auto introducer = (InVarOrLetPattern != IVOLP_InVar
                          ? VarDecl::Introducer::Let
                          : VarDecl::Introducer::Var);
@@ -1958,7 +1977,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   ParserStatus Status;
   {
-    Scope S(this, ScopeKind::Brace);
     SmallVector<ASTNode, 4> Stmts;
 
     // Make the variable which will contain our temporary value.
@@ -1968,7 +1986,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setUserAccessible(false);
-    addToScope(InterpolationVar);
     setLocalDiscriminator(InterpolationVar);
     
     Stmts.push_back(InterpolationVar);
@@ -2116,8 +2133,7 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
   SourceLoc baseNameLoc;
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
     Identifier baseNameId;
-    baseNameLoc = consumeIdentifier(
-        &baseNameId, /*allowDollarIdentifier=*/true);
+    baseNameLoc = consumeIdentifier(baseNameId, /*diagnoseDollarPrefix=*/false);
     baseName = baseNameId;
   } else if (flags.contains(DeclNameFlag::AllowOperators) &&
              Tok.isAnyOperator()) {
@@ -2203,54 +2219,13 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = nullptr;
-  // When doing incremental re-parsing for SwiftSyntax this check may emit bogus
-  // diagnostic. Also really the syntactic parser should not be doing name
-  // lookups, so disable this check when parsing for SwiftSyntax.
-  if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
-    D = lookupInScope(name);
-
-    if (!Context.LangOpts.DisableParserLookup) {
-      // FIXME: We want this to work: "var x = { x() }", but for now it's better
-      // to disallow it than to crash.
-      if (D) {
-        for (auto activeVar : DisabledVars) {
-          if (activeVar == D) {
-            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-            return new (Context) ErrorExpr(loc.getSourceRange());
-          }
-        }
-      } else {
-        for (auto activeVar : DisabledVars) {
-          if (activeVar->getName() == name.getFullName()) {
-            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-            return new (Context) ErrorExpr(loc.getSourceRange());
-          }
-        }
-      }
-    }
+  if (name.getBaseName().isEditorPlaceholder()) {
+    IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
+    return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
   }
-  
-  Expr *E;
-  if (D == nullptr || D->getAttrs().hasAttribute<CustomAttr>()) {
-    if (name.getBaseName().isEditorPlaceholder()) {
-      IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
-      return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
-    }
 
-    auto refKind = DeclRefKind::Ordinary;
-    E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-  } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    // When parsing default argument expressions for generic functions,
-    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
-    // to the FuncDecl yet. Other than that, we should only ever find
-    // global or local declarations here.
-    assert(!TD->getDeclContext()->isTypeContext() ||
-           isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc, TD, /*DC*/ nullptr);
-  } else {
-    E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-  }
+  auto refKind = DeclRefKind::Ordinary;
+  Expr *E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   
   if (hasGenericArgumentList) {
     E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
@@ -2354,14 +2329,14 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
   OS << ")";
 }
 
-bool Parser::
-parseClosureSignatureIfPresent(SourceRange &bracketRange,
-                               SmallVectorImpl<CaptureListEntry> &captureList,
-                               VarDecl *&capturedSelfDecl,
-                               ParameterList *&params,
-                               SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-                               SourceLoc &arrowLoc,
-                               TypeExpr *&explicitResultType, SourceLoc &inLoc){
+ParserStatus Parser::parseClosureSignatureIfPresent(
+    SourceRange &bracketRange,
+    SmallVectorImpl<CaptureListEntry> &captureList,
+    VarDecl *&capturedSelfDecl,
+    ParameterList *&params,
+    SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+    SourceLoc &arrowLoc,
+    TypeExpr *&explicitResultType, SourceLoc &inLoc) {
   // Clear out result parameters.
   bracketRange = SourceRange();
   capturedSelfDecl = nullptr;
@@ -2372,21 +2347,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   inLoc = SourceLoc();
 
   // Consume 'async', 'throws', and 'rethrows', but in any order.
-  auto consumeAsyncThrows = [&] {
-    bool hadAsync = false;
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async")) {
+  auto consumeEffectsSpecifiers = [&] {
+    while (isEffectsSpecifier(Tok) ||
+           (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()))
       consumeToken();
-      hadAsync = true;
-    }
-
-    if (!consumeIf(tok::kw_throws) && !consumeIf(tok::kw_rethrows))
-      return;
-
-    if (shouldParseExperimentalConcurrency() && !hadAsync &&
-        Tok.isContextualKeyword("async")) {
-      consumeToken();
-    }
   };
 
   // If we have a leading token that may be part of the closure signature, do a
@@ -2398,7 +2362,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
     if (consumeIf(tok::l_square)) {
       skipUntil(tok::r_square);
       if (!consumeIf(tok::r_square))
-        return false;
+        return makeParserSuccess();
     }
 
     // Parse pattern-tuple func-signature-result? 'in'.
@@ -2410,12 +2374,14 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
-        consumeAsyncThrows();
+        consumeEffectsSpecifiers();
 
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
-            return false;
+            return makeParserSuccess();
+
+          consumeEffectsSpecifiers();
         }
       }
 
@@ -2429,27 +2395,30 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
           continue;
         }
 
-        return false;
+        return makeParserSuccess();
       }
 
-      consumeAsyncThrows();
+      consumeEffectsSpecifiers();
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
         if (!canParseType())
-          return false;
+          return makeParserSuccess();
+
+        consumeEffectsSpecifiers();
       }
     }
     
     // Parse the 'in' at the end.
     if (Tok.isNot(tok::kw_in))
-      return false;
+      return makeParserSuccess();
 
     // Okay, we have a closure signature.
   } else {
     // No closure signature.
-    return false;
+    return makeParserSuccess();
   }
+  ParserStatus status;
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     
@@ -2533,7 +2502,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       } else {
         // Otherwise, the name is a new declaration.
-        consumeIdentifier(&name);
+        consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
         equalLoc = consumeToken(tok::equal);
 
         auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
@@ -2594,7 +2563,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       if (pattern.isNonNull())
         params = pattern.get();
       else
-        invalid = true;
+        status.setIsParseError();
     } else {
       SyntaxParsingContext ClParamListCtx(SyntaxContext,
                                           SyntaxKind::ClosureParamList);
@@ -2605,14 +2574,14 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
         if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
-          invalid = true;
+          status.setIsParseError();
           break;
         }
 
         Identifier name;
         SourceLoc nameLoc;
         if (Tok.is(tok::identifier)) {
-          nameLoc = consumeIdentifier(&name);
+          nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
         } else {
           nameLoc = consumeToken(tok::kw__);
         }
@@ -2629,12 +2598,8 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       params = ParameterList::create(Context, elements);
     }
 
-    bool rethrows = false;
-    parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
-    if (rethrows) {
-      diagnose(throwsLoc, diag::rethrowing_function_type)
-        .fixItReplace(throwsLoc, "throws");
-    }
+    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                                     /*rethrows*/nullptr);
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
@@ -2648,9 +2613,13 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       if (!explicitResultTypeRepr) {
         // If we couldn't parse the result type, clear out the arrow location.
         arrowLoc = SourceLoc();
-        invalid = true;
+        status.setIsParseError();
       } else {
         explicitResultType = new (Context) TypeExpr(explicitResultTypeRepr);
+
+        // Check for 'throws' and 'rethrows' after the type and correct it.
+        parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc,
+                               /*rethrows*/nullptr);
       }
     }
   }
@@ -2688,7 +2657,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   }
 
   if (!params)
-    return invalid;
+    return status;
 
   // If this was a closure declaration (maybe even trailing)
   // tuple parameter destructuring is one of the common
@@ -2726,14 +2695,15 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         .fixItReplace(param->getSourceRange(), argName)
         .fixItInsert(Tok.getLoc(), OS.str());
 
-    invalid = true;
+    status.setIsParseError();
   }
 
-  return invalid;
+  return status;
 }
 
 ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
+  ParserStatus Status;
   SyntaxParsingContext ClosureContext(SyntaxContext, SyntaxKind::ClosureExpr);
   // We may be parsing this closure expr in a matching pattern context.  If so,
   // reset our state to not be in a pattern for any recursive pattern parses.
@@ -2753,7 +2723,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
-  parseClosureSignatureIfPresent(
+  Status |= parseClosureSignatureIfPresent(
       bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc,
       arrowLoc, explicitResultType, inLoc);
 
@@ -2773,14 +2743,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   auto *closure = new (Context) ClosureExpr(
       bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc, arrowLoc,
       inLoc, explicitResultType, discriminator, CurDeclContext);
-  // The arguments to the func are defined in their own scope.
-  Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.
   if (params) {
-    // Add the parameters into scope.
-    addParametersToScope(params);
     setLocalDiscriminatorToParamList(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
@@ -2789,14 +2755,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // users who are refactoring code by adding names.
     AnonClosureVars.push_back({{}, leftBrace});
   }
-  
-  // Add capture list variables to scope.
-  for (auto c : captureList)
-    addToScope(c.Var);
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
-  ParserStatus Status;
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
   if (SourceMgr.rangeContainsCodeCompletionLoc({leftBrace, PreviousLoc})) {
@@ -3284,7 +3245,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
          PoundLoc.getAdvancedLoc(1) == Tok.getLoc());
 
   Identifier Name;
-  SourceLoc NameLoc = consumeIdentifier(&Name);
+  SourceLoc NameLoc = consumeIdentifier(Name, /*diagnoseDollarPrefix=*/false);
 
   // Parse arguments if exist.
   SourceLoc LParenLoc, RParenLoc;
@@ -3581,26 +3542,22 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
     return Element;
 
   // Parse the ':'.
-  if (!consumeIf(tok::colon)) {
-    if (Element.hasCodeCompletion()) {
-      // Return the completion expression itself so we can analyze the type
-      // later.
-      return Element;
+  ParserResult<Expr> Value;
+  if (consumeIf(tok::colon)) {
+    // Parse the value.
+    Value = parseExpr(diag::expected_value_in_dictionary_literal);
+    if (Value.isNull()) {
+      if (!Element.hasCodeCompletion()) {
+        Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+      } else {
+        Value = makeParserResult(Value,
+                                 new (Context) CodeCompletionExpr(PreviousLoc));
+      }
     }
+  } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-    return ParserStatus(Element) | makeParserError();
-  }
-
-  // Parse the value.
-  auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
-
-  if (Value.isNull()) {
-    if (!Element.hasCodeCompletion()) {
-      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
-    } else {
-      Value = makeParserResult(Value,
-                               new (Context) CodeCompletionExpr(PreviousLoc));
-    }
+    Value = makeParserResult(makeParserError(),
+                             new (Context) ErrorExpr(SourceRange()));
   }
 
   // Make a tuple of Key Value pair.
@@ -3644,23 +3601,6 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
     diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
         .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
   }
-}
-
-void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
-  for (Pattern *Pat : Patterns) {
-    Pat->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasName()) {
-        // Add any variable declarations to the current scope.
-        addToScope(VD);
-      }
-    });
-  }
-}
-
-void Parser::addParametersToScope(ParameterList *PL) {
-  for (auto param : *PL)
-    if (param->hasName())
-      addToScope(param);
 }
 
 
@@ -3742,6 +3682,7 @@ Parser::parsePlatformVersionConstraintSpec() {
   }
 
   if (parseIdentifier(PlatformIdentifier, PlatformLoc,
+                      /*diagnoseDollarPrefix=*/false,
                       diag::avail_query_expected_platform_name)) {
     return nullptr;
   }

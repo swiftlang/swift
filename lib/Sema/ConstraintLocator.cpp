@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
@@ -66,6 +67,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::KeyPathComponent:
   case ConstraintLocator::ConditionalRequirement:
   case ConstraintLocator::TypeParameterRequirement:
+  case ConstraintLocator::ConformanceRequirement:
   case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
   case ConstraintLocator::DynamicLookupResult:
   case ConstraintLocator::ContextualType:
@@ -394,6 +396,15 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       auto reqElt = elt.castTo<LocatorPathElt::TypeParameterRequirement>();
       out << "type parameter requirement #" << llvm::utostr(reqElt.getIndex());
       dumpReqKind(reqElt.getRequirementKind());
+      break;
+    }
+
+    case ConformanceRequirement: {
+      auto *conformance =
+          elt.castTo<LocatorPathElt::ConformanceRequirement>().getConformance();
+      out << "conformance requirement (";
+      conformance->getProtocol()->dumpRef(out);
+      out << ")";
       break;
     }
 

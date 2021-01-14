@@ -1,0 +1,96 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+import _Concurrency
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+sil hidden @createAndInvokeClosure : $@async @convention(thin) () -> () {
+bb0:
+  %captured_literal = integer_literal $Builtin.Int64, 783247897
+  %captured = struct $Int64 (%captured_literal : $Builtin.Int64)
+  %createPartialApply = function_ref @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  %partialApply = apply %createPartialApply(%captured) : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  strong_retain %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  %applied_literal = integer_literal $Builtin.Int64, 7823478
+  %applied = struct $Int64 (%applied_literal : $Builtin.Int64)
+  try_apply %partialApply(%applied) : $@async @callee_guaranteed (Int64) -> (Int64, @error Error), normal success, error failure
+
+success(%sum : $Int64):
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %result = apply %printInt64(%sum) : $@convention(thin) (Int64) -> () // CHECK: 791071375
+  br exit
+
+failure(%error : $Error):
+  br exit
+
+exit:
+  strong_release %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  strong_release %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
+  %out = tuple ()
+  return %out : $()
+}
+
+// CHECK-LL: @closureTu =
+// CHECK-LL: define internal swiftcc void @closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swiftcc void @"$s7closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}}
+sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error) {
+bb0(%captured : $Int64):
+  %closure = function_ref @closure : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error)
+  %partialApply = partial_apply [callee_guaranteed] %closure(%captured) : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error)
+  return %partialApply : $@async @callee_guaranteed (Int64) -> (Int64, @error Error)
+}
+
+sil private @closure : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error) {
+bb0(%one : $Int64, %two : $Int64):
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %printInt64_1 = apply %printInt64(%one) : $@convention(thin) (Int64) -> ()
+  %printInt64_2 = apply %printInt64(%two) : $@convention(thin) (Int64) -> ()
+  %one_builtin = struct_extract %one : $Int64, #Int64._value
+  %two_builtin = struct_extract %two : $Int64, #Int64._value
+  %flag = integer_literal $Builtin.Int1, -1
+  %sumAndOverflowed = builtin "sadd_with_overflow_Int64"(%one_builtin : $Builtin.Int64, %two_builtin : $Builtin.Int64, %flag : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %sum_builtin = tuple_extract %sumAndOverflowed : $(Builtin.Int64, Builtin.Int1), 0
+  %overflowed = tuple_extract %sumAndOverflowed : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %overflowed : $Builtin.Int1, "arithmetic overflow"
+  %sum = struct $Int64 (%sum_builtin : $Builtin.Int64)
+  return %sum : $Int64
+}
+// Defined in _Concurrency
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
+  %createAndInvokeClosure = function_ref @createAndInvokeClosure : $@async @convention(thin) () -> ()
+  %createAndInvokeClosure_result = apply %createAndInvokeClosure() : $@async @convention(thin) () -> ()
+
+  %void = tuple()
+  return %void : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
+}
+

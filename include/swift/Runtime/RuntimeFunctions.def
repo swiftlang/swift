@@ -1497,14 +1497,75 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create_f(
-//     size_t flags, AsyncTask *task, AsyncFunctionType<void()> *function,
-//     size_t initialContextSize);
+// AsyncTaskAndContext swift_task_create(
+//     size_t flags, AsyncTask *task, TaskContinuationFunction* function,
+//     size_t contextSize);
 FUNCTION(TaskCreateFunc,
          swift_task_create_f, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(AsyncTaskAndContextTy),
          ARGS(SizeTy, SwiftTaskPtrTy, TaskContinuationFunctionPtrTy, SizeTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// AsyncTaskAndContext swift_task_create_future_f(
+//     size_t flags, AsyncTask *task, const Metadata *futureResultType,
+//     TaskContinuationFunction *function, size_t contextSize);
+FUNCTION(TaskCreateFutureFunc,
+         swift_task_create_future_f, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, TypeMetadataPtrTy,
+              TaskContinuationFunctionPtrTy, SizeTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// void swift_task_switch(AsyncTask *task,
+//                        ExecutorRef currentExecutor,
+//                        ExecutorRef newExecutor);
+FUNCTION(TaskSwitchFunc,
+         swift_task_switch, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftExecutorPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_initialize(DefaultActor *actor);
+FUNCTION(DefaultActorInitialize,
+         swift_defaultActor_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_destroy(DefaultActor *actor);
+FUNCTION(DefaultActorDestroy,
+         swift_defaultActor_destroy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
+FUNCTION(AutoDiffCreateLinearMapContext,
+         swift_autoDiffCreateLinearMapContext, SwiftCC,
+         DifferentiationAvailability,
+         RETURNS(RefCountedPtrTy),
+         ARGS(SizeTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// void *swift_autoDiffProjectTopLevelSubcontext(AutoDiffLinearMapContext *);
+FUNCTION(AutoDiffProjectTopLevelSubcontext,
+         swift_autoDiffProjectTopLevelSubcontext, SwiftCC,
+         DifferentiationAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// void *swift_autoDiffAllocateSubcontext(AutoDiffLinearMapContext *, size_t);
+FUNCTION(AutoDiffAllocateSubcontext,
+         swift_autoDiffAllocateSubcontext, SwiftCC,
+         DifferentiationAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(RefCountedPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS

@@ -77,6 +77,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
+  Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
 
   // FIXME: Remove this flag
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
@@ -195,7 +196,9 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction) &&
       (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
-       Args.hasArg(OPT_experimental_skip_all_function_bodies))) {
+       Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
+       Args.hasArg(
+         OPT_experimental_skip_non_inlinable_function_bodies_without_types))) {
     Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
     return true;
   }
@@ -214,6 +217,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.AllowModuleWithCompilerErrors = Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -375,8 +379,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_scan_dependencies))
     return FrontendOptions::ActionType::ScanDependencies;
-  if (Opt.matches(OPT_scan_clang_dependencies))
-    return FrontendOptions::ActionType::ScanClangDependencies;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))

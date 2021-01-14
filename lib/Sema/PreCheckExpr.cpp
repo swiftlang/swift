@@ -380,15 +380,15 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
     ValueDecl *localDeclAfterUse = nullptr;
     auto isValid = [&](ValueDecl *D) {
+      // References to variables injected by lldb are always valid.
+      if (isa<VarDecl>(D) && cast<VarDecl>(D)->isDebuggerVar())
+        return true;
+
       // If we find something in the current context, it must be a forward
       // reference, because otherwise if it was in scope, it would have
       // been returned by the call to ASTScope::lookupLocalDecls() above.
       if (D->getDeclContext()->isLocalContext() &&
-          D->getDeclContext() == DC &&
-          (Context.LangOpts.DisableParserLookup ||
-           (Loc.isValid() && D->getLoc().isValid() &&
-            Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc()) &&
-            !isa<TypeDecl>(D)))) {
+          D->getDeclContext() == DC) {
         localDeclAfterUse = D;
         return false;
       }
@@ -1056,12 +1056,49 @@ namespace {
           if (isa<SequenceExpr>(parent))
             return finish(true, expr);
 
+          SourceLoc lastInnerParenLoc;
+          // Unwrap to the outermost paren in the sequence.
+          if (isa<ParenExpr>(parent)) {
+            for (;;) {
+              auto nextParent = parents.find(parent);
+              if (nextParent == parents.end())
+                break;
+
+              // e.g. `foo((&bar), x: ...)`
+              if (isa<TupleExpr>(nextParent->second)) {
+                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
+                parent = nextParent->second;
+                break;
+              }
+
+              // e.g. `foo(((&bar))`
+              if (isa<ParenExpr>(nextParent->second)) {
+                lastInnerParenLoc = cast<ParenExpr>(parent)->getLParenLoc();
+                parent = nextParent->second;
+                continue;
+              }
+
+              break;
+            }
+          }
+
           if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
             auto call = parents.find(parent);
             if (call != parents.end()) {
               if (isa<ApplyExpr>(call->getSecond()) ||
-                  isa<UnresolvedMemberExpr>(call->getSecond()))
+                  isa<UnresolvedMemberExpr>(call->getSecond())) {
+                // If outermost paren is associated with a call or
+                // a member reference, it might be valid to have `&`
+                // before all of the parens.
+                if (lastInnerParenLoc.isValid()) {
+                  auto &DE = getASTContext().Diags;
+                  auto diag = DE.diagnose(expr->getStartLoc(),
+                                          diag::extraneous_address_of);
+                  diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
+                }
+
                 return finish(true, expr);
+              }
 
               if (isa<SubscriptExpr>(call->getSecond())) {
                 getASTContext().Diags.diagnose(
@@ -1889,6 +1926,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
                                           bool replaceInvalidRefsWithErrors) {
+  auto &ctx = dc->getASTContext();
+  FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
+
   PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {

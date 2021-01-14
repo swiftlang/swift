@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-parser-lookup
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -21,9 +21,9 @@ func1()
 _ = 4+7
 
 var bind_test1 : () -> () = func1
-var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused variable}}
+var bind_test2 : Int = 4; func1 // expected-warning {{expression resolves to an unused variable}}
 
-(func1, func2) // expected-error {{expression resolves to an unused variable}}
+(func1, func2) // expected-warning {{expression resolves to an unused variable}}
 
 func basictest() {
   // Simple integer variables.
@@ -841,7 +841,7 @@ func inoutTests(_ arr: inout Int) {
 
   inoutTests((&x, 24).0) // expected-error {{use of extraneous '&'}}
 
-  inoutTests((&x)) // expected-error {{use of extraneous '&'}}
+  inoutTests((&x)) // expected-error {{use of extraneous '&'}} {{15-16=(}} {{14-15=&}}
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator

@@ -680,6 +680,15 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
+Optional<Fingerprint>
+ModuleDecl::loadFingerprint(const IterableDeclContext *IDC) const {
+  for (auto file : getFiles()) {
+    if (auto FP = file->loadFingerprint(IDC))
+      return FP;
+  }
+  return None;
+}
+
 void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
@@ -781,6 +790,11 @@ void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
 
 void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
+}
+
+void ModuleDecl::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &Results) const {
+  FORWARD(getExportedPrespecializations, (Results));
 }
 
 void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
@@ -1074,7 +1088,7 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
-void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
+Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
@@ -1082,7 +1096,7 @@ void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
                   .InterfaceHash;
   llvm::MD5::MD5Result result;
   md5.final(result);
-  llvm::MD5::stringifyResult(result, str);
+  return Fingerprint{std::move(result)};
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
@@ -1095,7 +1109,7 @@ syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
 
 void DirectOperatorLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
-    TinyPtrVector<OperatorDecl *> ops) const {
+    const TinyPtrVector<OperatorDecl *> &ops) const {
   auto &desc = std::get<0>(getStorage());
   reqTracker.addTopLevelName(desc.name);
 }
@@ -1130,7 +1144,7 @@ void SourceFile::lookupOperatorDirect(
 
 void DirectPrecedenceGroupLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
-    TinyPtrVector<PrecedenceGroupDecl *> groups) const {
+    const TinyPtrVector<PrecedenceGroupDecl *> &groups) const {
   auto &desc = std::get<0>(getStorage());
   reqTracker.addTopLevelName(desc.name);
 }

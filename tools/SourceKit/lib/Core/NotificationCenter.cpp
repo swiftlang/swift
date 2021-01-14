@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
 
 using namespace SourceKit;
@@ -27,21 +28,64 @@ void NotificationCenter::addDocumentUpdateNotificationReceiver(
   DocUpdReceivers.push_back(Receiver);
 }
 
+void NotificationCenter::addTestNotificationReceiver(
+    std::function<void(void)> Receiver) {
+  llvm::sys::ScopedLock L(Mtx);
+  TestReceivers.push_back(std::move(Receiver));
+}
+void NotificationCenter::addSemaEnabledNotificationReceiver(
+    std::function<void(void)> Receiver) {
+  llvm::sys::ScopedLock L(Mtx);
+  SemaEnabledReceivers.push_back(std::move(Receiver));
+}
+void NotificationCenter::addCompileWillStartNotificationReceiver(
+    CompileWillStartNotificationReceiver Receiver) {
+  llvm::sys::ScopedLock L(Mtx);
+  CompileWillStartReceivers.push_back(std::move(Receiver));
+}
+void NotificationCenter::addCompileDidFinishNotificationReceiver(
+    CompileDidFinishNotificationReceiver Receiver) {
+  llvm::sys::ScopedLock L(Mtx);
+  CompileDidFinishReceivers.push_back(std::move(Receiver));
+}
+
+#define POST_NOTIFICATION(Receivers, Args...)                                  \
+  do {                                                                         \
+    decltype(Receivers) recvs;                                                 \
+    {                                                                          \
+      llvm::sys::ScopedLock L(Mtx);                                            \
+      recvs = Receivers;                                                       \
+    }                                                                          \
+    auto sendNote = [=] {                                                      \
+      for (auto &Fn : recvs)                                                   \
+        Fn(Args);                                                              \
+    };                                                                         \
+    if (DispatchToMain)                                                        \
+      WorkQueue::dispatchOnMain(sendNote);                                     \
+    else                                                                       \
+      sendNote();                                                              \
+  } while (0)
+
 void NotificationCenter::postDocumentUpdateNotification(
     StringRef DocumentName) const {
-
-  std::vector<DocumentUpdateNotificationReceiver> recvs;
-  {
-    llvm::sys::ScopedLock L(Mtx);
-    recvs = DocUpdReceivers;
-  }
   std::string docName = DocumentName.str();
-  auto sendNote = [recvs, docName]{
-    for (auto &Fn : recvs)
-      Fn(docName);
-  };
-  if (DispatchToMain)
-    WorkQueue::dispatchOnMain(sendNote);
-  else
-    sendNote();
+  POST_NOTIFICATION(DocUpdReceivers, docName);
+}
+void NotificationCenter::postTestNotification() const {
+  POST_NOTIFICATION(TestReceivers, );
+}
+void NotificationCenter::postSemaEnabledNotification() const {
+  POST_NOTIFICATION(SemaEnabledReceivers, );
+}
+void NotificationCenter::postCompileWillStartNotification(
+    uint64_t CompileID, trace::OperationKind OpKind,
+    const trace::SwiftInvocation &Inv) const {
+  trace::SwiftInvocation inv(Inv);
+  POST_NOTIFICATION(CompileWillStartReceivers, CompileID, OpKind, inv);
+}
+void NotificationCenter::postCompileDidFinishNotification(
+    uint64_t CompileID, trace::OperationKind OpKind,
+    ArrayRef<DiagnosticEntryInfo> Diagnostics) const {
+  std::vector<DiagnosticEntryInfo> diags(Diagnostics);
+  POST_NOTIFICATION(CompileDidFinishReceivers, CompileID, OpKind, diags);
 }

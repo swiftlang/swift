@@ -247,7 +247,8 @@ static bool printModuleInterfaceDecl(Decl *D,
     // a cross-module extension.
     if (!extensionHasClangNode(Ext)) {
       auto ExtendedNominal = Ext->getExtendedNominal();
-      if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
+      if (!ExtendedNominal ||
+          Ext->getModuleContext() == ExtendedNominal->getModuleContext())
         return false;
     }
   }

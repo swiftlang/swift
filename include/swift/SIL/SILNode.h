@@ -317,9 +317,11 @@ protected:
     KeepUnique : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(FieldIndexCacheBase, SingleValueInstruction, 32,
-                             : NumPadBits,
-                             FieldIndex : 32);
+  SWIFT_INLINE_BITFIELD_FULL_TEMPLATE(FieldIndexCacheBase,
+                                      SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldIndex : 32
+  );
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   // Ensure that WitnessMethodInst bitfield does not overflow.
@@ -372,7 +374,7 @@ protected:
     // Number of cases 
     NumCases : 31 - NumTermInstBits;
     template <typename BaseTy>
-    friend class SwitchEnumInstBase;
+    friend class SwitchEnumInstBase
   );
 
 #define SEIB_BITFIELD_EMPTY(T, U) \

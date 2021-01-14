@@ -23,29 +23,26 @@ namespace fine_grained_dependencies {
 
 class FrontendSourceFileDepGraphFactory
     : public AbstractSourceFileDepGraphFactory {
-  SourceFile *const SF;
+  const SourceFile *SF;
   const DependencyTracker &depTracker;
 
 public:
-  FrontendSourceFileDepGraphFactory(SourceFile *SF, StringRef outputPath,
+  FrontendSourceFileDepGraphFactory(const SourceFile *SF, StringRef outputPath,
                                     const DependencyTracker &depTracker,
                                     bool alsoEmitDotFile);
 
   ~FrontendSourceFileDepGraphFactory() override = default;
 
 private:
-  static std::string getFingerprint(SourceFile *SF);
-  static std::string getInterfaceHash(SourceFile *SF);
-
   void addAllDefinedDecls() override;
   void addAllUsedDecls() override;
 };
 
 class ModuleDepGraphFactory : public AbstractSourceFileDepGraphFactory {
-  ModuleDecl *const Mod;
+  const ModuleDecl *Mod;
 
 public:
-  ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot);
+  ModuleDepGraphFactory(const ModuleDecl *Mod, bool emitDot);
 
   ~ModuleDepGraphFactory() override = default;
 

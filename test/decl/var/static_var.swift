@@ -2,21 +2,27 @@
 
 // See also rdar://15626843.
 static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-    // expected-error@-1 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
+    // expected-error@-1 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
+    // expected-note@-2 {{add an initializer to silence this error}} {{18-18= = <#initializer#>}}
 class var gvu2: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
+    // expected-error@-1 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
+    // expected-note@-2 {{add an initializer to silence this error}} {{17-17= = <#initializer#>}}
 override static var gvu3: Int // expected-error {{static properties may only be declared on a type}}{{10-17=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
-    // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
+    // expected-error@-2 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{27-27= = <#initializer#>}}
 override class var gvu4: Int // expected-error {{class properties may only be declared on a type}}{{10-16=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
-    // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
+    // expected-error@-2 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{26-26= = <#initializer#>}}
 static override var gvu5: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
-    // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
+    // expected-error@-2 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{27-27= = <#initializer#>}}
 class override var gvu6: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
-    // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
+    // expected-error@-2 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{26-26= = <#initializer#>}}
 
 static var gvu7: Int { // expected-error {{static properties may only be declared on a type}}{{1-8=}}
   return 42
@@ -28,20 +34,26 @@ class var gvu8: Int { // expected-error {{class properties may only be declared 
 
 static let glu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
     // expected-error@-1 {{global 'let' declaration requires an initializer expression}}
+    // expected-note@-2 {{add an initializer to silence this error}} {{18-18= = <#initializer#>}}
 class let glu2: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{global 'let' declaration requires an initializer expression}}
+    // expected-note@-2 {{add an initializer to silence this error}} {{17-17= = <#initializer#>}}
 override static let glu3: Int // expected-error {{static properties may only be declared on a type}}{{10-17=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{27-27= = <#initializer#>}}
 override class let glu4: Int // expected-error {{class properties may only be declared on a type}}{{10-16=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{26-26= = <#initializer#>}}
 static override let glu5: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{27-27= = <#initializer#>}}
 class override let glu6: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
+    // expected-note@-3 {{add an initializer to silence this error}} {{26-26= = <#initializer#>}}
 
 
 static var gvi1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-8=}}
@@ -187,7 +199,8 @@ extension P {
 
 struct S1 {
   // rdar://15626843
-  static var x: Int  // expected-error {{'static var' declaration requires an initializer expression or getter/setter specifier}}
+  static var x: Int  // expected-error {{'static var' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1 {{add an initializer to silence this error}} {{17-17= = <#initializer#>}}
   var y = 1
 
   static var z = 5
@@ -205,7 +218,20 @@ enum E1 {
 }
 
 class C1 {
-  class var x: Int // expected-error {{class stored properties not supported}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
+  class var x: Int // expected-error {{class stored properties not supported}} expected-error {{'class var' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1 {{add an initializer to silence this error}} {{16-16= = <#initializer#>}}
+  class let x: Int // expected-error {{class stored properties not supported}} expected-error {{'class let' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1 {{add an initializer to silence this error}} {{16-16= = <#initializer#>}}
+  static var x: Int // expected-error {{'static var' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1 {{add an initializer to silence this error}} {{17-17= = <#initializer#>}}
+  static let x: Int // expected-error {{'static let' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1 {{add an initializer to silence this error}} {{17-17= = <#initializer#>}}
+
+  // FIXME: We immediately invalidate the pattern binding after the first error
+  // is emitted, but we could definitely emit a second round of fixits for the
+  // other pattern here.
+  static var (x, y): (Int, Int), (z, w): (Int, Int)  // expected-error {{'static var' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1 {{add an initializer to silence this error}} {{31-31= = <#initializer#>}}
 }
 
 class C2 {

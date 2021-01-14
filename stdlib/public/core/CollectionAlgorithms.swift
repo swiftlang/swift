@@ -210,70 +210,6 @@ extension BidirectionalCollection where Element: Equatable {
 }
 
 //===----------------------------------------------------------------------===//
-// subranges(where:) / subranges(of:)
-//===----------------------------------------------------------------------===//
-
-extension Collection {
-  /// Returns the indices of all the elements that match the given predicate.
-  ///
-  /// For example, you can use this method to find all the places that a
-  /// vowel occurs in a string.
-  ///
-  ///     let str = "Fresh cheese in a breeze"
-  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let allTheVowels = str.subranges(where: { vowels.contains($0) })
-  ///     // str[allTheVowels].count == 9
-  ///
-  /// - Parameter predicate: A closure that takes an element as its argument
-  ///   and returns a Boolean value that indicates whether the passed element
-  ///   represents a match.
-  /// - Returns: A set of the indices of the elements for which `predicate`
-  ///   returns `true`.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  public func subranges(where predicate: (Element) throws -> Bool) rethrows
-    -> RangeSet<Index>
-  {
-    if isEmpty { return RangeSet() }
-
-    var result = RangeSet<Index>()
-    var i = startIndex
-    while i != endIndex {
-      let next = index(after: i)
-      if try predicate(self[i]) {
-        result._append(i..<next)
-      }
-      i = next
-    }
-
-    return result
-  }
-}
-
-extension Collection where Element: Equatable {
-  /// Returns the indices of all the elements that are equal to the given
-  /// element.
-  ///
-  /// For example, you can use this method to find all the places that a
-  /// particular letter occurs in a string.
-  ///
-  ///     let str = "Fresh cheese in a breeze"
-  ///     let allTheEs = str.subranges(of: "e")
-  ///     // str[allTheEs].count == 7
-  ///
-  /// - Parameter element: An element to look for in the collection.
-  /// - Returns: A set of the indices of the elements that are equal to
-  ///   `element`.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  public func subranges(of element: Element) -> RangeSet<Index> {
-    subranges(where: { $0 == element })
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // partition(by:)
 //===----------------------------------------------------------------------===//
 
@@ -401,35 +337,30 @@ extension MutableCollection where Self: BidirectionalCollection {
   ) rethrows -> Index {
     var lo = startIndex
     var hi = endIndex
+    while true {
+      // Invariants at this point:
+      //
+      // * `lo <= hi`
+      // * all elements in `startIndex ..< lo` belong in the first partition
+      // * all elements in `hi ..< endIndex` belong in the second partition
 
-    // 'Loop' invariants (at start of Loop, all are true):
-    // * lo < hi
-    // * predicate(self[i]) == false, for i in startIndex ..< lo
-    // * predicate(self[i]) == true, for i in hi ..< endIndex
+      // Find next element from `lo` that may not be in the right place.
+      while true {
+        guard lo < hi else { return lo }
+        if try belongsInSecondPartition(self[lo]) { break }
+        formIndex(after: &lo)
+      }
 
-    Loop: while true {
-      FindLo: repeat {
-        while lo < hi {
-          if try belongsInSecondPartition(self[lo]) { break FindLo }
-          formIndex(after: &lo)
-        }
-        break Loop
-      } while false
-
-      FindHi: repeat {
+      // Find next element down from `hi` that we can swap `lo` with.
+      while true {
         formIndex(before: &hi)
-        while lo < hi {
-          if try !belongsInSecondPartition(self[hi]) { break FindHi }
-          formIndex(before: &hi)
-        }
-        break Loop
-      } while false
+        guard lo < hi else { return lo }
+        if try !belongsInSecondPartition(self[hi]) { break }
+      }
 
       swapAt(lo, hi)
       formIndex(after: &lo)
     }
-
-    return lo
   }
 }
 

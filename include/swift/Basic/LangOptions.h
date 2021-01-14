@@ -116,7 +116,7 @@ namespace swift {
     std::string RequireExplicitAvailabilityTarget;
 
     // Availability macros definitions to be expanded at parsing.
-    SmallVector<StringRef, 4> AvailabilityMacros;
+    SmallVector<std::string, 4> AvailabilityMacros;
 
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
@@ -128,6 +128,9 @@ namespace swift {
     /// Emit a remark when import resolution implicitly adds a cross-import
     /// overlay.
     bool EnableCrossImportRemarks = false;
+
+    /// Emit a remark after loading a module.
+    bool EnableModuleLoadingRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -215,15 +218,11 @@ namespace swift {
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
     
-    /// The path to which we should emit GraphViz output for the complete
-    /// request-evaluator graph.
-    std::string RequestEvaluatorGraphVizPath;
-    
+    /// Whether to record request references for incremental builds.
+    bool RecordRequestReferences = true;
+
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
-
-    /// Whether to build a request dependency graph for debugging.
-    bool BuildRequestDependencyGraph = false;
 
     /// Enable SIL type lowering
     bool EnableSubstSILFunctionTypesForFunctionValues = true;
@@ -248,6 +247,9 @@ namespace swift {
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
 
+    /// Enable experimental support for `@_specialize(exported: true,...)` .
+    bool EnableExperimentalPrespecialization = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -257,9 +259,6 @@ namespace swift {
     ///
     /// This is a staging flag; eventually it will be removed.
     bool EnableDeserializationRecovery = true;
-
-    /// Someday, ASTScopeLookup will supplant lookup in the parser
-    bool DisableParserLookup = false;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -366,6 +365,10 @@ namespace swift {
     /// recovery issues won't bring down the debugger.
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
+
+    // Allow errors during module generation. See corresponding option in
+    // FrontendOptions.
+    bool AllowModuleWithCompilerErrors = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

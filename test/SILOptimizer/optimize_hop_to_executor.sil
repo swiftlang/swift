@@ -156,3 +156,53 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @handleUnreachable1 : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $MyActor):
+// CHECK-NOT:     hop_to_executor
+// CHECK:       } // end sil function 'handleUnreachable1'
+sil [ossa] @handleUnreachable1 : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor %0 : $MyActor
+  cond_br undef, bb1, bb2
+bb1:
+  unreachable
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @handleUnreachable2 : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $MyActor):
+// CHECK-NOT:     hop_to_executor
+// CHECK:       } // end sil function 'handleUnreachable2'
+sil [ossa] @handleUnreachable2 : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  cond_br undef, bb1, bb2
+bb1:
+  hop_to_executor %0 : $MyActor
+  unreachable
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @handleUnreachableBlock : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $MyActor):
+// CHECK-NEXT:    hop_to_executor
+// CHECK:       bb2:
+// CHECK-NOT:     hop_to_executor
+// CHECK:       } // end sil function 'handleUnreachableBlock'
+sil [ossa] @handleUnreachableBlock : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor %0 : $MyActor
+  %f = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
+  apply %f(%0) : $@convention(method) (@guaranteed MyActor) -> ()
+  br bb2
+bb1:
+  br bb2
+bb2:
+  hop_to_executor %0 : $MyActor
+  %r = tuple ()
+  return %r : $()
+}
+

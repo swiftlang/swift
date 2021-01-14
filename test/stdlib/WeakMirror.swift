@@ -35,7 +35,7 @@ class NativeSwiftClass : NativeClassBoundExistential {
   }
 }
 
-protocol NativeClassBoundExistential : class {
+protocol NativeClassBoundExistential : AnyObject {
   var x: Int { get }
 }
 class NativeSwiftClassHasWeak {
@@ -113,6 +113,8 @@ mirrors.test("class/NativeSwiftClassHasNativeWeakReferenceNoLeak") {
     let mirror = Mirror(reflecting: parent)
     let children = Array(mirror.children)
     let extractedChild = children[0].1 as! NativeSwiftClass
+    // If child is destroyed, the above cast will fail.
+    _fixLifetime(child)
     expectNotNil(extractedChild)
     expectNotNil(verifier)
   }
@@ -123,7 +125,7 @@ mirrors.test("class/NativeSwiftClassHasNativeWeakReferenceNoLeak") {
 
 import Foundation
 
-@objc protocol ObjCClassExistential : class {
+@objc protocol ObjCClassExistential : AnyObject {
   var weakProperty: AnyObject? { get set }
   var x: Int { get }
 }

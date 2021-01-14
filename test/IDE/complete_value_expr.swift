@@ -1410,6 +1410,9 @@ func testTypeCheckWithUnsolvedVariables3() {
 // TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<Int>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): Int#})[#BuilderStyle<Int>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-NEXT: Keyword[self]/CurrNominal: self[#BuilderStyle<Double>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<Double>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): Double#})[#BuilderStyle<Double>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_3-NEXT: End completions
 
 func testTypeCheckNil() {

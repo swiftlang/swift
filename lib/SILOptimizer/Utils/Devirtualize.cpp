@@ -491,7 +491,7 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
     resultBB = normalBB;
   } else {
     resultBB = builder.getFunction().createBasicBlockBefore(normalBB);
-    resultBB->createPhiArgument(newResultTy, ValueOwnershipKind::Owned);
+    resultBB->createPhiArgument(newResultTy, OwnershipKind::Owned);
   }
 
   // We can always just use the original error BB because we'll be
@@ -780,9 +780,9 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
     auto paramType =
         substConv.getSILType(param, builder.getTypeExpansionContext());
     SILValue arg = *paramArgIter;
-    if (builder.hasOwnership() && arg->getType().isObject()
-        && arg.getOwnershipKind() == ValueOwnershipKind::Owned
-        && param.isGuaranteed()) {
+    if (builder.hasOwnership() && arg->getType().isObject() &&
+        arg.getOwnershipKind() == OwnershipKind::Owned &&
+        param.isGuaranteed()) {
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
@@ -1006,11 +1006,11 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
     auto paramType =
         substConv.getSILArgumentType(substArgIdx++, typeExpansionContext);
     if (arg->getType() != paramType) {
-      if (argBuilder.hasOwnership()
-          && applySite.getKind() != ApplySiteKind::PartialApplyInst
-          && arg->getType().isObject()
-          && arg.getOwnershipKind() == ValueOwnershipKind::Owned
-          && paramInfo.isGuaranteedConvention()) {
+      if (argBuilder.hasOwnership() &&
+          applySite.getKind() != ApplySiteKind::PartialApplyInst &&
+          arg->getType().isObject() &&
+          arg.getOwnershipKind() == OwnershipKind::Owned &&
+          paramInfo.isGuaranteedConvention()) {
         SILBuilderWithScope borrowBuilder(applySite.getInstruction(),
                                           argBuilder);
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);

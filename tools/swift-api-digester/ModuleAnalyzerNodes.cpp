@@ -1,4 +1,5 @@
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILDeclRef.h"
 #include <ModuleAnalyzerNodes.h>
 #include <algorithm>

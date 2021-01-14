@@ -301,6 +301,10 @@ def experimental_skip_non_inlinable_function_bodies:
   Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
+def experimental_skip_non_inlinable_function_bodies_without_types:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies-without-types">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip work on non-inlinable function bodies that do not declare nested types">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;
@@ -331,6 +335,10 @@ def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-p
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if a cross-import of a module is triggered.">;
+
+def remark_loading_module : Flag<["-"], "Rmodule-loading">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark and file path of each loaded module">;
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
@@ -785,7 +793,7 @@ def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Specify the assert_configuration replacement. "
            "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
 
@@ -1096,6 +1104,13 @@ def sanitize_recover_EQ
                "checks should be comma separated. Default behavior is to not "
                "allow error recovery.">;
 
+def sanitize_address_use_odr_indicator
+    : Flag<["-"], "sanitize-address-use-odr-indicator">,
+      Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+      HelpText<"When using AddressSanitizer enable ODR indicator globals to "
+               "avoid false ODR violation reports in partially sanitized "
+               "programs at the cost of an increase in binary size">;
+
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   MetaVarName<"<type>">,
@@ -1106,21 +1121,9 @@ def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
-  HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
 def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
-def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable parser lookup & use ASTScope lookup only (experimental)">;
-
-def enable_parser_lookup : Flag<["-"], "enable-parser-lookup">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable parser lookup">;
 
 def enable_request_based_incremental_dependencies : Flag<["-"],
   "enable-request-based-incremental-dependencies">,

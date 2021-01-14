@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -653,9 +654,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           .fixItInsert(DRE->getStartLoc(), "self.");
       }
 
-      DeclContext *topLevelContext = DC->getModuleScopeContext();
+      DeclContext *topLevelSubcontext = DC->getModuleScopeContext();
       auto descriptor = UnqualifiedLookupDescriptor(
-          DeclNameRef(VD->getBaseName()), topLevelContext, SourceLoc());
+          DeclNameRef(VD->getBaseName()), topLevelSubcontext, SourceLoc());
       auto lookup = evaluateOrDefault(Ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
 
@@ -4612,7 +4613,6 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
-  checkActorIsolation(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

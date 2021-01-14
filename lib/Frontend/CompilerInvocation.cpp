@@ -81,6 +81,26 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 
+static std::string
+getVersionedPrebuiltModulePath(Optional<llvm::VersionTuple> sdkVer,
+                               StringRef defaultPrebuiltPath) {
+  if (!sdkVer.hasValue())
+    return defaultPrebuiltPath.str();
+  std::string versionStr = sdkVer->getAsString();
+  StringRef vs = versionStr;
+  do {
+    SmallString<64> pathWithSDKVer = defaultPrebuiltPath;
+    llvm::sys::path::append(pathWithSDKVer, vs);
+    if (llvm::sys::fs::exists(pathWithSDKVer)) {
+      return pathWithSDKVer.str().str();
+    } else if (vs.endswith(".0")) {
+      vs = vs.substr(0, vs.size() - 2);
+    } else {
+      return defaultPrebuiltPath.str();
+    }
+  } while(true);
+}
+
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   if (!FrontendOpts.PrebuiltModuleCachePath.empty())
@@ -101,18 +121,8 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   // If the SDK version is given, we should check if SDK-versioned prebuilt
   // module cache is available and use it if so.
-  if (auto ver = LangOpts.SDKVersion) {
-    // "../macosx/prebuilt-modules"
-    SmallString<64> defaultPrebuiltPathWithSDKVer = defaultPrebuiltPath;
-    // "../macosx/prebuilt-modules/10.15"
-    llvm::sys::path::append(defaultPrebuiltPathWithSDKVer, ver->getAsString());
-    // If the versioned prebuilt module cache exists in the disk, use it.
-    if (llvm::sys::fs::exists(defaultPrebuiltPathWithSDKVer)) {
-      FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPathWithSDKVer.str());
-      return;
-    }
-  }
-  FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath.str());
+  FrontendOpts.PrebuiltModuleCachePath =
+    getVersionedPrebuiltModulePath(LangOpts.SDKVersion, defaultPrebuiltPath);
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -434,9 +444,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
   
-  Opts.DisableParserLookup |= Args.hasFlag(OPT_disable_parser_lookup,
-                                           OPT_enable_parser_lookup,
-                                           /*default*/ true);
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -484,6 +491,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
 
+  Opts.EnableExperimentalPrespecialization |=
+      Args.hasArg(OPT_enable_experimental_prespecialization);
+
   if (auto A = Args.getLastArg(OPT_enable_testable_attr_requires_testable_module,
                                OPT_disable_testable_attr_requires_testable_module)) {
     Opts.EnableTestableAttrRequiresTestableModule
@@ -492,13 +502,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
-
-  if (Args.getLastArg(OPT_build_request_dependency_graph))
-    Opts.BuildRequestDependencyGraph = true;
-
-  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
-    Opts.RequestEvaluatorGraphVizPath = A->getValue();
-  }
 
   if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
     Opts.RequireExplicitAvailability = true;
@@ -576,6 +579,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Opts.EnableCrossImportOverlays);
 
   Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
+
+  Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
@@ -683,6 +688,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DisableAvailabilityChecking = true;
   }
 
+  if (FrontendOpts.AllowModuleWithCompilerErrors) {
+    Opts.AllowModuleWithCompilerErrors = true;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -725,6 +734,12 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
 
+  // Check for SkipFunctionBodies arguments in order from skipping less to
+  // skipping more.
+  if (Args.hasArg(
+        OPT_experimental_skip_non_inlinable_function_bodies_without_types))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
   if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -734,15 +749,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
     Opts.SkipFunctionBodies = FunctionBodySkipping::All;
 
-  if (Opts.SkipFunctionBodies == FunctionBodySkipping::NonInlinable &&
+  if (Opts.SkipFunctionBodies != FunctionBodySkipping::None &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
-    // Disable this optimization if we're compiling SwiftOnoneSupport, because
-    // we _definitely_ need to look inside every declaration to figure out
-    // what gets prespecialized.
+    // Disable these optimizations if we're compiling SwiftOnoneSupport,
+    // because we _definitely_ need to look inside every declaration to figure
+    // out what gets prespecialized.
     Opts.SkipFunctionBodies = FunctionBodySkipping::None;
     Diags.diagnose(
         SourceLoc(),
-        diag::module_incompatible_with_skip_non_inlinable_function_bodies,
+        diag::module_incompatible_with_skip_function_bodies,
         SWIFT_ONONE_SUPPORT);
   }
 
@@ -1214,6 +1229,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.SanitizersWithRecoveryInstrumentation =
         parseSanitizerRecoverArgValues(A, Opts.Sanitizers, Diags,
                                        /*emitWarnings=*/true);
+  }
+
+  if (const Arg *A =
+          Args.getLastArg(options::OPT_sanitize_address_use_odr_indicator)) {
+    IRGenOpts.SanitizeAddressUseODRIndicator =
+        parseSanitizerAddressUseODRIndicator(A, Opts.Sanitizers, Diags);
   }
 
   if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,

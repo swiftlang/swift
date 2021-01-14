@@ -15,6 +15,7 @@
 
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/Job.h"
@@ -55,7 +56,8 @@ class ModuleDepGraphNode : public DepGraphNode {
   bool hasBeenTracedAsADependent = false;
 
 public:
-  ModuleDepGraphNode(const DependencyKey &key, Optional<StringRef> fingerprint,
+  ModuleDepGraphNode(const DependencyKey &key,
+                     Optional<Fingerprint> fingerprint,
                      Optional<std::string> swiftDeps)
       : DepGraphNode(key, fingerprint), swiftDeps(swiftDeps) {}
 
@@ -186,8 +188,8 @@ class ModuleDepGraph {
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
 public:
-  const bool verifyFineGrainedDependencyGraphAfterEveryImport;
-  const bool emitFineGrainedDependencyDotFileAfterEveryImport;
+  bool verifyFineGrainedDependencyGraphAfterEveryImport;
+  bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
 private:
   /// If tracing dependencies, holds a vector used to hold the current path
@@ -201,7 +203,7 @@ private:
       dependencyPathsToJobs;
 
   /// For helping with performance tuning, may be null:
-  UnifiedStatsReporter *const stats;
+  UnifiedStatsReporter *stats;
 
   //==============================================================================
   // MARK: ModuleDepGraph - mutating dependencies
@@ -491,7 +493,12 @@ public:
 
   template <typename Nodes>
   std::vector<const driver::Job *>
-  findJobsToRecompileWhenNodesChange(const Nodes &);
+  findJobsToRecompileWhenNodesChange(const Nodes &nodes) {
+    std::vector<ModuleDepGraphNode *> foundDependents;
+    for (ModuleDepGraphNode *n : nodes)
+      findPreviouslyUntracedDependents(foundDependents, n);
+    return jobsContaining(foundDependents);
+  }
 
 private:
   std::vector<const driver::Job *>

@@ -71,7 +71,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
-    if (parseIdentifier(Name, NameLoc,
+    if (parseIdentifier(Name, NameLoc, /*diagnoseDollarPrefix=*/true,
                         diag::expected_generics_parameter_name)) {
       Result.setIsParseError();
       break;
@@ -117,9 +117,6 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Attach attributes.
     Param->getAttrs() = attributes;
 
-    // Add this parameter to the scope.
-    addToScope(Param);
-
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
   } while (HasNextParam);
@@ -140,11 +137,11 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
 
   // Parse the optional where-clause.
   SourceLoc WhereLoc;
+  SourceLoc EndLoc;
   SmallVector<RequirementRepr, 4> Requirements;
-  bool FirstTypeInComplete;
   if (Tok.is(tok::kw_where) &&
-      parseGenericWhereClause(WhereLoc, Requirements,
-                              FirstTypeInComplete).isErrorOrHasCompletion()) {
+      parseGenericWhereClause(WhereLoc, EndLoc, Requirements)
+        .isErrorOrHasCompletion()) {
     Invalid = true;
   }
   
@@ -261,16 +258,14 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
 ///   same-type-requirement:
 ///     type-identifier '==' type
 ParserStatus Parser::parseGenericWhereClause(
-               SourceLoc &WhereLoc,
+               SourceLoc &WhereLoc, SourceLoc &EndLoc,
                SmallVectorImpl<RequirementRepr> &Requirements,
-               bool &FirstTypeInComplete,
                bool AllowLayoutConstraints) {
   SyntaxParsingContext ClauseContext(SyntaxContext,
                                      SyntaxKind::GenericWhereClause);
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
-  FirstTypeInComplete = false;
   SyntaxParsingContext ReqListContext(SyntaxContext,
                                       SyntaxKind::GenericRequirementList);
   bool HasNextReq;
@@ -283,7 +278,7 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeGenericRequirement();
-      consumeToken(tok::code_complete);
+      EndLoc = consumeToken(tok::code_complete);
       Status.setHasCodeCompletionAndIsError();
       break;
     }
@@ -295,7 +290,6 @@ ParserStatus Parser::parseGenericWhereClause(
     if (FirstType.hasCodeCompletion()) {
       BodyContext->setTransparent();
       Status.setHasCodeCompletionAndIsError();
-      FirstTypeInComplete = true;
     }
 
     if (FirstType.isNull()) {
@@ -313,7 +307,8 @@ ParserStatus Parser::parseGenericWhereClause(
               ->isKnownLayout()) {
         // Parse a layout constraint.
         Identifier LayoutName;
-        auto LayoutLoc = consumeIdentifier(&LayoutName);
+        auto LayoutLoc = consumeIdentifier(LayoutName,
+                                           /*diagnoseDollarPrefix=*/false);
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
         if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.
@@ -383,8 +378,10 @@ ParserStatus Parser::parseGenericWhereClause(
     }
   } while (HasNextReq);
 
-  if (Requirements.empty())
-    WhereLoc = SourceLoc();
+  if (!Requirements.empty())
+    EndLoc = Requirements.back().getSourceRange().End;
+  else if (EndLoc.isInvalid())
+    EndLoc = WhereLoc;
 
   return Status;
 }
@@ -396,31 +393,26 @@ parseFreestandingGenericWhereClause(GenericContext *genCtx) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
 
   SmallVector<RequirementRepr, 4> Requirements;
-  SourceLoc WhereLoc;
-  bool FirstTypeInComplete;
-  auto result = parseGenericWhereClause(WhereLoc, Requirements,
-                                        FirstTypeInComplete);
-  if (result.isErrorOrHasCompletion() || Requirements.empty())
-    return result;
+  SourceLoc WhereLoc, EndLoc;
+  auto result = parseGenericWhereClause(WhereLoc, EndLoc, Requirements);
 
   genCtx->setTrailingWhereClause(
-      TrailingWhereClause::create(Context, WhereLoc, Requirements));
+      TrailingWhereClause::create(Context, WhereLoc, EndLoc, Requirements));
 
-  return ParserStatus();
+  return result;
 }
 
 /// Parse a where clause after a protocol or associated type declaration.
 ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
     TrailingWhereClause *&trailingWhere, bool isProtocol) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
-  SourceLoc whereLoc;
+  SourceLoc whereLoc, endLoc;
   SmallVector<RequirementRepr, 4> requirements;
-  bool firstTypeInComplete;
   auto whereStatus =
-      parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
+      parseGenericWhereClause(whereLoc, endLoc, requirements);
   if (whereStatus.isSuccess() && !whereStatus.hasCodeCompletion()) {
     trailingWhere =
-        TrailingWhereClause::create(Context, whereLoc, requirements);
+        TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
   } else if (whereStatus.hasCodeCompletion()) {
     return whereStatus;
   }

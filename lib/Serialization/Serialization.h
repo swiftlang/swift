@@ -105,6 +105,8 @@ class Serializer : public SerializerBase {
   uint32_t /*IdentifierID*/ LastUniquedStringID =
       serialization::NUM_SPECIAL_IDS - 1;
 
+  SmallVector<DeclID, 16> exportedPrespecializationDecls;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting
@@ -276,6 +278,11 @@ public:
   using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
       Identifier,
       llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
+
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of the fingerprint associated with a serialized
+  // iterable decl context. It is keyed by that context's decl ID.
+  using DeclFingerprintsTable = llvm::MapVector<uint32_t, Fingerprint>;
 
 private:
   /// A map from identifiers to methods and properties with the given name.

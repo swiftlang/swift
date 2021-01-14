@@ -81,7 +81,7 @@ func _mangledTypeName(_ type: Any.Type) -> String? {
   let (result, repairsMade) = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: stringPtr, count: count))
 
-  precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should always valid UTF-8")
+  precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
 
   return result
 }

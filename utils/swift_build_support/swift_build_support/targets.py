@@ -201,7 +201,7 @@ class StdlibDeploymentTarget(object):
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
-    Android = AndroidPlatform("android", archs=["armv7", "aarch64"])
+    Android = AndroidPlatform("android", archs=["armv7", "aarch64", "x86_64"])
 
     Windows = Platform("windows", archs=["x86_64"])
 
@@ -226,6 +226,16 @@ class StdlibDeploymentTarget(object):
     _targets_by_name = dict((target.name, target)
                             for platform in known_platforms
                             for target in platform.targets)
+
+    _sdk_targets = {
+        'OSX': OSX.targets,
+        'IOS': iOS.targets,
+        'IOS_SIMULATOR': iOSSimulator.targets,
+        'TVOS': AppleTV.targets,
+        'TVOS_SIMULATOR': AppleTVSimulator.targets,
+        'WATCHOS': AppleWatch.targets,
+        'WATCHOS_SIMULATOR': AppleWatchSimulator.targets,
+    }
 
     @staticmethod
     def host_target():
@@ -307,6 +317,14 @@ class StdlibDeploymentTarget(object):
     def get_target_names(cls):
         return sorted([name for (name, target) in
                        cls._targets_by_name.items()])
+
+    @classmethod
+    def get_migrated_targets_for_sdk(cls, sdk_name):
+        return cls._sdk_targets.get(sdk_name, None)
+
+    @classmethod
+    def get_all_migrated_sdks(cls):
+        return cls._sdk_targets.keys()
 
 
 def install_prefix():

@@ -193,16 +193,16 @@ std::string DependencyKey::computeNameForProvidedEntity<
 //==============================================================================
 
 bool fine_grained_dependencies::withReferenceDependencies(
-    llvm::PointerUnion<ModuleDecl *, SourceFile *> MSF,
+    llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
     const DependencyTracker &depTracker, StringRef outputPath,
     bool alsoEmitDotFile,
     llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
-  if (auto *MD = MSF.dyn_cast<ModuleDecl *>()) {
+  if (auto *MD = MSF.dyn_cast<const ModuleDecl *>()) {
     SourceFileDepGraph g =
         ModuleDepGraphFactory(MD, alsoEmitDotFile).construct();
     return cont(std::move(g));
   } else {
-    auto *SF = MSF.get<SourceFile *>();
+    auto *SF = MSF.get<const SourceFile *>();
     SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
                                SF, outputPath, depTracker, alsoEmitDotFile)
                                .construct();
@@ -215,26 +215,12 @@ bool fine_grained_dependencies::withReferenceDependencies(
 //==============================================================================
 
 FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
-    SourceFile *SF, StringRef outputPath, const DependencyTracker &depTracker,
-    const bool alsoEmitDotFile)
+    const SourceFile *SF, StringRef outputPath,
+    const DependencyTracker &depTracker, const bool alsoEmitDotFile)
     : AbstractSourceFileDepGraphFactory(
-          SF->getASTContext().hadError(),
-          outputPath, getInterfaceHash(SF), alsoEmitDotFile,
-          SF->getASTContext().Diags),
+          SF->getASTContext().hadError(), outputPath, SF->getInterfaceHash(),
+          alsoEmitDotFile, SF->getASTContext().Diags),
       SF(SF), depTracker(depTracker) {}
-
-/// Centralize the invariant that the fingerprint of the whole file is the
-/// interface hash
-std::string FrontendSourceFileDepGraphFactory::getFingerprint(SourceFile *SF) {
-  return getInterfaceHash(SF);
-}
-
-std::string
-FrontendSourceFileDepGraphFactory::getInterfaceHash(SourceFile *SF) {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  return interfaceHash.str().str();
-}
 
 //==============================================================================
 // MARK: FrontendSourceFileDepGraphFactory - adding collections of defined Decls
@@ -415,31 +401,24 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 namespace {
 /// Extracts uses out of a SourceFile
 class UsedDeclEnumerator {
-  SourceFile *SF;
+  const SourceFile *SF;
   const DependencyTracker &depTracker;
   StringRef swiftDeps;
 
   /// Cache these for efficiency
-  const DependencyKey sourceFileInterface;
   const DependencyKey sourceFileImplementation;
 
-  function_ref<void(const DependencyKey &, const DependencyKey &)> createDefUse;
-
 public:
-  UsedDeclEnumerator(
-      SourceFile *SF, const DependencyTracker &depTracker, StringRef swiftDeps,
-      function_ref<void(const DependencyKey &, const DependencyKey &)>
-          createDefUse)
+  UsedDeclEnumerator(const SourceFile *SF, const DependencyTracker &depTracker,
+                     StringRef swiftDeps)
       : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
-        sourceFileInterface(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::interface, swiftDeps)),
         sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
-            DeclAspect::implementation, swiftDeps)),
-        createDefUse(createDefUse) {
-  }
+            DeclAspect::implementation, swiftDeps)) {}
 
 public:
-  void enumerateAllUses() {
+  using UseEnumerator =
+      llvm::function_ref<void(const DependencyKey &, const DependencyKey &)>;
+  void enumerateAllUses(UseEnumerator enumerator) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       std::string name = ref.name.userFacingName().str();
@@ -451,36 +430,37 @@ public:
       case Kind::Tombstone:
         llvm_unreachable("Cannot enumerate dead reference!");
       case Kind::TopLevel:
-        return enumerateUse<NodeKind::topLevel>("", name);
+        return enumerateUse<NodeKind::topLevel>("", name, enumerator);
       case Kind::Dynamic:
-        return enumerateUse<NodeKind::dynamicLookup>("", name);
+        return enumerateUse<NodeKind::dynamicLookup>("", name, enumerator);
       case Kind::PotentialMember: {
         std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
-        return enumerateUse<NodeKind::potentialMember>(context, "");
+        return enumerateUse<NodeKind::potentialMember>(context, "", enumerator);
       }
       case Kind::UsedMember: {
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        return enumerateUse<NodeKind::member>(context, name);
+        return enumerateUse<NodeKind::member>(context, name, enumerator);
       }
       }
     });
-    enumerateExternalUses();
-    enumerateNominalUses();
+    enumerateExternalUses(enumerator);
+    enumerateNominalUses(enumerator);
   }
 
 private:
   template <NodeKind kind>
-  void enumerateUse(StringRef context, StringRef name) {
+  void enumerateUse(StringRef context, StringRef name,
+                    UseEnumerator createDefUse) {
     // Assume that what is depended-upon is the interface
     createDefUse(
         DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
         sourceFileImplementation);
   }
 
-  void enumerateNominalUses() {
+  void enumerateNominalUses(UseEnumerator enumerator) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       const NominalTypeDecl *subject = ref.subject;
@@ -491,37 +471,47 @@ private:
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
-      enumerateUse<NodeKind::nominal>(context, "");
+      enumerateUse<NodeKind::nominal>(context, "", enumerator);
     });
   }
 
-  void enumerateExternalUses() {
+  void enumerateExternalUses(UseEnumerator enumerator) {
     for (StringRef s : depTracker.getIncrementalDependencies())
-      enumerateUse<NodeKind::incrementalExternalDepend>("", s);
+      enumerateUse<NodeKind::incrementalExternalDepend>("", s, enumerator);
 
     for (StringRef s : depTracker.getDependencies())
-      enumerateUse<NodeKind::externalDepend>("", s);
+      enumerateUse<NodeKind::externalDepend>("", s, enumerator);
   }
 };
 } // end namespace
 
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  UsedDeclEnumerator(SF, depTracker, swiftDeps,
-                     [&](const DependencyKey &def, const DependencyKey &use) {
-                       addAUsedDecl(def, use);
-                     })
-    .enumerateAllUses();
+  UsedDeclEnumerator(SF, depTracker, swiftDeps)
+      .enumerateAllUses(
+          [&](const DependencyKey &def, const DependencyKey &use) {
+            addAUsedDecl(def, use);
+          });
 }
 
 //==============================================================================
 // MARK: ModuleDepGraphFactory
 //==============================================================================
 
-ModuleDepGraphFactory::ModuleDepGraphFactory(ModuleDecl *Mod, bool emitDot)
-    : AbstractSourceFileDepGraphFactory(
-          Mod->getASTContext().hadError(),
-          Mod->getNameStr(), "0xBADBEEF", emitDot, Mod->getASTContext().Diags),
-      Mod(Mod) {}
+ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
+                                             bool emitDot)
+    : AbstractSourceFileDepGraphFactory(Mod->getASTContext().hadError(),
+                                        Mod->getNameStr(), Fingerprint::ZERO(),
+                                        emitDot, Mod->getASTContext().Diags),
+
+      Mod(Mod) {
+  // Since a fingerprint only summarizes the state of the module but not
+  // the state of its fingerprinted sub-declarations, and since a module
+  // contains no state other than sub-declarations, its fingerprint does not
+  // matter and can just be some arbitrary value. Should it be the case that a
+  // change in a declaration that does not have a fingerprint must cause
+  // a rebuild of a file outside of the module, this assumption will need
+  // to be revisited.
+}
 
 void ModuleDepGraphFactory::addAllDefinedDecls() {
   // TODO: express the multiple provides and depends streams with variadic
@@ -548,6 +538,4 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
       declFinder.potentialMemberHolders);
   addAllDefinedDeclsOfAGivenType<NodeKind::member>(
       declFinder.valuesInExtensions);
-  addAllDefinedDeclsOfAGivenType<NodeKind::dynamicLookup>(
-      declFinder.classMembers);
 }

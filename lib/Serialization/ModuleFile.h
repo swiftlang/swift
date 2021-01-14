@@ -465,6 +465,12 @@ public:
     return Core->Bits.IsImplicitDynamicEnabled;
   }
 
+  /// Whether this module is compiled while allowing errors
+  /// ('-experimental-allow-module-with-compiler-errors').
+  bool isAllowModuleWithCompilerErrorsEnabled() const {
+    return Core->Bits.IsAllowModuleWithCompilerErrorsEnabled;
+  }
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
@@ -605,6 +611,8 @@ public:
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results);
+
   /// Adds all operators to the given vector.
   void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
 
@@ -685,6 +693,8 @@ public:
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
   Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
+  Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+
 
   // MARK: Deserialization interface
 

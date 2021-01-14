@@ -520,21 +520,45 @@ importer::getNormalInvocationArguments(
     invocationArgStrs.push_back(
         "-Werror=non-modular-include-in-framework-module");
 
+  bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+
   if (LangOpts.EnableObjCInterop) {
-    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
-    invocationArgStrs.insert(
-        invocationArgStrs.end(),
-        {"-x", EnableCXXInterop ? "objective-c++" : "objective-c",
-         EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11", "-fobjc-arc"});
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-fobjc-arc"});
     // TODO: Investigate whether 7.0 is a suitable default version.
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
+
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-x", EnableCXXInterop ? "objective-c++" : "objective-c",
+    });
   } else {
-    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-x", EnableCXXInterop ? "c++" : "c",
-                              EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11"});
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-x", EnableCXXInterop ? "c++" : "c",
+    });
+  }
+
+  {
+    const clang::LangStandard &stdcxx =
+#if defined(CLANG_DEFAULT_STD_CXX)
+        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_CXX);
+#else
+        clang::LangStandard::getLangStandardForKind(
+            clang::LangStandard::lang_gnucxx14);
+#endif
+
+    const clang::LangStandard &stdc =
+#if defined(CLANG_DEFAULT_STD_C)
+        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_C);
+#else
+        clang::LangStandard::getLangStandardForKind(
+            clang::LangStandard::lang_gnu11);
+#endif
+
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      (Twine("-std=") + StringRef(EnableCXXInterop ? stdcxx.getName()
+                                                   : stdc.getName())).str()
+    });
   }
 
   // Set C language options.
@@ -3425,18 +3449,23 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getModuleByIdentifier(M->getName());
-    if (overlay == M) {
-      overlay = nullptr;
-    } else {
-      // FIXME: This bizarre and twisty invariant is due to nested
-      // re-entrancy in both clang module loading and overlay module loading.
-      auto *sharedModuleRef = Ctx.getLoadedModule(M->getName());
-      assert(!sharedModuleRef || sharedModuleRef == overlay ||
-             sharedModuleRef == M);
+    auto overlay = Ctx.getOverlayModule(this);
+    if (overlay) {
       Ctx.addLoadedModule(overlay);
+    } else {
+      // FIXME: This is the awful legacy of the old implementation of overlay
+      // loading laid bare. Because the previous implementation used
+      // ASTContext::getModuleByIdentifier, it consulted the clang importer
+      // recursively which forced the current module, its dependencies, and
+      // the overlays of those dependencies to load and
+      // become visible in the current context. All of the callers of
+      // ClangModuleUnit::getOverlayModule are relying on this behavior, and
+      // untangling them is going to take a heroic amount of effort.
+      // Clang module loading should *never* *ever* be allowed to load unrelated
+      // Swift modules.
+      ImportPath::Module::Builder builder(M->getName());
+      (void) owner.loadModule(SourceLoc(), std::move(builder).get());
     }
-
     auto mutableThis = const_cast<ClangModuleUnit *>(this);
     mutableThis->overlayModule.setPointerAndInt(overlay, true);
   }

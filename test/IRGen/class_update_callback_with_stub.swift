@@ -105,7 +105,7 @@ import resilient_objc_class
 // -- ... but they do appear in the stub list
 
 // CHECK-LABEL: @objc_class_stubs = internal global
-// CHECK-SAME: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMs"
+// CHECK-SAME: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMt"
 // CHECK-SAME: , section "__DATA,__objc_stublist,regular,no_dead_strip"
 
 // -- The category list
@@ -128,7 +128,7 @@ import resilient_objc_class
 
 
 // -- Class symbol for NSObject-derived class points at the class stub
-// CHECK: @"OBJC_CLASS_$__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass" = alias %objc_class_stub, %objc_class_stub* @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMs"
+// CHECK: @"OBJC_CLASS_$__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass" = alias %objc_class_stub, {{.*}} @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMt"
 
 
 // -- Metadata update callbacks referenced from class stubs

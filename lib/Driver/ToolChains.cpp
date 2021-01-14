@@ -246,6 +246,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
@@ -268,8 +270,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
-  inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(
@@ -621,6 +621,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_SwiftRanges:
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
@@ -883,6 +884,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
+    case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_SwiftRanges:
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:

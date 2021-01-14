@@ -1,0 +1,59 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+import _Concurrency
+
+sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
+
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @int64ToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+sil @int64ToVoid : $@async @convention(thin) (Int64) -> () {
+entry(%int : $Int64):
+  %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
+  %result = apply %printInt64(%int) : $@convention(thin) (Int64) -> () // CHECK: 9999
+  return %result : $()
+}
+// Defined in _Concurrency
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
+  %int64ToVoid = function_ref @int64ToVoid : $@async @convention(thin) (Int64) -> ()
+  %int64ToVoidThick = thin_to_thick_function %int64ToVoid : $@convention(thin) @async (Int64) -> () to $@async @callee_guaranteed (Int64) -> ()
+  %int64ThrowsToVoid = convert_function %int64ToVoidThick : $@async @callee_guaranteed (Int64) -> () to $@async @callee_guaranteed (Int64) -> @error Error
+  %int_literal = integer_literal $Builtin.Int64, 9999
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  try_apply %int64ThrowsToVoid(%int) : $@async @callee_guaranteed (Int64) -> @error Error, normal success, error failure
+
+success(%value : $()):
+  %result = tuple()
+  return %result : $()
+
+failure(%error : $Error):
+  %end = builtin "errorInMain"(%error : $Error) : $()
+  unreachable
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
+}

@@ -243,6 +243,18 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return false;
   }
 
+  if (auto *pa = dyn_cast<PartialApplyInst>(user)) {
+    auto argConv = ApplySite(user).getArgumentConvention(*op);
+    if (pa->isOnStack() &&
+        argConv == SILArgumentConvention::Indirect_In_Guaranteed) {
+      return true;
+    }
+
+    // For all other conventions, the underlying address could be mutated
+    writeAccumulator.push_back(op);
+    return true;
+  }
+
   // Handle a capture-by-address like a write.
   if (auto as = ApplySite::isa(user)) {
     writeAccumulator.push_back(op);
@@ -256,12 +268,11 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   if (!op->get()->getType().isAddress() && !user->mayWriteToMemory()) {
     return true;
   }
-  // If we did not recognize the user, just return conservatively that it was
-  // written to in a way we did not understand.
+  // If we did not recognize the user, print additional error diagnostics and
+  // return false to force SIL verification to fail.
   llvm::errs() << "Function: " << user->getFunction()->getName() << "\n";
   llvm::errs() << "Value: " << op->get();
   llvm::errs() << "Unknown instruction: " << *user;
-  llvm::report_fatal_error("Unexpected instruction using borrowed address?!");
   return false;
 }
 

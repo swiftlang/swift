@@ -450,6 +450,9 @@ EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
   if (Node) {
     CGNode *targetNode = Node->getMergeTarget();
     targetNode->mergeFlags(false /*isInterior*/, hasReferenceOnly);
+    // Update the node in Values2Nodes, so that next time we don't need to find
+    // the final merge target.
+    Node = targetNode;
     return targetNode;
   }
   if (isa<SILFunctionArgument>(ptrBase)) {
@@ -768,7 +771,8 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     if (From->mappedValue) {
       // values previously mapped to 'From' but not transferred to 'To's
       // mappedValue must remain mapped to 'From'. Lookups on those values will
-      // find 'To' via the mergeTarget. Dropping a value's mapping is illegal
+      // find 'To' via the mergeTarget and will remap those values to 'To'
+      // on-the-fly for efficiency. Dropping a value's mapping is illegal
       // because it could cause a node to be recreated without the edges that
       // have already been discovered.
       if (!To->mappedValue) {
@@ -866,6 +870,7 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 #include "swift/AST/ReferenceStorage.def"
         case SILInstructionKind::StrongReleaseInst:
         case SILInstructionKind::ReleaseValueInst:
+        case SILInstructionKind::DestroyValueInst:
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst: {
           /// Actually we only add instructions which may release a reference.
@@ -2585,8 +2590,9 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
                                          SILInstruction *usePoint,
                                          ConnectionGraph *conGraph) {
 
-  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint))
-         && "use points are only created for calls and refcount instructions");
+  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint) ||
+          isa<DestroyValueInst>(usePoint)) &&
+         "use points are only created for calls and refcount instructions");
 
   CGNode *node = conGraph->getValueContent(value);
   if (!node)
@@ -2643,6 +2649,14 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
     return true;
   auto *ConGraph = getConnectionGraph(RI->getFunction());
   return canEscapeToUsePoint(V, RI, ConGraph);
+}
+
+bool EscapeAnalysis::canEscapeTo(SILValue V, DestroyValueInst *DVI) {
+  // If it's not uniquely identified we don't know anything about the value.
+  if (!isUniquelyIdentified(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(DVI->getFunction());
+  return canEscapeToUsePoint(V, DVI, ConGraph);
 }
 
 /// Utility to get the function which contains both values \p V1 and \p V2.

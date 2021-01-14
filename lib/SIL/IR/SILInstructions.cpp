@@ -482,7 +482,11 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
-  resultOwnerships.push_back(ValueOwnershipKind::None);
+  // The begin_apply token represents the borrow scope of all owned and
+  // guaranteed call arguments. Although SILToken is (currently) trivially
+  // typed, it must have guaranteed ownership so end_apply and abort_apply will
+  // be recognized as lifetime-ending uses.
+  resultOwnerships.push_back(OwnershipKind::Guaranteed);
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
@@ -621,7 +625,7 @@ ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
     SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions) {
   if (DerivativeFunctions.empty())
     return OriginalFunction.getOwnershipKind();
-  return *mergeSILValueOwnership(
+  return mergeSILValueOwnership(
       {OriginalFunction, DerivativeFunctions[0], DerivativeFunctions[1]});
 }
 
@@ -635,7 +639,7 @@ DifferentiableFunctionInst::DifferentiableFunctionInst(
                                         ResultIndices),
           HasOwnership
               ? getMergedOwnershipKind(OriginalFunction, DerivativeFunctions)
-              : ValueOwnershipKind(ValueOwnershipKind::None)),
+              : ValueOwnershipKind(OwnershipKind::None)),
       ParameterIndices(ParameterIndices), ResultIndices(ResultIndices),
       HasDerivativeFunctions(!DerivativeFunctions.empty()) {
   assert(DerivativeFunctions.empty() || DerivativeFunctions.size() == 2);
@@ -669,25 +673,24 @@ SILType LinearFunctionInst::getLinearFunctionType(
   return SILType::getPrimitiveObjectType(diffTy);
 }
 
-LinearFunctionInst::LinearFunctionInst(
-    SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
-    bool HasOwnership)
+LinearFunctionInst::LinearFunctionInst(SILDebugLocation Loc,
+                                       IndexSubset *ParameterIndices,
+                                       SILValue OriginalFunction,
+                                       Optional<SILValue> TransposeFunction,
+                                       bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
           OriginalFunction,
           TransposeFunction.hasValue()
               ? ArrayRef<SILValue>(TransposeFunction.getPointer(), 1)
               : ArrayRef<SILValue>(),
           Loc, getLinearFunctionType(OriginalFunction, ParameterIndices),
-          HasOwnership ? (
-            TransposeFunction
-                ? *mergeSILValueOwnership(
-                       {OriginalFunction, *TransposeFunction})
-                : *mergeSILValueOwnership({OriginalFunction})
-          ) : ValueOwnershipKind(ValueOwnershipKind::None)),
+          HasOwnership
+              ? (TransposeFunction ? mergeSILValueOwnership(
+                                         {OriginalFunction, *TransposeFunction})
+                                   : mergeSILValueOwnership({OriginalFunction}))
+              : ValueOwnershipKind(OwnershipKind::None)),
       ParameterIndices(ParameterIndices),
-      HasTransposeFunction(TransposeFunction.hasValue()) {
-}
+      HasTransposeFunction(TransposeFunction.hasValue()) {}
 
 LinearFunctionInst *LinearFunctionInst::create(
     SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
@@ -725,20 +728,9 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     : UnaryInstructionBase(debugLoc, function,
                            extracteeType
                                ? *extracteeType
-                               : getExtracteeType(function, extractee, module)),
+                               : getExtracteeType(function, extractee, module),
+                           function.getOwnershipKind()),
       Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
-#ifndef NDEBUG
-  if (extracteeType.hasValue()) {
-    // Note: explicit extractee type is used to avoid inconsistent typing in:
-    // - Canonical SIL, due to generic specialization.
-    // - Lowered SIL, due to LoadableByAddress.
-    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
-    // explanation of how explicit extractee type is used.
-    assert((module.getStage() == SILStage::Canonical ||
-            module.getStage() == SILStage::Lowered) &&
-           "Explicit type is valid only in canonical or lowered SIL");
-  }
-#endif
 }
 
 SILType LinearFunctionExtractInst::
@@ -764,7 +756,8 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
     LinearDifferentiableFunctionTypeComponent extractee, SILValue function)
     : UnaryInstructionBase(debugLoc, function,
-                           getExtracteeType(function, extractee, module)),
+                           getExtracteeType(function, extractee, module),
+                           function.getOwnershipKind()),
       extractee(extractee) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
@@ -1219,8 +1212,8 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems, bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
           Elems, Loc, Ty,
-          HasOwnership ? *mergeSILValueOwnership(Elems)
-                       : ValueOwnershipKind(ValueOwnershipKind::None)) {
+          HasOwnership ? mergeSILValueOwnership(Elems)
+                       : ValueOwnershipKind(OwnershipKind::None)) {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
@@ -1362,12 +1355,6 @@ VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
     index -= superDecl->getStoredProperties().size();
   }
   return nullptr;
-}
-
-unsigned FieldIndexCacheBase::cacheFieldIndex() {
-  unsigned index = ::getFieldIndex(getParentDecl(), getField());
-  SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = index;
-  return index;
 }
 
 // FIXME: this should be cached during cacheFieldIndex().
@@ -1739,8 +1726,8 @@ SelectValueInst::SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                  bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
           Operand, CaseValuesAndResults, DebugLoc, Type,
-          HasOwnership ? *mergeSILValueOwnership(CaseValuesAndResults)
-                       : ValueOwnershipKind(ValueOwnershipKind::None)) {}
+          HasOwnership ? mergeSILValueOwnership(CaseValuesAndResults)
+                       : ValueOwnershipKind(OwnershipKind::None)) {}
 
 SelectValueInst *
 SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
@@ -2092,7 +2079,7 @@ OpenExistentialRefInst::OpenExistentialRefInst(SILDebugLocation DebugLoc,
     : UnaryInstructionBase(DebugLoc, Operand, Ty,
                            HasOwnership
                                ? Operand.getOwnershipKind()
-                               : ValueOwnershipKind(ValueOwnershipKind::None)) {
+                               : ValueOwnershipKind(OwnershipKind::None)) {
   assert(Operand->getType().isObject() && "Operand must be an object.");
   assert(Ty.isObject() && "Result type must be an object type.");
 }
@@ -2109,13 +2096,13 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
 
 OpenExistentialBoxValueInst::OpenExistentialBoxValueInst(
     SILDebugLocation DebugLoc, SILValue operand, SILType ty)
-    : UnaryInstructionBase(DebugLoc, operand, ty) {
-}
+    : UnaryInstructionBase(DebugLoc, operand, ty, operand.getOwnershipKind()) {}
 
-OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
-                                                     SILValue Operand,
-                                                     SILType SelfTy)
-    : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
+OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation debugLoc,
+                                                   SILValue operand,
+                                                   SILType selfTy)
+    : UnaryInstructionBase(debugLoc, operand, selfTy,
+                           operand.getOwnershipKind()) {}
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
                                SILValue operand,
@@ -2135,7 +2122,8 @@ BeginCOWMutationInst::create(SILDebugLocation loc, SILValue operand,
                              SILType boolTy, SILFunction &F, bool isNative) {
 
   SILType resultTypes[2] = { boolTy, operand->getType() };
-  ValueOwnershipKind ownerships[2] = { ValueOwnershipKind::None, ValueOwnershipKind::Owned };
+  ValueOwnershipKind ownerships[2] = {OwnershipKind::None,
+                                      OwnershipKind::Owned};
 
   void *buffer =
     allocateTrailingInst<BeginCOWMutationInst,
@@ -2844,11 +2832,6 @@ DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
       DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }
 
-CanType GetAsyncContinuationInstBase::getFormalResumeType() const {
-  // The resume type is the type argument to the continuation type.
-  return getType().castTo<BoundGenericType>().getGenericArgs()[0];
-}
-
 SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   // The lowered resume type is the maximally-abstracted lowering of the
   // formal resume type.
@@ -2858,16 +2841,10 @@ SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
 }
 
-bool GetAsyncContinuationInstBase::throws() const {
-  // The continuation throws if it's an UnsafeThrowingContinuation
-  return getType().castTo<BoundGenericType>()->getDecl()
-    == getFunction()->getASTContext().getUnsafeThrowingContinuationDecl();
-}
-
 ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
                        SILValue returnValue)
     : UnaryInstructionBase(debugLoc, returnValue),
-      ownershipKind(ValueOwnershipKind::None) {
+      ownershipKind(OwnershipKind::None) {
   // If we have a trivial value, leave our ownership kind as none.
   if (returnValue->getType().isTrivial(func))
     return;
@@ -2887,7 +2864,7 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
 
   // Then merge all of our ownership kinds. Assert if we fail to merge.
   ownershipKind = ValueOwnershipKind::merge(ownershipKindRange);
-  assert(ownershipKind != ValueOwnershipKind::Invalid &&
+  assert(ownershipKind &&
          "Conflicting ownership kinds when creating term inst from function "
          "result info?!");
 }

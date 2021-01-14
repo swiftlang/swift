@@ -675,8 +675,6 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
 
-bool typeCheckCatchPattern(CaseStmt *S, DeclContext *dc);
-
 /// Coerce a pattern to the given type.
 ///
 /// \param pattern The contextual pattern.
@@ -765,16 +763,10 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 /// \param DC The context in which to check conformance. This affects, for
 /// example, extension visibility.
 ///
-/// \param ComplainLoc If valid, then this function will emit diagnostics if
-/// T does not conform to the given protocol. The primary diagnostic will
-/// be placed at this location, with notes for each of the protocol
-/// requirements not satisfied.
-///
 /// \returns The protocol conformance, if \c T conforms to the
 /// protocol \c Proto, or \c None.
 ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          DeclContext *DC,
-                                          SourceLoc ComplainLoc = SourceLoc());
+                                          DeclContext *DC);
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
 /// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final
@@ -1006,6 +998,12 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
+/// Same as \c checkDeclarationAvailability but doesn't give a reason for
+/// unavailability.
+bool isDeclarationUnavailable(
+    const Decl *D, const DeclContext *referenceDC,
+    llvm::function_ref<AvailabilityContext()> getAvailabilityContext);
+
 /// Checks whether a declaration should be considered unavailable when
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is
@@ -1066,10 +1064,10 @@ void diagnoseIfDeprecated(SourceRange SourceRange,
                           const ApplyExpr *Call);
 
 /// Emits a diagnostic for a reference to a conformnace that is deprecated.
-void diagnoseIfDeprecated(SourceLoc Loc,
-                          const RootProtocolConformance *DeprecatedConf,
-                          const ExtensionDecl *Ext,
-                          const ExportContext &Where);
+bool diagnoseIfDeprecated(SourceLoc loc,
+                          const RootProtocolConformance *rootConf,
+                          const ExtensionDecl *ext,
+                          const ExportContext &where);
 /// @}
 
 /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

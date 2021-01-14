@@ -71,6 +71,7 @@ KNOWN_SETTINGS=(
     swift-tools-num-parallel-lto-link-jobs        ""                "The number of parallel link jobs to use when compiling swift tools"
     use-gold-linker                               ""                "Enable using the gold linker"
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
+    dsymutil-jobs                                 "1"               "number of parallel invocations of dsymutil"
 
     ## Build Tools
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -414,7 +415,8 @@ function verify_host_is_supported() {
       | watchsimulator-arm64    \
       | watchos-armv7k          \
       | android-armv7           \
-      | android-aarch64)
+      | android-aarch64         \
+      | android-x86_64)
         ;;
       *)
         echo "Unknown host tools target: ${host}"
@@ -450,13 +452,35 @@ function set_build_options_for_host() {
     SWIFT_HOST_VARIANT_ARCH=$architecture
 
     case ${host} in
-        android-aarch64)
-            SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
-            llvm_target_arch="AArch64"
-            ;;
-        android-armv7)
-            SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
-            llvm_target_arch="ARM"
+        android-*)
+            # Clang uses a different sysroot natively on Android in the Termux
+            # app, which the Termux build scripts pass in through a $PREFIX
+            # variable.
+            if [[ "${PREFIX}" ]] ; then
+                llvm_cmake_options+=(
+                    -DDEFAULT_SYSROOT:STRING="$(dirname ${PREFIX})"
+                )
+            fi
+            # Android doesn't support building all of compiler-rt yet.
+            if [[ ! $(is_cross_tools_host "${host}") ]] ; then
+                llvm_cmake_options+=(
+                    -DCOMPILER_RT_INCLUDE_TESTS:BOOL=FALSE
+                )
+            fi
+            case ${host} in
+                android-aarch64)
+                    SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
+                    llvm_target_arch="AArch64"
+                    ;;
+                android-armv7)
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-androideabi"
+                    llvm_target_arch="ARM"
+                    ;;
+                android-x86_64)
+                    SWIFT_HOST_TRIPLE="x86_64-unknown-linux-android${ANDROID_API_LEVEL}"
+                    llvm_target_arch="X86"
+                    ;;
+            esac
             ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
@@ -474,8 +498,8 @@ function set_build_options_for_host() {
         watchos-*           | \
         watchsimulator-*)
             swift_cmake_options+=(
-              -DPython2_EXECUTABLE=$(xcrun -f python2.7)
-              -DPython3_EXECUTABLE=$(xcrun -f python3)
+              -DPython2_EXECUTABLE="$(xcrun -f python2.7)"
+              -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
             case ${host} in
                 macosx-x86_64)
@@ -1265,25 +1289,25 @@ function common_cross_c_flags() {
 
     case $host in
         macosx-*)
-            echo -n " -arch ${arch} "
+            echo -n " -arch ${arch} -target ${arch}-apple-macosx${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
             ;;
         iphonesimulator-*)
-            echo -n " -arch ${arch}  -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-ios-simulator${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
         iphoneos-*)
-            echo -n " -arch ${arch}  -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-iphoneos${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
         appletvsimulator-*)
-            echo -n " -arch ${arch}  -mtvos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-tvos-simulator${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
         appletvos-*)
-            echo -n " -arch ${arch}  -mtvos-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
         watchsimulator-*)
-            echo -n " -arch ${arch}  -mwatchos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-watchos-simulator${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
         watchos-*)
-            echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
     esac
 
@@ -1477,13 +1501,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 -DCMAKE_BUILD_WITH_INSTALL_RPATH="1"
             )
         fi
-    fi
-
-    if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
-        common_cmake_options_host+=(
-                -DCMAKE_C_COMPILER="${NATIVE_CLANG_TOOLS_PATH}/clang"
-                -DCMAKE_CXX_COMPILER="${NATIVE_CLANG_TOOLS_PATH}/clang++"
-            )
     fi
 
     llvm_cmake_options=(
@@ -1750,7 +1767,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
+                if [[ ! "${SKIP_BUILD_ANDROID}" ]] ||
+                   [[ $(is_cross_tools_host ${host}) && "${host}" == "android-"* ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
@@ -2138,6 +2156,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
 
                     -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                     -DLLBUILD_SUPPORT_BINDINGS:=Swift
@@ -2210,6 +2229,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                    -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
@@ -2278,6 +2298,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
+                  -DCMAKE_Swift_FLAGS:STRING="-module-cache-path \"${module_cache}\""
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
@@ -2438,6 +2459,8 @@ for host in "${ALL_HOSTS[@]}"; do
             elif [[ "$(uname -s)" == "Haiku" ]] ; then
               HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
             elif [[ "${ANDROID_DATA}" ]] ; then
+              # This means we're building natively on Android in the Termux
+              # app, which supplies the $PREFIX variable.
               HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
             else # Linux
               HOST_CXX_HEADERS_DIR="/usr/include/c++"
@@ -3007,6 +3030,25 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 
+function printJSONTimestamp() {
+    local command=$1
+    local kind=$2
+
+    echo "{ \"command\": \"${command}\", \"${kind}\": \"$(date "+%Y-%m-%dT%H:%M:%S")\" }"
+}
+
+function printJSONStartTimestamp() {
+    local command=$1
+
+    printJSONTimestamp ${command} "start"
+}
+
+function printJSONEndTimestamp() {
+    local command=$1
+
+    printJSONTimestamp ${command} "end"
+}
+
 for host in "${ALL_HOSTS[@]}"; do
     # Check if we should perform this action.
     if ! [[ $(should_execute_action "${host}-extractsymbols") ]]; then
@@ -3039,6 +3081,9 @@ for host in "${ALL_HOSTS[@]}"; do
         #        Instead, just echo we do "darwin_intall_extract_symbols".
         if [[ "${DRY_RUN}" ]]; then
             call darwin_install_extract_symbols
+            printJSONStartTimestamp dsymutil
+            echo xargs -n 1 -P ${DSYMUTIL_JOBS} dsymutil
+            printJSONEndTimestamp dsymutil
         else
             set -x
 
@@ -3061,13 +3106,16 @@ for host in "${ALL_HOSTS[@]}"; do
             #
             # Exclude shell scripts and static archives.
             # Exclude swift-api-digester dSYM to reduce debug toolchain size.
-            # Run sequentially -- dsymutil is multithreaded and can be memory intensive
+            # Tweak carefully the amount of parallelism -- dsymutil can be memory intensive and
+            # as such too many instance can exhaust the memory and slow down/panic the machine
+            printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
                grep -v 'swift-api-digester' | \
-               xargs -P 1 ${dsymutil_path})
+               xargs -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
+            printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.

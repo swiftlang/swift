@@ -103,4 +103,29 @@
 #define SWIFT_CRASH_BUG_REPORT_MESSAGE \
   "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and the crash backtrace."
 
+// Conditionally exclude declarations or statements that are only needed for
+// assertions from release builds (NDEBUG) without cluttering the surrounding
+// code by #ifdefs.
+//
+// struct DoThings  {
+//   SWIFT_ASSERT_ONLY_DECL(unsigned verifyCount = 0);
+//   DoThings() {
+//     SWIFT_ASSERT_ONLY(verifyCount = getNumberOfThingsToDo());
+//   }
+//   void doThings() {
+//     do {
+//       // ... do each thing
+//       SWIFT_ASSERT_ONLY(--verifyCount);
+//     } while (!done());
+//     assert(verifyCount == 0 && "did not do everything");
+//   }
+// };
+#ifdef NDEBUG
+#define SWIFT_ASSERT_ONLY_DECL(X)
+#define SWIFT_ASSERT_ONLY(X) do { } while (false)
+#else
+#define SWIFT_ASSERT_ONLY_DECL(X) X
+#define SWIFT_ASSERT_ONLY(X) do { X; } while (false)
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H

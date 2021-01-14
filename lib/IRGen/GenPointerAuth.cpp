@@ -71,9 +71,9 @@ llvm::Value *irgen::emitPointerAuthStrip(IRGenFunction &IGF,
 FunctionPointer irgen::emitPointerAuthResign(IRGenFunction &IGF,
                                              const FunctionPointer &fn,
                                           const PointerAuthInfo &newAuthInfo) {
-  llvm::Value *fnPtr = emitPointerAuthResign(IGF, fn.getPointer(),
+  llvm::Value *fnPtr = emitPointerAuthResign(IGF, fn.getRawPointer(),
                                              fn.getAuthInfo(), newAuthInfo);
-  return FunctionPointer(fnPtr, newAuthInfo, fn.getSignature());
+  return FunctionPointer(fn.getKind(), fnPtr, newAuthInfo, fn.getSignature());
 }
 
 llvm::Value *irgen::emitPointerAuthResign(IRGenFunction &IGF,

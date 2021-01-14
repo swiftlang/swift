@@ -109,7 +109,7 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
 
   // Optimization for whole-file users:
   if (interfaceKey.getKind() == NodeKind::sourceFileProvide &&
@@ -145,7 +145,7 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    const DependencyKey &key, const Optional<StringRef> fingerprint,
+    const DependencyKey &key, const Optional<Fingerprint> fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
@@ -339,9 +339,9 @@ void DepGraphNode::dump() const {
 void DepGraphNode::dump(raw_ostream &os) const {
   key.dump(os);
   if (fingerprint.hasValue())
-    llvm::errs() << "fingerprint: " << fingerprint.getValue() << "";
+    os << "fingerprint: " << fingerprint.getValue() << "";
   else
-    llvm::errs() << "no fingerprint";
+    os << "no fingerprint";
 }
 
 void SourceFileDepGraphNode::dump() const {

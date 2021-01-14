@@ -27,7 +27,6 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeResolutionStage.h"
-#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -802,7 +801,7 @@ public:
 class IsAsyncHandlerRequest :
     public SimpleRequest<IsAsyncHandlerRequest,
                          bool(FuncDecl *),
-                         RequestFlags::Cached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -812,8 +811,10 @@ private:
   bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
 
 public:
-  // Caching
+  // Separate caching.
   bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
 };
 
 /// Determine whether the given function can be an @asyncHandler, without
@@ -838,6 +839,24 @@ public:
 /// Determine whether the given class is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
+                         bool(ClassDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Determine whether the given class is a default actor.
+class IsDefaultActorRequest :
+    public SimpleRequest<IsDefaultActorRequest,
                          bool(ClassDecl *),
                          RequestFlags::Cached> {
 public:
@@ -2484,7 +2503,7 @@ public:
 
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
-                           ProtocolConformanceLookupResult r) const;
+                           const ProtocolConformanceLookupResult &r) const;
 };
 
 class CheckRedeclarationRequest
@@ -2736,25 +2755,6 @@ private:
 public:
   bool isCached() const { return true; }
 };
-
-// Allow AnyValue to compare two Type values, even though Type doesn't
-// support ==.
-template<>
-inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return value.getPointer() ==
-      static_cast<const Holder<Type> &>(other).value.getPointer();
-}
-
-// Allow AnyValue to compare two GenericSignature values.
-template <>
-inline bool
-AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return value.getPointer() ==
-         static_cast<const Holder<GenericSignature> &>(other)
-             .value.getPointer();
-}
 
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

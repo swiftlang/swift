@@ -580,7 +580,7 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
-  
+
   /// Look for the declaration with the given name within the
   /// Swift module.
   void lookupInSwiftModule(StringRef name,
@@ -639,6 +639,14 @@ public:
   /// Get the Swift declaration that a Clang declaration was exported from,
   /// if applicable.
   const Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl);
+
+  /// General conversion method from Swift types -> Clang types.
+  ///
+  /// HACK: This method is only intended to be called from a specific place in
+  /// IRGen. For converting function types, strongly prefer using one of the
+  /// other methods instead, instead of manually iterating over parameters
+  /// and results.
+  const clang::Type *getClangTypeForIRGen(Type ty);
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
@@ -705,6 +713,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the runtime availability of support for differentiation.
+  AvailabilityContext getDifferentiationAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -737,13 +748,10 @@ public:
   const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
-  const CanType TheNativeObjectType;      /// Builtin.NativeObject
-  const CanType TheBridgeObjectType;      /// Builtin.BridgeObject
-  const CanType TheRawPointerType;        /// Builtin.RawPointer
-  const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
-  const CanType TheSILTokenType;          /// Builtin.SILToken
-  const CanType TheIntegerLiteralType;    /// Builtin.IntegerLiteralType
-  
+#define SINGLETON_TYPE(SHORT_ID, ID) \
+  const CanType The##SHORT_ID##Type;
+#include "swift/AST/TypeNodes.def"
+
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
   
@@ -787,7 +795,8 @@ public:
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate);
+      InterfaceSubContextDelegate &delegate,
+      bool cacheOnly = false);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   Optional<ModuleDependencies> getSwiftModuleDependencies(
@@ -900,6 +909,13 @@ public:
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
   ModuleDecl *getModule(ImportPath::Module ModulePath);
+
+  /// Attempts to load the matching overlay module for the given clang
+  /// module into this ASTContext.
+  ///
+  /// \returns The Swift overlay module corresponding to the given Clang module,
+  /// or NULL if the overlay module cannot be found.
+  ModuleDecl *getOverlayModule(const FileUnit *ClangModule);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
 

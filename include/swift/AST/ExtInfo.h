@@ -827,6 +827,11 @@ public:
   SILExtInfo withNoEscape(bool noEscape = true) const {
     return builder.withNoEscape(noEscape).build();
   }
+  
+
+  SILExtInfo withAsync(bool isAsync = true) const {
+    return builder.withAsync(isAsync).build();
+  }
 
   bool isEqualTo(SILExtInfo other, bool useClangTypes) const {
     return builder.isEqualTo(other.builder, useClangTypes);

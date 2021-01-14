@@ -2543,7 +2543,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
   LinkEntity keyEntity =
       LinkEntity::forDynamicallyReplaceableFunctionKey(f);
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto silFunctionType = f->getLoweredFunctionType();
+  Signature signature = getSignature(silFunctionType);
 
   // Create and initialize the first link entry for the chain of replacements.
   // The first implementation is initialized with 'implFn'.
@@ -2602,9 +2603,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto authEntity = PointerAuthEntity(f);
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
 
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, authInfo,
-                                                     signature),
-                                     forwardedArgs);
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(silFunctionType, realReplFn, authInfo, signature),
+      forwardedArgs);
   Res->setTailCall();
   if (IGF.CurFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2657,8 +2658,10 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
                         ? PointerAuthEntity(keyEntity.getSILFunction())
                         : PointerAuthEntity::Special::TypeDescriptor;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
-  auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+  auto *Res =
+      IGF.Builder.CreateCall(FunctionPointer(FunctionPointer::KindTy::Function,
+                                             typeFnPtr, authInfo, signature),
+                             forwardedArgs);
 
   Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
@@ -2730,7 +2733,8 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
 
   auto entity = LinkEntity::forSILFunction(f, true);
 
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto fnType = f->getLoweredFunctionType();
+  Signature signature = getSignature(fnType);
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
@@ -2774,7 +2778,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       IGF, schema, fnPtrAddr,
       PointerAuthEntity(f->getDynamicallyReplacedFunction()));
   auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+      FunctionPointer(fnType, typeFnPtr, authInfo, signature), forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2968,11 +2972,19 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
 
   if (IGM.Triple.getObjectFormat() == llvm::Triple::COFF) {
     if (cast<llvm::GlobalValue>(global)->hasDLLImportStorageClass()) {
+      // Add the user label prefix *prior* to the introduction of the linker
+      // synthetic marker `__imp_`.
+      // Failure to do so will re-decorate the generated symbol and miss the
+      // user label prefix, generating e.g. `___imp_$sBoW` instead of
+      // `__imp__$sBoW`.
+      if (auto prefix = IGM.DataLayout.getGlobalPrefix())
+        globalName = (llvm::Twine(prefix) + globalName).str();
+      // Indicate to LLVM that the symbol should not be re-decorated.
       llvm::GlobalVariable *GV =
           new llvm::GlobalVariable(IGM.Module, global->getType(),
                                    /*Constant=*/true,
-                                   llvm::GlobalValue::ExternalLinkage,
-                                   nullptr, llvm::Twine("__imp_") + globalName);
+                                   llvm::GlobalValue::ExternalLinkage, nullptr,
+                                   "\01__imp_" + globalName);
       GV->setExternallyInitialized(true);
       return GV;
     }

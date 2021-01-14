@@ -12,13 +12,14 @@
 //
 // This file implements generation of Clang AST types from Swift AST types for
 // types that are representable in Objective-C interfaces.
-// Large chunks of the code are lightly modified versions of the code in
-// IRGen/GenClangType.cpp (which should eventually go away), so make sure
-// to keep the two in sync.
-// The three major differences are that, in this file:
+//
+// The usage of ClangTypeConverter at the AST level means that we may
+// encounter ill-formed types and/or sugared types. To avoid crashing and
+// keeping sugar as much as possible (in case the generated Clang type needs
+// to be surfaced to the user):
+//
 // 1. We fail gracefully instead of asserting/UB.
 // 2. We try to keep clang sugar instead of discarding it.
-// 3. We use getAs instead of cast as we handle Swift types with sugar.
 //
 //===----------------------------------------------------------------------===//
 
@@ -119,6 +120,10 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr) {
 
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return nullptr;
+#endif
+
   auto resultClangTy = convert(resultTy);
   if (resultClangTy.isNull())
     return nullptr;
@@ -161,6 +166,10 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
     SILFunctionType::Representation repr) {
+
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return nullptr;
+#endif
 
   // Using the interface type is sufficient as type parameters get mapped to
   // `id`, since ObjC lightweight generics use type erasure. (See also: SE-0057)
@@ -563,8 +572,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   case StructKind::Invalid:
     return clang::QualType();
 
-  case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
+    return convert(argCanonicalTy);
+
+  case StructKind::UnsafeMutablePointer:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
     auto clangTy = convert(argCanonicalTy);
     if (clangTy.isNull())
@@ -572,7 +583,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     return ClangASTContext.getPointerType(clangTy);
   }
   case StructKind::UnsafePointer: {
-    return ClangASTContext.getPointerType(convert(argCanonicalTy).withConst());
+    auto clangTy = convert(argCanonicalTy);
+    if (clangTy.isNull())
+      return clang::QualType();
+    return ClangASTContext.getPointerType(clangTy.withConst());
   }
 
   case StructKind::CFunctionPointer: {
@@ -592,6 +606,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
 
   case StructKind::SIMD: {
     clang::QualType scalarTy = convert(argCanonicalTy);
+    if (scalarTy.isNull())
+      return clang::QualType();
     auto numEltsString = swiftStructDecl->getName().str();
     numEltsString.consume_front("SIMD");
     unsigned numElts;

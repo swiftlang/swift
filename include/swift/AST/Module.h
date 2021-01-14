@@ -572,6 +572,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const;
+
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
   void lookupImportedSPIGroups(
@@ -628,6 +631,8 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 
   /// Finds top-level decls of this module filtered by their attributes.
   ///

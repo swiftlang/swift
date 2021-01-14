@@ -1,5 +1,5 @@
-#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_LOADABLE_TYPES_H
-#define TEST_INTEROP_CXX_CLASS_INPUTS_LOADABLE_TYPES_H
+#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H
+#define TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H
 
 struct EmptyStruct {};
 
@@ -112,6 +112,17 @@ struct StructWithSubobjectPrivateDefaultedDestructor {
   StructWithPrivateDefaultedDestructor subobject;
 };
 
+struct StructWithDeletedDestructor {
+  ~StructWithDeletedDestructor() = delete;
+};
+
+struct StructWithInheritedDeletedDestructor
+    : StructWithDeletedDestructor {};
+
+struct StructWithSubobjectDeletedDestructor {
+  StructWithDeletedDestructor subobject;
+};
+
 // Tests for common sets of special member functions.
 
 struct StructTriviallyCopyableMovable {
@@ -178,4 +189,4 @@ struct StructWithCopyConstructorAndSubobjectCopyConstructorAndValue {
       : member(other.member) {}
 };
 
-#endif
+#endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H

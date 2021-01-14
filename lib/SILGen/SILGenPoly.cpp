@@ -1412,7 +1412,7 @@ namespace {
                                        input, outputLoweredTy);
 
       // If our output is guaranteed or unowned, we need to create a copy here.
-      if (output.getOwnershipKind() != ValueOwnershipKind::Owned)
+      if (output.getOwnershipKind() != OwnershipKind::Owned)
         output = output.copyUnmanaged(SGF, Loc);
 
       Outputs.push_back(output);
@@ -1438,13 +1438,13 @@ namespace {
       // This means we can first transition unowned => owned and then handle
       // the new owned value using the same code path as values that are
       // initially owned.
-      if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
+      if (output.getOwnershipKind() == OwnershipKind::Unowned) {
         assert(!output.hasCleanup());
         output = SGF.emitManagedRetain(Loc, output.getValue());
       }
 
       // If the output is unowned or owned, create a borrow.
-      if (output.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
+      if (output.getOwnershipKind() != OwnershipKind::Guaranteed) {
         output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
       }
 
@@ -1465,7 +1465,7 @@ namespace {
         case ParameterConvention::Direct_Owned:
         case ParameterConvention::Indirect_In:
           if (!input.hasCleanup() &&
-              input.getOwnershipKind() != ValueOwnershipKind::None)
+              input.getOwnershipKind() != OwnershipKind::None)
             input = input.copyUnmanaged(SGF, Loc);
           break;
 
@@ -1734,7 +1734,7 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
-    if (value.getOwnershipKind() == ValueOwnershipKind::None)
+    if (value.getOwnershipKind() == OwnershipKind::None)
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -2731,7 +2731,8 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
       Scope S(SGF.Cleanups, CleanupLocation::get(Loc));
 
       // First create an rvalue cleanup for our direct result.
-      assert(innerResult.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+      assert(innerResult.getOwnershipKind().isCompatibleWith(
+          OwnershipKind::Owned));
       executeInnerTuple(innerResult, innerDirectResults);
       // Then allow the cleanups to be emitted in the proper reverse order.
     }
@@ -3914,8 +3915,9 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 }
 
 SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
-    SILFunction *customDerivativeFn, SILFunction *originalFn,
-    const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
+    AbstractFunctionDecl *originalAFD, SILFunction *originalFn,
+    SILFunction *customDerivativeFn, AutoDiffConfig config,
+    AutoDiffDerivativeFunctionKind kind) {
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
                               ? customDerivativeFnTy->getSubstGenericSignature()
@@ -3931,13 +3933,11 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  // TODO(TF-685): Use principled thunk mangling.
-  // Do not simply reuse reabstraction thunk mangling.
   Mangle::ASTMangler mangler;
   auto name = getASTContext()
-                  .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
-                      originalFn->getName(), kind, config))
-                  .str();
+      .getIdentifier(
+          mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
+      .str();
 
   auto loc = customDerivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
@@ -4484,6 +4484,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 // Concurrency
 //===----------------------------------------------------------------------===//
 
+/// If the current function is associated with an actor, then this
+/// function emits a hop_to_executor to that actor's executor at loc.
 void SILGenFunction::emitHopToCurrentExecutor(SILLocation loc) {
   if (actor)
     B.createHopToExecutor(loc, actor);

@@ -300,6 +300,7 @@ class Remangler : public RemanglerBase {
     mangleChildNodesReversed(FuncType);
   }
 
+  void mangleGenericSpecializationNode(Node *node, const char *operatorStr);
   void mangleAnyNominalType(Node *node);
   void mangleAnyGenericType(Node *node, StringRef TypeOp);
   void mangleGenericArgs(Node *node, char &Separator,
@@ -743,6 +744,12 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'o';
   } else if (text == BUILTIN_TYPE_NAME_RAWPOINTER) {
     Buffer << 'p';
+  } else if (text == BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION) {
+    Buffer << 'c';
+  } else if (text == BUILTIN_TYPE_NAME_JOB) {
+    Buffer << 'j';
+  } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
+    Buffer << 'D';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
@@ -805,6 +812,11 @@ void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
   Buffer << "TC";
 }
 
+void Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TZ";
+}
+
 void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
   mangleChildNodes(node);
   Buffer << "Tz";
@@ -823,6 +835,10 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node) {
   mangleChildNode(node, 0);
   Buffer << "fA";
   mangleChildNode(node, 1);
+}
+
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
 }
 
 void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
@@ -1289,7 +1305,8 @@ void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
   mangleGenericPartialSpecialization(node);
 }
 
-void Remangler::mangleGenericSpecialization(Node *node) {
+void Remangler::
+mangleGenericSpecializationNode(Node *node, const char *operatorStr) {
   bool FirstParam = true;
   for (NodePointer Child : *node) {
     if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
@@ -1299,22 +1316,7 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   }
   assert(!FirstParam && "generic specialization with no substitutions");
 
-  switch (node->getKind()) {
-  case Node::Kind::GenericSpecialization:
-    Buffer << "Tg";
-    break;
-  case Node::Kind::GenericSpecializationPrespecialized:
-    Buffer << "Ts";
-    break;
-  case Node::Kind::GenericSpecializationNotReAbstracted:
-    Buffer << "TG";
-    break;
-  case Node::Kind::InlinedGenericFunction:
-    Buffer << "Ti";
-    break;
- default:
-   unreachable("unsupported node");
-  }
+  Buffer << operatorStr;
 
   for (NodePointer Child : *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
@@ -1322,16 +1324,24 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   }
 }
 
+void Remangler::mangleGenericSpecialization(Node *node) {
+  mangleGenericSpecializationNode(node, "Tg");
+}
+
 void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
-  mangleGenericSpecialization(node);
+  mangleGenericSpecializationNode(node, "Ts");
 }
 
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
-  mangleGenericSpecialization(node);
+  mangleGenericSpecializationNode(node, "TG");
+}
+
+void Remangler::mangleGenericSpecializationInResilienceDomain(Node *node) {
+  mangleGenericSpecializationNode(node, "TB");
 }
 
 void Remangler::mangleInlinedGenericFunction(Node *node) {
-  mangleGenericSpecialization(node);
+  mangleGenericSpecializationNode(node, "Ti");
 }
 
 
@@ -1363,6 +1373,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::GenericSpecialization:
       case Node::Kind::GenericSpecializationPrespecialized:
       case Node::Kind::GenericSpecializationNotReAbstracted:
+      case Node::Kind::GenericSpecializationInResilienceDomain:
       case Node::Kind::InlinedGenericFunction:
       case Node::Kind::GenericPartialSpecialization:
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
@@ -1377,6 +1388,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
+      case Node::Kind::AsyncFunctionPointer:
         mangleInReverseOrder = true;
         break;
       default:
@@ -2106,6 +2118,27 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
 void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   mangleChildNodesReversed(node);
   Buffer << "Ty";
+}
+
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  auto childIt = node->begin();
+  mangle(*childIt++); // original
+  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
+    mangleDependentGenericSignature(*childIt++);
+  Buffer << "TJ";
+  mangle(*childIt++); // kind
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+}
+
+void Remangler::mangleAutoDiffFunctionKind(Node *node) {
+  Buffer << (char)node->getIndex();
+}
+
+void Remangler::mangleIndexSubset(Node *node) {
+  Buffer << node->getText();
 }
 
 void Remangler::mangleReadAccessor(Node *node) {

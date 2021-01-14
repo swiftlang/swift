@@ -47,6 +47,9 @@ constexpr static const StringLiteral CXX_TEMPLATE_INST_PREFIX =
 constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";
 
+constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
+    "$defaultActor";
+
 /// The name of the Builtin type prefix
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 
@@ -110,9 +113,18 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BRIDGEOBJECT = {
 /// The name of the Builtin type for RawPointer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
     "Builtin.RawPointer"};
+/// The name of the Builtin type for RawUnsafeContinuation
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWUNSAFECONTINUATION = {
+    "Builtin.RawUnsafeContinuation"};
 /// The name of the Builtin type for UnsafeValueBuffer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
     {"Builtin.UnsafeValueBuffer"};
+/// The name of the Builtin type for Job
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
+    "Builtin.Job"};
+/// The name of the Builtin type for DefaultActorStorage
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE = {
+    "Builtin.DefaultActorStorage"};
 /// The name of the Builtin type for UnknownObject
 ///
 /// This no longer exists as an AST-accessible type, but it's still used for

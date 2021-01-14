@@ -945,8 +945,8 @@ struct ConcreteArgumentCopy {
   }
 
   static Optional<ConcreteArgumentCopy>
-  generate(const ConcreteExistentialInfo &CEI, ApplySite apply, unsigned argIdx,
-           SILBuilderContext &BuilderCtx) {
+  generate(const ConcreteExistentialInfo &existentialInfo, ApplySite apply,
+           unsigned argIdx, SILBuilderContext &builderCtx) {
     SILParameterInfo paramInfo =
         apply.getOrigCalleeConv().getParamInfoForSILArg(argIdx);
     // Mutation should have been checked before we get this far.
@@ -976,21 +976,23 @@ struct ConcreteArgumentCopy {
     if (!paramInfo.isFormalIndirect())
       return None;
 
-    SILBuilderWithScope B(apply.getInstruction(), BuilderCtx);
+    SILBuilderWithScope builder(apply.getInstruction(), builderCtx);
     auto loc = apply.getLoc();
-    auto *ASI = B.createAllocStack(loc, CEI.ConcreteValue->getType());
+    auto *asi =
+        builder.createAllocStack(loc, existentialInfo.ConcreteValue->getType());
     // If the type is an address, simple copy it.
-    if (CEI.ConcreteValue->getType().isAddress()) {
-      B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
-                       IsInitialization_t::IsInitialization);
+    if (existentialInfo.ConcreteValue->getType().isAddress()) {
+      builder.createCopyAddr(loc, existentialInfo.ConcreteValue, asi, IsNotTake,
+                             IsInitialization_t::IsInitialization);
     } else {
       // Otherwise, we probably got the value from the source of a store
       // instruction so, create a store into the temporary argument.
-      B.createStrongRetain(loc, CEI.ConcreteValue, B.getDefaultAtomicity());
-      B.createStore(loc, CEI.ConcreteValue, ASI,
-                    StoreOwnershipQualifier::Unqualified);
+      auto copy =
+          builder.emitCopyValueOperation(loc, existentialInfo.ConcreteValue);
+      builder.emitStoreValueOperation(loc, copy, asi,
+                                      StoreOwnershipQualifier::Init);
     }
-    return ConcreteArgumentCopy(origArg, ASI);
+    return ConcreteArgumentCopy(origArg, asi);
   }
 };
 
@@ -1416,7 +1418,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
 
   // Emit a retain for the @owned return.
   SILBuilderWithScope Builder(Call);
-  Builder.createRetainValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
+  OnX = Builder.emitCopyValueOperation(Call->getLoc(), OnX);
 
   // Emit a release for the @owned parameter, or none for a @guaranteed
   // parameter.
@@ -1428,7 +1430,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
          ParamInfo == ParameterConvention::Direct_Guaranteed);
 
   if (ParamInfo == ParameterConvention::Direct_Owned)
-    Builder.createReleaseValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Call->getLoc(), OnX);
 }
 
 /// Replace an application of a cast composition f_inverse(f(x)) by x.

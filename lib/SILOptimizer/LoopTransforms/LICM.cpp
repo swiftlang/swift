@@ -15,6 +15,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -61,8 +62,8 @@ static bool mayWriteTo(AliasAnalysis *AA, InstSet &SideEffectInsts,
   return false;
 }
 
-/// Returns true if \p I is a store to \p addr.
-static StoreInst *isStoreToAddr(SILInstruction *I, SILValue addr) {
+/// Returns a non-null StoreInst if \p I is a store to \p accessPath.
+static StoreInst *isStoreToAccess(SILInstruction *I, AccessPath accessPath) {
   auto *SI = dyn_cast<StoreInst>(I);
   if (!SI)
     return nullptr;
@@ -71,53 +72,91 @@ static StoreInst *isStoreToAddr(SILInstruction *I, SILValue addr) {
   if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Init)
     return nullptr;
 
-  if (SI->getDest() != addr)
+  auto storeAccessPath = AccessPath::compute(SI->getDest());
+  if (accessPath != storeAccessPath)
     return nullptr;
 
   return SI;
 }
 
-/// Returns true if \p I is a load from \p addr or a projected address from
-/// \p addr.
-static LoadInst *isLoadFromAddr(SILInstruction *I, SILValue addr) {
+struct LoadWithAccess {
+  LoadInst *li = nullptr;
+  AccessPath accessPath;
+
+  operator bool() { return li != nullptr; }
+};
+
+static LoadWithAccess doesLoadOverlapAccess(SILInstruction *I,
+                                            AccessPath accessPath) {
   auto *LI = dyn_cast_or_null<LoadInst>(I);
   if (!LI)
-    return nullptr;
+    return LoadWithAccess();
 
-  // TODO: handle StoreOwnershipQualifier::Take
+  // TODO: handle LoadOwnershipQualifier::Take
   if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
-    return nullptr;
+    return LoadWithAccess();
 
-  SILValue v = LI->getOperand();
-  for (;;) {
-    if (v == addr) {
-      return LI;
-    } else if (isa<StructElementAddrInst>(v) || isa<TupleElementAddrInst>(v)) {
-      v = cast<SingleValueInstruction>(v)->getOperand(0);
-    } else {
-      return nullptr;
-    }
+  AccessPath loadAccessPath = AccessPath::compute(LI->getOperand());
+  if (!loadAccessPath.isValid())
+    return LoadWithAccess();
+
+  // Don't use AccessPath::mayOverlap. We only want definite overlap.
+  if (loadAccessPath.contains(accessPath)
+      || accessPath.contains(loadAccessPath)) {
+    return {LI, loadAccessPath};
   }
+  return LoadWithAccess();
+}
+
+/// Returns a valid LoadWithAccess if \p I is a load from \p accessPath or a
+/// projected address from \p accessPath.
+static LoadWithAccess isLoadWithinAccess(SILInstruction *I,
+                                         AccessPath accessPath) {
+  auto loadWithAccess = doesLoadOverlapAccess(I, accessPath);
+  if (!loadWithAccess)
+    return loadWithAccess;
+
+  // Make sure that any additional path components beyond the store's access
+  // path can be converted to value projections during projectLoadValue (it
+  // currently only supports StructElementAddr and TupleElementAddr).
+  auto storePathNode = accessPath.getPathNode();
+  auto loadPathNode = loadWithAccess.accessPath.getPathNode();
+  SILValue loadAddr = loadWithAccess.li->getOperand();
+  while (loadPathNode != storePathNode) {
+    if (!isa<StructElementAddrInst>(loadAddr)
+        && !isa<TupleElementAddrInst>(loadAddr)) {
+      return LoadWithAccess();
+    }
+    loadAddr = cast<SingleValueInstruction>(loadAddr)->getOperand(0);
+    loadPathNode = loadPathNode.getParent();
+  }
+  return loadWithAccess;
 }
 
 /// Returns true if all instructions in \p SideEffectInsts which may alias with
-/// \p addr are either loads or stores from \p addr.
+/// \p access are either loads or stores from \p access.
+///
+/// \p storeAddr is only needed for AliasAnalysis until we have an interface
+/// that supports AccessPath.
 static bool isOnlyLoadedAndStored(AliasAnalysis *AA, InstSet &SideEffectInsts,
                                   ArrayRef<LoadInst *> Loads,
                                   ArrayRef<StoreInst *> Stores,
-                                  SILValue addr) {
+                                  SILValue storeAddr, AccessPath accessPath) {
   for (auto *I : SideEffectInsts) {
-    if (AA->mayReadOrWriteMemory(I, addr) &&
-        !isStoreToAddr(I, addr) && !isLoadFromAddr(I, addr)) {
+    // Pass the original address value until we can fix AA
+    if (AA->mayReadOrWriteMemory(I, storeAddr)
+        && !isStoreToAccess(I, accessPath)
+        && !isLoadWithinAccess(I, accessPath)) {
       return false;
     }
   }
   for (auto *LI : Loads) {
-    if (AA->mayReadFromMemory(LI, addr) && !isLoadFromAddr(LI, addr))
+    if (AA->mayReadFromMemory(LI, storeAddr)
+        && !doesLoadOverlapAccess(LI, accessPath))
       return false;
   }
   for (auto *SI : Stores) {
-    if (AA->mayWriteToMemory(SI, addr) && !isStoreToAddr(SI, addr))
+    if (AA->mayWriteToMemory(SI, storeAddr) && !isStoreToAccess(SI, accessPath))
       return false;
   }
   return true;
@@ -466,6 +505,7 @@ class LoopTreeOptimization {
   llvm::DenseMap<SILLoop *, std::unique_ptr<LoopNestSummary>>
       LoopNestSummaryMap;
   SmallVector<SILLoop *, 8> BotUpWorkList;
+  InstSet toDelete;
   SILLoopInfo *LoopInfo;
   AliasAnalysis *AA;
   SideEffectAnalysis *SEA;
@@ -486,10 +526,12 @@ class LoopTreeOptimization {
   InstVector SinkDown;
 
   /// Load and store instructions that we may be able to move out of the loop.
+  /// All loads and stores within a block must be in instruction order to
+  /// simplify replacement of values after SSA update.
   InstVector LoadsAndStores;
 
-  /// All addresses of the \p LoadsAndStores instructions.
-  llvm::SetVector<SILValue> LoadAndStoreAddrs;
+  /// All access paths of the \p LoadsAndStores instructions.
+  llvm::SetVector<AccessPath> LoadAndStoreAddrs;
 
   /// Hoistable Instructions that need special treatment
   /// e.g. begin_access
@@ -522,11 +564,22 @@ protected:
   /// Collect a set of instructions that can be hoisted
   void analyzeCurrentLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
+  SingleValueInstruction *splitLoad(SILValue splitAddress,
+                                    ArrayRef<AccessPath::Index> remainingPath,
+                                    SILBuilder &builder,
+                                    SmallVectorImpl<LoadInst *> &Loads,
+                                    unsigned ldStIdx);
+
+  /// Given an \p accessPath that is only loaded and stored, split loads that
+  /// are wider than \p accessPath.
+  bool splitLoads(SmallVectorImpl<LoadInst *> &Loads, AccessPath accessPath,
+                  SILValue storeAddr);
+
   /// Optimize the current loop nest.
   bool optimizeLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
-  /// Move all loads and stores from/to \p addr out of the \p loop.
-  void hoistLoadsAndStores(SILValue addr, SILLoop *loop, InstVector &toDelete);
+  /// Move all loads and stores from/to \p accessPath out of the \p loop.
+  void hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop);
 
   /// Move all loads and stores from all addresses in LoadAndStoreAddrs out of
   /// the \p loop.
@@ -759,6 +812,8 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
 // We *need* to discover all SideEffectInsts -
 // even if the loop is otherwise skipped!
 // This is because outer loops will depend on the inner loop's writes.
+//
+// This may split some loads into smaller loads.
 void LoopTreeOptimization::analyzeCurrentLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary) {
   InstSet &sideEffects = CurrSummary->SideEffectInsts;
@@ -875,11 +930,23 @@ void LoopTreeOptimization::analyzeCurrentLoop(
 
   // Collect memory locations for which we can move all loads and stores out
   // of the loop.
+  //
+  // Note: The Loads set and LoadsAndStores set may mutate during this loop.
   for (StoreInst *SI : Stores) {
-    SILValue addr = SI->getDest();
-    if (isLoopInvariant(addr, Loop) &&
-        isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, addr)) {
-      LoadAndStoreAddrs.insert(addr);
+    // Use AccessPathWithBase to recover a base address that can be used for
+    // newly inserted memory operations. If we instead teach hoistLoadsAndStores
+    // how to rematerialize global_addr, then we don't need this base.
+    auto access = AccessPathWithBase::compute(SI->getDest());
+    auto accessPath = access.accessPath;
+    if (accessPath.isValid() && isLoopInvariant(access.base, Loop)) {
+      if (isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, SI->getDest(),
+                                accessPath)) {
+        if (!LoadAndStoreAddrs.count(accessPath)) {
+          if (splitLoads(Loads, accessPath, SI->getDest())) {
+            LoadAndStoreAddrs.insert(accessPath);
+          }
+        }
+      }
     }
   }
   if (!FixLifetimes.empty()) {
@@ -905,6 +972,172 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   }
 }
 
+// Recursively determine whether the innerAddress is a direct tuple or struct
+// projection chain from outerPath. Populate \p reversePathIndices with the path
+// difference.
+static bool
+computeInnerAccessPath(AccessPath::PathNode outerPath,
+                       AccessPath::PathNode innerPath, SILValue innerAddress,
+                       SmallVectorImpl<AccessPath::Index> &reversePathIndices) {
+  if (outerPath == innerPath)
+    return true;
+
+  if (!isa<StructElementAddrInst>(innerAddress)
+      && !isa<TupleElementAddrInst>(innerAddress)) {
+    return false;
+  }
+  assert(ProjectionIndex(innerAddress).Index
+         == innerPath.getIndex().getSubObjectIndex());
+
+  reversePathIndices.push_back(innerPath.getIndex());
+  SILValue srcAddr = cast<SingleValueInstruction>(innerAddress)->getOperand(0);
+  if (!computeInnerAccessPath(outerPath, innerPath.getParent(), srcAddr,
+                              reversePathIndices)) {
+    return false;
+  }
+  return true;
+}
+
+/// Split a load from \p outerAddress recursively following remainingPath.
+///
+/// Creates a load with identical \p accessPath and a set of
+/// non-overlapping loads. Add the new non-overlapping loads to HoistUp.
+///
+/// \p ldstIdx is the index into LoadsAndStores of the original outer load.
+///
+/// Return the aggregate produced by merging the loads.
+SingleValueInstruction *LoopTreeOptimization::splitLoad(
+    SILValue splitAddress, ArrayRef<AccessPath::Index> remainingPath,
+    SILBuilder &builder, SmallVectorImpl<LoadInst *> &Loads, unsigned ldstIdx) {
+  auto loc = LoadsAndStores[ldstIdx]->getLoc();
+  // Recurse until we have a load that matches accessPath.
+  if (remainingPath.empty()) {
+    // Create a load that matches the stored access path.
+    LoadInst *load = builder.createLoad(loc, splitAddress,
+                                        LoadOwnershipQualifier::Unqualified);
+    Loads.push_back(load);
+    // Replace the outer load in the list of loads and stores to hoist and
+    // sink. LoadsAndStores must remain in instruction order.
+    LoadsAndStores[ldstIdx] = load;
+    LLVM_DEBUG(llvm::dbgs() << "Created load from stored path: " << *load);
+    return load;
+  }
+  auto recordDisjointLoad = [&](LoadInst *newLoad) {
+    Loads.push_back(newLoad);
+    LoadsAndStores.insert(LoadsAndStores.begin() + ldstIdx + 1, newLoad);
+  };
+  auto subIndex = remainingPath.back().getSubObjectIndex();
+  SILType loadTy = splitAddress->getType();
+  if (CanTupleType tupleTy = loadTy.getAs<TupleType>()) {
+    SmallVector<SILValue, 4> elements;
+    for (int tupleIdx : range(tupleTy->getNumElements())) {
+      auto *projection = builder.createTupleElementAddr(
+          loc, splitAddress, tupleIdx, loadTy.getTupleElementType(tupleIdx));
+      SILValue elementVal;
+      if (tupleIdx == subIndex) {
+        elementVal = splitLoad(projection, remainingPath.drop_back(), builder,
+                               Loads, ldstIdx);
+      } else {
+        elementVal = builder.createLoad(loc, projection,
+                                        LoadOwnershipQualifier::Unqualified);
+        recordDisjointLoad(cast<LoadInst>(elementVal));
+      }
+      elements.push_back(elementVal);
+    }
+    return builder.createTuple(loc, elements);
+  }
+  auto structTy = loadTy.getStructOrBoundGenericStruct();
+  assert(structTy && "tuple and struct elements are checked earlier");
+  auto &module = builder.getModule();
+  auto expansionContext = builder.getFunction().getTypeExpansionContext();
+
+  SmallVector<SILValue, 4> elements;
+  int fieldIdx = 0;
+  for (auto *field : structTy->getStoredProperties()) {
+    SILType fieldTy = loadTy.getFieldType(field, module, expansionContext);
+    auto *projection =
+        builder.createStructElementAddr(loc, splitAddress, field, fieldTy);
+    SILValue fieldVal;
+    if (fieldIdx++ == subIndex)
+      fieldVal = splitLoad(projection, remainingPath.drop_back(), builder,
+                           Loads, ldstIdx);
+    else {
+      fieldVal = builder.createLoad(loc, projection,
+                                    LoadOwnershipQualifier::Unqualified);
+      recordDisjointLoad(cast<LoadInst>(fieldVal));
+    }
+    elements.push_back(fieldVal);
+  }
+  return builder.createStruct(loc, loadTy.getObjectType(), elements);
+}
+
+/// Find all loads that contain \p accessPath. Split them into a load with
+/// identical accessPath and a set of non-overlapping loads. Add the new
+/// non-overlapping loads to LoadsAndStores and HoistUp.
+///
+/// TODO: The \p storeAddr parameter is only needed until we have an
+/// AliasAnalysis interface that handles AccessPath.
+bool LoopTreeOptimization::splitLoads(SmallVectorImpl<LoadInst *> &Loads,
+                                      AccessPath accessPath,
+                                      SILValue storeAddr) {
+  // The Loads set may mutate during this loop, but we only want to visit the
+  // original set.
+  for (unsigned loadsIdx = 0, endIdx = Loads.size(); loadsIdx != endIdx;
+       ++loadsIdx) {
+    auto *load = Loads[loadsIdx];
+    if (toDelete.count(load))
+      continue;
+
+    if (!AA->mayReadFromMemory(load, storeAddr))
+      continue;
+
+    AccessPath loadAccessPath = AccessPath::compute(load->getOperand());
+    if (accessPath.contains(loadAccessPath))
+      continue;
+
+    assert(loadAccessPath.contains(accessPath));
+    LLVM_DEBUG(llvm::dbgs() << "Overlaps with loop stores: " << *load);
+    SmallVector<AccessPath::Index, 4> reversePathIndices;
+    if (!computeInnerAccessPath(loadAccessPath.getPathNode(),
+                                accessPath.getPathNode(), storeAddr,
+                                reversePathIndices)) {
+      return false;
+    }
+    // Found a load wider than the store to accessPath.
+    //
+    // SplitLoads is called for each unique access path in the loop that is
+    // only loaded from and stored to and this loop takes time proportional to:
+    //   num-wide-loads x num-fields x num-loop-memops
+    //
+    // For each load wider than the store, it creates a new load for each field
+    // in that type. Each new load is inserted in the LoadsAndStores vector.  To
+    // avoid super-linear behavior for large types (e.g. giant tuples), limit
+    // growth of new loads to an arbitrary constant factor per access path.
+    if (Loads.size() >= endIdx + 6) {
+      LLVM_DEBUG(llvm::dbgs() << "...Refusing to split more loads\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "...Splitting load\n");
+
+    unsigned ldstIdx = [this, load]() {
+      auto ldstIter = llvm::find(LoadsAndStores, load);
+      assert(ldstIter != LoadsAndStores.end() && "outerLoad missing");
+      return std::distance(LoadsAndStores.begin(), ldstIter);
+    }();
+
+    SILBuilderWithScope builder(load);
+
+    SILValue aggregateVal = splitLoad(load->getOperand(), reversePathIndices,
+                                      builder, Loads, ldstIdx);
+
+    load->replaceAllUsesWith(aggregateVal);
+    auto iterAndInserted = toDelete.insert(load);
+    (void)iterAndInserted;
+    assert(iterAndInserted.second && "the same load should only be split once");
+  }
+  return true;
+}
+
 bool LoopTreeOptimization::optimizeLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary) {
   auto *CurrentLoop = CurrSummary->Loop;
@@ -919,26 +1152,37 @@ bool LoopTreeOptimization::optimizeLoop(
   currChanged |= sinkInstructions(CurrSummary, DomTree, LoopInfo, SinkDown);
   currChanged |=
       hoistSpecialInstruction(CurrSummary, DomTree, LoopInfo, SpecialHoist);
+
+  assert(toDelete.empty() && "only hostAllLoadsAndStores deletes");
   return currChanged;
 }
 
 /// Creates a value projection from \p rootVal based on the address projection
-/// from \a rootAddr to \a addr.
-static SILValue projectLoadValue(SILValue addr, SILValue rootAddr,
-                                 SILValue rootVal, SILInstruction *beforeInst) {
-  if (addr == rootAddr)
+/// from \a rootVal to \a addr.
+static SILValue projectLoadValue(SILValue addr, AccessPath accessPath,
+                                 SILValue rootVal, AccessPath rootAccessPath,
+                                 SILInstruction *beforeInst) {
+  if (accessPath == rootAccessPath)
     return rootVal;
 
+  auto pathNode = accessPath.getPathNode();
+  int elementIdx = pathNode.getIndex().getSubObjectIndex();
   if (auto *SEI = dyn_cast<StructElementAddrInst>(addr)) {
-    SILValue val = projectLoadValue(SEI->getOperand(), rootAddr, rootVal,
-                                    beforeInst);
+    assert(ProjectionIndex(SEI).Index == elementIdx);
+    SILValue val = projectLoadValue(
+        SEI->getOperand(),
+        AccessPath(accessPath.getStorage(), pathNode.getParent(), 0),
+        rootVal, rootAccessPath, beforeInst);
     SILBuilder B(beforeInst);
     return B.createStructExtract(beforeInst->getLoc(), val, SEI->getField(),
                                  SEI->getType().getObjectType());
   }
   if (auto *TEI = dyn_cast<TupleElementAddrInst>(addr)) {
-    SILValue val = projectLoadValue(TEI->getOperand(), rootAddr, rootVal,
-                                    beforeInst);
+    assert(ProjectionIndex(TEI).Index == elementIdx);
+    SILValue val = projectLoadValue(
+        TEI->getOperand(),
+        AccessPath(accessPath.getStorage(), pathNode.getParent(), 0),
+        rootVal, rootAccessPath, beforeInst);
     SILBuilder B(beforeInst);
     return B.createTupleExtract(beforeInst->getLoc(), val, TEI->getFieldIndex(),
                                 TEI->getType().getObjectType());
@@ -946,12 +1190,17 @@ static SILValue projectLoadValue(SILValue addr, SILValue rootAddr,
   llvm_unreachable("unknown projection");
 }
 
-/// Returns true if all stores to \p addr commonly dominate the loop exitst of
-/// \p loop.
-static bool storesCommonlyDominateLoopExits(SILValue addr, SILLoop *loop,
-                                      ArrayRef<SILBasicBlock *> exitingBlocks) {
+/// Returns true if all stores to \p addr commonly dominate the loop exits.
+static bool
+storesCommonlyDominateLoopExits(AccessPath accessPath,
+                                SILLoop *loop,
+                                ArrayRef<SILBasicBlock *> exitingBlocks) {
   SmallPtrSet<SILBasicBlock *, 16> stores;
-  for (Operand *use : addr->getUses()) {
+  SmallVector<Operand *, 8> uses;
+  // Collect as many recognizable stores as possible. It's ok if not all stores
+  // are collected.
+  accessPath.collectUses(uses, AccessUseType::Exact, loop->getFunction());
+  for (Operand *use : uses) {
     SILInstruction *user = use->getUser();
     if (isa<StoreInst>(user))
       stores.insert(user->getParent());
@@ -1030,24 +1279,26 @@ static bool storesCommonlyDominateLoopExits(SILValue addr, SILLoop *loop,
   return true;
 }
 
-void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, InstVector &toDelete) {
-
-  SmallVector<SILBasicBlock *, 4> exitingBlocks;
-  loop->getExitingBlocks(exitingBlocks);
+void LoopTreeOptimization::
+hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
+  SmallVector<SILBasicBlock *, 4> exitingAndLatchBlocks;
+  loop->getExitingAndLatchBlocks(exitingAndLatchBlocks);
 
   // This is not a requirement for functional correctness, but we don't want to
   // _speculatively_ load and store the value (outside of the loop).
-  if (!storesCommonlyDominateLoopExits(addr, loop, exitingBlocks))
+  if (!storesCommonlyDominateLoopExits(accessPath, loop,
+                                       exitingAndLatchBlocks))
     return;
 
   // Inserting the stores requires the exit edges to be not critical.
-  for (SILBasicBlock *exitingBlock : exitingBlocks) {
-    for (unsigned idx = 0, e = exitingBlock->getSuccessors().size();
+  for (SILBasicBlock *exitingOrLatchBlock : exitingAndLatchBlocks) {
+    for (unsigned idx = 0, e = exitingOrLatchBlock->getSuccessors().size();
          idx != e; ++idx) {
       // exitingBlock->getSuccessors() must not be moved out of this loop,
       // because the successor list is invalidated by splitCriticalEdge.
-      if (!loop->contains(exitingBlock->getSuccessors()[idx])) {
-        splitCriticalEdge(exitingBlock->getTerminator(), idx, DomTree, LoopInfo);
+      if (!loop->contains(exitingOrLatchBlock->getSuccessors()[idx])) {
+        splitCriticalEdge(exitingOrLatchBlock->getTerminator(), idx, DomTree,
+                          LoopInfo);
       }
     }
   }
@@ -1057,30 +1308,46 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
 
   // Initially load the value in the loop pre header.
   SILBuilder B(preheader->getTerminator());
-  auto *initialLoad = B.createLoad(preheader->getTerminator()->getLoc(), addr,
-                                   LoadOwnershipQualifier::Unqualified);
-  LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
-
+  SILValue storeAddr;
   SILSSAUpdater ssaUpdater;
-  ssaUpdater.initialize(initialLoad->getType());
-  ssaUpdater.addAvailableValue(preheader, initialLoad);
 
   // Set all stored values as available values in the ssaUpdater.
   // If there are multiple stores in a block, only the last one counts.
   Optional<SILLocation> loc;
   for (SILInstruction *I : LoadsAndStores) {
-    if (auto *SI = isStoreToAddr(I, addr)) {
+    if (auto *SI = isStoreToAccess(I, accessPath)) {
       loc = SI->getLoc();
 
       // If a store just stores the loaded value, bail. The operand (= the load)
       // will be removed later, so it cannot be used as available value.
       // This corner case is suprisingly hard to handle, so we just give up.
-      if (isLoadFromAddr(dyn_cast<LoadInst>(SI->getSrc()), addr))
+      if (isLoadWithinAccess(dyn_cast<LoadInst>(SI->getSrc()), accessPath))
         return;
 
+      if (!storeAddr) {
+        storeAddr = SI->getDest();
+        ssaUpdater.initialize(storeAddr->getType().getObjectType());
+      } else if (SI->getDest()->getType() != storeAddr->getType()) {
+        // This transformation assumes that the values of all stores in the loop
+        // must be interchangeable. It won't work if stores different types
+        // because of casting or payload extraction even though they have the
+        // same access path.
+        return;
+      }
       ssaUpdater.addAvailableValue(SI->getParent(), SI->getSrc());
     }
   }
+  assert(storeAddr && "hoistLoadsAndStores requires a store in the loop");
+  SILValue initialAddr = cloneUseDefChain(
+      storeAddr, preheader->getTerminator(), [&](SILValue srcAddr) {
+        // Clone projections until the address dominates preheader.
+        return !DomTree->dominates(srcAddr->getParentBlock(), preheader);
+      });
+  LoadInst *initialLoad =
+      B.createLoad(preheader->getTerminator()->getLoc(), initialAddr,
+                   LoadOwnershipQualifier::Unqualified);
+  LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
+  ssaUpdater.addAvailableValue(preheader, initialLoad);
 
   // Remove all stores and replace the loads with the current value.
   SILBasicBlock *currentBlock = nullptr;
@@ -1091,37 +1358,45 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       currentBlock = block;
       currentVal = SILValue();
     }
-    if (auto *SI = isStoreToAddr(I, addr)) {
+    if (auto *SI = isStoreToAccess(I, accessPath)) {
       LLVM_DEBUG(llvm::dbgs() << "Deleting reloaded store " << *SI);
       currentVal = SI->getSrc();
-      toDelete.push_back(SI);
-    } else if (auto *LI = isLoadFromAddr(I, addr)) {
-      // If we didn't see a store in this block yet, get the current value from
-      // the ssaUpdater.
-      if (!currentVal)
-        currentVal = ssaUpdater.getValueInMiddleOfBlock(block);
-      SILValue projectedValue = projectLoadValue(LI->getOperand(), addr,
-                                                 currentVal, LI);
-      LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *LI << " with "
-                 << projectedValue);
-      LI->replaceAllUsesWith(projectedValue);
-      toDelete.push_back(LI);
+      toDelete.insert(SI);
+      continue;
     }
+    auto loadWithAccess = isLoadWithinAccess(I, accessPath);
+    if (!loadWithAccess) {
+      continue;
+    }
+    // If we didn't see a store in this block yet, get the current value from
+    // the ssaUpdater.
+    if (!currentVal)
+      currentVal = ssaUpdater.getValueInMiddleOfBlock(block);
+
+    LoadInst *load = loadWithAccess.li;
+    auto loadAddress = load->getOperand();
+    SILValue projectedValue = projectLoadValue(
+        loadAddress, loadWithAccess.accessPath, currentVal, accessPath, load);
+    LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *load << " with "
+                            << projectedValue);
+    load->replaceAllUsesWith(projectedValue);
+    toDelete.insert(load);
   }
 
   // Store back the value at all loop exits.
-  for (SILBasicBlock *exitingBlock : exitingBlocks) {
-    for (SILBasicBlock *succ : exitingBlock->getSuccessors()) {
-      if (!loop->contains(succ)) {
-        assert(succ->getSinglePredecessorBlock() &&
-               "should have split critical edges");
-        SILBuilder B(succ->begin());
-        auto *SI = B.createStore(loc.getValue(),
-                                 ssaUpdater.getValueInMiddleOfBlock(succ), addr,
-                                 StoreOwnershipQualifier::Unqualified);
-        (void)SI;
-        LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
-      }
+  for (SILBasicBlock *exitingOrLatchBlock : exitingAndLatchBlocks) {
+    for (SILBasicBlock *succ : exitingOrLatchBlock->getSuccessors()) {
+      if (loop->contains(succ))
+        continue;
+
+      assert(succ->getSinglePredecessorBlock()
+             && "should have split critical edges");
+      SILBuilder B(succ->begin());
+      auto *SI = B.createStore(
+          loc.getValue(), ssaUpdater.getValueInMiddleOfBlock(succ), initialAddr,
+          StoreOwnershipQualifier::Unqualified);
+      (void)SI;
+      LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
     }
   }
 
@@ -1130,17 +1405,20 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
 }
 
 bool LoopTreeOptimization::hoistAllLoadsAndStores(SILLoop *loop) {
-  InstVector toDelete;
-  for (SILValue addr : LoadAndStoreAddrs) {
-    hoistLoadsAndStores(addr, loop, toDelete);
+  for (AccessPath accessPath : LoadAndStoreAddrs) {
+    hoistLoadsAndStores(accessPath, loop);
   }
   LoadsAndStores.clear();
   LoadAndStoreAddrs.clear();
 
+  if (toDelete.empty())
+    return false;
+
   for (SILInstruction *I : toDelete) {
-    I->eraseFromParent();
+    recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true);
   }
-  return !toDelete.empty();
+  toDelete.clear();
+  return true;
 }
 
 namespace {

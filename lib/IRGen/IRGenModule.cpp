@@ -554,7 +554,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                                  MainInputFilenameForDebugInfo,
                                                      PrivateDiscriminator);
 
-  initClangTypeConverter();
+  if (auto loader = Context.getClangModuleLoader()) {
+    ClangASTContext =
+        &static_cast<ClangImporter *>(loader)->getClangASTContext();
+  }
 
   if (ClangASTContext) {
     auto atomicBoolTy = ClangASTContext->getAtomicType(ClangASTContext->BoolTy);
@@ -587,12 +590,31 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
+                                            {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = createStructType(*this, "swift.context", {});
-  SwiftTaskTy = createStructType(*this, "swift.task", {});
+  auto *ContextPtrTy = llvm::PointerType::getUnqual(SwiftContextTy);
+
+  // This must match the definition of class AsyncTask in swift/ABI/Task.h.
+  SwiftTaskTy = createStructType(*this, "swift.task", {
+    RefCountedStructTy,   // object header
+    Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
+    SizeTy,               // Job.Flags
+    FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
+    ContextPtrTy,         // Task.ResumeContext
+    IntPtrTy              // Task.Status
+  });
+
   SwiftExecutorTy = createStructType(*this, "swift.executor", {});
+  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+  SwiftJobTy = createStructType(*this, "swift.job", {
+    SizeTy,               // flags
+    Int8PtrTy             // execution function pointer
+  });
+  SwiftJobPtrTy = SwiftJobTy->getPointerTo();
 
   // using TaskContinuationFunction =
   //   SWIFT_CC(swift)
@@ -606,12 +628,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
+  AsyncContinuationContextTy = createStructType(
+      *this, "swift.async_continuation_context",
+      {SwiftContextPtrTy, SizeTy, ErrorPtrTy, OpaquePtrTy, SwiftExecutorPtrTy});
+  AsyncContinuationContextPtrTy = AsyncContinuationContextTy->getPointerTo();
+
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
 
 IRGenModule::~IRGenModule() {
-  destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   destroyPointerAuthCaches();
   delete &Types;
@@ -713,6 +739,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
     auto featureAvailability = context.getConcurrencyAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
+    auto featureAvailability = context.getDifferentiationAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

@@ -102,7 +102,7 @@ class ValidateIfConfigCondition :
     return nullptr;
   }
 
-  // Support '||' and '&&' operator. The procedence of '&&' is higher than '||'.
+  // Support '||' and '&&' operator. The precedence of '&&' is higher than '||'.
   // Invalid operator and the next operand are diagnosed and removed from AST.
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
@@ -635,7 +635,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       // Don't evaluate if it's in '-parse' mode, etc.
       shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
-      !getScopeInfo().isInactiveConfigBlock() &&
+      !InInactiveClauseEnvironment &&
       // If this directive contains code completion location, 'isActive' is
       // determined solely by which block has the completion token.
       !codeCompletionClauseLoc.isValid();

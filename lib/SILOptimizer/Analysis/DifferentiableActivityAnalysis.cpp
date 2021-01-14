@@ -509,26 +509,27 @@ bool DifferentiableActivityInfo::isUseful(
 }
 
 bool DifferentiableActivityInfo::isActive(
-    SILValue value, const SILAutoDiffIndices &indices) const {
-  return isVaried(value, indices.parameters) &&
-         isUseful(value, indices.results);
+    SILValue value, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices) const {
+  return isVaried(value, parameterIndices) && isUseful(value, resultIndices);
 }
 
 Activity DifferentiableActivityInfo::getActivity(
-    SILValue value, const SILAutoDiffIndices &indices) const {
+    SILValue value, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices) const {
   Activity activity;
-  if (isVaried(value, indices.parameters))
+  if (isVaried(value, parameterIndices))
     activity |= ActivityFlags::Varied;
-  if (isUseful(value, indices.results))
+  if (isUseful(value, resultIndices))
     activity |= ActivityFlags::Useful;
   return activity;
 }
 
-void DifferentiableActivityInfo::dump(SILValue value,
-                                      const SILAutoDiffIndices &indices,
-                                      llvm::raw_ostream &s) const {
+void DifferentiableActivityInfo::dump(
+    SILValue value, IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    llvm::raw_ostream &s) const {
   s << '[';
-  auto activity = getActivity(value, indices);
+  auto activity = getActivity(value, parameterIndices, resultIndices);
   switch (activity.toRaw()) {
   case 0:
     s << "NONE";
@@ -546,19 +547,24 @@ void DifferentiableActivityInfo::dump(SILValue value,
   s << "] " << value;
 }
 
-void DifferentiableActivityInfo::dump(SILAutoDiffIndices indices,
-                                      llvm::raw_ostream &s) const {
+void DifferentiableActivityInfo::dump(
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    llvm::raw_ostream &s) const {
   SILFunction &fn = getFunction();
-  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
+  s << "Activity info for " << fn.getName() << " at parameter indices (";
+  llvm::interleaveComma(parameterIndices->getIndices(), s);
+  s << ") and result indices (";
+  llvm::interleaveComma(resultIndices->getIndices(), s);
+  s << "):\n";
   for (auto &bb : fn) {
     s << "bb" << bb.getDebugID() << ":\n";
     for (auto *arg : bb.getArguments())
-      dump(arg, indices, s);
+      dump(arg, parameterIndices, resultIndices, s);
     for (auto &inst : bb)
       for (auto res : inst.getResults())
-        dump(res, indices, s);
+        dump(res, parameterIndices, resultIndices, s);
     if (std::next(bb.getIterator()) != fn.end())
       s << '\n';
   }
-  s << "End activity info for " << fn.getName() << " at " << indices << "\n\n";
+  s << "End activity info for " << fn.getName() << '\n';
 }

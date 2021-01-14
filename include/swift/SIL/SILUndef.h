@@ -23,25 +23,23 @@ class SILInstruction;
 class SILModule;
 
 class SILUndef : public ValueBase {
-  ValueOwnershipKind ownershipKind;
-
-  SILUndef(SILType type, ValueOwnershipKind ownershipKind);
+  SILUndef(SILType type);
 
 public:
   void operator=(const SILArgument &) = delete;
   void operator delete(void *, size_t) = delete;
 
-  static SILUndef *get(SILType ty, SILModule &m, ValueOwnershipKind ownershipKind);
+  static SILUndef *get(SILType ty, SILModule &m);
   static SILUndef *get(SILType ty, const SILFunction &f);
 
   template <class OwnerTy>
   static SILUndef *getSentinelValue(SILType type, OwnerTy owner) {
     // Ownership kind isn't used here, the value just needs to have a unique
     // address.
-    return new (*owner) SILUndef(type, ValueOwnershipKind::None);
+    return new (*owner) SILUndef(type);
   }
 
-  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+  ValueOwnershipKind getOwnershipKind() const { return OwnershipKind::None; }
 
   static bool classof(const SILArgument *) = delete;
   static bool classof(const SILInstruction *) = delete;

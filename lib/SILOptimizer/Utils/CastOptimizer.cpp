@@ -114,7 +114,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
 
   SILBasicBlock *castSuccessBB =
       f->createBasicBlockAfter(dynamicCast.getInstruction()->getParent());
-  castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+  castSuccessBB->createPhiArgument(silBridgedTy, OwnershipKind::Owned);
 
   // If we /are/ conditional and we do not need to bridge the load to the sil,
   // then we just create our cast success block and branch from the end of the
@@ -155,8 +155,8 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
     auto *newFailureBlock = ccbi->getFailureBB();
     SILValue defaultArg;
     if (builder.hasOwnership()) {
-      defaultArg = newFailureBlock->createPhiArgument(
-          load->getType(), ValueOwnershipKind::Owned);
+      defaultArg = newFailureBlock->createPhiArgument(load->getType(),
+                                                      OwnershipKind::Owned);
     } else {
       defaultArg = ccbi->getOperand();
     }
@@ -574,14 +574,14 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
         if (!innerBuilder.hasOwnership())
           return newAI;
         return failureBB->createPhiArgument(newAI->getType(),
-                                            ValueOwnershipKind::Owned);
+                                            OwnershipKind::Owned);
       }());
       innerBuilder.emitDestroyOperation(loc, valueToDestroy);
     }
 
     auto *condBrSuccessBB =
         newAI->getFunction()->createBasicBlockAfter(newAI->getParent());
-    condBrSuccessBB->createPhiArgument(destLoweredTy, ValueOwnershipKind::Owned);
+    condBrSuccessBB->createPhiArgument(destLoweredTy, OwnershipKind::Owned);
     builder.createCheckedCastBranch(loc, /* isExact*/ false, newAI,
                                     destLoweredTy, destFormalTy,
                                     condBrSuccessBB, failureBB);
@@ -1210,7 +1210,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
               Inst->getFalseBBCount());
           SuccessBB->createPhiArgument(Dest->getType().getObjectType(),
-                                       ValueOwnershipKind::Owned);
+                                       OwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,
@@ -1247,7 +1247,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto *fBlock = dynamicCast.getFailureBlock();
     if (B.hasOwnership()) {
       fBlock->replacePhiArgumentAndReplaceAllUses(0, mi->getType(),
-                                                  ValueOwnershipKind::None);
+                                                  OwnershipKind::None);
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,

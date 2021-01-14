@@ -30,6 +30,8 @@ def output_filelist : Separate<["-"], "output-filelist">,
 def supplementary_output_file_map : Separate<["-"], "supplementary-output-file-map">,
   HelpText<"Specify supplementary outputs in a file rather than on the command line">;
 
+def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
+  HelpText<"Emit textual output in a parseable format">;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
@@ -223,6 +225,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
+  def enable_experimental_prespecialization :
+    Flag<["-"], "enable-experimental-prespecialization">,
+    HelpText<"Enable experimental pre-specialization support">;
+
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
@@ -260,10 +266,6 @@ def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-s
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
-def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
-  HelpText<"Build request dependency graph">;
-def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
-  HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
@@ -778,5 +780,10 @@ def disable_building_interface
 def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
+
+def experimental_allow_module_with_compiler_errors:
+  Flag<["-"], "experimental-allow-module-with-compiler-errors">,
+  Flags<[HelpHidden]>,
+  HelpText<"Attempt to output .swiftmodule, regardless of compilation errors">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
@@ -2066,8 +2067,11 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   if (!hadError)
     performAbstractFuncDeclDiagnostics(AFD);
 
-  TypeChecker::checkFunctionEffects(AFD);
   TypeChecker::computeCaptures(AFD);
+  if (!AFD->getDeclContext()->isLocalContext()) {
+    checkFunctionActorIsolation(AFD);
+    TypeChecker::checkFunctionEffects(AFD);
+  }
 
   return hadError ? errorBody() : body;
 }
@@ -2108,6 +2112,7 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
+  checkTopLevelActorIsolation(TLCD);
   checkTopLevelEffects(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
 }

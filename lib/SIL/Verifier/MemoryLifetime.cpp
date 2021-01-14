@@ -781,7 +781,6 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
-    case SILArgumentConvention::Direct_Deallocating:
     case SILArgumentConvention::Direct_Guaranteed:
       break;
   }
@@ -968,7 +967,6 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       break;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
-    case SILArgumentConvention::Direct_Deallocating:
     case SILArgumentConvention::Direct_Guaranteed:
       break;
   }

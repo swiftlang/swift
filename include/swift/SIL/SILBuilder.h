@@ -268,8 +268,9 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hasValidInsertionPoint() const { return BB != nullptr; }
-  SILBasicBlock *getInsertionBB() { return BB; }
-  SILBasicBlock::iterator getInsertionPoint() { return InsertPt; }
+  SILBasicBlock *getInsertionBB() const { return BB; }
+  SILBasicBlock::iterator getInsertionPoint() const { return InsertPt; }
+  SILLocation getInsertionPointLoc() const { return InsertPt->getLoc(); }
 
   /// insertingAtEndOfBlock - Return true if the insertion point is at the end
   /// of the current basic block.  False if we're inserting before an existing
@@ -319,8 +320,6 @@ public:
   void setInsertionPoint(SILFunction::iterator BBIter) {
     setInsertionPoint(&*BBIter);
   }
-
-  SILBasicBlock *getInsertionPoint() const { return BB; }
 
   //===--------------------------------------------------------------------===//
   // Instruction Tracking
@@ -777,13 +776,13 @@ public:
 
   SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v) {
     if (!hasOwnership() ||
-        v.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed))
+        v.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return v;
     return createBeginBorrow(loc, v);
   }
 
   void emitEndBorrowOperation(SILLocation loc, SILValue v) {
-    if (!hasOwnership())
+    if (!hasOwnership() || v.getOwnershipKind() == OwnershipKind::None)
       return;
     createEndBorrow(loc, v);
   }
@@ -1940,17 +1939,27 @@ public:
   //===--------------------------------------------------------------------===//
 
   GetAsyncContinuationInst *createGetAsyncContinuation(SILLocation Loc,
-                                                       SILType ContinuationTy) {
+                                                       CanType ResumeType,
+                                                       bool Throws) {
+    auto ContinuationType = SILType::getPrimitiveObjectType(
+        getASTContext().TheRawUnsafeContinuationType);
     return insert(new (getModule()) GetAsyncContinuationInst(getSILDebugLocation(Loc),
-                                                             ContinuationTy));
+                                                             ContinuationType,
+                                                             ResumeType,
+                                                             Throws));
   }
 
   GetAsyncContinuationAddrInst *createGetAsyncContinuationAddr(SILLocation Loc,
                                                                SILValue Operand,
-                                                               SILType ContinuationTy) {
+                                                               CanType ResumeType,
+                                                               bool Throws) {
+    auto ContinuationType = SILType::getPrimitiveObjectType(
+        getASTContext().TheRawUnsafeContinuationType);
     return insert(new (getModule()) GetAsyncContinuationAddrInst(getSILDebugLocation(Loc),
                                                                  Operand,
-                                                                 ContinuationTy));
+                                                                 ContinuationType,
+                                                                 ResumeType,
+                                                                 Throws));
   }
 
   HopToExecutorInst *createHopToExecutor(SILLocation Loc, SILValue Actor) {
@@ -2255,7 +2264,7 @@ public:
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
-    if (F->hasOwnership() && v.getOwnershipKind() == ValueOwnershipKind::None)
+    if (F->hasOwnership() && v.getOwnershipKind() == OwnershipKind::None)
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);
@@ -2267,7 +2276,7 @@ public:
       SILLocation Loc, SILValue v,
       Lowering::TypeLowering::TypeExpansionKind expansionKind) {
     assert(!v->getType().isAddress());
-    if (F->hasOwnership() && v.getOwnershipKind() == ValueOwnershipKind::None)
+    if (F->hasOwnership() && v.getOwnershipKind() == OwnershipKind::None)
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitLoweredDestroyValue(*this, Loc, v, expansionKind);
@@ -2527,6 +2536,21 @@ public:
   /// predecessor block: the parent of \p inst.
   static void insertAfter(SILInstruction *inst,
                           function_ref<void(SILBuilder &)> func);
+
+  /// If \p is an inst, then this is equivalent to insertAfter(inst). If a
+  /// SILArgument is passed in, we use the first instruction in its parent
+  /// block. We assert on undef.
+  static void insertAfter(SILValue value,
+                          function_ref<void(SILBuilder &)> func) {
+    if (auto *i = dyn_cast<SingleValueInstruction>(value))
+      return insertAfter(i, func);
+    if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(value))
+      return insertAfter(mvir->getParent(), func);
+    if (auto *arg = dyn_cast<SILArgument>(value))
+      return insertAfter(&*arg->getParent()->begin(), func);
+    assert(!isa<SILUndef>(value) && "This API can not use undef");
+    llvm_unreachable("Unhandled case?!");
+  }
 };
 
 class SavedInsertionPointRAII {

@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
-// REQUIRES: CPU=x86_64
 // REQUIRES: concurrency
 
 import Builtin
@@ -53,7 +52,7 @@ entry(%a : $SwiftClass, %b: $SwiftClass):
   %t = tuple()
   return %t : $()
 }
-// CHECK-LABEL: define internal swiftcc void @"$s22generic_captured_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s22generic_captured_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 sil public_external @generic_captured_param : $@async @convention(thin) <T> (Int, @inout T) -> Int
 
 sil @partial_apply_generic_capture : $@async @convention(thin) (Int) -> @async @callee_owned (Int) -> Int {
@@ -95,7 +94,7 @@ bb0(%x : $SwiftClass):
 sil public_external @indirect_guaranteed_captured_class_param : $@async @convention(thin) (Int, @in_guaranteed SwiftClass) -> Int
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_indirect_guaranteed_class_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s40indirect_guaranteed_captured_class_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s40indirect_guaranteed_captured_class_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_indirect_guaranteed_class_param : $@async @convention(thin) (@in SwiftClass) -> @async @callee_owned (Int) -> Int {
 bb0(%x : $*SwiftClass):
@@ -107,7 +106,7 @@ bb0(%x : $*SwiftClass):
 sil public_external @indirect_consumed_captured_class_param : $@async @convention(thin) (Int, @in SwiftClass) -> Int
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_indirect_consumed_class_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s38indirect_consumed_captured_class_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s38indirect_consumed_captured_class_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_indirect_consumed_class_param : $@async @convention(thin) (@in SwiftClass) -> @async @callee_owned (Int) -> Int {
 bb0(%x : $*SwiftClass):
@@ -126,7 +125,7 @@ struct SwiftClassPair { var x: SwiftClass, y: SwiftClass }
 sil public_external @guaranteed_captured_class_pair_param : $@async @convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_guaranteed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s36guaranteed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s36guaranteed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned SwiftClassPair) -> @async @callee_owned (Int) -> Int {
 bb0(%x : $SwiftClassPair):
@@ -138,7 +137,7 @@ bb0(%x : $SwiftClassPair):
 sil public_external @indirect_guaranteed_captured_class_pair_param : $@async @convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_indirect_guaranteed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s45indirect_guaranteed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s45indirect_guaranteed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_indirect_guaranteed_class_pair_param : $@async @convention(thin) (@in SwiftClassPair) -> @async @callee_owned (Int) -> Int {
 bb0(%x : $*SwiftClassPair):
@@ -150,7 +149,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @indirect_consumed_captured_class_pair_param : $@async @convention(thin) (Int, @in SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_indirect_consumed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s43indirect_consumed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s43indirect_consumed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_indirect_consumed_class_pair_param : $@async @convention(thin) (@in SwiftClassPair) -> @async @callee_owned (Int) -> Int {
 bb0(%x : $*SwiftClassPair):
@@ -162,7 +161,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @captured_fixed_and_dependent_params : $@async @convention(thin) <A> (@owned SwiftClass, @in A, Int) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_indirect_non_fixed_layout(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s35captured_fixed_and_dependent_paramsTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s35captured_fixed_and_dependent_paramsTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 sil @partial_apply_indirect_non_fixed_layout : $@async @convention(thin) <T> (@owned SwiftClass, @in T, Int) -> @async @callee_owned () -> () {
 bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
   %f = function_ref @captured_fixed_and_dependent_params : $@async @convention(thin) <B> (@owned SwiftClass, @in B, Int) -> ()
@@ -179,7 +178,7 @@ bb0(%x : $*T):
   return %p : $@async @callee_owned () -> @out T
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s28captured_dependent_out_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s28captured_dependent_out_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_dynamic_with_out_param : $@async @convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T {
 bb0(%x : $Int32, %f : $@async @callee_owned (Int32) -> @out T):
@@ -208,8 +207,8 @@ sil public_external @receive_closure : $@async @convention(thin) <C where C : Ba
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_partial_apply(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
-// CHECK-LABEL: define internal swiftcc void @"$s26parametric_casting_closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s26parametric_casting_closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @test_partial_apply : $@async @convention(thin) (@owned Base) -> () {
 bb0(%0 : $Base):
@@ -251,7 +250,7 @@ bb0(%0 : $Int):
   return %result : $()
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_complex_generic_function(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s24complex_generic_functionTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s24complex_generic_functionTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 struct ComplexBoundedType<T: P2> {}
 
@@ -290,7 +289,7 @@ enum GenericEnum<T> {
 sil public_external @generic_indirect_return : $@async @convention(thin) <T> (Int) -> @owned GenericEnum<T>
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_generic_indirect_return(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s23generic_indirect_returnTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s23generic_indirect_returnTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 sil @partial_apply_generic_indirect_return : $@async @convention(thin) (Int) -> @async @callee_owned () -> @owned GenericEnum<Int> {
   bb0(%0 : $Int):
   %fn = function_ref @generic_indirect_return :$@async @convention(thin) <T> (Int) -> @owned GenericEnum<T>
@@ -307,7 +306,7 @@ enum GenericEnum2<T> {
 sil public_external @generic_indirect_return2 : $@async @convention(thin) <T> (Int) -> @owned GenericEnum2<T>
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_generic_indirect_return2(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s24generic_indirect_return2TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s24generic_indirect_return2TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 sil @partial_apply_generic_indirect_return2 : $@async @convention(thin) (Int) -> @async @callee_owned () -> @owned GenericEnum2<Int> {
   bb0(%0 : $Int):
   %fn = function_ref @generic_indirect_return2 :$@async @convention(thin) <T> (Int) -> @owned GenericEnum2<T>
@@ -406,7 +405,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @use_closure2 : $@async @convention(thin) (@noescape @async @callee_guaranteed (Int) -> Int) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s45indirect_guaranteed_captured_class_pair_paramTA.67"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s45indirect_guaranteed_captured_class_pair_paramTA.70"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param : $@async @convention(thin) (@in_guaranteed SwiftClassPair) -> () {
 bb0(%x : $*SwiftClassPair):
@@ -420,7 +419,7 @@ bb0(%x : $*SwiftClassPair):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s37indirect_in_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s37indirect_in_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil public_external @indirect_in_captured_class_pair_param : $@async @convention(thin) (Int, @in SwiftClassPair) -> Int
 
@@ -438,7 +437,7 @@ bb0(%x : $*SwiftClassPair):
 
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s46indirect_in_constant_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}, %swift.refcounted* swiftself {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swiftcc void @"$s46indirect_in_constant_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil public_external @indirect_in_constant_captured_class_pair_param : $@async @convention(thin) (Int, @in_constant SwiftClassPair) -> Int
 

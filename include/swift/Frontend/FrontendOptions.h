@@ -134,7 +134,6 @@ public:
     DumpPCM, ///< Dump information about a precompiled Clang module
 
     ScanDependencies,        ///< Scan dependencies of Swift source files
-    ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
     PrintFeature,       ///< Print supported feature of this compiler
   };
@@ -183,6 +182,11 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
+
+  /// Emit parseable-output directly from the frontend, instead of relying
+  /// the driver to emit it. This is used in context where frontend jobs are executed by
+  /// clients other than the driver.
+  bool FrontendParseableOutput = false;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -289,6 +293,12 @@ public:
   /// This flag is currently only propagated from the driver to
   /// any merge-modules jobs.
   bool EnableExperimentalCrossModuleIncrementalBuild = false;
+
+  /// Best effort to output a .swiftmodule regardless of any compilation
+  /// errors. SIL generation and serialization is skipped entirely when there
+  /// are errors. The resulting serialized AST may include errors types and
+  /// skip nodes entirely, depending on the errors involved.
+  bool AllowModuleWithCompilerErrors = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

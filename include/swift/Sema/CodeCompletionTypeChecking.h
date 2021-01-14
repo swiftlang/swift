@@ -18,6 +18,11 @@
 #ifndef SWIFT_SEMA_CODECOMPLETIONTYPECHECKING_H
 #define SWIFT_SEMA_CODECOMPLETIONTYPECHECKING_H
 
+#include "swift/Basic/LLVM.h"
+#include "swift/AST/Type.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+
 namespace swift {
   class Decl;
   class DeclContext;
@@ -32,7 +37,7 @@ namespace swift {
   class TypeCheckCompletionCallback {
   public:
     /// Called for each solution produced while  type-checking an expression
-    /// containing a code completion expression.
+    /// that the code completion expression participates in.
     virtual void sawSolution(const constraints::Solution &solution) = 0;
     virtual ~TypeCheckCompletionCallback() {}
   };
@@ -49,7 +54,7 @@ namespace swift {
       SmallVector<Type, 4> ExpectedTypes;
       bool ExpectsNonVoid;
       bool BaseIsStaticMetaType;
-      bool IsSingleExpressionBody;
+      bool IsImplicitSingleExpressionReturn;
     };
 
   private:
@@ -78,6 +83,39 @@ namespace swift {
 
     void sawSolution(const constraints::Solution &solution) override;
   };
+
+  /// Used to collect and store information needed to perform unresolved member
+  /// completion (\c CompletionKind::UnresolvedMember ) from the solutions
+  /// formed during expression type-checking.
+  class UnresolvedMemberTypeCheckCompletionCallback: public TypeCheckCompletionCallback {
+  public:
+    struct Result {
+      Type ExpectedTy;
+      bool IsImplicitSingleExpressionReturn;
+    };
+
+  private:
+    CodeCompletionExpr *CompletionExpr;
+    SmallVector<Result, 4> Results;
+    bool GotCallback = false;
+
+  public:
+    UnresolvedMemberTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
+    : CompletionExpr(CompletionExpr) {}
+
+    ArrayRef<Result> getResults() const { return Results; }
+
+    /// True if at least one solution was passed via the \c sawSolution
+    /// callback.
+    bool gotCallback() const { return GotCallback; }
+
+    /// Typecheck the code completion expression in its outermost expression
+    /// context, calling \c sawSolution for each solution formed.
+    void fallbackTypeCheck(DeclContext *DC);
+
+    void sawSolution(const constraints::Solution &solution) override;
+  };
+
 }
 
 #endif

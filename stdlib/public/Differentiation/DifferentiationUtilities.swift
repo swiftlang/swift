@@ -18,63 +18,6 @@
 import Swift
 
 //===----------------------------------------------------------------------===//
-// Differentiable function creation
-//===----------------------------------------------------------------------===//
-
-/// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
-public func differentiableFunction<T : Differentiable, R : Differentiable>(
-  from vjp: @escaping (T)
-           -> (value: R, pullback: (R.TangentVector) -> T.TangentVector)
-) -> @differentiable (T) -> R {
-  Builtin.differentiableFunction_arity1(
-    /*original*/ { vjp($0).value },
-    /*jvp*/ { _ in
-      fatalError("""
-        Functions formed with `differentiableFunction(from:)` cannot yet \
-        be used with differential-producing differential operators.
-        """)
-    },
-    /*vjp*/ vjp)
-}
-
-/// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
-public func differentiableFunction<T, U, R>(
-  from vjp: @escaping (T, U)
-           -> (value: R, pullback: (R.TangentVector)
-             -> (T.TangentVector, U.TangentVector))
-) -> @differentiable (T, U) -> R {
-  Builtin.differentiableFunction_arity2(
-    /*original*/ { vjp($0, $1).value },
-    /*jvp*/ { _, _ in
-      fatalError("""
-        Functions formed with `differentiableFunction(from:)` cannot yet \
-        be used with differential-producing differential operators.
-        """)
-    },
-    /*vjp*/ vjp)
-}
-
-/// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
-public func differentiableFunction<T, U, V, R>(
-  from vjp: @escaping (T, U, V)
-           -> (value: R, pullback: (R.TangentVector)
-             -> (T.TangentVector, U.TangentVector, V.TangentVector))
-) -> @differentiable (T, U, V) -> R {
-  Builtin.differentiableFunction_arity3(
-    /*original*/ { vjp($0, $1, $2).value },
-    /*jvp*/ { _, _, _ in
-      fatalError("""
-        Functions formed with `differentiableFunction(from:)` cannot yet \
-        be used with differential-producing differential operators.
-        """)
-    },
-    /*vjp*/ vjp)
-}
-
-//===----------------------------------------------------------------------===//
 // Derivative customization
 //===----------------------------------------------------------------------===//
 

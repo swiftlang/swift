@@ -369,6 +369,9 @@ void Remangler::mangleGenericSpecializationPrespecialized(Node *node) {
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::mangleGenericSpecializationInResilienceDomain(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleInlinedGenericFunction(Node *node) {
   unreachable("unsupported");
@@ -737,6 +740,18 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
 }
 
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  Buffer << "<autodiff-function>";
+}
+
+void Remangler::mangleAutoDiffFunctionKind(Node *node) {
+  Buffer << "<autodiff-function-kind>";
+}
+
+void Remangler::mangleIndexSubset(Node *node) {
+  Buffer << "<index-subset>";
+}
+
 void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
   Buffer << "TS";
   mangleSingleChildNode(node); // entity
@@ -811,6 +826,10 @@ void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
                                                  EntityContext &ctx) {
   mangleNamedEntity(node, 'I', "A", ctx);
+}
+
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
 }
 
 void Remangler::mangleDeallocator(Node *node, EntityContext &ctx) {
@@ -2166,13 +2185,16 @@ void Remangler::mangleGlobalVariableOnceFunction(Node *node) {
 void Remangler::mangleGlobalVariableOnceDeclList(Node *node) {
   unreachable("unsupported");
 }
+void Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node) {
+  unreachable("unsupported");
+}
 void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
   unreachable("unsupported");
 }
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
-  Buffer << "MM";
   mangleSingleChildNode(node); // type
+  Buffer << "MM";
 }
 
 void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(

@@ -1019,9 +1019,7 @@ namespace {
       // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
       // independent of the wider expression containing the ErrorExpr, so
       // there's no point attempting to produce a solution for it.
-      SourceRange range = E->getSourceRange();
-      if (range.isInvalid() ||
-          CS.getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(range))
+      if (CS.containsCodeCompletionLoc(E))
         return nullptr;
 
       return HoleType::get(CS.getASTContext(), E);
@@ -1744,33 +1742,31 @@ namespace {
         auto &DE = CS.getASTContext().Diags;
         auto numElements = expr->getNumElements();
 
-        if (numElements == 0) {
-          DE.diagnose(expr->getStartLoc(),
-                      diag::should_use_empty_dictionary_literal)
-              .fixItInsert(expr->getEndLoc(), ":");
+        // Empty and single element array literals with dictionary contextual
+        // types are fixed during solving, so continue as normal in those
+        // cases.
+        if (numElements > 1) {
+          bool isIniting =
+              CS.getContextualTypePurpose(expr) == CTP_Initialization;
+          DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
+                      contextualType->lookThroughAllOptionalTypes(), isIniting);
+
+          auto diagnostic =
+              DE.diagnose(expr->getStartLoc(), diag::meant_dictionary_lit);
+
+          // If there is an even number of elements in the array, let's produce
+          // a fix-it which suggests to replace "," with ":" to form a dictionary
+          // literal.
+          if ((numElements & 1) == 0) {
+            const auto commaLocs = expr->getCommaLocs();
+            if (commaLocs.size() == numElements - 1) {
+              for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+                diagnostic.fixItReplace(commaLocs[i * 2], ":");
+            }
+          }
+
           return nullptr;
         }
-
-        bool isIniting =
-            CS.getContextualTypePurpose(expr) == CTP_Initialization;
-        DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
-                    contextualType->lookThroughAllOptionalTypes(), isIniting);
-
-        auto diagnostic =
-            DE.diagnose(expr->getStartLoc(), diag::meant_dictionary_lit);
-
-        // If there is an even number of elements in the array, let's produce
-        // a fix-it which suggests to replace "," with ":" to form a dictionary
-        // literal.
-        if ((numElements & 1) == 0) {
-          const auto commaLocs = expr->getCommaLocs();
-          if (commaLocs.size() == numElements - 1) {
-            for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-              diagnostic.fixItReplace(commaLocs[i * 2], ":");
-          }
-        }
-
-        return nullptr;
       }
 
       auto arrayTy = CS.createTypeVariable(locator,
