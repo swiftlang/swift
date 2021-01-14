@@ -158,7 +158,7 @@ void SILGenFunction::mergeCleanupBlocks() {
       // not already adjacent, then the first is typically the trampoline.)
       assert(beforeSucc != F.rend()
              && "entry block cannot have a predecessor.");
-      predBB->moveAfter(&*beforeSucc);
+      F.moveBlockAfter(predBB, &*beforeSucc);
     }
     // If after moving predBB there are no more blocks to process, then break.
     if (beforePred == F.rbegin())

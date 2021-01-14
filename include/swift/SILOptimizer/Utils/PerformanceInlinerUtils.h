@@ -460,7 +460,7 @@ public:
       analyzeLoopsRecursively(Loop, 1);
     }
     // Compute the distances for the function itself.
-    solveDataFlow(F->getBlocks(), 0);
+    solveDataFlow(*F, 0);
   }
 
   /// Returns the length of the shortest path of the block \p BB in the loop

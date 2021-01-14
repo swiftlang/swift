@@ -146,7 +146,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
 
   // Move the epilog block to the end of the ordinary section.
   auto endOfOrdinarySection = SGF.StartOfPostmatter;
-  SGF.B.moveBlockTo(epilogBB, endOfOrdinarySection);
+  SGF.F.moveBlockBefore(epilogBB, endOfOrdinarySection);
 
   // Emit the epilog into the epilog bb. Its arguments are the
   // direct results.
@@ -282,7 +282,7 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
   // Reposition the block to the end of the postmatter section
   // unless we're emitting into a single predecessor.
   if (reposition) {
-    SGF.B.moveBlockTo(epilogBB, SGF.F.end());
+    SGF.F.moveBlockBefore(epilogBB, SGF.F.end());
   }
 
   SGF.B.setInsertionPoint(epilogBB);
