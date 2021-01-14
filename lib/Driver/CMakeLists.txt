@@ -4,7 +4,6 @@ set(swiftDriver_sources
   Action.cpp
   Compilation.cpp
   DarwinToolChains.cpp
-  SourceComparator.cpp
   Driver.cpp
   FineGrainedDependencyDriverGraph.cpp
   FrontendUtil.cpp

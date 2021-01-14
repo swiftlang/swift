@@ -596,7 +596,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
     return None;
   }
   llvm::Expected<OutputFileMap> OFM =
-      OutputFileMap::loadFromBuffer(std::move(buffer.get()), "", false);
+      OutputFileMap::loadFromBuffer(std::move(buffer.get()), "");
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_unable_to_load_supplementary_output_file_map,
