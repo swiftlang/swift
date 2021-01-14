@@ -73,9 +73,14 @@ class OverloadChoice {
     /// optional context type, turning a "Decl" kind into
     /// "DeclViaUnwrappedOptional".
     IsDeclViaUnwrappedOptional = 0x02,
+    /// Indicates that there are viable members found on `Optional`
+    /// type and its underlying type. And current overload choice
+    /// is a backup one, which should be picked only if members
+    /// found directly on `Optional` do not match.
+    IsFallbackDeclViaUnwrappedOptional = 0x03,
     /// Indicates that this declaration was dynamic, turning a
     /// "Decl" kind into "DeclViaDynamic" kind.
-    IsDeclViaDynamic = 0x03,
+    IsDeclViaDynamic = 0x07,
   };
 
   /// The base type to be used when referencing the declaration
@@ -175,17 +180,23 @@ public:
 
   /// Retrieve an overload choice for a declaration that was found
   /// by unwrapping an optional context type.
+  ///
+  /// \param isFallback Indicates that this result should be used
+  /// as a backup, if member found directly on `Optional` doesn't
+  /// match.
   static OverloadChoice
-  getDeclViaUnwrappedOptional(Type base, ValueDecl *value,
+  getDeclViaUnwrappedOptional(Type base, ValueDecl *value, bool isFallback,
                               FunctionRefKind functionRefKind) {
     OverloadChoice result;
     result.BaseAndDeclKind.setPointer(base);
-    result.BaseAndDeclKind.setInt(IsDeclViaUnwrappedOptional);
+    result.BaseAndDeclKind.setInt(isFallback
+                                      ? IsFallbackDeclViaUnwrappedOptional
+                                      : IsDeclViaUnwrappedOptional);
     result.DeclOrKind = value;
     result.TheFunctionRefKind = functionRefKind;
     return result;
   }
-  
+
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:)`
   /// method.
@@ -219,6 +230,7 @@ public:
       case IsDeclViaBridge: return OverloadChoiceKind::DeclViaBridge;
       case IsDeclViaDynamic: return OverloadChoiceKind::DeclViaDynamic;
       case IsDeclViaUnwrappedOptional:
+      case IsFallbackDeclViaUnwrappedOptional:
         return OverloadChoiceKind::DeclViaUnwrappedOptional;
       default: return OverloadChoiceKind::Decl;
       }
@@ -254,6 +266,12 @@ public:
 
   bool isKeyPathDynamicMemberLookup() const {
     return getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup;
+  }
+
+  /// Determine whether this member is a backup in case
+  /// members found directly on `Optional` didn't match.
+  bool isFallbackMemberOnUnwrappedBase() const {
+    return BaseAndDeclKind.getInt() == IsFallbackDeclViaUnwrappedOptional;
   }
 
   /// Get the name of the overload choice.
