@@ -132,7 +132,7 @@ extension CountSteps1 // expected-error {{type 'CountSteps1<T>' does not conform
      where T : Equatable
 {
   typealias Index = Int
-  // expected-error@-1 {{invalid redeclaration of synthesized implementation for protocol requirement 'Index'}}
+
   func index(_ i: Index, offsetBy d: Int) -> Index {
     return i + d
   }
