@@ -655,26 +655,6 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
-static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
-    CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasCompiledSourcePath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::emit_compiled_source_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &compiledSourceFilePath =
-        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
-    if (!compiledSourceFilePath.empty()) {
-      (void)Instance.emitCompiledSource(Instance.getDiags(), SF,
-                                        compiledSourceFilePath);
-    }
-  }
-}
-
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
@@ -1040,9 +1020,6 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
-
-  // Emit information about the parsed primaries.
-  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {

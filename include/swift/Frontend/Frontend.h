@@ -362,7 +362,6 @@ public:
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
-  std::string getCompiledSourceFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
@@ -650,11 +649,6 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
-
-  /// Return true for error
-  bool emitCompiledSource(DiagnosticEngine &diags,
-                          const SourceFile *primaryFile,
-                          StringRef outputPath) const;
 };
 
 } // namespace swift

@@ -83,10 +83,6 @@ struct SupplementaryOutputPaths {
   /// \sa DependencyGraph
   std::string ReferenceDependenciesFilePath;
 
-  /// The path to which we should save the source code of a primary source file
-  /// to be compiled. Used to diff sources of primary inputs.
-  std::string CompiledSourceFilePath;
-
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   ///
@@ -174,8 +170,6 @@ struct SupplementaryOutputPaths {
       fn(DependenciesFilePath); 
     if (!ReferenceDependenciesFilePath.empty())
       fn(ReferenceDependenciesFilePath); 
-    if (!CompiledSourceFilePath.empty())
-      fn(CompiledSourceFilePath); 
     if (!SerializedDiagnosticsPath.empty())
       fn(SerializedDiagnosticsPath); 
     if (!FixItsOutputPath.empty())

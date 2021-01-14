@@ -103,11 +103,6 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
 }
-std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
-    StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.CompiledSourceFilePath;
-}
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
@@ -1198,12 +1193,4 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
-}
-
-bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
-                                          const SourceFile *primaryFile,
-                                          StringRef outputPath) const {
-  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile,
-                                                   SourceMgr, diags)
-      .emit();
 }

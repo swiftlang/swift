@@ -2017,7 +2017,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
-      case file_types::TY_CompiledSource:
       case file_types::TY_Remapping:
       case file_types::TY_IndexData:
       case file_types::TY_PCH:

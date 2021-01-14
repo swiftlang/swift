@@ -284,11 +284,16 @@ namespace driver {
     DriverTimers;
 
     void noteBuilding(const Job *cmd, const bool willBeBuilding,
-                      const bool isTentative, StringRef reason) const {
+                      StringRef reason) const {
       if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
         return;
+      if (!willBeBuilding)
+        return;
+
+      llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
+      getFineGrainedDepGraph().printPath(llvm::outs(), cmd);
     }
 
     template <typename JobsCollection>
@@ -304,7 +309,7 @@ namespace driver {
       llvm::SmallVector<const Job *, 16> sortedJobs;
       Comp.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
       for (const Job *j : sortedJobs)
-        noteBuilding(j, /*willBeBuilding=*/true, /*isTentative=*/false, reason);
+        noteBuilding(j, /*willBeBuilding=*/true, reason);
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
@@ -854,10 +859,10 @@ namespace driver {
         if (!isa<IncrementalJobAction>(Cmd->getSource()) ||
             compileJobsToSchedule.count(Cmd)) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
-          noteBuilding(Cmd, /*willBeBuilding*/ true, /*isTentative=*/false, "");
+          noteBuilding(Cmd, /*willBeBuilding*/ true, "");
         } else {
           DeferredCommands.insert(Cmd);
-          noteBuilding(Cmd, /*willBeBuilding*/ false, /*isTentative=*/false, "");
+          noteBuilding(Cmd, /*willBeBuilding*/ false, "");
         }
       }
     }
@@ -1013,11 +1018,11 @@ namespace driver {
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
-        noteBuilding(Cmd, /*willBeBuilding=*/true, /*isTentative=*/false,
+        noteBuilding(Cmd, /*willBeBuilding=*/true,
                      "(initial)");
         return true;
       case Job::Condition::CheckDependencies:
-        noteBuilding(Cmd, /*willBeBuilding=*/false, /*isTentative=*/false,
+        noteBuilding(Cmd, /*willBeBuilding=*/false,
                      "file is up-to-date and output exists");
         return false;
       }

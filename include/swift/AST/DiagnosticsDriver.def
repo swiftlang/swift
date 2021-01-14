@@ -155,10 +155,6 @@ WARNING(warn_use_filelists_deprecated, none,
         "the option '-driver-use-filelists' is deprecated; use "
         "'-driver-filelist-threshold=0' instead", ())
 
-WARNING(warn_unable_to_load_compiled_swift, none,
-        "unable to load previously compiled swift file \"%0\", %1",
-        (StringRef, StringRef))
-
 WARNING(warn_unable_to_load_primary, none,
 "unable to load primary swift file \"%0\", %1",
 (StringRef, StringRef))
