@@ -14,25 +14,25 @@ struct HasAsyncMembers {
   init(withAsyncRethrows: () async throws -> Void) async rethrows {}
 }
 
-func testGlobalFuncAsync() {
+func testGlobalFuncAsync() async {
   globalFuncAsync#^CHECK_globalFuncAsync^#
 // CHECK_globalFuncAsync: Begin completions
 // CHECK_globalFuncAsync-DAG: Decl[FreeFunction]/CurrModule: ()[' async'][#Void#]; name=() async
 // CHECK_globalFuncAsync: End completions
 }
-func testGlobalFuncAsyncThrows() {
+func testGlobalFuncAsyncThrows() async {
   globalFuncAsyncThrows#^CHECK_globalFuncAsyncThrows^#
 // CHECK_globalFuncAsyncThrows: Begin completions
 // CHECK_globalFuncAsyncThrows-DAG: Decl[FreeFunction]/CurrModule: ()[' async'][' throws'][#Void#]; name=() async throws
 // CHECK_globalFuncAsyncThrows: End completions
 }
-func testGlobalFuncAsyncRethrows() {
+func testGlobalFuncAsyncRethrows() async {
   globalFuncAsyncRethrows#^CHECK_globalFuncAsyncRethrows^#
 // CHECK_globalFuncAsyncRethrows: Begin completions
 // CHECK_globalFuncAsyncRethrows-DAG: Decl[FreeFunction]/CurrModule: ({#(x): () async throws -> ()##() async throws -> ()#})[' async'][' rethrows'][#Void#]; name=(x: () async throws -> ()) async rethrows
 // CHECK_globalFuncAsyncRethrows: End completions
 }
-func testAsyncMembers(_ x: HasAsyncMembers) {
+func testAsyncMembers(_ x: HasAsyncMembers) async {
   x.#^CHECK_members^#
 // CHECK_members: Begin completions
 // CHECK_members-DAG: Decl[InstanceMethod]/CurrNominal:   memberAsync()[' async'][#Void#]; name=memberAsync() async
@@ -41,26 +41,26 @@ func testAsyncMembers(_ x: HasAsyncMembers) {
 // CHECK_members-DAG: Decl[InstanceMethod]/CurrNominal:   memberAsyncRethrows({#(x): () async throws -> ()##() async throws -> ()#})[' async'][' rethrows'][#Void#]; name=memberAsyncRethrows(x: () async throws -> ()) async rethrows
 // CHECK_members: End completions
 }
-func testMemberAsync(_ x: HasAsyncMembers) {
+func testMemberAsync(_ x: HasAsyncMembers) async {
   x.memberAsync#^CHECK_memberAsync^#
 // CHECK_memberAsync: Begin completions
 // CHECK_memberAsync-DAG: Decl[InstanceMethod]/CurrNominal: ()[' async'][#Void#]; name=() async
 // CHECK_memberAsync: End completions
 }
-func testMemberAsyncThrows(_ x: HasAsyncMembers) {
+func testMemberAsyncThrows(_ x: HasAsyncMembers) async {
   x.memberAsyncThrows#^CHECK_memberAsyncThrows^#
 // CHECK_memberAsyncThrows: Begin completions
 // CHECK_memberAsyncThrows-DAG: Decl[InstanceMethod]/CurrNominal: ()[' async'][' throws'][#Void#]; name=() async throws
 // CHECK_memberAsyncThrows: End completions
 }
-func testMemberAsyncRethrows(_ x: HasAsyncMembers) {
+func testMemberAsyncRethrows(_ x: HasAsyncMembers) async {
   x.memberAsyncRethrows#^CHECK_memberAsyncRethrows^#
 // CHECK_memberAsyncRethrows: Begin completions
 // CHECK_memberAsyncRethrows-DAG: Decl[InstanceMethod]/CurrNominal: ({#(x): () async throws -> ()##() async throws -> ()#})[' async'][' rethrows'][#Void#]; name=(x: () async throws -> ()) async rethrows
 // CHECK_memberAsyncRethrows: End completions
 }
 
-func testAsyncIntiializers() {
+func testAsyncIntiializers() async {
   HasAsyncMembers(#^CHECK_initializers^#
 // CHECK_initializers: Begin completions
 // CHECK_initializers-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#HasAsyncMembers#]; name=
