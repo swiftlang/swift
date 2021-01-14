@@ -666,6 +666,18 @@ FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
                                                 SILValue newCallee,
                                                 SILBuilderContext &builderCtx);
 
+/// This is a low level routine that makes all uses of \p svi uses of \p
+/// newValue (ignoring end scope markers) and then deletes \p svi and all end
+/// scope markers. Then returns the next inst to process.
+SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
+                                               SILValue newValue,
+                                               InstModCallbacks &callbacks);
+
+/// Low level routine that replaces the current value of \p use with \p
+/// newValue.
+SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
+                                         InstModCallbacks &callbacks);
+
 } // end namespace swift
 
 #endif

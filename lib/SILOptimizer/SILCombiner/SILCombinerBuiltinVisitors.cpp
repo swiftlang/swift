@@ -138,14 +138,18 @@ SILInstruction *SILCombiner::optimizeBuiltinCOWBufferForReading(BuiltinInst *BI)
         RTAI->setImmutable();
         break;
       }
-      case SILInstructionKind::StrongReleaseInst:
-        cast<StrongReleaseInst>(user)->setOperand(ref);
-        break;
-      default:
-        break;
+    case SILInstructionKind::DestroyValueInst:
+      cast<DestroyValueInst>(user)->setOperand(ref);
+      break;
+    case SILInstructionKind::StrongReleaseInst:
+      cast<StrongReleaseInst>(user)->setOperand(ref);
+      break;
+    default:
+      break;
     }
     useIter = nextIter;
   }
+
   // If there are unknown users, keep the builtin, and IRGen will handle it.
   if (BI->use_empty())
     return eraseInstFromFunction(*BI);
@@ -577,9 +581,6 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 }
 
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
-  if (I->getFunction()->hasOwnership())
-    return nullptr;
-
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)

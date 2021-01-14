@@ -52,14 +52,7 @@ replaceAllSimplifiedUsesAndErase(SILInstruction *I, SILValue result,
                                  InstModCallbacks &callbacks,
                                  DeadEndBlocks *deadEndBlocks = nullptr);
 
-/// This is a low level routine that makes all uses of \p svi uses of \p
-/// newValue (ignoring end scope markers) and then deletes \p svi and all end
-/// scope markers. Then returns the next inst to process.
-SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
-                                               SILValue newValue,
-                                               InstModCallbacks &callbacks);
-
-/// Simplify invocations of builtin operations that may overflow.
+// Simplify invocations of builtin operations that may overflow.
 /// All such operations return a tuple (result, overflow_flag).
 /// This function try to simplify such operations, but returns only a
 /// simplified first element of a tuple. The overflow flag is not returned

@@ -468,11 +468,46 @@ public:
   /// For instruction results, this returns getDefiningInstruction(). For
   /// arguments, this returns SILBasicBlock::begin() for the argument's parent
   /// block. Returns nullptr for SILUndef.
+  SILInstruction *getDefiningInsertionPoint();
+
+  // Const version of \see getDefiningInsertionPoint.
   const SILInstruction *getDefiningInsertionPoint() const {
     return const_cast<ValueBase *>(this)->getDefiningInsertionPoint();
   }
 
-  SILInstruction *getDefiningInsertionPoint();
+  /// Return the next SIL instruction to execute /after/ this value is
+  /// available.
+  ///
+  /// Operationally this means that:
+  ///
+  /// * For SILArguments, this returns the first instruction in the block. This
+  ///   is the main divergence from getDefiningInsertionPoint (see discussion
+  ///   below).
+  ///
+  /// * For SILInstructions, this returns std::next.
+  ///
+  /// * For SILUndef, this returns nullptr.
+  ///
+  /// DISCUSSION: The reason that this exists is that when one wants a "next"
+  /// instruction pointer, one often times wants to write:
+  ///
+  ///   if (auto *insertPt = value->getDefiningInsertionPoint())
+  ///     return std::next(insertPt);
+  ///
+  /// This is incorrect for SILArguments since after processing a SILArgument,
+  /// we need to process the actual first instruction in the block. With this
+  /// API, one can simply do:
+  ///
+  ///   if (auto *inst = value->getNextInstruction())
+  ///     return inst;
+  ///
+  /// And get the correct answer every time.
+  SILInstruction *getNextInstruction();
+
+  // Const version of \see getDefiningInsertionPoint.
+  const SILInstruction *getNextInstruction() const {
+    return const_cast<ValueBase *>(this)->getNextInstruction();
+  }
 
   struct DefiningInstructionResult {
     SILInstruction *Instruction;
