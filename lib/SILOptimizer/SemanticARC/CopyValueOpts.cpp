@@ -334,7 +334,7 @@ static Operand *lookThroughSingleForwardingUse(Operand *use) {
   auto forwardingOperand = ForwardingOperand::get(use);
   if (!forwardingOperand)
     return nullptr;
-  auto forwardedValue = (*forwardingOperand).getSingleForwardedValue();
+  auto forwardedValue = forwardingOperand.getSingleForwardedValue();
   if (!forwardedValue)
     return nullptr;
   auto *singleConsumingUse = forwardedValue->getSingleConsumingUse();
@@ -426,7 +426,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     auto forwardingOperand = ForwardingOperand::get(currentForwardingUse);
     if (!forwardingOperand)
       return false;
-    auto forwardedValue = (*forwardingOperand).getSingleForwardedValue();
+    auto forwardedValue = forwardingOperand.getSingleForwardedValue();
     if (!forwardedValue)
       return false;
 
@@ -478,7 +478,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // singleConsumingUse (the original forwarded use) and the destroy_value. In
     // such a case, we must bail!
     if (auto operand = BorrowingOperand::get(use))
-      if (!operand->visitLocalEndScopeUses([&](Operand *endScopeUse) {
+      if (!operand.visitLocalEndScopeUses([&](Operand *endScopeUse) {
             // Return false if we did see the relevant end scope instruction
             // in the block. That means that we are going to exit early and
             // return false.

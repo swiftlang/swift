@@ -221,8 +221,8 @@ public:
     // know statically that our let can not be written to in the current
     // function. To be conservative, assume that all other non-local scopes
     // write to memory.
-    if (!value->isLocalScope()) {
-      if (value->kind == BorrowedValueKind::SILFunctionArgument) {
+    if (!value.isLocalScope()) {
+      if (value.kind == BorrowedValueKind::SILFunctionArgument) {
         return answer(false);
       }
 
@@ -233,7 +233,7 @@ public:
 
     // TODO: This is disabled temporarily for guaranteed phi args just for
     // staging purposes. Thus be conservative and assume true in these cases.
-    if (value->kind == BorrowedValueKind::Phi) {
+    if (value.kind == BorrowedValueKind::Phi) {
       return answer(true);
     }
 
@@ -243,7 +243,7 @@ public:
     // to check whether the copied value is dominated by the lifetime of the
     // borrow it's based on.
     SmallVector<Operand *, 4> endScopeInsts;
-    value->visitLocalScopeEndingUses(
+    value.visitLocalScopeEndingUses(
         [&](Operand *use) { endScopeInsts.push_back(use); });
 
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
