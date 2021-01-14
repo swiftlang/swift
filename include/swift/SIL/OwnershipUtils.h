@@ -80,7 +80,7 @@ class ForwardingOperand {
   ForwardingOperand(Operand *use) : use(use) {}
 
 public:
-  static Optional<ForwardingOperand> get(Operand *use);
+  static ForwardingOperand get(Operand *use);
 
   OwnershipConstraint getOwnershipConstraint() const {
     // We use a force unwrap since a ForwardingOperand should always have an
@@ -93,12 +93,16 @@ public:
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
-  const Operand *operator->() const { return use; }
-
-  Operand *operator->() { return use; }
-
+  operator bool() const { return bool(use); }
+  const Operand *operator->() const {
+    assert(use);
+    return use;
+  }
+  Operand *operator->() {
+    assert(use);
+    return use;
+  }
   const Operand &operator*() const { return *use; }
-
   Operand &operator*() { return *use; }
 
   /// Call \p visitor with each value that contains the final forwarded
@@ -118,6 +122,7 @@ bool isReborrowInstruction(const SILInstruction *inst);
 class BorrowingOperandKind {
 public:
   enum Kind : uint8_t {
+    Invalid = 0,
     BeginBorrow,
     BeginApply,
     Branch,
@@ -134,22 +139,22 @@ public:
 
   operator Kind() const { return value; }
 
-  static Optional<BorrowingOperandKind> get(SILInstructionKind kind) {
+  static BorrowingOperandKind get(SILInstructionKind kind) {
     switch (kind) {
     default:
-      return None;
+      return Kind::Invalid;
     case SILInstructionKind::BeginBorrowInst:
-      return BorrowingOperandKind(BeginBorrow);
+      return Kind::BeginBorrow;
     case SILInstructionKind::BeginApplyInst:
-      return BorrowingOperandKind(BeginApply);
+      return Kind::BeginApply;
     case SILInstructionKind::BranchInst:
-      return BorrowingOperandKind(Branch);
+      return Kind::Branch;
     case SILInstructionKind::ApplyInst:
-      return BorrowingOperandKind(Apply);
+      return Kind::Apply;
     case SILInstructionKind::TryApplyInst:
-      return BorrowingOperandKind(TryApply);
+      return Kind::TryApply;
     case SILInstructionKind::YieldInst:
-      return BorrowingOperandKind(Yield);
+      return Kind::Yield;
     }
   }
 
@@ -170,13 +175,13 @@ struct BorrowedValue;
 /// guaranteed value in the same function: see begin_apply. In such cases, we
 /// require instead an end_* instruction to mark the end of the scope's region.
 struct BorrowingOperand {
-  BorrowingOperandKind kind;
   Operand *op;
+  BorrowingOperandKind kind;
 
   BorrowingOperand(Operand *op)
-      : kind(*BorrowingOperandKind::get(op->getUser()->getKind())), op(op) {}
+      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {}
   BorrowingOperand(const BorrowingOperand &other)
-      : kind(other.kind), op(other.op) {}
+      : op(other.op), kind(other.kind) {}
   BorrowingOperand &operator=(const BorrowingOperand &other) {
     kind = other.kind;
     op = other.op;
@@ -194,17 +199,17 @@ struct BorrowingOperand {
 
   /// If \p op is a borrow introducing operand return it after doing some
   /// checks.
-  static Optional<BorrowingOperand> get(Operand *op) {
+  static BorrowingOperand get(Operand *op) {
     auto *user = op->getUser();
     auto kind = BorrowingOperandKind::get(user->getKind());
     if (!kind)
-      return None;
-    return BorrowingOperand(*kind, op);
+      return {nullptr, kind};
+    return {op, kind};
   }
 
   /// If \p op is a borrow introducing operand return it after doing some
   /// checks.
-  static Optional<BorrowingOperand> get(const Operand *op) {
+  static BorrowingOperand get(const Operand *op) {
     return get(const_cast<Operand *>(op));
   }
 
@@ -226,6 +231,8 @@ struct BorrowingOperand {
   /// TODO: tuple, struct, destructure_tuple, destructure_struct.
   bool isReborrow() const {
     switch (kind) {
+    case BorrowingOperandKind::Invalid:
+      llvm_unreachable("Using invalid case?!");
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::BeginApply:
     case BorrowingOperandKind::Apply:
@@ -244,6 +251,8 @@ struct BorrowingOperand {
   bool areAnyUserResultsBorrowIntroducers() const {
     // TODO: Can we derive this by running a borrow introducer check ourselves?
     switch (kind) {
+    case BorrowingOperandKind::Invalid:
+      llvm_unreachable("Using invalid case?!");
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::Branch:
       return true;
@@ -293,8 +302,8 @@ struct BorrowingOperand {
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
-  BorrowingOperand(BorrowingOperandKind kind, Operand *op)
-      : kind(kind), op(op) {}
+  BorrowingOperand(Operand *op, BorrowingOperandKind kind)
+      : op(op), kind(kind) {}
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -304,6 +313,7 @@ class BorrowedValueKind {
 public:
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
   enum Kind : uint8_t {
+    Invalid = 0,
     LoadBorrow,
     BeginBorrow,
     SILFunctionArgument,
@@ -314,26 +324,26 @@ private:
   Kind value;
 
 public:
-  static Optional<BorrowedValueKind> get(SILValue value) {
+  static BorrowedValueKind get(SILValue value) {
     if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
-      return None;
+      return Kind::Invalid;
     switch (value->getKind()) {
     default:
-      return None;
+      return Kind::Invalid;
     case ValueKind::LoadBorrowInst:
-      return BorrowedValueKind(LoadBorrow);
+      return Kind::LoadBorrow;
     case ValueKind::BeginBorrowInst:
-      return BorrowedValueKind(BeginBorrow);
+      return Kind::BeginBorrow;
     case ValueKind::SILFunctionArgument:
-      return BorrowedValueKind(SILFunctionArgument);
+      return Kind::SILFunctionArgument;
     case ValueKind::SILPhiArgument: {
       if (llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
                        [](SILBasicBlock *block) {
                          return !isa<BranchInst>(block->getTerminator());
                        })) {
-        return None;
+        return Kind::Invalid;
       }
-      return BorrowedValueKind(Phi);
+      return Kind::Phi;
     }
     }
   }
@@ -350,6 +360,8 @@ public:
   /// of the scope.
   bool isLocalScope() const {
     switch (value) {
+    case BorrowedValueKind::Invalid:
+      llvm_unreachable("Using invalid case?!");
     case BorrowedValueKind::BeginBorrow:
     case BorrowedValueKind::LoadBorrow:
     case BorrowedValueKind::Phi:
@@ -385,19 +397,23 @@ struct InteriorPointerOperand;
 /// borrow introducers can not have guaranteed results that are not creating a
 /// new borrow scope. No such instructions exist today.
 struct BorrowedValue {
-  BorrowedValueKind kind;
   SILValue value;
+  BorrowedValueKind kind;
+
+  BorrowedValue() : value(), kind(BorrowedValueKind::Invalid) {}
 
   /// If value is a borrow introducer return it after doing some checks.
   ///
   /// This is the only way to construct a BorrowScopeIntroducingValue. We make
   /// the primary constructor private for this reason.
-  static Optional<BorrowedValue> get(SILValue value) {
+  static BorrowedValue get(SILValue value) {
     auto kind = BorrowedValueKind::get(value);
     if (!kind)
-      return None;
-    return BorrowedValue(*kind, value);
+      return {nullptr, kind};
+    return {value, kind};
   }
+
+  operator bool() const { return kind != BorrowedValueKind::Invalid && value; }
 
   /// If this value is introducing a local scope, gather all local end scope
   /// instructions and append them to \p scopeEndingInsts. Asserts if this is
@@ -459,7 +475,7 @@ struct BorrowedValue {
     bool foundAnyReborrows = false;
     for (auto *op : value->getUses()) {
       if (auto borrowingOperand = BorrowingOperand::get(op)) {
-        if (borrowingOperand->isReborrow()) {
+        if (borrowingOperand.isReborrow()) {
           foundReborrows.push_back(*borrowingOperand);
           foundAnyReborrows = true;
         }
@@ -478,8 +494,8 @@ struct BorrowedValue {
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
-  BorrowedValue(BorrowedValueKind kind, SILValue value)
-      : kind(kind), value(value) {}
+  BorrowedValue(SILValue value, BorrowedValueKind kind)
+      : value(value), kind(kind) {}
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -502,7 +518,7 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// find a point in the chain we do not understand, we bail and return false. If
 /// we are able to understand all of the def-use graph and only find a single
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
-Optional<BorrowedValue> getSingleBorrowIntroducingValue(SILValue inputValue);
+BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 
 class InteriorPointerOperandKind {
 public:
@@ -566,25 +582,31 @@ struct InteriorPointerOperand {
   Operand *operand;
   InteriorPointerOperandKind kind;
 
+  InteriorPointerOperand()
+      : operand(nullptr), kind(InteriorPointerOperandKind::Invalid) {}
+
   InteriorPointerOperand(Operand *op)
       : operand(op), kind(InteriorPointerOperandKind::get(op)) {
     assert(kind.isValid());
   }
 
+  operator bool() const {
+    return kind != InteriorPointerOperandKind::Invalid && operand;
+  }
+
   /// If \p op has a user that is an interior pointer, return a valid
   /// value. Otherwise, return None.
-  static Optional<InteriorPointerOperand> get(Operand *op) {
+  static InteriorPointerOperand get(Operand *op) {
     auto kind = InteriorPointerOperandKind::get(op);
     if (!kind)
-      return None;
+      return {};
     return InteriorPointerOperand(op, kind);
   }
 
   /// If \p val is a result of an instruction that is an interior pointer,
   /// return an interor pointer operand based off of the base value operand of
   /// the instruction.
-  static Optional<InteriorPointerOperand>
-  inferFromResult(SILValue resultValue) {
+  static InteriorPointerOperand inferFromResult(SILValue resultValue) {
     auto kind = InteriorPointerOperandKind::inferFromResult(resultValue);
 
     // NOTE: We use an exhaustive switch here to allow for further interior
@@ -593,7 +615,7 @@ struct InteriorPointerOperand {
     switch (kind) {
     case InteriorPointerOperandKind::Invalid:
       // We do not have a valid instruction, so return None.
-      return None;
+      return {};
     case InteriorPointerOperandKind::RefElementAddr:
     case InteriorPointerOperandKind::RefTailAddr:
     case InteriorPointerOperandKind::OpenExistentialBox: {
@@ -621,7 +643,7 @@ struct InteriorPointerOperand {
   }
 
   /// Return the base BorrowedValue of the incoming value's operand.
-  Optional<BorrowedValue> getSingleBaseValue() const {
+  BorrowedValue getSingleBaseValue() const {
     return getSingleBorrowIntroducingValue(operand->get());
   }
 
@@ -664,6 +686,9 @@ private:
 class OwnedValueIntroducerKind {
 public:
   enum Kind : uint8_t {
+    /// None value.
+    Invalid = 0,
+
     /// An owned value that is a result of an Apply.
     Apply,
 
@@ -718,52 +743,53 @@ private:
   Kind value;
 
 public:
-  static Optional<OwnedValueIntroducerKind> get(SILValue value) {
+  static OwnedValueIntroducerKind get(SILValue value) {
     if (value.getOwnershipKind() != OwnershipKind::Owned)
-      return None;
+      return Kind::Invalid;
 
     switch (value->getKind()) {
     default:
-      return None;
+      return Kind::Invalid;
+      ;
     case ValueKind::ApplyInst:
-      return OwnedValueIntroducerKind(Apply);
+      return Kind::Apply;
     case ValueKind::BeginApplyResult:
-      return OwnedValueIntroducerKind(BeginApply);
+      return Kind::BeginApply;
     case ValueKind::StructInst:
-      return OwnedValueIntroducerKind(Struct);
+      return Kind::Struct;
     case ValueKind::TupleInst:
-      return OwnedValueIntroducerKind(Tuple);
+      return Kind::Tuple;
     case ValueKind::SILPhiArgument: {
       auto *phiArg = cast<SILPhiArgument>(value);
       if (dyn_cast_or_null<TryApplyInst>(phiArg->getSingleTerminator())) {
-        return OwnedValueIntroducerKind(TryApply);
+        return Kind::TryApply;
       }
       if (llvm::all_of(phiArg->getParent()->getPredecessorBlocks(),
                        [](SILBasicBlock *block) {
                          return isa<BranchInst>(block->getTerminator());
                        })) {
-        return OwnedValueIntroducerKind(Phi);
+        return Kind::Phi;
       }
-      return None;
+      return Kind::Invalid;
     }
     case ValueKind::SILFunctionArgument:
-      return OwnedValueIntroducerKind(FunctionArgument);
+      return Kind::FunctionArgument;
     case ValueKind::CopyValueInst:
-      return OwnedValueIntroducerKind(Copy);
+      return Kind::Copy;
     case ValueKind::LoadInst: {
       auto qual = cast<LoadInst>(value)->getOwnershipQualifier();
       if (qual == LoadOwnershipQualifier::Take)
-        return OwnedValueIntroducerKind(LoadTake);
+        return Kind::LoadTake;
       if (qual == LoadOwnershipQualifier::Copy)
-        return OwnedValueIntroducerKind(LoadCopy);
-      return None;
+        return Kind::LoadCopy;
+      return Kind::Invalid;
     }
     case ValueKind::PartialApplyInst:
-      return OwnedValueIntroducerKind(PartialApplyInit);
+      return Kind::PartialApplyInit;
     case ValueKind::AllocBoxInst:
-      return OwnedValueIntroducerKind(AllocBoxInit);
+      return Kind::AllocBoxInit;
     case ValueKind::AllocRefInst:
-      return OwnedValueIntroducerKind(AllocRefInit);
+      return Kind::AllocRefInit;
     }
     llvm_unreachable("Default should have caught this");
   }
@@ -796,13 +822,20 @@ struct OwnedValueIntroducer {
   /// underlying introducing values.
   OwnedValueIntroducerKind kind;
 
+  OwnedValueIntroducer()
+      : value(nullptr), kind(OwnedValueIntroducerKind::Invalid) {}
+
   /// If a value is an owned value introducer we can recognize, return
   /// .some(OwnedValueIntroducer). Otherwise, return None.
-  static Optional<OwnedValueIntroducer> get(SILValue value) {
+  static OwnedValueIntroducer get(SILValue value) {
     auto kind = OwnedValueIntroducerKind::get(value);
     if (!kind)
-      return None;
-    return OwnedValueIntroducer(value, *kind);
+      return {nullptr, kind};
+    return {value, kind};
+  }
+
+  operator bool() const {
+    return kind != OwnedValueIntroducerKind::Invalid && bool(value);
   }
 
   /// Returns true if this owned introducer is able to be converted into a
@@ -814,6 +847,8 @@ struct OwnedValueIntroducer {
   /// not analyze them without analyzing their operands/incoming values.
   bool isConvertableToGuaranteed() const {
     switch (kind) {
+    case OwnedValueIntroducerKind::Invalid:
+      llvm_unreachable("Using invalid case?!");
     case OwnedValueIntroducerKind::Copy:
     case OwnedValueIntroducerKind::LoadCopy:
       return true;
@@ -839,6 +874,8 @@ struct OwnedValueIntroducer {
   /// E.x.: phi, struct.
   bool hasConsumingGuaranteedOperands() const {
     switch (kind) {
+    case OwnedValueIntroducerKind::Invalid:
+      llvm_unreachable("Using invalid case?!");
     case OwnedValueIntroducerKind::Phi:
       return true;
     case OwnedValueIntroducerKind::Struct:
@@ -883,7 +920,7 @@ private:
 bool getAllOwnedValueIntroducers(SILValue value,
                                  SmallVectorImpl<OwnedValueIntroducer> &out);
 
-Optional<OwnedValueIntroducer> getSingleOwnedValueIntroducer(SILValue value);
+OwnedValueIntroducer getSingleOwnedValueIntroducer(SILValue value);
 
 } // namespace swift
 

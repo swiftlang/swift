@@ -266,8 +266,8 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
                      << "Initial: " << *initialScopedOperand << "\n";
       });
     };
-    initialScopedOperand->getImplicitUses(nonLifetimeEndingUsers, &error);
-    reborrowVerifier.verifyReborrows(initialScopedOperand.getValue(), value);
+    initialScopedOperand.getImplicitUses(nonLifetimeEndingUsers, &error);
+    reborrowVerifier.verifyReborrows(initialScopedOperand, value);
   }
 
   return foundError;
@@ -354,7 +354,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       // BorrowScopeOperand and if so, add its end scope instructions as
       // implicit regular users of our value.
       if (auto scopedOperand = BorrowingOperand::get(op)) {
-        assert(!scopedOperand->isReborrow());
+        assert(!scopedOperand.isReborrow());
 
         std::function<void(Operand *)> onError = [&](Operand *op) {
           errorBuilder.handleMalformedSIL([&] {
@@ -364,8 +364,8 @@ bool SILValueOwnershipChecker::gatherUsers(
           });
         };
 
-        scopedOperand->getImplicitUses(nonLifetimeEndingUsers, &onError);
-        reborrowVerifier.verifyReborrows(scopedOperand.getValue(), value);
+        scopedOperand.getImplicitUses(nonLifetimeEndingUsers, &onError);
+        reborrowVerifier.verifyReborrows(scopedOperand, value);
       }
 
       // Next see if our use is an interior pointer operand. If we have an
@@ -377,11 +377,11 @@ bool SILValueOwnershipChecker::gatherUsers(
             llvm::errs() << "Could not recognize address user of interior "
                             "pointer operand!\n"
                          << "Interior Pointer Operand: "
-                         << *interiorPointerOperand->operand->getUser()
+                         << *interiorPointerOperand.operand->getUser()
                          << "Address User: " << *op->getUser();
           });
         };
-        foundError |= interiorPointerOperand->getImplicitUses(
+        foundError |= interiorPointerOperand.getImplicitUses(
             nonLifetimeEndingUsers, &onError);
       }
 
