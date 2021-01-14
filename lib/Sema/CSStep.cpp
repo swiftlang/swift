@@ -642,9 +642,23 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   // current score), we can skip any generic operators with conformance
   // requirements that are not satisfied by any known argument types.
   auto argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
-  auto bestScore = getBestScore(Solutions);
-  auto bestChoiceNeedsConversions = bestScore && (bestScore > getCurrentScore());
-  if (bestScore && !bestChoiceNeedsConversions && choice.isGenericOperator() && argFnType) {
+  auto checkRequirementsEarly = [&]() -> bool {
+    auto bestScore = getBestScore(Solutions);
+    if (!(bestScore && choice.isGenericOperator() && argFnType))
+      return false;
+
+    auto currentScore = getCurrentScore();
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (i == SK_NonDefaultLiteral)
+        continue;
+
+      if (bestScore->Data[i] > currentScore.Data[i])
+        return false;
+    }
+
+    return true;
+  };
+  if (checkRequirementsEarly()) {
     Constraint *constraint = choice;
     auto *decl = constraint->getOverloadChoice().getDecl();
     auto *useDC = constraint->getOverloadUseDC();
