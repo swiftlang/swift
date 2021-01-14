@@ -128,7 +128,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
         env;
     env.insert({floatLiteralTy, cs.inferBindingsFor(floatLiteralTy)});
 
-    bindings.finalize(cs, env);
+    bindings.finalize(env);
 
     // Inferred a single transitive binding through `$T_float`.
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
