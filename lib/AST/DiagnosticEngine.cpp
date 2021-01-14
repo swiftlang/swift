@@ -455,18 +455,17 @@ static bool typeSpellingIsAmbiguous(Type type,
   return false;
 }
 
-/// Walks the type recursivelly desugaring  types to display, but skiping
-/// `GenericTypeParamType` because we would lose association with it's original
+/// Walks the type recursivelly desugaring  types to display, but skipping
+/// `GenericTypeParamType` because we would lose association with its original
 /// declaration and end up presenting the parameter in τ_0_0 format on
 /// diagnostic.
 static Type getAkaTypeForDisplay(Type type) {
-  auto Func = [](Type visitTy) -> Type {
+  return type.transform([](Type visitTy) -> Type {
     if (isa<SugarType>(visitTy.getPointer()) &&
         !isa<GenericTypeParamType>(visitTy.getPointer()))
       return getAkaTypeForDisplay(visitTy->getDesugaredType());
     return visitTy;
-  };
-  return type.transform(Func).getPointer();
+  });
 }
 
 /// Format a single diagnostic argument and write it to the given
