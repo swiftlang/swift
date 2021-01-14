@@ -480,11 +480,10 @@ public:
   ///
   /// Operationally this means that:
   ///
-  /// * For SILArguments, this returns the first instruction in the block. This
-  ///   is the main divergence from getDefiningInsertionPoint (see discussion
-  ///   below).
+  /// * For SILArguments, this returns the first instruction in the block.
   ///
-  /// * For SILInstructions, this returns std::next.
+  /// * For SILInstructions, this returns std::next. This is the main divergence
+  ///   from getDefiningInsertionPoint() (see discussion below).
   ///
   /// * For SILUndef, this returns nullptr.
   ///
