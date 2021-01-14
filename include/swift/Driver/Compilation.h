@@ -259,9 +259,6 @@ private:
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// Experiment with source-range-based dependencies
-  const bool EnableSourceRangeDependencies;
-
   /// (experimental) Enable cross-module incremental build scheduling.
   const bool EnableCrossModuleIncrementalBuild;
 
@@ -298,9 +295,6 @@ public:
               bool OnlyOneDependencyFile = false,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
-              bool EnableSourceRangeDependencies = false,
-              bool CompareIncrementalSchemes = false,
-              StringRef CompareIncrementalSchemesPath = "",
               bool EnableCrossModuleIncrementalBuild = false);
   // clang-format on
   ~Compilation();
@@ -365,10 +359,6 @@ public:
 
   bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
     return EmitFineGrainedDependencyDotFileAfterEveryImport;
-  }
-
-  bool getEnableSourceRangeDependencies() const {
-    return EnableSourceRangeDependencies;
   }
 
   bool getBatchModeEnabled() const {

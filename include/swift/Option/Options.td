@@ -147,26 +147,6 @@ def disable_only_one_dependency_file :
 Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Disables incremental build optimization that only produces one dependencies file">;
 
-
-def enable_source_range_dependencies :
-Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
-HelpText<"Try using source range information">;
-
-
-def driver_compare_incremental_schemes :
-Flag<["-"], "driver-compare-incremental-schemes">, Flags<[DoesNotAffectIncrementalBuild]>,
-HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
-
-def driver_compare_incremental_schemes_path :
-Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
-HelpText<"Path to use for machine-readable comparison">,
-MetaVarName<"<path>">;
-
-def driver_compare_incremental_schemes_path_EQ :
-Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
-Alias<driver_compare_incremental_schemes_path>;
-
-
 def driver_verify_fine_grained_dependency_graph_after_every_import :
 Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,

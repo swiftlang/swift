@@ -26,7 +26,6 @@
 #include "swift/Basic/type_traits.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Driver.h"
-#include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ToolChain.h"
@@ -125,9 +124,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool OnlyOneDependencyFile,
                          bool VerifyFineGrainedDependencyGraphAfterEveryImport,
                          bool EmitFineGrainedDependencyDotFileAfterEveryImport,
-                         bool EnableSourceRangeDependencies,
-                         bool CompareIncrementalSchemes,
-                         StringRef CompareIncrementalSchemesPath,
                          bool EnableCrossModuleIncrementalBuild)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
@@ -153,7 +149,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       VerifyFineGrainedDependencyGraphAfterEveryImport),
     EmitFineGrainedDependencyDotFileAfterEveryImport(
       EmitFineGrainedDependencyDotFileAfterEveryImport),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies),
     EnableCrossModuleIncrementalBuild(EnableCrossModuleIncrementalBuild)
     { };
 // clang-format on
@@ -282,7 +277,6 @@ namespace driver {
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     fine_grained_dependencies::ModuleDepGraph FineGrainedDepGraph;
-    fine_grained_dependencies::ModuleDepGraph FineGrainedDepGraphForRanges;
 
   private:
     /// TaskQueue for execution.

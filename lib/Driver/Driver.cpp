@@ -457,7 +457,6 @@ static std::string
 populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
                      StringRef argsHashStr, const InputFileList &inputs,
                      StringRef buildRecordPath,
-                     const bool EnableSourceRangeDependencies,
                      const bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
@@ -916,18 +915,8 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  const bool EnableSourceRangeDependencies =
-      ArgList->hasArg(options::OPT_enable_source_range_dependencies);
-  const bool CompareIncrementalSchemes =
-      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes) ||
-      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes_path);
-  const StringRef CompareIncrementalSchemesPath = ArgList->getLastArgValue(
-      options::OPT_driver_compare_incremental_schemes_path);
-
   Optional<OutputFileMap> OFM = buildOutputFileMap(
-      *TranslatedArgList, workingDirectory,
-      /*addEntriesForSourceFileDependencies=*/EnableSourceRangeDependencies ||
-          CompareIncrementalSchemes);
+      *TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -960,7 +949,6 @@ Driver::buildCompilation(const ToolChain &TC,
                 ? "no build record path"
                 : populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash,
                                        Inputs, buildRecordPath,
-                                       EnableSourceRangeDependencies,
                                        ShowIncrementalBuildDecisions);
   // FIXME: Distinguish errors from "file removed", which is benign.
 
@@ -1045,9 +1033,6 @@ Driver::buildCompilation(const ToolChain &TC,
         OnlyOneDependencyFile,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
-        EnableSourceRangeDependencies,
-        CompareIncrementalSchemes,
-        CompareIncrementalSchemesPath,
         EnableCrossModuleDependencies);
     // clang-format on
   }
@@ -1844,10 +1829,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
                               options::OPT_disable_batch_mode,
                               false);
 
-  // For best unparsed ranges, want non-batch mode, standard compile
-  const Arg *ArgRequiringSinglePrimaryCompile =
-      Args.getLastArg(options::OPT_enable_source_range_dependencies);
-
   // AST dump doesn't work with `-wmo`. Since it's not common to want to dump
   // the AST, we assume that's the priority and ignore `-wmo`, but we warn the
   // user about this decision.
@@ -1867,9 +1848,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
       Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
                      ArgRequiringSingleCompile->getOption().getPrefixedName());
     }
-    if (ArgRequiringSinglePrimaryCompile)
-      Diags.diagnose(SourceLoc(), diag::warn_ignoring_source_range_dependencies,
-                     ArgRequiringSingleCompile->getOption().getPrefixedName());
     return OutputInfo::Mode::SingleCompile;
   }
 
@@ -2371,8 +2349,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
 Optional<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
-                           StringRef workingDirectory,
-                           bool addEntriesForSourceFileDependencies) const {
+                           StringRef workingDirectory) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
     return None;
