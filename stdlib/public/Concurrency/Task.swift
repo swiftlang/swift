@@ -329,8 +329,8 @@ public func _asyncMainDrainQueue() -> Never
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
   let _ = Task.runDetached {
     do {
-      await try asyncFun()
-      exit(EXIT_SUCCESS)
+      try await asyncFun()
+      exit(0)
     } catch {
       _errorInMain(error)
     }

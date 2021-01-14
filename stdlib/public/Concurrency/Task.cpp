@@ -535,7 +535,7 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 
 void swift::swift_task_asyncMainDrainQueue() {
   auto runLoop =
-      reinterpret_cast<void (*)(void)>(dlsym(RTLD_SELF, "CFRunLoopRun"));
+      reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
   if (runLoop)
     runLoop();
   else

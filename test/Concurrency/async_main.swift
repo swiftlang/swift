@@ -1,7 +1,13 @@
 // RUN: %target-swift-frontend -dump-ast -enable-experimental-concurrency -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-AST
-// REQUIRES: concurrency
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -Xfrontend -parse-as-library %s -o %t_binary
+// RUN: %target-run %t_binary | %FileCheck %s --check-prefix=CHECK-EXEC
 
-func asyncFunc() async { }
+// REQUIRES: concurrency
+// REQUIRES: executable_test
+
+func asyncFunc() async {
+  print("Hello World!")
+}
 
 @main struct MyProgram {
   static func main() async {
@@ -9,6 +15,7 @@ func asyncFunc() async { }
   }
 }
 
+// CHECK-EXEC: Hello World!
 
 // CHECK-AST-LABEL: "main()" interface
 // CHECK-AST:       (await_expr type='()'
