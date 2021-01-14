@@ -870,12 +870,6 @@ namespace driver {
     /// Figure out the best strategy and return those jobs. May return
     /// duplicates.
     CommandSet computeFirstRoundCompileJobsForIncrementalCompilation() {
-      return computeDependenciesAndGetNeededCompileJobs();
-    }
-
-    /// Return jobs to run if using dependencies, may include duplicates.
-    CommandSet
-    computeDependenciesAndGetNeededCompileJobs() {
       auto getEveryCompileJob = [&] {
         CommandSet everyIncrementalJob;
         for (const Job *Cmd : Comp.getJobs()) {
@@ -939,20 +933,11 @@ namespace driver {
       return jobsToSchedule;
     }
 
-    /// If error return None, else return if this (compile) job should be
-    /// scheduled, and if its dependents should be.
-    Optional<std::pair<bool, bool>>
-    computeShouldInitiallyScheduleJobAndDependendents(const Job *cmd) {
-      return isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
-              cmd);
-    }
-
-    /// Return whether job should be scheduled when using dependencies, and if
+    /// Return whether \p Cmd should be scheduled when using dependencies, and if
     /// the job is cascading. Or if there was a dependency-read error, return
-    /// None to indicate don't-know.
+    /// \c None to indicate don't-know.
     Optional<std::pair<bool, bool>>
-    isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
-        const Job *Cmd) {
+    computeShouldInitiallyScheduleJobAndDependendents(const Job *Cmd) {
       auto CondAndHasDepsIfNoError =
           loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
@@ -1572,13 +1557,12 @@ namespace driver {
     /// When the driver next runs, the condition will be filtered through
     /// \c loadDependenciesAndComputeCondition .
     /// Then, the cascading predicate is returned from
-    /// \c isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation
-    /// and \c computeShouldInitiallyScheduleJobAndDependendents Then, in \c
-    /// computeDependenciesAndGetNeededCompileJobs if the job needs a cascading
-    /// build, it's dependents will be scheduled immediately.
-    /// After the job finishes, it's dependencies will be processed again.
-    /// If a non-cascading job failed, the driver will schedule all  of its
-    /// dependents. (All of its dependents are assumed to have already been
+    /// \c isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation.
+    /// Then, in \c computeShouldInitiallyScheduleJobAndDependendents
+    /// if the job needs a cascading build, it's dependents will be scheduled
+    /// immediately. After the job finishes, it's dependencies will be processed
+    /// again. If a non-cascading job failed, the driver will schedule all of
+    /// its dependents. (All of its dependents are assumed to have already been
     /// scheduled.) If the job succeeds, the revised dependencies are consulted
     /// to schedule any needed jobs.
 
