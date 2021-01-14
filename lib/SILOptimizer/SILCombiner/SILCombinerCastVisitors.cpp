@@ -141,6 +141,7 @@ public:
     if (!hasOneNonDebugUse(next))
       return false;
 
+    assert(getSingleNonDebugUser(rest.back()) == next);
     rest.push_back(next);
     return true;
   }
@@ -166,14 +167,13 @@ public:
   }
 
 private:
-  /// From backwards -> forwards, for each instruction in rest, delete all of
-  /// its debug uses and then set its single remaining use to be SILUndef.
+  /// Processing from def->use by walking rest backwards, delete all of its
+  /// debug uses and then set its single remaining use to be SILUndef.
   ///
   /// This means that after this runs front's forwarding operand is now
   /// SILUndef.
   void cleanupRest() & {
-    // We process backwards -> forwards. This cleans up everything but the front
-    // value.
+    // We process from def->use. This cleans up everything but the front value.
     while (!rest.empty()) {
       auto *inst = rest.pop_back_val();
       deleteAllDebugUses(inst, SC.getInstModCallbacks());
