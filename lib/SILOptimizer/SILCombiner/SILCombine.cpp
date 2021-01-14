@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+
 #include "SILCombiner.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -28,6 +29,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -40,6 +42,11 @@ using namespace swift;
 
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
+
+static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
+    "silcombine-owned-code-sinking",
+    llvm::cl::desc("Enable sinking of owened forwarding insts"),
+    llvm::cl::init(true), llvm::cl::Hidden);
 
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
@@ -145,6 +152,63 @@ public:
   }
 };
 
+bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
+  if (auto *consumingUse = svi->getSingleConsumingUse()) {
+    auto *consumingUser = consumingUse->getUser();
+
+    // If our user is already in the same block, we don't move it further.
+    if (svi->getParent() == consumingUser->getParent())
+      return false;
+
+    // Otherwise, make sure our instruction does not have any non-debug uses
+    // that are non-lifetime ending. If so, we return.
+    if (llvm::any_of(getNonDebugUses(svi),
+                     [](Operand *use) { return !use->isLifetimeEnding(); }))
+      return false;
+
+    // Otherwise, delete all of the debug uses so we don't have to sink them as
+    // well and then return true so we process svi in its new position.
+    deleteAllDebugUses(svi, instModCallbacks);
+    svi->moveBefore(consumingUser);
+    MadeChange = true;
+
+    // NOTE: We return nullptr here so that our caller doesn't delete the
+    // instruction and instead tries to simplify it.
+    return false;
+  }
+
+  // If we have multiple consuming uses, then we know that our
+  // forwarding inst must be live out of the current block and thus we
+  // might be able to duplicate/sink.
+  if (llvm::any_of(getNonDebugUses(svi),
+                   [](Operand *use) { return !use->isLifetimeEnding(); }))
+    return false;
+
+  while (!svi->use_empty()) {
+    auto *sviUse = *svi->use_begin();
+    auto *sviUser = sviUse->getUser();
+
+    if (auto *dvi = dyn_cast<DestroyValueInst>(sviUser)) {
+      dvi->setOperand(svi->getOperand(0));
+      Worklist.add(dvi);
+      continue;
+    }
+
+    if (sviUser->isDebugInstruction()) {
+      eraseInstFromFunction(*sviUser);
+      continue;
+    }
+
+    auto *newSVI = svi->clone(sviUser);
+    Worklist.add(newSVI);
+    sviUse->set(newSVI);
+  }
+
+  eraseInstFromFunction(*svi);
+  MadeChange = true;
+  return true;
+}
+
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
 
@@ -184,7 +248,31 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     }
 
     // If we have reached this point, all attempts to do simple simplifications
-    // have failed. Prepare to SILCombine.
+    // have failed. First if we have an owned forwarding value, we try to
+    // sink. Otherwise, we perform the actual SILCombine operation.
+    if (EnableSinkingOwnedForwardingInstToUses) {
+      // If we have an ownership forwarding single value inst that forwards
+      // through its first argument and it is trivially duplicatable, see if it
+      // only has consuming uses. If so, we can duplicate the instruction into
+      // the consuming use blocks and destroy any destroy_value uses of it that
+      // we see. This makes it easier for SILCombine to fold instructions with
+      // owned paramaters since chains of these values will be in the same
+      // block.
+      if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
+        if ((isa<FirstArgOwnershipForwardingSingleValueInst>(svi) ||
+             isa<OwnershipForwardingConversionInst>(svi)) &&
+            SILValue(svi).getOwnershipKind() == OwnershipKind::Owned) {
+          // Try to sink the value. If we sank the value and deleted it,
+          // continue. If we didn't optimize or sank but we are still able to
+          // optimize further, we fall through to SILCombine below.
+          if (trySinkOwnedForwardingInst(svi)) {
+            continue;
+          }
+        }
+      }
+    }
+
+    // Then begin... SILCombine.
     Builder.setInsertionPoint(I);
 
 #ifndef NDEBUG
