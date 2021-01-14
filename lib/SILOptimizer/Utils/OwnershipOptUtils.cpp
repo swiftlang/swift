@@ -113,7 +113,7 @@ static void getAllNonTrivialUsePointsOfBorrowedValue(
   // different every time.
   for (unsigned i = firstOffset; i < usePoints.size(); ++i) {
     if (auto fOperand = ForwardingOperand::get(usePoints[i])) {
-      fOperand->visitForwardedValues([&](SILValue transitiveValue) {
+      fOperand.visitForwardedValues([&](SILValue transitiveValue) {
         // Do not include transitive uses with 'none' ownership
         if (transitiveValue.getOwnershipKind() == OwnershipKind::None)
           return true;
@@ -127,16 +127,16 @@ static void getAllNonTrivialUsePointsOfBorrowedValue(
     if (auto borrowingOp = BorrowingOperand::get(usePoints[i])) {
       // If we have a reborrow, we have no further work to do, our reborrow is
       // already a use and we will handle the reborrow separately.
-      if (borrowingOp->isReborrow())
+      if (borrowingOp.isReborrow())
         continue;
 
       // Otherwise, try to grab additional end scope instructions to find more
       // liveness info. Stash any reborrow uses so that we can eliminate the
       // reborrow before we are done processing.
-      borrowingOp->visitLocalEndScopeUses([&](Operand *scopeEndingUse) {
+      borrowingOp.visitLocalEndScopeUses([&](Operand *scopeEndingUse) {
         if (auto scopeEndingBorrowingOp =
                 BorrowingOperand::get(scopeEndingUse)) {
-          if (scopeEndingBorrowingOp->isReborrow()) {
+          if (scopeEndingBorrowingOp.isReborrow()) {
             reborrowPoints.push_back(scopeEndingUse);
             return true;
           }
@@ -153,7 +153,7 @@ static void getAllNonTrivialUsePointsOfBorrowedValue(
     // function arguments), we need to be sure to include interior pointer
     // operands since we may not get a use from a end_scope instruction.
     if (auto intPtrOperand = InteriorPointerOperand::get(usePoints[i])) {
-      intPtrOperand->getImplicitUses(usePoints);
+      intPtrOperand.getImplicitUses(usePoints);
       continue;
     }
   }
@@ -405,7 +405,7 @@ static void eliminateReborrowsOfRecursiveBorrows(
       // Otherwise, we have a reborrow. For now our reborrows must be
       // phis. Add our owned value as a new argument of that phi along our
       // edge and undef along all other edges.
-      auto borrowingOp = *BorrowingOperand::get(use);
+      auto borrowingOp = BorrowingOperand::get(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(borrowingOp);
       auto *newBasePhi =
@@ -466,7 +466,7 @@ static void rewriteReborrows(SILValue newBorrowedValue,
       // Otherwise, we have a reborrow. For now our reborrows must be
       // phis. Add our owned value as a new argument of that phi along our
       // edge and undef along all other edges.
-      auto borrowingOp = *BorrowingOperand::get(use);
+      auto borrowingOp = BorrowingOperand::get(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(borrowingOp);
       auto *newBasePhi =
@@ -628,7 +628,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
   //    need a base phi argument (the one of our choosing).
   if (auto oldValueBorrowedVal = BorrowedValue::get(oldValue)) {
     SmallVector<BorrowingOperand, 8> foundReborrows;
-    if (oldValueBorrowedVal->gatherReborrows(foundReborrows)) {
+    if (oldValueBorrowedVal.gatherReborrows(foundReborrows)) {
       rewriteReborrows(newBorrowedValue, foundReborrows, ctx.callbacks);
     }
   }

@@ -69,7 +69,9 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
     if (auto borrowedVal = BorrowedValue::get(def)) {
       // Any def's that aren't filtered out here must be handled by
       // computeBorrowLiveness.
-      switch (borrowedVal->kind) {
+      switch (borrowedVal.kind) {
+      case BorrowedValueKind::Invalid:
+        llvm_unreachable("Using invalid case?!");
       case BorrowedValueKind::SILFunctionArgument:
       case BorrowedValueKind::BeginBorrow:
         return def;
@@ -98,7 +100,9 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
   if (!borrowedVal) {
     return false;
   }
-  switch (borrowedVal->kind) {
+  switch (borrowedVal.kind) {
+  case BorrowedValueKind::Invalid:
+    llvm_unreachable("Used invalid");
   case BorrowedValueKind::SILFunctionArgument:
     // For efficiency, function arguments skip liveness.
     return true;
@@ -113,7 +117,7 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
   if (!EnableRewriteBorrows) {
     return false;
   }
-  borrowedVal->visitLocalScopeEndingUses([this](Operand *use) {
+  borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
     liveness.updateForUse(use, /*lifetimeEnding*/ true);
   });
 
@@ -208,7 +212,7 @@ void CanonicalizeOSSALifetime::consolidateBorrowScope() {
 
   // Remove outer uses that occur before the end of the borrow scope.
   auto *beginBorrow = cast<BeginBorrowInst>(currentDef);
-  BorrowedValue::get(beginBorrow)->visitLocalScopeEndingUses([&](Operand *use) {
+  BorrowedValue::get(beginBorrow).visitLocalScopeEndingUses([&](Operand *use) {
     // Forward iterate until we find the end of the borrow scope.
     auto *endScope = use->getUser();
     for (auto instIter = beginBorrow->getIterator(),

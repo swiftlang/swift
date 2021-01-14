@@ -19,8 +19,9 @@ using namespace swift;
 using namespace swift::semanticarc;
 
 OwnershipLiveRange::OwnershipLiveRange(SILValue value)
-    : introducer(*OwnedValueIntroducer::get(value)), destroyingUses(),
+    : introducer(OwnedValueIntroducer::get(value)), destroyingUses(),
       ownershipForwardingUses(), unknownConsumingUses() {
+  assert(introducer);
   assert(introducer.value.getOwnershipKind() == OwnershipKind::Owned);
 
   SmallVector<Operand *, 32> tmpDestroyingUses;
@@ -227,7 +228,7 @@ void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   while (!ownershipForwardingUses.empty()) {
     auto *use = ownershipForwardingUses.back();
     ownershipForwardingUses = ownershipForwardingUses.drop_back();
-    auto operand = *ForwardingOperand::get(use);
+    auto operand = ForwardingOperand::get(use);
     operand.replaceOwnershipKind(OwnershipKind::Owned,
                                  OwnershipKind::Guaranteed);
   }
@@ -253,6 +254,8 @@ void OwnershipLiveRange::convertToGuaranteedAndRAUW(
 // TODO: If this is useful, move onto OwnedValueIntroducer itself?
 static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   switch (introducer.kind) {
+  case OwnedValueIntroducerKind::Invalid:
+    llvm_unreachable("Using invalid case?!");
   case OwnedValueIntroducerKind::Phi: {
     auto *phiArg = cast<SILPhiArgument>(introducer.value);
     phiArg->setOwnershipKind(OwnershipKind::Guaranteed);
