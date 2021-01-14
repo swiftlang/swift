@@ -435,18 +435,6 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
         return outs.ReferenceDependenciesFilePath;
       });
 }
-bool FrontendInputsAndOutputs::hasSwiftRangesPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.SwiftRangesFilePath;
-      });
-}
-bool FrontendInputsAndOutputs::hasCompiledSourcePath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.CompiledSourceFilePath;
-      });
-}
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/STLExtras.h"
-#include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/PrettyStackTrace.h"
 #include "llvm/ADT/STLExtras.h"
