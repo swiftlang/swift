@@ -7,10 +7,12 @@ SwiftWasm book](https://swiftwasm.github.io/swiftwasm-book/) to get started, and
 the [`awesome-swiftwasm`](https://github.com/swiftwasm/awesome-swiftwasm) list for
 more links in the SwiftWasm ecosystem.
 
-
 If you'd like to participate in the growing [SwiftWasm](https://swiftwasm.org) community, you're
 very welcome to join [our Discord server](https://discord.gg/ashJW8T8yp), or the `#webassembly`
 channel in [the SwiftPM Slack](https://swift-package-manager.herokuapp.com/).
+
+What follows below is `README.md` of the upstream Swift project included verbatim. If you'd like
+to track the status of our builds, please refer to our [GitHub Actions page](https://github.com/swiftwasm/swift/actions).
 
 <hr>
 <br/>
