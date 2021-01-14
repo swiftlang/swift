@@ -757,12 +757,45 @@ struct OperandOwnership {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const OperandOwnership &operandOwnership);
 
-/// Defined inline so the switch is eliminated for constant OperandOwnership.
+/// Map OperandOwnership to the OwnershipConstraint used in OSSA validation.
 ///
-/// Here, an Any ownership constraint is used to allow either Owned or
-/// Guaranteed values. However, enforcement of Unowned values is more
-/// strict. This is handled by separate logic in canAcceptUnownedValue() to
-/// avoid complicating the OwnershipKind lattice.
+/// Each OperandOwnership kind maps directly to a fixed OwnershipConstraint. Any
+/// value that can be legally passed to this operand must have an ownership kind
+/// permitted by this constraint. A constraint permits an ownership kind if,
+/// when it is applied to that ownership kind via a lattice join, it returns the
+/// same ownership kind, indicating that no restriction exists.
+///
+/// Consequently, OperandOwnership kinds that are allowed to take either Owned
+/// or Guaranteed values map to an OwnershipKind::Any constraint.
+///
+/// Unowned values are more restricted than then Owned or Guaranteed values in
+/// terms of their valid uses, which helps limit the situations where the
+/// implementation needs to consider this special case. This additional
+/// restriction is validated by `canAcceptUnownedValue`.
+///
+/// Forwarding instructions that produce Owned or Guaranteed values always
+/// forward an operand of the same ownership kind. Each case has a distinct
+/// OperandOwnership (ForwardingConsume and ForwardingBorrow), which enforces a
+/// specific constraint on the operand's ownership. Forwarding instructions that
+/// produce an Unowned value, however, may forward an operand of any
+/// ownership. Therefore, ForwardingUnowned is mapped to OwnershipKind::Any.
+///
+/// This design yields the following advantages:
+///
+/// 1. Keeping the verification of Unowned in a separate utility avoids
+///    the need to add an extra OwnedOrGuaranteed state to the OwnershipKind
+///    lattice. That state would be meaningless as a representation of value
+///    ownership, would serve no purpose as a data flow state, and would make
+///    the basic definition of ownership less approachable to developers.
+///
+/// 2. Owned or Guaranteed values can be passed to instructions that want to
+///    produce an unowned result from a parent operand. This simplifies the IR
+///    and makes RAUWing Unowned values with Owned or Guaranteed values much
+///    easier since it does not need to introduce operations that convert those
+///    values to Unowned. This significantly simplifies the implementation of
+///    OSSA utilities.
+///
+/// Defined inline so the switch is eliminated for constant OperandOwnership.
 inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   switch (value) {
   case OperandOwnership::TrivialUse:
@@ -785,6 +818,31 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
     return {OwnershipKind::Guaranteed, UseLifetimeConstraint::LifetimeEnding};
+  }
+}
+
+/// Return true if this use can accept Unowned values.
+///
+/// This extra restriction is applied on top of the OwnershipConstraint to limit
+/// the spread of Unowned values.
+inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
+  switch (operandOwnership) {
+  case OperandOwnership::NonUse:
+  case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::ForwardingUnowned:
+  case OperandOwnership::PointerEscape:
+  case OperandOwnership::BitwiseEscape:
+    return true;
+  case OperandOwnership::TrivialUse:
+  case OperandOwnership::InstantaneousUse:
+  case OperandOwnership::Borrow:
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume:
+  case OperandOwnership::InteriorPointer:
+  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::EndBorrow:
+  case OperandOwnership::Reborrow:
+    return false;
   }
 }
 
