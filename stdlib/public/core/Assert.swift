@@ -12,7 +12,7 @@
 
 /// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal safety checks that are active during testing
+/// Use this function for internal invariant checks that are active during testing
 /// but do not impact performance of shipping code. To check for invalid usage
 /// in Release builds, see `precondition(_:_:file:line:)`.
 ///
@@ -98,7 +98,7 @@ public func precondition(
   }
 }
 
-/// Indicates that an internal safety check failed.
+/// Indicates that an internal invariant check failed.
 ///
 /// Use this function to stop the program, without impacting the performance of
 /// shipping code, when control flow is not expected to reach the call---for

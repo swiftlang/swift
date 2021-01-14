@@ -101,7 +101,7 @@ extension _ArrayBuffer {
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
   ///
-  /// This function should only be used for internal safety checks.
+  /// This function should only be used for internal invariant checks.
   /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {

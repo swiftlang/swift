@@ -63,7 +63,7 @@ public:
   }
 };
 
-/// Instrument decls with safety-checks which the debugger can evaluate.
+/// Instrument decls with internal invariant checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
   DiscriminatorFinder &DF;
@@ -265,7 +265,7 @@ void swift::performDebuggerTestingTransform(SourceFile &SF) {
   for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
-  // Instrument the decls with checkExpect() safety-checks.
+  // Instrument the decls with checkExpect() internal invariant checks.
   for (Decl *D : SF.getTopLevelDecls()) {
     DebuggerTestingTransform Transform{D->getASTContext(), DF};
     D->walk(Transform);
