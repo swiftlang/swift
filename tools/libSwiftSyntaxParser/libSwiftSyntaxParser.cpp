@@ -28,7 +28,6 @@
 
 using namespace swift;
 using namespace swift::syntax;
-using namespace swift::byteTree;
 
 typedef swiftparse_range_t CRange;
 typedef swiftparse_client_node_t CClientNode;
@@ -122,7 +121,7 @@ private:
     for (const auto &piece : trivia) {
       CTriviaPiece c_piece;
       auto numValue =
-        WrapperTypeTraits<TriviaKind>::numericValue(piece.getKind());
+        serialization::getNumericValue(piece.getKind());
       c_piece.kind = numValue;
       assert(c_piece.kind == numValue && "trivia kind value is too large");
       c_piece.length = piece.getLength();
@@ -139,8 +138,8 @@ private:
                      ArrayRef<CTriviaPiece> leadingTrivia,
                      ArrayRef<CTriviaPiece> trailingTrivia,
                      CharSourceRange range) {
-    node.kind = WrapperTypeTraits<SyntaxKind>::numericValue(SyntaxKind::Token);
-    auto numValue = WrapperTypeTraits<swift::tok>::numericValue(kind);
+    node.kind = serialization::getNumericValue(SyntaxKind::Token);
+    auto numValue = serialization::getNumericValue(kind);
     node.token_data.kind = numValue;
     assert(node.token_data.kind == numValue && "token kind value is too large");
     node.token_data.leading_trivia = leadingTrivia.data();
@@ -179,7 +178,7 @@ private:
                                    ArrayRef<OpaqueSyntaxNode> elements,
                                    CharSourceRange range) override {
     CRawSyntaxNode node;
-    auto numValue = WrapperTypeTraits<SyntaxKind>::numericValue(kind);
+    auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
     assert(node.kind == numValue && "syntax kind value is too large");
     node.layout_data.nodes = elements.data();
@@ -205,7 +204,7 @@ private:
     if (!NodeLookup) {
       return {0, nullptr};
     }
-    auto numValue = WrapperTypeTraits<SyntaxKind>::numericValue(kind);
+    auto numValue = serialization::getNumericValue(kind);
     CSyntaxKind ckind = numValue;
     assert(ckind == numValue && "syntax kind value is too large");
     auto result = NodeLookup(lexerOffset, ckind);
