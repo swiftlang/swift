@@ -974,7 +974,7 @@ void ModuleFile::collectBasicSourceFileInfo(
     auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
                            Fingerprint::DIGEST_LENGTH};
     Cursor += Fingerprint::DIGEST_LENGTH;
-    // LastModified (seconds since epoch).
+    // LastModified (nanoseconds since epoch).
     auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
     // FileSize (num of bytes).
     auto fileSize = endian::readNext<uint64_t, little, unaligned>(Cursor);
@@ -987,7 +987,8 @@ void ModuleFile::collectBasicSourceFileInfo(
     BasicSourceFileInfo info;
     info.FilePath = filePath;
     info.InterfaceHash = Fingerprint::fromString(fpStr);
-    info.LastModified = llvm::sys::TimePoint<>(std::chrono::seconds(timestamp));
+    info.LastModified =
+        llvm::sys::TimePoint<>(std::chrono::nanoseconds(timestamp));
     info.FileSize = fileSize;
     callback(info);
   }

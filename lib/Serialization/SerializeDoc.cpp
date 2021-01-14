@@ -804,7 +804,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
 
       auto fileID = FWriter.getTextOffset(absolutePath);
       auto fingerprintStr = info.InterfaceHash.getRawValue();
-      auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+      auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                            info.LastModified.time_since_epoch())
                            .count();
 
@@ -815,9 +815,9 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       // InterfaceHash (fixed length string).
       assert(fingerprintStr.size() == Fingerprint::DIGEST_LENGTH);
       out << fingerprintStr;
-      // LastModified.
+      // LastModified (nanoseconds since epoch).
       writer.write<uint64_t>(timestamp);
-      // FileSize.
+      // FileSize (num of bytes).
       writer.write<uint64_t>(info.FileSize);
     }
 
