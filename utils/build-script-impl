@@ -1294,25 +1294,25 @@ function common_cross_c_flags() {
 
     case $host in
         macosx-*)
-            echo -n " -arch ${arch} "
+            echo -n " -arch ${arch} -target ${arch}-apple-macosx${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
             ;;
         iphonesimulator-*)
-            echo -n " -arch ${arch}  -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-ios-simulator${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
         iphoneos-*)
-            echo -n " -arch ${arch}  -miphoneos-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-iphoneos${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
         appletvsimulator-*)
-            echo -n " -arch ${arch}  -mtvos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-tvos-simulator${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
         appletvos-*)
-            echo -n " -arch ${arch}  -mtvos-version-min=${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
             ;;
         watchsimulator-*)
-            echo -n " -arch ${arch}  -mwatchos-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-watchos-simulator${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
         watchos-*)
-            echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+            echo -n " -arch ${arch} -target ${arch}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
         wasi-wasm32)
             echo -n " -arch wasm32"

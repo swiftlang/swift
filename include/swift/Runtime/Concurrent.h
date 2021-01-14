@@ -538,7 +538,7 @@ public:
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
+    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
       deallocateFreeList();
   }
 
@@ -853,7 +853,7 @@ private:
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
+    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
       FreeListNode::freeAll(&FreeList);
   }
 

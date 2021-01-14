@@ -153,25 +153,25 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
 static std::vector<ModuleDependencyID>
 resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
                           ModuleDependenciesCache &cache,
-                          InterfaceSubContextDelegate &ASTDelegate) {
+                          InterfaceSubContextDelegate &ASTDelegate,
+                          bool cacheOnly = false) {
   auto &ctx = instance.getASTContext();
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
-  auto isSwift = knownDependencies.isSwiftTextualModule();
+  auto isSwiftInterface = knownDependencies.isSwiftTextualModule();
+  auto isSwift = isSwiftInterface || knownDependencies.isSwiftBinaryModule();
 
   // Find the dependencies of every module this module directly depends on.
   std::set<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
     // Figure out what kind of module we need.
     bool onlyClangModule = !isSwift || module.first == dependsOn;
-
-    // Retrieve the dependencies for this module.
     if (auto found = ctx.getModuleDependencies(dependsOn, onlyClangModule,
-                                               cache, ASTDelegate)) {
+                                               cache, ASTDelegate, cacheOnly)) {
       result.insert({dependsOn, found->getKind()});
     }
   }
 
-  if (isSwift) {
+  if (isSwiftInterface) {
     // A record of all of the Clang modules referenced from this Swift module.
     std::vector<std::string> allClangModules;
     llvm::StringSet<> knownModules;
@@ -209,7 +209,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
     // directly depends on these.
     for (const auto &clangDep : allClangModules) {
       if (auto found = ctx.getModuleDependencies(
-              clangDep, /*onlyClangModule=*/false, cache, ASTDelegate)) {
+              clangDep, /*onlyClangModule=*/false, cache, ASTDelegate, cacheOnly)) {
         // ASTContext::getModuleDependencies returns dependencies for a module
         // with a given name. This Clang module may have the same name as the
         // Swift module we are resolving, so we need to make sure we don't add a
@@ -761,7 +761,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
     // DirectDependencies
     auto directDependencies = resolveDirectDependencies(
         instance, ModuleDependencyID(module.first, module.second), cache,
-        ASTDelegate);
+        ASTDelegate, /*cacheOnly*/ true);
 
     // Generate a swiftscan_clang_details_t object based on the dependency kind
     auto getModuleDetails = [&]() -> swiftscan_module_details_t {
@@ -871,7 +871,7 @@ static bool diagnoseCycle(CompilerInstance &instance,
     auto &lastOpen = openSet.back();
     auto beforeSize = openSet.size();
     for (auto dep :
-         resolveDirectDependencies(instance, lastOpen, cache, astDelegate)) {
+         resolveDirectDependencies(instance, lastOpen, cache, astDelegate, /*cacheOnly*/ true)) {
       if (closeSet.count(dep))
         continue;
       if (openSet.insert(dep)) {

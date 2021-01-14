@@ -1759,6 +1759,52 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
   return false;
 }
 
+/// Returns \c true if \p DC can handles async call.
+static bool canDeclContextHandlesAsync(const DeclContext *DC) {
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+    return func->isAsyncContext();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(DC)) {
+    // See if the closure has 'async' function type.
+    if (auto closureType = closure->getType())
+      if (auto fnType = closureType->getAs<AnyFunctionType>())
+        if (fnType->isAsync())
+          return true;
+
+    // If the closure doesn't contain any async call in the body, closure itself
+    // doesn't have 'async' type even if 'async' closure is expected.
+    //   func foo(fn: () async -> Void)
+    //   foo { <HERE> }
+    // In this case, the closure is wrapped with a 'FunctionConversionExpr'
+    // which has 'async' function type.
+    struct AsyncClosureChecker: public ASTWalker {
+      const ClosureExpr *Target;
+      bool Result = false;
+
+      AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        if (E == Target)
+          return {false, E};
+
+        if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
+          if (conversionExpr->getSubExpr() == Target) {
+            if (conversionExpr->getType()->is<AnyFunctionType>() &&
+                conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
+              Result = true;
+            return {false, E};
+          }
+        }
+        return {true, E};
+      }
+    } checker(closure);
+    closure->getParent()->walkContext(checker);
+    return checker.Result;
+  }
+
+  return false;
+}
+
 /// Build completions by doing visible decl lookup from a context.
 class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
@@ -2813,6 +2859,12 @@ public:
                                                         genericSig);
       else
         addTypeAnnotation(Builder, AFT->getResult(), genericSig);
+
+      if (AFT->isAsync() &&
+          !canDeclContextHandlesAsync(CurrDeclContext)) {
+        Builder.setNotRecommended(
+            CodeCompletionResult::NotRecommendedReason::InvalidContext);
+      }
     };
 
     if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
@@ -3023,6 +3075,13 @@ public:
           ResultType->isVoid()) {
         Builder.setExpectedTypeRelation(CodeCompletionResult::Invalid);
       }
+
+      if (!IsImplicitlyCurriedInstanceMethod &&
+          AFT->isAsync() &&
+          !canDeclContextHandlesAsync(CurrDeclContext)) {
+        Builder.setNotRecommended(
+                CodeCompletionResult::NotRecommendedReason::InvalidContext);
+      }
     };
 
     if (!AFT || IsImplicitlyCurriedInstanceMethod) {
@@ -3108,6 +3167,12 @@ public:
             Builder, *Result, CD->getGenericSignatureOfContext());
       } else {
         addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
+      }
+
+      if (ConstructorType->isAsync() &&
+          !canDeclContextHandlesAsync(CurrDeclContext)) {
+        Builder.setNotRecommended(
+            CodeCompletionResult::NotRecommendedReason::InvalidContext);
       }
     };
 

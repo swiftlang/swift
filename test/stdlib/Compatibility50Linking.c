@@ -4,6 +4,7 @@
 // RUN: %target-run %t/main
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: rdar73174820
 
 // The compatibility library needs to have no build-time dependencies on
 // libswiftCore so it can be linked into a program that doesn't link

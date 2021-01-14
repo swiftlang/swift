@@ -1884,3 +1884,82 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   }
   llvm_unreachable("Unhandled case?!");
 }
+
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
+                              InstModCallbacks &callbacks) {
+  assert(svi != newValue && "Cannot RAUW a value with itself");
+  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
+
+  // Only SingleValueInstructions are currently simplified.
+  while (!svi->use_empty()) {
+    Operand *use = *svi->use_begin();
+    SILInstruction *user = use->getUser();
+    // Erase the end of scope marker.
+    if (isEndOfScopeMarker(user)) {
+      if (&*nextii == user)
+        ++nextii;
+      callbacks.deleteInst(user);
+      continue;
+    }
+    callbacks.setUseValue(use, newValue);
+  }
+
+  callbacks.deleteInst(svi);
+
+  return nextii;
+}
+
+/// Given that we are going to replace use's underlying value, if the use is a
+/// lifetime ending use, insert an end scope scope use for the underlying value
+/// before we RAUW.
+static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
+                                         SILLocation loc,
+                                         InstModCallbacks &callbacks) {
+  if (!use->isLifetimeEnding()) {
+    return;
+  }
+
+  switch (use->get().getOwnershipKind()) {
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid ownership for value");
+  case OwnershipKind::Owned: {
+    auto *dvi = builder.createDestroyValue(loc, use->get());
+    callbacks.createdNewInst(dvi);
+    return;
+  }
+  case OwnershipKind::Guaranteed: {
+    // Should only happen once we model destructures as true reborrows.
+    auto *ebi = builder.createEndBorrow(loc, use->get());
+    callbacks.createdNewInst(ebi);
+    return;
+  }
+  case OwnershipKind::None:
+    return;
+  case OwnershipKind::Unowned:
+    llvm_unreachable("Unowned object can never be consumed?!");
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
+SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
+                                                InstModCallbacks &callbacks) {
+  auto oldValue = use->get();
+  assert(oldValue != newValue && "Cannot RAUW a value with itself");
+
+  auto *user = use->getUser();
+  auto nextII = std::next(user->getIterator());
+
+  // If we have an end of scope marker, just return next. We are done.
+  if (isEndOfScopeMarker(user)) {
+    return nextII;
+  }
+
+  // Otherwise, first insert clean up our use's value if we need to and then set
+  // use to have a new value.
+  SILBuilderWithScope builder(user);
+  cleanupUseOldValueBeforeRAUW(use, builder, user->getLoc(), callbacks);
+  callbacks.setUseValue(use, newValue);
+
+  return nextII;
+}

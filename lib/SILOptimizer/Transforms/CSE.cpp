@@ -1023,7 +1023,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
                 cast<SingleValueInstruction>(AvailInst)))
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
-        nextI = FixupCtx.replaceAllUsesAndEraseFixingOwnership(
+        nextI = FixupCtx.replaceAllUsesAndErase(
             cast<SingleValueInstruction>(Inst),
             cast<SingleValueInstruction>(AvailInst));
         Changed = true;

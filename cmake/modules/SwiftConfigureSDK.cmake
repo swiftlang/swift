@@ -28,7 +28,6 @@ function(_report_sdk prefix)
     message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
     message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
     message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
-    message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
     message(STATUS "  Simulator: ${SWIFT_SDK_${prefix}_IS_SIMULATOR}")
   endif()
@@ -125,7 +124,6 @@ endfunction()
 #     name               # Display name for this SDK
 #     deployment_version # Deployment version
 #     xcrun_name         # SDK name to use with xcrun
-#     version_min_name   # The name used in the -mOS-version-min flag
 #     triple_name        # The name used in Swift's -triple
 #     architectures      # A list of architectures this SDK supports
 #   )
@@ -143,7 +141,6 @@ endfunction()
 #   SWIFT_SDK_${prefix}_BUILD_NUMBER        SDK build number (e.g., 14A389a)
 #   SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION  Deployment version (e.g., 10.9, 7.0)
 #   SWIFT_SDK_${prefix}_LIB_SUBDIR          Library subdir for this SDK
-#   SWIFT_SDK_${prefix}_VERSION_MIN_NAME    Version min name for this SDK
 #   SWIFT_SDK_${prefix}_TRIPLE_NAME         Triple name for this SDK
 #   SWIFT_SDK_${prefix}_OBJECT_FORMAT       The object file format (e.g. MACHO)
 #   SWIFT_SDK_${prefix}_USE_ISYSROOT        Whether to use -isysroot
@@ -153,7 +150,7 @@ endfunction()
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_MODULE Module triple name for this SDK
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
-    version_min_name triple_name module_name architectures)
+    triple_name module_name architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -186,7 +183,6 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "${deployment_version}")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
-  set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT TRUE)
@@ -495,7 +491,6 @@ function(configure_target_variant prefix name sdk build_config lib_subdir)
   set(SWIFT_VARIANT_${prefix}_BUILD_NUMBER       ${SWIFT_SDK_${sdk}_BUILD_NUMBER})
   set(SWIFT_VARIANT_${prefix}_DEPLOYMENT_VERSION ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
   set(SWIFT_VARIANT_${prefix}_LIB_SUBDIR         "${lib_subdir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-  set(SWIFT_VARIANT_${prefix}_VERSION_MIN_NAME   ${SWIFT_SDK_${sdk}_VERSION_MIN_NAME})
   set(SWIFT_VARIANT_${prefix}_TRIPLE_NAME        ${SWIFT_SDK_${sdk}_TRIPLE_NAME})
   set(SWIFT_VARIANT_${prefix}_ARCHITECTURES      ${SWIFT_SDK_${sdk}_ARCHITECTURES})
 endfunction()
