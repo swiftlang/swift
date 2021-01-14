@@ -6,6 +6,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// REQUIRES: OS=macosx || OS=ios
 
 enum Err : Error { case noGood }
 

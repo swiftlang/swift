@@ -4,6 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// REQUIRES: OS=macosx || OS=ios
 
 func asyncFunc() async {
   print("Hello World!")
