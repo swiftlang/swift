@@ -654,24 +654,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
   }
 }
-static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::emit_swift_ranges_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &swiftRangesFilePath =
-        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
-    if (!swiftRangesFilePath.empty()) {
-      (void)Instance.emitSwiftRanges(Instance.getDiags(), SF,
-                                     swiftRangesFilePath);
-    }
-  }
-}
+
 static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -1059,7 +1042,6 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
                                Instance.getDependencyTracker(), opts);
 
   // Emit information about the parsed primaries.
-  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 

@@ -264,16 +264,6 @@ namespace driver {
     /// Jobs that incremental-mode has decided it can skip.
     CommandSet DeferredCommands;
   public:
-    /// Why are we keeping two dependency graphs?
-    ///
-    /// We want to compare what dependency-based incrementalism would do vs
-    /// range-based incrementalism. Unfortunately, the dependency graph
-    /// includes marks that record if a node (Job) has ever been traversed
-    /// (i.e. marked for cascading). So, in order to find externally-dependent
-    /// jobs for range based incrementality, the range-based computation
-    /// needs its own graph when both strategies are used for comparison
-    /// purposes. Sigh.
-    ///
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     fine_grained_dependencies::ModuleDepGraph FineGrainedDepGraph;
@@ -879,7 +869,6 @@ namespace driver {
     }
 
     /// Return jobs to run if using dependencies, may include duplicates.
-    /// If optional argument is present, optimize with source range info
     CommandSet
     computeDependenciesAndGetNeededCompileJobs() {
       auto getEveryCompileJob = [&] {
@@ -1015,7 +1004,6 @@ namespace driver {
         const Job *const Cmd, const Job::Condition Condition,
         const bool hasDependenciesFileName) {
 
-      // When using ranges may still decide not to schedule the job.
       switch (Condition) {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:

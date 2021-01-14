@@ -622,7 +622,6 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
-  case file_types::TY_SwiftRanges:
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
@@ -768,8 +767,6 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
-  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
-                   "-emit-swift-ranges-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
                    "-emit-compiled-source-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
@@ -885,7 +882,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
     case file_types::TY_ExternalSwiftDeps:
-    case file_types::TY_SwiftRanges:
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:

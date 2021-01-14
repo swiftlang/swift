@@ -61,12 +61,6 @@ def emit_reference_dependencies_path
     HelpText<"Output Swift-style dependencies file to <path>">;
 
 
-def emit_swift_ranges : Flag<["-"], "emit-swift-ranges">,
-  HelpText<"Emit unparsed source ranges">;
-def emit_swift_ranges_path
-  : Separate<["-"], "emit-swift-ranges-path">, MetaVarName<"<path>">,
-    HelpText<"Output unparsed ranges to <path>">;
-
 def emit_compiled_source : Flag<["-"], "emit-compiled-source">,
   HelpText<"Emit compiled source">;
 def emit_compiled_source_path

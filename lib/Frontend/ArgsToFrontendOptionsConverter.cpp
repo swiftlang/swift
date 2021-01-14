@@ -533,11 +533,6 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
-  if (!FrontendOptions::canActionEmitSwiftRanges(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasSwiftRangesPath()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_swift_ranges);
-    return true;
-  }
   if (!FrontendOptions::canActionEmitCompiledSource(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasCompiledSourcePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_compiled_source);
