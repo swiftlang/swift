@@ -4964,79 +4964,10 @@ public:
                       &inferredBindings);
 
     void dump(llvm::raw_ostream &out,
-              unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
-      out.indent(indent);
-      if (isDirectHole())
-        out << "hole ";
-      if (isPotentiallyIncomplete())
-        out << "potentially_incomplete ";
-      if (isDelayed())
-        out << "delayed ";
-      if (isSubtypeOfExistentialType())
-        out << "subtype_of_existential ";
-      auto literalKind = getLiteralKind();
-      if (literalKind != inference::LiteralBindingKind::None)
-        out << "literal=" << static_cast<int>(literalKind) << " ";
-      if (involvesTypeVariables())
-        out << "involves_type_vars ";
-
-      auto numDefaultable = getNumViableDefaultableBindings();
-      if (numDefaultable > 0)
-        out << "#defaultable_bindings=" << numDefaultable << " ";
-
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
-      auto printBinding = [&](const inference::PotentialBinding &binding) {
-        auto type = binding.BindingType;
-        switch (binding.Kind) {
-        case inference::AllowedBindingKind::Exact:
-          break;
-
-        case inference::AllowedBindingKind::Subtypes:
-          out << "(subtypes of) ";
-          break;
-
-        case inference::AllowedBindingKind::Supertypes:
-          out << "(supertypes of) ";
-          break;
-        }
-        if (auto *literal = binding.getDefaultedLiteralProtocol())
-          out << "(default from " << literal->getName() << ") ";
-        out << type.getString(PO);
-      };
-
-      out << "bindings={";
-      interleave(Bindings, printBinding, [&]() { out << "; "; });
-      out << "}";
-
-      if (!Defaults.empty()) {
-        out << " defaults={";
-        for (const auto &entry : Defaults) {
-          auto *constraint = entry.second;
-          inference::PotentialBinding binding{
-              constraint->getSecondType(), inference::AllowedBindingKind::Exact,
-              constraint};
-          printBinding(binding);
-        }
-        out << "}";
-      }
-    }
-
-    void dump(ConstraintSystem *cs,
-              unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
-      dump(llvm::errs());
-    }
+              unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
 
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-              unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
-      out.indent(indent);
-      out << "(";
-      if (typeVar)
-        out << "$T" << typeVar->getImpl().getID();
-      dump(out, 1);
-      out << ")\n";
-    }
+              unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
   };
 
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
