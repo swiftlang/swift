@@ -567,8 +567,24 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   }
   const StringRef supplementaryFileMapPath =
       Args.getLastArgValue(options::OPT_supplementary_output_file_map);
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-      llvm::MemoryBuffer::getFile(supplementaryFileMapPath);
+
+  unsigned BadFileDescriptorRetryCount = 0;
+  if (const Arg *A = Args.getLastArg(options::OPT_bad_file_descriptor_retry_count)) {
+    if (StringRef(A->getValue()).getAsInteger(10, BadFileDescriptorRetryCount)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return None;
+    }
+  }
+
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer = nullptr;
+  for (unsigned I = 0; I < BadFileDescriptorRetryCount + 1; ++I) {
+    buffer = llvm::MemoryBuffer::getFile(supplementaryFileMapPath);
+    if (buffer)
+      break;
+    if (buffer.getError().value() != EBADF)
+      break;
+  }
   if (!buffer) {
     Diags.diagnose(SourceLoc(), diag::cannot_open_file,
                    supplementaryFileMapPath, buffer.getError().message());
