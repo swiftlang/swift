@@ -323,6 +323,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
                [&](Constraint *constraint) {
                  if (constraint->isDisabled())
                    Out << ">  [disabled] ";
+                 else if (constraint->isFavored())
+                   Out << ">  [favored]  ";
                  else
                    Out << ">             ";
                  constraint->print(Out, sm);
