@@ -756,9 +756,7 @@ void TempRValueOptPass::run() {
     // Simplify any access scope markers that were only used by the dead
     // copy_addr and other potentially unused addresses.
     if (srcInst) {
-      if (SILValue result = simplifyInstruction(srcInst)) {
-        replaceAllSimplifiedUsesAndErase(srcInst, result, callbacks);
-      }
+      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks);
     }
   }
   if (changed) {

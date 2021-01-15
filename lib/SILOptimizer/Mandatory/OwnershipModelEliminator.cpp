@@ -479,13 +479,11 @@ static bool stripOwnership(SILFunction &func) {
     auto value = visitor.instructionsToSimplify.pop_back_val();
     if (!value.hasValue())
       continue;
-    if (SILValue newValue = simplifyInstruction(*value)) {
-      InstModCallbacks callbacks([&](SILInstruction *instToErase) {
-        visitor.eraseInstruction(instToErase);
-      });
-      replaceAllSimplifiedUsesAndErase(*value, newValue, callbacks);
-      madeChange = true;
-    }
+    InstModCallbacks callbacks([&](SILInstruction *instToErase) {
+      visitor.eraseInstruction(instToErase);
+    });
+    simplifyAndReplaceAllSimplifiedUsesAndErase(*value, callbacks);
+    madeChange |= callbacks.hadCallbackInvocation();
   }
 
   return madeChange;

@@ -1458,12 +1458,9 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
     if (!svi)
       continue;
 
-    SILValue S = simplifyInstruction(svi);
-    if (!S)
-      continue;
-
-    replaceAllSimplifiedUsesAndErase(svi, S, callbacks);
-    changed = true;
+    callbacks.resetHadCallbackInvocation();
+    simplifyAndReplaceAllSimplifiedUsesAndErase(svi, callbacks);
+    changed |= callbacks.hadCallbackInvocation();
   }
 
   return changed;
