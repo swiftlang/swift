@@ -44,15 +44,15 @@ void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB) {
   }
 }
 
-/// Update the current def's liveness based on one specific use operand.
+/// Update the current def's liveness based on one specific use instruction.
 ///
 /// Return the updated liveness of the \p use block (LiveOut or LiveWithin).
 ///
 /// Terminators are not live out of the block.
-PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(Operand *use) {
+PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(SILInstruction *user) {
   SWIFT_ASSERT_ONLY(seenUse = true);
 
-  auto *bb = use->getUser()->getParent();
+  auto *bb = user->getParent();
   switch (getBlockLiveness(bb)) {
   case LiveOut:
     return LiveOut;
@@ -71,8 +71,8 @@ PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(Operand *use) {
 //                            MARK: PrunedLiveness
 //===----------------------------------------------------------------------===//
 
-void PrunedLiveness::updateForUse(Operand *use, bool lifetimeEnding) {
-  auto useBlockLive = liveBlocks.updateForUse(use);
+void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
+  auto useBlockLive = liveBlocks.updateForUse(user);
   // Record all uses of blocks on the liveness boundary. For blocks marked
   // LiveWithin, the boundary is considered to be the last use in the block.
   if (!lifetimeEnding && useBlockLive == PrunedLiveBlocks::LiveOut) {
@@ -89,7 +89,7 @@ void PrunedLiveness::updateForUse(Operand *use, bool lifetimeEnding) {
   //
   // This call is not considered the end of %val's lifetime. The @owned
   // argument must be copied.
-  auto iterAndSuccess = users.try_emplace(use->getUser(), lifetimeEnding);
+  auto iterAndSuccess = users.try_emplace(user, lifetimeEnding);
   if (!iterAndSuccess.second)
     iterAndSuccess.first->second &= lifetimeEnding;
 }

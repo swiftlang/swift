@@ -52,6 +52,8 @@ public:
 /// Top-level pass driver.
 void CopyPropagation::run() {
   auto *f = getFunction();
+  auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+  auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
 
   // Debug label for unit testing.
   LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
@@ -70,7 +72,8 @@ void CopyPropagation::run() {
     }
   }
   // Perform copy propgation for each copied value.
-  CanonicalizeOSSALifetime canonicalizer(pruneDebug);
+  CanonicalizeOSSALifetime canonicalizer(pruneDebug, accessBlockAnalysis,
+                                         dominanceAnalysis);
   for (auto &def : copiedDefs) {
     canonicalizer.canonicalizeValueLifetime(def);
     if (SILValue outerCopy = canonicalizer.createdOuterCopy()) {
@@ -81,7 +84,10 @@ void CopyPropagation::run() {
     // live ranges.
   }
   if (canonicalizer.hasChanged()) {
+    // Preserves NonLocalAccessBlockAnalysis.
+    accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    accessBlockAnalysis->unlockInvalidation();
     DeadEndBlocks deBlocks(f);
     f->verifyOwnership(&deBlocks);
   }
