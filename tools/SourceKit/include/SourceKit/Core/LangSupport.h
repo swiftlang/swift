@@ -231,8 +231,6 @@ enum class SyntaxTreeTransferMode {
   Full
 };
 
-enum class SyntaxTreeSerializationFormat { JSON, ByteTree };
-
 class EditorConsumer {
   virtual void anchor();
 public:

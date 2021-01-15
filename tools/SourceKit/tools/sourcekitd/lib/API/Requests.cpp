@@ -83,8 +83,6 @@ struct SKEditorConsumerOptions {
   bool EnableStructure = false;
   bool EnableDiagnostics = false;
   SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
-  SyntaxTreeSerializationFormat SyntaxSerializationFormat =
-      SyntaxTreeSerializationFormat::JSON;
   bool SyntacticOnly = false;
 };
 
@@ -330,20 +328,6 @@ static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
     return SyntaxTreeTransferMode::Full;
   } else {
     llvm_unreachable("Unexpected syntax tree transfer mode");
-  }
-}
-
-static llvm::Optional<SyntaxTreeSerializationFormat>
-syntaxSerializationFormatFromUID(sourcekitd_uid_t UID) {
-  if (UID == nullptr) {
-    // Default is JSON
-    return SyntaxTreeSerializationFormat::JSON;
-  } else if (UID == KindSyntaxTreeSerializationJSON) {
-    return SyntaxTreeSerializationFormat::JSON;
-  } else if (UID == KindSyntaxTreeSerializationByteTree) {
-    return SyntaxTreeSerializationFormat::ByteTree;
-  } else {
-    return llvm::None;
   }
 }
 
@@ -640,7 +624,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
     auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
-    auto SerializationFormatUID = Req.getUID(KeySyntaxTreeSerializationFormat);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
 
@@ -649,11 +632,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
     Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
-    auto SyntaxSerializationFormat =
-        syntaxSerializationFormatFromUID(SerializationFormatUID);
-    if (!SyntaxSerializationFormat)
-      return Rec(createErrorRequestFailed("Invalid serialization format"));
-    Opts.SyntaxSerializationFormat = SyntaxSerializationFormat.getValue();
     Opts.SyntacticOnly = SyntacticOnly;
     return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args, std::move(vfsOptions)));
   }
@@ -688,18 +666,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
     auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
-    auto SerializationFormatUID = Req.getUID(KeySyntaxTreeSerializationFormat);
 
     SKEditorConsumerOptions Opts;
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
     Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
-    auto SyntaxSerializationFormat =
-        syntaxSerializationFormatFromUID(SerializationFormatUID);
-    if (!SyntaxSerializationFormat)
-      return Rec(createErrorRequestFailed("Invalid serialization format"));
-    Opts.SyntaxSerializationFormat = SyntaxSerializationFormat.getValue();
     Opts.SyntacticOnly = SyntacticOnly;
 
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
@@ -2843,39 +2815,6 @@ void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
 }
 
-void serializeSyntaxTreeAsByteTree(
-    const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> &ReusedNodeIds,
-    ResponseBuilder::Dictionary &Dict) {
-  auto StartClock = clock();
-  // Serialize the syntax tree as a ByteTree
-  auto Stream = swift::ExponentialGrowthAppendingBinaryByteStream();
-  Stream.reserve(32 * 1024);
-  std::map<void *, void *> UserInfo;
-  UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
-  swift::byteTree::ByteTreeWriter::write(Stream,
-                                         swift::byteTree::SYNTAX_TREE_VERSION,
-                                         *SyntaxTree.getRaw(), UserInfo);
-
-  std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeof(uint64_t) + Stream.data().size());
-  *reinterpret_cast<uint64_t*>(Buf->getBufferStart()) =
-      (uint64_t)CustomBufferKind::RawData;
-  memcpy(Buf->getBufferStart() + sizeof(uint64_t),
-         Stream.data().data(), Stream.data().size());
-
-  Dict.setCustomBuffer(KeySerializedSyntaxTree, std::move(Buf));
-
-  auto EndClock = clock();
-  LOG_SECTION("incrParse Performance", InfoLowPrio) {
-    Log->getOS() << "Serialized " << Stream.data().size()
-                 << " bytes as ByteTree in ";
-    auto Seconds = (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC;
-    llvm::write_double(Log->getOS(), Seconds, llvm::FloatStyle::Fixed, 2);
-    Log->getOS() << "ms";
-  }
-}
-
 void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
     std::unordered_set<unsigned> ReusedNodeIds,
@@ -2926,14 +2865,7 @@ void SKEditorConsumer::handleSyntaxTree(
     break;
   }
 
-  switch (Opts.SyntaxSerializationFormat) {
-  case SourceKit::SyntaxTreeSerializationFormat::JSON:
-    serializeSyntaxTreeAsJson(SyntaxTree, OmitNodes, Dict);
-    break;
-  case SourceKit::SyntaxTreeSerializationFormat::ByteTree:
-    serializeSyntaxTreeAsByteTree(SyntaxTree, OmitNodes, Dict);
-    break;
-  }
+  serializeSyntaxTreeAsJson(SyntaxTree, OmitNodes, Dict);
 }
 
 static sourcekitd_response_t
