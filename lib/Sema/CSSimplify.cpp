@@ -1535,27 +1535,39 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
-// Determine whether conversion is allowed between two function types
-// based on their representations.
+/// Check where a representation is a subtype of another.
+///
+/// The subtype relationship is defined as:
+/// 1. any representation R is a sub-type of itself.
+/// 2. a thin representation is a subtype of any other representation.
+/// 3. a thick representation is a subtype of any other thick representation.
+///
+/// For example, since `@convention(c)` is a thin representation, and
+/// `@convention(swift)` is a thick representation,
+/// `@convention(c) (A) -> B` is a sub-type of `(A) -> B`.
+///
+/// NOTE: Unlike typical subtyping relationships, this is not anti-symmetric.
+/// For example, @convention(c) and @convention(thin) are subtypes of each other
+/// but not equal.
 static bool
-isConversionAllowedBetween(FunctionTypeRepresentation rep1,
-                           FunctionTypeRepresentation rep2) {
+isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
+            FunctionTypeRepresentation potentialSuperRepr) {
   auto isThin = [](FunctionTypeRepresentation rep) {
     return rep == FunctionTypeRepresentation::CFunctionPointer ||
         rep == FunctionTypeRepresentation::Thin;
   };
   
-  // Allowing "thin" (c, thin) to "thin" conventions
-  if (isThin(rep1) && isThin(rep2))
+  // Allowing "thin" (c, thin) to "thin" conversions
+  if (isThin(potentialSubRepr) && isThin(potentialSuperRepr))
     return true;
   
-  // Allowing all to "thick" (swift, block) conventions
+  // Allowing all to "thick" (swift, block) conversions
   // "thin" (c, thin) to "thick" or "thick" to "thick"
-  if (rep2 == FunctionTypeRepresentation::Swift ||
-      rep2 == FunctionTypeRepresentation::Block)
+  if (potentialSuperRepr == FunctionTypeRepresentation::Swift ||
+      potentialSuperRepr == FunctionTypeRepresentation::Block)
     return true;
   
-  return rep1 == rep2;
+  return potentialSubRepr == potentialSuperRepr;
 }
 
 /// Returns true if `constraint rep1 rep2` is satisfied.
@@ -1575,7 +1587,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
       return true;
 
-    return isConversionAllowedBetween(rep1, rep2);
+    return isSubtypeOf(rep1, rep2);
   }
 
   case ConstraintKind::OpaqueUnderlyingType:
