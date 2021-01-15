@@ -1558,8 +1558,7 @@ isConversionAllowedBetween(FunctionTypeRepresentation rep1,
   return rep1 == rep2;
 }
 
-// Returns 'false' (i.e. no error) if it is legal to match functions with the
-// corresponding function type representations and the given match kind.
+/// Returns true if `constraint rep1 rep2` is satisfied.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          FunctionTypeRepresentation rep2,
                                          ConstraintKind kind,
@@ -1569,16 +1568,14 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
-    return rep1 != rep2;
+    return rep1 == rep2;
       
   case ConstraintKind::Subtype: {
     auto last = locator.last();
     if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
-      return false;
-    
-    // Inverting the result because matchFunctionRepresentations
-    // returns false in conversions are allowed.
-    return !isConversionAllowedBetween(rep1, rep2);
+      return true;
+
+    return isConversionAllowedBetween(rep1, rep2);
   }
 
   case ConstraintKind::OpaqueUnderlyingType:
@@ -1609,7 +1606,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
-    return false;
+    return true;
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -1902,9 +1899,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
-  if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
-                                   func2->getExtInfo().getRepresentation(),
-                                   kind, locator)) {
+  if (!matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
+                                    func2->getExtInfo().getRepresentation(),
+                                    kind, locator)) {
     return getTypeMatchFailure(locator);
   }
 
