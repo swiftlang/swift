@@ -779,7 +779,7 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
 ///
 /// NOTE: We assume that the insertion point associated with the SILValue must
 /// dominate \p i.
-SILValue swift::simplifyInstruction(SILInstruction *i) {
+static SILValue simplifyInstruction(SILInstruction *i) {
   SILValue result = InstSimplifier().visit(i);
   if (!result)
     return SILValue();
@@ -794,4 +794,26 @@ SILValue swift::simplifyInstruction(SILInstruction *i) {
       return SILValue();
 
   return result;
+}
+
+SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
+    SILInstruction *i, InstModCallbacks &callbacks,
+    DeadEndBlocks *deadEndBlocks) {
+  auto next = std::next(i->getIterator());
+  auto *svi = dyn_cast<SingleValueInstruction>(i);
+  if (!svi)
+    return next;
+  SILValue result = simplifyInstruction(i);
+
+  // If we fail to simplify or the simplified value returned is our passed in
+  // value, just return std::next since we can't simplify.
+  if (!result || svi == result)
+    return next;
+
+  if (svi->getFunction()->hasOwnership()) {
+    JointPostDominanceSetComputer computer(*deadEndBlocks);
+    OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
+    return ctx.replaceAllUsesAndErase(svi, result);
+  }
+  return replaceAllUsesAndErase(svi, result, callbacks);
 }

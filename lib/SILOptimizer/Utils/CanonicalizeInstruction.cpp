@@ -81,24 +81,16 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 // intruction that wasn't erased.
 static Optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
-  SILValue result = simplifyInstruction(inst);
-  if (!result)
-    return None;
-
-  ++NumSimplified;
-
-  LLVM_DEBUG(llvm::dbgs() << "Simplify Old = " << *inst
-                          << "    New = " << *result << '\n');
-
   // Erase the simplified instruction and any instructions that end its
   // scope. Nothing needs to be added to the worklist except for Result,
   // because the instruction and all non-replaced users will be deleted.
-  auto nextII = replaceAllSimplifiedUsesAndErase(inst, result, pass.callbacks,
-                                                 &pass.deadEndBlocks);
+  pass.callbacks.resetHadCallbackInvocation();
+  auto result = simplifyAndReplaceAllSimplifiedUsesAndErase(
+      inst, pass.callbacks, &pass.deadEndBlocks);
+  if (!pass.callbacks.hadCallbackInvocation())
+    return None;
 
-  // Push the new instruction and any users onto the worklist.
-  pass.notifyHasNewUsers(result);
-  return nextII;
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
