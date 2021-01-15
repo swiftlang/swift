@@ -974,6 +974,9 @@ bool ModuleFileSharedCore::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
         return false;
       }
       switch (*kind) {
+      case decl_locs_block::SOURCE_FILE_LIST:
+        SourceFileListData = blobData;
+        break;
       case decl_locs_block::BASIC_DECL_LOCS:
         BasicDeclLocsData = blobData;
         break;
