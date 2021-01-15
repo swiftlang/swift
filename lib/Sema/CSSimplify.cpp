@@ -1552,22 +1552,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 static bool
 isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
             FunctionTypeRepresentation potentialSuperRepr) {
-  auto isThin = [](FunctionTypeRepresentation rep) {
-    return rep == FunctionTypeRepresentation::CFunctionPointer ||
-        rep == FunctionTypeRepresentation::Thin;
-  };
-  
-  // Allowing "thin" (c, thin) to "thin" conversions
-  if (isThin(potentialSubRepr) && isThin(potentialSuperRepr))
-    return true;
-  
-  // Allowing all to "thick" (swift, block) conversions
-  // "thin" (c, thin) to "thick" or "thick" to "thick"
-  if (potentialSuperRepr == FunctionTypeRepresentation::Swift ||
-      potentialSuperRepr == FunctionTypeRepresentation::Block)
-    return true;
-  
-  return potentialSubRepr == potentialSuperRepr;
+  return (potentialSubRepr == potentialSuperRepr)
+       || isThinRepresentation(potentialSubRepr)
+       || isThickRepresentation(potentialSuperRepr);
 }
 
 /// Returns true if `constraint rep1 rep2` is satisfied.
