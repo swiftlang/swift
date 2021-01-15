@@ -44,8 +44,14 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
     cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps).str();
   assert(!swiftDeps.empty());
   swiftDeps.resize(Fingerprint::DIGEST_LENGTH, 'X');
+  auto swiftDepsFingerprint = Fingerprint::fromString(swiftDeps);
+  if (!swiftDepsFingerprint) {
+    llvm::errs() << "unconvertable fingerprint from switdeps ':"
+                 << swiftDeps << "'\n";
+    abort();
+  }
   auto interfaceHash =
-    interfaceHashIfNonEmpty.getValueOr(Fingerprint::fromString(swiftDeps));
+    interfaceHashIfNonEmpty.getValueOr(swiftDepsFingerprint.getValue());
 
   SourceManager sm;
   DiagnosticEngine diags(sm);
