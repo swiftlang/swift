@@ -40,6 +40,10 @@ public:
 
   /// Advance this index to point to its first immediate child.
   SyntaxIndexInTree advancedToFirstChild() const;
+
+  bool operator==(SyntaxIndexInTree Other) const {
+    return IndexInTree == Other.IndexInTree;
+  }
 };
 
 /// A syntax identifier that globally identifies a \c Syntax node.
@@ -96,6 +100,10 @@ public:
   SyntaxIdentifier advancedToFirstChild() const {
     auto NewIndexInTree = IndexInTree.advancedToFirstChild();
     return SyntaxIdentifier(RootId, NewIndexInTree);
+  }
+
+  bool operator==(SyntaxIdentifier Other) const {
+    return RootId == Other.RootId && IndexInTree == Other.IndexInTree;
   }
 };
 
@@ -230,6 +238,18 @@ public:
 
   AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
     return getPosition().getIndexInParent();
+  }
+
+  /// Construct a new \c AbsoluteRawSyntax node that has the same info as the
+  /// current one, but
+  ///  - the \p NewRaw as the backing storage
+  ///  - the \p NewRootId as the RootId
+  AbsoluteRawSyntax
+  replacingSelf(const RC<RawSyntax> &NewRaw,
+                SyntaxIdentifier::RootIdType NewRootId) const {
+    SyntaxIdentifier NewNodeId(NewRootId, Info.getNodeId().getIndexInTree());
+    AbsoluteSyntaxInfo NewInfo(Info.getPosition(), NewNodeId);
+    return AbsoluteRawSyntax(NewRaw, NewInfo);
   }
 };
 

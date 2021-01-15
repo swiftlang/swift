@@ -15,10 +15,22 @@
 using namespace swift;
 using namespace swift::syntax;
 
-RC<SyntaxData> SyntaxData::make(AbsoluteRawSyntax AbsoluteRaw,
-                                const RC<SyntaxData> &Parent) {
-  // FIXME: Can we use a bump allocator here?
-  return RC<SyntaxData>{new SyntaxData(AbsoluteRaw, Parent)};
+SyntaxData SyntaxData::make(AbsoluteRawSyntax AbsoluteRaw,
+                            const RC<RefCountedBox<SyntaxData>> &Parent) {
+  return SyntaxData(AbsoluteRaw, Parent);
+}
+
+SyntaxData SyntaxData::replacingSelf(const RC<RawSyntax> &NewRaw) const {
+  if (hasParent()) {
+    auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
+    auto NewRootBox = RefCountedBox<SyntaxData>::make(NewRoot);
+    auto NewSelf = AbsoluteRaw.replacingSelf(
+        NewRaw, NewRoot.AbsoluteRaw.getNodeId().getRootId());
+    return SyntaxData(NewSelf, NewRootBox);
+  } else {
+    auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
+    return SyntaxData(NewSelf, /*Parent=*/nullptr);
+  }
 }
 
 bool SyntaxData::isType() const { return getRaw()->isType(); }
@@ -40,7 +52,7 @@ void SyntaxData::dump(llvm::raw_ostream &OS) const {
 
 void SyntaxData::dump() const { dump(llvm::errs()); }
 
-RC<SyntaxData> SyntaxData::getPreviousNode() const {
+Optional<SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
     if (hasParent()) {
       for (size_t I = N - 1; ; --I) {
@@ -53,26 +65,26 @@ RC<SyntaxData> SyntaxData::getPreviousNode() const {
       }
     }
   }
-  return hasParent() ? Parent->getPreviousNode() : nullptr;
+  return hasParent() ? getParent()->getPreviousNode() : None;
 }
 
-RC<SyntaxData> SyntaxData::getNextNode() const {
+Optional<SyntaxData> SyntaxData::getNextNode() const {
   if (hasParent()) {
-    for (size_t I = getIndexInParent() + 1, N = Parent->getNumChildren();
+    for (size_t I = getIndexInParent() + 1, N = getParent()->getNumChildren();
          I != N; ++I) {
       if (auto C = getParent()->getChild(I)) {
         if (C->getRaw()->isPresent() && C->getFirstToken())
           return C;
       }
     }
-    return Parent->getNextNode();
+    return getParent()->getNextNode();
   }
-  return nullptr;
+  return None;
 }
 
-RC<SyntaxData> SyntaxData::getFirstToken() const {
+Optional<SyntaxData> SyntaxData::getFirstToken() const {
   if (getRaw()->isToken()) {
-    return getRefCountedThis();
+    return *this;
   }
 
   for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
@@ -86,16 +98,16 @@ RC<SyntaxData> SyntaxData::getFirstToken() const {
       }
     }
   }
-  return nullptr;
+  return None;
 }
 
-RC<SyntaxData> SyntaxData::getLastToken() const {
+Optional<SyntaxData> SyntaxData::getLastToken() const {
   if (getRaw()->isToken() && !getRaw()->isMissing()) {
-    return getRefCountedThis();
+    return *this;
   }
 
   if (getNumChildren() == 0) {
-    return nullptr;
+    return None;
   }
   for (int I = getNumChildren() - 1; I >= 0; --I) {
     if (auto Child = getChild(I)) {
@@ -109,13 +121,13 @@ RC<SyntaxData> SyntaxData::getLastToken() const {
       }
     }
   }
-  return nullptr;
+  return None;
 }
 
-RC<SyntaxData>
+Optional<SyntaxData>
 SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
   if (!getRaw()->getChild(Index)) {
-    return nullptr;
+    return None;
   }
   /// FIXME: Start from the back (advancedToEndOfChildren) and reverse from
   /// there if Index is closer to the end as a performance improvement?
@@ -130,13 +142,10 @@ SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
   }
   AbsoluteSyntaxInfo Info(Position, NodeId);
 
-  // FIXME: We are leaking here.
-  const RC<SyntaxData> RefCountedParent = getRefCountedThis();
-  RC<SyntaxData> Data = SyntaxData::make(
-      AbsoluteRawSyntax(getRaw()->getChild(Index), Info), RefCountedParent);
-  auto Data2 = Data;
-  Data2.resetWithoutRelease();
-  return Data;
+  const RC<RefCountedBox<SyntaxData>> RefCountedParent =
+      RefCountedBox<SyntaxData>::make(*this);
+  return SyntaxData(AbsoluteRawSyntax(getRaw()->getChild(Index), Info),
+                    RefCountedParent);
 }
 
 AbsoluteOffsetPosition

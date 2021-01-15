@@ -51,6 +51,20 @@
 namespace swift {
 namespace syntax {
 
+/// A reference counted box that can contain any type.
+template <typename T>
+class RefCountedBox final
+    : public llvm::ThreadSafeRefCountedBase<RefCountedBox<T>> {
+public:
+  const T Data;
+
+  RefCountedBox(const T Data) : Data(Data) {}
+
+  static RC<RefCountedBox<T>> make(const T Data) {
+    return RC<RefCountedBox<T>>{new RefCountedBox(Data)};
+  }
+};
+
 /// The class for holding parented syntax.
 ///
 /// This structure should not contain significant public
@@ -58,93 +72,52 @@ namespace syntax {
 ///
 /// It is essentially a wrapper around \c AbsoluteRawSyntax that also keeps
 /// track of the parent.
-class SyntaxData final : public llvm::ThreadSafeRefCountedBase<SyntaxData> {
-
-  using RootDataPair = std::pair<RC<SyntaxData>, RC<SyntaxData>>;
-
+class SyntaxData {
   const AbsoluteRawSyntax AbsoluteRaw;
-  const RC<SyntaxData> Parent;
+  RC<RefCountedBox<SyntaxData>> Parent;
 
-  SyntaxData(AbsoluteRawSyntax AbsoluteRaw, const RC<SyntaxData> &Parent)
+  SyntaxData(AbsoluteRawSyntax AbsoluteRaw,
+             const RC<RefCountedBox<SyntaxData>> &Parent)
       : AbsoluteRaw(AbsoluteRaw), Parent(Parent) {}
 
+public:
   /// With a new \c RawSyntax node, create a new node from this one and
   /// recursively rebuild the parental chain up to the root.
-  ///
-  /// DO NOT expose this as public API.
-  RootDataPair replacingSelf(const RC<RawSyntax> &NewRaw) const {
-    if (hasParent()) {
-      auto NewRootAndParent =
-          Parent->replacingChild(NewRaw, getIndexInParent());
-      auto NewMe = NewRootAndParent.second->getChild(getIndexInParent());
-      return { NewRootAndParent.first, NewMe.get() };
-    } else {
-      auto NewMe = make(AbsoluteRawSyntax::forRoot(NewRaw), nullptr);
-      return { NewMe, NewMe.get() };
-    }
-  }
+  SyntaxData replacingSelf(const RC<RawSyntax> &NewRaw) const;
 
   /// Replace a child in the raw syntax and recursively rebuild the
   /// parental chain up to the root.
-  ///
-  /// DO NOT expose this as public API.
   template <typename CursorType>
-  RootDataPair replacingChild(const RC<RawSyntax> &RawChild,
-                              CursorType ChildCursor) const {
+  SyntaxData replacingChild(const RC<RawSyntax> &RawChild,
+                            CursorType ChildCursor) const {
     auto NewRaw = AbsoluteRaw.getRaw()->replacingChild(ChildCursor, RawChild);
     return replacingSelf(NewRaw);
   }
 
-  RC<SyntaxData> getRefCountedThis() const {
-    // FIXME: Is the usage of const_cast safe here?
-    return RC<SyntaxData>(const_cast<SyntaxData *>(this));
-  }
-
-public:
   /// Get the node immediately before this current node that does contain a
-  /// non-missing token. Return \c nullptr if we cannot find such node.
-  RC<SyntaxData> getPreviousNode() const;
+  /// non-missing token. Return \c None if we cannot find such node.
+  Optional<SyntaxData> getPreviousNode() const;
 
   /// Get the node immediately after this current node that does contain a
-  /// non-missing token. Return \c nullptr if we cannot find such node.
-  RC<SyntaxData> getNextNode() const;
+  /// non-missing token. Return \c None if we cannot find such node.
+  Optional<SyntaxData> getNextNode() const;
 
-  /// Get the first non-missing token node in this tree. Return \c nullptr if
+  /// Get the first non-missing token node in this tree. Return \c None if
   /// this node does not contain non-missing tokens.
-  RC<SyntaxData> getFirstToken() const;
+  Optional<SyntaxData> getFirstToken() const;
 
-  /// Get the last non-missing token node in this tree. Return \c nullptr if
+  /// Get the last non-missing token node in this tree. Return \c None if
   /// this node does not contain non-missing tokens.
-  RC<SyntaxData> getLastToken() const;
-
-  /// Constructs a SyntaxNode by replacing `self` and recursively building
-  /// the parent chain up to the root.
-  template <typename SyntaxNode>
-  SyntaxNode replacingSelf(const RC<RawSyntax> &NewRaw) const {
-    auto NewRootAndData = replacingSelf(NewRaw);
-    return { NewRootAndData.first, NewRootAndData.second.get() };
-  }
-
-  /// Replace a child in the raw syntax and recursively rebuild the
-  /// parental chain up to the root.
-  ///
-  /// DO NOT expose this as public API.
-  template <typename SyntaxNode, typename CursorType>
-  SyntaxNode replacingChild(const RC<RawSyntax> &RawChild,
-                            CursorType ChildCursor) const {
-    auto NewRootAndParent = replacingChild(RawChild, ChildCursor);
-    return SyntaxNode {
-      NewRootAndParent.first,
-      NewRootAndParent.second.get()
-    };
-  }
+  Optional<SyntaxData> getLastToken() const;
 
   /// Make a new \c SyntaxData node for the tree's root.
-  static RC<SyntaxData> make(AbsoluteRawSyntax AbsoluteRaw) {
+  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw) {
     return make(AbsoluteRaw, nullptr);
   }
-  static RC<SyntaxData> make(AbsoluteRawSyntax AbsoluteRaw,
-                             const RC<SyntaxData> &Parent);
+  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw,
+                         const RC<RefCountedBox<SyntaxData>> &Parent);
+
+  const AbsoluteRawSyntax &getAbsoluteRaw() const { return AbsoluteRaw; }
 
   /// Returns the raw syntax node for this syntax node.
   const RC<RawSyntax> &getRaw() const { return AbsoluteRaw.getRaw(); }
@@ -153,7 +126,13 @@ public:
   SyntaxKind getKind() const { return AbsoluteRaw.getRaw()->getKind(); }
 
   /// Return the parent syntax if there is one.
-  const RC<SyntaxData> &getParent() const { return Parent; }
+  Optional<SyntaxData> getParent() const {
+    if (Parent) {
+      return Parent->Data;
+    } else {
+      return None;
+    }
+  }
 
   /// Returns true if this syntax node has a parent.
   bool hasParent() const {
@@ -171,42 +150,15 @@ public:
     return AbsoluteRaw.getRaw()->getLayout().size();
   }
 
-  /// Gets the child at the index specified by the provided cursor,
-  /// lazily creating it if necessary.
+  /// Gets the child at the index specified by the provided cursor.
   template <typename CursorType>
-  RC<SyntaxData> getChild(CursorType Cursor) const {
+  Optional<SyntaxData> getChild(CursorType Cursor) const {
     return getChild(
         (AbsoluteSyntaxPosition::IndexInParentType)cursorIndex(Cursor));
   }
 
-  /// Gets the child at the specified index in this data's children array.
-  /// Why do we need this?
-  /// - SyntaxData nodes should have pointer identity.
-  /// - We only want to construct parented, realized child nodes as
-  ///   SyntaxData when asked.
-  ///
-  /// For example, if we have a ReturnStmtSyntax, and ask for its returned
-  /// expression for the first time with getExpression(), two nodes can race
-  /// to create and set the cached expression.
-  ///
-  /// Looking at an example - say we have a SyntaxData.
-  ///
-  /// SyntaxData = {
-  ///   RC<RawSyntax> Raw = {
-  ///     RC<RawTokenSyntax> { SyntaxKind::Token, tok::return_kw, "return" },
-  ///     RC<RawSyntax> { SyntaxKind::SomeExpression, ... }
-  ///   }
-  ///   llvm::SmallVector<AtomicCache<SyntaxData>, 10> Children {
-  ///     AtomicCache<SyntaxData> { RC<SyntaxData> = nullptr; },
-  ///     AtomicCache<SyntaxData> { RC<SyntaxData> = nullptr; },
-  ///   }
-  /// }
-  ///
-  /// If we wanted to safely create the 0th child, an instance of TokenSyntax,
-  /// then we ask the AtomicCache in that position to realize its value and
-  /// cache it. This is safe because AtomicCache only ever mutates its cache
-  /// one time -- the first initialization that wins a compare_exchange_strong.
-  RC<SyntaxData>
+  /// Gets the child at the specified \p Index.
+  Optional<SyntaxData>
   getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const;
 
   /// Get the offset at which the leading trivia of this node starts.

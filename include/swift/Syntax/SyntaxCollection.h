@@ -57,8 +57,7 @@ class SyntaxCollection : public Syntax {
   friend class Syntax;
 
 private:
-  static RC<SyntaxData>
-  makeData(std::initializer_list<Element> &Elements) {
+  static SyntaxData makeData(std::initializer_list<Element> &Elements) {
     std::vector<RC<RawSyntax>> List;
     List.reserve(Elements.size());
     for (auto &Elt : Elements)
@@ -67,12 +66,9 @@ private:
                                             SourcePresence::Present);
     return SyntaxData::make(AbsoluteRawSyntax::forRoot(Raw));
   }
-  SyntaxCollection(const RC<SyntaxData> Root): Syntax(Root, Root.get()) {}
 
 public:
-
-  SyntaxCollection(const RC<SyntaxData> Root, const SyntaxData *Data)
-  : Syntax(Root, Data) {}
+  SyntaxCollection(const SyntaxData Data) : Syntax(Data) {}
 
   SyntaxCollection(std::initializer_list<Element> list):
     SyntaxCollection(SyntaxCollection::makeData(list)) {}
@@ -108,7 +104,7 @@ public:
   Element operator[](const size_t Index) const {
     assert(Index < size());
     assert(!empty());
-    return { Root, Data->getChild(Index).get() };
+    return Element(*Data.getChild(Index));
   }
 
   /// Return a new collection with the given element added to the end.
@@ -120,7 +116,7 @@ public:
     std::copy(OldLayout.begin(), OldLayout.end(), back_inserter(NewLayout));
     NewLayout.push_back(E.getRaw());
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return a new collection with an element removed from the end.
@@ -130,7 +126,7 @@ public:
     assert(!empty());
     auto NewLayout = getRaw()->getLayout().drop_back();
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return a new collection with the given element appended to the front.
@@ -141,7 +137,7 @@ public:
     std::copy(OldLayout.begin(), OldLayout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return a new collection with an element removed from the end.
@@ -151,7 +147,7 @@ public:
     assert(!empty());
     auto NewLayout = getRaw()->getLayout().drop_front();
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return a new collection with the Element inserted at index i.
@@ -170,7 +166,7 @@ public:
     std::copy(OldLayout.begin() + i, OldLayout.end(),
               std::back_inserter(NewLayout));
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return a new collection with the element removed at index i.
@@ -181,13 +177,13 @@ public:
     std::advance(iterator, i);
     NewLayout.erase(iterator);
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return an empty syntax collection of this type.
   SyntaxCollection<CollectionKind, Element> cleared() const {
     auto Raw = RawSyntax::make(CollectionKind, {}, getRaw()->getPresence());
-    return Data->replacingSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
+    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   static bool kindof(SyntaxKind Kind) {
