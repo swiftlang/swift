@@ -46,12 +46,10 @@ public:
   /// Loads an OutputFileMap from the given \p Path into the receiver, if
   /// possible.
   static llvm::Expected<OutputFileMap>
-  loadFromPath(StringRef Path, StringRef workingDirectory,
-               bool addEntriesForSourceRangeDependencies);
+  loadFromPath(StringRef Path, StringRef workingDirector);
 
   static llvm::Expected<OutputFileMap>
-  loadFromBuffer(StringRef Data, StringRef workingDirectory,
-                 bool addEntriesForSourceRangeDependencies);
+  loadFromBuffer(StringRef Data, StringRef workingDirectory);
 
   /// Loads an OutputFileMap from the given \p Buffer, taking ownership
   /// of the buffer in the process.
@@ -60,8 +58,7 @@ public:
   /// the output file map.
   static llvm::Expected<OutputFileMap>
   loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer,
-                 StringRef workingDirectory,
-                 bool addEntriesForSourceRangeDependencies);
+                 StringRef workingDirectory);
 
   /// Get the map of outputs for the given \p Input, if present in the
   /// OutputFileMap. (If not present, returns nullptr.)
@@ -90,8 +87,7 @@ private:
   /// Parses the given \p Buffer and returns either an OutputFileMap or
   /// error, taking ownership of \p Buffer in the process.
   static llvm::Expected<OutputFileMap>
-  parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory,
-        bool addEntriesForSourceRangeDependencies);
+  parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory);
 };
 
 } // end namespace swift

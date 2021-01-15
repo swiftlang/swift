@@ -20,7 +20,6 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
-#include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
@@ -103,16 +102,6 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
-}
-std::string
-CompilerInvocation::getSwiftRangesFilePathForPrimary(StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.SwiftRangesFilePath;
-}
-std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
-    StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.CompiledSourceFilePath;
 }
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
@@ -1209,21 +1198,4 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
-}
-
-bool CompilerInstance::emitSwiftRanges(DiagnosticEngine &diags,
-                                       SourceFile *primaryFile,
-                                       StringRef outputPath) const {
-  return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile,
-                                                SourceMgr, diags)
-      .emit();
-  return false;
-}
-
-bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
-                                          const SourceFile *primaryFile,
-                                          StringRef outputPath) const {
-  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile,
-                                                   SourceMgr, diags)
-      .emit();
 }

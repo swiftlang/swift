@@ -3300,12 +3300,19 @@ namespace {
 
       // Create the struct declaration and record it.
       auto name = importedName.getDeclName().getBaseIdentifier();
-      auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
-                                 AccessLevel::Public,
-                                 Impl.importSourceLoc(decl->getBeginLoc()),
-                                 name,
-                                 Impl.importSourceLoc(decl->getLocation()),
-                                 None, nullptr, dc);
+      StructDecl *result = nullptr;
+      // Try to find an already-imported struct. This case happens any time
+      // there are nested structs. The "Parent" struct will import the "Child"
+      // struct at which point it attempts to import its decl context which is
+      // the "Parent" struct. Without trying to look up already-imported structs
+      // this will cause an infinite loop.
+      auto alreadyImportedResult =
+          Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+      if (alreadyImportedResult != Impl.ImportedDecls.end())
+        return alreadyImportedResult->second;
+      result = Impl.createDeclWithClangNode<StructDecl>(
+          decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
+          name, Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -3316,6 +3323,7 @@ namespace {
       SmallVector<VarDecl *, 4> members;
       SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
+      SmallVector<TypeDecl *, 4> nestedTypes;
 
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
@@ -3374,27 +3382,13 @@ namespace {
           continue;
         }
 
-        if (isa<TypeDecl>(member)) {
+        if (auto nestedType = dyn_cast<TypeDecl>(member)) {
           // Only import definitions. Otherwise, we might add the same member
           // twice.
           if (auto tagDecl = dyn_cast<clang::TagDecl>(nd))
             if (tagDecl->getDefinition() != tagDecl)
               continue;
-          // A struct nested inside another struct will either be logically
-          // a sibling of the outer struct, or contained inside of it, depending
-          // on if it has a declaration name or not.
-          //
-          // struct foo { struct bar { ... } baz; } // sibling
-          // struct foo { struct { ... } baz; } // child
-          //
-          // In the latter case, we add the imported type as a nested type
-          // of the parent.
-          //
-          // TODO: C++ types have different rules.
-          if (auto nominalDecl = dyn_cast<NominalTypeDecl>(member->getDeclContext())) {
-            assert(nominalDecl == result && "interesting nesting of C types?");
-            nominalDecl->addMember(member);
-          }
+          nestedTypes.push_back(nestedType);
           continue;
         }
 
@@ -3417,7 +3411,30 @@ namespace {
         }
 
         members.push_back(VD);
+      }
 
+      for (auto nestedType : nestedTypes) {
+        // A struct nested inside another struct will either be logically
+        // a sibling of the outer struct, or contained inside of it, depending
+        // on if it has a declaration name or not.
+        //
+        // struct foo { struct bar { ... } baz; } // sibling
+        // struct foo { struct { ... } baz; } // child
+        //
+        // In the latter case, we add the imported type as a nested type
+        // of the parent.
+        //
+        // TODO: C++ types have different rules.
+        if (auto nominalDecl =
+                dyn_cast<NominalTypeDecl>(nestedType->getDeclContext())) {
+          assert(nominalDecl == result && "interesting nesting of C types?");
+          nominalDecl->addMember(nestedType);
+        }
+      }
+
+      bool hasReferenceableFields = !members.empty();
+      for (auto member : members) {
+        auto nd = cast<clang::NamedDecl>(member->getClangDecl());
         // Bitfields are imported as computed properties with Clang-generated
         // accessors.
         bool isBitField = false;
@@ -3428,36 +3445,32 @@ namespace {
             hasUnreferenceableStorage = true;
             isBitField = true;
 
-            makeBitFieldAccessors(Impl,
-                                  const_cast<clang::RecordDecl *>(decl),
-                                  result,
-                                  const_cast<clang::FieldDecl *>(field),
-                                  VD);
+            makeBitFieldAccessors(Impl, const_cast<clang::RecordDecl *>(decl),
+                                  result, const_cast<clang::FieldDecl *>(field),
+                                  member);
           }
         }
 
         if (auto ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
           // Indirect fields are created as computed property accessible the
           // fields on the anonymous field from which they are injected.
-          makeIndirectFieldAccessors(Impl, ind, members, result, VD);
+          makeIndirectFieldAccessors(Impl, ind, members, result, member);
         } else if (decl->isUnion() && !isBitField) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
           // field type.
-          makeUnionFieldAccessors(Impl, result, VD);
+          makeUnionFieldAccessors(Impl, result, member);
 
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
-          auto valueCtor =
-              createValueConstructor(Impl, result, VD,
-                                     /*want param names*/true,
-                                     /*wantBody=*/true);
+          auto valueCtor = createValueConstructor(Impl, result, member,
+                                                  /*want param names*/ true,
+                                                  /*wantBody=*/true);
           ctors.push_back(valueCtor);
         }
+        result->addMember(member);
       }
-
-      bool hasReferenceableFields = !members.empty();
 
       const clang::CXXRecordDecl *cxxRecordDecl =
           dyn_cast<clang::CXXRecordDecl>(decl);
@@ -3484,10 +3497,6 @@ namespace {
           valueCtor->setIsMemberwiseInitializer();
 
         ctors.push_back(valueCtor);
-      }
-
-      for (auto member : members) {
-        result->addMember(member);
       }
 
       for (auto ctor : ctors) {
@@ -9033,7 +9042,9 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
         if (!member)
           continue;
 
-        enumDecl->addMember(member);
+        // TODO: remove this change when #34706 lands.
+        if (!member->NextDecl)
+          enumDecl->addMember(member);
       }
     }
     return;

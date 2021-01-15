@@ -480,11 +480,10 @@ public:
   ///
   /// Operationally this means that:
   ///
-  /// * For SILArguments, this returns the first instruction in the block. This
-  ///   is the main divergence from getDefiningInsertionPoint (see discussion
-  ///   below).
+  /// * For SILArguments, this returns the first instruction in the block.
   ///
-  /// * For SILInstructions, this returns std::next.
+  /// * For SILInstructions, this returns std::next. This is the main divergence
+  ///   from getDefiningInsertionPoint() (see discussion below).
   ///
   /// * For SILUndef, this returns nullptr.
   ///
@@ -803,7 +802,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Consequently, OperandOwnership kinds that are allowed to take either Owned
 /// or Guaranteed values map to an OwnershipKind::Any constraint.
 ///
-/// Unowned values are more restricted than then Owned or Guaranteed values in
+/// Unowned values are more restricted than Owned or Guaranteed values in
 /// terms of their valid uses, which helps limit the situations where the
 /// implementation needs to consider this special case. This additional
 /// restriction is validated by `canAcceptUnownedValue`.

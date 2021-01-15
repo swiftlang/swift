@@ -146,6 +146,8 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 
 void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   switch (value) {
+  case Kind::Invalid:
+    llvm_unreachable("Using an unreachable?!");
   case Kind::BeginBorrow:
     os << "BeginBorrow";
     return;
@@ -190,6 +192,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 bool BorrowingOperand::visitLocalEndScopeUses(
     function_ref<bool(Operand *)> func) const {
   switch (kind) {
+  case BorrowingOperandKind::Invalid:
+    llvm_unreachable("Using invalid case");
   case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
@@ -228,20 +232,24 @@ bool BorrowingOperand::visitLocalEndScopeUses(
 void BorrowingOperand::visitBorrowIntroducingUserResults(
     function_ref<void(BorrowedValue)> visitor) const {
   switch (kind) {
+  case BorrowingOperandKind::Invalid:
+    llvm_unreachable("Using invalid case");
   case BorrowingOperandKind::Apply:
   case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::Yield:
     llvm_unreachable("Never has borrow introducer results!");
   case BorrowingOperandKind::BeginBorrow: {
-    auto value = *BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
+    auto value = BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
+    assert(value);
     return visitor(value);
   }
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
     for (auto *succBlock : bi->getSuccessorBlocks()) {
       auto value =
-          *BorrowedValue::get(succBlock->getArgument(op->getOperandNumber()));
+          BorrowedValue::get(succBlock->getArgument(op->getOperandNumber()));
+      assert(value);
       visitor(value);
     }
     return;
@@ -263,8 +271,8 @@ void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     // single guaranteed scope.
     value.visitLocalScopeEndingUses([&](Operand *valueUser) {
       if (auto subBorrowScopeOp = BorrowingOperand::get(valueUser)) {
-        if (subBorrowScopeOp->isReborrow()) {
-          subBorrowScopeOp->visitUserResultConsumingUses(func);
+        if (subBorrowScopeOp.isReborrow()) {
+          subBorrowScopeOp.visitUserResultConsumingUses(func);
           return;
         }
       }
@@ -315,6 +323,8 @@ void BorrowingOperand::getImplicitUses(
 
 void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   switch (value) {
+  case BorrowedValueKind::Invalid:
+    llvm_unreachable("Using invalid case?!");
   case BorrowedValueKind::SILFunctionArgument:
     os << "SILFunctionArgument";
     return;
@@ -342,6 +352,8 @@ void BorrowedValue::getLocalScopeEndingInstructions(
   assert(isLocalScope() && "Should only call this given a local scope");
 
   switch (kind) {
+  case BorrowedValueKind::Invalid:
+    llvm_unreachable("Using invalid case?!");
   case BorrowedValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
   case BorrowedValueKind::BeginBorrow:
@@ -361,6 +373,8 @@ void BorrowedValue::visitLocalScopeEndingUses(
     function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
+  case BorrowedValueKind::Invalid:
+    llvm_unreachable("Using invalid case?!");
   case BorrowedValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
   case BorrowedValueKind::LoadBorrow:
@@ -441,7 +455,7 @@ bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
       continue;
     }
 
-    scopeOperand->visitConsumingUsesOfBorrowIntroducingUserResults(
+    scopeOperand.visitConsumingUsesOfBorrowIntroducingUserResults(
         [&](Operand *op) {
           assert(op->isLifetimeEnding() && "Expected only consuming uses");
           // Make sure we haven't visited this consuming operand yet. If we
@@ -464,7 +478,7 @@ bool BorrowedValue::visitInteriorPointerOperands(
     auto *op = worklist.pop_back_val();
 
     if (auto interiorPointer = InteriorPointerOperand::get(op)) {
-      func(*interiorPointer);
+      func(interiorPointer);
       continue;
     }
 
@@ -617,6 +631,8 @@ bool InteriorPointerOperand::getImplicitUses(
 
 void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
   switch (value) {
+  case OwnedValueIntroducerKind::Invalid:
+    llvm_unreachable("Using invalid case?!");
   case OwnedValueIntroducerKind::Apply:
     os << "Apply";
     return;
@@ -677,7 +693,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
 
     // First check if v is an introducer. If so, stash it and continue.
     if (auto scopeIntroducer = BorrowedValue::get(value)) {
-      out.push_back(*scopeIntroducer);
+      out.push_back(scopeIntroducer);
       continue;
     }
 
@@ -716,10 +732,9 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   return true;
 }
 
-Optional<BorrowedValue>
-swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
+BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
   if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
-    return None;
+    return {};
 
   SILValue currentValue = inputValue;
   while (true) {
@@ -738,7 +753,7 @@ swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
         // this.
         auto begin = instOps.begin();
         if (std::next(begin) != instOps.end()) {
-          return None;
+          return {};
         }
         // Otherwise, set currentOp to the single operand and continue.
         currentValue = *begin;
@@ -758,7 +773,7 @@ swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
 
     // Otherwise, this is an introducer we do not understand. Bail and return
     // None.
-    return None;
+    return {};
   }
 
   llvm_unreachable("Should never hit this");
@@ -777,7 +792,7 @@ bool swift::getAllOwnedValueIntroducers(
 
     // First check if v is an introducer. If so, stash it and continue.
     if (auto introducer = OwnedValueIntroducer::get(value)) {
-      out.push_back(*introducer);
+      out.push_back(introducer);
       continue;
     }
 
@@ -816,10 +831,9 @@ bool swift::getAllOwnedValueIntroducers(
   return true;
 }
 
-Optional<OwnedValueIntroducer>
-swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
+OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
   if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
-    return None;
+    return {};
 
   SILValue currentValue = inputValue;
   while (true) {
@@ -838,7 +852,7 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
         // this.
         auto begin = instOps.begin();
         if (std::next(begin) != instOps.end()) {
-          return None;
+          return {};
         }
         // Otherwise, set currentOp to the single operand and continue.
         currentValue = *begin;
@@ -859,7 +873,7 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
 
     // Otherwise, this is an introducer we do not understand. Bail and return
     // None.
-    return None;
+    return {};
   }
 
   llvm_unreachable("Should never hit this");
@@ -869,12 +883,12 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
 //                             Forwarding Operand
 //===----------------------------------------------------------------------===//
 
-Optional<ForwardingOperand> ForwardingOperand::get(Operand *use) {
+ForwardingOperand ForwardingOperand::get(Operand *use) {
   if (use->isTypeDependent())
-    return None;
+    return nullptr;
 
   if (!OwnershipForwardingMixin::isa(use->getUser())) {
-    return None;
+    return nullptr;
   }
 #ifndef NDEBUG
   switch (use->getOperandOwnership()) {

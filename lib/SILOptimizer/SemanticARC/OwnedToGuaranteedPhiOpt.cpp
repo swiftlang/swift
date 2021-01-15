@@ -61,19 +61,19 @@ static bool canEliminatePhi(
     // to eliminate. Since we do not look through joined live ranges, we must
     // only have a single introducer. So look for that one and if not, bail.
     auto singleIntroducer = getSingleOwnedValueIntroducer(incomingValue);
-    if (!singleIntroducer.hasValue()) {
+    if (!singleIntroducer) {
       return false;
     }
 
     // Then make sure that our owned value introducer is able to be converted to
     // guaranteed and that we found it to have a LiveRange that we could have
     // eliminated /if/ we were to get rid of this phi.
-    if (!singleIntroducer->isConvertableToGuaranteed()) {
+    if (!singleIntroducer.isConvertableToGuaranteed()) {
       return false;
     }
 
     // Otherwise, add the introducer to our result array.
-    ownedValueIntroducerAccumulator.push_back(*singleIntroducer);
+    ownedValueIntroducerAccumulator.push_back(singleIntroducer);
   }
 
 #ifndef NDEBUG
