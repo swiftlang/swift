@@ -5296,8 +5296,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   return false;
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(
-    ConstraintSystem::PotentialBindings &bindings)
+TypeVarBindingProducer::TypeVarBindingProducer(PotentialBindings &bindings)
     : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
       TypeVar(bindings.TypeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {

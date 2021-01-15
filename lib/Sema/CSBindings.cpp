@@ -25,10 +25,24 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-bool ConstraintSystem::PotentialBindings::canBeNil() const {
+bool PotentialBindings::canBeNil() const {
   auto &ctx = CS.getASTContext();
   return Literals.count(
       ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral));
+}
+
+bool PotentialBindings::isDirectHole() const {
+  // Direct holes are only allowed in "diagnostic mode".
+  if (!CS.shouldAttemptFixes())
+    return false;
+
+  return Bindings.empty() && getNumViableLiteralBindings() == 0 &&
+         Defaults.empty() && TypeVar->getImpl().canBindToHole();
+}
+
+bool PotentialBindings::isGenericParameter() const {
+  auto *locator = TypeVar->getImpl().getLocator();
+  return locator && locator->isLastElement<LocatorPathElt::GenericParameter>();
 }
 
 bool PotentialBinding::isViableForJoin() const {
@@ -42,7 +56,7 @@ bool PotentialBinding::isViableForJoin() const {
          !isDefaultableBinding();
 }
 
-bool ConstraintSystem::PotentialBindings::isDelayed() const {
+bool PotentialBindings::isDelayed() const {
   if (!DelayedBy.empty())
     return true;
 
@@ -67,7 +81,7 @@ bool ConstraintSystem::PotentialBindings::isDelayed() const {
   return false;
 }
 
-bool ConstraintSystem::PotentialBindings::involvesTypeVariables() const {
+bool PotentialBindings::involvesTypeVariables() const {
   // This is effectively O(1) right now since bindings are re-computed
   // on each step of the solver, but once bindings are computed
   // incrementally it becomes more important to double-check that
@@ -77,7 +91,7 @@ bool ConstraintSystem::PotentialBindings::involvesTypeVariables() const {
   });
 }
 
-bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
+bool PotentialBindings::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
   if (isGenericParameter())
     return true;
@@ -154,8 +168,8 @@ bool ConstraintSystem::PotentialBindings::isPotentiallyIncomplete() const {
   return false;
 }
 
-void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
-    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+void PotentialBindings::inferTransitiveProtocolRequirements(
+    llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
         &inferredBindings) {
   if (TransitiveProtocols)
     return;
@@ -284,9 +298,8 @@ void ConstraintSystem::PotentialBindings::inferTransitiveProtocolRequirements(
   } while (!workList.empty());
 }
 
-void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    const llvm::SmallDenseMap<TypeVariableType *,
-                              ConstraintSystem::PotentialBindings>
+void PotentialBindings::inferTransitiveBindings(
+    const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
         &inferredBindings) {
   using BindingKind = AllowedBindingKind;
 
@@ -353,15 +366,35 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
   }
 }
 
-void ConstraintSystem::PotentialBindings::finalize(
-    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+void PotentialBindings::finalize(
+    llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
         &inferredBindings) {
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
 }
 
-Optional<ConstraintSystem::PotentialBindings>
-ConstraintSystem::determineBestBindings() {
+PotentialBindings::BindingScore
+PotentialBindings::formBindingScore(const PotentialBindings &b) {
+  // If there are no bindings available but this type
+  // variable represents a closure - let's consider it
+  // as having a single non-default binding - that would
+  // be a type inferred based on context.
+  // It's considered to be non-default for purposes of
+  // ranking because we'd like to prioritize resolving
+  // closures to gain more information from their bodies.
+  unsigned numBindings = b.Bindings.size() + b.getNumViableLiteralBindings();
+  auto numNonDefaultableBindings = numBindings > 0 ? numBindings
+                                   : b.TypeVar->getImpl().isClosureType() ? 1
+                                                                          : 0;
+
+  return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
+                         b.isDelayed(), b.isSubtypeOfExistentialType(),
+                         b.involvesTypeVariables(),
+                         static_cast<unsigned char>(b.getLiteralKind()),
+                         -numNonDefaultableBindings);
+}
+
+Optional<PotentialBindings> ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   Optional<PotentialBindings> bestBindings;
   llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> cache;
@@ -378,8 +411,7 @@ ConstraintSystem::determineBestBindings() {
   // types, default types from "defaultable" constraints or literal
   // conformances, such type variable is not viable to be evaluated to be
   // attempted next.
-  auto isViableForRanking =
-      [this](const ConstraintSystem::PotentialBindings &bindings) -> bool {
+  auto isViableForRanking = [this](const PotentialBindings &bindings) -> bool {
     auto *typeVar = bindings.TypeVar;
 
     // If type variable is marked as a potential hole there is always going
@@ -462,13 +494,12 @@ findInferableTypeVars(Type type,
   type.walk(Walker(typeVars));
 }
 
-void ConstraintSystem::PotentialBindings::addDefault(Constraint *constraint) {
+void PotentialBindings::addDefault(Constraint *constraint) {
   auto defaultTy = constraint->getSecondType();
   Defaults.insert({defaultTy->getCanonicalType(), constraint});
 }
 
-bool ConstraintSystem::LiteralRequirement::isCoveredBy(
-    Type type, DeclContext *useDC) const {
+bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
   auto coversDefaultType = [](Type type, Type defaultType) -> bool {
     if (!defaultType->hasUnboundGenericType())
       return type->isEqual(defaultType);
@@ -491,9 +522,10 @@ bool ConstraintSystem::LiteralRequirement::isCoveredBy(
   return bool(TypeChecker::conformsToProtocol(type, getProtocol(), useDC));
 }
 
-std::pair<bool, Type> ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
-    const LiteralRequirement &literal, const PotentialBinding &binding,
-    bool canBeNil) const {
+std::pair<bool, Type>
+PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
+                                      const PotentialBinding &binding,
+                                      bool canBeNil) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
   case AllowedBindingKind::Exact:
@@ -541,8 +573,8 @@ std::pair<bool, Type> ConstraintSystem::PotentialBindings::isLiteralCoveredBy(
   } while (true);
 }
 
-bool ConstraintSystem::PotentialBindings::addPotentialBinding(
-    PotentialBinding binding, bool allowJoinMeet) {
+bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
+                                            bool allowJoinMeet) {
   assert(!binding.BindingType->is<ErrorType>());
 
   if (Bindings.count(binding))
@@ -631,7 +663,7 @@ bool ConstraintSystem::PotentialBindings::addPotentialBinding(
   return Bindings.insert(std::move(binding));
 }
 
-void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
+void PotentialBindings::addLiteral(Constraint *constraint) {
   auto isDirectRequirement = [&](Constraint *constraint) -> bool {
     if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
       auto *repr = CS.getRepresentative(typeVar);
@@ -716,8 +748,7 @@ void ConstraintSystem::PotentialBindings::addLiteral(Constraint *constraint) {
   Literals.insert({protocol, std::move(literal)});
 }
 
-bool ConstraintSystem::PotentialBindings::isViable(
-    PotentialBinding &binding) const {
+bool PotentialBindings::isViable(PotentialBinding &binding) const {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
@@ -739,8 +770,7 @@ bool ConstraintSystem::PotentialBindings::isViable(
   return true;
 }
 
-bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
-    Constraint *disjunction) const {
+bool PotentialBindings::favoredOverDisjunction(Constraint *disjunction) const {
   if (isHole() || isDelayed())
     return false;
 
@@ -770,8 +800,8 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
   return !involvesTypeVariables();
 }
 
-ConstraintSystem::PotentialBindings
-ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
+PotentialBindings ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
+                                                     bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
@@ -791,8 +821,7 @@ ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar, bool finalize) {
   }
 
   if (finalize) {
-    llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
-        inferred;
+    llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> inferred;
 
     bindings.finalize(inferred);
   }
@@ -1003,7 +1032,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-bool ConstraintSystem::PotentialBindings::infer(Constraint *constraint) {
+bool PotentialBindings::infer(Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -1194,7 +1223,7 @@ bool ConstraintSystem::PotentialBindings::infer(Constraint *constraint) {
   return false;
 }
 
-LiteralBindingKind ConstraintSystem::PotentialBindings::getLiteralKind() const {
+LiteralBindingKind PotentialBindings::getLiteralKind() const {
   LiteralBindingKind kind = LiteralBindingKind::None;
 
   for (const auto &literal : Literals) {
@@ -1226,16 +1255,14 @@ LiteralBindingKind ConstraintSystem::PotentialBindings::getLiteralKind() const {
   return kind;
 }
 
-unsigned
-ConstraintSystem::PotentialBindings::getNumViableLiteralBindings() const {
+unsigned PotentialBindings::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
     return literal.second.viableAsBinding();
   });
 }
 
-void ConstraintSystem::PotentialBindings::dump(TypeVariableType *typeVar,
-                                               llvm::raw_ostream &out,
-                                               unsigned indent) const {
+void PotentialBindings::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
+                             unsigned indent) const {
   out.indent(indent);
   out << "(";
   if (typeVar)
@@ -1244,8 +1271,7 @@ void ConstraintSystem::PotentialBindings::dump(TypeVariableType *typeVar,
   out << ")\n";
 }
 
-void ConstraintSystem::PotentialBindings::dump(llvm::raw_ostream &out,
-                                               unsigned indent) const {
+void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
   out.indent(indent);
   if (isDirectHole())
     out << "hole ";
@@ -1256,7 +1282,7 @@ void ConstraintSystem::PotentialBindings::dump(llvm::raw_ostream &out,
   if (isSubtypeOfExistentialType())
     out << "subtype_of_existential ";
   auto literalKind = getLiteralKind();
-  if (literalKind != inference::LiteralBindingKind::None)
+  if (literalKind != LiteralBindingKind::None)
     out << "literal=" << static_cast<int>(literalKind) << " ";
   if (involvesTypeVariables())
     out << "involves_type_vars ";
