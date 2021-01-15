@@ -4348,10 +4348,13 @@ NOTE(actor_isolated_sync_func,none,
      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' asynchronous methods can be used outside the distributed actor instance; "
-      "do you want to add '@distributed'?", ())
+      "do you want to add 'distributed'?", ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "distributed function parameter '%0' type %1 must conform to 'Codable'",
+      "distributed function parameter '%0' type %1 does not conform to 'Codable'",
       (StringRef, Type))
+ERROR(distributed_actor_func_result_not_codable,none,
+      "distributed function result type %0 does not conform to 'Codable'",
+      (Type))
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -4423,30 +4426,30 @@ ERROR(actor_instance_property_wrapper,none,
       (Identifier, Identifier))
 
 ERROR(distributedactor_local_var,none,
-      "'@distributed' can not be applied to local variables",
+      "'distributed' can not be applied to local variables",
       ())
 ERROR(distributedactor_let,none,
-      "'@distributed' can not be applied to local properties",
+      "'distributed' can not be applied to local properties",
       ())
 ERROR(distributedactor_storage,none,
-      "'@distributed' can not be applied to actor properties; "
-      "Only async functions can be '@distributed'",
+      "'distributed' can not be applied to actor properties; "
+      "Only async functions can be 'distributed'",
       ())
 ERROR(distributedactor_not_actor,none,
-      "'@distributed' can only be applied to 'actor class' definitions, "
+      "'distributed' can only be applied to 'actor class' definitions, "
       "and distributed actor isolated async functions",
       ())
 ERROR(distributedactor_not_actor_func,none,
-      "'@distributed' can only be applied to distributed actor async functions",
+      "'distributed' can only be applied to distributed actor async functions",
       ())
 ERROR(distributedactor_func_not_async_throws,none,
-      "'@distributed' actor-isolated function must be 'async throws'",
+      "'distributed' actor-isolated function must be 'async throws'",
       ())
 ERROR(distributedactor_func_static,none,
-      "'@distributed' actor-isolated functions cannot be 'static'",
+      "'distributed' actor-isolated functions cannot be 'static'",
       ())
 ERROR(distributedactor_func_not_in_distributed_actor,none,
-      "'@distributed' function can only be declared within 'distributed actor class'",
+      "'distributed' function can only be declared within 'distributed actor class'",
       ())
 
 ERROR(concurrency_lib_missing,none,

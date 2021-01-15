@@ -5774,7 +5774,6 @@ public:
   bool hasPolymorphicEffect(EffectKind kind) const;
 
   /// Returns 'true' if the function is distributed.
-  // TODO: now we also check that it is a well formed distributed (i.e. also async, should we just check the annotation presence?)
   bool isDistributed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;

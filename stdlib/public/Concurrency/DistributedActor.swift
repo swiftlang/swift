@@ -71,15 +71,38 @@ extension DistributedActor {
   }
 }
 
+// TODO: implement in C, by inspecting the status flag of the instance
 public func __isRemoteActor<Act>(_ actor: Act) -> Bool
   where Act: DistributedActor {
   return false // TODO: implement
 }
 
+public func __isLocalActor<Act>(_ actor: Act) -> Bool
+  where Act: DistributedActor {
+  return !__isRemoteActor(actor)
+}
+
 public protocol ActorTransport {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
-  func resolve<A>(address: ActorAddress, as actorType: A.Type) where A: DistributedActor
+  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
+    where Act: DistributedActor
+
+  /// Create an `ActorAddress` for the passed actor type.
+  ///
+  /// This function is invoked by an distributed actor during its initialization,
+  /// and the returned address value is stored along with it for the time of its
+  /// lifetime.
+  ///
+  /// The address MUST uniquely identify the actor, and allow resolving it.
+  /// E.g. if an actor is created under address `addr1` then immediately invoking
+  /// `transport.resolve(address: addr1, as: Greeter.self)` MUST return a reference
+  /// to the same actor.
+  func makeAddress<Act>(
+    forType: Act.Type,
+    onActorCreated: (Act) -> ()
+  ) -> ActorAddress
+    where Act: DistributedActor
 
   func send<Message>(
     _ message: Message,

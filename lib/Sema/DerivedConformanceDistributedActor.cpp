@@ -124,6 +124,14 @@ bool DerivedConformance::canDeriveDistributedActor(
 //}
 //
 
+///// Synthesizer callback for an empty implicit function body.
+//static std::pair<BraceStmt *, bool>
+//synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
+//  ASTContext &ctx = afd->getASTContext();
+//  return { BraceStmt::create(ctx, afd->getLoc(), { }, afd->getLoc(), true),
+//      /*isTypeChecked=*/true };
+//}
+
 /// Derive the declaration of Actor's actorTransport.
 static ValueDecl *deriveDistributedActor_initializer(DerivedConformance &derived) {
   ASTContext &ctx = derived.Context;
@@ -158,8 +166,6 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   // Synthesize properties
   auto var = dyn_cast<VarDecl>(requirement);
   if (var) {
-    requirement->dump();
-
     if (VarDecl::isDistributedActorTransportName(Context, var->getName())) {
       fprintf(stderr, "[%s:%d] >> (%s)  \n", __FILE__, __LINE__, __FUNCTION__);
       return deriveDistributedActor_actorTransport(*this);
@@ -178,7 +184,11 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   }
 
   // Synthesize initializers
-  // TODO: derive init(from:) impl
+  auto ctor = dyn_cast<ConstructorDecl>(requirement);
+  if (ctor) {
+    fprintf(stderr, "[%s:%d] >> (%s)  \n", __FILE__, __LINE__, __FUNCTION__);
+    return deriveDistributedActor_initializer(*this);
+  }
 
-   return nullptr;
+ return nullptr;
 }

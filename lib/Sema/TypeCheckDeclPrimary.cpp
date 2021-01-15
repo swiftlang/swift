@@ -1401,6 +1401,58 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
+void TypeChecker::checkParameterList(ParameterList *params,
+                                     DeclContext *owner) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+
+    // async autoclosures can only occur as parameters to async functions.
+    if (param->isAutoClosure()) {
+      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+        if (fnType->isAsync() &&
+            !(isa<AbstractFunctionDecl>(owner) &&
+              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
+          param->diagnose(diag::async_autoclosure_nonasync_function);
+          if (auto func = dyn_cast<FuncDecl>(owner))
+            addAsyncNotes(func);
+        }
+      }
+    }
+  }
+
+  // For source compatibility, allow duplicate internal parameter names
+  // on protocol requirements.
+  //
+  // FIXME: Consider turning this into a warning or error if we do
+  // another -swift-version.
+  if (!isa<ProtocolDecl>(owner->getParent())) {
+    // Check for duplicate parameter names.
+    diagnoseDuplicateDecls(*params);
+  }
+}
+
+void TypeChecker::checkResultType(Type resultType,
+                                  DeclContext *owner) {
+//  // Only distributed functions have special requirements on return types.
+//  if (!owner->isDistributed())
+//    return;
+//
+//  auto conformanceDC = owner->getConformanceContext();
+//
+//  // Result type of distributed functions must be Codable.
+//  auto target =
+//      conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
+//  if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
+//      .isInvalid()) {
+//    TypeLoc typeLoc = {
+//        it->second->getTypeReprOrParentPatternTypeRepr(),
+//        it->second->getType(),
+//    };
+//    it->second->diagnose(diag::codable_non_conforming_property_here,
+//                         derived.getProtocolType(), typeLoc);
+//    propertiesAreValid = false;
+}
+
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -2564,6 +2616,7 @@ public:
       checkAccessControl(FD);
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
+      TypeChecker::checkResultType(FD->getResultInterfaceType(), FD);
     }
 
     TypeChecker::checkDeclAttributes(FD);

@@ -1942,7 +1942,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   BraceStmt *body = AFD->getBody();
   assert(body && "Expected body to type-check");
 
-  // It's possible we sythesized an already type-checked body, in which case
+  // It's possible we synthesized an already type-checked body, in which case
   // we're done.
   if (AFD->isBodyTypeChecked())
     return body;
