@@ -49,7 +49,7 @@ const uint16_t SWIFTSOURCEINFO_VERSION_MAJOR = 2;
 /// interesting to test for. A backwards-compatible change is one where an \e
 /// old compiler can read the new format without any problems (usually by
 /// ignoring new information).
-const uint16_t SWIFTSOURCEINFO_VERSION_MINOR = 0; // Last change: add doc comment ranges
+const uint16_t SWIFTSOURCEINFO_VERSION_MINOR = 1; // Last change: add source file list
 
 /// The hash seed used for the string hashes(llvm::djbHash) in a .swiftsourceinfo file.
 const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
@@ -72,7 +72,13 @@ namespace decl_locs_block {
     DECL_USRS,
     TEXT_DATA,
     DOC_RANGES,
+    SOURCE_FILE_LIST,
   };
+
+  using SourceFileListLayout = BCRecordLayout<
+    SOURCE_FILE_LIST, // record ID
+    BCBlob            // An array of fixed size 'BasicSourceFileInfo' data.
+  >;
 
   using BasicDeclLocsLayout = BCRecordLayout<
     BASIC_DECL_LOCS, // record ID
