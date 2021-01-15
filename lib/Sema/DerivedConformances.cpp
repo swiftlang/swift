@@ -75,6 +75,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveHashable(Nominal);
   }
 
+  if (*derivableKind == KnownDerivableProtocolKind::DistributedActor) {
+    return canDeriveDistributedActor(Nominal, DC);
+  }
+
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
@@ -306,6 +310,18 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+
+    // DistributedActor.actorAddress
+    if (name.isSimpleName(ctx.Id_actorAddress)) {
+      printf("[%s:%d] >> derived conformances: Id_actorAddress \n", __FILE__, __LINE__);
+      return getRequirement(KnownProtocolKind::DistributedActor);
+    }
+
+    // DistributedActor.actorTransport
+    if (name.isSimpleName(ctx.Id_actorTransport)) {
+      printf("[%s:%d] >> derived conformances: Id_actorTransport \n", __FILE__, __LINE__);
+      return getRequirement(KnownProtocolKind::DistributedActor);
+    }
 
     return nullptr;
   }

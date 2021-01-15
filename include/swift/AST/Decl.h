@@ -3943,6 +3943,8 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Actor,
+  DistributedActor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -5073,13 +5075,19 @@ public:
     return getAttrs().getAttributes<SemanticsAttr>();
   }
 
-  /// Returns true if this VarDelc has the string \p attrValue as a semantics
+  /// Returns true if this VarDecl has the string \p attrValue as a semantics
   /// attribute.
   bool hasSemanticsAttr(StringRef attrValue) const {
     return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
       return attrValue.equals(attr->Value);
     });
   }
+
+  /// Whether the given name is actorAddress, which is used for distributed actors.
+  static bool isDistributedActorAddressName(ASTContext &ctx, DeclName name);
+
+  /// Whether the given name is actorTransport, which is used for distributed actors.
+  static bool isDistributedActorTransportName(ASTContext &ctx, DeclName name);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -5765,7 +5773,7 @@ public:
   /// Returns if the function is 'rethrows' or 'reasync'.
   bool hasPolymorphicEffect(EffectKind kind) const;
 
-  /// Returns 'true' if the function is @distributed.
+  /// Returns 'true' if the function is distributed.
   // TODO: now we also check that it is a well formed distributed (i.e. also async, should we just check the annotation presence?)
   bool isDistributed() const;
 

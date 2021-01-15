@@ -4347,10 +4347,10 @@ NOTE(actor_isolated_sync_func,none,
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
-      "only @distributed asynchronous methods can be used outside the distributed actor instance; "
+      "only 'distributed' asynchronous methods can be used outside the distributed actor instance; "
       "do you want to add '@distributed'?", ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "@distributed function parameter '%0' type %1 must conform to 'Codable'",
+      "distributed function parameter '%0' type %1 must conform to 'Codable'",
       (StringRef, Type))
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
@@ -4437,7 +4437,7 @@ ERROR(distributedactor_not_actor,none,
       "and distributed actor isolated async functions",
       ())
 ERROR(distributedactor_not_actor_func,none,
-      "'@distributed' can only be applied to @distributed actor async functions",
+      "'@distributed' can only be applied to distributed actor async functions",
       ())
 ERROR(distributedactor_func_not_async_throws,none,
       "'@distributed' actor-isolated function must be 'async throws'",
@@ -4446,7 +4446,7 @@ ERROR(distributedactor_func_static,none,
       "'@distributed' actor-isolated functions cannot be 'static'",
       ())
 ERROR(distributedactor_func_not_in_distributed_actor,none,
-      "'@distributed' function can only be declared within '@distributed actor class'",
+      "'@distributed' function can only be declared within 'distributed actor class'",
       ())
 
 ERROR(concurrency_lib_missing,none,

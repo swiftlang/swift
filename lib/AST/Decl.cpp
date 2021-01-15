@@ -5090,6 +5090,8 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
+  case KnownProtocolKind::DistributedActor:
+    return KnownDerivableProtocolKind::DistributedActor;
   default: return None;
   }
 }
@@ -7579,6 +7581,16 @@ bool FuncDecl::isMainTypeMainMethod() const {
   return (getBaseIdentifier() == getASTContext().Id_main) &&
          !isInstanceMember() && getResultInterfaceType()->isVoid() &&
          getParameters()->size() == 0;
+}
+
+bool VarDecl::isDistributedActorAddressName(ASTContext &ctx, DeclName name) {
+  assert(name.getArgumentNames().size() == 0);
+  return name.getBaseName() == ctx.Id_actorAddress;
+}
+
+bool VarDecl::isDistributedActorTransportName(ASTContext &ctx, DeclName name) {
+  assert(name.getArgumentNames().size() == 0);
+  return name.getBaseName() == ctx.Id_actorTransport;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
