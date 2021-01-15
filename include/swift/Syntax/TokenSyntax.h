@@ -37,7 +37,7 @@ public:
     : Syntax(Root, Data) {}
 
   static TokenSyntax missingToken(const tok Kind, OwnedString Text) {
-    return make<TokenSyntax>(RawSyntax::missing(Kind, Text));
+    return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text));
   }
 
   Trivia getLeadingTrivia() const {
@@ -50,12 +50,12 @@ public:
 
   TokenSyntax withLeadingTrivia(const Trivia &Trivia) const {
     auto NewRaw = getRaw()->withLeadingTrivia(Trivia.Pieces);
-    return Data->replaceSelf<TokenSyntax>(NewRaw);
+    return Data->replacingSelf<TokenSyntax>(NewRaw);
   }
 
   TokenSyntax withTrailingTrivia(const Trivia &Trivia) const {
     auto NewRaw = getRaw()->withTrailingTrivia(Trivia.Pieces);
-    return Data->replaceSelf<TokenSyntax>(NewRaw);
+    return Data->replacingSelf<TokenSyntax>(NewRaw);
   }
 
   /* TODO: If we really need them.

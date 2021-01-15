@@ -39,9 +39,8 @@ namespace syntax {
 struct SyntaxVisitor;
 class SourceFileSyntax;
 
-template <typename SyntaxNode>
-SyntaxNode make(RC<RawSyntax> Raw) {
-  auto Data = SyntaxData::make(Raw);
+template <typename SyntaxNode> SyntaxNode makeRoot(RC<RawSyntax> Raw) {
+  auto Data = SyntaxData::make(AbsoluteRawSyntax::forRoot(Raw));
   return { Data, Data.get() };
 }
 
@@ -80,7 +79,7 @@ public:
   SyntaxKind getKind() const;
 
   /// Get the shared raw syntax.
-  const RC<RawSyntax> &getRaw() const;
+  const RC<RawSyntax> getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
   SyntaxNodeId getId() const { return getRaw()->getId(); }
@@ -192,21 +191,30 @@ public:
   /// Recursively visit this node.
   void accept(SyntaxVisitor &Visitor);
 
-  /// Get the absolute position of this raw syntax: its offset, line,
-  /// and column.
-  AbsolutePosition getAbsolutePosition() const {
-    return Data->getAbsolutePosition();
+  /// Same as \c getAbsolutePositionAfterLeadingTrivia.
+  AbsoluteOffsetPosition getAbsolutePosition() const {
+    return getAbsolutePositionAfterLeadingTrivia();
   }
 
-  /// Get the absolute end position (exclusively) where the trailing trivia of
-  /// this node ends.
-  AbsolutePosition getAbsoluteEndPositionAfterTrailingTrivia() const {
-    return Data->getAbsoluteEndPositionAfterTrailingTrivia();
-  }
-
-  /// Get the absolute position at which the leading trivia of this node starts.
-  AbsolutePosition getAbsolutePositionBeforeLeadingTrivia() const {
+  /// Get the offset at which the leading trivia of this node starts.
+  AbsoluteOffsetPosition getAbsolutePositionBeforeLeadingTrivia() const {
     return Data->getAbsolutePositionBeforeLeadingTrivia();
+  }
+
+  /// Get the offset at which the actual content (i.e. non-triva) of this node
+  /// starts.
+  AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const {
+    return Data->getAbsolutePositionAfterLeadingTrivia();
+  }
+
+  /// Get the offset at which the trailing trivia of this node starts.
+  AbsoluteOffsetPosition getAbsoluteEndPositionBeforeTrailingTrivia() const {
+    return Data->getAbsoluteEndPositionBeforeTrailingTrivia();
+  }
+
+  /// Get the offset at which the trailing trivia of this node starts.
+  AbsoluteOffsetPosition getAbsoluteEndPositionAfterTrailingTrivia() const {
+    return Data->getAbsoluteEndPositionAfterTrailingTrivia();
   }
 
   // TODO: hasSameStructureAs ?

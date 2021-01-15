@@ -79,9 +79,9 @@ ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
   if (raw)
     raw = raw->append(${child_elt}.getRaw());
   else
-    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
-                          {${child_elt}.getRaw()}, SourcePresence::Present);
-  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
+    raw = RawSyntax::makeAndCalcLength(SyntaxKind::${child_node.syntax_kind},
+      {${child_elt}.getRaw()}, SourcePresence::Present);
+  return Data->replacingChild<${node.name}>(raw, Cursor::${child.name});
 }
 %     end
 
@@ -97,7 +97,7 @@ ${node.name} ${node.name}::with${child.name}(
     raw = ${make_missing_child(child)};
 % end
   }
-  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
+  return Data->replacingChild<${node.name}>(raw, Cursor::${child.name});
 }
 
 %   end

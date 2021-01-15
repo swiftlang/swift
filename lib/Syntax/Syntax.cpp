@@ -17,9 +17,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-const RC<RawSyntax> &Syntax::getRaw() const {
-  return Data->getRaw();
-}
+const RC<RawSyntax> Syntax::getRaw() const { return Data->getRaw(); }
 
 SyntaxKind Syntax::getKind() const {
   return getRaw()->getKind();
@@ -77,9 +75,7 @@ bool Syntax::isMissing() const {
 llvm::Optional<Syntax> Syntax::getParent() const {
   auto ParentData = getData().getParent();
   if (!ParentData) return llvm::None;
-  return llvm::Optional<Syntax> {
-    Syntax { Root, ParentData }
-  };
+  return llvm::Optional<Syntax>{Syntax{Root, ParentData.get()}};
 }
 
 Syntax Syntax::getRoot() const {
