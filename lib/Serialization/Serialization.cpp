@@ -5275,6 +5275,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     }
     
     for (auto OTD : opaqueReturnTypeDecls) {
+      // FIXME: We should delay parsing function bodies so these type decls
+      //        don't even get added to the file.
+      if (OTD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+
       hasOpaqueReturnTypes = true;
       Mangle::ASTMangler Mangler;
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
