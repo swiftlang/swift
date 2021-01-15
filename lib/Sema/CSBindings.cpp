@@ -829,6 +829,46 @@ PotentialBindings ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
   return bindings;
 }
 
+/// Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns the type to bind to, if the binding is okay.
+static Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
+  // If the type references the type variable, don't permit the binding.
+  SmallVector<TypeVariableType *, 4> referencedTypeVars;
+  type->getTypeVariables(referencedTypeVars);
+  if (count(referencedTypeVars, typeVar))
+    return None;
+
+  // If type variable is not allowed to bind to `lvalue`,
+  // let's check if type of potential binding has any
+  // type variables, which are allowed to bind to `lvalue`,
+  // and postpone such type from consideration.
+  if (!typeVar->getImpl().canBindToLValue()) {
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().canBindToLValue())
+        return None;
+    }
+  }
+
+  {
+    auto objType = type->getWithoutSpecifierType();
+
+    // If the type is a type variable itself, don't permit the binding.
+    if (objType->is<TypeVariableType>())
+      return None;
+
+    // Don't bind to a dependent member type, even if it's currently
+    // wrapped in any number of optionals, because binding producer
+    // might unwrap and try to attempt it directly later.
+    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+      return None;
+  }
+
+  // Okay, allow the binding (with the simplified type).
+  return type;
+}
+
 Optional<PotentialBinding>
 PotentialBindings::inferFromRelational(Constraint *constraint) {
   assert(constraint->getClassification() ==
@@ -942,8 +982,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
 
   // Check whether we can perform this binding.
-  // FIXME: this has a super-inefficient extraneous simplifyType() in it.
-  if (auto boundType = CS.checkTypeOfBinding(TypeVar, type)) {
+  if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
     type = *boundType;
     if (type->hasTypeVariable()) {
       SmallVector<TypeVariableType *, 4> referencedVars;
@@ -1325,50 +1364,6 @@ void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
   }
 }
 
-/// Check whether the given type can be used as a binding for the given
-/// type variable.
-///
-/// \returns the type to bind to, if the binding is okay.
-Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
-                                                    Type type) const {
-  // Simplify the type.
-  type = simplifyType(type);
-
-  // If the type references the type variable, don't permit the binding.
-  SmallVector<TypeVariableType *, 4> referencedTypeVars;
-  type->getTypeVariables(referencedTypeVars);
-  if (count(referencedTypeVars, typeVar))
-    return None;
-
-  // If type variable is not allowed to bind to `lvalue`,
-  // let's check if type of potential binding has any
-  // type variables, which are allowed to bind to `lvalue`,
-  // and postpone such type from consideration.
-  if (!typeVar->getImpl().canBindToLValue()) {
-    for (auto *typeVar : referencedTypeVars) {
-      if (typeVar->getImpl().canBindToLValue())
-        return None;
-    }
-  }
-
-  {
-    auto objType = type->getWithoutSpecifierType();
-
-    // If the type is a type variable itself, don't permit the binding.
-    if (objType->is<TypeVariableType>())
-      return None;
-
-    // Don't bind to a dependent member type, even if it's currently
-    // wrapped in any number of optionals, because binding producer
-    // might unwrap and try to attempt it directly later.
-    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
-      return None;
-  }
-
-  // Okay, allow the binding (with the simplified type).
-  return type;
-}
-
 // Given a possibly-Optional type, return the direct superclass of the
 // (underlying) type wrapped in the same number of optional levels as
 // type.
@@ -1491,7 +1486,7 @@ bool TypeVarBindingProducer::computeNext() {
     if (binding.Kind == BindingKind::Supertypes) {
       for (auto supertype : enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
-        if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
+        if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype))
           addNewBinding(binding.withType(*simplifiedSuper));
       }
     }

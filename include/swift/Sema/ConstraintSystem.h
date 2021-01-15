@@ -4601,7 +4601,6 @@ public:
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
 
-  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
 
   /// Infer bindings for the given type variable based on current
