@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: rdar73262638
 
 // REQUIRES: OS=macosx || OS=ios
 // FIXME: should not require Darwin to run this test once we have async main!
