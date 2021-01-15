@@ -830,27 +830,24 @@ PotentialBindings ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
 }
 
 Optional<PotentialBinding>
-ConstraintSystem::getPotentialBindingForRelationalConstraint(
-    PotentialBindings &result, Constraint *constraint) const {
+PotentialBindings::inferFromRelational(Constraint *constraint) {
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
 
-  auto *typeVar = result.TypeVar;
-
-  auto first = simplifyType(constraint->getFirstType());
-  auto second = simplifyType(constraint->getSecondType());
+  auto first = CS.simplifyType(constraint->getFirstType());
+  auto second = CS.simplifyType(constraint->getSecondType());
 
   if (first->is<TypeVariableType>() && first->isEqual(second))
     return None;
 
   Type type;
   AllowedBindingKind kind;
-  if (first->getAs<TypeVariableType>() == typeVar) {
+  if (first->getAs<TypeVariableType>() == TypeVar) {
     // Upper bound for this type variable.
     type = second;
     kind = AllowedBindingKind::Subtypes;
-  } else if (second->getAs<TypeVariableType>() == typeVar) {
+  } else if (second->getAs<TypeVariableType>() == TypeVar) {
     // Lower bound for this type variable.
     type = first;
     kind = AllowedBindingKind::Supertypes;
@@ -863,7 +860,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // of bindings for them until closure's body is opened.
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
-        result.DelayedBy.push_back(constraint);
+        DelayedBy.push_back(constraint);
         return None;
       }
     }
@@ -874,8 +871,8 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     findInferableTypeVars(first, typeVars);
     findInferableTypeVars(second, typeVars);
 
-    if (typeVars.erase(typeVar)) {
-      result.AdjacentVars.insert(typeVars.begin(), typeVars.end());
+    if (typeVars.erase(TypeVar)) {
+      AdjacentVars.insert(typeVars.begin(), typeVars.end());
     }
 
     return None;
@@ -885,11 +882,11 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
-  if (auto *locator = typeVar->getImpl().getLocator()) {
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (locator->isKeyPathType()) {
       auto *BGT =
           type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
-      if (!BGT || !isKnownKeyPathDecl(getASTContext(), BGT->getDecl()))
+      if (!BGT || !isKnownKeyPathDecl(CS.getASTContext(), BGT->getDecl()))
         return None;
     }
   }
@@ -915,8 +912,8 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     for (auto *var : referencedVars) {
       // Add all type variables encountered in the type except
       // to the current type variable.
-      if (var != typeVar) {
-        result.AdjacentVars.insert(var);
+      if (var != TypeVar) {
+        AdjacentVars.insert(var);
         continue;
       }
 
@@ -927,7 +924,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // let's mark bindings as delayed until dependent member type
     // is resolved.
     if (!containsSelf)
-      result.DelayedBy.push_back(constraint);
+      DelayedBy.push_back(constraint);
 
     return None;
   }
@@ -941,17 +938,17 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // should be allowed to escape. As a result we allow anything
   // passed in to escape.
   if (auto *fnTy = type->getAs<AnyFunctionType>())
-    if (typeVar->getImpl().getGenericParameter() && !shouldAttemptFixes())
+    if (isGenericParameter() && !CS.shouldAttemptFixes())
       type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
 
   // Check whether we can perform this binding.
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
-  if (auto boundType = checkTypeOfBinding(typeVar, type)) {
+  if (auto boundType = CS.checkTypeOfBinding(TypeVar, type)) {
     type = *boundType;
     if (type->hasTypeVariable()) {
       SmallVector<TypeVariableType *, 4> referencedVars;
       type->getTypeVariables(referencedVars);
-      result.AdjacentVars.insert(referencedVars.begin(), referencedVars.end());
+      AdjacentVars.insert(referencedVars.begin(), referencedVars.end());
     }
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
@@ -959,7 +956,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     if (!bindingTypeVar)
       return None;
 
-    result.AdjacentVars.insert(bindingTypeVar);
+    AdjacentVars.insert(bindingTypeVar);
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
@@ -968,7 +965,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     // available.
     if (auto *locator = bindingTypeVar->getImpl().getLocator()) {
       if (locator->directlyAt<CodeCompletionExpr>())
-        result.AssociatedCodeCompletionToken = locator->getAnchor();
+        AssociatedCodeCompletionToken = locator->getAnchor();
     }
 
     switch (constraint->getKind()) {
@@ -977,10 +974,10 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
       if (kind == AllowedBindingKind::Subtypes) {
-        result.SubtypeOf.insert({bindingTypeVar, constraint});
+        SubtypeOf.insert({bindingTypeVar, constraint});
       } else {
         assert(kind == AllowedBindingKind::Supertypes);
-        result.SupertypeOf.insert({bindingTypeVar, constraint});
+        SupertypeOf.insert({bindingTypeVar, constraint});
       }
       break;
     }
@@ -988,7 +985,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal: {
-      result.EquivalentTo.insert({bindingTypeVar, constraint});
+      EquivalentTo.insert({bindingTypeVar, constraint});
       break;
     }
 
@@ -1002,14 +999,14 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // Make sure we aren't trying to equate type variables with different
   // lvalue-binding rules.
   if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
-    if (typeVar->getImpl().canBindToLValue() !=
+    if (TypeVar->getImpl().canBindToLValue() !=
         otherTypeVar->getImpl().canBindToLValue())
       return None;
   }
 
-  if (type->is<InOutType>() && !typeVar->getImpl().canBindToInOut())
+  if (type->is<InOutType>() && !TypeVar->getImpl().canBindToInOut())
     type = LValueType::get(type->getInOutObjectType());
-  if (type->is<LValueType>() && !typeVar->getImpl().canBindToLValue())
+  if (type->is<LValueType>() && !TypeVar->getImpl().canBindToLValue())
     type = type->getRValueType();
 
   // BindParam constraints are not reflexive and must be treated specially.
@@ -1043,8 +1040,7 @@ bool PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OptionalObject: {
-    auto binding =
-        CS.getPotentialBindingForRelationalConstraint(*this, constraint);
+    auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
 

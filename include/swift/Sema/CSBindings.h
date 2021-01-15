@@ -458,6 +458,11 @@ private:
       llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
           &inferredBindings);
 
+  /// Attempt to infer a new binding and other useful information
+  /// (i.e. whether bindings should be delayed) from the given
+  /// relational constraint.
+  Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
+
 public:
   bool infer(Constraint *constraint);
 

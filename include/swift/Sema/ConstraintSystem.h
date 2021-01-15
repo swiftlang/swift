@@ -2036,7 +2036,6 @@ public:
   friend class TypeVariableStep;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
-  friend struct PotentialBindings;
 
   class SolverScope;
 
@@ -4611,10 +4610,6 @@ public:
                                      bool finalize = true);
 
 private:
-  Optional<PotentialBinding>
-  getPotentialBindingForRelationalConstraint(PotentialBindings &result,
-                                             Constraint *constraint) const;
-
   /// Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,
