@@ -528,9 +528,10 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        llvm::AttributeList &attrs,
-                                       unsigned argIndex, Alignment align) {
+                                       unsigned argIndex, Alignment align,
+                                       llvm::Type *storageType) {
   llvm::AttrBuilder b;
-  b.addAttribute(llvm::Attribute::ByVal);
+  b.addByValAttr(storageType);
   b.addAttribute(llvm::Attribute::getWithAlignment(
       IGM.getLLVMContext(), llvm::Align(align.getValue())));
   attrs = attrs.addAttributes(IGM.getLLVMContext(),
@@ -1579,10 +1580,12 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       auto paramTy = getSILFuncConventions().getSILType(
           param, IGM.getMaximalTypeExpansionContext());
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
-      if (AI.getIndirectByVal())
+      if (AI.getIndirectByVal()) {
         addByvalArgumentAttributes(
             IGM, Attrs, getCurParamIndex(),
-            Alignment(AI.getIndirectAlign().getQuantity()));
+            Alignment(AI.getIndirectAlign().getQuantity()),
+            paramTI.getStorageType());
+      }
       addPointerParameter(paramTI.getStorageType());
       break;
     }
@@ -2645,6 +2648,27 @@ llvm::CallInst *CallEmission::emitCallSite() {
   return call;
 }
 
+static llvm::AttributeList
+fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
+                                        llvm::AttributeList attrList) {
+  auto &context = fnType->getContext();
+  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
+    auto paramTy = fnType->getParamType(i);
+    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
+    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
+        paramTy->getPointerElementType() != attrList.getParamStructRetType(i))
+      attrList = attrList.replaceAttributeType(
+          context, attrListIndex, llvm::Attribute::StructRet,
+          paramTy->getPointerElementType());
+    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
+        paramTy->getPointerElementType() != attrList.getParamByValType(i))
+      attrList = attrList.replaceAttributeType(
+          context, attrListIndex, llvm::Attribute::ByVal,
+          paramTy->getPointerElementType());
+  }
+  return attrList;
+}
+
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
   assert(fn.getKind() == FunctionPointer::KindTy::Function);
@@ -2659,11 +2683,12 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   }
 
   assert(!isTrapIntrinsic(fn.getRawPointer()) && "Use CreateNonMergeableTrap");
-  llvm::CallInst *call = IRBuilderBase::CreateCall(
-      cast<llvm::FunctionType>(
-          fn.getRawPointer()->getType()->getPointerElementType()),
-      fn.getRawPointer(), args, bundles);
-  call->setAttributes(fn.getAttributes());
+  auto fnTy = cast<llvm::FunctionType>(
+      fn.getRawPointer()->getType()->getPointerElementType());
+  llvm::CallInst *call =
+      IRBuilderBase::CreateCall(fnTy, fn.getRawPointer(), args, bundles);
+  call->setAttributes(
+      fixUpTypesInByValAndStructRetAttributes(fnTy, fn.getAttributes()));
   call->setCallingConv(fn.getCallingConv());
   return call;
 }
