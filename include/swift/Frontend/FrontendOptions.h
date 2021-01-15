@@ -86,6 +86,9 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
+  /// Number of retry opening an input file if the previous opening returns
+  /// bad file descriptor error.
+  unsigned BadFileDescriptorRetryCount = 0;
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
