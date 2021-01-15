@@ -367,6 +367,10 @@ public:
   /// correct join but one better than Any may exist.
   static Optional<Type> join(Type first, Type second);
 
+  friend llvm::hash_code hash_value(Type T) {
+    return llvm::hash_value(T.getPointer());
+  }
+
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
   void operator==(Type T) const = delete;
