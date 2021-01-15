@@ -37,7 +37,7 @@ public struct BigBigStruct {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval({{.*}}) align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
@@ -45,7 +45,7 @@ entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTupleExtract
-// CHECK:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval({{.*}}) align 8 {{%.*}})
 sil @testTupleExtract : $@convention(thin) (@owned (BitfieldOne, @convention(block) (BitfieldOne) -> BitfieldOne), BitfieldOne) -> BitfieldOne  {
 entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x : $BitfieldOne):
   %a = tuple_extract %b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), 1

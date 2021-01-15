@@ -46,7 +46,7 @@ class Foo {
 
 
   // x86_64-macosx: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(double %0, double %1, double %2, double %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
-  // x86_64-macosx: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, %TSo6CGRectV* byval align 8 %2) {{[#0-9]*}} {
+  // x86_64-macosx: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, %TSo6CGRectV* byval({{.*}}) align 8 %2) {{[#0-9]*}} {
   // armv7-ios: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
   // armv7-ios: define hidden double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x i32] %2) {{[#0-9]*}} {
   // armv7s-ios: define hidden swiftcc double @"$s8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
@@ -112,7 +112,7 @@ class Foo {
   }
 
   // Ensure that MyRect is passed as an indirect-byval on x86_64 because we run out of registers for direct arguments
-  // x86_64-macosx: define hidden float @"$s8abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, float %2, float %3, float %4, float %5, float %6, float %7, float %8, %TSo6MyRectV* byval align 8 %9) {{[#0-9]*}} {
+  // x86_64-macosx: define hidden float @"$s8abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, float %2, float %3, float %4, float %5, float %6, float %7, float %8, %TSo6MyRectV* byval({{.*}}) align 8 %9) {{[#0-9]*}} {
   @objc dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
@@ -128,7 +128,7 @@ class Foo {
     // x86_64-macosx: alloca
     // x86_64-macosx: alloca
     // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 8
-    // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 8 [[TEMP]])
+    // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval({{.*}}) align 8 [[TEMP]])
     // x86_64-macosx: ret float [[RESULT]]
     return getXFromRectIndirectByVal(f, second: f, third: f, fourth: f, fifth: f, sixth: f, seventh: f, withRect: r);
   }

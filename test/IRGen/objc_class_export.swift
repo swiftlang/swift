@@ -81,7 +81,7 @@ struct BigStructWithNativeObjects {
 
   @objc func drawInRect(dirty dirty: NSRect) {
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tFTo"([[OPAQUE:%.*]]* %0, i8* %1, [[NSRECT]]* byval align 8 %2) {{[#0-9]*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tFTo"([[OPAQUE:%.*]]* %0, i8* %1, [[NSRECT]]* byval({{.*}}) align 8 %2) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
   // CHECK:   call swiftcc void @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
   // CHECK: }
@@ -97,7 +97,7 @@ struct BigStructWithNativeObjects {
   @objc func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"([[NSRECT]]* noalias nocapture sret({{.*}}) %0, [[OPAQUE5:%.*]]* %1, i8* %2, [[NSRECT]]* byval align 8 %3) {{[#0-9]*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"([[NSRECT]]* noalias nocapture sret({{.*}}) %0, [[OPAQUE5:%.*]]* %1, i8* %2, [[NSRECT]]* byval({{.*}} align 8 %3) {{[#0-9]*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
 

@@ -90,7 +90,7 @@ bb0:
 // CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 8
 // CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %Ts6UInt32V, %Ts6UInt32V* [[ADDR_M]], i32 0, i32 0
 // CHECK-x86_64:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
-// CHECK-SYSV-x86_64:  call void @consumeBitfieldOne(%TSo11BitfieldOneV* byval align 8 [[ARG]])
+// CHECK-SYSV-x86_64:  call void @consumeBitfieldOne(%TSo11BitfieldOneV* byval({{.*}}) align 8 [[ARG]])
 // CHECK-WIN-x86_64:   call void @consumeBitfieldOne(%TSo11BitfieldOneV* [[ARG]])
 // CHECK-x86_64:   ret void
 
@@ -365,7 +365,7 @@ entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 }
 
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK-SYSV-x86_64:        call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK-SYSV-x86_64:        call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval({{.*}}) align 8 {{%.*}})
 // CHECK-WIN-x86_64:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret({{.*}}) {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):

@@ -22,9 +22,9 @@ func test_indirect_by_val_alignment() {
 // x86_64-LABEL: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // x86_64: %indirect-temporary = alloca %TSo7a_thinga, align [[ALIGN:[0-9]+]]
 // x86_64: [[CAST:%.*]] = bitcast %TSo7a_thinga* %indirect-temporary to %struct.a_thing*
-// SYSV-x86_64: call void @log_a_thing(%struct.a_thing* byval align [[ALIGN]] [[CAST]])
+// SYSV-x86_64: call void @log_a_thing(%struct.a_thing* byval({{.*}}) align [[ALIGN]] [[CAST]])
 // WIN-x86_64: call void @log_a_thing(%struct.a_thing* [[CAST]])
-// x86_64: define internal void @log_a_thing(%struct.a_thing* {{(byval align [[ALIGN]])?}}
+// x86_64: define internal void @log_a_thing(%struct.a_thing* {{(byval(%struct.a_thing) align [[ALIGN]])?}}
 
 // aarch64: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // arm64: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
