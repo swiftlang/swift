@@ -406,7 +406,7 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // Beautify the IR. Move the old header to after the old latch as it is now
   // the latch.
-  header->moveAfter(latch);
+  header->getParent()->moveBlockAfter(header, latch);
 
   // Merge the old latch with the old header if possible.
   if (mergeBasicBlockWithSuccessor(latch, domInfo, loopInfo))

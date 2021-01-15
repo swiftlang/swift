@@ -123,7 +123,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
   // insert the bridge call/switch there. We return the argument of the cast
   // success block as the value to be passed to the bridging function.
   if (load->getType() == silBridgedTy) {
-    castSuccessBB->moveAfter(dynamicCast.getInstruction()->getParent());
+    f->moveBlockAfter(castSuccessBB, dynamicCast.getInstruction()->getParent());
     builder.createBranch(loc, castSuccessBB, load);
     builder.setInsertionPoint(castSuccessBB);
     return {castSuccessBB->getArgument(0), nullptr};
@@ -138,7 +138,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
 
   // Now that we have created the failure bb, move our cast success block right
   // after the checked_cast_br bb.
-  castSuccessBB->moveAfter(dynamicCast.getInstruction()->getParent());
+  f->moveBlockAfter(castSuccessBB, dynamicCast.getInstruction()->getParent());
 
   // Ok, we need to perform the full cast optimization. This means that we are
   // going to replace the cast terminator in inst_block with a checked_cast_br.

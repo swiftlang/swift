@@ -511,9 +511,8 @@ void SILModule::eraseFunction(SILFunction *F) {
 
   // This opens dead-function-removal opportunities for called functions.
   // (References are not needed anymore.)
-  F->dropAllReferences();
+  F->clear();
   F->dropDynamicallyReplacedFunction();
-  F->getBlocks().clear();
   // Drop references for any _specialize(target:) functions.
   F->clearSpecializeAttrs();
 }

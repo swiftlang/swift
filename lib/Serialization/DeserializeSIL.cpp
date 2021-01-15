@@ -320,7 +320,7 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   (void)wasForwardReferenced;
 
   if (Prev)
-    BB->moveAfter(Prev);
+    Fn->moveBlockAfter(BB, Prev);
   return BB;
 }
 

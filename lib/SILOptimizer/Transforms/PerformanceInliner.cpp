@@ -743,7 +743,7 @@ calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
     return;
   }
   // Add all blocks to BBToWeightMap without count 0
-  for (auto &block : Caller->getBlocks()) {
+  for (auto &block : *Caller) {
     BBToWeightMap[&block] = 0;
   }
   BBToWeightMap[Caller->getEntryBlock()] = entryCount.getValue();

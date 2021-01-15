@@ -103,11 +103,6 @@ def main():
     parser.add_argument(
         '--swiftsyntax-lit-test-helper', required=True,
         help='The path to the lit-test-helper binary of SwiftSyntax')
-    parser.add_argument(
-        '--serialization-format', choices=['json', 'byteTree'],
-        default='json', help='''
-    The format that shall be used to transfer the syntax tree
-    ''')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -117,7 +112,6 @@ def main():
     temp_dir = args.temp_dir
     swift_syntax_test = args.swift_syntax_test
     swiftsyntax_lit_test_helper = args.swiftsyntax_lit_test_helper
-    serialization_format = args.serialization_format
 
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
@@ -141,12 +135,10 @@ def main():
             after_roundtrip_file=after_roundtrip_file,
             swiftsyntax_lit_test_helper=swiftsyntax_lit_test_helper)
 
-    treeFileExtension = serialization_format
-
     pre_edit_tree_file = temp_dir + '/' + test_file_name + '.' \
-        + test_case + '.pre.' + treeFileExtension
+        + test_case + '.pre.json'
     incremental_tree_file = temp_dir + '/' + test_file_name + '.' \
-        + test_case + '.incr.' + treeFileExtension
+        + test_case + '.incr.json'
     post_edit_source_file = temp_dir + '/' + test_file_name + '.' \
         + test_case + '.post.swift'
     after_roundtrip_source_file = temp_dir + '/' + test_file_name + '.' \
@@ -158,7 +150,6 @@ def main():
                                      test_case=test_case,
                                      mode='pre-edit',
                                      serialization_mode='full',
-                                     serialization_format=serialization_format,
                                      omit_node_ids=False,
                                      output_file=pre_edit_tree_file,
                                      diags_output_file=None,
@@ -170,7 +161,6 @@ def main():
                                      test_case=test_case,
                                      mode='incremental',
                                      serialization_mode='incremental',
-                                     serialization_format=serialization_format,
                                      omit_node_ids=False,
                                      output_file=incremental_tree_file,
                                      diags_output_file=None,
@@ -185,7 +175,6 @@ def main():
 
     try:
         run_command([swiftsyntax_lit_test_helper, '-deserialize-incremental'] +
-                    ['-serialization-format', serialization_format] +
                     ['-pre-edit-tree', pre_edit_tree_file] +
                     ['-incr-tree', incremental_tree_file] +
                     ['-out', after_roundtrip_source_file])

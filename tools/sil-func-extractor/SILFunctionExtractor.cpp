@@ -206,7 +206,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
   // Now mark all of these functions as public and remove their bodies.
   for (auto &F : DeadFunctions) {
     F->setLinkage(SILLinkage::PublicExternal);
-    F->getBlocks().clear();
+    F->clear();
   }
 
   // Remove dead functions.
