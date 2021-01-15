@@ -5528,7 +5528,7 @@ public:
     }
 
     // Otherwise, verify the body of the function.
-    verifyEntryBlock(&*F->getBlocks().begin());
+    verifyEntryBlock(F->getEntryBlock());
     verifyEpilogBlocks(F);
     verifyFlowSensitiveRules(F);
     verifyBranches(F);

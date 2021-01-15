@@ -67,12 +67,12 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   ContBB = StartBB->split(B.getInsertionPoint());
 
   TrueBB = StartBB->getParent()->createBasicBlock();
-  B.moveBlockTo(TrueBB, ContBB);
+  TrueBB->getParent()->moveBlockBefore(TrueBB, ContBB->getIterator());
   B.setInsertionPoint(TrueBB);
   B.createBranch(Loc, ContBB);
 
   FalseBB = StartBB->getParent()->createBasicBlock();
-  B.moveBlockTo(FalseBB, ContBB);
+  FalseBB->getParent()->moveBlockBefore(FalseBB, ContBB->getIterator());
   B.setInsertionPoint(FalseBB);
   B.createBranch(Loc, ContBB);
 

@@ -5714,8 +5714,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   
   // Make sure the block is at the end of the function so that forward
   // references don't affect block layout.
-  F->getBlocks().remove(BB);
-  F->getBlocks().push_back(BB);
+  F->moveBlockBefore(BB, F->end());
 
   B.setInsertionPoint(BB);
   do {
