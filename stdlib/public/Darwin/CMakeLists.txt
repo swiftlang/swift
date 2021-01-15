@@ -19,6 +19,7 @@ set(all_overlays
   Dispatch
   Foundation
   ObjectiveC
+  XCTest
 )
 
 if(DEFINED SWIFT_OVERLAY_TARGETS)
