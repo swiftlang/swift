@@ -163,7 +163,7 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
                                            DifferentiationInvoker invoker) {
-  if (original->getBlocks().size() <= 1)
+  if (original->size() <= 1)
     return false;
   // Diagnose unsupported branching terminators.
   for (auto &bb : *original) {
@@ -926,7 +926,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
-      if (witness->getOriginalFunction()->getBlocks().size() > 1) {
+      if (witness->getOriginalFunction()->size() > 1) {
         context.emitNondifferentiabilityError(
             witness->getOriginalFunction()->getLocation().getSourceLoc(),
             invoker, diag::autodiff_jvp_control_flow_not_supported);

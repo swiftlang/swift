@@ -959,7 +959,12 @@ public:
   SILType mapTypeIntoContext(SILType type) const;
 
   /// Converts the given function definition to a declaration.
-  void convertToDeclaration();
+  void convertToDeclaration() {
+    assert(isDefinition() && "Can only convert definitions to declarations");
+    clear();
+  }
+
+  void clear();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
@@ -968,9 +973,6 @@ public:
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//
-
-  BlockListType &getBlocks() { return BlockList; }
-  const BlockListType &getBlocks() const { return BlockList; }
 
   using iterator = BlockListType::iterator;
   using reverse_iterator = BlockListType::reverse_iterator;
@@ -995,9 +997,38 @@ public:
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
-  /// Splice the body of \p F into this function at end.
-  void spliceBody(SILFunction *F) {
-    getBlocks().splice(begin(), F->getBlocks());
+  /// Removes and destroys \p BB;
+  void eraseBlock(SILBasicBlock *BB) {
+    assert(BB->getParent() == this);
+    BlockList.erase(BB);
+  }
+
+  /// Transfer all blocks of \p F into this function, at the begin of the block
+  /// list.
+  void moveAllBlocksFromOtherFunction(SILFunction *F) {
+    BlockList.splice(begin(), F->BlockList);
+  }
+  
+  /// Transfer \p blockInOtherFunction of another function into this function,
+  /// before \p insertPointInThisFunction.
+  void moveBlockFromOtherFunction(SILBasicBlock *blockInOtherFunction,
+                                  iterator insertPointInThisFunction) {
+    SILFunction *otherFunc = blockInOtherFunction->getParent();
+    assert(otherFunc != this);
+    BlockList.splice(insertPointInThisFunction, otherFunc->BlockList,
+                     blockInOtherFunction);
+  }
+
+  /// Move block \p BB to immediately before the iterator \p IP.
+  ///
+  /// The block must be part of this function.
+  void moveBlockBefore(SILBasicBlock *BB, SILFunction::iterator IP);
+
+  /// Move block \p BB to immediately after block \p After.
+  ///
+  /// The block must be part of this function.
+  void moveBlockAfter(SILBasicBlock *BB, SILBasicBlock *After) {
+    moveBlockBefore(BB, std::next(After->getIterator()));
   }
 
   /// Return the unique basic block containing a return inst if it

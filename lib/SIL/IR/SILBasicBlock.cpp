@@ -31,17 +31,6 @@ using namespace swift;
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *relativeToBB,
-                             bool after)
-    : Parent(parent), PredList(nullptr) {
-  if (!relativeToBB) {
-    parent->getBlocks().push_back(this);
-  } else if (after) {
-    parent->getBlocks().insertAfter(relativeToBB->getIterator(), this);
-  } else {
-    parent->getBlocks().insert(relativeToBB->getIterator(), this);
-  }
-}
 SILBasicBlock::~SILBasicBlock() {
   if (!getParent()) {
     assert(ArgumentList.empty() &&
@@ -134,7 +123,7 @@ SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
 void SILBasicBlock::eraseFromParent() {
-  getParent()->getBlocks().erase(this);
+  getParent()->eraseBlock(this);
 }
 
 void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
@@ -289,21 +278,11 @@ void SILBasicBlock::eraseArgument(int Index) {
 /// stay as part of the original basic block. The old basic block is left
 /// without a terminator.
 SILBasicBlock *SILBasicBlock::split(iterator I) {
-  SILBasicBlock *New =
-    new (Parent->getModule()) SILBasicBlock(Parent, this, /*after*/true);
+  SILBasicBlock *New = Parent->createBasicBlockAfter(this);
   // Move all of the specified instructions from the original basic block into
   // the new basic block.
   New->InstList.splice(New->end(), InstList, I, end());
   return New;
-}
-
-/// Move the basic block to after the specified basic block in the IR.
-void SILBasicBlock::moveAfter(SILBasicBlock *After) {
-  assert(getParent() && getParent() == After->getParent() &&
-         "Blocks must be in the same function");
-  auto InsertPt = std::next(SILFunction::iterator(After));
-  auto &BlkList = getParent()->getBlocks();
-  BlkList.splice(InsertPt, BlkList, this);
 }
 
 void SILBasicBlock::moveTo(SILBasicBlock::iterator To, SILInstruction *I) {

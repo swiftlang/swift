@@ -535,7 +535,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Then we transfer the body of F to NewF.
-  NewF->spliceBody(F);
+  NewF->moveAllBlocksFromOtherFunction(F);
 
   // Array semantic clients rely on the signature being as in the original
   // version.
