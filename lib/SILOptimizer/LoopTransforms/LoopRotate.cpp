@@ -39,6 +39,8 @@ using namespace swift;
 /// loops in the swift benchmarks).
 static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
                                               llvm::cl::init(20));
+static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
+                                                 llvm::cl::init(false));
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -228,9 +230,9 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  bool didRotate =
-      rotateLoop(loop, domInfo, loopInfo, false /* rotateSingleBlockLoops */,
-                 latch, ShouldVerify);
+  bool didRotate = rotateLoop(
+      loop, domInfo, loopInfo,
+      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, ShouldVerify);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
@@ -440,9 +442,6 @@ class LoopRotation : public SILFunctionTransform {
 
     SILFunction *f = getFunction();
     assert(f);
-    // FIXME: Add ownership support.
-    if (f->hasOwnership())
-      return;
 
     SILLoopInfo *loopInfo = loopAnalysis->get(f);
     assert(loopInfo);
