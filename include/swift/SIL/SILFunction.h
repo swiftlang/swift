@@ -147,6 +147,7 @@ private:
   friend class SILBasicBlock;
   friend class SILModule;
   friend class SILFunctionBuilder;
+  template <typename Data, typename Vector> friend class BasicBlockData;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -213,6 +214,11 @@ private:
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
+
+  /// Used to verify if a BasicBlockData is not valid anymore.
+  /// This counter is incremented every time a BasicBlockData re-assigns new
+  /// block indices.
+  unsigned BlockListChangeIdx = 0;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -1006,6 +1012,9 @@ public:
   /// Transfer all blocks of \p F into this function, at the begin of the block
   /// list.
   void moveAllBlocksFromOtherFunction(SILFunction *F) {
+    for (SILBasicBlock &block : *F) {
+      block.index = -1;
+    }
     BlockList.splice(begin(), F->BlockList);
   }
   
@@ -1017,6 +1026,7 @@ public:
     assert(otherFunc != this);
     BlockList.splice(insertPointInThisFunction, otherFunc->BlockList,
                      blockInOtherFunction);
+    blockInOtherFunction->index = -1;
   }
 
   /// Move block \p BB to immediately before the iterator \p IP.
