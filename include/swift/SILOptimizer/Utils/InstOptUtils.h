@@ -673,8 +673,18 @@ SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
                                                SILValue newValue,
                                                InstModCallbacks &callbacks);
 
-/// Low level routine that replaces the current value of \p use with \p
-/// newValue.
+/// This API is equivalent to performing \p use->set(\p newValue) except that:
+///
+/// 1. If the user of \p use is an end scope, this API no-opts. This API is only
+///    used in contexts where we are rewriting uses and are not interesting in
+///    end scope instructions since we are moving uses from one scope to another
+///    scope.
+///
+/// 2. If the user of \p use is not an end scope, but is a lifetime ending use
+///    of \p use->get(), we insert a destroy_value|end_borrow as appropriate on
+///    \p use->get() to ensure \p use->get()'s lifetime is still ended. We
+///    assume that if \p use->getUser() is lifetime ending, that our caller has
+///    ensured that we can end \p newValue's lifetime.
 SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
                                          InstModCallbacks &callbacks);
 
