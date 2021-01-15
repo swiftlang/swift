@@ -60,7 +60,7 @@ public:
 
   RefCountedBox(const T Data) : Data(Data) {}
 
-  static RC<RefCountedBox<T>> make(const T Data) {
+  static RC<RefCountedBox<T>> make(const T &Data) {
     return RC<RefCountedBox<T>>{new RefCountedBox(Data)};
   }
 };

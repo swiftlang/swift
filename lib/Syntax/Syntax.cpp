@@ -17,7 +17,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-const RC<RawSyntax> Syntax::getRaw() const { return Data.getRaw(); }
+const RC<RawSyntax> &Syntax::getRaw() const { return Data.getRaw(); }
 
 SyntaxKind Syntax::getKind() const {
   return getRaw()->getKind();
