@@ -25,7 +25,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: rdar73174820
 
 #import <objc/runtime.h>
 #import <assert.h>
