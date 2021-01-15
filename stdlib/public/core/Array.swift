@@ -1984,3 +1984,31 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     return true
   }
 }
+
+@_transparent
+public func myTestFunction<T>(_ t: T) {
+  myGenericFunctionAdded(t)
+}
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal func myGenericFunctionAdded<T>(_ t: T) {
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+    myGenericFunctionAddedNewImpl(t)
+  } else {
+    myGenericFunctionAddedBackwardsImpl(t)
+  }
+}
+
+@_alwaysEmitIntoClient
+internal func myGenericFunctionAddedBackwardsImpl<T>(_ t: T) {
+  print("myGenericFunctionAddedBackwardsImpl")
+  print(t)
+}
+
+@usableFromInline
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+internal func myGenericFunctionAddedNewImpl<T>(_ t: T) {
+  print("myGenericFunctionAddedNewImpl")
+  print(t)
+}
