@@ -34,7 +34,9 @@ ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
     DiagnosticEngine &diags, const ArgList &args)
     : Diags(diags), Args(args),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
-      PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
+      PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)),
+      BadFileDescriptorRetryCountArg(
+        args.getLastArg(options::OPT_bad_file_descriptor_retry_count)) {}
 
 Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
@@ -118,8 +120,26 @@ bool ArgsToFrontendInputsConverter::forAllFilesInFilelist(
   if (!pathArg)
     return false;
   StringRef path = pathArg->getValue();
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
-      llvm::MemoryBuffer::getFile(path);
+
+  // Honor -bad-file-descriptor-retry-count from the argument list
+  unsigned RetryCount = 0;
+  if (BadFileDescriptorRetryCountArg &&
+      StringRef(BadFileDescriptorRetryCountArg->getValue())
+        .getAsInteger(10,RetryCount)) {
+    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                   BadFileDescriptorRetryCountArg->getAsString(Args),
+                   BadFileDescriptorRetryCountArg->getValue());
+    return true;
+  }
+
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError = nullptr;
+  for (unsigned I = 0; I < RetryCount + 1; ++I) {
+    filelistBufferOrError = llvm::MemoryBuffer::getFile(path);
+    if (filelistBufferOrError)
+      break;
+    if (filelistBufferOrError.getError().value() != EBADF)
+      break;
+  }
   if (!filelistBufferOrError) {
     Diags.diagnose(SourceLoc(), diag::cannot_open_file, path,
                    filelistBufferOrError.getError().message());
