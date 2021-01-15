@@ -661,27 +661,29 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (checkRequirementsEarly()) {
     Constraint *constraint = choice;
     auto *decl = constraint->getOverloadChoice().getDecl();
-    auto *useDC = constraint->getOverloadUseDC();
-    auto choiceType = CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
-                                                  /*allowMembers=*/true, useDC);
-    auto choiceFnType = choiceType->getAs<FunctionType>();
-    auto genericFnType = decl->getInterfaceType()->getAs<GenericFunctionType>();
-    auto signature = genericFnType->getGenericSignature();
+    if (decl->getBaseIdentifier().isArithmeticOperator()) {
+      auto *useDC = constraint->getOverloadUseDC();
+      auto choiceType = CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
+                                                    /*allowMembers=*/true, useDC);
+      auto choiceFnType = choiceType->getAs<FunctionType>();
+      auto genericFnType = decl->getInterfaceType()->getAs<GenericFunctionType>();
+      auto signature = genericFnType->getGenericSignature();
 
-    for (auto argParamPair : llvm::zip(argFnType->getParams(),
-                                       choiceFnType->getParams())) {
-      auto argType = std::get<0>(argParamPair).getPlainType();
-      auto paramType = std::get<1>(argParamPair).getPlainType();
+      for (auto argParamPair : llvm::zip(argFnType->getParams(),
+                                         choiceFnType->getParams())) {
+        auto argType = std::get<0>(argParamPair).getPlainType();
+        auto paramType = std::get<1>(argParamPair).getPlainType();
 
-      // Only check argument types with no type variables that will be matched
-      // against a plain type parameter.
-      argType = argType->getCanonicalType()->getWithoutSpecifierType();
-      if (argType->hasTypeVariable() || !paramType->isTypeParameter())
-        continue;
+        // Only check argument types with no type variables that will be matched
+        // against a plain type parameter.
+        argType = argType->getCanonicalType()->getWithoutSpecifierType();
+        if (argType->hasTypeVariable() || !paramType->isTypeParameter())
+          continue;
 
-      for (auto *protocol : signature->getRequiredProtocols(paramType)) {
-        if (!TypeChecker::conformsToProtocol(argType, protocol, useDC))
-          return skip("unsatisfied");
+        for (auto *protocol : signature->getRequiredProtocols(paramType)) {
+          if (!TypeChecker::conformsToProtocol(argType, protocol, useDC))
+            return skip("unsatisfied");
+        }
       }
     }
   }
