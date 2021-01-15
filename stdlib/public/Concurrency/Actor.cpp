@@ -18,6 +18,7 @@
 #include "swift/Runtime/Concurrency.h"
 
 #include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ThreadLocal.h"
 #include "swift/ABI/Actor.h"
@@ -1223,6 +1224,18 @@ void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
   asImpl(_actor)->enqueue(job);
 }
 
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+namespace swift {
+  Metadata* MainActorMetadata = nullptr;
+}
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+void swift::swift_MainActor_register(HeapObject *actor) {
+  assert(actor);
+  MainActorMetadata = const_cast<Metadata*>(swift_getObjectType(actor));
+  assert(MainActorMetadata);
+}
+
 /*****************************************************************************/
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
@@ -1354,6 +1367,10 @@ void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
 
   if (executor.isGeneric())
     return swift_task_enqueueGlobal(job);
+
+  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+  if (executor.isMainExecutor())
+    return swift_task_enqueueMainExecutor(job);
 
   if (executor.isDefaultActor())
     return asImpl(executor.getDefaultActor())->enqueue(job);
