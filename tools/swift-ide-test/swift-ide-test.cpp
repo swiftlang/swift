@@ -2519,6 +2519,13 @@ static void printModuleMetadata(ModuleDecl *MD) {
     OS << "link library: " << lib.getName()
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
   });
+  MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+    OS << "filepath=" << info.FilePath << "; ";
+    OS << "hash=" << info.InterfaceHash.getRawValue() << "; ";
+    OS << "mtime=" << info.LastModified << "; ";
+    OS << "size=" << info.FileSize;
+    OS << "\n";
+  });
 }
 
 static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
