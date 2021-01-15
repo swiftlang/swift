@@ -101,7 +101,7 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   bool isCoroutine = originalType->isCoroutine();
   SmallVector<SILYieldInfo, 4> yieldInfos;
   SmallVector<SILResultInfo, 4> indirectReturnInfos;
-  SmallVector<SILResultInfo, 4> directReturnInfos;
+  Optional<SILType> directReturnSILType;
 
   auto parameters = substitutedType->getParameters();
   SILFunctionConventions fnConv(substitutedType, IGM.getSILModule());
@@ -187,13 +187,17 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
       yieldInfos.push_back(yield);
     }
   } else {
-    //     ResultTypes directResults...;
-    for (auto result : fnConv.getDirectSILResults()) {
-      auto ty = fnConv.getSILType(result, IGM.getMaximalTypeExpansionContext());
-      auto &ti = IGM.getTypeInfoForLowered(ty.getASTType());
-      valTypes.push_back(ty);
+    //     ResultTypes *(directResults...);
+    //
+    //     Store the address of the direct result tuple.
+    if (fnConv.getNumDirectSILResults()) {
+      auto resultType =
+          fnConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto resultLoweringTy = CanInOutType::get(resultType.getASTType());
+      auto &ti = IGM.getTypeInfoForLowered(resultLoweringTy);
+      valTypes.push_back(resultType);
       typeInfos.push_back(&ti);
-      directReturnInfos.push_back(result);
+      directReturnSILType = resultType;
     }
   }
 
@@ -278,7 +282,7 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
                             originalType, substitutedType, substitutionMap,
                             std::move(bindings), trailingWitnessInfo, errorType,
                             canHaveValidError, paramInfos, isCoroutine,
-                            yieldInfos, indirectReturnInfos, directReturnInfos,
+                            yieldInfos, indirectReturnInfos, directReturnSILType,
                             localContextInfo);
 }
 
@@ -291,7 +295,7 @@ AsyncContextLayout::AsyncContextLayout(
     bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
     bool isCoroutine, ArrayRef<SILYieldInfo> yieldInfos,
     ArrayRef<SILResultInfo> indirectReturnInfos,
-    ArrayRef<SILResultInfo> directReturnInfos,
+    Optional<SILType> directReturnSILType,
     Optional<AsyncContextLayout::ArgumentInfo> localContextInfo)
     : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject, strategy,
                    fieldTypeInfos, /*typeToFill*/ nullptr),
@@ -299,7 +303,7 @@ AsyncContextLayout::AsyncContextLayout(
       substitutionMap(substitutionMap), errorType(errorType),
       canHaveValidError(canHaveValidError), isCoroutine(isCoroutine),
       yieldInfos(yieldInfos.begin(), yieldInfos.end()),
-      directReturnInfos(directReturnInfos.begin(), directReturnInfos.end()),
+      directReturnSILType(directReturnSILType),
       indirectReturnInfos(indirectReturnInfos.begin(),
                           indirectReturnInfos.end()),
       localContextInfo(localContextInfo), bindings(std::move(bindings)),
@@ -309,7 +313,7 @@ AsyncContextLayout::AsyncContextLayout(
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
          "type infos don't match types");
   if (isCoroutine) {
-    assert(directReturnInfos.empty());
+    assert(!directReturnSILType);
   } else {
     assert(yieldInfos.empty());
   }
@@ -2307,6 +2311,7 @@ class AsyncCallEmission final : public CallEmission {
 
   Address contextBuffer;
   Address context;
+  StackAddress directReturnLocation;
   llvm::Value *calleeFunction = nullptr;
   llvm::Value *currentResumeFn = nullptr;
   llvm::Value *thickContext = nullptr;
@@ -2472,15 +2477,34 @@ public:
       auto fieldLayout = layout.getSelfWitnessTableLayout();
       saveValue(fieldLayout, selfWitnessTableExplosion, isOutlined);
     }
+    if (layout.getDirectReturnSILType()) {
+      auto returnTy = layout.getDirectReturnSILType().getValue();
+      auto &returnTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(returnTy));
+      auto stackAddr = returnTI.allocateStack(IGF, returnTy, "direct.return");
+      auto fieldLayout = layout.getDirectReturnAddrLayout();
+      Explosion addr;
+      addr.add(stackAddr.getAddress().getAddress());
+      saveValue(fieldLayout, addr, isOutlined);
+      directReturnLocation = stackAddr;
+    }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
     auto layout = getAsyncContextLayout();
-    for (unsigned index = 0, count = layout.getDirectReturnCount();
-         index < count; ++index) {
-      auto fieldLayout = layout.getDirectReturnLayout(index);
-      loadValue(fieldLayout, out);
-    }
+    assert(layout.getDirectReturnCount() <= 1);
+    if (!layout.getDirectReturnCount())
+      return;
+    auto fieldLayout = layout.getDirectReturnAddrLayout();
+    Explosion tempAddr;
+    loadValue(fieldLayout, tempAddr);
+    auto &returnTI = cast<LoadableTypeInfo>(
+        IGF.getTypeInfo(layout.getDirectReturnSILType().getValue()));
+    auto returnValueAddr = returnTI.getAddressForPointer(tempAddr.claimNext());
+    returnTI.loadAsTake(IGF, returnValueAddr, out);
+    auto returnTy = layout.getDirectReturnSILType().getValue();
+    assert(directReturnLocation.isValid());
+    returnTI.deallocateStack(IGF, directReturnLocation, returnTy);
   }
+
   Address getCalleeErrorSlot(SILType errorType) override {
     auto layout = getAsyncContextLayout();
     auto errorLayout = layout.getErrorLayout();

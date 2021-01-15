@@ -3223,14 +3223,20 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     llvm::Value *context = IGF.getAsyncContext();
     auto layout = getAsyncContextLayout(IGF);
 
-    Address dataAddr = layout.emitCastTo(IGF, context);
-    for (unsigned index = 0, count = layout.getDirectReturnCount();
-         index < count; ++index) {
-      auto fieldLayout = layout.getDirectReturnLayout(index);
+    // Store the direct results to the designated address.
+    if (layout.getDirectReturnSILType()) {
+      Address dataAddr = layout.emitCastTo(IGF, context);
+      auto fieldLayout = layout.getDirectReturnAddrLayout();
       Address fieldAddr =
           fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+      Explosion resultAddr;
       cast<LoadableTypeInfo>(fieldLayout.getType())
-          .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
+          .loadAsTake(IGF, fieldAddr, resultAddr);
+      auto &resultTI = cast<LoadableTypeInfo>(
+          IGF.getTypeInfo(layout.getDirectReturnSILType().getValue()));
+      resultTI.initialize(IGF, result,
+                          resultTI.getAddressForPointer(resultAddr.claimNext()),
+                          /*isOutlined*/ false);
     }
     emitAsyncReturn(IGF, layout, fnType);
     IGF.emitCoroutineOrAsyncExit();

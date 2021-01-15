@@ -68,7 +68,8 @@ public:
 
   // No indirect results.
 
-  TaskFutureWaitResult result;
+  // Address of direct result.
+  TaskFutureWaitResult *result;
 
   // FIXME: Currently, this is always here, but it isn't technically
   // necessary.
@@ -89,12 +90,12 @@ static void runTaskWithFutureResult(
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
-  waitingTaskContext->result.hadErrorResult = hadErrorResult;
+  waitingTaskContext->result->hadErrorResult = hadErrorResult;
   if (hadErrorResult) {
-    waitingTaskContext->result.storage =
+    waitingTaskContext->result->storage =
         reinterpret_cast<OpaqueValue *>(futureFragment->getError());
   } else {
-    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
+    waitingTaskContext->result->storage = futureFragment->getStoragePtr();
   }
 
   // TODO: schedule this task on the executor rather than running it directly.
@@ -109,21 +110,21 @@ static void runTaskWithGroupPollResult(
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
   // Was it an error or successful return?
-  waitingTaskContext->result.hadErrorResult =
+  waitingTaskContext->result->hadErrorResult =
       result.status == AsyncTask::GroupFragment::GroupPollStatus::Error;
 
   // Extract the stored value into the waiting task's result storage:
   switch (result.status) {
     case AsyncTask::GroupFragment::GroupPollStatus::Success:
-      waitingTaskContext->result.storage = result.storage;
+      waitingTaskContext->result->storage = result.storage;
       break;
     case AsyncTask::GroupFragment::GroupPollStatus::Error:
-      waitingTaskContext->result.storage =
+      waitingTaskContext->result->storage =
         reinterpret_cast<OpaqueValue *>(result.storage);
       break;
     case AsyncTask::GroupFragment::GroupPollStatus::Empty:
       // return a `nil` here (as result of the `group.next()`)
-      waitingTaskContext->result.storage = nullptr;
+      waitingTaskContext->result->storage = nullptr;
       break;
     case AsyncTask::GroupFragment::GroupPollStatus::Waiting:
       assert(false && "Must not attempt to run with a Waiting result.");

@@ -113,7 +113,7 @@ namespace irgen {
     bool canHaveValidError;
     bool isCoroutine;
     SmallVector<SILYieldInfo, 4> yieldInfos;
-    SmallVector<SILResultInfo, 4> directReturnInfos;
+    Optional<SILType> directReturnSILType;
     SmallVector<SILResultInfo, 4> indirectReturnInfos;
     Optional<ArgumentInfo> localContextInfo;
     NecessaryBindings bindings;
@@ -266,14 +266,18 @@ namespace irgen {
     ElementLayout getSelfWitnessTableLayout() {
       return getElement(getSelfWitnessTableIndex());
     }
-
     unsigned getDirectReturnCount() {
-      assert(!isCoroutine);
-      return directReturnInfos.size();
+      if (directReturnSILType)
+        return 1;
+      else
+        return 0;
     }
-    ElementLayout getDirectReturnLayout(unsigned index) {
+    ElementLayout getDirectReturnAddrLayout() {
       assert(!isCoroutine);
-      return getElement(getFirstDirectReturnIndex() + index);
+      return getElement(getFirstDirectReturnIndex());
+    }
+    Optional<SILType> getDirectReturnSILType() {
+      return directReturnSILType;
     }
     unsigned getYieldCount() {
       assert(isCoroutine);
@@ -289,7 +293,7 @@ namespace irgen {
         bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
         bool isCoroutine, ArrayRef<SILYieldInfo> yieldInfos,
         ArrayRef<SILResultInfo> indirectReturnInfos,
-        ArrayRef<SILResultInfo> directReturnInfos,
+        Optional<SILType> directReturnSILType,
         Optional<ArgumentInfo> localContextInfo);
   };
 
