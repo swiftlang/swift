@@ -86,9 +86,6 @@ documentation, please create a thread on the Swift forums under the
 
 ## Explanations
 
-- [ByteTree.md](/docs/ByteTree.md):
-  Describes the ByteTree binary format used for serializing syntax trees
-  in `libSyntax`.
 - [WebAssembly.md](/docs/WebAssembly.md):
   Explains some decisions that were made while implementing the WebAssembly target.
 
