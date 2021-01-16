@@ -1577,11 +1577,27 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     return isSubtypeOf(rep1, rep2);
   }
 
-  case ConstraintKind::OpaqueUnderlyingType:
+
+  // [NOTE: diagnose-swift-to-c-convention-change]: @convention(swift) ->
+  // @convention(c) conversions are permitted only in certain cases.
+  //
+  //   var w = 3; func f() { print(w) }; func g(_ : @convention(c) () -> ()) {}
+  //   g(f); // OK
+  //   let h = f as @convention(c) () -> (); g(h) // OK
+  //   let k = f; g(k) // error
+  //   func m() { let x = 0; g({ print(x) }) } // error
+  //   func n() { let y = 0; func p() { }; g(p); } // OK
+  //   func q() { let z = 0; func r() { print(z) }; g(r); } // error
+  //
+  // Since checking for disallowed cases requires access to captures,
+  // it is simpler to defer diagnosing (to CSApply/SILGen) and return true here.
   case ConstraintKind::Conversion:
-  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+    return true;
+
+  case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload:
