@@ -524,7 +524,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
           return binding.BindingType->isDoubleType();
         }))
-      return;
+      return false;
 
     if (type->isDoubleType()) {
       auto inferredCGFloat =
@@ -532,13 +532,10 @@ void BindingSet::addBinding(PotentialBinding binding) {
             return binding.BindingType->isCGFloatType();
           });
 
-      // TODO: If CGFloat has been already inferred, we can't simply remove it
-      // because that would break supertype join logic - index stored in
-      // `lastSupertypeIndex` would get invalidated. Instead let's replace type
-      // of an existing binding with Double.
       if (inferredCGFloat != Bindings.end()) {
-        inferredCGFloat->BindingType = type;
-        return;
+        Bindings.erase(inferredCGFloat);
+        Bindings.insert(inferredCGFloat->withType(type));
+        return false;
       }
     }
   }
