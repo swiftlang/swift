@@ -2386,8 +2386,6 @@ bool SourceFile::hasDelayedBodyParsing() const {
   // Not supported right now.
   if (Kind == SourceFileKind::SIL)
     return false;
-  if (hasInterfaceHash())
-    return false;
   if (shouldCollectTokens())
     return false;
   if (shouldBuildSyntaxTree())
