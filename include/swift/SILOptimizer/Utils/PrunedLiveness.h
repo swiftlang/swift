@@ -147,7 +147,7 @@ public:
   }
 
   /// Update this liveness result for a single use.
-  IsLive updateForUse(Operand *use);
+  IsLive updateForUse(SILInstruction *user);
 
   IsLive getBlockLiveness(SILBasicBlock *bb) const {
     auto liveBlockIter = liveBlocks.find(bb);
@@ -217,7 +217,7 @@ public:
   /// relationships that generate liveness. For example, use->isLifetimeEnding()
   /// cannot distinguish the end of the borrow scope that defines this extended
   /// live range vs. a nested borrow scope within the extended live range.
-  void updateForUse(Operand *use, bool lifetimeEnding);
+  void updateForUse(SILInstruction *user, bool lifetimeEnding);
 
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb) const {
     return liveBlocks.getBlockLiveness(bb);
