@@ -124,8 +124,8 @@
 #define SWIFT_ASSERT_ONLY_DECL(...)
 #define SWIFT_ASSERT_ONLY(...) do { } while (false)
 #else
-#define SWIFT_ASSERT_ONLY_DECL(X...) X
-#define SWIFT_ASSERT_ONLY(X...) do { X; } while (false)
+#define SWIFT_ASSERT_ONLY_DECL(...) __VA_ARGS__
+#define SWIFT_ASSERT_ONLY(...) do { __VA_ARGS__; } while (false)
 #endif
 
 #endif // SWIFT_BASIC_COMPILER_H
