@@ -7,6 +7,6 @@ protocol MyProto {
 
 func compile(x: MyProto) throws {
   try x.compile 
-  // expected-error@-1 {{expression resolves to an unused function}}
+  // expected-error@-1 {{function is unused}}
   // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
 }
