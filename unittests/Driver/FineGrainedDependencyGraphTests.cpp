@@ -57,6 +57,19 @@ static bool contains(const Range &range, const T &value) {
          std::end(range);
 }
 
+/// Ensure that 0 and 10 get distinct fingerprints
+TEST(ModuleDepGraph, FingerprintFormation) {
+  ModuleDepGraph graph;
+
+  simulateLoad(graph, &job0, {{NodeKind::topLevel, {"a"}}});
+  simulateLoad(graph, &job1, {{NodeKind::topLevel, {"a->", "z"}}});
+  simulateLoad(graph, &job10, {{NodeKind::topLevel, {"z"}}});
+  {
+    auto jobs = graph.findJobsToRecompileWhenWholeJobChanges(&job0);
+    EXPECT_FALSE(contains(jobs, &job10));
+  }
+}
+
 TEST(ModuleDepGraph, BasicLoad) {
   ModuleDepGraph graph;
 
