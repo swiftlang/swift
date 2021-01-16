@@ -583,7 +583,7 @@ public:
 
   DeadEndBlocks &DeadEndBBs;
 
-  OwnershipFixupContext &FixupCtx;
+  OwnershipRAUWHelper &RAUWHelper;
 
   /// The set of calls to lazy property getters which can be replace by a direct
   /// load of the property value.
@@ -591,9 +591,9 @@ public:
 
   CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
       SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs,
-      OwnershipFixupContext &FixupCtx)
+      OwnershipRAUWHelper &RAUWHelper)
       : SEA(SEA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
-        FixupCtx(FixupCtx), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+        RAUWHelper(RAUWHelper), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
@@ -1017,12 +1017,12 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         // extend it here as well
         if (!isa<SingleValueInstruction>(Inst))
           continue;
-        if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(
+        if (!OwnershipRAUWHelper::canFixUpOwnershipForRAUW(
                 cast<SingleValueInstruction>(Inst),
                 cast<SingleValueInstruction>(AvailInst)))
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
-        nextI = FixupCtx.replaceAllUsesAndErase(
+        nextI = RAUWHelper.replaceAllUsesAndErase(
             cast<SingleValueInstruction>(Inst),
             cast<SingleValueInstruction>(AvailInst));
         Changed = true;
@@ -1399,7 +1399,8 @@ class SILCSE : public SILFunctionTransform {
     JointPostDominanceSetComputer Computer(DeadEndBBs);
     InstModCallbacks callbacks;
     OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
-    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
+    OwnershipRAUWHelper RAUWHelper(FixupCtx);
+    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, RAUWHelper);
     bool Changed = false;
 
     // Perform the traditional CSE.

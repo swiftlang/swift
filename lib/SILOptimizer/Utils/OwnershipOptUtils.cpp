@@ -644,7 +644,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
 SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   assert(oldValue->getFunction()->hasOwnership());
   assert(
-      OwnershipFixupContext::canFixUpOwnershipForRAUW(oldValue, newValue) &&
+      OwnershipRAUWHelper::canFixUpOwnershipForRAUW(oldValue, newValue) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to do it so just RAUW
   // and return.
@@ -689,7 +689,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 
 // All callers of our RAUW routines must ensure that their values return true
 // from this.
-bool OwnershipFixupContext::canFixUpOwnershipForRAUW(SILValue oldValue,
+bool OwnershipRAUWHelper::canFixUpOwnershipForRAUW(SILValue oldValue,
                                                      SILValue newValue) {
   auto newOwnershipKind = newValue.getOwnershipKind();
 
@@ -741,8 +741,8 @@ bool OwnershipFixupContext::canFixUpOwnershipForRAUW(SILValue oldValue,
 }
 
 SILBasicBlock::iterator
-OwnershipFixupContext::replaceAllUsesAndErase(SingleValueInstruction *oldValue,
+OwnershipRAUWHelper::replaceAllUsesAndErase(SingleValueInstruction *oldValue,
                                               SILValue newValue) {
-  OwnershipRAUWUtility utility{oldValue, newValue, *this};
+  OwnershipRAUWUtility utility{oldValue, newValue, ctx};
   return utility.perform();
 }

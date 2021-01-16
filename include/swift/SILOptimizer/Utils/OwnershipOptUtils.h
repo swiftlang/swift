@@ -19,6 +19,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_OWNERSHIPOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_OWNERSHIPOPTUTILS_H
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -28,6 +29,9 @@ namespace swift {
 // Defined in BasicBlockUtils.h
 struct JointPostDominanceSetComputer;
 
+/// A struct that contains context shared in between different operation +
+/// "ownership fixup" utilities. Please do not put actual methods on this, it is
+/// meant to be composed with.
 struct OwnershipFixupContext {
   Optional<InstModCallbacks> inlineCallbacks;
   InstModCallbacks &callbacks;
@@ -43,6 +47,20 @@ struct OwnershipFixupContext {
                         JointPostDominanceSetComputer &inputJPDComputer)
       : inlineCallbacks(InstModCallbacks()), callbacks(*inlineCallbacks),
         deBlocks(deBlocks), jointPostDomSetComputer(inputJPDComputer) {}
+
+  void clear() {
+    jointPostDomSetComputer.clear();
+  }
+};
+
+/// A utility composed ontop of OwnershipFixupContext that knows how to RAUW a
+/// value or a single value instruction with a new value and then fixup
+/// ownership invariants afterwards.
+class OwnershipRAUWHelper {
+  OwnershipFixupContext &ctx;
+
+public:
+  OwnershipRAUWHelper(OwnershipFixupContext &ctx) : ctx(ctx) {}
 
   SILBasicBlock::iterator
   replaceAllUsesAndErase(SingleValueInstruction *oldValue, SILValue newValue);
