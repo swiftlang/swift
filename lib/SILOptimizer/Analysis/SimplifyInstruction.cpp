@@ -755,7 +755,8 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
-    return ctx.replaceAllUsesAndErase(svi, result);
+    OwnershipRAUWHelper helper(ctx);
+    return helper.replaceAllUsesAndErase(svi, result);
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
 }
@@ -790,7 +791,7 @@ static SILValue simplifyInstruction(SILInstruction *i) {
   // this code is not updated at this point in time.
   auto *svi = cast<SingleValueInstruction>(i);
   if (svi->getFunction()->hasOwnership())
-    if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(svi, result))
+    if (!OwnershipRAUWHelper::canFixUpOwnershipForRAUW(svi, result))
       return SILValue();
 
   return result;
@@ -813,7 +814,8 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
-    return ctx.replaceAllUsesAndErase(svi, result);
+    OwnershipRAUWHelper helper(ctx);
+    return helper.replaceAllUsesAndErase(svi, result);
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
 }
