@@ -118,7 +118,7 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
     return false;
   }
   borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
-    liveness.updateForUse(use, /*lifetimeEnding*/ true);
+    liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ true);
   });
 
   // TODO: Remove this check. Canonicalize multi-block borrow scopes only after
@@ -160,7 +160,7 @@ void CanonicalizeOSSALifetime::consolidateBorrowScope() {
   // Gather all outer uses before rewriting any to avoid scanning any basic
   // block more than once.
   SmallVector<Operand *, 8> outerUses;
-  llvm::SmallDenseSet<SILInstruction *, 8> outerUseInsts;
+  llvm::SmallPtrSet<SILInstruction *, 8> outerUseInsts;
   auto recordOuterUse = [&](Operand *use) {
     outerUses.push_back(use);
     outerUseInsts.insert(use->getUser());
@@ -278,16 +278,16 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
-        liveness.updateForUse(use, /*lifetimeEnding*/ false);
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::ForwardingConsume:
         recordConsumingUse(use);
-        liveness.updateForUse(use, /*lifetimeEnding*/ true);
+        liveness.updateForUse(user, /*lifetimeEnding*/ true);
         break;
       case OperandOwnership::DestroyingConsume:
         // destroy_value does not force pruned liveness (but store etc. does).
         if (!isa<DestroyValueInst>(user)) {
-          liveness.updateForUse(use, /*lifetimeEnding*/ true);
+          liveness.updateForUse(user, /*lifetimeEnding*/ true);
         }
         recordConsumingUse(use);
         break;
@@ -295,7 +295,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         // An entire borrow scope is considered a single use that occurs at the
         // point of the end_borrow.
         BorrowingOperand(use).visitLocalEndScopeUses([this](Operand *end) {
-          liveness.updateForUse(end, /*lifetimeEnding*/ false);
+          liveness.updateForUse(end->getUser(), /*lifetimeEnding*/ false);
           return true;
         });
         break;
@@ -308,6 +308,176 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
     }
   }
   return true;
+}
+
+// Return true if \p inst is an end_access whose access scope overlaps the end
+// of the pruned live range. This means that a hoisted destroy might execute
+// within the access scope which previously executed outside the access scope.
+//
+// Not overlapping (ignored):
+//
+//     %def
+//     use %def     // pruned liveness ends here
+//     begin_access // access scope unrelated to def
+//     end_access
+//
+// Overlapping (must extend pruned liveness):
+//
+//     %def
+//     begin_access // access scope unrelated to def
+//     use %def     // pruned liveness ends here
+//     end_access
+//
+// Overlapping (must extend pruned liveness):
+//
+//     begin_access // access scope unrelated to def
+//     %def
+//     use %def     // pruned liveness ends here
+//     end_access
+//
+bool CanonicalizeOSSALifetime::
+endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
+  if (isa<EndUnpairedAccessInst>(inst)) {
+    return true;
+  }
+  auto *endAccess = dyn_cast<EndAccessInst>(inst);
+  if (!endAccess) {
+    return false;
+  }
+  auto *beginAccess = endAccess->getBeginAccess();
+  SILBasicBlock *beginBB = beginAccess->getParent();
+  switch (liveness.getBlockLiveness(beginBB)) {
+  case PrunedLiveBlocks::LiveOut:
+    // Found partial overlap of the form:
+    //     currentDef
+    //     beginAccess
+    //     br...
+    //   bb...
+    //     use
+    //     endAccess
+    return true;
+  case PrunedLiveBlocks::LiveWithin:
+    // Check for partial overlap of this form where beginAccess and the last use
+    // are in the same block:
+    //     currentDef
+    //     beginAccess
+    //     use
+    //     endAccess
+    if (std::find_if(std::next(beginAccess->getIterator()), beginBB->end(),
+                     [this](SILInstruction &nextInst) {
+                       return liveness.isInterestingUser(&nextInst)
+                         != PrunedLiveness::NonUser;
+                     }) != beginBB->end()) {
+      // An interesting use after the beginAccess means overlap.
+      return true;
+    }
+    return false;
+  case PrunedLiveBlocks::Dead:
+    // Check for partial overlap of this form where beginAccess and currentDef
+    // are in different blocks:
+    //     beginAccess
+    //     br...
+    //  bb...
+    //     currentDef
+    //     endAccess
+    //
+    // Since beginAccess is not within the canonical live range, its access
+    // scope overlaps only if there is a path from beginAccess to currentDef
+    // that does not pass through endAccess. endAccess is dominated by
+    // both currentDef and begin_access. Therefore, such a path only exists if
+    // beginAccess dominates currentDef.
+    DominanceInfo *domInfo = dominanceAnalysis->get(inst->getFunction());
+    return domInfo->properlyDominates(beginAccess->getParent(),
+                                      getCurrentDef()->getParentBlock());
+  }
+}
+
+// Find all overlapping access scopes and extend pruned liveness to cover them:
+//
+// This may also unnecessarily, but conservatively extend liveness over some
+// originally overlapping access, such as:
+//
+//     begin_access // access scope unrelated to def
+//     %def
+//     use %def
+//     destroy %def
+//     end_access
+//
+// Or:
+//
+//     %def
+//     begin_access // access scope unrelated to def
+//     use %def
+//     destroy %def
+//     end_access
+//
+// To minimize unnecessary lifetime extension, only search for end_access
+// within dead blocks that are backward reachable from an original destroy.
+//
+// Note that lifetime extension is iterative because adding a new liveness use
+// may create new overlapping access scopes. This can happen because there is no
+// guarantee of strict stack discpline across unrelated access. For example:
+//
+//     %def
+//     begin_access A
+//     use %def        // Initial pruned lifetime boundary
+//     begin_access B
+//     end_access A    // Lifetime boundary after first extension
+//     end_access B    // Lifetime boundary after second extension
+//     destroy %def
+//
+// If the lifetime extension did not iterate, then def would be destroyed within
+// B's access scope when originally it was destroyed outside that scope.
+void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
+  this->accessBlocks = accessBlockAnalysis->get(getCurrentDef()->getFunction());
+
+  // Visit each original consuming use or destroy as the starting point for a
+  // backward CFG traversal. This traversal must only visit blocks within the
+  // original extended lifetime.
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    blockWorklist.clear();
+    blockWorklist.insert(consumingBlocks.begin(), consumingBlocks.end());
+    // This worklist is also a visited set, so we never pop the entries.
+    for (unsigned blockIdx = 0; blockIdx < blockWorklist.size(); ++blockIdx) {
+      SILBasicBlock *bb = blockWorklist[blockIdx];
+      auto blockLiveness = liveness.getBlockLiveness(bb);
+      // Ignore blocks within pruned liveness.
+      if (blockLiveness == PrunedLiveBlocks::LiveOut) {
+        continue;
+      }
+      if (blockLiveness == PrunedLiveBlocks::Dead) {
+        // Continue searching upward to find the pruned liveness boundary.
+        for (auto *predBB : bb->getPredecessorBlocks()) {
+          blockWorklist.insert(predBB);
+        }
+        // Otherwise, ignore dead blocks with no nonlocal end_access.
+        if (!accessBlocks->containsNonLocalEndAccess(bb)) {
+          continue;
+        }
+      }
+      bool blockHasUse = (blockLiveness == PrunedLiveBlocks::LiveWithin);
+      // Find the latest partially overlapping access scope, if one exists:
+      //     use %def // pruned liveness ends here
+      //     end_access
+      for (auto &inst : llvm::reverse(*bb)) {
+        // Stop at the latest use. An earlier end_access does not overlap.
+        if (blockHasUse && liveness.isInterestingUser(&inst)) {
+          break;
+        }
+        if (endsAccessOverlappingPrunedBoundary(&inst)) {
+          liveness.updateForUse(&inst, /*lifetimeEnding*/ false);
+          changed = true;
+          break;
+        }
+      }
+      // If liveness changed, might as well restart CFG traversal.
+      if (changed) {
+        break;
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -360,8 +530,6 @@ static void insertDestroyAtInst(SILBasicBlock::iterator pos,
 // The pruned liveness boundary is within the given basic block. Find the
 // block's last use. If the last use consumes the value, record it as a
 // destroy. Otherwise, insert a new destroy_value.
-//
-// Return true if a new destroy was inserted.
 void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
   auto *defInst = currentDef->getDefiningInstruction();
   DestroyValueInst *existingDestroy = nullptr;
@@ -436,6 +604,8 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
 /// - The postdominating consumes cannot be within nested loops.
 /// - Any blocks in nested loops are now marked LiveOut.
 void CanonicalizeOSSALifetime::findOrInsertDestroys() {
+  this->accessBlocks = accessBlockAnalysis->get(getCurrentDef()->getFunction());
+
   // Visit each original consuming use or destroy as the starting point for a
   // backward CFG traversal.
   blockWorklist.clear();
@@ -631,6 +801,7 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
       clearLiveness();
       return false;
     }
+    extendLivenessThroughOverlappingAccess();
     // Step 2: record final destroys
     findOrInsertDestroys();
     // Invalidate book-keeping before deleting instructions.

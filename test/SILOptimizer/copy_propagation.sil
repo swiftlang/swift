@@ -643,6 +643,8 @@ bb0(%0 : @guaranteed $C):
   return %val : $Int64
 }
 
+// CHECK-TRACE-LABEL: *** CopyPropagation: testExtract
+//
 // CHECK-LABEL: sil [ossa] @testExtract : $@convention(thin) (@guaranteed NativeObjectPair) -> @owned Builtin.NativeObject {
 // CHECK: bb0(%0 : @guaranteed $NativeObjectPair):
 // CHECK-NEXT:  [[B:%.*]] = begin_borrow %0 : $NativeObjectPair
@@ -665,3 +667,499 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   destroy_value %copy3 : $Builtin.NativeObject
   return %copy4 : $Builtin.NativeObject
 }
+
+// =============================================================================
+// Test extending liveness though overlapping access scopes.
+// =============================================================================
+
+class X {}
+class Y {}
+
+sil [ossa] @getObject : $@convention(thin) () -> @owned AnyObject
+
+// No overlap (access ignored):
+//     def
+//     use
+//     begin_access
+//     end_access
+//     destroy
+//
+// CHECK-LABEL: sil [ossa] @testNoOverlapInLiveBlock : $@convention(thin) () -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK-NOT: copy_value
+// CHECK:   store [[DEF]] to [init]
+// CHECK:   begin_access
+// CHECK:   end_access
+// CHECK: bb1:
+// CHECK-NOT:   destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testNoOverlapInLiveBlock'
+sil [ossa] @testNoOverlapInLiveBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  // end canonical lifetime
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  br bb1
+
+bb1:
+  destroy_value %copy : $AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// No overlap (access ignored):
+//     def
+//     use
+//     br...
+// bb...
+//     begin_access
+//     end_access
+//     destroy
+//
+// CHECK-LABEL: sil [ossa] @testNoOverlapInDeadBlock : $@convention(thin) () -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK-NOT: copy_value
+// CHECK:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK:   begin_access
+// CHECK:   end_access
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK-NOT: destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testNoOverlapInDeadBlock'
+sil [ossa] @testNoOverlapInDeadBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  // end canonical lifetime
+  br bb1
+
+bb1:
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  br bb2
+
+bb2:
+  destroy_value %copy : $AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Overlapping (must extend pruned liveness):
+//
+//     %def
+//     begin_access // access scope unrelated to def
+//     use %def     // pruned liveness ends here
+//     end_access
+//
+// CHECK-LABEL: sil [ossa] @testOverlapInLiveBlock : $@convention(thin) () -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   begin_access
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   end_access
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testOverlapInLiveBlock'
+sil [ossa] @testOverlapInLiveBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  // Branch to avoid reusing the destroy_value
+  br bb1
+
+bb1:
+  destroy_value %copy : $AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Overlapping (must extend pruned liveness):
+//
+//     %def
+//     begin_access // access scope unrelated to def
+//     use %def     // pruned liveness ends here
+//     br...
+//   bb...
+//     end_access
+//
+// CHECK-LABEL: sil [ossa] @testOverlapInDeadBlock : $@convention(thin) () -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   begin_access
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK:   end_access
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK-NOT: destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testOverlapInDeadBlock'
+sil [ossa] @testOverlapInDeadBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  br bb1
+
+bb1:
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  br bb2
+
+bb2:
+  destroy_value %copy : $AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Fully Overlapping (must extend pruned liveness):
+//
+//     begin_access // access scope unrelated to def
+//     %def
+//     use %def     // pruned liveness ends here
+//     end_access
+//
+// CHECK-LABEL: sil [ossa] @testFullOverlapInDefBlock : $@convention(thin) () -> () {
+// CHECK:   begin_access
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   end_access
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testFullOverlapInDefBlock'
+sil [ossa] @testFullOverlapInDefBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  // Branch to avoid reusing the destroy_value
+  br bb1
+
+bb1:
+  destroy_value %copy : $AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Fully Overlapping (must extend pruned liveness):
+//
+//     begin_access // access scope unrelated to def
+//     br...
+//   bb...
+//     %def
+//     use %def     // pruned liveness ends here
+//     end_access
+//
+// CHECK-LABEL: sil [ossa] @testFullOverlapBeforeDefBlock : $@convention(thin) () -> () {
+// CHECK:   begin_access
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   end_access
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK-NOT: destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testFullOverlapBeforeDefBlock'
+sil [ossa] @testFullOverlapBeforeDefBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  br bb1
+
+bb1:
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  // Branch to avoid reusing the destroy_value
+  br bb2
+
+bb2:
+  destroy_value %copy : $AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Original Overlapping (unnecessarilly extends pruned liveness):
+//
+// TODO: this copy could be avoided but is probably an unusual case,
+// and sinking the destroy outside the access scope might help to
+// optimize the access itself.
+//
+//     %def
+//     begin_access // access scope unrelated to def
+//     use %def     // pruned liveness ends here
+//     destroy %def
+//     end_access
+//
+// CHECK-LABEL: sil [ossa] @testOriginalOverlapInLiveBlock : $@convention(thin) () -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   begin_access
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   end_access
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK: br bb1
+// CHECK-LABEL: } // end sil function 'testOriginalOverlapInLiveBlock'
+sil [ossa] @testOriginalOverlapInLiveBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  destroy_value %copy : $AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  br bb1
+
+bb1:
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Original Overlapping (unnecessarilly extends pruned liveness):
+//
+// TODO: this copy could be avoided but is probably an unusual case,
+// and sinking the destroy outside the access scope might help to
+// optimize the access itself.
+//
+//     %def
+//     begin_access // access scope unrelated to def
+//     use %def     // pruned liveness ends here
+//     br bb1
+// bb1:
+//     destroy %def
+//     end_access
+//
+// CHECK-LABEL: sil [ossa] @testOriginalOverlapInDeadBlock : $@convention(thin) () -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   begin_access
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   end_access
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testOriginalOverlapInDeadBlock'
+sil [ossa] @testOriginalOverlapInDeadBlock : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var AnyObject }, var, name "x"
+  %adr = project_box %box : ${ var AnyObject }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  // use
+  store %def to [init] %adr : $*AnyObject
+  br bb1
+
+bb1:
+  destroy_value %copy : $AnyObject
+  %obj = load [copy] %access : $*AnyObject
+  end_access %access : $*AnyObject
+  destroy_value %obj : $AnyObject
+  destroy_value %box : ${ var AnyObject }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Interleaved access (requires iterative lifetime extension):
+//
+//     %def
+//     begin_access X
+//     use %def        // Initial pruned lifetime boundary
+//     begin_access Y
+//     end_access X    // Lifetime boundary after first extension
+//     end_access Y    // Lifetime boundary after second extension
+//     destroy %def
+//
+// CHECK-LABEL: sil [ossa] @testInterleavedAccessScope : $@convention(thin) (@inout AnyObject) -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   begin_access {{.*}} : $*X
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [assign] %{{.*}} : $*AnyObject
+// CHECK:   begin_access {{.*}} : $*Y
+// CHECK:   end_access {{.*}} : $*X
+// CHECK:   end_access {{.*}} : $*Y
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK-NOT: destroy_value {{.*}} : $AnyObject
+// CHECK-LABEL: } // end sil function 'testInterleavedAccessScope'
+sil [ossa] @testInterleavedAccessScope : $@convention(thin) (@inout AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %x = alloc_box ${ var X }, var, name "x"
+  %xadr = project_box %x : ${ var X }, 0
+  %y = alloc_box ${ var Y }, var, name "y"
+  %yadr = project_box %y : ${ var Y }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  %accessX = begin_access [read] [dynamic] %xadr : $*X
+  // use
+  store %def to [assign] %0 : $*AnyObject
+  %accessY = begin_access [read] [dynamic] %yadr : $*Y
+  // accessX overlaps pruned liveness on the first iteration
+  end_access %accessX : $*X
+  // accessY only overlaps pruned liveness on the second iteration
+  end_access %accessY : $*Y
+  br bb1
+
+bb1:
+  destroy_value %copy : $AnyObject
+  destroy_value %y : ${ var Y }
+  destroy_value %x : ${ var X }
+  %v = tuple ()
+  return %v : $()
+}
+
+// Interleaved non-local access (requires iterative lifetime extension):
+//
+//     %def
+//     begin_access X
+//     use %def        // Initial pruned lifetime boundary
+//     br bb1
+//   bb1:
+//     begin_access Y
+//     br bb2
+//   bb2:
+//     end_access X    // Lifetime boundary after first extension
+//     br bb3
+//   bb3:
+//     end_access Y    // Lifetime boundary after second extension
+//     br bb4
+//   bb4:
+//     destroy %def
+//
+// CHECK-LABEL: sil [ossa] @testInterleavedNonLocalAccessScope : $@convention(thin) (@inout AnyObject) -> () {
+// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   begin_access {{.*}} : $*X
+// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
+// CHECK:   store [[COPY]] to [assign] %{{.*}} : $*AnyObject
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   begin_access {{.*}} : $*Y
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   end_access {{.*}} : $*X
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK:   end_access {{.*}} : $*Y
+// CHECK:   destroy_value [[DEF]] : $AnyObject
+// CHECK:   br bb4
+// CHECK: bb4:
+// CHECK-NOT: destroy_value {{.*}} : $AnyObject
+// CHECK-LABEL: } // end sil function 'testInterleavedNonLocalAccessScope'
+sil [ossa] @testInterleavedNonLocalAccessScope : $@convention(thin) (@inout AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %x = alloc_box ${ var X }, var, name "x"
+  %xadr = project_box %x : ${ var X }, 0
+  %y = alloc_box ${ var Y }, var, name "y"
+  %yadr = project_box %y : ${ var Y }, 0
+  %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  // def
+  %def = apply %f() : $@convention(thin) () -> @owned AnyObject
+  %copy = copy_value %def : $AnyObject
+  %accessX = begin_access [read] [dynamic] %xadr : $*X
+  // use
+  store %def to [assign] %0 : $*AnyObject
+  br bb1
+
+bb1:
+  %accessY = begin_access [read] [dynamic] %yadr : $*Y
+  br bb2
+
+bb2:
+  // accessX overlaps pruned liveness on the first iteration
+  end_access %accessX : $*X
+  br bb3
+
+bb3:
+  // accessY only overlaps pruned liveness on the second iteration
+  end_access %accessY : $*Y
+  br bb4
+
+bb4:
+  destroy_value %copy : $AnyObject
+  destroy_value %y : ${ var Y }
+  destroy_value %x : ${ var X }
+  %v = tuple ()
+  return %v : $()
+}
+
+// =============================================================================
