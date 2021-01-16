@@ -29,7 +29,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Fingerprint &fp) {
   out << fp.getRawValue();
 }
 
-Fingerprint Fingerprint::fromString(StringRef value) {
+Optional<Fingerprint> Fingerprint::fromString(StringRef value) {
   assert(value.size() == Fingerprint::DIGEST_LENGTH &&
          "Only supports 32-byte hash values!");
   auto fp = Fingerprint::ZERO();
@@ -41,14 +41,35 @@ Fingerprint Fingerprint::fromString(StringRef value) {
     std::istringstream s(value.drop_front(Fingerprint::DIGEST_LENGTH/2).str());
     s >> std::hex >> fp.core.second;
   }
+  // If the input string is not valid hex, the conversion above can fail.
+  if (value != fp.getRawValue())
+    return None;
+
   return fp;
 }
+
+Optional<Fingerprint> Fingerprint::mockFromString(llvm::StringRef value) {
+  auto contents = value.str();
+  const auto n = value.size();
+  if (n == 0 || n > Fingerprint::DIGEST_LENGTH)
+    return None;
+  // Insert at start so that "1" and "10" are distinct
+  contents.insert(0, Fingerprint::DIGEST_LENGTH - n, '0');
+  auto fingerprint = fromString(contents);
+    if (!fingerprint) {
+    llvm::errs() << "unconvertable fingerprint from switdeps ':"
+                 << contents << "'\n";
+    abort();
+  }
+  return fingerprint;
+}
+
+
 
 llvm::SmallString<Fingerprint::DIGEST_LENGTH> Fingerprint::getRawValue() const {
   llvm::SmallString<Fingerprint::DIGEST_LENGTH> Str;
   llvm::raw_svector_ostream Res(Str);
   Res << llvm::format_hex_no_prefix(core.first, 16);
   Res << llvm::format_hex_no_prefix(core.second, 16);
-  assert(*this == Fingerprint::fromString(Str));
   return Str;
 }

@@ -602,7 +602,10 @@ public:
     using namespace llvm::support;
     auto str = llvm::StringRef{reinterpret_cast<const char *>(data),
                                Fingerprint::DIGEST_LENGTH};
-    return Fingerprint::fromString(str);
+    if (auto fp = Fingerprint::fromString(str))
+      return fp.getValue();
+    llvm::errs() << "Unconvertable fingerprint '" << str << "'\n";
+    abort();
   }
 };
 

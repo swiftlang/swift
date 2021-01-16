@@ -168,7 +168,7 @@ func SR3671() {
   ;
 
   // Also a valid call (!!)
-  { $0 { $0 } } { $0 { 1 } }  // expected-error {{expression resolves to an unused function}}
+  { $0 { $0 } } { $0 { 1 } }  // expected-error {{function is unused}}
   consume(111)
 }
 
@@ -907,7 +907,7 @@ do {
 // The funny error is because we infer the type of badResult as () -> ()
 // via the 'T -> U => T -> ()' implicit conversion.
 let badResult = { (fn: () -> ()) in fn }
-// expected-error@-1 {{expression resolves to an unused function}}
+// expected-error@-1 {{function is unused}}
 
 // rdar://problem/55102498 - closure's result type can't be inferred if the last parameter has a default value
 func test_trailing_closure_with_defaulted_last() {
