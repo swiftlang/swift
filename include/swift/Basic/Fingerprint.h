@@ -76,6 +76,10 @@ public:
   /// Strings that violate this invariant will return a null optional.
   static llvm::Optional<Fingerprint> fromString(llvm::StringRef value);
 
+  /// For mocking only:
+  /// Aborts if unconvertible, returns None for an empty string.
+  static llvm::Optional<Fingerprint> mockFromString(llvm::StringRef value);
+
  /// Creates a fingerprint value by consuming the given \c MD5Result from LLVM.
   explicit Fingerprint(llvm::MD5::MD5Result &&MD5Value)
       : core{MD5Value.words()} {}

@@ -42,17 +42,9 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
     const bool hadCompilationError) {
   auto swiftDeps =
     cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps).str();
-  assert(!swiftDeps.empty());
-  // Insert at start so that "1" and "10" are distinct
-  swiftDeps.insert(0, Fingerprint::DIGEST_LENGTH - swiftDeps.size(), '0');
-  auto swiftDepsFingerprint = Fingerprint::fromString(swiftDeps);
-  if (!swiftDepsFingerprint) {
-    llvm::errs() << "unconvertable fingerprint from switdeps ':"
-                 << swiftDeps << "'\n";
-    abort();
-  }
-  auto interfaceHash =
-    interfaceHashIfNonEmpty.getValueOr(swiftDepsFingerprint.getValue());
+  auto swiftDepsFingerprint =
+    Fingerprint::mockFromString(swiftDeps).getValue();
+  auto interfaceHash = interfaceHashIfNonEmpty.getValueOr(swiftDepsFingerprint);
 
   SourceManager sm;
   DiagnosticEngine diags(sm);
