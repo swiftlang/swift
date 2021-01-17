@@ -973,3 +973,23 @@ bb4:
   destroy_value %0 : $Klass
   return %3 : $Builtin.NativeObject
 }
+
+// Make sure that we always RAUW if our new value address is from a
+// pointer_to_address since we don't track interior pointers that escape through
+// address_to_pointer.
+//
+// CHECK-LABEL: sil [ossa] @interior_pointer_no_base_new_value : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned Builtin.NativeObject {
+// CHECK: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK-NOT: pointer_to_address
+// CHECK: } // end sil function 'interior_pointer_no_base_new_value'
+sil [ossa] @interior_pointer_no_base_new_value : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.RawPointer, %count : $Builtin.Word):
+  %0a = index_raw_pointer %0 : $Builtin.RawPointer, %count : $Builtin.Word
+  %2 = pointer_to_address %0a : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %3 = index_addr %2 : $*Builtin.NativeObject, %count : $Builtin.Word
+  %4 = address_to_pointer %3 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %6 = load [copy] %5 : $*Builtin.NativeObject
+  return %6 : $Builtin.NativeObject
+}

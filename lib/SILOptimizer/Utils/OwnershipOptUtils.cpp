@@ -901,28 +901,46 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // But if we have an address, we need to check if new value is from an
   // interior pointer or not in a way that the pass understands. What we do is:
   //
-  // 1. Compute the AccessPathWithBase of newValue. If we do not get back a
+  // 1. Early exit some cases that we know can never have interior pointers.
+  //
+  // 2. Compute the AccessPathWithBase of newValue. If we do not get back a
   //    valid such object, invalidate and then bail.
   //
-  // 2. Then we check if the base address is the result of an interior pointer
+  // 3. Then we check if the base address is the result of an interior pointer
   //    instruction. If we do not find one we bail.
   //
-  // 3. Then grab the base value of the interior pointer operand. We only
+  // 4. Then grab the base value of the interior pointer operand. We only
   //    support cases where we have a single BorrowedValue as our base. This is
   //    a safe future proof assumption since one reborrows are on
   //    structs/tuple/destructures, a guaranteed value will always be associated
   //    with a single BorrowedValue, so this will never fail (and the code will
   //    probably be DCEed).
   //
-  // 4. Then we compute an AccessPathWithBase for oldValue and then find its
+  // 5. Then we compute an AccessPathWithBase for oldValue and then find its
   //    derived uses. If we fail, we bail.
   //
-  // 5. At this point, we know that we can perform this RAUW. The only question
+  // 6. At this point, we know that we can perform this RAUW. The only question
   //    is if we need to when we RAUW copy the interior pointer base value. We
   //    perform this check by making sure all of the old value's derived uses
   //    are within our BorrowedValue's scope. If so, we clear the extra state we
   //    were tracking (the interior pointer/oldValue's transitive uses), so we
   //    perform just a normal RAUW (without inserting the copy) when we RAUW.
+  //
+  // We can always RAUW an address with a pointer_to_address since if there
+  // were any interior pointer constraints on whatever address pointer came
+  // from, the address_to_pointer producing that value erases that
+  // information, so we can RAUW without worrying.
+  //
+  // NOTE: We also need to handle this here since a pointer_to_address is not a
+  // valid base value for an access path since it doesn't refer to any storage.
+  {
+    auto baseProj =
+        getUnderlyingObjectStoppingAtObjectToAddrProjections(newValue);
+    if (isa<PointerToAddressInst>(baseProj)) {
+      return;
+    }
+  }
+
   auto accessPathWithBase = AccessPathWithBase::compute(newValue);
   if (!accessPathWithBase.base) {
     // Invalidate!

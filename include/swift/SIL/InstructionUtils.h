@@ -27,6 +27,10 @@ SILValue getUnderlyingObject(SILValue V);
 
 SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
 
+/// Given an address look through address to address projections and indexing
+/// insts.
+SILValue getUnderlyingObjectStoppingAtObjectToAddrProjections(SILValue v);
+
 SILValue stripSinglePredecessorArgs(SILValue V);
 
 /// Return the underlying SILValue after stripping off all casts from the
@@ -55,7 +59,13 @@ SILValue stripClassCasts(SILValue V);
 
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
+///
+/// FIXME: Today address projections are referring to the result of the
+/// projection and doesn't consider the operand. Should we change this?
 SILValue stripAddressProjections(SILValue V);
+
+/// Look through any projections that transform an address -> an address.
+SILValue lookThroughAddressToAddressProjections(SILValue v);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
