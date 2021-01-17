@@ -5349,11 +5349,12 @@ public:
 
   bool isBeginningOfPartition() const { return IsBeginningOfPartition; }
 
-  // FIXME: Both of the accessors below are required to support
+  // FIXME: All three of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
 
   bool isGenericOperator() const;
   bool isSymmetricOperator() const;
+  bool isUnaryOperator() const;
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "disjunction choice ";

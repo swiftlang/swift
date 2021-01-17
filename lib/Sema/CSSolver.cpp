@@ -2167,6 +2167,15 @@ bool DisjunctionChoice::isSymmetricOperator() const {
   return firstType->isEqual(secondType);
 }
 
+bool DisjunctionChoice::isUnaryOperator() const {
+  auto *decl = getOperatorDecl(Choice);
+  if (!decl)
+    return false;
+
+  auto func = cast<FuncDecl>(decl);
+  return func->getParameters()->size() == 1;
+}
+
 void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   assert(ExplicitConversion);
 
