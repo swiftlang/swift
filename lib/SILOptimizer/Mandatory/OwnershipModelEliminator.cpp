@@ -482,6 +482,7 @@ static bool stripOwnership(SILFunction &func) {
     InstModCallbacks callbacks([&](SILInstruction *instToErase) {
       visitor.eraseInstruction(instToErase);
     });
+    // We are no longer in OSSA, so we don't need to pass in a deBlocks.
     simplifyAndReplaceAllSimplifiedUsesAndErase(*value, callbacks);
     madeChange |= callbacks.hadCallbackInvocation();
   }

@@ -793,6 +793,11 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
 
+  // If we weren't passed a dead end blocks, we can't optimize without ownership
+  // enabled.
+  if (!deadEndBlocks)
+    return next;
+
   JointPostDominanceSetComputer computer(*deadEndBlocks);
   OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
   OwnershipRAUWHelper helper(ctx, svi, result);
