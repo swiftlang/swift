@@ -14,6 +14,7 @@
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/IR/Function.h"
 
 #include <string>
 
@@ -81,22 +82,6 @@ struct SupplementaryOutputPaths {
   /// \sa swift::emitReferenceDependencies
   /// \sa DependencyGraph
   std::string ReferenceDependenciesFilePath;
-
-  /// The path to which we should output a Swift "unparsed ranges" file.
-  /// It is valid whenever there are any inputs.
-  ///
-  /// "Unparsed ranges" track source ranges in non-primary files whose parsing
-  /// was skipped
-  /// (a.k.a. "delayed).\
-  /// These files are consumed by the Swift driver (or will be someday) to
-  /// decide whether a source file needs to be recompiled during a build.
-  ///
-  /// \sa swift::emitSwiftRanges
-  std::string SwiftRangesFilePath;
-
-  /// The path to which we should save the source code of a primary source file
-  /// to be compiled. Used to diff sources of primary inputs.
-  std::string CompiledSourceFilePath;
 
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
@@ -170,6 +155,38 @@ struct SupplementaryOutputPaths {
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
+
+  /// Apply a given function for each existing (non-empty string) supplementary output
+  void forEachSetOutput(llvm::function_ref<void(const std::string&)> fn) const {
+    if (!ObjCHeaderOutputPath.empty())
+      fn(ObjCHeaderOutputPath); 
+    if (!ModuleOutputPath.empty())
+      fn(ModuleOutputPath); 
+    if (!ModuleSourceInfoOutputPath.empty())
+      fn(ModuleSourceInfoOutputPath); 
+    if (!ModuleDocOutputPath.empty())
+      fn(ModuleDocOutputPath); 
+    if (!DependenciesFilePath.empty())
+      fn(DependenciesFilePath); 
+    if (!ReferenceDependenciesFilePath.empty())
+      fn(ReferenceDependenciesFilePath); 
+    if (!SerializedDiagnosticsPath.empty())
+      fn(SerializedDiagnosticsPath); 
+    if (!FixItsOutputPath.empty())
+      fn(FixItsOutputPath); 
+    if (!LoadedModuleTracePath.empty())
+      fn(LoadedModuleTracePath); 
+    if (!TBDPath.empty())
+      fn(TBDPath); 
+    if (!ModuleInterfaceOutputPath.empty())
+      fn(ModuleInterfaceOutputPath); 
+    if (!PrivateModuleInterfaceOutputPath.empty())
+      fn(PrivateModuleInterfaceOutputPath); 
+    if (!LdAddCFilePath.empty())
+      fn(LdAddCFilePath); 
+    if (!ModuleSummaryOutputPath.empty())
+      fn(ModuleSummaryOutputPath); 
+  }
 
   bool empty() const {
     return ObjCHeaderOutputPath.empty() && ModuleOutputPath.empty() &&

@@ -157,6 +157,14 @@ public struct Range<Bound: Comparable> {
   /// instance does not contain its upper bound.
   public let upperBound: Bound
 
+  // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
+  @_alwaysEmitIntoClient @inline(__always)
+  internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.lowerBound = bounds.lower
+    self.upperBound = bounds.upper
+  }
+
   /// Creates an instance with the given bounds.
   ///
   /// Because this initializer does not perform any checks, it should be used
@@ -167,8 +175,9 @@ public struct Range<Bound: Comparable> {
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @inlinable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-    self.lowerBound = bounds.lower
-    self.upperBound = bounds.upper
+    _debugPrecondition(bounds.lower <= bounds.upper,
+      "Range requires lowerBound <= upperBound")
+    self.init(_uncheckedBounds: (lower: bounds.lower, upper: bounds.upper))
   }
 
   /// Returns a Boolean value indicating whether the given element is contained
@@ -308,7 +317,7 @@ extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// require an upper bound of `Int.max + 1`, which is not representable as
   public init(_ other: ClosedRange<Bound>) {
     let upperBound = other.upperBound.advanced(by: 1)
-    self.init(uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
+    self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
   }
 }
 
@@ -325,7 +334,7 @@ extension Range: RangeExpression {
   @inlinable // trivial-implementation
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
-    return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    self
   }
 }
 
@@ -359,7 +368,7 @@ extension Range {
       limits.upperBound < self.upperBound ? limits.upperBound
           : limits.lowerBound > self.upperBound ? limits.lowerBound
           : self.upperBound
-    return Range(uncheckedBounds: (lower: lower, upper: upper))
+    return Range(_uncheckedBounds: (lower: lower, upper: upper))
   }
 }
 
@@ -435,7 +444,7 @@ extension Range: Decodable where Bound: Decodable {
           codingPath: decoder.codingPath,
           debugDescription: "Cannot initialize \(Range.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
     }
-    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 
@@ -729,7 +738,7 @@ extension Comparable {
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
       "Range requires lowerBound <= upperBound")
-    return Range(uncheckedBounds: (lower: minimum, upper: maximum))
+    return Range(_uncheckedBounds: (lower: minimum, upper: maximum))
   }
 
   /// Returns a partial range up to, but not including, its upper bound.

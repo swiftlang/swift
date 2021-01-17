@@ -56,9 +56,186 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-REPLACEMENT3: func sorted(by areInIncreasingOrder: (<Type usr="s:13cursor_stdlib2S1V">S1</Type>
 // CHECK-REPLACEMENT3: sorted()</RelatedName>
 
-// RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
+// RUN: %sourcekitd-test -req=cursor -req-opts=retrieve_symbol_graph=1 -pos=18:8 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
 // CHECK-REPLACEMENT4: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT4: <Declaration>{{.*}}mutating func append(_ newElement: <Type usr="s:13cursor_stdlib2S1V">S1</Type>)</Declaration>
+// CHECK-REPLACEMENT4: SYMBOL GRAPH BEGIN
+// CHECK-REPLACEMENT4: {
+// CHECK-REPLACEMENT4:   "module": {
+// CHECK-REPLACEMENT4:     "name": "Swift",
+// CHECK-REPLACEMENT4:   },
+// CHECK-REPLACEMENT4:   "relationships": [
+// CHECK-REPLACEMENT4:     {
+// CHECK-REPLACEMENT4:       "kind": "memberOf",
+// CHECK-REPLACEMENT4:       "source": "s:Sa6appendyyxnF",
+// CHECK-REPLACEMENT4:       "target": "s:Sa"
+// CHECK-REPLACEMENT4:     }
+// CHECK-REPLACEMENT4:   ],
+// CHECK-REPLACEMENT4:   "symbols": [
+// CHECK-REPLACEMENT4:     {
+// CHECK-REPLACEMENT4:       "accessLevel": "public",
+// CHECK-REPLACEMENT4:       "declarationFragments": [
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "keyword",
+// CHECK-REPLACEMENT4:           "spelling": "mutating"
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "text",
+// CHECK-REPLACEMENT4:           "spelling": " "
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "keyword",
+// CHECK-REPLACEMENT4:           "spelling": "func"
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "text",
+// CHECK-REPLACEMENT4:           "spelling": " "
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "identifier",
+// CHECK-REPLACEMENT4:           "spelling": "append"
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "text",
+// CHECK-REPLACEMENT4:           "spelling": "("
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "externalParam",
+// CHECK-REPLACEMENT4:           "spelling": "_"
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "text",
+// CHECK-REPLACEMENT4:           "spelling": " "
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "internalParam",
+// CHECK-REPLACEMENT4:           "spelling": "newElement"
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "text",
+// CHECK-REPLACEMENT4:           "spelling": ": "
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "typeIdentifier",
+// CHECK-REPLACEMENT4:           "preciseIdentifier": "s:13cursor_stdlib2S1V",
+// CHECK-REPLACEMENT4:           "spelling": "S1"
+// CHECK-REPLACEMENT4:         },
+// CHECK-REPLACEMENT4:         {
+// CHECK-REPLACEMENT4:           "kind": "text",
+// CHECK-REPLACEMENT4:           "spelling": ")"
+// CHECK-REPLACEMENT4:         }
+// CHECK-REPLACEMENT4:       ],
+// CHECK-REPLACEMENT4:       "docComment": {
+// CHECK-REPLACEMENT4:         "lines": [
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "text": "Adds a new element at the end of the array."
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:         ]
+// CHECK-REPLACEMENT4:       },
+// CHECK-REPLACEMENT4:       "functionSignature": {
+// CHECK-REPLACEMENT4:         "parameters": [
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "declarationFragments": [
+// CHECK-REPLACEMENT4:               {
+// CHECK-REPLACEMENT4:                 "kind": "identifier",
+// CHECK-REPLACEMENT4:                 "spelling": "newElement"
+// CHECK-REPLACEMENT4:               },
+// CHECK-REPLACEMENT4:               {
+// CHECK-REPLACEMENT4:                 "kind": "text",
+// CHECK-REPLACEMENT4:                 "spelling": ": "
+// CHECK-REPLACEMENT4:               },
+// CHECK-REPLACEMENT4:               {
+// CHECK-REPLACEMENT4:                 "kind": "typeIdentifier",
+// CHECK-REPLACEMENT4:                 "preciseIdentifier": "s:13cursor_stdlib2S1V",
+// CHECK-REPLACEMENT4:                 "spelling": "S1"
+// CHECK-REPLACEMENT4:               }
+// CHECK-REPLACEMENT4:             ],
+// CHECK-REPLACEMENT4:             "name": "newElement"
+// CHECK-REPLACEMENT4:           }
+// CHECK-REPLACEMENT4:         ],
+// CHECK-REPLACEMENT4:         "returns": [
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": "()"
+// CHECK-REPLACEMENT4:           }
+// CHECK-REPLACEMENT4:         ]
+// CHECK-REPLACEMENT4:       },
+// CHECK-REPLACEMENT4:       "identifier": {
+// CHECK-REPLACEMENT4:         "interfaceLanguage": "swift",
+// CHECK-REPLACEMENT4:         "precise": "s:Sa6appendyyxnF"
+// CHECK-REPLACEMENT4:       },
+// CHECK-REPLACEMENT4:       "kind": {
+// CHECK-REPLACEMENT4:         "displayName": "Instance Method",
+// CHECK-REPLACEMENT4:         "identifier": "swift.method"
+// CHECK-REPLACEMENT4:       },
+// CHECK-REPLACEMENT4:       "names": {
+// CHECK-REPLACEMENT4:         "navigator": [
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "keyword",
+// CHECK-REPLACEMENT4:             "spelling": "func"
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": " "
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "identifier",
+// CHECK-REPLACEMENT4:             "spelling": "append"
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": "("
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "typeIdentifier",
+// CHECK-REPLACEMENT4:             "preciseIdentifier": "s:13cursor_stdlib2S1V",
+// CHECK-REPLACEMENT4:             "spelling": "S1"
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": ")"
+// CHECK-REPLACEMENT4:           }
+// CHECK-REPLACEMENT4:         ],
+// CHECK-REPLACEMENT4:         "subHeading": [
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "keyword",
+// CHECK-REPLACEMENT4:             "spelling": "func"
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": " "
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "identifier",
+// CHECK-REPLACEMENT4:             "spelling": "append"
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": "("
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "typeIdentifier",
+// CHECK-REPLACEMENT4:             "preciseIdentifier": "s:13cursor_stdlib2S1V",
+// CHECK-REPLACEMENT4:             "spelling": "S1"
+// CHECK-REPLACEMENT4:           },
+// CHECK-REPLACEMENT4:           {
+// CHECK-REPLACEMENT4:             "kind": "text",
+// CHECK-REPLACEMENT4:             "spelling": ")"
+// CHECK-REPLACEMENT4:           }
+// CHECK-REPLACEMENT4:         ],
+// CHECK-REPLACEMENT4:         "title": "append(_:)"
+// CHECK-REPLACEMENT4:       },
+// CHECK-REPLACEMENT4:       "pathComponents": [
+// CHECK-REPLACEMENT4:         "Array",
+// CHECK-REPLACEMENT4:         "append(_:)"
+// CHECK-REPLACEMENT4:       ],
+// CHECK-REPLACEMENT4:       "swiftExtension": {
+// CHECK-REPLACEMENT4:         "extendedModule": "Swift"
+// CHECK-REPLACEMENT4:       }
+// CHECK-REPLACEMENT4:     }
+// CHECK-REPLACEMENT4:   ]
+// CHECK-REPLACEMENT4: }
+// CHECK-REPLACEMENT4: SYMBOL GRAPH END
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:10 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-MODULE-GROUP1 %s
 // CHECK-MODULE-GROUP1: MODULE GROUPS BEGIN

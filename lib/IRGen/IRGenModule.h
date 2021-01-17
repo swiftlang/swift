@@ -726,10 +726,12 @@ public:
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
   llvm::StructType *SwiftContextTy;
   llvm::StructType *SwiftTaskTy;
+  llvm::StructType *SwiftJobTy;
   llvm::StructType *SwiftExecutorTy;
   llvm::PointerType *AsyncFunctionPointerPtrTy;
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
+  llvm::PointerType *SwiftJobPtrTy;
   llvm::PointerType *SwiftExecutorPtrTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
@@ -1617,6 +1619,9 @@ public:
 
   /// Add the swiftself attribute.
   void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
+
+  void addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
+                                      unsigned argIndex);
 
   /// Add the swifterror attribute.
   void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);

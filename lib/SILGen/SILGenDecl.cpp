@@ -1220,17 +1220,21 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
 
-  // Emit the property wrapper backing initializer if necessary.
-  auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
-  if (wrapperInfo && wrapperInfo.initializeFromOriginal)
-    SGM.emitPropertyWrapperBackingInitializer(D);
+  // Avoid request evaluator overhead in the common case where there's
+  // no wrapper.
+  if (D->getAttrs().hasAttribute<CustomAttr>()) {
+    // Emit the property wrapper backing initializer if necessary.
+    auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
+    if (wrapperInfo && wrapperInfo.initializeFromOriginal)
+      SGM.emitPropertyWrapperBackingInitializer(D);
 
-  D->visitAuxiliaryDecls([&](VarDecl *var) {
-    if (auto *patternBinding = var->getParentPatternBinding())
-      visitPatternBindingDecl(patternBinding);
+    D->visitAuxiliaryDecls([&](VarDecl *var) {
+      if (auto *patternBinding = var->getParentPatternBinding())
+        visitPatternBindingDecl(patternBinding);
 
-    visit(var);
-  });
+      visit(var);
+    });
+  }
 
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {

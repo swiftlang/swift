@@ -104,6 +104,7 @@ NODE(GenericProtocolWitnessTableInstantiationFunction)
 NODE(ResilientProtocolWitnessTable)
 NODE(GenericSpecialization)
 NODE(GenericSpecializationNotReAbstracted)
+NODE(GenericSpecializationInResilienceDomain)
 NODE(GenericSpecializationParam)
 NODE(GenericSpecializationPrespecialized)
 NODE(InlinedGenericFunction)
@@ -304,6 +305,12 @@ NODE(GlobalVariableOnceFunction)
 NODE(GlobalVariableOnceToken)
 NODE(GlobalVariableOnceDeclList)
 NODE(CanonicalPrespecializedGenericTypeCachingOnceToken)
+
+// Added in Swift 5.5
+NODE(AsyncFunctionPointer)
+NODE(AutoDiffFunction)
+NODE(AutoDiffFunctionKind)
+NODE(IndexSubset)
 
 #undef CONTEXT_NODE
 #undef NODE

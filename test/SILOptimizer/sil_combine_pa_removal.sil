@@ -5,9 +5,9 @@ sil_stage canonical
 import Builtin
 import Swift
 
-//CHECK: sil @a_function1
-//CHECK-NOT: partial_apply
-//CHECK: return
+// CHECK-LABEL: sil @a_function1
+// XHECK-NOT: partial_apply
+// XHECK: return
 sil @a_function1 : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = function_ref @our_closure_function1 : $@convention(thin) (Int64) -> Bool // user: %2
@@ -20,21 +20,21 @@ bb0(%0 : $Int64):
 class K {
 }
 
-//CHECK: sil @a_function2
+// CHECK-LABEL: sil @a_function2
 // The release_value of $K is optimized to a strong_release.
 sil @a_function2 : $@convention(thin) (@owned K) -> () {
 bb0(%0 : $K):
   %1 = alloc_ref $K
   %2 = function_ref @our_closure_function2 : $@convention(thin) (@owned K) -> Bool // user: %2
-//CHECK-NOT: partial_apply
+// XHECK-NOT: partial_apply
   %3 = partial_apply %2(%0) : $@convention(thin) (@owned K) -> Bool // user: %3
-//CHECK: br
+// XHECK: br
   br bb1
  bb1:
-//CHECK: strong_release
+// XHECK: strong_release
   strong_release %3 : $@callee_owned () -> Bool   // id: %3
   %5 = tuple ()                                   // user: %5
-//CHECK: return
+// XHECK: return
   return %5 : $()                                 // id: %5
 }
 

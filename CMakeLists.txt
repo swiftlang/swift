@@ -147,7 +147,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.3")
+set(SWIFT_VERSION "5.4")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -435,10 +435,24 @@ option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB "Only build the Swift Syntax Parser libr
 option(SWIFT_BUILD_SOURCEKIT "Build SourceKit" TRUE)
 option(SWIFT_ENABLE_SOURCEKIT_TESTS "Enable running SourceKit tests" ${SWIFT_BUILD_SOURCEKIT})
 
+# Use dispatch as the system scheduler by default.
+# For convenience, we set this to false when concurrency is disabled.
+set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
+if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND NOT SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
+endif()
+
+set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    set(SWIFT_BUILD_HOST_DISPATCH TRUE)
+  endif()
+endif()
+
+if(SWIFT_BUILD_HOST_DISPATCH OR SWIFT_CONCURRENCY_USES_DISPATCH)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-      message(SEND_ERROR "SyntaxParserLib and SourceKit require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+      message(SEND_ERROR "SyntaxParserLib, SourceKit, and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
     endif()
   endif()
 endif()
@@ -467,10 +481,12 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
 endif()
 message(STATUS "")
 
-if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
-  set(SWIFT_CROSS_COMPILING FALSE)
+# Check if a prebuilt clang path was passed in, as this variable will be
+# assigned if not, in SwiftSharedCMakeConfig.
+if("${SWIFT_NATIVE_CLANG_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_PREBUILT_CLANG FALSE)
 else()
-  set(SWIFT_CROSS_COMPILING TRUE)
+  set(SWIFT_PREBUILT_CLANG TRUE)
 endif()
 
 include(SwiftSharedCMakeConfig)
@@ -591,8 +607,12 @@ if(SWIFT_HOST_VARIANT_ARCH)
 else()
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
-    set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+    if(SWIFT_HOST_VARIANT_SDK_default STREQUAL OSX)
+      set(SWIFT_HOST_VARIANT_ARCH_default "arm64")
+    else()
+      set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
+    endif()
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
     set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
@@ -635,9 +655,10 @@ endif()
 #
 
 if(XCODE)
-  # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
-  # insists on passing -mmacosx-version-min to the compiler, and we need
-  # to pass -mios-version-min.  Clang sees both options and complains.
+  # FIXME: It used to be the case that Xcode would force
+  # -m${platform}-version-min flags that would conflict with those computed
+  # by build-script. version-min flags are deprecated in favor of -target since
+  # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
 endif()
 
@@ -758,7 +779,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   #
   # Primary variant is always OSX; even on iOS hosts.
   set(SWIFT_PRIMARY_VARIANT_SDK_default "OSX")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${CMAKE_HOST_SYSTEM_PROCESSOR}")
 
 endif()
 
@@ -941,7 +962,7 @@ if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
 endif()
 
-if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
+if(SWIFT_BUILD_HOST_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
        CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.8

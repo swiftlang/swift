@@ -81,14 +81,7 @@ public:
     return ReachableBlocks.count(block) == 0;
   }
 
-  bool empty() {
-    if (!isComputed) {
-      // Lazily compute the dataflow.
-      compute();
-      isComputed = true;
-    }
-    return ReachableBlocks.empty();
-  }
+  const SILFunction *getFunction() const { return F; }
 };
 
 /// A struct that contains the intermediate state used in computing

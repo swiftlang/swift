@@ -45,14 +45,15 @@ template<> struct TypeIDZoneTypes<Zone::SWIFT_TYPEID_ZONE> {
 #undef SWIFT_TYPEID_NAMED
 #undef SWIFT_TYPEID_TEMPLATE1_NAMED
 #undef SWIFT_TYPEID_TEMPLATE2_NAMED
+    Count
   };
 };
 
 // Second pass: create specializations of TypeID for these types.
 #define SWIFT_TYPEID_NAMED(Type, Name)                       \
 template<> struct TypeID<Type> {                             \
-  static const uint8_t zoneID =                              \
-    static_cast<uint8_t>(Zone::SWIFT_TYPEID_ZONE);           \
+  static constexpr Zone zone = Zone::SWIFT_TYPEID_ZONE;      \
+  static const uint8_t zoneID = static_cast<uint8_t>(zone);  \
   static const uint8_t localID =                             \
     TypeIDZoneTypes<Zone::SWIFT_TYPEID_ZONE>::Name;          \
                                                              \

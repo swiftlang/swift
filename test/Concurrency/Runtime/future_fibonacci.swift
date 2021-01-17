@@ -1,9 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// XFAIL: CPU=arm64e
 
 import Dispatch
 
@@ -12,33 +11,6 @@ import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #endif
-
-extension DispatchQueue {
-  func async<R>(execute: @escaping () async throws -> R) -> Task.Handle<R> {
-    let handle = Task.runDetached(operation: execute)
-
-    // Run the task
-    _ = { self.async { handle.run() } }()
-
-    return handle
-  }
-
-  func async<R>(in group: DispatchGroup,
-    execute: @escaping () async throws -> R) -> Task.Handle<R> {
-    let handle = Task.runDetached(operation: execute)
-
-    // Run the task
-    group.enter()
-    _ = {
-      self.async {
-        handle.run()
-        group.leave()
-      }
-    }()
-
-    return handle
-  }
-}
 
 func fib(_ n: Int) -> Int {
     var first = 0
@@ -51,23 +23,23 @@ func fib(_ n: Int) -> Int {
     return first
 }
 
-func asyncFib(_ n: Int, group: DispatchGroup, queue: DispatchQueue) async -> Int {
+func asyncFib(_ n: Int) async -> Int {
   if n == 0 || n == 1 {
     return n
   }
 
-  let first = queue.async(in: group) {
-    await asyncFib(n - 2, group: group, queue: queue)
+  let first = Task.runDetached {
+    await asyncFib(n - 2)
   }
 
-  let second = queue.async(in: group) {
-    await asyncFib(n - 1, group: group, queue: queue)
+  let second = Task.runDetached {
+    await asyncFib(n - 1)
   }
 
   // Sleep a random amount of time waiting on the result producing a result.
   usleep(UInt32.random(in: 0..<100) * 1000)
 
-  let result = await try! first.get() + second.get()
+  let result = try! await first.get() + second.get()
 
   // Sleep a random amount of time before producing a result.
   usleep(UInt32.random(in: 0..<100) * 1000)
@@ -76,14 +48,10 @@ func asyncFib(_ n: Int, group: DispatchGroup, queue: DispatchQueue) async -> Int
 }
 
 func runFibonacci(_ n: Int) {
-  let queue = DispatchQueue(label: "concurrent", attributes: .concurrent)
-  let group = DispatchGroup()
-
   var result = 0
-  _ = queue.async(in: group) {
-    result = await asyncFib(n, group: group, queue: queue)
+  runAsyncAndBlock {
+    result = await asyncFib(n)
   }
-  group.wait()
 
   print()
   print("Async fib = \(result), sequential fib = \(fib(n))")

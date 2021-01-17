@@ -233,7 +233,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                            IsNotDynamic);
   
   if (F->empty()) {
-    // TODO: Emit the implementation.
+    // Emit the implementation.
     SILGenFunction SGF(*this, *F, SwiftModule);
     {
       Scope scope(SGF, loc);
@@ -310,7 +310,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           // Convert the ObjC argument to the bridged Swift representation we
           // want.
           ManagedValue bridgedArg = SGF.emitBridgedToNativeValue(loc,
-                                       arg,
+                                       arg.copy(SGF, loc),
                                        arg.getType().getASTType(),
                                        // FIXME: pass down formal type
                                        destBuf->getType().getASTType(),
@@ -404,7 +404,7 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
-  auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
+  auto name = "AD__" + derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, originalFnDeclRef.getLinkage(ForDefinition),
       constantTy, IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(),

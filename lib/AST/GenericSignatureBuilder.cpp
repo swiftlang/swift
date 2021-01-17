@@ -2633,16 +2633,24 @@ void ArchetypeType::resolveNestedType(
   Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
     DependentMemberType::get(interfaceType, nested.first);
-  auto equivClass =
-    builder.resolveEquivalenceClass(
+  auto resolved =
+    builder.maybeResolveEquivalenceClass(
                                   memberInterfaceType,
-                                  ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass) {
+                                  ArchetypeResolutionKind::CompleteWellFormed,
+                                  /*wantExactPotentialArchetype=*/false);
+  if (!resolved) {
     nested.second = ErrorType::get(interfaceType);
     return;
   }
 
-  auto result = equivClass->getTypeInContext(builder, genericEnv);
+  Type result;
+  if (auto concrete = resolved.getAsConcreteType()) {
+    result = concrete;
+  } else {
+    auto *equivClass = resolved.getEquivalenceClass(builder);
+    result = equivClass->getTypeInContext(builder, genericEnv);
+  }
+
   assert(!nested.second ||
          nested.second->isEqual(result) ||
          (nested.second->hasError() && result->hasError()));

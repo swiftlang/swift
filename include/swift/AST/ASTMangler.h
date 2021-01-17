@@ -166,23 +166,23 @@ public:
                                                    bool predefined);
   
   /// Mangle the derivative function (JVP/VJP) for the given:
-  /// - Mangled original function name.
+  /// - Mangled original function declaration.
   /// - Derivative function kind.
   /// - Derivative function configuration: parameter/result indices and
   ///   derivative generic signature.
   std::string
-  mangleAutoDiffDerivativeFunctionHelper(StringRef name,
-                                         AutoDiffDerivativeFunctionKind kind,
-                                         AutoDiffConfig config);
+  mangleAutoDiffDerivativeFunction(const AbstractFunctionDecl *originalAFD,
+                                   AutoDiffDerivativeFunctionKind kind,
+                                   AutoDiffConfig config);
 
   /// Mangle the linear map (differential/pullback) for the given:
-  /// - Mangled original function name.
+  /// - Mangled original function declaration.
   /// - Linear map kind.
   /// - Derivative function configuration: parameter/result indices and
   ///   derivative generic signature.
-  std::string mangleAutoDiffLinearMapHelper(StringRef name,
-                                            AutoDiffLinearMapKind kind,
-                                            AutoDiffConfig config);
+  std::string mangleAutoDiffLinearMap(const AbstractFunctionDecl *originalAFD,
+                                      AutoDiffLinearMapKind kind,
+                                      AutoDiffConfig config);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
@@ -254,6 +254,8 @@ public:
   std::string mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl);
 
   std::string mangleOpaqueTypeDecl(const ValueDecl *decl);
+
+  std::string mangleGenericSignature(const GenericSignature sig);
 
   enum SpecialContext {
     ObjCContext,
@@ -427,6 +429,12 @@ protected:
   void appendSymbolicReference(SymbolicReferent referent);
   
   void appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl);
+
+  void beginManglingWithAutoDiffOriginalFunction(
+      const AbstractFunctionDecl *afd);
+  void appendAutoDiffFunctionParts(char functionKindCode,
+                                   AutoDiffConfig config);
+  void appendIndexSubset(IndexSubset *indexSubset);
 };
 
 } // end namespace Mangle

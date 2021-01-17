@@ -10,7 +10,6 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -20,7 +19,7 @@ import _Concurrency
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
-// CHECK-LL: @inGenericAndInoutGenericToGenericAD =
+// CHECK-LL: @inGenericAndInoutGenericToGenericTu =
 // CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @inGenericAndInoutGenericToGeneric(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 // CHECK-LL: define internal swiftcc void @"$s017inGenericAndInoutb2ToB0TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
 sil @inGenericAndInoutGenericToGeneric : $@async @convention(thin) <T> (@in T, @inout T) -> @out T {
@@ -41,7 +40,7 @@ entry(%a : $*T):
 }
 
 // Defined in _Concurrency
-sil public_external @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
 sil @test_case : $@convention(thin) @async () -> () {
   %in_literal = integer_literal $Builtin.Int64, 876
@@ -76,7 +75,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
 
   %2 = function_ref @test_case : $@convention(thin) @async () -> ()
   %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
-  %4 = function_ref @$s12_Concurrency8runAsyncyyyyYcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
   %6 = integer_literal $Builtin.Int32, 0

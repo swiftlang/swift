@@ -13,11 +13,15 @@
 #ifndef SWIFT_AST_RAW_COMMENT_H
 #define SWIFT_AST_RAW_COMMENT_H
 
+#include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 
 namespace swift {
+
+class SourceFile;
+
 struct SingleRawComment {
   enum class CommentKind {
     OrdinaryLine,  ///< Any normal // comments
@@ -90,6 +94,17 @@ struct BasicDeclLocs {
   LineColumn Loc;
   LineColumn StartLoc;
   LineColumn EndLoc;
+};
+
+struct BasicSourceFileInfo {
+  StringRef FilePath;
+  Fingerprint InterfaceHash = Fingerprint::ZERO();
+  llvm::sys::TimePoint<> LastModified = {};
+  uint64_t FileSize = 0;
+
+  BasicSourceFileInfo() {}
+
+  bool populate(SourceFile *SF);
 };
 
 } // namespace swift

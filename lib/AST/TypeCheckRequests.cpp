@@ -617,6 +617,20 @@ void SelfAccessKindRequest::cacheResult(SelfAccessKind value) const {
 }
 
 //----------------------------------------------------------------------------//
+// IsAsyncHandlerRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsAsyncHandlerRequest::getCachedResult() const {
+  auto *funcDecl = std::get<0>(getStorage());
+  return funcDecl->getCachedIsAsyncHandler();
+}
+
+void IsAsyncHandlerRequest::cacheResult(bool value) const {
+  auto *funcDecl = std::get<0>(getStorage());
+  funcDecl->setIsAsyncHandler(value);
+}
+
+//----------------------------------------------------------------------------//
 // IsGetterMutatingRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1276,7 +1290,7 @@ void CheckRedeclarationRequest::writeDependencySink(
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,
-    ProtocolConformanceLookupResult conformances) const {
+    const ProtocolConformanceLookupResult &conformances) const {
   for (auto conformance : conformances) {
     tracker.addPotentialMember(conformance->getProtocol());
   }

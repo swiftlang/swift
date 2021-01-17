@@ -144,20 +144,11 @@ FRONTEND_STATISTIC(AST, NumModuleLookupValue)
 /// AnyObject lookup.
 FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
 
-/// Number of body scopes for iterable types
-FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopes)
-
-/// Number of expansions of body scopes for iterable types
-FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopeExpansions)
-
-/// Number of brace statment scopes for iterable types
-FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
-
-/// Number of expansions of brace statement scopes for iterable types
-FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
-
 /// Number of ASTScope lookups
 FRONTEND_STATISTIC(AST, NumASTScopeLookups)
+
+/// Number of ASTScope expansions
+FRONTEND_STATISTIC(AST, NumASTScopeExpansions)
 
 /// Number of lookups of the cached import graph for a module or
 /// source file.

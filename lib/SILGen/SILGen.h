@@ -123,6 +123,7 @@ public:
   Optional<FuncDecl*> TaskFutureGet;
   Optional<FuncDecl*> TaskFutureGetThrowing;
 
+  Optional<FuncDecl*> RunTaskForBridgedAsyncMethod;
   Optional<FuncDecl*> ResumeUnsafeContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
@@ -235,8 +236,9 @@ public:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
   SILFunction *getOrCreateCustomDerivativeThunk(
-      SILFunction *customDerivativeFn, SILFunction *originalFn,
-      const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind);
+      AbstractFunctionDecl *originalAFD, SILFunction *originalFn,
+      SILFunction *customDerivativeFn, AutoDiffConfig config,
+      AutoDiffDerivativeFunctionKind kind);
 
   /// Get or create a derivative function vtable entry thunk for the given
   /// SILDeclRef and derivative function type.
@@ -322,7 +324,7 @@ public:
 
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
-
+  
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
@@ -495,6 +497,8 @@ public:
   FuncDecl *getResumeUnsafeThrowingContinuationWithError();
   /// Retrieve the _Concurrency._runAsyncHandler intrinsic.
   FuncDecl *getRunAsyncHandler();
+  /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
+  FuncDecl *getRunTaskForBridgedAsyncMethod();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

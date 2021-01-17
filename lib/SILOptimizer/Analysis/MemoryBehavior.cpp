@@ -182,6 +182,7 @@ public:
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
+  MemBehavior visitDestroyValueInst(DestroyValueInst *DVI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
   MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -225,6 +226,7 @@ public:
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(CopyValueInst)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   REFCOUNTINC_MEMBEHAVIOR_INST(Name##RetainValueInst)                          \
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongCopy##Name##ValueInst)
@@ -490,6 +492,13 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   return MemBehavior::MayHaveSideEffects;
 }
 
+MemBehavior
+MemoryBehaviorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
+  if (!EA->canEscapeTo(V, DVI))
+    return MemBehavior::None;
+  return MemBehavior::MayHaveSideEffects;
+}
+
 MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
   return MemBehavior::None;
 }
@@ -518,10 +527,6 @@ AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V) {
   // Flush the cache if the size of the cache is too large.
   if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
     MemoryBehaviorCache.clear();
-    MemoryBehaviorNodeToIndex.clear();
-
-    // Key is no longer valid as we cleared the MemoryBehaviorNodeToIndex.
-    Key = toMemoryBehaviorKey(Inst, V);
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -540,12 +545,10 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V) {
 
 MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
                                                     SILValue V2) {
-  size_t idx1 =
-    MemoryBehaviorNodeToIndex.getIndex(V1->getRepresentativeSILNodeInObject());
+  size_t idx1 = InstructionToIndex.getIndex(V1);
   assert(idx1 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = MemoryBehaviorNodeToIndex.getIndex(
-      V2->getRepresentativeSILNodeInObject());
+  size_t idx2 = ValueToIndex.getIndex(V2);
   assert(idx2 != std::numeric_limits<size_t>::max() &&
          "~0 index reserved for empty/tombstone keys");
   return {idx1, idx2};

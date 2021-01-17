@@ -68,11 +68,7 @@ static inline void forAllTypes(llvm::function_ref<void(file_types::ID)> fn) {
 /// such file type.
 static inline void
 forEachIncrementalOutputType(llvm::function_ref<void(file_types::ID)> fn) {
-  static const std::vector<file_types::ID> incrementalOutputTypes = {
-      file_types::TY_SwiftDeps, file_types::TY_SwiftRanges,
-      file_types::TY_CompiledSource};
-  for (auto type : incrementalOutputTypes)
-    fn(type);
+  fn(file_types::TY_SwiftDeps);
 }
 
 } // end namespace file_types

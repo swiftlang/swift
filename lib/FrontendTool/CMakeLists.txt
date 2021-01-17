@@ -4,7 +4,6 @@ add_swift_host_library(swiftFrontendTool STATIC
   ImportedModules.cpp
   LoadedModuleTrace.cpp
   MakeStyleDependencies.cpp
-  ScanDependencies.cpp
   TBD.cpp)
 add_dependencies(swiftFrontendTool
   swift-syntax-generated-headers
@@ -15,6 +14,7 @@ target_link_libraries(swiftFrontendTool INTERFACE
 target_link_libraries(swiftFrontendTool PRIVATE
     swiftClangImporter
     swiftDemangling
+    swiftDependencyScan
     swiftFrontend
     swiftIDE
     swiftImmediate

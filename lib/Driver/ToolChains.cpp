@@ -246,6 +246,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
@@ -619,8 +621,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
-  case file_types::TY_SwiftRanges:
-  case file_types::TY_CompiledSource:
+  case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
@@ -765,10 +766,6 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
-  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
-                   "-emit-swift-ranges-path");
-  addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
-                   "-emit-compiled-source-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
@@ -881,8 +878,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
-    case file_types::TY_SwiftRanges:
-    case file_types::TY_CompiledSource:
+    case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
     case file_types::TY_YAMLOptRecord:

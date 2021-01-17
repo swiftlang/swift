@@ -365,48 +365,22 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   auto tyR = ty.get();
   auto status = ParserStatus(ty);
 
-  // Parse an async specifier.
+  // Parse effects specifiers.
+  // Don't consume them, if there's no following '->', so we can emit a more
+  // useful diagnostic when parsing a function decl.
   SourceLoc asyncLoc;
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
-    asyncLoc = consumeToken();
-  }
-
-  // Parse a throws specifier.
-  // Don't consume 'throws', if the next token is not '->' or 'async', so we
-  // can emit a more useful diagnostic when parsing a function decl.
   SourceLoc throwsLoc;
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
-      (peekToken().is(tok::arrow) ||
-       (shouldParseExperimentalConcurrency() &&
-        peekToken().isContextualKeyword("async")))) {
-    if (Tok.isAny(tok::kw_rethrows, tok::kw_throw, tok::kw_try)) {
-      // 'rethrows' is only allowed on function declarations for now.
-      // 'throw' or 'try' are probably typos for 'throws'.
-      Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
-        diag::rethrowing_function_type : diag::throw_in_function_type;
-      diagnose(Tok.getLoc(), DiagID)
-        .fixItReplace(Tok.getLoc(), "throws");
-    }
-    throwsLoc = consumeToken();
-
-    // 'async' must preceed 'throws'; accept this but complain.
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async")) {
-      asyncLoc = consumeToken();
-
-      diagnose(asyncLoc, diag::async_after_throws, false)
-        .fixItRemove(asyncLoc)
-        .fixItInsert(throwsLoc, "async ");
-    }
+  if (isAtFunctionTypeArrow()) {
+    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
+                                     /*rethrows=*/nullptr);
   }
 
+  // Handle type-function if we have an arrow.
   if (Tok.is(tok::arrow)) {
-    // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
 
     // Handle async/throws in the wrong place.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
@@ -1488,39 +1462,18 @@ bool Parser::canParseType() {
     break;
   }
 
-  // Handle type-function if we have an 'async'.
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
+  if (!isAtFunctionTypeArrow())
+    return true;
+
+  // Handle type-function if we have an '->' with optional
+  // 'async' and/or 'throws'.
+  while (isEffectsSpecifier(Tok))
     consumeToken();
 
-    // 'async' isn't a valid type without being followed by throws/rethrows
-    // or a return.
-    if (!Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::arrow))
-      return false;
-  }
-
-  // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
-    consumeToken();
-
-    // Allow 'async' here even though it is ill-formed, so we can provide
-    // a better error.
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async"))
-      consumeToken();
-
-    // "throws" or "rethrows" isn't a valid type without being followed by
-    // a return. We also accept 'async' here so we can provide a better
-    // error.
-    if (!Tok.is(tok::arrow))
-      return false;
-  }
+  if (!consumeIf(tok::arrow))
+    return false;
   
-  if (consumeIf(tok::arrow)) {
-    return canParseType();
-  }
-
-  return true;
+  return canParseType();
 }
 
 bool Parser::canParseTypeIdentifierOrTypeComposition() {
@@ -1659,4 +1612,31 @@ bool Parser::canParseTypeTupleBody() {
   }
   
   return consumeIf(tok::r_paren);
+}
+
+bool Parser::isAtFunctionTypeArrow() {
+  if (Tok.is(tok::arrow))
+    return true;
+
+  if (isEffectsSpecifier(Tok)) {
+    if (peekToken().is(tok::arrow))
+      return true;
+    if (isEffectsSpecifier(peekToken())) {
+      BacktrackingScope backtrack(*this);
+      consumeToken();
+      consumeToken();
+      return isAtFunctionTypeArrow();
+    }
+    // Don't look for '->' in code completion. The user may write it later.
+    if (peekToken().is(tok::code_complete) && !peekToken().isAtStartOfLine())
+      return true;
+
+    return false;
+  }
+
+  // Don't look for '->' in code completion. The user may write it later.
+  if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine())
+    return true;
+
+  return false;
 }

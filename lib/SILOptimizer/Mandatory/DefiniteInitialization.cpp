@@ -67,12 +67,12 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   ContBB = StartBB->split(B.getInsertionPoint());
 
   TrueBB = StartBB->getParent()->createBasicBlock();
-  B.moveBlockTo(TrueBB, ContBB);
+  TrueBB->getParent()->moveBlockBefore(TrueBB, ContBB->getIterator());
   B.setInsertionPoint(TrueBB);
   B.createBranch(Loc, ContBB);
 
   FalseBB = StartBB->getParent()->createBasicBlock();
-  B.moveBlockTo(FalseBB, ContBB);
+  FalseBB->getParent()->moveBlockBefore(FalseBB, ContBB->getIterator());
   B.setInsertionPoint(FalseBB);
   B.createBranch(Loc, ContBB);
 
@@ -625,6 +625,22 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
       }))
     return false;
 
+  // Ignore loads used only by an assign_by_wrapper setter. This
+  // is safe to ignore because assign_by_wrapper will only be
+  // re-written to use the setter if the value is fully initialized.
+  if (auto *load = dyn_cast<SingleValueInstruction>(Inst)) {
+    if (auto Op = load->getSingleUse()) {
+      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+        if (std::find_if(PAI->use_begin(), PAI->use_end(),
+                         [](auto PAIUse) {
+                           return isa<AssignByWrapperInst>(PAIUse->getUser());
+                         }) != PAI->use_end()) {
+          return false;
+        }
+      }
+    }
+  }
+
   EmittedErrorLocs.push_back(InstLoc);
   return true;
 }
@@ -866,7 +882,8 @@ static void replaceValueMetatypeInstWithMetatypeArgument(
         valueMetatype->getLoc(), metatypeArgument,
         valueMetatype->getType());
   }
-  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+  InstModCallbacks callbacks;
+  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument, callbacks);
 }
 
 void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
@@ -1841,20 +1858,6 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
 
-    // Ignore loads used only for a set-by-value (nonmutating) setter
-    // since it will be deleted by lowering anyway.
-    auto load = cast<SingleValueInstruction>(Inst);
-    if (auto Op = load->getSingleUse()) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
-        if (std::find_if(PAI->use_begin(), PAI->use_end(),
-                         [](auto PAIUse) {
-                           return isa<AssignByWrapperInst>(PAIUse->getUser());
-                         }) != PAI->use_end()) {
-          return;
-        }
-      }
-    }
-
     diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);
     return;
@@ -2026,6 +2029,18 @@ void LifetimeChecker::processUninitializedReleaseOfBox(
   Destroys.push_back(B.createDeallocBox(Release->getLoc(), MUI));
 }
 
+static void emitDefaultActorDestroy(SILBuilder &B, SILLocation loc,
+                                    SILValue self) {
+  auto builtinName = B.getASTContext().getIdentifier(
+    getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
+  auto resultTy = B.getModule().Types.getEmptyTupleType();
+
+  self = B.createBeginBorrow(loc, self);
+  B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
+                  { self });
+  B.createEndBorrow(loc, self);
+}
+
 void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
                                                   bool consumed,
                                              SILBasicBlock::iterator InsertPt) {
@@ -2075,6 +2090,15 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
     else
       Metatype = B.createMetatype(Loc, SILMetatypeTy);
+
+    // If this is a root default actor, destroy the default-actor state.
+    // SILGen ensures that this is unconditionally initialized, so we
+    // don't need to track it specially.
+    if (!TheMemory.isDelegatingInit()) {
+      auto classDecl = TheMemory.getASTType().getClassOrBoundGenericClass();
+      if (classDecl && classDecl->isRootDefaultActor())
+        emitDefaultActorDestroy(B, Loc, Pointer);
+    }
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass

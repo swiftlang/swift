@@ -68,40 +68,7 @@ bool areArraysEqual(RCIdentityFunctionInfo *RCIA, SILValue A, SILValue B,
   return A == B;
 }
 
-/// \return true if the given instruction releases the given value.
-static bool isRelease(SILInstruction *Inst, SILValue RetainedValue,
-                      SILValue ArrayAddress, RCIdentityFunctionInfo *RCIA,
-                      SmallPtrSetImpl<Operand *> &MatchedReleases) {
 
-  // Before we can match a release with a retain we need to check that we have
-  // not already matched the release with a retain we processed earlier.
-  // We don't want to match the release with both retains in the example below.
-  //
-  //   retain %a  <--|
-  //   retain %a     | Match.   <-| Don't match.
-  //   release %a <--|          <-|
-  //
-  if (auto *R = dyn_cast<ReleaseValueInst>(Inst))
-    if (!MatchedReleases.count(&R->getOperandRef()))
-      if (areArraysEqual(RCIA, Inst->getOperand(0), RetainedValue,
-                         ArrayAddress)) {
-        LLVM_DEBUG(llvm::dbgs() << "     matching with release " << *Inst);
-        MatchedReleases.insert(&R->getOperandRef());
-        return true;
-      }
-
-  if (auto *R = dyn_cast<StrongReleaseInst>(Inst))
-    if (!MatchedReleases.count(&R->getOperandRef()))
-      if (areArraysEqual(RCIA, Inst->getOperand(0), RetainedValue,
-                         ArrayAddress)) {
-        LLVM_DEBUG(llvm::dbgs() << "     matching with release " << *Inst);
-        MatchedReleases.insert(&R->getOperandRef());
-        return true;
-      }
-
-  LLVM_DEBUG(llvm::dbgs() << "      not a matching release " << *Inst);
-  return false;
-}
 
 namespace {
 
@@ -189,7 +156,7 @@ public:
 
   bool run();
 
-protected:
+private:
   bool checkUniqueArrayContainer(SILValue ArrayContainer);
   SmallPtrSetImpl<SILBasicBlock*> &getReachingBlocks();
   bool isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
@@ -203,8 +170,54 @@ protected:
   void hoistAddressProjections(Operand &ArrayOp);
   bool hasLoopOnlyDestructorSafeArrayOperations();
   SILValue getArrayAddressBase(SILValue V);
+
+  /// \return true if the \p inst releases the value retained by \p retainInst
+  bool isMatchingRelease(SILInstruction *inst, SILInstruction *retainInst);
+
+  static bool isRetain(SILInstruction *inst) {
+    if (auto *load = dyn_cast<LoadInst>(inst)) {
+      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+        return true;
+    }
+    return isa<RetainValueInst>(inst) || isa<StrongRetainInst>(inst) ||
+           isa<CopyValueInst>(inst);
+  }
+  static bool isRelease(SILInstruction *inst) {
+    return isa<ReleaseValueInst>(inst) || isa<StrongReleaseInst>(inst) ||
+           isa<DestroyValueInst>(inst);
+  }
+  static SILValue getRetainedValue(SILInstruction *inst) {
+    assert(isRetain(inst));
+    if (isa<RetainValueInst>(inst) || isa<StrongRetainInst>(inst))
+      return inst->getOperand(0);
+    return cast<SingleValueInstruction>(inst);
+  }
 };
 } // end anonymous namespace
+
+bool COWArrayOpt::isMatchingRelease(SILInstruction *inst,
+                                    SILInstruction *retainInst) {
+  // Before we can match a release with a retain we need to check that we have
+  // not already matched the release with a retain we processed earlier.
+  // We don't want to match the release with both retains in the example below.
+  //
+  //   retain %a  <--|
+  //   retain %a     | Match.   <-| Don't match.
+  //   release %a <--|          <-|
+  //
+  if (isRelease(inst)) {
+    if (!MatchedReleases.count(&inst->getOperandRef(0))) {
+      if (areArraysEqual(RCIA, inst->getOperand(0),
+                         getRetainedValue(retainInst), CurrentArrayAddr)) {
+        LLVM_DEBUG(llvm::dbgs() << "     matching with release " << *inst);
+        MatchedReleases.insert(&inst->getOperandRef(0));
+        return true;
+      }
+    }
+  }
+  LLVM_DEBUG(llvm::dbgs() << "      not a matching release " << *inst);
+  return false;
+}
 
 /// \return true of the given container is known to be a unique copy of the
 /// array with no aliases. Cases we check:
@@ -325,11 +338,10 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
   // (element uses may only be retained/released).
   for (auto II = std::next(SILBasicBlock::iterator(RetainInst)),
          IE = RetainInst->getParent()->end(); II != IE; ++II) {
-    if (isRelease(&*II, RetainInst->getOperand(0), CurrentArrayAddr, RCIA,
-                  MatchedReleases))
+    if (isMatchingRelease(&*II, RetainInst))
       return true;
 
-    if (isa<RetainValueInst>(II) || isa<StrongRetainInst>(II))
+    if (isRetain(&*II))
       continue;
 
     // A side effect free instruction cannot mutate the array.
@@ -338,6 +350,10 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 
     // Non mutating array calls are safe.
     if (isNonMutatingArraySemanticCall(&*II))
+      continue;
+
+    // borrows are safe
+    if (isa<BeginBorrowInst>(II) || isa<EndBorrowInst>(II))
       continue;
 
     if (IsUniquelyIdentifiedArray) {
@@ -353,7 +369,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
       // This is not the case for a potentially aliased array because a release
       // can cause a destructor to run. The destructor in turn can cause
       // arbitrary side effects.
-      if (isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II))
+      if (isRelease(&*II))
         continue;
 
       if (ArrayUserSet.count(&*II)) // May be an array mutation.
@@ -381,9 +397,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 /// not safe to store to an element in the array because we may be storing an
 /// alias to the array storage.
 bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
-
   for (auto *UseInst : AddressUsers) {
-
     if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
       if (ArraySemanticsCall(AI))
         continue;
@@ -398,6 +412,15 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
                                  "through call!\n"
                               << "    " << *UseInst);
       return false;
+    }
+
+    if (isRetain(UseInst) && isRetainReleasedBeforeMutate(UseInst)) {
+      continue;
+    }
+
+    if (auto *LdInst = dyn_cast<LoadInst>(UseInst)) {
+      if (LdInst->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
+        continue;
     }
 
     if (auto *StInst = dyn_cast<StoreInst>(UseInst)) {
@@ -429,6 +452,10 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       continue;
     }
 
+    if (UseInst->isDebugInstruction()) {
+      continue;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n"
                             << "    " << *UseInst);
     // Found an unsafe or unknown user. The Array may escape here.
@@ -451,19 +478,23 @@ ArraySemanticsCall getEndMutationCall(const UserRange &AddressUsers) {
 
 /// Returns true if this instruction is a safe array use if all of its users are
 /// also safe array users.
-static SILValue isTransitiveSafeUser(SILInstruction *I) {
+static Optional<SILInstructionResultArray>
+isTransitiveSafeUser(SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::StructInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
-    return cast<SingleValueInstruction>(I);
+  case SILInstructionKind::BeginBorrowInst:
+    return I->getResults();
   default:
-    return nullptr;
+    return None;
   }
 }
 
@@ -486,17 +517,20 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     /// Is this a unary transitive safe user instruction. This means that the
     /// instruction is safe only if all of its users are safe. Check this
     /// recursively.
-    if (auto inst = isTransitiveSafeUser(UseInst)) {
-      if (std::all_of(inst->use_begin(), inst->use_end(),
-                      [this](Operand *Op) -> bool {
-                        return checkSafeArrayElementUse(Op->getUser(),
-                                                        Op->get());
-                      }))
-        continue;
-      return false;
+    auto results = isTransitiveSafeUser(UseInst);
+    if (results.hasValue()) {
+      for (auto result : results.getValue()) {
+        if (!std::all_of(result->use_begin(), result->use_end(),
+                         [this](Operand *Op) -> bool {
+                           return checkSafeArrayElementUse(Op->getUser(),
+                                                           Op->get());
+                         }))
+          return false;
+      }
+      continue;
     }
 
-    if (isa<RetainValueInst>(UseInst)) {
+    if (isRetain(UseInst)) {
       if (isRetainReleasedBeforeMutate(UseInst))
         continue;
       // Found an unsafe or unknown user. The Array may escape here.
@@ -506,7 +540,7 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
       return false;
     }
 
-    if (isa<ReleaseValueInst>(UseInst)) {
+    if (isRelease(UseInst)) {
       // Releases are always safe. This case handles the release of an array
       // buffer that is loaded from a local array struct.
       continue;
@@ -517,7 +551,7 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
 
     if (UseInst->isDebugInstruction())
       continue;
-    
+
     // Found an unsafe or unknown user. The Array may escape here.
     LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: unsafe Array value use!\n"
                             << "    " << *UseInst);
@@ -550,13 +584,12 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
 /// set is necessary.
 bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
                                            SILValue ArrayVal) {
-  if ((isa<RetainValueInst>(UseInst) || isa<StrongRetainInst>(UseInst)) &&
-      isRetainReleasedBeforeMutate(UseInst))
+  if (isRetain(UseInst) && isRetainReleasedBeforeMutate(UseInst))
     return true;
 
-  if (isa<ReleaseValueInst>(UseInst) || isa<StrongReleaseInst>(UseInst))
-    // Releases are always safe. This case handles the release of an array
-    // buffer that is loaded from a local array struct.
+  // Releases are always safe. This case handles the release of an array
+  // buffer that is loaded from a local array struct.
+  if (isRelease(UseInst))
     return true;
 
   if (isa<RefTailAddrInst>(UseInst)) {
@@ -582,6 +615,9 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   if (isa<MarkDependenceInst>(UseInst))
     return true;
 
+  if (isa<EndBorrowInst>(UseInst))
+    return true;
+
   if (UseInst->isDebugInstruction())
     return true;
   
@@ -589,12 +625,17 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   // all of its users are safe array element uses, recursively check its uses
   // and return false if any of them are not transitive escape array element
   // uses.
-  if (auto result = isTransitiveSafeUser(UseInst)) {
-    return std::all_of(result->use_begin(), result->use_end(),
-                       [this, &ArrayVal](Operand *UI) -> bool {
-                         return checkSafeArrayElementUse(UI->getUser(),
-                                                         ArrayVal);
-                       });
+  auto results = isTransitiveSafeUser(UseInst);
+  if (results.hasValue()) {
+    for (auto result : results.getValue()) {
+      if (!std::all_of(result->use_begin(), result->use_end(),
+                       [this](Operand *Op) -> bool {
+                         return checkSafeArrayElementUse(Op->getUser(),
+                                                         Op->get());
+                       }))
+        return false;
+    }
+    return true;
   }
 
   // Found an unsafe or unknown user. The Array may escape here.
@@ -685,6 +726,10 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
 
       // Stores to array elements.
       if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+        if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
+          LLVM_DEBUG(llvm::dbgs() << "     (NO) store with [assign]" << *SI);
+          return ReturnWithCleanup(false);
+        }
         if (isAddressOfArrayElement(SI->getDest()))
           continue;
         LLVM_DEBUG(llvm::dbgs() << "     (NO) unknown store " << *SI);
@@ -699,20 +744,22 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
       if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
         continue;
 
-      if (isa<RetainValueInst>(Inst) || isa<StrongRetainInst>(Inst))
-        if (isRetainReleasedBeforeMutate(Inst, false))
-          continue;
+      if (isRetain(Inst) && isRetainReleasedBeforeMutate(Inst, false)) {
+        continue;
+      }
 
       // If the instruction is a matched release we can ignore it.
-      if (auto SRI = dyn_cast<StrongReleaseInst>(Inst))
-        if (MatchedReleases.count(&SRI->getOperandRef()))
+      if (isRelease(Inst)) {
+        if (MatchedReleases.count(&Inst->getOperandRef(0)))
           continue;
-      if (auto RVI = dyn_cast<ReleaseValueInst>(Inst))
-        if (MatchedReleases.count(&RVI->getOperandRef()))
-          continue;
+      }
 
       // Ignore fix_lifetime. It cannot increment ref counts.
       if (isa<FixLifetimeInst>(Inst))
+        continue;
+
+      // Ignore begin_borrow/end_borrow, they do not effect ref counts
+      if (isa<BeginBorrowInst>(Inst) || isa<EndBorrowInst>(Inst))
         continue;
 
       LLVM_DEBUG(llvm::dbgs() << "     (NO) unknown operation " << *Inst);
@@ -728,6 +775,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
 /// Return the underlying Array address after stripping off all address
 /// projections. Returns an invalid SILValue if the array base does not dominate
 /// the loop.
+// TODO: Support begin_borrow here
 SILValue COWArrayOpt::getArrayAddressBase(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
@@ -770,6 +818,8 @@ SILValue COWArrayOpt::getArrayAddressBase(SILValue V) {
 /// Requires the projected value to dominate the insertion point.
 ///
 /// Will look through single basic block predecessor arguments.
+// TODO: Support hoisting of begin_borrow and create end_borrow at appropriate
+// lifetime endpoints
 void COWArrayOpt::hoistAddressProjections(Operand &ArrayOp) {
   SILValue V = ArrayOp.get();
   SILInstruction *Prev = nullptr;
@@ -925,8 +975,11 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
   if (arrayContainerIsUnique &&
       StructUses.hasOnlyAddressUses((ApplyInst *)MakeMutable, EMInst)) {
     for (auto use : MakeMutable.getSelf()->getUses()) {
-      if (auto *LI = dyn_cast<LoadInst>(use->getUser()))
-        HoistableLoads.insert(LI);
+      if (auto *LI = dyn_cast<LoadInst>(use->getUser())) {
+        // TODO: Support HoistableLoads for OSSA
+        if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Unqualified)
+          HoistableLoads.insert(LI);
+      }
     }
   }
   return true;
@@ -991,10 +1044,6 @@ namespace {
 
 class COWArrayOptPass : public SILFunctionTransform {
   void run() override {
-    // FIXME: Update for ownership.
-    if (getFunction()->hasOwnership())
-      return;
-
     LLVM_DEBUG(llvm::dbgs() << "COW Array Opts in Func "
                             << getFunction()->getName() << "\n");
 

@@ -97,26 +97,6 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   llvm_unreachable("invalid derivative kind");
 }
 
-void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
-  s << "(parameters=(";
-  interleave(
-      parameters->getIndices(), [&s](unsigned p) { s << p; },
-      [&s] { s << ' '; });
-  s << ") results=(";
-  interleave(
-      results->getIndices(), [&s](unsigned p) { s << p; }, [&s] { s << ' '; });
-  s << "))";
-}
-
-void SILAutoDiffIndices::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
-SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
-  return SILAutoDiffIndices(parameterIndices, resultIndices);
-}
-
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
   parameterIndices->print(s);
@@ -577,4 +557,24 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   }
   // Otherwise, tangent property is valid.
   return TangentPropertyInfo(tanField);
+}
+
+Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
+    AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffDerivativeFunctionKind::JVP:
+    return Demangle::AutoDiffFunctionKind::JVP;
+  case AutoDiffDerivativeFunctionKind::VJP:
+    return Demangle::AutoDiffFunctionKind::VJP;
+  }
+}
+
+Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
+    AutoDiffLinearMapKind kind) {
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential:
+    return Demangle::AutoDiffFunctionKind::Differential;
+  case AutoDiffLinearMapKind::Pullback:
+    return Demangle::AutoDiffFunctionKind::Pullback;
+  }
 }

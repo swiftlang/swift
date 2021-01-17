@@ -168,7 +168,7 @@ func SR3671() {
   ;
 
   // Also a valid call (!!)
-  { $0 { $0 } } { $0 { 1 } }  // expected-error {{expression resolves to an unused function}}
+  { $0 { $0 } } { $0 { 1 } }  // expected-error {{function is unused}}
   consume(111)
 }
 
@@ -345,7 +345,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}} {{23-23=Int(}} {{33-33=)}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -907,7 +907,7 @@ do {
 // The funny error is because we infer the type of badResult as () -> ()
 // via the 'T -> U => T -> ()' implicit conversion.
 let badResult = { (fn: () -> ()) in fn }
-// expected-error@-1 {{expression resolves to an unused function}}
+// expected-error@-1 {{function is unused}}
 
 // rdar://problem/55102498 - closure's result type can't be inferred if the last parameter has a default value
 func test_trailing_closure_with_defaulted_last() {
@@ -1041,4 +1041,18 @@ let explicitUnboundResult2: (Array<Bool>) -> Array<Int> = {
 // expected-error@+1 {{unable to infer closure type in the current context}}
 let explicitUnboundResult3: (Array<Bool>) -> Array<Int> = {
   (arr: Array) -> Array in [true]
+}
+
+// rdar://problem/71525503 - Assertion failed: (!shouldHaveDirectCalleeOverload(call) && "Should we have resolved a callee for this?")
+func test_inout_with_invalid_member_ref() {
+  struct S {
+    static func createS(_ arg: inout Int) -> S { S() }
+  }
+  class C {
+    static subscript(s: (Int) -> Void) -> Bool { get { return false } }
+  }
+
+  let _: Bool = C[{ .createS(&$0) }]
+  // expected-error@-1 {{value of tuple type 'Void' has no member 'createS'}}
+  // expected-error@-2 {{cannot pass immutable value as inout argument: '$0' is immutable}}
 }

@@ -47,7 +47,7 @@ void Edge::serialize(llvm::json::OStream &OS) const {
           ConformanceExtension->getGenericRequirements(),
           ConformanceExtension->getExtendedNominal()
               ->getDeclContext()->getSelfNominalTypeDecl(),
-                                FilteredRequirements);
+          FilteredRequirements);
       if (!FilteredRequirements.empty()) {
         OS.attributeArray("swiftConstraints", [&](){
           for (const auto &Req :

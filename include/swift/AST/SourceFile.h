@@ -531,6 +531,9 @@ public:
     out << getInterfaceHash() << '\n';
   }
 
+  /// Get this file's interface hash including the type members in the file.
+  Fingerprint getInterfaceHashIncludingTypeMembers() const;
+
   /// If this source file has been told to collect its parsed tokens, retrieve
   /// those tokens.
   ArrayRef<Token> getAllTokens() const;

@@ -29,7 +29,7 @@ Library evolution was formally described in `SE-0260 <SE0260_>`_, but this
 document should be kept up to date as new features are added to the language.
 
 .. _library evolution: https://swift.org/blog/abi-stability-and-more/
-.. _SE0260: https://github.com/apple/swift-evolution/blob/master/proposals/0260-library-evolution.md
+.. _SE0260: https://github.com/apple/swift-evolution/blob/main/proposals/0260-library-evolution.md
 
 .. contents:: :local:
 
@@ -108,7 +108,7 @@ with a single app target are not forced to think about access control, anyone
 writing a bundled library should (ideally) not be required to use any of the
 annotations described below in order to achieve full performance.
 
-.. _SE0193: https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md
+.. _SE0193: https://github.com/apple/swift-evolution/blob/main/proposals/0193-cross-module-inlining-and-specialization.md
 .. _Swift Package Manager: https://swift.org/package-manager/
 
 .. note::
@@ -210,7 +210,7 @@ any future use of the function must take this into account.
 Although they are not a supported feature for arbitrary libraries at this time,
 public `transparent`_ functions are implicitly marked ``@inlinable``.
 
-.. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.md
+.. _transparent: https://github.com/apple/swift/blob/main/docs/TransparentAttr.md
 
 
 Restrictions on Inlinable Functions

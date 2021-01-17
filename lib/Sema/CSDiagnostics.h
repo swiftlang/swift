@@ -2352,6 +2352,35 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose if the base type is optional, we're referring to a nominal
+/// type member via the dot syntax and the member name matches
+/// Optional<T>.{member_name} or an unresolved `.none` inferred as a static
+/// non-optional member  base but could be an Optional<T>.none. So we enforce
+/// explicit type annotation to avoid ambiguity.
+///
+/// \code
+///   enum Enum<T> {
+///     case bar
+///     static var none: Enum<Int> { .bar }
+///   }
+///   let _: Enum<Int>? = .none // Base inferred as Optional.none, suggest
+///   // explicit type.
+///   let _: Enum? = .none // Base inferred as static member Enum<Int>.none,
+///   // emit warning suggesting explicit type.
+///   let _: Enum = .none // Ok
+/// \endcode
+class MemberMissingExplicitBaseTypeFailure final : public FailureDiagnostic {
+  DeclNameRef Member;
+
+public:
+  MemberMissingExplicitBaseTypeFailure(const Solution &solution,
+                                       DeclNameRef member,
+                                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

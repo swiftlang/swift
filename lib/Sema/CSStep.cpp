@@ -342,7 +342,7 @@ StepResult ComponentStep::take(bool prevFailed) {
       (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.
     return suspend(
-        std::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
+        std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
     return suspend(
@@ -446,13 +446,15 @@ void TypeVariableStep::setup() {
     PO.PrintTypesForDebugging = true;
     auto &log = getDebugLogger();
 
+    auto initialBindings = Producer.getCurrentBindings();
     log << "Initial bindings: ";
-    interleave(InitialBindings.begin(), InitialBindings.end(),
-               [&](const Binding &binding) {
-                 log << TypeVar->getString(PO)
-                     << " := " << binding.BindingType->getString(PO);
-               },
-               [&log] { log << ", "; });
+    interleave(
+        initialBindings.begin(), initialBindings.end(),
+        [&](const Binding &binding) {
+          log << TypeVar->getString(PO)
+              << " := " << binding.BindingType->getString(PO);
+        },
+        [&log] { log << ", "; });
 
     log << '\n';
   }

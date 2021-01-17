@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir | %FileCheck %s
 
 // Verify that non-trival/address-only C++ classes are constructed and accessed
 // correctly. Make sure that we correctly IRGen functions that construct

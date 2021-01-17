@@ -67,7 +67,7 @@ private:
   SILLoopInfo *loopInfo;
 
   /// Differentiation indices of the function.
-  const SILAutoDiffIndices indices;
+  const AutoDiffConfig config;
 
   /// Mapping from original basic blocks to linear map structs.
   llvm::DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
@@ -149,7 +149,7 @@ public:
 
   explicit LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                          SILFunction *original, SILFunction *derivative,
-                         SILAutoDiffIndices indices,
+                         AutoDiffConfig config,
                          const DifferentiableActivityInfo &activityInfo,
                          SILLoopInfo *loopInfo);
 

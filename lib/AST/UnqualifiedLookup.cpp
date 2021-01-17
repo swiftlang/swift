@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -272,12 +273,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
                                   "performUnqualifedLookup",
                                   DC->getParentSourceFile());
 
-  if (Loc.isValid()) {
+  if (Loc.isValid() && DC->getParentSourceFile()) {
     // Operator lookup is always global, for the time being.
     if (!Name.isOperator())
       lookInASTScopes();
   } else {
-    assert(DC->isModuleScopeContext() &&
+    assert((DC->isModuleScopeContext() || !DC->getParentSourceFile()) &&
            "Unqualified lookup without a source location must start from "
            "a module-scope context");
 

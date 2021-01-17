@@ -732,8 +732,7 @@ ERROR(rethrowing_function_type,none,
       "only function declarations may be marked 'rethrows'; "
       "did you mean 'throws'?", ())
 ERROR(async_or_throws_in_wrong_position,none,
-      "%select{'throws'|'rethrows'|'async'}0 may only occur before '->'",
-      (unsigned))
+      "'%0' may only occur before '->'", (StringRef))
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
 ERROR(expected_type_before_arrow,none,
@@ -748,6 +747,8 @@ ERROR(expected_dynamic_func_attr,none,
 ERROR(async_after_throws,none,
       "'async' must precede %select{'throws'|'rethrows'}0", (bool))
 ERROR(async_init,none, "initializer cannot be marked 'async'", ())
+ERROR(duplicate_effects_specifier,none,
+      "'%0' has already been specified", (StringRef))
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -1222,7 +1223,10 @@ ERROR(super_in_closure_with_capture,none,
 NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
-ERROR(try_before_await,none, "'await' must precede 'try'", ())
+WARNING(await_before_try,none, "'try' must precede 'await'", ())
+WARNING(warn_await_keyword,none, 
+      "future versions of Swift reserve the word 'await'; "
+      "if this name is unavoidable, use backticks to escape it", ())
 
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,none,
@@ -1484,6 +1488,14 @@ WARNING(originally_defined_in_major_minor_only,none,
 
 WARNING(originally_defined_in_missing_platform_name,none,
         "* as platform name has no effect", ())
+
+WARNING(originally_defined_in_swift_version, none,
+        "Swift language version checks has no effect "
+        "in @_originallyDefinedIn", ())
+
+WARNING(originally_defined_in_package_description, none,
+        "PackageDescription version checks has no effect "
+        "in @_originallyDefinedIn", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,

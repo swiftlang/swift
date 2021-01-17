@@ -151,26 +151,9 @@ WARNING(warn_ignoring_batch_mode,none,
 WARNING(warn_ignoring_wmo, none,
         "ignoring '-wmo' because '-dump-ast' was also specified", ())
 
-WARNING(warn_ignoring_source_range_dependencies,none,
-"ignoring '-enable-source-range-dependencies' because '%0' was also specified", (StringRef))
-
-WARNING(warn_bad_swift_ranges_header,none,
-"ignoring '-enable-source-range-dependencies' because of bad header in '%0'", (StringRef))
-
-WARNING(warn_bad_swift_ranges_format,none,
-"ignoring '-enable-source-range-dependencies' because of bad format '%1' in '%0'", (StringRef, StringRef))
-
 WARNING(warn_use_filelists_deprecated, none,
         "the option '-driver-use-filelists' is deprecated; use "
         "'-driver-filelist-threshold=0' instead", ())
-
-WARNING(warn_unable_to_load_swift_ranges, none,
-"unable to load swift ranges file \"%0\", %1",
-(StringRef, StringRef))
-
-WARNING(warn_unable_to_load_compiled_swift, none,
-"unable to load previously compiled swift file \"%0\", %1",
-(StringRef, StringRef))
 
 WARNING(warn_unable_to_load_primary, none,
 "unable to load primary swift file \"%0\", %1",

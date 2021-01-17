@@ -23,6 +23,7 @@
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
@@ -298,44 +299,85 @@ static int printDiags();
 
 static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename);
 
-static void addRequestOptions(sourcekitd_object_t Req, TestOptions &Opts,
-                              sourcekitd_uid_t Key, StringRef(prefix)) {
-  if (!Opts.RequestOptions.empty()) {
-    sourcekitd_object_t CCOpts =
-        sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
-    for (auto &Opt : Opts.RequestOptions) {
-      auto KeyValue = StringRef(Opt).split('=');
-      std::string KeyStr(prefix.str());
-      KeyStr.append(KeyValue.first.str());
-      sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
-
-      // FIXME: more robust way to determine the option type.
-      if (KeyValue.first == "filtertext") {
-        sourcekitd_request_dictionary_set_stringbuf(
-            CCOpts, Key, KeyValue.second.data(), KeyValue.second.size());
-      } else if (KeyValue.first == "expectedtypes") {
-        SmallVector<StringRef, 4> expectedTypeNames;
-        KeyValue.second.split(expectedTypeNames, ';');
-
-        auto typenames = sourcekitd_request_array_create(nullptr, 0);
-        for (auto &name : expectedTypeNames) {
-          std::string n = name.str();
-          sourcekitd_request_array_set_string(typenames,
-                                              SOURCEKITD_ARRAY_APPEND,
-                                              n.c_str());
-        }
-        // NOTE: 'key.expectedtypes' directly to the request.
-        sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes,
-                                                typenames);
-      } else {
-        int64_t Value = 0;
-        KeyValue.second.getAsInteger(0, Value);
-        sourcekitd_request_dictionary_set_int64(CCOpts, Key, Value);
-      }
-    }
-    sourcekitd_request_dictionary_set_value(Req, Key, CCOpts);
-    sourcekitd_request_release(CCOpts);
+static Optional<int64_t> getReqOptValueAsInt(StringRef Value) {
+  if (Value.equals_lower("true"))
+    return 1;
+  if (Value.equals_lower("false"))
+    return 0;
+  int64_t Ret;
+  if (Value.find_first_not_of("-0123456789") != StringRef::npos ||
+      Value.getAsInteger(0, Ret)) {
+    return None;
   }
+  return Ret;
+}
+
+static Optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
+  if (!Value.startswith("uid:"))
+    return None;
+  Value = Value.drop_front(4);
+  return sourcekitd_uid_get_from_buf(Value.data(), Value.size());
+}
+
+static Optional<sourcekitd_object_t> getReqOptValueAsArray(StringRef Value) {
+  if (!Value.startswith("[") || !Value.endswith("]"))
+    return None;
+  SmallVector<StringRef, 4> Elements;
+  Value.drop_front().drop_back().split(Elements, ';');
+  auto Array = sourcekitd_request_array_create(nullptr, 0);
+  for (auto &Elem : Elements) {
+    if (auto Val = getReqOptValueAsInt(Elem)) {
+      sourcekitd_request_array_set_int64(Array, SOURCEKITD_ARRAY_APPEND, *Val);
+    } else if (auto Val = getReqOptValueAsUID(Elem)) {
+      sourcekitd_request_array_set_uid(Array, SOURCEKITD_ARRAY_APPEND, *Val);
+    } else if (auto Val = getReqOptValueAsArray(Elem)) {
+      sourcekitd_request_array_set_value(Array, SOURCEKITD_ARRAY_APPEND, *Val);
+    } else {
+      sourcekitd_request_array_set_stringbuf(Array, SOURCEKITD_ARRAY_APPEND,
+                                             Elem.data(), Elem.size());
+    }
+  }
+  return Array;
+}
+
+static void addRequestOptionsDirect(sourcekitd_object_t Req, TestOptions &Opts,
+                                    StringRef prefix = "key.") {
+  if (Opts.RequestOptions.empty())
+    return;
+
+  for (auto &Opt: Opts.RequestOptions) {
+    auto KeyValue = StringRef(Opt).split('=');
+    std::string KeyStr(prefix.str());
+    KeyStr.append(KeyValue.first.str());
+    sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
+
+    StringRef RawValue = KeyValue.second;
+
+    if (auto Val = getReqOptValueAsInt(RawValue)) {
+      sourcekitd_request_dictionary_set_int64(Req, Key, *Val);
+    } else if (auto Val = getReqOptValueAsUID(RawValue)) {
+      sourcekitd_request_dictionary_set_uid(Req, Key, *Val);
+    } else if (auto Val = getReqOptValueAsArray(RawValue)) {
+      sourcekitd_request_dictionary_set_value(Req, Key, *Val);
+      sourcekitd_request_release(*Val);
+    } else {
+      sourcekitd_request_dictionary_set_stringbuf(Req, Key, RawValue.data(), RawValue.size());
+    }
+  }
+}
+
+static void addRequestOptions(sourcekitd_object_t Req, TestOptions &Opts,
+                              sourcekitd_uid_t Key, StringRef prefix = "key.") {
+  if (Opts.RequestOptions.empty())
+    return;
+
+  sourcekitd_object_t CCOpts =
+      sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+
+  addRequestOptionsDirect(CCOpts, Opts, prefix);
+
+  sourcekitd_request_dictionary_set_value(Req, Key, CCOpts);
+  sourcekitd_request_release(CCOpts);
 }
 
 static bool readPopularAPIList(StringRef filename,
@@ -675,8 +717,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    addRequestOptions(Req, Opts, KeyConformingMethodListOptions,
-                      "key.conformingmethods.");
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -692,6 +733,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     } else {
       sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     }
+    addRequestOptionsDirect(Req, Opts);
     break;
   case SourceKitRequest::RangeInfo: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRangeInfo);
@@ -708,10 +750,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::CollectExpresstionType: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
-    // NOTE: KeyCodeCompletion and the prefix are just dummy. This request
-    // only accepts 'expectedtypes' which is placed to the Req root dictionary.
-    addRequestOptions(Req, Opts, KeyCodeCompleteOptions,
-                      "key.expression.type.");
+    addRequestOptionsDirect(Req, Opts);
     break;
   }
 
@@ -1545,6 +1584,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                               KeyAnnotatedDecl);
   const char *FullAnnotDecl =
       sourcekitd_variant_dictionary_get_string(Info, KeyFullyAnnotatedDecl);
+  const char *SymbolGraph =
+      sourcekitd_variant_dictionary_get_string(Info, KeySymbolGraph);
   const char *DocFullAsXML =
       sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
   sourcekitd_variant_t OffsetObj =
@@ -1645,9 +1686,19 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << FullAnnotDecl << '\n';
   if (DocFullAsXML)
     OS << DocFullAsXML << '\n';
-  if (LocalizationKey)
+  if (LocalizationKey) {
     OS << "<LocalizationKey>" << LocalizationKey;
-  OS << "</LocalizationKey>" << '\n';
+    OS << "</LocalizationKey>" << '\n';
+  }
+  if (SymbolGraph) {
+    OS << "SYMBOL GRAPH BEGIN\n";
+    if (auto Val = json::parse(StringRef(SymbolGraph))) {
+      OS << formatv("{0:2}", Val.get());
+    } else {
+      OS << SymbolGraph;
+    }
+    OS << "\nSYMBOL GRAPH END\n";
+  }
   OS << "OVERRIDES BEGIN\n";
   for (auto OverUSR : OverrideUSRs)
     OS << OverUSR << '\n';

@@ -263,6 +263,7 @@ private:
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   ArrayRef<serialization::DeclID> OrderedTopLevelDecls;
+  ArrayRef<serialization::DeclID> ExportedPrespecializationDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
@@ -287,6 +288,9 @@ private:
 
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
+
+  /// A blob of source file list.
+  StringRef SourceFileListData;
 
   /// An array of fixed size source location data for each USR appearing in
   /// \c DeclUSRsTable.

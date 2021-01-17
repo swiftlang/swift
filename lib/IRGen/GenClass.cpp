@@ -88,7 +88,7 @@ static bool classHasIncompleteLayout(IRGenModule &IGM,
 namespace {
   class ClassLayoutBuilder : public StructLayoutBuilder {
     SmallVector<ElementLayout, 8> Elements;
-    SmallVector<VarDecl*, 8> AllStoredProperties;
+    SmallVector<Field, 8> AllStoredProperties;
     SmallVector<FieldAccess, 8> AllFieldAccesses;
 
     // If we're building a layout with tail-allocated elements, we do
@@ -277,14 +277,22 @@ namespace {
     void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
                                   ClassDecl *theClass, SILType classType,
                                   bool superclass) {
-      if (theClass->isRootDefaultActor())
-        addDefaultActorHeader();
+      bool collectStoredProperties =
+        !superclass ||
+        (rootClass->isGenericContext() && !rootClassType.getASTType()
+                                               ->getRecursiveProperties()
+                                               .hasUnboundGeneric());
 
-      for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = classType.getFieldType(var, IGM.getSILModule(),
-                                              TypeExpansionContext::minimal());
+      forEachField(IGM, theClass, [&](Field field) {
+        // Ignore missing properties here; we should have flagged these
+        // with the classHasIncompleteLayout call above.
+        if (!field.isConcrete()) {
+          assert(Options & ClassMetadataFlags::ClassHasMissingMembers);
+          return;
+        }
 
         // Lower the field type.
+        SILType type = field.getType(IGM, classType);
         auto *eltType = &IGM.getTypeInfo(type);
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
           LoweringModeScope scope(IGM, TypeConverter::Mode::Legacy);
@@ -301,21 +309,16 @@ namespace {
         auto element = ElementLayout::getIncomplete(*eltType);
         bool isKnownEmpty = !addField(element, LayoutStrategy::Universal);
 
-        bool isSpecializedGeneric =
-            (rootClass->isGenericContext() && !rootClassType.getASTType()
-                                                   ->getRecursiveProperties()
-                                                   .hasUnboundGeneric());
-
         // The 'Elements' list only contains superclass fields when we're
         // building a layout for tail allocation.
-        if (!superclass || TailTypes || isSpecializedGeneric)
+        if (collectStoredProperties || TailTypes)
           Elements.push_back(element);
 
-        if (!superclass || isSpecializedGeneric) {
-          AllStoredProperties.push_back(var);
+        if (collectStoredProperties) {
+          AllStoredProperties.push_back(field);
           AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
-      }
+      });
 
       if (!superclass) {
         // If we're calculating the layout of a specialized generic class type,
@@ -338,9 +341,9 @@ namespace {
 
           for (unsigned index : indices(AllFieldAccesses)) {
             auto &access = AllFieldAccesses[index];
-            auto *var = AllStoredProperties[index];
+            auto field = AllStoredProperties[index];
             if (access == FieldAccess::NonConstantDirect)
-              access = abstractLayout->getFieldAccessAndElement(var).first;
+              access = abstractLayout->getFieldAccessAndElement(field).first;
           }
         }
 
@@ -1034,7 +1037,7 @@ namespace {
     };
 
     llvm::SmallString<16> CategoryName;
-    SmallVector<VarDecl*, 8> Ivars;
+    SmallVector<Field, 8> Ivars;
     SmallVector<MethodDescriptor, 16> InstanceMethods;
     SmallVector<MethodDescriptor, 16> ClassMethods;
     SmallVector<MethodDescriptor, 16> OptInstanceMethods;
@@ -1073,6 +1076,9 @@ namespace {
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
       visitConformances(getClass());
+
+      if (getClass()->isRootDefaultActor())
+        Ivars.push_back(Field::DefaultActorStorage);
       visitMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
@@ -1805,20 +1811,26 @@ namespace {
     ///   uint32_t alignment;    // actually the log2 of the alignment
     ///   uint32_t size;
     /// };
-    void buildIvar(ConstantArrayBuilder &ivars, VarDecl *ivar) {
+    void buildIvar(ConstantArrayBuilder &ivars, Field field) {
       assert(FieldLayout && "can't build ivar for category");
-
-      auto fields = ivars.beginStruct();
 
       // For now, we never try to emit specialized versions of the
       // metadata statically, so compute the field layout using the
       // originally-declared type.
-      auto pair = FieldLayout->getFieldAccessAndElement(ivar);
+      auto pair = FieldLayout->getFieldAccessAndElement(field);
 
       llvm::Constant *offsetPtr;
       switch (pair.first) {
       case FieldAccess::ConstantDirect:
       case FieldAccess::NonConstantDirect: {
+        // Default actor storage doesn't get an ivar access variable.
+        if (field.getKind() == Field::DefaultActorStorage) {
+          offsetPtr = nullptr;
+          break;
+        }
+
+        // Otherwise, we should have a normal stored property.
+        auto ivar = field.getVarDecl();
         // If the field offset is fixed relative to the start of the superclass,
         // reference the global from the ivar metadata so that the Objective-C
         // runtime will slide it down.
@@ -1829,22 +1841,28 @@ namespace {
       case FieldAccess::ConstantIndirect:
         // Otherwise, swift_initClassMetadata() will point the Objective-C
         // runtime into the field offset vector of the instantiated metadata.
-        offsetPtr
-          = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
+        offsetPtr = nullptr;
         break;
       }
 
-      fields.add(offsetPtr);
+      StringRef name = field.getName();
+      const TypeInfo &storageTI = pair.second.getType();
+      auto fields = ivars.beginStruct();
+
+      if (offsetPtr)
+        fields.add(offsetPtr);
+      else
+        fields.addNullPointer(IGM.IntPtrTy->getPointerTo());
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(ivar->getName().str()));
+      fields.add(IGM.getAddrOfGlobalString(name));
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
       fields.add(IGM.getAddrOfGlobalString(""));
 
       Size size;
       Alignment alignment;
-      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&pair.second.getType())) {
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&storageTI)) {
         size = fixedTI->getFixedSize();
         alignment = fixedTI->getFixedAlignment();
       } else {
@@ -1855,7 +1873,7 @@ namespace {
       // If the size is larger than we can represent in 32-bits,
       // complain about the unimplementable ivar.
       if (uint32_t(size.getValue()) != size.getValue()) {
-        IGM.error(ivar->getLoc(),
+        IGM.error(field.getVarDecl()->getLoc(),
                   "ivar size (" + Twine(size.getValue()) +
                   " bytes) overflows Objective-C ivar layout");
         size = Size(0);
@@ -1878,8 +1896,8 @@ namespace {
       return buildOptionalList(Ivars, eltSize, "_IVARS_",
                                /*constant*/ true,
                                [&](ConstantArrayBuilder &descriptors,
-                                   VarDecl *ivar) {
-        buildIvar(descriptors, ivar);
+                                   Field field) {
+        buildIvar(descriptors, field);
       });
     }
 
@@ -2076,6 +2094,15 @@ namespace {
     /// Get the name of the class or protocol to mangle into the ObjC symbol
     /// name.
     StringRef getEntityName(llvm::SmallVectorImpl<char> &buffer) const {
+      if (auto prespecialization = getSpecializedGenericType()) {
+        buffer.clear();
+        llvm::raw_svector_ostream os(buffer);
+        os << LinkEntity::forTypeMetadata(*prespecialization,
+                                          TypeMetadataAddress::FullMetadata)
+                  .mangleAsString();
+        return os.str();
+      }
+
       if (auto theClass = getClass()) {
         return theClass->getObjCRuntimeName(buffer);
       }

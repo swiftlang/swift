@@ -298,7 +298,7 @@ public:
           case ActorIndependentKind::Safe:
             diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
             return;
-            
+
           case ActorIndependentKind::Unsafe:
             break;
         }
@@ -315,26 +315,11 @@ public:
           (dc->isTypeContext() && var->isStatic())) {
         return;
       }
-
-      // Otherwise, fall through to make sure we're in an appropriate
-      // context.
     }
 
-    // @actorIndependent only makes sense on an actor instance member.
-    if (!dc->getSelfClassDecl() ||
-        !dc->getSelfClassDecl()->isActor()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_not_actor_member);
-      return;
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      (void)getActorIsolation(VD);
     }
-
-    auto VD = cast<ValueDecl>(D);
-    if (!VD->isInstanceMember()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::actorindependent_not_actor_instance_member);
-      return;
-    }
-
-    (void)getActorIsolation(VD);
   }
 
   void visitGlobalActorAttr(GlobalActorAttr *attr) {
@@ -1950,16 +1935,40 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
 
   Expr *returnedExpr;
 
-  if (mainFunction->hasThrows()) {
+  if (mainFunction->hasAsync()) {
+    // Pass main into _runAsyncMain(_ asyncFunc: () async throws -> ())
+    // Resulting $main looks like:
+    // $main() { _runAsyncMain(main) }
+    auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
+    assert(concurrencyModule != nullptr && "Failed to find Concurrency module");
+
+    SmallVector<ValueDecl *, 1> decls;
+    concurrencyModule->lookupQualified(
+        concurrencyModule,
+        DeclNameRef(context.getIdentifier("_runAsyncMain")),
+        NL_QualifiedDefault | NL_IncludeUsableFromInline,
+        decls);
+    assert(!decls.empty() && "Failed to find _runAsyncMain");
+    FuncDecl *runner = cast<FuncDecl>(decls[0]);
+
+    auto asyncRunnerDeclRef = ConcreteDeclRef(runner, substitutionMap);
+
+    DeclRefExpr *funcExpr = new (context) DeclRefExpr(asyncRunnerDeclRef,
+                                                      DeclNameLoc(),
+                                                      /*implicit=*/true);
+    funcExpr->setType(runner->getInterfaceType());
+    auto *callExpr = CallExpr::createImplicit(context, funcExpr, memberRefExpr, {});
+    returnedExpr = callExpr;
+  } else if (mainFunction->hasThrows()) {
     auto *tryExpr = new (context) TryExpr(
-        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
+        callExpr->getLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
     returnedExpr = tryExpr;
   } else {
     returnedExpr = callExpr;
   }
 
   auto *returnStmt =
-      new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
+      new (context) ReturnStmt(SourceLoc(), returnedExpr, /*Implicit=*/true);
 
   SmallVector<ASTNode, 1> stmts;
   stmts.push_back(returnStmt);
@@ -4325,11 +4334,10 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
     }
   }
   // Non-`get` accessors are not yet supported: `set`, `read`, and `modify`.
-  // TODO(TF-129): Enable `set` when differentiation supports inout parameters.
   // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
   // coroutines.
   if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
-    if (!accessor->isGetter())
+    if (!accessor->isGetter() && !accessor->isSetter())
       original = nullptr;
   // Diagnose if original `AbstractFunctionDecl` could not be resolved.
   if (!original) {

@@ -795,7 +795,8 @@ public:
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate);
+      InterfaceSubContextDelegate &delegate,
+      bool cacheOnly = false);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   Optional<ModuleDependencies> getSwiftModuleDependencies(

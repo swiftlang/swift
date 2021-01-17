@@ -35,6 +35,8 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA168_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
+// RUN:             -e  _ZZNSt8__detail18__to_chars_10_implIjEEvPcjT_E8__digits \
+// RUN:             -e  _ZZNSt8__detail18__to_chars_10_implImEEvPcjT_E8__digits \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
 // RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
@@ -61,6 +63,8 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA168_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA216_cEEEvv \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
+// RUN:             -e  _ZZNSt8__detail18__to_chars_10_implIjEEvPcjT_E8__digits \
+// RUN:             -e  _ZZNSt8__detail18__to_chars_10_implImEEvPcjT_E8__digits \
 // RUN:   > %t/swiftRemoteMirror-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
 // RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt

@@ -25,7 +25,7 @@ using namespace swift;
 
 TermInst *swift::addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
                                          SILValue val,
-                                         const InstModCallbacks &callbacks) {
+                                         InstModCallbacks &callbacks) {
   SILBuilderWithScope builder(branch);
   TermInst *newBr = nullptr;
 

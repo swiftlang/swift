@@ -546,6 +546,10 @@ public:
     return cast<EnumElementDecl>(Constant.getDecl());
   }
 
+  ValueDecl *getDecl() {
+    return Constant.getDecl();
+  }
+
   CalleeTypeInfo createCalleeTypeInfo(SILGenFunction &SGF,
                                       Optional<SILDeclRef> constant,
                                       SILType formalFnType) const & {
@@ -3646,6 +3650,7 @@ class CallEmission {
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
   unsigned expectedSiteCount;
+  bool implicitlyAsync;
 
 public:
   /// Create an emission for a call of the given callee.
@@ -3653,7 +3658,8 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        expectedSiteCount(callee.getParameterListCount()) {}
+        expectedSiteCount(callee.getParameterListCount()),
+        implicitlyAsync(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -3687,6 +3693,11 @@ public:
   bool isEnumElementConstructor() {
     return (callee.kind == Callee::Kind::EnumElement);
   }
+
+  /// Sets a flag that indicates whether this call be treated as being 
+  /// implicitly async, i.e., it requires a hop_to_executor prior to 
+  /// invoking the sync callee, etc.
+  void setImplicitlyAsync(bool flag) { implicitlyAsync = flag; }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
@@ -3912,11 +3923,15 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
 
   auto mv = callee.getFnValue(SGF, borrowedSelf);
 
+  Optional<ValueDecl*> calleeDeclInfo;
+  if (implicitlyAsync)
+    calleeDeclInfo = callee.getDecl();
+
   // Emit the uncurried call.
   return SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
-      uncurriedContext);
+      uncurriedContext, calleeDeclInfo);
 }
 
 static void emitPseudoFunctionArguments(SILGenFunction &SGF,
@@ -4224,6 +4239,8 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
 
     emission.addCallSite(apply.callSite, std::move(preparedArgs),
                          apply.callSite->throws());
+
+    emission.setImplicitlyAsync(apply.callSite->implicitlyAsync());
   }
 
   return emission;
@@ -4266,6 +4283,31 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
   return self.isFormalIndirect();
 }
 
+Optional<SILValue> SILGenFunction::EmitLoadActorExecutorForCallee(
+                                                  SILGenFunction *SGF, 
+                                                  ValueDecl *calleeVD,
+                                                  ArrayRef<ManagedValue> args) {
+  if (auto *funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(calleeVD)) {
+    auto actorIso = getActorIsolation(funcDecl);
+    switch (actorIso.getKind()) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+        break;
+
+      case ActorIsolation::ActorInstance: {
+        assert(args.size() > 0 && "no self argument for actor-instance call?");
+        auto calleeSelf = args.back();
+        return calleeSelf.borrow(*SGF, SGF->F.getLocation()).getValue();
+      }
+
+      case ActorIsolation::GlobalActor:
+        return SGF->emitLoadGlobalActorExecutor(actorIso.getGlobalActor());
+    }
+  }
+  return None;
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
@@ -4279,7 +4321,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                                  ManagedValue fn, SubstitutionMap subs,
                                  ArrayRef<ManagedValue> args,
                                  const CalleeTypeInfo &calleeTypeInfo,
-                                 ApplyOptions options, SGFContext evalContext) {
+                                 ApplyOptions options, SGFContext evalContext,
+                                 Optional<ValueDecl *> implicitlyAsyncApply) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -4365,15 +4408,31 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
            subs.getGenericSignature().getCanonicalSignature());
   }
 
-  auto rawDirectResult = [&] {
+  // The presence of `implicitlyAsyncApply` indicates that the callee is a 
+  // synchronous function isolated to an actor other than our own.
+  // Such functions require the caller to hop to the callee's executor
+  // prior to invoking the callee.
+  if (implicitlyAsyncApply.hasValue()) {
+    assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
+
+    auto calleeVD = implicitlyAsyncApply.getValue();
+    auto maybeExecutor = EmitLoadActorExecutorForCallee(this, calleeVD, args);
+
+    assert(maybeExecutor.hasValue());
+    B.createHopToExecutor(loc, maybeExecutor.getValue());
+  }
+
+  SILValue rawDirectResult;
+  {
     SmallVector<SILValue, 1> rawDirectResults;
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                  indirectResultAddrs, rawDirectResults);
     assert(rawDirectResults.size() == 1);
-    return rawDirectResults[0];
-  }();
+    rawDirectResult = rawDirectResults[0];
+  }
 
-  if (substFnType->isAsync())
+  // hop back to the current executor
+  if (substFnType->isAsync() || implicitlyAsyncApply.hasValue())
     emitHopToCurrentExecutor(loc);
 
   // Pop the argument scope.
@@ -4482,7 +4541,7 @@ RValue SILGenFunction::emitMonomorphicApply(
       *this, calleeTypeInfo, loc, evalContext);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
-                   args, calleeTypeInfo, options, evalContext);
+                   args, calleeTypeInfo, options, evalContext, None);
 }
 
 /// Emit either an 'apply' or a 'try_apply', with the error branch of
@@ -4768,7 +4827,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subMap,
-                   finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
+                   finalArgs, calleeTypeInfo, ApplyOptions::None, ctx, None);
 }
 
 StringRef SILGenFunction::getMagicFunctionString() {

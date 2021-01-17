@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SourceEntityWalker.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -23,7 +22,9 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h"
 #include "clang/Basic/Module.h"
 
 using namespace swift;

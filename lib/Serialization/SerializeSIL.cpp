@@ -2294,11 +2294,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto operandType = dfei->getOperand()->getType();
     auto operandTypeRef = S.addTypeRef(operandType.getASTType());
     auto rawExtractee = (unsigned)dfei->getExtractee();
+    auto extracteeTypeRef = S.addTypeRef(dfei->getType().getASTType());
     SILInstDifferentiableFunctionExtractLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType(),
+        extracteeTypeRef);
     break;
   }
   case SILInstructionKind::LinearFunctionExtractInst: {

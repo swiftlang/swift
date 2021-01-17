@@ -108,12 +108,6 @@ def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
 def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   InternalDebugOpt,
   HelpText<"Show every step in the lifecycle of driver jobs">;
-def driver_dump_swift_ranges : Flag<["-"], "driver-dump-swift-ranges">,
-  InternalDebugOpt,
-  HelpText<"Show the unparsed ranges read upon startup">;
-def driver_dump_compiled_source_diffs : Flag<["-"], "driver-dump-compiled-source-diffs">,
-  InternalDebugOpt,
-  HelpText<"Show the compiled source diffs read upon startup">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
@@ -146,26 +140,6 @@ Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalB
 def disable_only_one_dependency_file :
 Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Disables incremental build optimization that only produces one dependencies file">;
-
-
-def enable_source_range_dependencies :
-Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
-HelpText<"Try using source range information">;
-
-
-def driver_compare_incremental_schemes :
-Flag<["-"], "driver-compare-incremental-schemes">, Flags<[DoesNotAffectIncrementalBuild]>,
-HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
-
-def driver_compare_incremental_schemes_path :
-Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
-HelpText<"Path to use for machine-readable comparison">,
-MetaVarName<"<path>">;
-
-def driver_compare_incremental_schemes_path_EQ :
-Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
-Alias<driver_compare_incremental_schemes_path>;
-
 
 def driver_verify_fine_grained_dependency_graph_after_every_import :
 Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
@@ -793,7 +767,7 @@ def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Specify the assert_configuration replacement. "
            "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
 
@@ -1104,6 +1078,13 @@ def sanitize_recover_EQ
                "checks should be comma separated. Default behavior is to not "
                "allow error recovery.">;
 
+def sanitize_address_use_odr_indicator
+    : Flag<["-"], "sanitize-address-use-odr-indicator">,
+      Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+      HelpText<"When using AddressSanitizer enable ODR indicator globals to "
+               "avoid false ODR violation reports in partially sanitized "
+               "programs at the cost of an increase in binary size">;
+
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   MetaVarName<"<type>">,
@@ -1112,10 +1093,6 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
 
 def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
-def scan_clang_dependencies : Flag<["-"], "scan-clang-dependencies">,
-  HelpText<"Scan dependencies of the given Clang module">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def emit_supported_features : Flag<["-"], "emit-supported-features">,

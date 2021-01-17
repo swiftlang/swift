@@ -16,6 +16,7 @@
 
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -238,8 +239,11 @@ namespace {
 struct ConformanceState {
   ConcurrentReadableHashMap<ConformanceCacheEntry> Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
-  
+  bool scanSectionsBackwards;
+
   ConformanceState() {
+    scanSectionsBackwards =
+        runtime::bincompat::workaroundProtocolConformanceReverseIteration();
     initializeProtocolConformanceLookup();
   }
 
@@ -466,8 +470,7 @@ swift_conformsToProtocolImpl(const Metadata *const type,
     return found.second;
 
   // Scan conformance records.
-  auto snapshot = C.SectionsToScan.snapshot();
-  for (auto &section : snapshot) {
+  auto processSection = [&](const ConformanceSection &section) {
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
       auto &descriptor = *record.get();
@@ -485,6 +488,15 @@ swift_conformsToProtocolImpl(const Metadata *const type,
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
       }
     }
+  };
+
+  auto snapshot = C.SectionsToScan.snapshot();
+  if (C.scanSectionsBackwards) {
+    for (auto &section : llvm::reverse(snapshot))
+      processSection(section);
+  } else {
+    for (auto &section : snapshot)
+      processSection(section);
   }
 
   // Try the search again to look for the most specific cached conformance.

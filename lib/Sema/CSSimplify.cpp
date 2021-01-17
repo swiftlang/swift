@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -3722,14 +3723,15 @@ bool ConstraintSystem::repairFailures(
         if (lhs->is<FunctionType>() && rhs->is<FunctionType>())
           return false;
 
-        // If either object type is a bound generic or existential it means
-        // that follow-up to value-to-optional is going to be:
+        // If either object type is a generic, nominal or existential type
+        // it means that follow-up to value-to-optional is going to be:
         //
         // 1. "deep equality" check, which is handled by generic argument(s)
-        //    mismatch fix, or
+        //    or contextual mismatch fix, or
         // 2. "existential" check, which is handled by a missing conformance
         //    fix.
         if ((lhs->is<BoundGenericType>() && rhs->is<BoundGenericType>()) ||
+            (lhs->is<NominalType>() && rhs->is<NominalType>()) ||
             rhs->isAnyExistentialType())
           return false;
       }
@@ -3747,7 +3749,12 @@ bool ConstraintSystem::repairFailures(
       // a property with a function type or a method reference,
       // e.g. `foo.bar = 42` neither can be used if the destination
       // is not l-value.
-      if (!getType(destExpr)->is<LValueType>() && rhs->is<FunctionType>()) {
+      auto destType = getType(destExpr);
+      auto destTypeVar = destType->getAs<TypeVariableType>();
+      bool destIsOrCanBindToLValue =
+          destType->is<LValueType>() ||
+          (destTypeVar && destTypeVar->getImpl().canBindToLValue());
+      if (!destIsOrCanBindToLValue && rhs->is<FunctionType>()) {
         conversionsOrFixes.push_back(
             TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
         return true;
@@ -3771,9 +3778,9 @@ bool ConstraintSystem::repairFailures(
                                TMF_ApplyingFix, locator);
       
       auto *loc = getConstraintLocator(locator);
-      if (getType(destExpr)->is<LValueType>() || result.isFailure()) {
-        // Let this asignment failure be diagnosed by the AllowTupleTypeMismatch
-        // fix already recorded.
+      if (destIsOrCanBindToLValue || result.isFailure()) {
+        // Let this assignment failure be diagnosed by the
+        // AllowTupleTypeMismatch fix already recorded.
         if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
           return true;
 
@@ -4262,11 +4269,16 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
-      break;
-
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
+      break;
+
+    // Let's wait until both sides are of the same optionality before
+    // attempting `.rawValue` fix.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::ValueToOptional))
+      break;
+
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
       break;
 
     // If there are any restrictions here we need to wait and let
@@ -5709,9 +5721,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
-    // Record the conformance.
-    CheckedConformances.push_back({loc, conformance});
-
     if (isConformanceUnavailable(conformance, loc))
       increaseScore(SK_Unavailable);
 
@@ -5719,11 +5728,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
       unsigned index = 0;
+      auto *conformanceLoc = getConstraintLocator(
+          loc,
+          LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
+
       for (const auto &req : conformance.getConditionalRequirements()) {
-        addConstraint(req,
-                      locator.withPathElement(
-                          LocatorPathElt::ConditionalRequirement(
-                              index++, req.getKind())));
+        addConstraint(
+            req, getConstraintLocator(conformanceLoc,
+                                      LocatorPathElt::ConditionalRequirement(
+                                          index++, req.getKind())));
       }
     }
 
@@ -6659,8 +6672,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Local function that turns a ValueDecl into a properly configured
   // OverloadChoice.
-  auto getOverloadChoice = [&](ValueDecl *cand, bool isBridged,
-                               bool isUnwrappedOptional) -> OverloadChoice {
+  auto getOverloadChoice =
+      [&](ValueDecl *cand, bool isBridged, bool isUnwrappedOptional,
+          bool isFallbackUnwrap = false) -> OverloadChoice {
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (instanceTy->isAnyObject()) {
@@ -6681,8 +6695,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       auto ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
                                              ->getInstanceType()
                                              ->getOptionalObjectType());
-      return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
-                                                         functionRefKind);
+      return OverloadChoice::getDeclViaUnwrappedOptional(
+          ovlBaseTy, cand,
+          /*isFallback=*/isFallbackUnwrap, functionRefKind);
     }
 
     // While looking for subscript choices it's possible to find
@@ -6706,7 +6721,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     return OverloadChoice(baseTy, cand, functionRefKind);
   };
-  
+
   // Add all results from this lookup.
   for (auto result : lookup)
     addChoice(getOverloadChoice(result.getValueDecl(),
@@ -6789,11 +6804,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
 
       if (objectType->mayHaveMembers()) {
+        // If there are viable members directly on `Optional`, let's
+        // prioritize them and mark any results found on wrapped type
+        // as a fallback results.
+        bool isFallback = !result.ViableCandidates.empty();
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
           addChoice(getOverloadChoice(result.getValueDecl(),
-                                      /*bridged*/false,
-                                      /*isUnwrappedOptional=*/true));
+                                      /*bridged*/ false,
+                                      /*isUnwrappedOptional=*/true,
+                                      /*isUnwrapFallback=*/isFallback));
       }
     }
   }
@@ -7290,7 +7310,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   }
 
   if (!result.UnviableCandidates.empty()) {
-    // Generate constraints for unvailable choices if they have a fix,
+    // Generate constraints for unavailable choices if they have a fix,
     // and disable them by default, they'd get picked up in the "salvage" mode.
     generateConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
@@ -7299,6 +7319,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           return fixMemberRef(*this, baseTy, member, choice, locator,
                               result.UnviableReasons[idx]);
         });
+  }
+
+  // Attempt to record a warning where the unresolved member could be
+  // ambiguous with optional member. e.g.
+  //  enum Foo {
+  //    case none
+  //  }
+  //
+  //  let _: Foo? = .none // Although base is inferred as Optional.none
+  //  it could be also Foo.none.
+  if (auto *fix = SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
+          *this, kind, baseObjTy, member, functionRefKind, result, locator)) {
+    (void)recordFix(fix);
   }
 
   if (!candidates.empty()) {
@@ -10234,7 +10267,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowKeyPathWithoutComponents:
   case FixKind::IgnoreInvalidResultBuilderBody:
   case FixKind::SpecifyContextualTypeForNil:
-  case FixKind::AllowRefToInvalidDecl: {
+  case FixKind::AllowRefToInvalidDecl:
+  case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -10341,7 +10375,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (auto *fnType1 = type1->getAs<FunctionType>()) {
       // If this is a contextual mismatch between two
       // function types which we couldn't find a more
-      // speficit fix for. Let's assume that such types
+      // specific fix for. Let's assume that such types
       // are competely disjoint and adjust impact of
       // the fix accordingly.
       if (auto *fnType2 = type2->getAs<FunctionType>()) {

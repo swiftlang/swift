@@ -18,12 +18,18 @@
 #define SWIFT_ABI_EXECUTOR_H
 
 #include <inttypes.h>
+#include "swift/ABI/HeapObject.h"
+#include "swift/Runtime/Casting.h"
 
 namespace swift {
 class AsyncContext;
 class AsyncTask;
 class DefaultActor;
 class Job;
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+Metadata* MainActorMetadata;
 
 /// An ExecutorRef isn't necessarily just a pointer to an executor
 /// object; it may have other bits set.
@@ -44,6 +50,13 @@ public:
     return ExecutorRef(0);
   }
 
+  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+  /// NOTE: I didn't go with Executor::forMainActor(DefaultActor*) because
+  /// __swift_run_job_main_executor can't take more than one argument.
+  constexpr static ExecutorRef mainExecutor() {
+    return ExecutorRef(2);
+  }
+
   /// Given a pointer to a default actor, return an executor reference
   /// for it.
   static ExecutorRef forDefaultActor(DefaultActor *actor) {
@@ -56,6 +69,20 @@ public:
     return Value == 0;
   }
 
+  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+  bool isMainExecutor() const {
+    if (Value == ExecutorRef::mainExecutor().Value)
+      return true;
+
+    HeapObject *heapObj = reinterpret_cast<HeapObject*>(Value & ~PointerMask);
+
+    if (heapObj == nullptr || MainActorMetadata == nullptr)
+      return false;
+
+    Metadata const* metadata = swift_getObjectType(heapObj);
+    return metadata == MainActorMetadata;
+  }
+
   /// Is this a default-actor executor reference?
   bool isDefaultActor() const {
     return Value & IsDefaultActor;
@@ -65,6 +92,10 @@ public:
     return reinterpret_cast<DefaultActor*>(Value & ~PointerMask);
   }
 
+  uintptr_t getRawValue() const {
+    return Value;
+  }
+
   /// Do we have to do any work to start running as the requested
   /// executor?
   bool mustSwitchToRun(ExecutorRef newExecutor) const {
@@ -72,10 +103,12 @@ public:
   }
 
   bool operator==(ExecutorRef other) const {
-    return Value == other.Value;
+    return Value == other.Value
+    /// FIXME: only exists for the quick-and-dirty MainActor implementation.
+          || (isMainExecutor() && other.isMainExecutor());
   }
   bool operator!=(ExecutorRef other) const {
-    return Value != other.Value;
+    return !(*this == other);
   }
 };
 
@@ -87,10 +120,53 @@ using TaskContinuationFunction =
   SWIFT_CC(swiftasync)
   void (AsyncTask *, ExecutorRef, AsyncContext *);
 
-template <class Fn>
+template <class AsyncSignature>
+class AsyncFunctionPointer;
+template <class AsyncSignature>
 struct AsyncFunctionTypeImpl;
-template <class Result, class... Params>
-struct AsyncFunctionTypeImpl<Result(Params...)> {
+
+/// The abstract signature for an asynchronous function.
+template <class Sig, bool HasErrorResult>
+struct AsyncSignature;
+
+template <class DirectResultTy, class... ArgTys, bool HasErrorResult>
+struct AsyncSignature<DirectResultTy(ArgTys...), HasErrorResult> {
+  bool hasDirectResult = !std::is_same<DirectResultTy, void>::value;
+  using DirectResultType = DirectResultTy;
+
+  bool hasErrorResult = HasErrorResult;
+
+  using FunctionPointer = AsyncFunctionPointer<AsyncSignature>;
+  using FunctionType = typename AsyncFunctionTypeImpl<AsyncSignature>::type;
+};
+
+/// A signature for a thin async function that takes no arguments
+/// and returns no results.
+using ThinNullaryAsyncSignature =
+  AsyncSignature<void(), false>;
+
+/// A signature for a thick async function that takes no formal
+/// arguments and returns no results.
+using ThickNullaryAsyncSignature =
+  AsyncSignature<void(HeapObject*), false>;
+
+/// A class which can be used to statically query whether a type
+/// is a specialization of AsyncSignature.
+template <class T>
+struct IsAsyncSignature {
+  static const bool value = false;
+};
+template <class DirectResultTy, class... ArgTys, bool HasErrorResult>
+struct IsAsyncSignature<AsyncSignature<DirectResultTy(ArgTys...),
+                                       HasErrorResult>> {
+  static const bool value = true;
+};
+
+template <class Signature>
+struct AsyncFunctionTypeImpl {
+  static_assert(IsAsyncSignature<Signature>::value,
+                "template argument is not an AsyncSignature");
+
   // TODO: expand and include the arguments in the parameters.
   using type = TaskContinuationFunction;
 };
@@ -102,11 +178,11 @@ using AsyncFunctionType = typename AsyncFunctionTypeImpl<Fn>::type;
 ///
 /// Eventually, this will always be signed with the data key
 /// using a type-specific discriminator.
-template <class FnType>
+template <class AsyncSignature>
 class AsyncFunctionPointer {
 public:
   /// The function to run.
-  RelativeDirectPointer<AsyncFunctionType<FnType>,
+  RelativeDirectPointer<AsyncFunctionType<AsyncSignature>,
                         /*nullable*/ false,
                         int32_t> Function;
 

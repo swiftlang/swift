@@ -23,8 +23,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -557,7 +559,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
       autodiff::getDifferentiabilityWitnessGenericSignature(
           original->getGenericSignature(), config.derivativeGenericSignature)};
   std::string linearMapName =
-      mangler.mangleAutoDiffLinearMapHelper(declRef.mangle(), kind, silConfig);
+      mangler.mangleAutoDiffLinearMap(original, kind, silConfig);
   addSymbol(linearMapName, SymbolSource::forSILDeclRef(declRef));
 }
 
@@ -721,7 +723,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   visitDefaultArguments(AFD, AFD->getParameters());
 
-  if (AFD->isAsyncContext()) {
+  if (AFD->hasAsync()) {
     addSymbol(LinkEntity::forAsyncFunctionPointer(AFD));
   }
 }

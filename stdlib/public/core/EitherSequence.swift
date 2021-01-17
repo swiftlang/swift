@@ -107,7 +107,7 @@ extension _EitherCollection: Collection {
     switch (self,position) {
     case let (.left(s),.left(i)): return s[i]
     case let (.right(s),.right(i)): return s[i]
-    default: fatalError("_EitherCollecton: Sequence used with other index type")
+    default: fatalError("_EitherCollection: Sequence used with other index type")
     }
   }
 
@@ -115,7 +115,7 @@ extension _EitherCollection: Collection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(after: i))
     case let (.right(s),.right(i)): return .right(s.index(after: i))
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 
@@ -129,7 +129,7 @@ extension _EitherCollection: Collection {
       return s.index(i, offsetBy: distance, limitedBy: limit).map { .left($0) }
     case let (.right(s),.right(i),.right(limit)):
       return s.index(i, offsetBy: distance, limitedBy: limit).map { .right($0) }
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 
@@ -137,7 +137,7 @@ extension _EitherCollection: Collection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(i, offsetBy: distance))
     case let (.right(s),.right(i)): return .right(s.index(i, offsetBy: distance))
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 
@@ -147,7 +147,7 @@ extension _EitherCollection: Collection {
       return s.distance(from: i, to: j)
     case let (.right(s),.right(i),.right(j)):
       return s.distance(from: i, to: j)
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 }
@@ -161,7 +161,7 @@ extension _EitherBidirectionalCollection: BidirectionalCollection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(before: i))
     case let (.right(s),.right(i)): return .right(s.index(before: i))
-    default: fatalError("_EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollection: wrong type of index used")
     }
   }
 }

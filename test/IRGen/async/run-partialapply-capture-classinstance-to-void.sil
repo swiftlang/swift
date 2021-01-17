@@ -1,0 +1,103 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import PrintShims
+import _Concurrency
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+class S {
+  deinit
+  init()
+}
+
+sil hidden [exact_self_class] @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S {
+bb0(%0 : $@thick S.Type):
+  %1 = alloc_ref $S
+  %2 = function_ref @$S_init : $@convention(method) (@owned S) -> @owned S
+  %3 = apply %2(%1) : $@convention(method) (@owned S) -> @owned S
+  return %3 : $S
+}
+
+sil hidden @$S_init : $@convention(method) (@owned S) -> @owned S {
+bb0(%0 : $S):
+  return %0 : $S
+}
+
+sil hidden @$S_deinit : $@convention(method) (@guaranteed S) -> @owned Builtin.NativeObject {
+bb0(%0 : $S):
+  %2 = unchecked_ref_cast %0 : $S to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+sil hidden @S_deallocating_deinit : $@convention(method) (@owned S) -> () {
+bb0(%0 : $S):
+  %2 = function_ref @$S_deinit : $@convention(method) (@guaranteed S) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed S) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $S
+  dealloc_ref %4 : $S
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil_vtable S {
+  #S.init!allocator: (S.Type) -> () -> S : @S_allocating_init
+  #S.deinit!deallocator: @S_deallocating_deinit
+}
+
+// CHECK-LL: @classinstanceSToVoidTu =
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classinstanceSToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+sil @classinstanceSToVoid : $@async @convention(method) (@owned S) -> () {
+entry(%c : $S):
+  %class_addr = alloc_stack $S
+  store %c to %class_addr : $*S
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %result = apply %printGeneric<S>(%class_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: main.S
+  dealloc_stack %class_addr : $*S
+  return %result : $()
+}
+
+// Defined in _Concurrency
+sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+sil @test_case : $@convention(thin) @async () -> () {
+  %s_type = metatype $@thick S.Type
+  %allocating_init = function_ref @S_allocating_init : $@convention(method) (@thick S.Type) -> @owned S
+  %instance = apply %allocating_init(%s_type) : $@convention(method) (@thick S.Type) -> @owned S
+  strong_retain %instance : $S
+
+  %classinstanceSToVoid = function_ref @classinstanceSToVoid : $@async @convention(method) (@owned S) -> ()
+  %partiallyApplied = partial_apply %classinstanceSToVoid(%instance) : $@async @convention(method) (@owned S) -> ()
+  %result = apply %partiallyApplied() : $@async @callee_owned () -> ()
+
+  strong_release %instance : $S
+
+  %void = tuple()
+  return %void : $()
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+
+  %2 = function_ref @test_case : $@convention(thin) @async () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
+  %4 = function_ref @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
+
+  %6 = integer_literal $Builtin.Int32, 0
+  %7 = struct $Int32 (%6 : $Builtin.Int32)
+  return %7 : $Int32
+}
+

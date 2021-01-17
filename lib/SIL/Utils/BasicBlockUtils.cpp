@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
@@ -387,9 +388,9 @@ void DeadEndBlocks::compute() {
 
 void JointPostDominanceSetComputer::findJointPostDominatingSet(
     SILBasicBlock *dominatingBlock, ArrayRef<SILBasicBlock *> dominatedBlockSet,
-    function_ref<void(SILBasicBlock *)> foundInputBlocksNotInJointPostDomSet,
+    function_ref<void(SILBasicBlock *)> inputBlocksFoundDuringWalk,
     function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
-    function_ref<void(SILBasicBlock *)> foundInputBlocksInJointPostDomSet) {
+    function_ref<void(SILBasicBlock *)> inputBlocksInJointPostDomSet) {
   // If our reachable block set is empty, assert. This is most likely programmer
   // error.
   assert(dominatedBlockSet.size() != 0);
@@ -397,10 +398,12 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
   // If we have a reachable block set with a single block and that block is
   // dominatingBlock, then we return success since a block post-doms its self so
   // it is already complete.
+  //
+  // NOTE: We do not consider this a visiteed
   if (dominatedBlockSet.size() == 1) {
     if (dominatingBlock == dominatedBlockSet[0]) {
-      if (foundInputBlocksInJointPostDomSet)
-        foundInputBlocksInJointPostDomSet(dominatingBlock);
+      if (inputBlocksInJointPostDomSet)
+        inputBlocksInJointPostDomSet(dominatingBlock);
       return;
     }
   }
@@ -475,16 +478,16 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
   // callback.
   sortUnique(reachableInputBlocks);
   for (auto *block : reachableInputBlocks)
-    foundInputBlocksNotInJointPostDomSet(block);
+    inputBlocksFoundDuringWalk(block);
 
   // Then if were asked to find the subset of our input blocks that are in the
   // joint-postdominance set, compute that.
-  if (!foundInputBlocksInJointPostDomSet)
+  if (!inputBlocksInJointPostDomSet)
     return;
 
   // Pass back the reachable input blocks that were not reachable from other
   // input blocks to.
   for (auto *block : dominatedBlockSet)
     if (lower_bound(reachableInputBlocks, block) == reachableInputBlocks.end())
-      foundInputBlocksInJointPostDomSet(block);
+      inputBlocksInJointPostDomSet(block);
 }

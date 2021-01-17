@@ -685,6 +685,9 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::ORDERED_TOP_LEVEL_DECLS:
         allocateBuffer(OrderedTopLevelDecls, scratch);
         break;
+      case index_block::EXPORTED_PRESPECIALIZATION_DECLS:
+        allocateBuffer(ExportedPrespecializationDecls, scratch);
+        break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;
@@ -971,6 +974,9 @@ bool ModuleFileSharedCore::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
         return false;
       }
       switch (*kind) {
+      case decl_locs_block::SOURCE_FILE_LIST:
+        SourceFileListData = blobData;
+        break;
       case decl_locs_block::BASIC_DECL_LOCS:
         BasicDeclLocsData = blobData;
         break;

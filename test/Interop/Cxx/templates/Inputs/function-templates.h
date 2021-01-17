@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
+#define TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H
+
 template <class T> T add(T a, T b) { return a + b; }
 
 template <class A, class B> A addTwoTemplates(A a, B b) { return a + b; }
@@ -85,3 +88,5 @@ struct HasImposibleMember {
 };
 
 } // namespace Unimportable
+
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_FUNCTION_TEMPLATES_H

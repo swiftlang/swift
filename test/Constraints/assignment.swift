@@ -77,3 +77,12 @@ func f23798944() {
 
 func returnsVoid() {}
 _ = returnsVoid() // expected-warning {{using '_' to ignore the result of a Void-returning function is redundant}}{{1-5=}}
+
+// SR-14003
+class SR14003 {
+  var callback: ((SR14003) -> Void)!
+  
+  func setCallback(_ callback: @escaping (Self) -> Void) {
+    self.callback = callback // expected-error {{cannot assign value of type '(Self) -> Void' to type '((SR14003) -> Void)?'}}
+  }
+}

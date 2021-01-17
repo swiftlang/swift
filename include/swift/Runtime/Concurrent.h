@@ -488,9 +488,13 @@ public:
     ~Snapshot() {
       Array->decrementReaders();
     }
-    
-    const ElemTy *begin() { return Start; }
-    const ElemTy *end() { return Start + Count; }
+
+    // These are marked as ref-qualified (the &) to make sure they can't be
+    // called on temporaries, since the temporary would be destroyed before the
+    // return value can be used, making it invalid.
+    const ElemTy *begin() & { return Start; }
+    const ElemTy *end() & { return Start + Count; }
+
     size_t count() { return Count; }
   };
 
@@ -523,13 +527,18 @@ public:
       
       storage = newStorage;
       Capacity = newCapacity;
-      Elements.store(storage, std::memory_order_release);
+
+      // Use seq_cst here to ensure that the subsequent load of ReaderCount is
+      // ordered after this store. If ReaderCount is loaded first, then a new
+      // reader could come in between that load and this store, and then we
+      // could end up freeing the old storage pointer while it's still in use.
+      Elements.store(storage, std::memory_order_seq_cst);
     }
     
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
+    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
       deallocateFreeList();
   }
 
@@ -844,7 +853,7 @@ private:
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
+    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
       FreeListNode::freeAll(&FreeList);
   }
 
@@ -862,7 +871,11 @@ private:
       FreeListNode::add(&FreeList, elements);
     }
 
-    Elements.store(newElements, std::memory_order_release);
+    // Use seq_cst here to ensure that the subsequent load of ReaderCount is
+    // ordered after this store. If ReaderCount is loaded first, then a new
+    // reader could come in between that load and this store, and then we
+    // could end up freeing the old elements pointer while it's still in use.
+    Elements.store(newElements, std::memory_order_seq_cst);
     return newElements;
   }
 
@@ -896,7 +909,11 @@ private:
       newIndices.storeIndexAt(nullptr, index, newI, std::memory_order_relaxed);
     }
 
-    Indices.store(newIndices.Value, std::memory_order_release);
+    // Use seq_cst here to ensure that the subsequent load of ReaderCount is
+    // ordered after this store. If ReaderCount is loaded first, then a new
+    // reader could come in between that load and this store, and then we
+    // could end up freeing the old indices pointer while it's still in use.
+    Indices.store(newIndices.Value, std::memory_order_seq_cst);
 
     if (auto *ptr = indices.pointer())
       FreeListNode::add(&FreeList, ptr);
@@ -974,7 +991,11 @@ public:
 
     /// Search for an element matching the given key. Returns a pointer to the
     /// found element, or nullptr if no matching element exists.
-    template <class KeyTy> const ElemTy *find(const KeyTy &key) {
+    //
+    // This is marked as ref-qualified (the &) to make sure it can't be called
+    // on temporaries, since the temporary would be destroyed before the return
+    // value can be used, making it invalid.
+    template <class KeyTy> const ElemTy *find(const KeyTy &key) & {
       if (!Indices.Value || !ElementCount || !Elements)
         return nullptr;
       return ConcurrentReadableHashMap::find(key, Indices, ElementCount,
@@ -1146,9 +1167,15 @@ struct StableAddressConcurrentReadableHashMap
         return {lastFound, false};
 
     // Optimize for the case where the value already exists.
-    if (auto wrapper = this->snapshot().find(key)) {
-      LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
-      return {wrapper->Ptr, false};
+    {
+      // Tightly scope the snapshot so it's gone before we call getOrInsert
+      // below, otherwise that call will always see an outstanding snapshot and
+      // never be able to collect garbage.
+      auto snapshot = this->snapshot();
+      if (auto wrapper = snapshot.find(key)) {
+        LastFound.store(wrapper->Ptr, std::memory_order_relaxed);
+        return {wrapper->Ptr, false};
+      }
     }
 
     // No such element. Insert if needed. Note: another thread may have inserted
@@ -1175,7 +1202,8 @@ struct StableAddressConcurrentReadableHashMap
   }
 
   template <class KeyTy> ElemTy *find(const KeyTy &key) {
-    auto result = this->snapshot().find(key);
+    auto snapshot = this->snapshot();
+    auto result = snapshot.find(key);
     if (!result)
       return nullptr;
     return result->Ptr;

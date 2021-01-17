@@ -16,6 +16,7 @@
 #include "SemanticARCOptVisitor.h"
 #include "Transforms.h"
 
+#include "swift/Basic/Defer.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -40,6 +41,10 @@ static llvm::cl::list<ARCTransformKind> TransformsToPerform(
         clEnumValN(ARCTransformKind::LifetimeJoiningPeephole,
                    "sil-semantic-arc-peepholes-lifetime-joining",
                    "Perform the join lifetimes peephole"),
+        clEnumValN(ARCTransformKind::OwnershipConversionElimPeephole,
+                   "sil-semantic-arc-peepholes-ownership-conversion-elim",
+                   "Eliminate unchecked_ownership_conversion insts that are "
+                   "not needed"),
         clEnumValN(ARCTransformKind::OwnedToGuaranteedPhi,
                    "sil-semantic-arc-owned-to-guaranteed-phi",
                    "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
@@ -78,6 +83,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       case ARCTransformKind::RedundantBorrowScopeElimPeephole:
       case ARCTransformKind::LoadCopyToLoadBorrowPeephole:
       case ARCTransformKind::AllPeepholes:
+      case ARCTransformKind::OwnershipConversionElimPeephole:
         // We never assume we are at fixed point when running these transforms.
         if (performPeepholesWithoutFixedPoint(visitor)) {
           invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

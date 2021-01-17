@@ -148,7 +148,7 @@ public:
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args, None,
+    getLang().getCursorInfo(DocName, Offset, 0, false, false, false, Args, None,
       [&](const RequestResult<CursorInfoData> &Result) {
         assert(!Result.isCancelled());
         if (Result.isError()) {

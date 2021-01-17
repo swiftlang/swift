@@ -19,39 +19,26 @@
 
 #include "TaskPrivate.h"
 #include "swift/Runtime/Concurrency.h"
-#include "swift/Runtime/Debug.h"
+#include "../runtime/StackAllocator.h"
 #include <stdlib.h>
-#include <vector>
 
 using namespace swift;
 
 namespace {
 
-class TaskAllocator {
-  // Just keep track of all allocations in a vector so that we can
-  // verify stack discipline.  We should make sure the allocator
-  // implementation strictly verifies allocation order at least
-  // until we've stabilized the compiler implementation.
-  std::vector<void*> Allocations;
+/// The size of an allocator slab.
+///
+/// TODO: find the optimal value by experiment.
+static constexpr size_t SlabCapacity = 1024;
 
-public:
-  void *alloc(size_t size) {
-    void *ptr = malloc(size);
-    Allocations.push_back(ptr);
-    return ptr;
-  }
+using TaskAllocator = StackAllocator<SlabCapacity>;
 
-  void dealloc(void *ptr) {
-    if (Allocations.empty() || Allocations.back() != ptr)
-      fatalError(0, "pointer was not the last allocation on this task");
+struct GlobalAllocator {
+  TaskAllocator allocator;
+  void *spaceForFirstSlab[64];
 
-    Allocations.pop_back();
-    free(ptr);
-  }
+  GlobalAllocator() : allocator(spaceForFirstSlab, sizeof(spaceForFirstSlab)) {}
 };
-
-static_assert(sizeof(TaskAllocator) <= sizeof(AsyncTask::AllocatorPrivate),
-              "task allocator must fit in allocator-private slot");
 
 static_assert(alignof(TaskAllocator) <= alignof(decltype(AsyncTask::AllocatorPrivate)),
               "task allocator must not be more aligned than "
@@ -70,8 +57,8 @@ static TaskAllocator &allocator(AsyncTask *task) {
   // FIXME: this fall-back shouldn't be necessary, but it's useful
   // for now, since the current execution tests aren't setting up a task
   // properly.
-  static TaskAllocator global;
-  return global;
+  static GlobalAllocator global;
+  return global.allocator;
 }
 
 void swift::_swift_task_alloc_destroy(AsyncTask *task) {

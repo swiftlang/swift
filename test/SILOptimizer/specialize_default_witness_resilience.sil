@@ -15,11 +15,11 @@ public struct ConformingStruct : ResilientProtocol {
   public func defaultB()
 }
 
-// CHECK-LABEL: sil shared @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK-LABEL: sil shared @$s8defaultA4main16ConformingStructV_TB5
 // CHECK:       bb0(%0 : $ConformingStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
 // CHECK-NEXT:    store %0 to [[TMP]] : $*ConformingStruct
-// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_TB5
 // CHECK-NEXT:    [[LOAD:%.*]] = load [[TMP]] : $*ConformingStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
 // CHECK-NEXT:    dealloc_stack [[TMP]] : $*ConformingStruct
@@ -32,7 +32,7 @@ bb0(%0 : $*Self):
   return %result : $()
 }
 
-// CHECK-LABEL: sil shared @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK-LABEL: sil shared @$s8defaultB4main16ConformingStructV_TB5
 // CHECK:       bb0(%0 : $ConformingStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
 // CHECK-NEXT:    store %0 to [[TMP]] : $*ConformingStruct
@@ -48,7 +48,7 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: sil hidden @test_specialize_default_witness_method
 // CHECK:       bb0(%0 : $*ConformingStruct):
-// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_TB5
 // CHECK-NEXT:    [[VALUE:%.*]] = load %0 : $*ConformingStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[VALUE]])
 // CHECK-NEXT:    return [[RESULT]]

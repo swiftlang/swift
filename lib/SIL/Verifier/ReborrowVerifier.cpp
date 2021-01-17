@@ -54,7 +54,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
     auto *borrowLifetimeEndUser = borrowLifetimeEndOp->getUser();
 
     auto borrowingOperand = BorrowingOperand::get(borrowLifetimeEndOp);
-    if (!borrowingOperand || !borrowingOperand->isReborrow())
+    if (!borrowingOperand || !borrowingOperand.isReborrow())
       continue;
 
     if (isVisitedOp(borrowLifetimeEndOp, baseVal))
@@ -85,8 +85,8 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
       // Find the scope ending uses of the guaranteed phi arg and add it to the
       // worklist.
       auto scopedValue = BorrowedValue::get(phiArg);
-      assert(scopedValue.hasValue());
-      scopedValue->visitLocalScopeEndingUses([&](Operand *op) {
+      assert(scopedValue);
+      scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
         addVisitedOp(op, newBaseVal);
         worklist.emplace_back(op, newBaseVal);
       });

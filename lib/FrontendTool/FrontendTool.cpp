@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,10 +21,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "Dependencies.h"
-#include "ScanDependencies.h"
 #include "TBD.h"
-
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -38,10 +37,12 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -49,6 +50,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Option/Options.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -67,6 +69,7 @@
 #include "swift/TBDGen/TBDGen.h"
 
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
@@ -77,12 +80,18 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#elif defined(_WIN32)
+#include <process.h>
+#endif
 #include <algorithm>
 #include <memory>
 #include <unordered_set>
 #include <utility>
 
 using namespace swift;
+using namespace swift::parseable_output;
 
 static std::string displayName(StringRef MainExecutablePath) {
   std::string Name = llvm::sys::path::stem(MainExecutablePath).str();
@@ -536,7 +545,79 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
       });
 }
 
-static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
+static const char *
+mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
+  FrontendOptions::ActionType ActionType =
+  Invocation.getFrontendOptions().RequestedAction;
+  switch (ActionType) {
+    case FrontendOptions::ActionType::REPL:
+      return "repl";
+    case FrontendOptions::ActionType::MergeModules:
+      return "merge-module";
+    case FrontendOptions::ActionType::Immediate:
+      return "interpret";
+    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+      return "verify-module-interface";
+    case FrontendOptions::ActionType::EmitPCH:
+      return "generate-pch";
+    case FrontendOptions::ActionType::EmitIR:
+    case FrontendOptions::ActionType::EmitBC:
+    case FrontendOptions::ActionType::EmitAssembly:
+    case FrontendOptions::ActionType::EmitObject:
+      // Whether or not these actions correspond to a "compile" job or a
+      // "backend" job, depends on the input kind.
+      if (Invocation.getFrontendOptions().InputsAndOutputs.shouldTreatAsLLVM())
+        return "backend";
+      else
+        return "compile";
+    default:
+      return "compile";
+  }
+  // The following Driver/Parseable-output actions do not correspond to
+  // possible Frontend invocations:
+  // ModuleWrapJob, AutolinkExtractJob, GenerateDSYMJob, VerifyDebugInfoJob,
+  // StaticLinkJob, DynamicLinkJob
+}
+
+static DetailedTaskDescription
+constructDetailedTaskDescription(const CompilerInvocation &Invocation,
+                                 const InputFile &PrimaryInput,
+                                 ArrayRef<const char *> Args) {
+  // Command line and arguments
+  std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
+  SmallVector<std::string, 16> Arguments;
+  std::string CommandLine;
+  SmallVector<CommandInput, 4> Inputs;
+  SmallVector<OutputPair, 8> Outputs;
+  CommandLine += Executable;
+  for (const auto &A : Args) {
+    Arguments.push_back(A);
+    CommandLine += std::string(" ") + A;
+  }
+
+  // Primary Input only
+  Inputs.push_back(CommandInput(PrimaryInput.getFileName()));
+
+  // Output for this Primary
+  auto OutputFile = PrimaryInput.outputFilename();
+  Outputs.push_back(OutputPair(file_types::lookupTypeForExtension(
+                                   llvm::sys::path::extension(OutputFile)),
+                               OutputFile));
+
+  // Supplementary outputs
+  const auto &primarySpecificFiles = PrimaryInput.getPrimarySpecificPaths();
+  const auto &supplementaryOutputPaths =
+      primarySpecificFiles.SupplementaryOutputs;
+  supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
+    Outputs.push_back(OutputPair(
+        file_types::lookupTypeForExtension(llvm::sys::path::extension(output)),
+        output));
+  });
+  return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
+                                 Outputs};
+}
+
+static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
@@ -546,6 +627,22 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
   }
+
+  // Do not write out swiftdeps for any primaries if we've encountered an
+  // error. Without this, the driver will attempt to integrate swiftdeps
+  // from broken swift files. One way this could go wrong is if a primary that
+  // fails to build in an early wave has dependents in a later wave. The
+  // driver will not schedule those later dependents after this batch exits,
+  // so they will have no opportunity to bring their swiftdeps files up to
+  // date. With this early exit, the driver sees the same priors in the
+  // swiftdeps files from before errors were introduced into the batch, and
+  // integration therefore always hops from "known good" to "known good" states.
+  //
+  // FIXME: It seems more appropriate for the driver to notice the early-exit
+  // and react by always enqueuing the jobs it dropped in the other waves.
+  if (Instance.getDiags().hadAnyError())
+    return;
+
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
@@ -555,43 +652,6 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
 
     emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
-  }
-}
-static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::emit_swift_ranges_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &swiftRangesFilePath =
-        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
-    if (!swiftRangesFilePath.empty()) {
-      (void)Instance.emitSwiftRanges(Instance.getDiags(), SF,
-                                     swiftRangesFilePath);
-    }
-  }
-}
-static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
-    CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasCompiledSourcePath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::emit_compiled_source_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &compiledSourceFilePath =
-        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
-    if (!compiledSourceFilePath.empty()) {
-      (void)Instance.emitCompiledSource(Instance.getDiags(), SF,
-                                        compiledSourceFilePath);
-    }
   }
 }
 
@@ -954,14 +1014,12 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     emitIndexData(Instance);
   }
 
-  // Emit dependencies.
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  // Emit Swiftdeps for every file in the batch.
+  emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
+
+  // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
-
-  // Emit information about the parsed primaries.
-  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
-  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {
@@ -1053,10 +1111,17 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 static bool performScanDependencies(CompilerInstance &Instance) {
   auto batchScanInput =
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+  ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
-    return scanDependencies(Instance);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::prescanDependencies(Instance);
+    else
+      return dependencies::scanDependencies(Instance);
   } else {
-    return batchScanModuleDependencies(Instance, batchScanInput);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::batchPrescanDependencies(Instance, batchScanInput);
+    else
+      return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 
@@ -1143,8 +1208,6 @@ static bool performAction(CompilerInstance &Instance,
   // MARK: Dependency Scanning Actions
   case FrontendOptions::ActionType::ScanDependencies:
     return performScanDependencies(Instance);
-  case FrontendOptions::ActionType::ScanClangDependencies:
-    return scanClangDependencies(Instance);
 
   // MARK: General Compilation Actions
   case FrontendOptions::ActionType::Parse:
@@ -1694,6 +1757,22 @@ createSerializedDiagnosticConsumerIfNeeded(
       });
 }
 
+/// Creates a diagnostic consumer that accumulates all emitted diagnostics as compilation
+/// proceeds. The accumulated diagnostics are then emitted in the frontend's parseable-output.
+static std::unique_ptr<DiagnosticConsumer>
+createAccumulatingDiagnosticConsumer(
+    const FrontendInputsAndOutputs &InputsAndOutputs,
+    llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
+  return createDispatchingDiagnosticConsumerIfNeeded(
+      InputsAndOutputs,
+      [&](const InputFile &Input) -> std::unique_ptr<DiagnosticConsumer> {
+    FileSpecificDiagnostics.try_emplace(Input.getFileName(),
+                                        std::vector<std::string>());
+    auto &DiagBufferRef = FileSpecificDiagnostics[Input.getFileName()];
+    return std::make_unique<AccumulatingFileDiagnosticConsumer>(DiagBufferRef);
+  });
+}
+
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
 /// the supplementary output paths specified in \p options.
 ///
@@ -1897,6 +1976,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();
+
+  // In parseable output, avoid printing diagnostics
   Instance->addDiagnosticConsumer(&PDC);
 
   struct FinishDiagProcessingCheckRAII {
@@ -1995,6 +2076,22 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
+  std::unique_ptr<DiagnosticConsumer> FileSpecificAccumulatingConsumer;
+  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+    // We need a diagnostic consumer that will, per-file, collect all
+    // diagnostics to be reported in parseable-output
+    FileSpecificAccumulatingConsumer = createAccumulatingDiagnosticConsumer(
+        Invocation.getFrontendOptions().InputsAndOutputs,
+        FileSpecificDiagnostics);
+    Instance->addDiagnosticConsumer(FileSpecificAccumulatingConsumer.get());
+
+    // If we got this far, we need to suppress the output of the
+    // PrintingDiagnosticConsumer to ensure that only the parseable-output
+    // is emitted
+    PDC.setSuppressOutput(true);
+  }
+
   // Because the serialized diagnostics consumer is initialized here,
   // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
@@ -2043,6 +2140,27 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
+  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    const auto OSPid = getpid();
+    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+    // Parseable output clients may not understand the idea of a batch
+    // compilation. We assign each primary in a batch job a quasi process id,
+    // making sure it cannot collide with a real PID (always positive). Non-batch
+    // compilation gets a real OS PID.
+    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                        unsigned idx) -> bool {
+      emitBeganMessage(
+          llvm::errs(),
+          mapFrontendInvocationToAction(Invocation),
+          constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
+          ProcInfo);
+      return false;
+    });
+  }
+
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, ReturnValue, observer);
 
@@ -2060,6 +2178,36 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto r = finishDiagProcessing(HadError ? 1 : ReturnValue, verifierEnabled);
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
+
+  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+    const auto OSPid = getpid();
+    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+    // Parseable output clients may not understand the idea of a batch
+    // compilation. We assign each primary in a batch job a quasi process id,
+    // making sure it cannot collide with a real PID (always positive). Non-batch
+    // compilation gets a real OS PID.
+    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                        unsigned idx) -> bool {
+      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+             "Expected diagnostic collection for input.");
+
+      // Join all diagnostics produced for this file into a single output.
+      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+      const char *const Delim = "";
+      std::ostringstream JoinedDiags;
+      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+                std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+      emitFinishedMessage(llvm::errs(),
+                          mapFrontendInvocationToAction(Invocation),
+                          JoinedDiags.str(), r, Pid - idx, ProcInfo);
+      return false;
+    });
+  }
+
   return r;
 }
 

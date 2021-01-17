@@ -125,8 +125,8 @@ func anotherAsyncFunc() async {
 
 }
 
-// expected-note@+2 {{add 'async' to function 'regularFunc()' to make it asynchronous}}
-// expected-note@+1 {{add '@asyncHandler' to function 'regularFunc()' to create an implicit asynchronous context}}
+// expected-note@+2 {{add 'async' to function 'regularFunc()' to make it asynchronous}} {{none}}
+// expected-note@+1 {{add '@asyncHandler' to function 'regularFunc()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 
@@ -184,4 +184,34 @@ func blender(_ peeler : () -> Void) {
 
 @OrangeActor func quinoa() async {
   rice() // expected-error {{call is 'async' but is not marked with 'await'}}
+}
+
+///////////
+// check various curried applications to ensure we mark the right expression.
+
+actor class Calculator {
+  func addCurried(_ x : Int) -> ((Int) -> Int) { 
+    return { (_ y : Int) in x + y }
+  }
+
+  func add(_ x : Int, _ y : Int) -> Int {
+    return x + y
+  }
+}
+
+@BananaActor func bananaAdd(_ x : Int) -> ((Int) -> Int) { 
+  return { (_ y : Int) in x + y }
+}
+
+@OrangeActor func doSomething() async {
+  let _ = (await bananaAdd(1))(2)
+  let _ = await (await bananaAdd(1))(2) // expected-warning{{no calls to 'async' functions occur within 'await' expression}}
+
+  let calc = Calculator()
+  
+  let _ = (await calc.addCurried(1))(2)
+  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no calls to 'async' functions occur within 'await' expression}}
+
+  let plusOne = await calc.addCurried(await calc.add(0, 1))
+  let _ = plusOne(2)
 }

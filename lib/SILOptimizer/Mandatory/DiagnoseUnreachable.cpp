@@ -16,6 +16,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -992,12 +993,14 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   NumInstructionsRemoved += ToBeDeleted.size();
 
   // Delete the dead blocks.
-  for (auto I = F.begin(), E = F.end(); I != E;)
-    if (!Reachable.count(&*I)) {
-      I = F.getBlocks().erase(I);
+  for (auto I = F.begin(), E = F.end(); I != E;) {
+    SILBasicBlock *BB = &*I;
+    ++I;
+    if (!Reachable.count(BB)) {
+      F.eraseBlock(BB);
       ++NumBlocksRemoved;
-    } else
-      ++I;
+    }
+  }
 
   return true;
 }

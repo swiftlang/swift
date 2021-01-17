@@ -36,7 +36,7 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
-struct InstModCallbacks;
+class InstModCallbacks;
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block. Allows for user injected callbacks via \p callbacks.
@@ -47,8 +47,7 @@ struct InstModCallbacks;
 /// \return The created branch. The old branch is deleted.
 /// The argument is appended at the end of the argument tuple.
 TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
-                                  SILValue val,
-                                  const InstModCallbacks &callbacks);
+                                  SILValue val, InstModCallbacks &callbacks);
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block.
@@ -60,7 +59,8 @@ TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
 /// The argument is appended at the end of the argument tuple.
 inline TermInst *addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
                                          SILValue val) {
-  return addNewEdgeValueToBranch(branch, dest, val, InstModCallbacks());
+  InstModCallbacks callbacks;
+  return addNewEdgeValueToBranch(branch, dest, val, callbacks);
 }
 
 /// Changes the edge value between a branch and destination basic block

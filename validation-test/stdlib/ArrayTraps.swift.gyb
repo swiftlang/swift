@@ -172,8 +172,8 @@ ${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
 
 ArrayTraps.test("unsafeLength")
   .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    { !_isDebugAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -O or -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "UnsafeBufferPointer with negative count" : "")
   .code {

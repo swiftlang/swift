@@ -787,7 +787,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
   // Check for the 'async' and 'throws' keywords.
   rethrows = false;
-  parseAsyncThrows(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  Status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;
@@ -802,7 +802,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     // Check for 'throws' and 'rethrows' after the arrow, but
     // before the type, and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -812,7 +812,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       return Status;
 
     // Check for 'throws' and 'rethrows' after the type and correct it.
-    parseAsyncThrows(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
@@ -821,52 +821,103 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   return Status;
 }
 
-void Parser::parseAsyncThrows(
-    SourceLoc existingArrowLoc, SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-    bool *rethrows) {
+bool Parser::isEffectsSpecifier(const Token &T) {
+  // NOTE: If this returns 'true', that token must be handled in
+  //       'parseEffectsSpecifiers()'.
+
   if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("async")) {
-    asyncLoc = consumeToken();
+      T.isContextualKeyword("async"))
+    return true;
 
-    if (existingArrowLoc.isValid()) {
-      diagnose(asyncLoc, diag::async_or_throws_in_wrong_position, 2)
-        .fixItRemove(asyncLoc)
-        .fixItInsert(existingArrowLoc, "async ");
-    }
-  }
+  if (T.isAny(tok::kw_throws, tok::kw_rethrows) ||
+      (T.isAny(tok::kw_throw, tok::kw_try) && !T.isAtStartOfLine()))
+    return true;
 
-  if (Tok.isAny(tok::kw_throws, tok::kw_throw, tok::kw_try) ||
-      (rethrows && Tok.is(tok::kw_rethrows))) {
-    // If we allowed parsing rethrows, record whether we did in fact parse it.
-    if (rethrows)
-      *rethrows = Tok.is(tok::kw_rethrows);
+  return false;
+}
 
-    // Replace 'throw' or 'try' with 'throws'.
-    if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
-      diagnose(Tok, diag::throw_in_function_type)
-        .fixItReplace(Tok.getLoc(), "throws");
-    }
+ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
+                                            SourceLoc &asyncLoc,
+                                            SourceLoc &throwsLoc,
+                                            bool *rethrows) {
+  ParserStatus status;
 
-    StringRef keyword = Tok.getText();
-    throwsLoc = consumeToken();
-
-    if (existingArrowLoc.isValid()) {
-      diagnose(throwsLoc, diag::async_or_throws_in_wrong_position,
-               rethrows ? (*rethrows ? 1 : 0) : 0)
-        .fixItRemove(throwsLoc)
-        .fixItInsert(existingArrowLoc, (keyword + " ").str());
-    }
-
+  while (true) {
+    // 'async'
     if (shouldParseExperimentalConcurrency() &&
         Tok.isContextualKeyword("async")) {
-      asyncLoc = consumeToken();
 
-      diagnose(asyncLoc, diag::async_after_throws, rethrows && *rethrows)
-        .fixItRemove(asyncLoc)
-        .fixItInsert(
-          existingArrowLoc.isValid() ? existingArrowLoc : throwsLoc, "async ");
+      if (asyncLoc.isValid()) {
+        diagnose(Tok, diag::duplicate_effects_specifier, Tok.getText())
+            .highlight(asyncLoc)
+            .fixItRemove(Tok.getLoc());
+      } else if (existingArrowLoc.isValid()) {
+        SourceLoc insertLoc = existingArrowLoc;
+        if (throwsLoc.isValid() &&
+            SourceMgr.isBeforeInBuffer(throwsLoc, insertLoc))
+          insertLoc = throwsLoc;
+        diagnose(Tok, diag::async_or_throws_in_wrong_position, "async")
+            .fixItRemove(Tok.getLoc())
+            .fixItInsert(insertLoc, "async ");
+      } else if (throwsLoc.isValid()) {
+        // 'async' cannot be after 'throws'.
+        assert(existingArrowLoc.isInvalid());
+        diagnose(Tok, diag::async_after_throws, rethrows && *rethrows)
+            .fixItRemove(Tok.getLoc())
+            .fixItInsert(throwsLoc, "async ");
+      }
+      if (asyncLoc.isInvalid())
+        asyncLoc = Tok.getLoc();
+      consumeToken();
+      continue;
     }
+
+    // 'throws'/'rethrows', or diagnose 'throw'/'try'.
+    if (Tok.isAny(tok::kw_throws, tok::kw_rethrows) ||
+        (Tok.isAny(tok::kw_throw, tok::kw_try) && !Tok.isAtStartOfLine())) {
+      bool isRethrows = Tok.is(tok::kw_rethrows);
+
+      if (throwsLoc.isValid()) {
+        diagnose(Tok, diag::duplicate_effects_specifier, Tok.getText())
+            .highlight(throwsLoc)
+            .fixItRemove(Tok.getLoc());
+      } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
+        // Replace 'throw' or 'try' with 'throws'.
+        diagnose(Tok, diag::throw_in_function_type)
+            .fixItReplace(Tok.getLoc(), "throws");
+      } else if (!rethrows && isRethrows) {
+        // Replace 'rethrows' with 'throws' unless it's allowed.
+        diagnose(Tok, diag::rethrowing_function_type)
+            .fixItReplace(Tok.getLoc(), "throws");
+      } else if (existingArrowLoc.isValid()) {
+        diagnose(Tok, diag::async_or_throws_in_wrong_position, Tok.getText())
+            .fixItRemove(Tok.getLoc())
+            .fixItInsert(existingArrowLoc, (Tok.getText() + " ").str());
+      }
+
+      if (throwsLoc.isInvalid()) {
+        if (rethrows)
+          *rethrows = isRethrows;
+        throwsLoc = Tok.getLoc();
+      }
+      consumeToken();
+      continue;
+    }
+
+    // Code completion.
+    if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine() &&
+        !existingArrowLoc.isValid()) {
+      if (CodeCompletion)
+        CodeCompletion->completeEffectsSpecifier(asyncLoc.isValid(),
+                                                 throwsLoc.isValid());
+      consumeToken(tok::code_complete);
+      status.setHasCodeCompletionAndIsError();
+      continue;
+    }
+
+    break;
   }
+  return status;
 }
 
 /// Parse a pattern with an optional type annotation.

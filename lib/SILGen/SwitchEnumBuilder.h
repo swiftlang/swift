@@ -133,14 +133,14 @@ private:
 
   SILGenBuilder &builder;
   SILLocation loc;
-  ManagedValue optional;
+  ManagedValue subjectExprOperand;
   llvm::Optional<DefaultCaseData> defaultBlockData;
   llvm::SmallVector<NormalCaseData, 8> caseDataArray;
 
 public:
   SwitchEnumBuilder(SILGenBuilder &builder, SILLocation loc,
-                    ManagedValue optional)
-      : builder(builder), loc(loc), optional(optional) {}
+                    ManagedValue subjectExprOperand)
+      : builder(builder), loc(loc), subjectExprOperand(subjectExprOperand) {}
 
   void addDefaultCase(
       SILBasicBlock *defaultBlock, SwitchCaseBranchDest branchDest,

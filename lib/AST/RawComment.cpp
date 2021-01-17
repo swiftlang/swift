@@ -22,6 +22,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
@@ -237,4 +238,28 @@ CharSourceRange RawComment::getCharSourceRange() {
   auto Length = static_cast<const char *>(End.getOpaquePointerValue()) -
                 static_cast<const char *>(Start.getOpaquePointerValue());
   return CharSourceRange(Start, Length);
+}
+
+bool BasicSourceFileInfo::populate(SourceFile *SF) {
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+
+  auto filename = SF->getFilename();
+  if (filename.empty())
+    return true;
+  auto stat = SM.getFileSystem()->status(filename);
+  if (!stat)
+    return true;
+
+  FilePath = filename;
+  LastModified = stat->getLastModificationTime();
+  FileSize = stat->getSize();
+
+  if (SF->hasInterfaceHash()) {
+    InterfaceHash = SF->getInterfaceHashIncludingTypeMembers();
+  } else {
+    // FIXME: Parse the file with EnableInterfaceHash option.
+    InterfaceHash = Fingerprint::ZERO();
+  }
+
+  return false;
 }

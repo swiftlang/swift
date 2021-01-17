@@ -159,3 +159,57 @@ struct StructWithIUOinit : InitProtocol {
   init!(_ x: Int) {  } // no missing-return error
 }
 
+func testSR13753() {
+  // SR-13753
+  let _ : () -> Int = {
+    var x : Int {
+      get { 0 }
+      set { }
+    }
+    x // expected-error {{missing return in a closure expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
+    // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
+    // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+    // expected-warning@-3 {{variable is unused}}
+  }
+
+  func f() -> Int {
+    var x : Int {
+        get { 0 }
+        set { }
+    }
+    x // expected-error {{missing return in a function expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
+    // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
+    // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+    // expected-warning@-3 {{variable is unused}}
+  } 
+
+  let _ : () -> Int = {
+    var x : UInt {
+      get { 0 }
+      set { }
+    }
+    x 
+    // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
+    // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+    // expected-warning@-3 {{variable is unused}}
+  } // expected-error {{missing return in a closure expected to return 'Int'}}
+
+  func f1() -> Int {
+    var x : UInt {
+        get { 0 }
+        set { }
+    }
+    x 
+    // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
+    // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+    // expected-warning@-3 {{variable is unused}}
+  } // expected-error {{missing return in a function expected to return 'Int'}}
+
+  let _ : () -> Int = {
+    var x : Int = 0 // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+    var _ : Int = 0
+    
+    x // expected-error{{missing return in a closure expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
+    //expected-warning@-1{{variable is unused}}
+  }
+}

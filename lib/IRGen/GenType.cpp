@@ -1420,8 +1420,9 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   }
 
   bool error = readLegacyTypeInfo(*fs, path);
-  if (error)
-    llvm::report_fatal_error("Cannot read '" + path + "'");
+  if (error) {
+    IGM.error(SourceLoc(), "Cannot read legacy layout file at '" + path + "'");
+  }
 }
 
 TypeConverter::~TypeConverter() {
@@ -1662,8 +1663,7 @@ const LoadableTypeInfo &TypeConverter::getJobTypeInfo() {
   // they're valid until they are scheduled, and then they're responsible
   // for destroying themselves.  (Jobs are often interior pointers into
   // an AsyncTask*, but that's not guaranteed.)
-  auto ty = llvm::StructType::create(IGM.getLLVMContext(), "swift.job")
-              ->getPointerTo();
+  auto ty = IGM.SwiftJobPtrTy;
   auto pointeeAlign = Alignment(2 * IGM.getPointerAlignment().getValue());
   JobTI = createAlignedPointerTypeInfo(IGM, ty, pointeeAlign);
   JobTI->NextConverted = FirstType;
@@ -2090,6 +2090,20 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     std::tie(llvmTy, size, align) = convertPrimitiveBuiltin(IGM, ty);
     align = IGM.getCappedAlignment(align);
     return createPrimitive(llvmTy, size, align);
+  }
+  case TypeKind::BuiltinDefaultActorStorage: {
+    // Builtin.DefaultActorStorage represents the extra storage
+    // (beyond the heap header) of a default actor class.  It is
+    // fixed-size and totally opaque.
+    auto numWords = NumWords_DefaultActor;
+
+    auto ty = llvm::StructType::create(IGM.getLLVMContext(),
+                                 llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
+                                       "swift.defaultactor");
+    auto size = IGM.getPointerSize() * numWords;
+    auto align = Alignment(2 * IGM.getPointerAlignment().getValue());
+    auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
+    return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
   }
 
   case TypeKind::PrimaryArchetype:

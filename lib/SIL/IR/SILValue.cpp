@@ -81,6 +81,14 @@ SILInstruction *ValueBase::getDefiningInsertionPoint() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getNextInstruction() {
+  if (auto *inst = getDefiningInstruction())
+    return std::next(inst);
+  if (auto *arg = dyn_cast<SILArgument>(this))
+    return &*arg->getParentBlock()->begin();
+  return nullptr;
+}
+
 Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
@@ -216,8 +224,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   case SILArgumentConvention::Direct_Guaranteed:
     value = OwnershipKind::Guaranteed;
     return;
-  case SILArgumentConvention::Direct_Deallocating:
-    llvm_unreachable("Not handled");
   }
 }
 
@@ -322,24 +328,14 @@ SILFunction *Operand::getParentFunction() const {
 }
 
 bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
-  auto constraint = getOwnershipConstraint();
-  if (!constraint)
-    return false;
-
-  if (constraint->satisfiesConstraint(kind))
+  auto operandOwnership = getOperandOwnership();
+  auto constraint = operandOwnership.getOwnershipConstraint();
+  if (constraint.satisfiesConstraint(kind)) {
+    // Constraints aren't precise enough to enforce Unowned value uses.
+    if (kind == OwnershipKind::Unowned) {
+      return canAcceptUnownedValue(operandOwnership);
+    }
     return true;
-
-  // Then see if our preferred ownership constraint was not guaranteed or our
-  // use lifetime constraint was LifetimeEnding. If it wasn't, then we fail
-  // since we do not allow for implicit borrows in such situations.
-  if (kind == OwnershipKind::Owned && !isLifetimeEnding()) {
-    // Otherwise, we now know that our constraint is non lifetime ending
-    // and guaranteed and our value had owned ownership. If our user
-    // allows for implicit borrows and thus can accept owned values,
-    // return true.
-    if (auto borrowingOperand = BorrowingOperand::get(this))
-      if (borrowingOperand->canAcceptOwnedValues())
-        return true;
   }
 
   return false;
@@ -352,13 +348,8 @@ bool Operand::satisfiesConstraints() const {
 bool Operand::isLifetimeEnding() const {
   auto constraint = getOwnershipConstraint();
 
-  // If we got back Optional::None, then our operand is for a type dependent
-  // operand. So return false.
-  if (!constraint)
-    return false;
-
   // If our use lifetime constraint is NonLifetimeEnding, just return false.
-  if (!constraint->isLifetimeEnding())
+  if (!constraint.isLifetimeEnding())
     return false;
 
   // Otherwise, we may have a lifetime ending use. We consider two cases here:
@@ -382,4 +373,42 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                "Kind:" << constraint.getPreferredKind()
             << " LifetimeConstraint:" << constraint.getLifetimeConstraint()
             << ">";
+}
+
+StringRef OperandOwnership::asString() const {
+  switch (value) {
+  case OperandOwnership::NonUse:
+    return "non-use";
+  case OperandOwnership::TrivialUse:
+    return "trivial-use";
+  case OperandOwnership::InstantaneousUse:
+    return "instantaneous";
+  case OperandOwnership::UnownedInstantaneousUse:
+    return "unowned-instantaneous";
+  case OperandOwnership::ForwardingUnowned:
+    return "forwarding-unowned";
+  case OperandOwnership::PointerEscape:
+    return "pointer-escape";
+  case OperandOwnership::BitwiseEscape:
+    return "bitwise-escape";
+  case OperandOwnership::Borrow:
+    return "borrow";
+  case OperandOwnership::DestroyingConsume:
+    return "destroying-consume";
+  case OperandOwnership::ForwardingConsume:
+    return "forwarding-consume";
+  case OperandOwnership::InteriorPointer:
+    return "interior-pointer";
+  case OperandOwnership::ForwardingBorrow:
+    return "forwarding-borrow";
+  case OperandOwnership::EndBorrow:
+    return "end-borrow";
+  case OperandOwnership::Reborrow:
+    return "reborrow";
+  }
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     const OperandOwnership &operandOwnership) {
+  return os << operandOwnership.asString();
 }

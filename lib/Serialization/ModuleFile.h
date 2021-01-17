@@ -611,6 +611,8 @@ public:
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results);
+
   /// Adds all operators to the given vector.
   void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
 
@@ -692,6 +694,8 @@ public:
   Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+  void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
 
 
   // MARK: Deserialization interface

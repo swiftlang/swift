@@ -135,7 +135,12 @@ bb0(%0 : @guaranteed $Optional<Klass>):
   return %res : $()
 }
 
-// CHECK-NOT: Function: 'bitwise_cast_borrow_dest'
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'bitwise_cast_borrow_dest'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value:   %2 = unchecked_bitwise_cast %1 : $Pair to $AnyObject // user: %3
+// CHECK: User:   %3 = begin_borrow %2 : $AnyObject               // users: %6, %5
+// CHECK: Conv: unowned
+// CHECK-LABEL: Error#: 0. End Error in Function: 'bitwise_cast_borrow_dest'
 sil [ossa] @bitwise_cast_borrow_dest : $@convention(thin) (@guaranteed Pair) -> () {
 bb0(%0 : @guaranteed $Pair):
   %1 = copy_value %0 : $Pair

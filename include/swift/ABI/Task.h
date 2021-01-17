@@ -24,6 +24,9 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
+#include "bitset"
+#include "string"
+#include "queue"
 
 namespace swift {
 class AsyncTask;
@@ -130,6 +133,18 @@ public:
 /// An asynchronous task.  Tasks are the analogue of threads for
 /// asynchronous functions: that is, they are a persistent identity
 /// for the overall async computation.
+///
+/// ### Fragments
+/// An AsyncTask may have the following fragments:
+///
+///    +------------------+
+///    | childFragment?   |
+///    | groupFragment?   |
+///    | futureFragment?  |*
+///    +------------------+
+///
+/// The future fragment is dynamic in size, based on the future result type
+/// it can hold, and thus must be the *last* fragment.
 class AsyncTask : public HeapObject, public Job {
 public:
   /// The context for resuming the job.  When a task is scheduled
@@ -161,8 +176,8 @@ public:
     ResumeTask(this, currentExecutor, ResumeContext);
   }
 
-  /// Check whether this task has been cancelled.  Checking this is,
-  /// of course, inherently race-prone on its own.
+  /// Check whether this task has been cancelled.
+  /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const {
     return Status.load(std::memory_order_relaxed).isCancelled();
   }
@@ -190,11 +205,349 @@ public:
     }
   };
 
+  // TODO: rename? all other functions are `is...` rather than `has...Fragment`
   bool hasChildFragment() const { return Flags.task_isChildTask(); }
+
   ChildFragment *childFragment() {
     assert(hasChildFragment());
     return reinterpret_cast<ChildFragment*>(this + 1);
   }
+
+  // ==== TaskGroup ------------------------------------------------------------
+
+  class GroupFragment {
+  public:
+    /// Describes the status of the channel.
+    enum class ReadyStatus : uintptr_t {
+        /// The channel is empty, no tasks are pending.
+        /// Return immediately, there is no point in suspending.
+        ///
+        /// The storage is not accessible.
+        Empty = 0b00,
+
+        /// The future has completed with result (of type \c resultType).
+        Success = 0b10,
+
+        /// The future has completed by throwing an error (an \c Error
+        /// existential).
+        Error = 0b11,
+    };
+
+    /// Describes the status of the waiting task that is suspended on `next()`.
+    enum class WaitStatus : uintptr_t {
+        Waiting = 0,
+    };
+
+    enum class GroupPollStatus : uintptr_t {
+        /// The channel is known to be empty and we can immediately return nil.
+        Empty = 0,
+
+        /// The task has been enqueued to the channels wait queue.
+        Waiting = 1,
+
+        /// The task has completed with result (of type \c resultType).
+        Success = 2,
+
+        /// The task has completed by throwing an error (an \c Error
+        /// existential).
+        Error = 3,
+    };
+
+    /// The result of waiting on a Channel (TaskGroup).
+    struct GroupPollResult {
+        GroupPollStatus status; // TODO: pack it into storage pointer or not worth it?
+
+        /// Storage for the result of the future.
+        ///
+        /// When the future completed normally, this is a pointer to the storage
+        /// of the result value, which lives inside the future task itself.
+        ///
+        /// When the future completed by throwing an error, this is the error
+        /// object itself.
+        OpaqueValue *storage;
+
+        /// Optional, the completed task that was polled out of the ready queue.
+        ///
+        /// # Important: swift_release
+        /// If if a task is returned here, the task MUST be swift_release'd
+        /// once we are done with it, to balance out the retain made before
+        /// when the task was enqueued into the ready queue to keep it alive
+        /// until a next() call eventually picks it up.
+        AsyncTask *retainedTask;
+
+        bool isStorageAccessible() {
+          return status == GroupPollStatus::Success ||
+              status == GroupPollStatus::Error ||
+              status == GroupPollStatus::Empty;
+        }
+
+        static GroupPollResult get(AsyncTask *asyncTask, bool hadErrorResult,
+                                   bool needsSwiftRelease) {
+          auto fragment = asyncTask->futureFragment();
+          return GroupPollResult{
+              /*status*/ hadErrorResult ?
+                  GroupFragment::GroupPollStatus::Error :
+                  GroupFragment::GroupPollStatus::Success,
+              /*storage*/ hadErrorResult ?
+                  reinterpret_cast<OpaqueValue *>(fragment->getError()) :
+                  fragment->getStoragePtr(),
+              /*task*/ needsSwiftRelease ?
+                  asyncTask :
+                  nullptr
+          };
+        }
+    };
+
+    /// An item within the message queue of a channel.
+    struct ReadyQueueItem {
+        /// Mask used for the low status bits in a message queue item.
+        static const uintptr_t statusMask = 0x03;
+
+        uintptr_t storage;
+
+        ReadyStatus getStatus() const {
+          return static_cast<ReadyStatus>(storage & statusMask);
+        }
+
+        AsyncTask *getTask() const {
+          return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+        }
+
+        static ReadyQueueItem get(ReadyStatus status, AsyncTask *task) {
+          assert(task == nullptr || task->isFuture());
+          return ReadyQueueItem{
+              reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+        }
+    };
+
+    /// An item within the wait queue, which includes the status and the
+    /// head of the list of tasks.
+    struct WaitQueueItem { // TODO: reuse the future's wait queue instead?
+        /// Mask used for the low status bits in a wait queue item.
+        static const uintptr_t statusMask = 0x03;
+
+        uintptr_t storage;
+
+        WaitStatus getStatus() const {
+          return static_cast<WaitStatus>(storage & statusMask);
+        }
+
+        AsyncTask *getTask() const {
+          return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+        }
+
+        static WaitQueueItem get(WaitStatus status, AsyncTask *task) {
+          return WaitQueueItem{
+              reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+        }
+    };
+
+    struct GroupStatus {
+        static const unsigned long maskReady      = 0x00FFFFF0000000000l;
+        static const unsigned long oneReadyTask   = 0x00000010000000000l;
+
+        static const unsigned long maskPending    = 0x0000000FFFFF00000l;
+        static const unsigned long onePendingTask = 0x00000000000100000l;
+
+        static const unsigned long maskWaiting    = 0x000000000000FFFFFl;
+        static const unsigned long oneWaitingTask = 0x00000000000000001l;
+
+        unsigned long status;
+
+        unsigned int readyTasks() {
+          return (status & maskReady) >> 40;
+        }
+
+        unsigned int pendingTasks() {
+          return (status & maskPending) >> 20;
+        }
+
+        unsigned int waitingTasks() {
+          return status & maskWaiting;
+        }
+
+        bool isEmpty() {
+          return pendingTasks() == 0;
+        }
+
+        /// Status value decrementing the Ready, Pending and Waiting counters by one.
+        GroupStatus completingReadyPendingWaitingTask() {
+          assert(pendingTasks() > 0 && "can only complete waiting tasks when pending tasks available");
+          assert(readyTasks() > 0 && "can only complete waiting tasks when ready tasks available");
+          assert(waitingTasks() > 0 && "can only complete waiting tasks when waiting tasks available");
+          return GroupStatus { status - oneReadyTask - oneWaitingTask - onePendingTask };
+        }
+
+        /// Pretty prints the status, as follows:
+        /// GroupStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
+        std::string to_string() {
+          std::string str;
+          str.append("GroupStatus{ ");
+          str.append("R:");
+          str.append(std::to_string(readyTasks()));
+          str.append(" P:");
+          str.append(std::to_string(pendingTasks()));
+          str.append(" W:");
+          str.append(std::to_string(waitingTasks()));
+          str.append(" " + std::bitset<64>(status).to_string());
+          str.append(" }");
+          return str;
+        }
+
+        /// Initially there are no waiting and no pending tasks.
+        static const GroupStatus initial() {
+          return GroupStatus { 0 };
+        };
+    };
+
+    template<typename T>
+    class NaiveQueue {
+        std::queue<T> queue;
+
+    public:
+        NaiveQueue() = default;
+        NaiveQueue(const NaiveQueue<T> &) = delete ;
+        NaiveQueue& operator=(const NaiveQueue<T> &) = delete ;
+
+        NaiveQueue(NaiveQueue<T>&& other) {
+          queue = std::move(other.queue);
+        }
+
+        virtual ~NaiveQueue() { }
+
+        bool dequeue(T &output) {
+          if (queue.empty()) {
+            return false;
+          }
+          output = queue.front();
+          queue.pop();
+          return true;
+        }
+
+        void enqueue(const T item) {
+          queue.push(item);
+        }
+
+    };
+
+  private:
+
+    // TODO: move to lockless via the status atomic
+    mutable std::mutex mutex;
+
+    /// Used for queue management, counting number of waiting and ready tasks
+    std::atomic<unsigned long> status;
+
+    /// Queue containing completed tasks offered into this channel.
+    ///
+    /// The low bits contain the status, the rest of the pointer is the
+    /// AsyncTask.
+    NaiveQueue<ReadyQueueItem> readyQueue;
+//     mpsc_queue_t<ReadyQueueItem> readyQueue; // TODO: can we get away with an MPSC queue here once actor executors land?
+
+    /// Queue containing all of the tasks that are waiting in `get()`.
+    ///
+    /// A task group is also a future, and awaits on the group's result *itself*
+    /// are enqueued on its future fragment.
+    ///
+    /// The low bits contain the status, the rest of the pointer is the
+    /// AsyncTask.
+    std::atomic<WaitQueueItem> waitQueue;
+
+    friend class AsyncTask;
+
+  public:
+    explicit GroupFragment()
+        : status(GroupStatus::initial().status),
+          readyQueue(),
+//          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
+          waitQueue(WaitQueueItem::get(WaitStatus::Waiting, nullptr)) {}
+
+    /// Destroy the storage associated with the channel.
+    void destroy();
+
+    bool isEmpty() {
+      auto oldStatus = GroupStatus { status.load(std::memory_order_relaxed) };
+      return oldStatus.pendingTasks() == 0;
+    }
+
+    /// Returns *assumed* new status, including the just performed +1.
+    GroupStatus statusAddReadyTaskAcquire() {
+      auto old = status.fetch_add(GroupStatus::oneReadyTask, std::memory_order_acquire);
+      auto s = GroupStatus {old + GroupStatus::oneReadyTask };
+      assert(s.readyTasks() <= s.pendingTasks());
+      return s;
+    }
+
+    /// Returns *assumed* new status, including the just performed +1.
+    GroupStatus statusAddPendingTaskRelaxed() {
+      auto old = status.fetch_add(GroupStatus::onePendingTask, std::memory_order_relaxed);
+      return GroupStatus {old + GroupStatus::onePendingTask };
+    }
+
+    /// Returns *assumed* new status, including the just performed +1.
+    GroupStatus statusAddWaitingTaskAcquire() {
+      auto old = status.fetch_add(GroupStatus::oneWaitingTask, std::memory_order_acquire);
+      return GroupStatus { old + GroupStatus::oneWaitingTask };
+    }
+
+    /// Remove waiting task, without taking any pending task.
+    GroupStatus statusRemoveWaitingTask() {
+      return GroupStatus {
+          status.fetch_sub(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
+      };
+    }
+
+    /// Compare-and-set old status to a status derived from the old one,
+    /// by simultaneously decrementing one Pending and one Waiting tasks.
+    ///
+    /// This is used to atomically perform a waiting task completion.
+    bool statusCompleteReadyPendingWaitingTasks(GroupStatus& old) {
+      return status.compare_exchange_weak(
+          old.status, old.completingReadyPendingWaitingTask().status,
+          /*success*/ std::memory_order_relaxed,
+          /*failure*/ std::memory_order_relaxed);
+    }
+
+  };
+
+  bool isTaskGroup() const { return Flags.task_isTaskGroup(); }
+
+  GroupFragment *groupFragment() {
+    assert(isTaskGroup());
+
+    if (hasChildFragment()) {
+      return reinterpret_cast<GroupFragment *>(
+          reinterpret_cast<ChildFragment*>(this + 1) + 1);
+    }
+
+    return reinterpret_cast<GroupFragment *>(this + 1);
+  }
+
+  /// Offer result of a task into this channel.
+  /// The value is enqueued at the end of the channel.
+  void groupOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+
+  /// Attempt to dequeue ready tasks and complete the waitingTask.
+  ///
+  /// If unable to complete the waiting task immediately (with an readily
+  /// available completed task), either returns an `GroupPollStatus::Empty`
+  /// result if it is known that no pending tasks in the group,
+  /// or a `GroupPollStatus::Waiting` result if there are tasks in flight
+  /// and the waitingTask eventually be woken up by a completion.
+  GroupFragment::GroupPollResult groupPoll(AsyncTask *waitingTask);
+
+  // ==== TaskGroup Child ------------------------------------------------------
+
+  // Checks if task is a child of a TaskGroup task.
+  //
+  // A child task that is a group child knows that it's parent is a group
+  // and therefore may `groupOffer` to it upon completion.
+  bool isTaskGroupChild() {
+    return hasChildFragment() && childFragment()->getParent()->isTaskGroup();
+  }
+
+  // ==== Future ---------------------------------------------------------------
 
   class FutureFragment {
   public:
@@ -248,7 +601,7 @@ public:
     const Metadata *resultType;
 
     // Trailing storage for the result itself. The storage will be uninitialized,
-    // contain an instance of \c resultType, or contaon an an \c Error.
+    // contain an instance of \c resultType, or contain an an \c Error.
 
     friend class AsyncTask;
 
@@ -293,12 +646,19 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
+
+    auto offset = reinterpret_cast<uintptr_t>(this); // TODO: char* instead?
+    offset += sizeof(AsyncTask);
+
     if (hasChildFragment()) {
-      return reinterpret_cast<FutureFragment *>(
-          reinterpret_cast<ChildFragment*>(this + 1) + 1);
+      offset += sizeof(ChildFragment);
     }
 
-    return reinterpret_cast<FutureFragment *>(this + 1);
+    if (isTaskGroup()) {
+      offset += sizeof(GroupFragment);
+    }
+
+    return reinterpret_cast<FutureFragment *>(offset);
   }
 
   /// Wait for this future to complete.
@@ -315,6 +675,8 @@ public:
   /// executor.
   void completeFuture(AsyncContext *context, ExecutorRef executor);
 
+  // ==== ----------------------------------------------------------------------
+
   static bool classof(const Job *job) {
     return job->isAsyncTask();
   }
@@ -326,6 +688,7 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
+
 };
 
 // The compiler will eventually assume these.

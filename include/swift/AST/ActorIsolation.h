@@ -152,6 +152,9 @@ public:
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
 
+/// Determine how the given declaration context is isolated.
+ActorIsolation getActorIsolationOfContext(DeclContext *dc);
+
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 
 } // end namespace swift
