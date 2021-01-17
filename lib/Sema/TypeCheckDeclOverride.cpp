@@ -734,6 +734,20 @@ static bool isNSObjectHashValue(ValueDecl *baseDecl) {
   return false;
 }
 
+/// Returns true if the given declaration is for the `NSObject.hash(into:)`
+/// function.
+static bool isNSObjectHashMethod(ValueDecl *baseDecl) {
+  auto baseFunc = dyn_cast<FuncDecl>(baseDecl);
+  if (!baseFunc)
+    return false;
+
+  if (auto classDecl = baseFunc->getDeclContext()->getSelfClassDecl()) {
+    ASTContext &ctx = baseDecl->getASTContext();
+    return baseFunc->getBaseName() == ctx.Id_hash && classDecl->isNSObject();
+  }
+  return false;
+}
+
 namespace {
   /// Class that handles the checking of a particular declaration against
   /// superclass entities that it could override.
@@ -995,11 +1009,13 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl)) {
-    // NSObject.hashValue was made non-overridable in Swift 5; one should
-    // override NSObject.hash instead.
+    // NSObject.hashValue and NSObject.hash(into:) was made non-overridable in
+    // Swift 5; one should override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
       diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
         .fixItReplace(SourceRange(decl->getNameLoc()), "hash");
+    } else if (isNSObjectHashMethod(baseDecl)) {
+      diags.diagnose(decl, diag::override_nsobject_hash_error);
     } else {
       diags.diagnose(decl, diag::override_of_non_open,
                      decl->getDescriptiveKind());
@@ -1791,11 +1807,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       (isa<ExtensionDecl>(base->getDeclContext()) ||
        isa<ExtensionDecl>(override->getDeclContext())) &&
       !base->isObjC()) {
-    // Suppress this diagnostic for overrides of a non-open NSObject.hashValue
-    // property; these are diagnosed elsewhere. An error message complaining
+    // Suppress this diagnostic for overrides of a non-open NSObject.Hashable
+    // interfaces; these are diagnosed elsewhere. An error message complaining
     // about extensions would be misleading in this case; the correct fix is to
     // override NSObject.hash instead.
-    if (isNSObjectHashValue(base) && 
+    if ((isNSObjectHashValue(base) || isNSObjectHashMethod(base)) &&
         !base->hasOpenAccess(override->getDeclContext()))
       return true;
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
