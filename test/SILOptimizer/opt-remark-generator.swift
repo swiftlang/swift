@@ -22,11 +22,7 @@ public func getGlobal() -> Klass {
 public func useGlobal() {
     let x = getGlobal()
     print(x) // expected-remark @:11 {{heap allocated ref of type}}
-             // expected-remark @-1:5 {{retain of type 'Klass'}}
-             // expected-note @-3:9 {{of 'x'}}
-             // expected-remark @-3:12 {{release of type}}
-             // expected-remark @-4:12 {{release of type 'Klass'}}
-             // expected-note @-6:9 {{of 'x'}}
+             // expected-remark @-1:12 {{release of type}}
 }
 
 public enum TrivialState {
@@ -188,21 +184,13 @@ func castAsQuestionDiamondGEP2(x: KlassPair) {
                                                       // expected-note @-4 {{of 'x.rhs'}}
     case let (.some(x1), .some(x2)):
         print(x1, x2) // expected-remark @:15 {{heap allocated ref of type}}
-                      // expected-remark @-1 {{retain of type 'Optional<SubKlass>'}}
-                      // expected-remark @-2 {{retain of type 'Optional<SubKlass>'}}
-                      // expected-remark @-3 {{release of type}}
-                      // expected-remark @-4 {{release of type 'Optional<SubKlass>'}}
-                      // expected-remark @-5 {{release of type 'Optional<SubKlass>'}}
+                      // expected-remark @-1 {{release of type}}
     case let (.some(x1), nil):
         print(x1) // expected-remark @:15 {{heap allocated ref of type}}
-                  // expected-remark @-1 {{retain of type 'SubKlass'}}
-                  // expected-remark @-2 {{release of type}}
-                  // expected-remark @-3 {{release of type 'Optional<SubKlass>'}}
+                  // expected-remark @-1 {{release of type}}
     case let (nil, .some(x2)):
         print(x2) // expected-remark @:15 {{heap allocated ref of type}}
-                  // expected-remark @-1 {{retain of type 'SubKlass'}}
-                  // expected-remark @-2 {{release of type}}
-                  // expected-remark @-3 {{release of type 'Optional<SubKlass>'}}
+                  // expected-remark @-1 {{release of type}}
     case (nil, nil):
         break
     }
@@ -278,9 +266,5 @@ func allocateValue() {
     let k = Klass() // expected-remark @:13 {{heap allocated ref of type 'Klass'}}
                     // expected-note @-1:9 {{of 'k'}}
     print(k)        // expected-remark @:11 {{heap allocated ref of type}}
-                    // expected-remark @-1:5 {{retain of type 'Klass'}}
-                    // expected-note @-4:9 {{of 'k'}}
-                    // expected-remark @-3:12 {{release of type}}
-                    // expected-remark @-4:12 {{release of type 'Klass'}}
-                    // expected-note @-7:9 {{of 'k'}}
+                    // expected-remark @-1:12 {{release of type}}
 }
