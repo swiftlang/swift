@@ -414,7 +414,8 @@ namespace {
         // If there is a default type for the literal protocol, check whether
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
-        if (paramTy->isEqual(defaultType))
+        if (paramTy->isEqual(defaultType) ||
+            (defaultType->isDoubleType() && paramTy->isCGFloatType()))
           return true;
       }
     }
