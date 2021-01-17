@@ -151,12 +151,12 @@ namespace {
       auto conformance = DC->getParentModule()->lookupConformance(
           conformingType, foundProto);
       if (conformance.isInvalid()) {
-        // If there's no conformance, we have an existential
-        // and we found a member from one of the protocols, and
-        // not a class constraint if any.
-        assert(foundInType->isExistentialType() || foundInType->hasError());
-        if (foundInType->isExistentialType())
+        if (foundInType->isExistentialType()) {
+          // If there's no conformance, we have an existential
+          // and we found a member from one of the protocols, and
+          // not a class constraint if any.
           addResult(found);
+        }
         return;
       }
 
