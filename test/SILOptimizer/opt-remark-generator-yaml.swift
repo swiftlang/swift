@@ -48,7 +48,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
-// CHECK-NEXT:                    Line: [[# @LINE + 51]], Column: 11 }
+// CHECK-NEXT:                    Line: [[# @LINE + 23]], Column: 11 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'heap allocated ref of type '''
@@ -59,40 +59,12 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
-// CHECK-NEXT:                    Line: [[# @LINE + 40]], Column: 5 }
-// CHECK-NEXT: Function:        'useGlobal()'
-// CHECK-NEXT: Args:
-// CHECK-NEXT:   - String:          'retain of type '''
-// CHECK-NEXT:   - ValueType:       Klass
-// CHECK-NEXT:   - String:          ''''
-// CHECK-NEXT:   - InferredValue:   'of ''x'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
-// CHECK-NEXT:                        Line: [[# @LINE + 29]], Column: 9 }
-// CHECK-NEXT: ...
-// CHECK-NEXT: --- !Missed
-// CHECK-NEXT: Pass:            sil-opt-remark-gen
-// CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
-// CHECK-NEXT:                    Line: [[# @LINE + 26]], Column: 12 }
+// CHECK-NEXT:                    Line: [[# @LINE + 12]], Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'release of type '''
 // CHECK-NEXT:   - ValueType:
 // CHECK-NEXT:   - String:          ''''
-// CHECK-NEXT: ...
-// CHECK-NEXT: --- !Missed
-// CHECK-NEXT: Pass:            sil-opt-remark-gen
-// CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
-// CHECK-NEXT:                    Line: [[# @LINE + 15]], Column: 12 }
-// CHECK-NEXT: Function:        'useGlobal()'
-// CHECK-NEXT: Args:
-// CHECK-NEXT:   - String:          'release of type '''
-// CHECK-NEXT:   - ValueType:       Klass
-// CHECK-NEXT:   - String:          ''''
-// CHECK-NEXT:   - InferredValue:   'of ''x'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
-// CHECK-NEXT:                        Line: [[# @LINE + 4]], Column: 9 }
 // CHECK-NEXT: ...
 
 public func useGlobal() {
@@ -100,10 +72,6 @@ public func useGlobal() {
     // Make sure that the retain msg is at the beginning of the print and the
     // releases are the end of the print.
     print(x) // expected-remark @:11 {{heap allocated ref of type}}
-             // expected-remark @-1:5 {{retain of type 'Klass'}}
-             // expected-note @-5:9 {{of 'x'}}
              // We test the type emission above since FileCheck can handle regex.
-             // expected-remark @-4:12 {{release of type}}
-             // expected-remark @-5:12 {{release of type 'Klass'}}
-             // expected-note @-9:9 {{of 'x'}}
+             // expected-remark @-2:12 {{release of type}}
 }
