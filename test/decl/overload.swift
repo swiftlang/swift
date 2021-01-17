@@ -381,23 +381,23 @@ func inout2(x: inout Int) { }
 func optional(x: Int?) { } // expected-note{{previously declared}}
 func optional(x: Int!) { } 
 // expected-error@-1{{invalid redeclaration of 'optional(x:)'}}
-// expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
+// expected-note@-2 {{parameter with implicitly unwrapped optional type is same as original parameter with optional type}}
 
 func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
 func optionalInOut(x: inout Int!) { } 
 // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
-// expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
+// expected-note@-2 {{parameter with implicitly unwrapped optional type is same as original parameter with optional type}}
 
 class optionalOverloads {
   class func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
   class func optionalInOut(x: inout Int!) { } 
   // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
-  // expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
+  // expected-note@-2 {{parameter with implicitly unwrapped optional type is same as original parameter with optional type}}
 
   func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
   func optionalInOut(x: inout Int!) { } 
   // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
-  // expected-note@-2 {{parameter with implicitly unwrapped optional type is not different from original parameter with optional type}}
+  // expected-note@-2 {{parameter with implicitly unwrapped optional type is same as original parameter with optional type}}
 }
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}

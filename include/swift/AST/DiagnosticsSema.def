@@ -785,8 +785,8 @@ ERROR(reserved_member_name,none,
       " 'foo.%1' expression", (DeclName, StringRef))
 
 NOTE(invalid_redecl_by_optionality_note,none,
-      "parameter with %select{implicitly unwrapped |}0optional type is not different "
-      "from original parameter with %select{implicitly unwrapped |}1optional type",
+      "parameter with %select{implicitly unwrapped |}0optional type is same "
+      "as original parameter with %select{implicitly unwrapped |}1optional type",
       (bool, bool))
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 ERROR(invalid_redecl_init,none,
