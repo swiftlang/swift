@@ -349,6 +349,7 @@ func testMetatypeInterpolation<T>(of type: T.Type) {
 
     // CHECK: [[NOT_ENABLED]]:
     // CHECK-NEXT: call void @swift_release
+    // CHECK: br label %[[EXIT:[0-9]+]]
 
     // CHECK: [[ENABLED]]:
     //
