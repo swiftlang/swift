@@ -62,6 +62,12 @@ Expr *swift::buildSelfReference(VarDecl *selfDecl,
       selfTy = metaTy->getInstanceType();
     }
     selfTy = selfTy->getSuperclass();
+    if (!selfTy) {
+      // Error recovery path. We end up here if getSuperclassDecl() succeeds
+      // but getSuperclass() fails (because, for instance, a generic parameter
+      // of a generic nominal type cannot be resolved).
+      selfTy = ErrorType::get(ctx);
+    }
     if (isMetatype)
       selfTy = MetatypeType::get(selfTy);
 
@@ -70,7 +76,7 @@ Expr *swift::buildSelfReference(VarDecl *selfDecl,
 
     // If no conversion type was specified, or we're already at that type, we're
     // done.
-    if (!convertTy || convertTy->isEqual(selfTy))
+    if (!convertTy || convertTy->isEqual(selfTy) || selfTy->is<ErrorType>())
       return superRef;
 
     // Insert the appropriate expr to handle the upcast.
