@@ -1066,9 +1066,6 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 }
 
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
-  if (CFI->getFunction()->hasOwnership())
-    return nullptr;
-
   // Remove runtime asserts such as overflow checks and bounds checks.
   if (RemoveCondFails)
     return eraseInstFromFunction(*CFI);
