@@ -255,6 +255,8 @@ public:
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
+  SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
 
