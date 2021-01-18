@@ -626,6 +626,10 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// Returns true if a function, which is using \p nominal, can be serialized
+  /// by cross-module-optimization.
+  bool canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const;
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

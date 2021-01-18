@@ -2012,6 +2012,30 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   return true;
 }
 
+bool ModuleDecl::
+canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const {
+  ModuleDecl *moduleOfNominal = nominal->getParentModule();
+
+  // If the nominal is defined in the same module, it's fine.
+  if (moduleOfNominal == this)
+    return true;
+
+  // See if nominal is imported in a "regular" way, i.e. not with
+  // @_implementationOnly or @_spi.
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default};
+  SmallVector<ImportedModule, 4> results;
+  getImportedModules(results, filter);
+
+  auto &imports = getASTContext().getImportCache();
+  for (auto &desc : results) {
+    if (imports.isImportedBy(moduleOfNominal, desc.importedModule))
+      return true;
+  }
+  return false;
+}
+
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
