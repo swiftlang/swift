@@ -34,8 +34,6 @@
 
 namespace swift {
 
-class SyntaxASTMap;
-
 namespace syntax {
 
 struct SyntaxVisitor;
@@ -58,7 +56,6 @@ const auto NoParent = llvm::None;
 /// their children.
 class Syntax {
   friend struct SyntaxFactory;
-  friend class swift::SyntaxASTMap;
 
 protected:
   /// A strong reference to the root node of the tree in which this piece of
