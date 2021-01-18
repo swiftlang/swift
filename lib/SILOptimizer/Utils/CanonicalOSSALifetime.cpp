@@ -92,7 +92,7 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
 //===----------------------------------------------------------------------===//
 
 llvm::cl::opt<bool>
-    EnableRewriteBorrows("canonical-ossa-rewrite-borrows", llvm::cl::init(true),
+    EnableRewriteBorrows("canonical-ossa-rewrite-borrows", llvm::cl::init(false),
                          llvm::cl::desc("Enable rewriting borrow scopes"));
 
 bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
