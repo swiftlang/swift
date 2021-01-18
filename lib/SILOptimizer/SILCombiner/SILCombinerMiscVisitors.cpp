@@ -2027,26 +2027,20 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   return nullptr;
 }
 
-
-SILInstruction *SILCombiner::
-visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
-  if (CBOI->getFunction()->hasOwnership())
+SILInstruction *
+SILCombiner::visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *cboi) {
+  auto *urc = dyn_cast<UncheckedRefCastInst>(cboi->getOperand());
+  if (!urc)
     return nullptr;
 
-  auto *URC = dyn_cast<UncheckedRefCastInst>(CBOI->getOperand());
-  if (!URC)
-    return nullptr;
-
-  auto type = URC->getOperand()->getType().getASTType();
+  auto type = urc->getOperand()->getType().getASTType();
   if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
     if (!cd->isObjC()) {
       auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
-      SILValue zero = Builder.createIntegerLiteral(CBOI->getLoc(),
-                                                   int1Ty, 0);
-      return Builder.createTuple(CBOI->getLoc(), { zero, zero });
+      SILValue zero = Builder.createIntegerLiteral(cboi->getLoc(), int1Ty, 0);
+      return Builder.createTuple(cboi->getLoc(), {zero, zero});
     }
   }
 
   return nullptr;
 }
-

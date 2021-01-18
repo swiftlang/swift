@@ -4080,11 +4080,12 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
 
 // Test to see if we can constant fold a classify_bridge_object on a Swift class
 // to false.
-// CHECK-LABEL: sil [ossa] @test_classify_fold
-// XHECK-NOT: classify_bridge_object
-// XHECK: integer_literal $Builtin.Int1, 0
-// XHECK-NEXT: destroy_value
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @test_classify_fold :
+// CHECK-NOT: classify_bridge_object
+// CHECK: destroy_value
+// CHECK: [[LITERAL:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK: return [[LITERAL]]
+// CHECK: } // end sil function 'test_classify_fold'
 sil [ossa] @test_classify_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> Builtin.Int1 {
 bb0(%0 : @owned $_ContiguousArrayStorage<B>):
   %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
@@ -4094,10 +4095,11 @@ bb0(%0 : @owned $_ContiguousArrayStorage<B>):
   return %3 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil [ossa] @bridge_cast_noop_fold
-// XHECK: bb0(%0
-// XHECK-NEXT: %1 = upcast %0
-// XHECK-NEXT: return %1
+// CHECK-LABEL: sil [ossa] @bridge_cast_noop_fold :
+// CHECK: bb0(%0
+// CHECK-NEXT: %1 = upcast %0
+// CHECK-NEXT: return %1
+// CHECK: } // end sil function 'bridge_cast_noop_fold'
 sil [ossa] @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> @owned __ContiguousArrayStorageBase {
 bb0(%0 : @owned $_ContiguousArrayStorage<B>):
   %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
