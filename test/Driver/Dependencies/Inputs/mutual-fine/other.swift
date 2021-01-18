@@ -6,7 +6,7 @@ allNodes:
       aspect:          interface
       context:         ''
       name:            other.swiftdeps
-    fingerprint:     sameasiteverwassameasiteverwassa
+    fingerprint:     11111111111111111111111111111111
     sequenceNumber:  0
     defsIDependUpon: [ 8, 7, 2, 4, 6 ]
     isProvides:      true
@@ -15,7 +15,7 @@ allNodes:
       aspect:          implementation
       context:         ''
       name:            other.swiftdeps
-    fingerprint:     sameasiteverwassameasiteverwassa
+    fingerprint:     11111111111111111111111111111111
     sequenceNumber:  1
     defsIDependUpon: [  ]
     isProvides:      true

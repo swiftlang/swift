@@ -1,6 +1,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"

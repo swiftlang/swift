@@ -834,6 +834,13 @@ namespace {
         }
       }
 
+      // The children of #selector expressions are not evaluated, so we do not
+      // need to do isolation checking there. This is convenient because such
+      // expressions tend to violate restrictions on the use of instance
+      // methods.
+      if (isa<ObjCSelectorExpr>(expr))
+        return { false, expr };
+
       return { true, expr };
     }
 
@@ -852,8 +859,9 @@ namespace {
     }
 
   private:
-    /// If the expression is a reference to `self`, return the 'self' parameter.
-    static VarDecl *getSelfReference(Expr *expr) {
+    /// If the expression is a reference to `self`, return the context of
+    /// the 'self' parameter.
+    static DeclContext *getSelfReferenceContext(Expr *expr) {
       // Look through identity expressions and implicit conversions.
       Expr *prior;
       do {
@@ -867,13 +875,25 @@ namespace {
 
       // 'super' references always act on self.
       if (auto super = dyn_cast<SuperRefExpr>(expr))
-        return super->getSelf();
+        return super->getSelf()->getDeclContext();
 
       // Declaration references to 'self'.
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto var = dyn_cast<VarDecl>(declRef->getDecl()))
+        if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
           if (var->isSelfParameter())
-            return var;
+            return var->getDeclContext();
+
+          // If this is a 'self' capture in a capture list, recurse through
+          // the capture list entry's initializer to find the original 'self'.
+          if (var->isSelfParamCapture()) {
+            for (auto capture : var->getParentCaptureList()->getCaptureList()) {
+              if (capture.Var == var) {
+                expr = capture.Init->getInit(0);
+                return getSelfReferenceContext(expr);
+              }
+            }
+          }
+        }
       }
 
       // Not a self reference.
@@ -1121,8 +1141,11 @@ namespace {
         return true;
       }
 
-      case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
+        // Allow unrestricted use of something in a global actor.
+        return false;
+
+      case ActorIsolation::Independent:
         if (inspectForImplicitlyAsync())
           return false;
 
@@ -1148,8 +1171,8 @@ namespace {
           }
           noteIsolatedActorMember(value);
         };
-        
-        if (AbstractFunctionDecl const* fn = 
+
+        if (AbstractFunctionDecl const* fn =
             dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
           bool isAsyncContext = fn->isAsyncContext();
 
@@ -1250,8 +1273,8 @@ namespace {
 
       case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
-        auto selfVar = getSelfReference(base);
-        if (!selfVar) {
+        auto *selfDC = getSelfReferenceContext(base);
+        if (!selfDC) {
           // actor-isolated non-self calls are implicitly async and thus OK.
           if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
             markNearestCallAsImplicitlyAsync();
@@ -1268,8 +1291,7 @@ namespace {
         }
 
         // Check whether the context of 'self' is actor-isolated.
-        switch (auto contextIsolation = getActorIsolation(
-                   cast<ValueDecl>(selfVar->getDeclContext()->getAsDecl()))) {
+        switch (auto contextIsolation = getActorIsolationOfContext(selfDC)) {
           case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
@@ -1312,8 +1334,7 @@ namespace {
 
         // Check whether we are in a context that will not execute concurrently
         // with the context of 'self'.
-        if (mayExecuteConcurrentlyWith(
-                getDeclContext(), selfVar->getDeclContext())) {
+        if (mayExecuteConcurrentlyWith(getDeclContext(), selfDC)) {
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_concurrent_access,
               member->getDescriptiveKind(), member->getName());
@@ -1752,6 +1773,16 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
   return std::get<1>(isolatedRequirements.front());
 }
 
+// Check whether a declaration is an asynchronous handler.
+static bool isAsyncHandler(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (func->isAsyncHandler())
+      return true;
+  }
+
+  return false;
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has one of the actor isolation attributes, report
@@ -1807,12 +1838,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If the declaration overrides another declaration, it must have the same
   // actor isolation.
   if (auto overriddenValue = value->getOverriddenDecl()) {
-    if (auto isolation = getActorIsolation(overriddenValue)) {
+    // Ignore the overridden declaration's isolation for an async handler,
+    // because async handlers dispatch to wherever they need to be.
+    if (!isAsyncHandler(value)) {
+      auto isolation = getActorIsolation(overriddenValue);
       SubstitutionMap subs;
       if (auto env = value->getInnermostDeclContext()
               ->getGenericEnvironmentOfContext()) {
         subs = SubstitutionMap::getOverrideSubstitutions(
-            overriddenValue, value, subs);
+          overriddenValue, value, subs);
       }
 
       return inferredIsolation(isolation.subst(subs));
@@ -1852,32 +1886,28 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // If the declaration is in an extension that has one of the isolation
-  // attributes, use that.
-  if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
-    if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-      return inferredIsolation(*isolationFromAttr);
+  // Instance members can infer isolation from their context.
+  if (value->isInstanceMember()) {
+    // If the declaration is in an extension that has one of the isolation
+    // attributes, use that.
+    if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
+      if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
+        return inferredIsolation(*isolationFromAttr);
+      }
     }
-  }
 
-  // If the declaration is in a nominal type (or extension thereof) that
-  // has isolation, use that.
-  if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
-    auto selfTypeIsolation = getActorIsolation(selfTypeDecl);
-    if (!selfTypeIsolation.isUnspecified()) {
-      return inferredIsolation(selfTypeIsolation);
+    // If the declaration is in a nominal type (or extension thereof) that
+    // has isolation, use that.
+    if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto selfTypeIsolation = getActorIsolation(selfTypeDecl);
+      if (!selfTypeIsolation.isUnspecified()) {
+        return inferredIsolation(selfTypeIsolation);
+      }
     }
   }
 
   // Default isolation for this member.
   return defaultIsolation;
-}
-
-ActorIsolation swift::getActorIsolation(ValueDecl *value) {
-  auto &ctx = value->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, ActorIsolationRequest{value},
-      ActorIsolation::forUnspecified());
 }
 
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
@@ -1886,6 +1916,10 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
   auto overridden = value->getOverriddenDecl();
   if (!overridden)
+    return;
+
+  // Actor isolation doesn't matter for async handlers.
+  if (isAsyncHandler(value))
     return;
 
   // Determine the actor isolation of this declaration.

@@ -67,12 +67,12 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   ContBB = StartBB->split(B.getInsertionPoint());
 
   TrueBB = StartBB->getParent()->createBasicBlock();
-  B.moveBlockTo(TrueBB, ContBB);
+  TrueBB->getParent()->moveBlockBefore(TrueBB, ContBB->getIterator());
   B.setInsertionPoint(TrueBB);
   B.createBranch(Loc, ContBB);
 
   FalseBB = StartBB->getParent()->createBasicBlock();
-  B.moveBlockTo(FalseBB, ContBB);
+  FalseBB->getParent()->moveBlockBefore(FalseBB, ContBB->getIterator());
   B.setInsertionPoint(FalseBB);
   B.createBranch(Loc, ContBB);
 
@@ -624,6 +624,22 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
         return L.getSourceLoc() == InstLoc.getSourceLoc();
       }))
     return false;
+
+  // Ignore loads used only by an assign_by_wrapper setter. This
+  // is safe to ignore because assign_by_wrapper will only be
+  // re-written to use the setter if the value is fully initialized.
+  if (auto *load = dyn_cast<SingleValueInstruction>(Inst)) {
+    if (auto Op = load->getSingleUse()) {
+      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+        if (std::find_if(PAI->use_begin(), PAI->use_end(),
+                         [](auto PAIUse) {
+                           return isa<AssignByWrapperInst>(PAIUse->getUser());
+                         }) != PAI->use_end()) {
+          return false;
+        }
+      }
+    }
+  }
 
   EmittedErrorLocs.push_back(InstLoc);
   return true;
@@ -1841,20 +1857,6 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   if ((isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) &&
       TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
-
-    // Ignore loads used only for a set-by-value (nonmutating) setter
-    // since it will be deleted by lowering anyway.
-    auto load = cast<SingleValueInstruction>(Inst);
-    if (auto Op = load->getSingleUse()) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
-        if (std::find_if(PAI->use_begin(), PAI->use_end(),
-                         [](auto PAIUse) {
-                           return isa<AssignByWrapperInst>(PAIUse->getUser());
-                         }) != PAI->use_end()) {
-          return;
-        }
-      }
-    }
 
     diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);

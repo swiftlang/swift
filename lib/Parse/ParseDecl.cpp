@@ -1536,7 +1536,7 @@ void Parser::parseAllAvailabilityMacroArguments() {
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
-                                   DeclAttrKind DK) {
+                                   DeclAttrKind DK, bool isFromClangAttribute) {
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef AttrName = Tok.getText();
   SourceLoc Loc = consumeToken();
@@ -1550,7 +1550,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // Delay issuing the diagnostic until we parse the attribute.
       DiscardAttribute = true;
     }
- 
+
   // If this is a SIL-only attribute, reject it.
   if ((DeclAttribute::getOptions(DK) & DeclAttribute::SILOnly) != 0 &&
       !isInSILMode()) {
@@ -1561,9 +1561,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   // If this attribute is only permitted when concurrency is enabled, reject it.
   if (DeclAttribute::isConcurrencyOnly(DK) &&
       !shouldParseExperimentalConcurrency()) {
-    diagnose(
-        Loc, diag::attr_requires_concurrency, AttrName,
-        DeclAttribute::isDeclModifier(DK));
+    // Ignore concurrency-only attributes that come from Clang.
+    if (!isFromClangAttribute) {
+      diagnose(
+          Loc, diag::attr_requires_concurrency, AttrName,
+          DeclAttribute::isDeclModifier(DK));
+    }
+
     DiscardAttribute = true;
   }
 
@@ -2038,7 +2042,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
       PlatformAndVersions;
 
-    StringRef AttrName = "@_originalDefinedIn";
+    StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
@@ -2080,9 +2084,53 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
         if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
-            (peekToken().is(tok::floating_literal) ||
-             peekToken().is(tok::integer_literal))) {
+            (peekToken().isAny(tok::integer_literal, tok::floating_literal) ||
+             peekAvailabilityMacroName())) {
+
           PlatformKind Platform;
+
+          if (peekAvailabilityMacroName()) {
+            // Handle availability macros first.
+            //
+            // The logic to search for macros and platform name could
+            // likely be handled by parseAvailabilitySpecList
+            // if we don't rely on parseList here.
+            SmallVector<AvailabilitySpec *, 4> Specs;
+            ParserStatus MacroStatus = parseAvailabilityMacro(Specs);
+            if (MacroStatus.isError())
+              return MacroStatus;
+
+            for (auto *Spec : Specs) {
+              if (auto *PlatformVersionSpec =
+                   dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+                auto Platform = PlatformVersionSpec->getPlatform();
+                auto Version = PlatformVersionSpec->getVersion();
+                if (Version.getSubminor().hasValue() ||
+                    Version.getBuild().hasValue()) {
+                  diagnose(Tok.getLoc(), diag::originally_defined_in_major_minor_only);
+                }
+                PlatformAndVersions.emplace_back(Platform, Version);
+
+              } else if (auto *PlatformAgnostic =
+                  dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+                diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
+                         PlatformAgnostic->isLanguageVersionSpecific() ?
+                           diag::originally_defined_in_swift_version :
+                           diag::originally_defined_in_package_description);
+
+              } else if (auto *OtherPlatform =
+                         dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
+                diagnose(OtherPlatform->getStarLoc(),
+                         diag::originally_defined_in_missing_platform_name);
+
+              } else {
+                llvm_unreachable("Unexpected AvailabilitySpec kind.");
+              }
+            }
+
+            return makeParserSuccess();
+          }
+
           // Parse platform name.
           auto Plat = platformFromString(Tok.getText());
           if (!Plat.hasValue()) {
@@ -2682,7 +2730,8 @@ static PatternBindingInitializer *findAttributeInitContent(
 /// Note that various attributes (like mutating, weak, and unowned) are parsed
 /// but rejected since they have context-sensitive keywords.
 ///
-ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
+ParserStatus Parser::parseDeclAttribute(
+  DeclAttributes &Attributes, SourceLoc AtLoc, bool isFromClangAttribute) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
@@ -2789,7 +2838,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
   }
 
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK)) {
-    parseNewDeclAttribute(Attributes, AtLoc, DK);
+    parseNewDeclAttribute(Attributes, AtLoc, DK, isFromClangAttribute);
     return makeParserSuccess();
   }
 

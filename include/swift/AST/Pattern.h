@@ -17,6 +17,7 @@
 #ifndef SWIFT_PATTERN_H
 #define SWIFT_PATTERN_H
 
+#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"

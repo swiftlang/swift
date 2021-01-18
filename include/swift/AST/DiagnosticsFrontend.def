@@ -109,10 +109,6 @@ ERROR(error_mode_cannot_emit_dependencies,none,
       "this mode does not support emitting dependency files", ())
 ERROR(error_mode_cannot_emit_reference_dependencies,none,
       "this mode does not support emitting reference dependency files", ())
-ERROR(error_mode_cannot_emit_swift_ranges,none,
-"this mode does not support emitting unparsed ranges files", ())
-ERROR(error_mode_cannot_emit_compiled_source,none,
-"this mode does not support emitting compiled source files", ())
 ERROR(error_mode_cannot_emit_header,none,
       "this mode does not support emitting Objective-C headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
@@ -132,11 +128,7 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
-  "ignoring -emit-reference-dependencies (requires -primary-file)", ())
-WARNING(emit_swift_ranges_without_primary_file,none,
-"ignoring -emit-swift-ranges (requires -primary-file)", ())
-WARNING(emit_compiled_source_without_primary_file,none,
-"ignoring -emit-compiled-source (requires -primary-file)", ())
+        "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
@@ -335,14 +327,6 @@ ERROR(error_invalid_debug_prefix_map, none,
 ERROR(error_invalid_coverage_prefix_map, none,
       "values for '-coverage-prefix-map' must be in the format "
       "'original=remapped', but '%0' was provided", (StringRef))
-
-
-ERROR(error_unable_to_write_swift_ranges_file, none,
-"unable to write unparsed ranges file '$0': %1", (StringRef, StringRef))
-
-ERROR(error_unable_to_write_compiled_source_file, none,
-"unable to write compiled source file: '$0': %1", (StringRef, StringRef))
-
 
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))

@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -4268,11 +4269,16 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
-      break;
-
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
+      break;
+
+    // Let's wait until both sides are of the same optionality before
+    // attempting `.rawValue` fix.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::ValueToOptional))
+      break;
+
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
       break;
 
     // If there are any restrictions here we need to wait and let
@@ -5715,9 +5721,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
-    // Record the conformance.
-    CheckedConformances.push_back({loc, conformance});
-
     if (isConformanceUnavailable(conformance, loc))
       increaseScore(SK_Unavailable);
 
@@ -5725,11 +5728,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
       unsigned index = 0;
+      auto *conformanceLoc = getConstraintLocator(
+          loc,
+          LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
+
       for (const auto &req : conformance.getConditionalRequirements()) {
-        addConstraint(req,
-                      locator.withPathElement(
-                          LocatorPathElt::ConditionalRequirement(
-                              index++, req.getKind())));
+        addConstraint(
+            req, getConstraintLocator(conformanceLoc,
+                                      LocatorPathElt::ConditionalRequirement(
+                                          index++, req.getKind())));
       }
     }
 
@@ -6665,8 +6672,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Local function that turns a ValueDecl into a properly configured
   // OverloadChoice.
-  auto getOverloadChoice = [&](ValueDecl *cand, bool isBridged,
-                               bool isUnwrappedOptional) -> OverloadChoice {
+  auto getOverloadChoice =
+      [&](ValueDecl *cand, bool isBridged, bool isUnwrappedOptional,
+          bool isFallbackUnwrap = false) -> OverloadChoice {
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (instanceTy->isAnyObject()) {
@@ -6687,8 +6695,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       auto ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
                                              ->getInstanceType()
                                              ->getOptionalObjectType());
-      return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
-                                                         functionRefKind);
+      return OverloadChoice::getDeclViaUnwrappedOptional(
+          ovlBaseTy, cand,
+          /*isFallback=*/isFallbackUnwrap, functionRefKind);
     }
 
     // While looking for subscript choices it's possible to find
@@ -6712,7 +6721,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     return OverloadChoice(baseTy, cand, functionRefKind);
   };
-  
+
   // Add all results from this lookup.
   for (auto result : lookup)
     addChoice(getOverloadChoice(result.getValueDecl(),
@@ -6795,11 +6804,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
 
       if (objectType->mayHaveMembers()) {
+        // If there are viable members directly on `Optional`, let's
+        // prioritize them and mark any results found on wrapped type
+        // as a fallback results.
+        bool isFallback = !result.ViableCandidates.empty();
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
           addChoice(getOverloadChoice(result.getValueDecl(),
-                                      /*bridged*/false,
-                                      /*isUnwrappedOptional=*/true));
+                                      /*bridged*/ false,
+                                      /*isUnwrappedOptional=*/true,
+                                      /*isUnwrapFallback=*/isFallback));
       }
     }
   }

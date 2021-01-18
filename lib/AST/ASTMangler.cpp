@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericSignature.h"
@@ -405,55 +406,51 @@ std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
   return finalize();
 }
 
-std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
-    StringRef name, AutoDiffDerivativeFunctionKind kind,
+std::string ASTMangler::mangleAutoDiffDerivativeFunction(
+    const AbstractFunctionDecl *originalAFD,
+    AutoDiffDerivativeFunctionKind kind,
     AutoDiffConfig config) {
-  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
-  beginManglingWithoutPrefix();
-
-  Buffer << "AD__" << name << '_';
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    Buffer << "_jvp_";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    Buffer << "_vjp_";
-    break;
-  }
-  Buffer << config.mangle();
-  if (config.derivativeGenericSignature) {
-    Buffer << '_';
-    appendGenericSignature(config.derivativeGenericSignature);
-  }
-
-  auto result = Storage.str().str();
-  Storage.clear();
-  return result;
+  beginManglingWithAutoDiffOriginalFunction(originalAFD);
+  appendAutoDiffFunctionParts((char)getAutoDiffFunctionKind(kind), config);
+  return finalize();
 }
 
-std::string ASTMangler::mangleAutoDiffLinearMapHelper(
-    StringRef name, AutoDiffLinearMapKind kind, AutoDiffConfig config) {
-  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
-  beginManglingWithoutPrefix();
+std::string ASTMangler::mangleAutoDiffLinearMap(
+    const AbstractFunctionDecl *originalAFD, AutoDiffLinearMapKind kind,
+    AutoDiffConfig config) {
+  beginManglingWithAutoDiffOriginalFunction(originalAFD);
+  appendAutoDiffFunctionParts((char)getAutoDiffFunctionKind(kind), config);
+  return finalize();
+}
 
-  Buffer << "AD__" << name << '_';
-  switch (kind) {
-  case AutoDiffLinearMapKind::Differential:
-    Buffer << "_differential_";
-    break;
-  case AutoDiffLinearMapKind::Pullback:
-    Buffer << "_pullback_";
-    break;
+void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
+    const AbstractFunctionDecl *afd) {
+  if (auto *attr = afd->getAttrs().getAttribute<SILGenNameAttr>()) {
+    beginManglingWithoutPrefix();
+    appendOperator(attr->Name);
+    return;
   }
-  Buffer << config.mangle();
-  if (config.derivativeGenericSignature) {
-    Buffer << '_';
-    appendGenericSignature(config.derivativeGenericSignature);
-  }
+  beginMangling();
+  if (auto *cd = dyn_cast<ConstructorDecl>(afd))
+    appendConstructorEntity(cd, /*isAllocating*/ !cd->isConvenienceInit());
+  else
+    appendEntity(afd);
+}
 
-  auto result = Storage.str().str();
-  Storage.clear();
-  return result;
+void ASTMangler::appendAutoDiffFunctionParts(char functionKindCode,
+                                             AutoDiffConfig config) {
+  if (auto sig = config.derivativeGenericSignature)
+    appendGenericSignature(sig);
+  appendOperator("TJ", StringRef(&functionKindCode, 1));
+  appendIndexSubset(config.parameterIndices);
+  appendOperator("p");
+  appendIndexSubset(config.resultIndices);
+  appendOperator("r");
+}
+
+/// Mangle the index subset.
+void ASTMangler::appendIndexSubset(IndexSubset *indices) {
+  Buffer << indices->getString();
 }
 
 std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
@@ -739,6 +736,12 @@ std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
   DWARFMangling = true;
   OptimizeProtocolNames = false;
   return mangleDeclAsUSR(decl, MANGLING_PREFIX_STR);
+}
+
+std::string ASTMangler::mangleGenericSignature(const GenericSignature sig) {
+  beginMangling();
+  appendGenericSignature(sig);
+  return finalize();
 }
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {

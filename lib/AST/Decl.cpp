@@ -45,6 +45,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -7973,6 +7974,25 @@ void ClassDecl::setSuperclass(Type superclass) {
   LazySemanticInfo.SuperclassDecl.setPointerAndInt(
     superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
     true);
+}
+
+ActorIsolation swift::getActorIsolation(ValueDecl *value) {
+  auto &ctx = value->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, ActorIsolationRequest{value},
+      ActorIsolation::forUnspecified());
+}
+
+ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
+  if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
+    return getActorIsolation(vd);
+
+  if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
+    if (auto *var = init->getBinding()->getSingleVar())
+      return getActorIsolation(var);
+  }
+
+  return ActorIsolation::forUnspecified();
 }
 
 ClangNode Decl::getClangNodeImpl() const {

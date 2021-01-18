@@ -304,6 +304,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // We earlier eliminated ownership if we are not compiling the stdlib. Now
   // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  P.addCopyPropagation();
   P.addSemanticARCOpts();
   P.addNonTransparentFunctionOwnershipModelEliminator();
 
@@ -447,6 +448,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
+  P.addCopyPropagation();
   P.addSemanticARCOpts();
 
   // Devirtualizes differentiability witnesses into functions that reference them.

@@ -4,6 +4,8 @@
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 
+// REQUIRES: rdar73154198
+
 import Dispatch
 
 struct Boom: Error {}

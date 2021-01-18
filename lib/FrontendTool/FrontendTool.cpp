@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,8 +21,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "Dependencies.h"
-#include "ScanDependencies.h"
 #include "TBD.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -37,6 +37,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
@@ -616,7 +617,7 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
                                  Outputs};
 }
 
-static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
+static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
@@ -626,6 +627,22 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
   }
+
+  // Do not write out swiftdeps for any primaries if we've encountered an
+  // error. Without this, the driver will attempt to integrate swiftdeps
+  // from broken swift files. One way this could go wrong is if a primary that
+  // fails to build in an early wave has dependents in a later wave. The
+  // driver will not schedule those later dependents after this batch exits,
+  // so they will have no opportunity to bring their swiftdeps files up to
+  // date. With this early exit, the driver sees the same priors in the
+  // swiftdeps files from before errors were introduced into the batch, and
+  // integration therefore always hops from "known good" to "known good" states.
+  //
+  // FIXME: It seems more appropriate for the driver to notice the early-exit
+  // and react by always enqueuing the jobs it dropped in the other waves.
+  if (Instance.getDiags().hadAnyError())
+    return;
+
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
@@ -635,43 +652,6 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
 
     emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
-  }
-}
-static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::emit_swift_ranges_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &swiftRangesFilePath =
-        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
-    if (!swiftRangesFilePath.empty()) {
-      (void)Instance.emitSwiftRanges(Instance.getDiags(), SF,
-                                     swiftRangesFilePath);
-    }
-  }
-}
-static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
-    CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasCompiledSourcePath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::emit_compiled_source_without_primary_file);
-    return;
-  }
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &compiledSourceFilePath =
-        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
-    if (!compiledSourceFilePath.empty()) {
-      (void)Instance.emitCompiledSource(Instance.getDiags(), SF,
-                                        compiledSourceFilePath);
-    }
   }
 }
 
@@ -1034,14 +1014,12 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     emitIndexData(Instance);
   }
 
-  // Emit dependencies.
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  // Emit Swiftdeps for every file in the batch.
+  emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
+
+  // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
-
-  // Emit information about the parsed primaries.
-  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
-  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {
@@ -1133,10 +1111,17 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 static bool performScanDependencies(CompilerInstance &Instance) {
   auto batchScanInput =
       Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
+  ModuleDependenciesCache SingleUseCache;
   if (batchScanInput.empty()) {
-    return scanDependencies(Instance);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::prescanDependencies(Instance);
+    else
+      return dependencies::scanDependencies(Instance);
   } else {
-    return batchScanModuleDependencies(Instance, batchScanInput);
+    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+      return dependencies::batchPrescanDependencies(Instance, batchScanInput);
+    else
+      return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 
@@ -1223,8 +1208,6 @@ static bool performAction(CompilerInstance &Instance,
   // MARK: Dependency Scanning Actions
   case FrontendOptions::ActionType::ScanDependencies:
     return performScanDependencies(Instance);
-  case FrontendOptions::ActionType::ScanClangDependencies:
-    return scanClangDependencies(Instance);
 
   // MARK: General Compilation Actions
   case FrontendOptions::ActionType::Parse:

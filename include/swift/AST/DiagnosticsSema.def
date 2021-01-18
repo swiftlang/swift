@@ -2628,7 +2628,7 @@ WARNING(duplicate_anyobject_class_inheritance,none,
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
 WARNING(anyobject_class_inheritance_deprecated,none,
-  "using 'class' keyword for protocol inheritance is deprecated; "
+  "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
@@ -3789,9 +3789,14 @@ WARNING(guard_always_succeeds,none,
 ERROR(expression_unused_closure,none,
       "closure expression is unused", ())
 ERROR(expression_unused_function,none,
-      "expression resolves to an unused function", ())
-ERROR(expression_unused_lvalue,none,
-      "expression resolves to an unused %select{variable|property|subscript}0", (unsigned))
+      "function is unused", ())
+WARNING(expression_unused_lvalue,none,
+      "%select{"
+        "variable|"
+        "property is accessed but result|"
+        "subscript is accessed but result"
+      "}0 is unused",
+      (unsigned))
 WARNING(expression_unused_result_call,none,
         "result of call to %0 is unused", (DeclName))
 WARNING(expression_unused_result_operator,none,
@@ -4284,13 +4289,6 @@ ERROR(actorindependent_mutable_storage,none,
       ())
 ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
-      ())
-ERROR(actorindependent_not_actor_member,none,
-      "'@actorIndependent' can only be applied to actor members and "
-      "global/static variables",
-      ())
-ERROR(actorindependent_not_actor_instance_member,none,
-      "'@actorIndependent' can only be applied to instance members of actors",
       ())
 
 ERROR(concurrency_lib_missing,none,

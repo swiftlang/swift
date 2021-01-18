@@ -89,6 +89,16 @@ bool ArgsToFrontendOptionsConverter::convert(
         IntermoduleDepTrackingMode::IncludeSystem;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_bad_file_descriptor_retry_count)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    Opts.BadFileDescriptorRetryCount = limit;
+  }
+
   Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
@@ -379,8 +389,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_scan_dependencies))
     return FrontendOptions::ActionType::ScanDependencies;
-  if (Opt.matches(OPT_scan_clang_dependencies))
-    return FrontendOptions::ActionType::ScanClangDependencies;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))
@@ -533,16 +541,6 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
       && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_reference_dependencies);
-    return true;
-  }
-  if (!FrontendOptions::canActionEmitSwiftRanges(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasSwiftRangesPath()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_swift_ranges);
-    return true;
-  }
-  if (!FrontendOptions::canActionEmitCompiledSource(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasCompiledSourcePath()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_compiled_source);
     return true;
   }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&

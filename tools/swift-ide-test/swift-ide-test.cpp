@@ -742,11 +742,6 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
-GraphVisPath("output-request-graphviz",
-             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
-             llvm::cl::cat(Category));
-
 static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
@@ -2524,6 +2519,13 @@ static void printModuleMetadata(ModuleDecl *MD) {
     OS << "link library: " << lib.getName()
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
   });
+  MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+    OS << "filepath=" << info.FilePath << "; ";
+    OS << "hash=" << info.InterfaceHash.getRawValue() << "; ";
+    OS << "mtime=" << info.LastModified << "; ";
+    OS << "size=" << info.FileSize;
+    OS << "\n";
+  });
 }
 
 static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
@@ -2611,6 +2613,14 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   if (!Stdlib) {
     llvm::errs() << "Failed loading stdlib\n";
     return 1;
+  }
+
+  // If needed, load _Concurrency library so that the Clang importer can use it.
+  if (Context.LangOpts.EnableExperimentalConcurrency) {
+    if (!getModuleByFullName(Context, Context.Id_Concurrency)) {
+      llvm::errs() << "Failed loading _Concurrency library\n";
+      return 1;
+    }
   }
 
   int ExitCode = 0;
@@ -3827,8 +3837,6 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
-  InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
-    options::GraphVisPath;
   InitInvok.getLangOptions().EnableCrossImportOverlays =
     options::EnableCrossImportOverlays;
   if (options::DisableObjCInterop) {

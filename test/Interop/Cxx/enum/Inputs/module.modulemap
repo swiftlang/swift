@@ -1,7 +1,9 @@
 module BoolEnums {
   header "bool-enums.h"
+  requires cplusplus
 }
 
 module ScopedEnums {
   header "scoped-enums.h"
+  requires cplusplus
 }

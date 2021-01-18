@@ -236,8 +236,9 @@ public:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
   SILFunction *getOrCreateCustomDerivativeThunk(
-      SILFunction *customDerivativeFn, SILFunction *originalFn,
-      const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind);
+      AbstractFunctionDecl *originalAFD, SILFunction *originalFn,
+      SILFunction *customDerivativeFn, AutoDiffConfig config,
+      AutoDiffDerivativeFunctionKind kind);
 
   /// Get or create a derivative function vtable entry thunk for the given
   /// SILDeclRef and derivative function type.

@@ -1787,15 +1787,15 @@ the ``ValueOwnershipKind`` of ``v``. In symbols, we must have that::
 
 In words, a value can be passed to an operand if applying the operand's
 ownership constraint to the value's ownership does not change the value's
-ownership. Operationally this has a few interesting effects on SIL::
+ownership. Operationally this has a few interesting effects on SIL:
 
-  1. We have defined away invalid value-operand (aka def-use) pairing since the
-     SILVerifier validates the aforementioned relationship on all SIL values,
-     uses at all points of the pipeline until ossa is lowered.
+1. We have defined away invalid value-operand (aka def-use) pairing since the
+   SILVerifier validates the aforementioned relationship on all SIL values,
+   uses at all points of the pipeline until ossa is lowered.
 
-  2. Many SIL instructions do not care about the ownership kind that their value
-     will take. They can just define all of their operand's as having an
-     ownership constraint of Any.
+2. Many SIL instructions do not care about the ownership kind that their value
+   will take. They can just define all of their operand's as having an
+   ownership constraint of Any.
 
 Now lets go into more depth upon `Value Ownership Kind`_ and `Ownership Constraint`_.
 
@@ -5371,7 +5371,7 @@ presence or value of the ``enum_extensibility`` Clang attribute.
 
 (See `SE-0192`__ for more information about non-frozen enums.)
 
-__ https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md
+__ https://github.com/apple/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md
 
 enum
 ````

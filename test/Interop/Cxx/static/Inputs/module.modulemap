@@ -1,19 +1,24 @@
 module StaticVar {
   header "static-var.h"
+  requires cplusplus
 }
 
 module StaticLocalVar {
   header "static-local-var.h"
+  requires cplusplus
 }
 
 module StaticMemberVar {
   header "static-member-var.h"
+  requires cplusplus
 }
 
 module InlineStaticMemberVar {
   header "inline-static-member-var.h"
+  requires cplusplus
 }
 
 module StaticMemberFunc {
   header "static-member-func.h"
+  requires cplusplus
 }

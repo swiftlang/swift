@@ -2604,7 +2604,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
 
   auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(silFunctionType, realReplFn, authInfo, signature),
+      FunctionPointer(silFunctionType, realReplFn, authInfo, signature)
+          .getAsFunction(IGF),
       forwardedArgs);
   Res->setTailCall();
   if (IGF.CurFn->getReturnType()->isVoidTy())

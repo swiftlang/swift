@@ -2,11 +2,13 @@ target_sources(swiftSILOptimizer PRIVATE
   BasicBlockOptUtils.cpp
   CFGOptUtils.cpp
   CanonicalizeInstruction.cpp
+  CanonicalOSSALifetime.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
   ConstantFolding.cpp
   ConstExpr.cpp
   Devirtualize.cpp
+  DifferentiationMangler.cpp
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp

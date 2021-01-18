@@ -22,6 +22,7 @@
 
 #include "OwnershipPhiOperand.h"
 #include "SemanticARCOptVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
@@ -333,7 +334,7 @@ static Operand *lookThroughSingleForwardingUse(Operand *use) {
   auto forwardingOperand = ForwardingOperand::get(use);
   if (!forwardingOperand)
     return nullptr;
-  auto forwardedValue = (*forwardingOperand).getSingleForwardedValue();
+  auto forwardedValue = forwardingOperand.getSingleForwardedValue();
   if (!forwardedValue)
     return nullptr;
   auto *singleConsumingUse = forwardedValue->getSingleConsumingUse();
@@ -425,7 +426,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     auto forwardingOperand = ForwardingOperand::get(currentForwardingUse);
     if (!forwardingOperand)
       return false;
-    auto forwardedValue = (*forwardingOperand).getSingleForwardedValue();
+    auto forwardedValue = forwardingOperand.getSingleForwardedValue();
     if (!forwardedValue)
       return false;
 
@@ -477,7 +478,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // singleConsumingUse (the original forwarded use) and the destroy_value. In
     // such a case, we must bail!
     if (auto operand = BorrowingOperand::get(use))
-      if (!operand->visitLocalEndScopeUses([&](Operand *endScopeUse) {
+      if (!operand.visitLocalEndScopeUses([&](Operand *endScopeUse) {
             // Return false if we did see the relevant end scope instruction
             // in the block. That means that we are going to exit early and
             // return false.
@@ -762,7 +763,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   SmallVector<Operand *, 8> parentLifetimeEndingUses;
   for (auto *origValueUse : originalValue->getUses())
     if (origValueUse->isLifetimeEnding() &&
-        !isa<OwnershipForwardingInst>(origValueUse->getUser()))
+        !OwnershipForwardingMixin::isa(origValueUse->getUser()))
       parentLifetimeEndingUses.push_back(origValueUse);
 
   // Ok, we have an owned value. If we do not have any non-destroying consuming

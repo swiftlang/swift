@@ -314,7 +314,7 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
         continue;
       }
     } else if (auto borrowingOperand = BorrowingOperand::get(consumingUse)) {
-      assert(borrowingOperand->isReborrow());
+      assert(borrowingOperand.isReborrow());
       continue;
     }
 

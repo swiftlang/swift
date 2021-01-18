@@ -43,6 +43,7 @@ extern "C" void swift_arrayInitWithCopy(OpaqueValue *dest,
 
 #define COPY_POD_TEST(kind)                                                    \
   ValueWitnessTable pod_witnesses;                                             \
+  memset(&pod_witnesses, 0, sizeof(pod_witnesses));                            \
   initialize_pod_witness_table_size_uint32_t_stride_uint64_t(pod_witnesses);   \
   uint64_t srcArray[3] = {0, 1, 2};                                            \
   uint64_t destArray[3] = {0x5A5A5A5AU, 0x5A5A5A5AU, 0x5A5A5A5AU};             \
@@ -296,6 +297,7 @@ extern "C" void swift_arrayDestroy(OpaqueValue *begin, size_t count,
 
 TEST(TestArrayCopy, test_swift_arrayDestroyPOD) {
   ValueWitnessTable pod_witnesses;
+  memset(&pod_witnesses, 0, sizeof(pod_witnesses));
   initialize_pod_witness_table_size_uint32_t_stride_uint64_t(pod_witnesses);
   uint64_t array[3] = {0, 1, 2};
   FullOpaqueMetadata testMetadata = {{&pod_witnesses},

@@ -47,6 +47,10 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 -(void)findAnswerNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *))handler;
 -(void)doSomethingDangerousNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
+
+// rdar://72604599
+- (void)stopRecordingWithHandler:(nullable void (^)(NSObject *_Nullable_result x, NSError *_Nullable error))handler __attribute__((swift_async_name("stopRecording()"))) __attribute__((swift_async(not_swift_private, 1)));
+
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -62,6 +66,15 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 @optional
 -(void)askUserToJumpThroughHoop:(NSString *)hoop completionHandler:(void (^ _Nullable)(NSString *))completionHandler;
+@end
+
+@protocol ProtocolWithSwiftAttributes
+-(void)independentMethod __attribute__((__swift_attr__("@actorIndependent")));
+-(void)asyncHandlerMethod __attribute__((__swift_attr__("@asyncHandler")));
+-(void)mainActorMethod __attribute__((__swift_attr__("@MainActor")));
+
+@optional
+-(void)missingAtAttributeMethod __attribute__((__swift_attr__("asyncHandler")));
 @end
 
 #pragma clang assume_nonnull end

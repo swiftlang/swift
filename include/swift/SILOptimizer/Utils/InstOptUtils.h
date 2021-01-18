@@ -666,6 +666,28 @@ FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
                                                 SILValue newCallee,
                                                 SILBuilderContext &builderCtx);
 
+/// This is a low level routine that makes all uses of \p svi uses of \p
+/// newValue (ignoring end scope markers) and then deletes \p svi and all end
+/// scope markers. Then returns the next inst to process.
+SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
+                                               SILValue newValue,
+                                               InstModCallbacks &callbacks);
+
+/// This API is equivalent to performing \p use->set(\p newValue) except that:
+///
+/// 1. If the user of \p use is an end scope, this API no-opts. This API is only
+///    used in contexts where we are rewriting uses and are not interesting in
+///    end scope instructions since we are moving uses from one scope to another
+///    scope.
+///
+/// 2. If the user of \p use is not an end scope, but is a lifetime ending use
+///    of \p use->get(), we insert a destroy_value|end_borrow as appropriate on
+///    \p use->get() to ensure \p use->get()'s lifetime is still ended. We
+///    assume that if \p use->getUser() is lifetime ending, that our caller has
+///    ensured that we can end \p newValue's lifetime.
+SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
+                                         InstModCallbacks &callbacks);
+
 } // end namespace swift
 
 #endif

@@ -37,6 +37,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
@@ -5295,6 +5296,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     }
     
     for (auto OTD : opaqueReturnTypeDecls) {
+      // FIXME: We should delay parsing function bodies so these type decls
+      //        don't even get added to the file.
+      if (OTD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+
       hasOpaqueReturnTypes = true;
       Mangle::ASTMangler Mangler;
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);

@@ -62,6 +62,7 @@ extension Float: HasFloat {
   init(float: Float) { self = float }
 }
 
+#if REQUIRES_SR14042
 ReabstractionE2ETests.test("diff param generic => concrete") {
   func inner<T: HasFloat>(x: T) -> Float {
     7 * x.float * x.float
@@ -70,6 +71,7 @@ ReabstractionE2ETests.test("diff param generic => concrete") {
   expectEqual(Float(7 * 3 * 3), transformed(3))
   expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: transformed))
 }
+#endif
 
 ReabstractionE2ETests.test("nondiff param generic => concrete") {
   func inner<T: HasFloat>(x: Float, y: T) -> Float {
@@ -80,6 +82,7 @@ ReabstractionE2ETests.test("nondiff param generic => concrete") {
   expectEqual(Float(7 * 2 * 3), gradient(at: 3) { transformed($0, 10) })
 }
 
+#if REQUIRES_SR14042
 ReabstractionE2ETests.test("diff param and nondiff param generic => concrete") {
   func inner<T: HasFloat>(x: T, y: T) -> Float {
     7 * x.float * x.float + y.float
@@ -88,7 +91,9 @@ ReabstractionE2ETests.test("diff param and nondiff param generic => concrete") {
   expectEqual(Float(7 * 3 * 3 + 10), transformed(3, 10))
   expectEqual(Float(7 * 2 * 3), gradient(at: 3) { transformed($0, 10) })
 }
+#endif
 
+#if REQUIRES_SR14042
 ReabstractionE2ETests.test("result generic => concrete") {
   func inner<T: HasFloat>(x: Float) -> T {
     T(float: 7 * x * x)
@@ -97,6 +102,7 @@ ReabstractionE2ETests.test("result generic => concrete") {
   expectEqual(Float(7 * 3 * 3), transformed(3))
   expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: transformed))
 }
+#endif
 
 ReabstractionE2ETests.test("diff param concrete => generic => concrete") {
   typealias FnTy<T: Differentiable> = @differentiable (T) -> Float

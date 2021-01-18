@@ -60,19 +60,6 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
-
-def emit_swift_ranges : Flag<["-"], "emit-swift-ranges">,
-  HelpText<"Emit unparsed source ranges">;
-def emit_swift_ranges_path
-  : Separate<["-"], "emit-swift-ranges-path">, MetaVarName<"<path>">,
-    HelpText<"Output unparsed ranges to <path>">;
-
-def emit_compiled_source : Flag<["-"], "emit-compiled-source">,
-  HelpText<"Emit compiled source">;
-def emit_compiled_source_path
-  : Separate<["-"], "emit-compiled-source-path">, MetaVarName<"<path>">,
-    HelpText<"Output compiled source to <path>">;
-
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
@@ -266,10 +253,6 @@ def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-s
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
-def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
-  HelpText<"Build request dependency graph">;
-def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
-  HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
@@ -790,4 +773,8 @@ def experimental_allow_module_with_compiler_errors:
   Flags<[HelpHidden]>,
   HelpText<"Attempt to output .swiftmodule, regardless of compilation errors">;
 
+def bad_file_descriptor_retry_count:
+  Separate<["-"], "bad-file-descriptor-retry-count">,
+  HelpText<"Number of retrying opening a file if previous open returns a bad "
+           "file descriptor error.">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

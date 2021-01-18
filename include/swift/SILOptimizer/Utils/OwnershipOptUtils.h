@@ -29,21 +29,30 @@ namespace swift {
 struct JointPostDominanceSetComputer;
 
 struct OwnershipFixupContext {
-  InstModCallbacks callbacks;
+  Optional<InstModCallbacks> inlineCallbacks;
+  InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
   JointPostDominanceSetComputer &jointPostDomSetComputer;
 
+  OwnershipFixupContext(InstModCallbacks &callbacks, DeadEndBlocks &deBlocks,
+                        JointPostDominanceSetComputer &inputJPDComputer)
+      : inlineCallbacks(), callbacks(callbacks), deBlocks(deBlocks),
+        jointPostDomSetComputer(inputJPDComputer) {}
+
+  OwnershipFixupContext(DeadEndBlocks &deBlocks,
+                        JointPostDominanceSetComputer &inputJPDComputer)
+      : inlineCallbacks(InstModCallbacks()), callbacks(*inlineCallbacks),
+        deBlocks(deBlocks), jointPostDomSetComputer(inputJPDComputer) {}
+
   SILBasicBlock::iterator
-  replaceAllUsesAndEraseFixingOwnership(SingleValueInstruction *oldValue,
-                                        SILValue newValue);
+  replaceAllUsesAndErase(SingleValueInstruction *oldValue, SILValue newValue);
 
   /// We can not RAUW all old values with new values.
   ///
   /// Namely, we do not support RAUWing values with ValueOwnershipKind::None
   /// that have uses that do not require ValueOwnershipKind::None or
   /// ValueOwnershipKind::Any.
-  static bool canFixUpOwnershipForRAUW(const SingleValueInstruction *oldValue,
-                                       SILValue newValue);
+  static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue);
 };
 
 } // namespace swift

@@ -2484,7 +2484,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
 
       // Otherwise, move the block to after the first predecessor.
       auto predBB = *caseBB->pred_begin();
-      caseBB->moveAfter(predBB);
+      SGF.F.moveBlockAfter(caseBB, predBB);
 
       // Then emit the case body into the caseBB.
       SGF.B.setInsertionPoint(caseBB);

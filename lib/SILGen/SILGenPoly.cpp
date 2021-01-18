@@ -3915,8 +3915,9 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 }
 
 SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
-    SILFunction *customDerivativeFn, SILFunction *originalFn,
-    const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
+    AbstractFunctionDecl *originalAFD, SILFunction *originalFn,
+    SILFunction *customDerivativeFn, AutoDiffConfig config,
+    AutoDiffDerivativeFunctionKind kind) {
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
                               ? customDerivativeFnTy->getSubstGenericSignature()
@@ -3932,13 +3933,11 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  // TODO(TF-685): Use principled thunk mangling.
-  // Do not simply reuse reabstraction thunk mangling.
   Mangle::ASTMangler mangler;
   auto name = getASTContext()
-                  .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
-                      originalFn->getName(), kind, config))
-                  .str();
+      .getIdentifier(
+          mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
+      .str();
 
   auto loc = customDerivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);

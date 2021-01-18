@@ -81,6 +81,14 @@ SILInstruction *ValueBase::getDefiningInsertionPoint() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getNextInstruction() {
+  if (auto *inst = getDefiningInstruction())
+    return std::next(inst);
+  if (auto *arg = dyn_cast<SILArgument>(this))
+    return &*arg->getParentBlock()->begin();
+  return nullptr;
+}
+
 Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
@@ -317,28 +325,6 @@ SILBasicBlock *Operand::getParentBlock() const {
 SILFunction *Operand::getParentFunction() const {
   auto *self = const_cast<Operand *>(this);
   return self->getUser()->getFunction();
-}
-
-/// Return true if this use can accept Unowned values.
-static bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
-  switch (operandOwnership) {
-  case OperandOwnership::NonUse:
-  case OperandOwnership::UnownedInstantaneousUse:
-  case OperandOwnership::ForwardingUnowned:
-  case OperandOwnership::PointerEscape:
-  case OperandOwnership::BitwiseEscape:
-    return true;
-  case OperandOwnership::TrivialUse:
-  case OperandOwnership::InstantaneousUse:
-  case OperandOwnership::Borrow:
-  case OperandOwnership::DestroyingConsume:
-  case OperandOwnership::ForwardingConsume:
-  case OperandOwnership::InteriorPointer:
-  case OperandOwnership::ForwardingBorrow:
-  case OperandOwnership::EndBorrow:
-  case OperandOwnership::Reborrow:
-    return false;
-  }
 }
 
 bool Operand::canAcceptKind(ValueOwnershipKind kind) const {

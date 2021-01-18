@@ -19,12 +19,10 @@ import Swift
 // Transpose
 
 @inlinable
-public func transpose<T, R>(
+public func _transpose<T, R>(
   of body: @escaping @differentiable(linear) (T) -> R
 ) -> @differentiable(linear) (R) -> T {
-  let original = body as (T) -> R
-  let transpose = { x in Builtin.applyTranspose_arity1(body, x) }
-  return Builtin.linearFunction_arity1(transpose, original)
+  fatalError("Transpose is unimplemented and unsupported")
 }
 
 // Value with differential
@@ -298,62 +296,4 @@ public func gradient<T, U, V, R>(
 ) -> (T, U, V) -> (T.TangentVector, U.TangentVector, V.TangentVector)
   where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in gradient(at: x, y, z, in: f) }
-}
-
-// Value with derivative (curried)
-
-@inlinable
-public func valueWithDerivative<T: FloatingPoint, R>(
-  of f: @escaping @differentiable (T) -> R
-) -> (T) -> (value: R, derivative: R.TangentVector)
-  where T.TangentVector == T {
-  return { x in valueWithDerivative(at: x, in: f) }
-}
-
-@inlinable
-public func valueWithDerivative<T: FloatingPoint, U: FloatingPoint, R>(
-  of f: @escaping @differentiable (T, U) -> R
-) -> (T, U) -> (value: R, derivative: R.TangentVector)
-  where T.TangentVector == T,
-        U.TangentVector == U {
-  return { (x, y) in valueWithDerivative(at: x, y, in: f) }
-}
-
-@inlinable
-public func valueWithDerivative<
-  T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R>(
-  of f: @escaping @differentiable (T, U, V) -> R
-) -> (T, U, V) -> (value: R, derivative: R.TangentVector)
-  where T.TangentVector == T,
-        U.TangentVector == U,
-        V.TangentVector == V {
-  return { (x, y, z) in valueWithDerivative(at: x, y, z, in: f) }
-}
-
-// Value with gradient (curried)
-
-@inlinable
-public func valueWithGradient<T, R>(
-  of f: @escaping @differentiable (T) -> R
-) -> (T) -> (value: R, gradient: T.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x in valueWithGradient(at: x, in: f) }
-}
-
-@inlinable
-public func valueWithGradient<T, U, R>(
-  of f: @escaping @differentiable (T, U) -> R
-) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x, y in valueWithGradient(at: x, y, in: f) }
-}
-
-@inlinable
-public func valueWithGradient<T, U, V, R>(
-  of f: @escaping @differentiable (T, U, V) -> R
-) -> (T, U, V)
-  -> (value: R,
-      gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
 }

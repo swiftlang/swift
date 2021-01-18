@@ -217,6 +217,7 @@ DerivativeRegistrationTests.testWithLeakChecking("DerivativeGenericSignature") {
   expectEqual(1000, dx)
 }
 
+#if REQUIRES_SR14042
 // When non-canonicalized generic signatures are used to compare derivative configurations, the
 // `@differentiable` and `@derivative` attributes create separate derivatives, and we get a
 // duplicate symbol error in TBDGen.
@@ -236,6 +237,7 @@ DerivativeRegistrationTests.testWithLeakChecking("NonCanonicalizedGenericSignatu
   // give a gradient of 1).
   expectEqual(0, dx)
 }
+#endif
 
 // Test derivatives of default implementations.
 protocol HasADefaultImplementation {

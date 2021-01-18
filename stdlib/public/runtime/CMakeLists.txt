@@ -117,7 +117,7 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
 
 set(ELFISH_SDKS)
 set(COFF_SDKS)
-foreach(sdk ${SWIFT_CONFIGURED_SDKS})
+foreach(sdk ${SWIFT_SDKS})
   if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND ELFISH_SDKS ${sdk})
   elseif("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "COFF")
@@ -145,7 +145,7 @@ add_swift_target_library(swiftImageRegistrationObjectCOFF
                   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   INSTALL_IN_COMPONENT none)
 
-foreach(sdk ${SWIFT_CONFIGURED_SDKS})
+foreach(sdk ${SWIFT_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
@@ -225,11 +225,18 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
           set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
         endif()
       endif()
+      set(libpthread -lpthread)
+      set(android_libraries)
+      if(sdk STREQUAL ANDROID)
+        set(android_libraries -llog)
+        set(libpthread)
+      endif()
 
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
 -ldl
--lpthread
+${libpthread}
+${android_libraries}
 -lswiftCore
 ${libicu_i18n_a}
 ${libicu_uc_a}

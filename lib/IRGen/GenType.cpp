@@ -1420,8 +1420,9 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   }
 
   bool error = readLegacyTypeInfo(*fs, path);
-  if (error)
-    llvm::report_fatal_error("Cannot read '" + path + "'");
+  if (error) {
+    IGM.error(SourceLoc(), "Cannot read legacy layout file at '" + path + "'");
+  }
 }
 
 TypeConverter::~TypeConverter() {

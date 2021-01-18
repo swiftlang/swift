@@ -708,6 +708,18 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--host-libtool", toolchain.libtool,
             ]
+        if args.native_clang_tools_path is not None:
+            impl_args += [
+                "--native-clang-tools-path=%s" % args.native_clang_tools_path
+            ]
+        if args.native_llvm_tools_path is not None:
+            impl_args += [
+                "--native-llvm-tools-path=%s" % args.native_llvm_tools_path
+            ]
+        if args.native_swift_tools_path is not None:
+            impl_args += [
+                "--native-swift-tools-path=%s" % args.native_swift_tools_path
+            ]
 
         # If we have extra_swift_args, combine all of them together and then
         # add them as one command.
@@ -1167,7 +1179,7 @@ def main_preset():
                 "build-presets.ini")
         ]
 
-        user_presets_file = os.path.join(os.getenv("HOME", "/"),
+        user_presets_file = os.path.join(os.path.expanduser("~"),
                                          '.swift-build-presets')
         if os.path.isfile(user_presets_file):
             args.preset_file_names.append(user_presets_file)

@@ -41,6 +41,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <set>
@@ -399,6 +400,18 @@ private:
 
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
+
+  /// The main actor type, populated the first time we look for it.
+  Optional<Type> MainActorType;
+
+  /// Mapping from Clang swift_attr attribute text to the Swift source buffer
+  /// IDs that contain that attribute text. These are re-used when parsing the
+  /// Swift attributes on import.
+  llvm::StringMap<unsigned> ClangSwiftAttrSourceBuffers;
+
+  /// Mapping from modules in which a Clang swift_attr attribute occurs, to be
+  /// used when parsing the attribute text.
+  llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
 public:
   /// Mapping of already-imported declarations.
@@ -767,6 +780,17 @@ public:
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
+
+  /// Look for the MainActor type in the _Concurrency library.
+  Type getMainActorType();
+
+  /// Retrieve the Swift source buffer ID that corresponds to the given
+  /// swift_attr attribute text, creating one if necessary.
+  unsigned getClangSwiftAttrSourceBuffer(StringRef attributeText);
+
+  /// Retrieve the placeholder source file for use in parsing Swift attributes
+  /// in the given module.
+  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.

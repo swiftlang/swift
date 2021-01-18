@@ -3781,8 +3781,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
     if (ClangDecl && Options.CurrentModule) {
       for (auto *Redecl : ClangDecl->redecls()) {
-        clang::Module *ClangModule =
-            Redecl->getOwningModule()->getTopLevelModule();
+        auto *owningModule = Redecl->getOwningModule();
+        if (!owningModule)
+          continue;
+        clang::Module *ClangModule = owningModule->getTopLevelModule();
         if (!ClangModule)
           continue;
 

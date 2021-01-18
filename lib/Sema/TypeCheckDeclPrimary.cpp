@@ -565,12 +565,14 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (current == other || (other->hasInterfaceType() && other->isInvalid()))
       continue;
 
+    auto *otherDC = other->getDeclContext();
+
     // Skip declarations in other modules.
-    if (currentModule != other->getModuleContext())
+    if (currentModule != otherDC->getParentModule())
       continue;
 
     // If both declarations are in the same file, only diagnose the second one.
-    if (currentFile == other->getDeclContext()->getParentSourceFile())
+    if (currentFile == otherDC->getParentSourceFile())
       if (current->getLoc().isValid() &&
           ctx.SourceMgr.isBeforeInBuffer(
             current->getLoc(), other->getLoc()))
@@ -578,7 +580,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
 
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
-    if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
+    if (currentDC->isTypeContext() != otherDC->isTypeContext())
       continue;
 
     // In local context, only consider exact name matches.
@@ -592,7 +594,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // Skip declarations in other files.
+    // Skip inaccessible declarations in other files.
     // In practice, this means we will warn on a private declaration that
     // shadows a non-private one, but only in the file where the shadowing
     // happens. We will warn on conflicting non-private declarations in both
@@ -603,6 +605,15 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
 
     // Skip invalid declarations.
     if (other->isInvalid())
+      continue;
+
+    // Allow redeclarations of typealiases in different constrained
+    // extensions.
+    if (isa<TypeAliasDecl>(current) &&
+        isa<TypeAliasDecl>(other) &&
+        currentDC != otherDC &&
+        currentDC->getGenericSignatureOfContext().getCanonicalSignature() !=
+        otherDC->getGenericSignatureOfContext().getCanonicalSignature())
       continue;
 
     // Thwart attempts to override the same declaration more than once.

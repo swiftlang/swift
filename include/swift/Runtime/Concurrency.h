@@ -299,6 +299,14 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueMainExecutor(Job *job);
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_MainActor_register(HeapObject *actor);
+
 /// A hook to take over global enqueuing.
 /// TODO: figure out a better abstraction plan than this.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -345,6 +353,15 @@ void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
                                                 void *continuation,
                                                 const Metadata *resumeType);
 
+/// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
+extern "C" SWIFT_CC(swift)
+void swift_continuation_logFailedCheck(const char *message);
+
+/// Drain the queue
+/// If the binary links CoreFoundation, uses CFRunLoopRun
+/// Otherwise it uses dispatchMain.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueue();
 }
 
 #endif

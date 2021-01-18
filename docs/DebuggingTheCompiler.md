@@ -607,11 +607,11 @@ missing important content from the downstream branch. As an example,
 consider a situation where one has the following straw man commit flow
 graph:
 
-    github/master -> github/tensorflow
+    github/main -> github/tensorflow
 
 In this case if one attempts to use `git-bisect` on
 github/tensorflow, `git-bisect` will sometimes choose commits from
-github/master resulting in one being unable to compile/test specific
+github/main resulting in one being unable to compile/test specific
 tensorflow code that has not been upstreamed yet. Even worse, what if
 we are trying to bisect in between two that were branched from
 github/tensorflow and have had subsequent commits cherry-picked on
@@ -619,7 +619,7 @@ top. Without any loss of generality, lets call those two tags
 `tag-tensorflow-bad` and `tag-tensorflow-good`. Since both of
 these tags have had commits cherry-picked on top, they are technically
 not even on the github/tensorflow branch, but rather in a certain
-sense are a tag of a feature branch from master/tensorflow. So,
+sense are a tag of a feature branch from main/tensorflow. So,
 `git-bisect` doesn't even have a clear history to bisect on in
 multiple ways.
 
@@ -634,14 +634,14 @@ commits. We can compute this as so:
 
 Given that both tags were taken from the feature branch, the reader
 can prove to themselves that this commit is guaranteed to be on
-`github/tensorflow` and not `github/master` since all commits from
-`github/master` are forwarded using git merges.
+`github/tensorflow` and not `github/main` since all commits from
+`github/main` are forwarded using git merges.
 
 Then lets assume that we checked out `$TAG_MERGE_BASE` and then ran
 `test.sh` and did not hit any error. Ok, we can not bisect. Sadly,
 as mentioned above if we run git-bisect in between `$TAG_MERGE_BASE`
 and `tags/tag-tensorflow-bad`, `git-bisect` will sometimes choose
-commits from `github/master` which would cause `test.sh` to fail
+commits from `github/main` which would cause `test.sh` to fail
 if we are testing tensorflow specific code! To work around this
 problem, we need to start our bisect and then tell `git-bisect` to
 ignore those commits by using the skip sub command:
@@ -875,14 +875,14 @@ well as cleanups/modernizations on a code-base. Swift's cmake invocation by
 default creates one of these json databases at the root path of the swift host
 build, for example on macOS:
 
-    $PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json
+    $PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json
 
 Using this file, one invokes `clang-tidy` on a specific file in the codebase
 as follows:
 
-    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_FILE
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_FILE
 
 One can also use shell regex to visit multiple files in the same directory. Example:
 
-    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
 

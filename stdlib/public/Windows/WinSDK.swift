@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_exported import ucrt
 @_exported import WinSDK // Clang module
 
 // WinBase.h

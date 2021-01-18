@@ -205,23 +205,14 @@ const Requirement &RequirementFailure::getRequirement() const {
 
 ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     ConstraintLocator *locator) {
-  auto &solution = getSolution();
   auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
   if (!reqElt.isConditionalRequirement())
     return nullptr;
 
-  auto path = locator->getPath();
-  auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
-
-  auto result = llvm::find_if(
-      solution.Conformances,
-      [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
-              &conformance) { return conformance.first == typeReqLoc; });
-  assert(result != solution.Conformances.end());
-
-  auto conformance = result->second;
-  assert(conformance.isConcrete());
-  return conformance.getConcrete();
+  auto conformanceRef =
+    locator->findLast<LocatorPathElt::ConformanceRequirement>();
+  assert(conformanceRef && "Invalid locator for a conditional requirement");
+  return conformanceRef->getConformance();
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
@@ -249,8 +240,28 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return getAffectedDeclFromType(func->getResultInterfaceType());
   }
 
-  if (isFromContextualType())
-    return getAffectedDeclFromType(getContextualType(getRawAnchor()));
+  if (isFromContextualType()) {
+    auto anchor = getRawAnchor();
+    auto contextualPurpose = getContextualTypePurpose(anchor);
+    auto contextualTy = getContextualType(anchor);
+
+    // If the issue is a mismatch between `return` statement/expression
+    // and its contextual requirements, it means that affected declaration
+    // is a declarer of a contextual "result" type e.g. member of a
+    // type, local function etc.
+    if (contextualPurpose == CTP_ReturnStmt ||
+        contextualPurpose == CTP_ReturnSingleExpr) {
+      // In case of opaque result type, let's point to the declaration
+      // associated with the type itself (since it has one) instead of
+      // declarer.
+      if (auto *opaque = contextualTy->getAs<OpaqueTypeArchetypeType>())
+        return opaque->getDecl();
+
+      return cast<ValueDecl>(getDC()->getAsDecl());
+    }
+
+    return getAffectedDeclFromType(contextualTy);
+  }
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     // If there is a declaration associated with this

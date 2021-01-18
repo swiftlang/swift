@@ -30,6 +30,7 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -374,7 +375,7 @@ private:
   void prepareForDifferentialGeneration();
 
 public:
-  explicit Implementation(ADContext &context, SILFunction *original,
+  explicit Implementation(ADContext &context,
                           SILDifferentiabilityWitness *witness,
                           SILFunction *jvp, DifferentiationInvoker invoker);
 
@@ -1407,13 +1408,13 @@ getActivityInfo(ADContext &context, SILFunction *original,
 }
 
 JVPCloner::Implementation::Implementation(ADContext &context,
-                                          SILFunction *original,
                                           SILDifferentiabilityWitness *witness,
                                           SILFunction *jvp,
                                           DifferentiationInvoker invoker)
-    : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
-      context(context), original(original), witness(witness), jvp(jvp),
-      invoker(invoker),
+    : TypeSubstCloner(*jvp, *witness->getOriginalFunction(),
+                      getSubstitutionMap(witness->getOriginalFunction(), jvp)),
+      context(context), original(witness->getOriginalFunction()),
+      witness(witness), jvp(jvp), invoker(invoker),
       activityInfo(
           getActivityInfo(context, original, witness->getConfig(), jvp)),
       loopInfo(context.getPassManager().getAnalysis<SILLoopAnalysis>()
@@ -1427,10 +1428,9 @@ JVPCloner::Implementation::Implementation(ADContext &context,
   context.recordGeneratedFunction(&getDifferential());
 }
 
-JVPCloner::JVPCloner(ADContext &context, SILFunction *original,
-                     SILDifferentiabilityWitness *witness, SILFunction *jvp,
-                     DifferentiationInvoker invoker)
-    : impl(*new Implementation(context, original, witness, jvp, invoker)) {}
+JVPCloner::JVPCloner(ADContext &context, SILDifferentiabilityWitness *witness,
+                     SILFunction *jvp, DifferentiationInvoker invoker)
+    : impl(*new Implementation(context, witness, jvp, invoker)) {}
 
 JVPCloner::~JVPCloner() { delete &impl; }
 
@@ -1684,13 +1684,10 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
-  Mangle::ASTMangler mangler;
-  auto diffName =
-      original->getASTContext()
-          .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
-              original->getName(), AutoDiffLinearMapKind::Differential,
-              witness->getConfig()))
-          .str();
+  Mangle::DifferentiationMangler mangler;
+  auto diffName = mangler.mangleLinearMap(
+      witness->getOriginalFunction(), AutoDiffLinearMapKind::Differential,
+      witness->getConfig());
   // Set differential generic signature equal to JVP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.
@@ -1705,10 +1702,11 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
+  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *differential = fb.createFunction(
-      linkage, diffName, diffType, diffGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, jvp->isSerialized(),
+      linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
+      diffGenericEnv, original->getLocation(), original->isBare(),
+      IsNotTransparent, jvp->isSerialized(),
       original->isDynamicallyReplaceable());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));

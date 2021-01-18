@@ -520,21 +520,45 @@ importer::getNormalInvocationArguments(
     invocationArgStrs.push_back(
         "-Werror=non-modular-include-in-framework-module");
 
+  bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+
   if (LangOpts.EnableObjCInterop) {
-    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
-    invocationArgStrs.insert(
-        invocationArgStrs.end(),
-        {"-x", EnableCXXInterop ? "objective-c++" : "objective-c",
-         EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11", "-fobjc-arc"});
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-fobjc-arc"});
     // TODO: Investigate whether 7.0 is a suitable default version.
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
+
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-x", EnableCXXInterop ? "objective-c++" : "objective-c",
+    });
   } else {
-    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-x", EnableCXXInterop ? "c++" : "c",
-                              EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11"});
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-x", EnableCXXInterop ? "c++" : "c",
+    });
+  }
+
+  {
+    const clang::LangStandard &stdcxx =
+#if defined(CLANG_DEFAULT_STD_CXX)
+        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_CXX);
+#else
+        clang::LangStandard::getLangStandardForKind(
+            clang::LangStandard::lang_gnucxx14);
+#endif
+
+    const clang::LangStandard &stdc =
+#if defined(CLANG_DEFAULT_STD_C)
+        *clang::LangStandard::getLangStandardForName(CLANG_DEFAULT_STD_C);
+#else
+        clang::LangStandard::getLangStandardForKind(
+            clang::LangStandard::lang_gnu11);
+#endif
+
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      (Twine("-std=") + StringRef(EnableCXXInterop ? stdcxx.getName()
+                                                   : stdc.getName())).str()
+    });
   }
 
   // Set C language options.

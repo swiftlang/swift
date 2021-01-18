@@ -308,6 +308,9 @@ NODE(CanonicalPrespecializedGenericTypeCachingOnceToken)
 
 // Added in Swift 5.5
 NODE(AsyncFunctionPointer)
+NODE(AutoDiffFunction)
+NODE(AutoDiffFunctionKind)
+NODE(IndexSubset)
 
 #undef CONTEXT_NODE
 #undef NODE

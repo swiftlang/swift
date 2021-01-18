@@ -26,6 +26,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Error.h"
 
@@ -653,6 +654,17 @@ getDifferentiabilityWitnessGenericSignature(GenericSignature origGenSig,
 
 } // end namespace autodiff
 
+} // end namespace swift
+
+namespace swift {
+namespace Demangle {
+
+AutoDiffFunctionKind
+getAutoDiffFunctionKind(AutoDiffDerivativeFunctionKind kind);
+
+AutoDiffFunctionKind getAutoDiffFunctionKind(AutoDiffLinearMapKind kind);
+
+} // end namespace autodiff
 } // end namespace swift
 
 namespace llvm {
