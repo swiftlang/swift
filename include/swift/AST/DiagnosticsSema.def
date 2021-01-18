@@ -3570,6 +3570,9 @@ ERROR(self_assignment_prop,none,
 ERROR(property_use_in_closure_without_explicit_self,none,
       "reference to property %0 in closure requires explicit use of 'self' to"
       " make capture semantics explicit", (Identifier))
+WARNING(member_assign_to_closure_without_explicit_self,none,
+      "assignment of member %0 to closure requires explicit use of 'self' to"
+      " make capture semantics explicit", (Identifier))
 ERROR(method_call_in_closure_without_explicit_self,none,
       "call to method %0 in closure requires explicit use of 'self' to make"
       " capture semantics explicit", (Identifier))

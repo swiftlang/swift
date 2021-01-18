@@ -528,3 +528,15 @@ class SR3186 {
     print("\(v)")
   }
 }
+
+var sr8536_closure: () -> () = {}
+
+class SR8536 {
+
+  func baz() {}
+
+  init() {
+     // expected-warning@+1{{assignment of member 'baz' to closure requires explicit use of 'self' to make capture semantics explicit}}
+    sr8536_closure = baz
+  }
+}

@@ -1444,6 +1444,68 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
+static void
+diagnoseMemberMethodAssignmentsCapturingSelf(const Expr *E,
+                                             const DeclContext *DC) {
+
+  class DiagnoseWalker : public ASTWalker {
+    ASTContext &Ctx;
+
+  public:
+    explicit DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    bool walkToDeclPre(Decl *D) override { return false; }
+
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
+    }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
+
+    DeclRefExpr *getMemberFuncReferencingSelf(Expr *selfParam,
+                                              AutoClosureExpr *ACE) {
+
+      if (auto *ICE = dyn_cast<AutoClosureExpr>(ACE->getSingleExpressionBody()))
+        if (auto *AE = dyn_cast<ApplyExpr>(ICE->getSingleExpressionBody()))
+          if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(AE->getFn()))
+            if (auto *base = dyn_cast<DeclRefExpr>(DSCE->getBase()))
+              if (base->getType()->getCanonicalType() ==
+                  selfParam->getType()->getCanonicalType()) {
+                auto *member = dyn_cast<DeclRefExpr>(DSCE->getFn());
+                return member;
+              }
+
+      return nullptr;
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+
+      if (auto *ASE = dyn_cast<AssignExpr>(E))
+        if (auto *AE = dyn_cast<ApplyExpr>(ASE->getSrc()))
+          if (auto *ACE = dyn_cast<AutoClosureExpr>(AE->getFn()))
+            if (auto *selfParam = dyn_cast<DeclRefExpr>(AE->getArg()))
+              if (selfParam->isImplicit())
+                if (auto *member =
+                        getMemberFuncReferencingSelf(selfParam, ACE)) {
+                  auto baseName = member->getDecl()->getBaseName();
+                  auto memberLoc = member->getLoc();
+                  auto &Diags = Ctx.Diags;
+                  Diags.diagnose(
+                      memberLoc,
+                      diag::member_assign_to_closure_without_explicit_self,
+                      baseName.getIdentifier());
+                }
+
+      return {true, E};
+    }
+  };
+
+  auto &ctx = DC->getASTContext();
+  const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx));
+}
+
 /// Look for any property references in closures that lack a 'self.' qualifier.
 /// Within a closure, we require that the source code contain 'self.' explicitly
 /// (or that the closure explicitly capture 'self' in the capture list) because
@@ -4602,6 +4664,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
+  diagnoseMemberMethodAssignmentsCapturingSelf(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
