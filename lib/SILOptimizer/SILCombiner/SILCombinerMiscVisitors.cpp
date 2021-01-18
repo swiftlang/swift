@@ -1875,19 +1875,16 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
 }
 
 SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
-  if (TEI->getFunction()->hasOwnership())
-    return nullptr;
-
   // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
   // if it can be proven that no overflow can happen.
-  if (TEI->getFieldIndex() != 1)
-    return nullptr;
+  if (TEI->getFieldIndex() == 1) {
+    Builder.setCurrentDebugScope(TEI->getDebugScope());
+    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
+      if (!canOverflow(BI))
+        return Builder.createIntegerLiteral(TEI->getLoc(), TEI->getType(),
+                                            APInt(1, 0));
+  }
 
-  Builder.setCurrentDebugScope(TEI->getDebugScope());
-  if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
-    if (!canOverflow(BI))
-      return Builder.createIntegerLiteral(TEI->getLoc(), TEI->getType(),
-                                          APInt(1, 0));
   return nullptr;
 }
 
