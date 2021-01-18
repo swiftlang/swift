@@ -47,5 +47,6 @@ ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
 ANALYSIS(PassManagerVerifier)
+ANALYSIS(DeadEndBlocks)
 
 #undef ANALYSIS
