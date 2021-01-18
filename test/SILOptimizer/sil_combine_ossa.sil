@@ -410,12 +410,12 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @optimize_nested_index_addr
-// XHECK:      bb0(%0 : $Builtin.RawPointer):
-// XHECK-NEXT:   %1 = pointer_to_address %0
-// XHECK-NEXT:   %2 = integer_literal $Builtin.Word, 10
-// XHECK-NEXT:   %3 = index_addr %1 : $*UInt8, %2
-// XHECK-NEXT:   %4 = address_to_pointer %3
-// XHECK-NEXT:   return %4
+// CHECK:      bb0(%0 : $Builtin.RawPointer):
+// CHECK-NEXT:   %1 = pointer_to_address %0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Word, 10
+// CHECK-NEXT:   %3 = index_addr %1 : $*UInt8, %2
+// CHECK-NEXT:   %4 = address_to_pointer %3
+// CHECK-NEXT:   return %4
 sil [ossa] @optimize_nested_index_addr : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 3

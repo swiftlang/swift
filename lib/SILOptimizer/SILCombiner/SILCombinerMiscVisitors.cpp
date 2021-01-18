@@ -937,9 +937,6 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 /// ->
 ///    %2 = index_addr %ptr, x+y
 SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
-  if (IA->getFunction()->hasOwnership())
-    return nullptr;
-
   unsigned index = 0;
   SILValue base = isConstIndexAddr(IA, index);
   if (!base)
