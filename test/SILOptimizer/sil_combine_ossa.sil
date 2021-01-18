@@ -4182,8 +4182,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @conversion_to_and_from_bridge_object
-// XHECK:      bb0(%0 : $Builtin.Int64):
-// XHECK-NEXT:   return %0
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:   return %0
+// CHECK: } // end sil function 'conversion_to_and_from_bridge_object'
 sil [ossa] @conversion_to_and_from_bridge_object : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
   %1 = struct $UInt64 (%0 : $Builtin.Int64)
