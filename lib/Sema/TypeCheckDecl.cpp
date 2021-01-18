@@ -2511,18 +2511,18 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
 namespace {
 
 // Utility class for deterministically ordering vtable entries for
-// synthesized methods.
-struct SortedFuncList {
+// synthesized declarations.
+struct SortedDeclList {
   using Key = std::tuple<DeclName, std::string>;
-  using Entry = std::pair<Key, AbstractFunctionDecl *>;
+  using Entry = std::pair<Key, ValueDecl *>;
   SmallVector<Entry, 2> elts;
   bool sorted = false;
 
-  void add(AbstractFunctionDecl *afd) {
-    assert(!isa<AccessorDecl>(afd));
+  void add(ValueDecl *vd) {
+    assert(!isa<AccessorDecl>(vd));
 
-    Key key{afd->getName(), afd->getInterfaceType().getString()};
-    elts.emplace_back(key, afd);
+    Key key{vd->getName(), vd->getInterfaceType()->getCanonicalType().getString()};
+    elts.emplace_back(key, vd);
   }
 
   bool empty() { return elts.empty(); }
@@ -2603,13 +2603,13 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  SortedFuncList synthesizedMembers;
+  SortedDeclList synthesizedMembers;
 
   for (auto *member : idc->getMembers()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+    if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // If this is a witness to Actor.enqueue(partialTask:), put it at the
       // beginning of the vtable.
-      if (auto func = dyn_cast<FuncDecl>(afd)) {
+      if (auto func = dyn_cast<FuncDecl>(vd)) {
         if (func->isActorEnqueuePartialTaskWitness()) {
           result.insert(result.begin(), func);
           continue;
@@ -2618,8 +2618,8 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
-      if (afd->isSynthesized()) {
-        synthesizedMembers.add(afd);
+      if (vd->isSynthesized()) {
+        synthesizedMembers.add(vd);
         continue;
       }
     }
@@ -2629,7 +2629,6 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
   if (!synthesizedMembers.empty()) {
     synthesizedMembers.sort();
-
     for (const auto &pair : synthesizedMembers)
       result.push_back(pair.second);
   }

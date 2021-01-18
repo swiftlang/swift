@@ -579,6 +579,7 @@ static ValueDecl *deriveDifferentiable_method(
       /*Async=*/false,
       /*Throws=*/false,
       /*GenericParams=*/nullptr, params, returnType, parentDC);
+  funcDecl->setSynthesized();
   if (!nominal->getSelfClassDecl())
     funcDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
@@ -732,6 +733,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
                          /*GenericParams*/ {}, parentDC);
   structDecl->setBraces({synthesizedLoc, synthesizedLoc});
   structDecl->setImplicit();
+  structDecl->setSynthesized();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   // Add stored properties to the `TangentVector` struct.
@@ -741,6 +743,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto *tangentProperty = new (C) VarDecl(
         member->isStatic(), member->getIntroducer(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
+    tangentProperty->setSynthesized();
     // Note: `tangentProperty` is not marked as implicit here, because that
     // incorrectly affects memberwise initializer synthesis.
     auto memberContextualType =
