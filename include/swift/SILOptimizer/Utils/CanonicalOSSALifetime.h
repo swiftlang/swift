@@ -196,6 +196,8 @@ private:
 
   DominanceAnalysis *dominanceAnalysis;
 
+  DeadEndBlocks *deBlocks;
+
   /// Current copied def for which this state describes the liveness.
   SILValue currentDef;
 
@@ -237,9 +239,10 @@ private:
 public:
   CanonicalizeOSSALifetime(bool pruneDebug,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceAnalysis *dominanceAnalysis)
+                           DominanceAnalysis *dominanceAnalysis,
+                           DeadEndBlocks *deBlocks)
     : pruneDebug(pruneDebug), accessBlockAnalysis(accessBlockAnalysis),
-      dominanceAnalysis(dominanceAnalysis) {}
+      dominanceAnalysis(dominanceAnalysis), deBlocks(deBlocks) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
@@ -293,7 +296,7 @@ protected:
 
   bool computeBorrowLiveness();
 
-  void consolidateBorrowScope();
+  bool consolidateBorrowScope();
 
   bool computeCanonicalLiveness();
 

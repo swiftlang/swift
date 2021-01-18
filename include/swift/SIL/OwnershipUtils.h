@@ -217,6 +217,9 @@ struct BorrowingOperand {
   /// over a region of code instead of just for a single instruction, visit
   /// those uses.
   ///
+  /// Returns true if all visitor invocations returns true. Exits early if a
+  /// visitor returns false.
+  ///
   /// Example: An apply performs an instantaneous recursive borrow of a
   /// guaranteed value but a begin_apply borrows the value over the entire
   /// region of code corresponding to the coroutine.
