@@ -347,11 +347,10 @@ updateSSA(SILModule &M, SILLoop *Loop,
 }
 
 /// Try to fully unroll the loop if we can determine the trip count and the trip
-/// count is below a threshold.
+/// count lis below a threshold.
 static bool tryToUnrollLoop(SILLoop *Loop) {
   assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
 
-  LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
@@ -365,15 +364,11 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
 
   Optional<uint64_t> MaxTripCount =
       getMaxLoopTripCount(Loop, Preheader, Header, Latch);
-  if (!MaxTripCount) {
-    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
+  if (!MaxTripCount)
     return false;
-  }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.getValue())) {
-    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.getValue()))
     return false;
-  }
 
   // TODO: We need to split edges from non-condbr exits for the SSA updater. For
   // now just don't handle loops containing such exits.
@@ -448,6 +443,7 @@ class LoopUnrolling : public SILFunctionTransform {
 
   void run() override {
     bool Changed = false;
+
     auto *Fun = getFunction();
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
 
@@ -465,12 +461,6 @@ class LoopUnrolling : public SILFunctionTransform {
           InnermostLoops.push_back(L);
       }
     }
-
-    if (InnermostLoops.empty())
-      return;
-
-    LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
-                            << Fun->getName() << "\n");
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)
