@@ -2765,7 +2765,8 @@ bool LoadableByAddress::recreateTupleInstr(
   for (auto elem : tupleInstr->getElements()) {
     elems.push_back(elem);
   }
-  auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), elems);
+  auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), newResultTy,
+                                            elems);
   tupleInstr->replaceAllUsesWith(newTuple);
   Delete.push_back(tupleInstr);
   return true;
