@@ -59,13 +59,6 @@ DifferentialOperatorTestSuite.test("gradient_curried_${arity}") {
   expectEqual(${expectedGradients}, gradF(${args}))
 }
 
-DifferentialOperatorTestSuite.test("valueWithGradient_curried_${arity}") {
-  let valueWithGradF = valueWithGradient(of: exampleDiffFunc_${arity})
-  let (value, grad) = valueWithGradF(${args})
-  expectEqual(${expectedValue}, value)
-  expectEqual(${expectedGradients}, grad)
-}
-
 % end
 
 runAllTests()
