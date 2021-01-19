@@ -35,6 +35,7 @@ namespace syntax {
 % for node in SYNTAX_NODES:
 %   if not node.is_syntax_collection():
 class ${node.name};
+class ${node.name}Ref;
 %   end
 % end
 
@@ -43,6 +44,9 @@ class ${node.name};
 using ${node.name} =
   SyntaxCollection<SyntaxKind::${node.syntax_kind},
                    ${node.collection_element_type}>;
+using ${node.name}Ref =
+  SyntaxCollectionRef<SyntaxKind::${node.syntax_kind},
+                      ${node.collection_element_type}Ref>;
 %   end
 % end
 
@@ -69,7 +73,7 @@ public:
   };
 %     end
 
-  ${node.name}(const SyntaxData Data) : ${node.base_type}(Data) {
+  ${node.name}(const SyntaxData &Data) : ${node.base_type}(Data) {
 %     if node.requires_validation():
     this->validate();
 %     end
@@ -109,6 +113,57 @@ public:
 
 %     end
 
+  static bool kindof(SyntaxKind Kind) {
+%     if node.is_base():
+    return is${node.syntax_kind}Kind(Kind);
+%     else:
+    return Kind == SyntaxKind::${node.syntax_kind};
+%     end
+  }
+
+  static bool classof(const Syntax *S) {
+    return kindof(S->getKind());
+  }
+};
+
+%     for line in dedented_lines(node.description):
+/// ${line}
+%     end
+///
+/// This node is an unsafe reference that requires parents to always outlive
+/// their child nodes. See doc comment on \c SyntaxDataRef for more details.
+class ${node.name}Ref ${qualifier} : public ${node.base_type}Ref {
+  friend class ${node.name}; // Non-Ref node is a friend to call validate.
+  
+%     if node.requires_validation():
+  void validate() const;
+
+%     end
+public:
+%     if node.children:
+  using Cursor = ${node.name}::Cursor; // Use same cursor as non-Ref node.
+%     end
+
+  ${node.name}Ref(const SyntaxDataRef &Data) : ${node.base_type}Ref(Data) {
+%     if node.requires_validation():
+    this->validate();
+%     end
+  }
+
+  /// Demote a ${node.name} node to a ${node.name}Ref node.
+  ${node.name}Ref(const ${node.name} &Node) : ${node.base_type}Ref(Node.getDataRef()) {}
+
+%     for child in node.children:
+%       for line in dedented_lines(child.description):
+  /// ${line}
+%       end
+%       if child.is_optional:
+  llvm::Optional<${child.type_name}Ref> get${child.name}() const;
+%       else:
+  ${child.type_name}Ref get${child.name}() const;
+%       end
+
+%     end
   static bool kindof(SyntaxKind Kind) {
 %     if node.is_base():
     return is${node.syntax_kind}Kind(Kind);

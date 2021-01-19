@@ -26,9 +26,9 @@ using namespace swift::syntax;
 
 % for node in SYNTAX_NODES:
 %   if node.requires_validation():
-void ${node.name}::validate() const {
+void ${node.name}Ref::validate() const {
 #ifndef NDEBUG
-  auto raw = Data.getRaw();
+  auto raw = Data.getRawRef();
   if (isMissing()) return;
   assert(raw->getLayout().size() == ${len(node.children)});
 %     for child in node.children:
@@ -55,15 +55,39 @@ void ${node.name}::validate() const {
 
 %   for child in node.children:
 %     if child.is_optional:
+llvm::Optional<${child.type_name}Ref> ${node.name}Ref::get${child.name}() const {
+  if (auto ChildData = getDataRef().getChildRef(Cursor::${child.name})) {
+    return ${child.type_name}Ref(*ChildData);
+  } else {
+    return None;
+  }
+}
+%     else:
+${child.type_name}Ref ${node.name}Ref::get${child.name}() const {
+  return ${child.type_name}Ref(*getDataRef().getChildRef(Cursor::${child.name}));
+}
+%     end
+%   end
+
+
+%   if node.requires_validation():
+void ${node.name}::validate() const {
+  ${node.name}Ref(*this).validate();
+}
+%   end
+
+%   for child in node.children:
+%     if child.is_optional:
 llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() const {
-  auto ChildData = Data.getChild(Cursor::${child.name});
-  if (!ChildData)
-    return llvm::None;
-  return ${child.type_name}(*ChildData);
+  if (auto ChildData = getData().getChild(Cursor::${child.name})) {
+    return ${child.type_name}(*ChildData);
+  } else {
+    return None;
+  }
 }
 %     else:
 ${child.type_name} ${node.name}::get${child.name}() const {
-  return ${child.type_name}(*Data.getChild(Cursor::${child.name}));
+  return ${child.type_name}(*getData().getChild(Cursor::${child.name}));
 }
 %     end
 
@@ -81,7 +105,7 @@ ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
   else
     raw = RawSyntax::makeAndCalcLength(SyntaxKind::${child_node.syntax_kind},
       {${child_elt}.getRaw()}, SourcePresence::Present);
-  return ${node.name}(Data.replacingChild(raw, Cursor::${child.name}));
+  return ${node.name}(getData().replacingChild(raw, Cursor::${child.name}));
 }
 %     end
 
@@ -97,7 +121,7 @@ ${node.name} ${node.name}::with${child.name}(
     raw = ${make_missing_child(child)};
 % end
   }
-  return ${node.name}(Data.replacingChild(raw, Cursor::${child.name}));
+  return ${node.name}(getData().replacingChild(raw, Cursor::${child.name}));
 }
 
 %   end

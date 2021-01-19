@@ -17,63 +17,50 @@
 using namespace swift;
 using namespace swift::syntax;
 
-const RC<RawSyntax> &Syntax::getRaw() const { return Data.getRaw(); }
-
-SyntaxKind Syntax::getKind() const {
-  return getRaw()->getKind();
+llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
+  if (auto ChildData = getData().getChild(N)) {
+    return Syntax(*ChildData);
+  } else {
+    return None;
+  }
 }
 
-void Syntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
-  if (auto Raw = getRaw())
-    Raw->print(OS, Opts);
+Optional<TokenSyntax> Syntax::getFirstToken() const {
+  if (auto Token = getData().getFirstToken()) {
+    return TokenSyntax(*Token);
+  } else {
+    return None;
+  }
 }
 
-void Syntax::dump() const {
-  getRaw()->dump();
-}
-
-void Syntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
-  getRaw()->dump(OS, 0);
-}
-
-bool Syntax::isType() const { return Data.isType(); }
-
-bool Syntax::isDecl() const { return Data.isDecl(); }
-
-bool Syntax::isStmt() const { return Data.isStmt(); }
-
-bool Syntax::isExpr() const { return Data.isExpr(); }
-
-bool Syntax::isToken() const {
-  return getRaw()->isToken();
-}
-
-bool Syntax::isPattern() const { return Data.isPattern(); }
-
-bool Syntax::isUnknown() const { return Data.isUnknown(); }
-
-bool Syntax::isPresent() const {
-  return getRaw()->isPresent();
-}
-
-bool Syntax::isMissing() const {
-  return getRaw()->isMissing();
+Optional<TokenSyntax> Syntax::getLastToken() const {
+  if (auto Token = getData().getLastToken()) {
+    return TokenSyntax(*Token);
+  } else {
+    return None;
+  }
 }
 
 llvm::Optional<Syntax> Syntax::getParent() const {
-  auto ParentData = getData().getParent();
-  if (!ParentData) {
+  if (auto ParentData = getData().getParent()) {
+    return Syntax(*ParentData);
+  } else {
     return None;
   }
-  return Syntax(*ParentData);
 }
 
-size_t Syntax::getNumChildren() const { return Data.getNumChildren(); }
-
-llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
-  auto ChildData = Data.getChild(N);
-  if (!ChildData) {
+Optional<Syntax> Syntax::getPreviousNode() const {
+  if (auto prev = getData().getPreviousNode()) {
+    return Syntax(*prev);
+  } else {
     return None;
   }
-  return Syntax(*ChildData);
+}
+
+Optional<Syntax> Syntax::getNextNode() const {
+  if (auto prev = getData().getNextNode()) {
+    return Syntax(*prev);
+  } else {
+    return None;
+  }
 }
