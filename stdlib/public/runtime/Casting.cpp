@@ -885,7 +885,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
 /******************************** Existentials ********************************/
 /******************************************************************************/
 
-
+#if SWIFT_OBJC_INTEROP
 static void unwrapExistential(OpaqueValue *src,
                               const ExistentialTypeMetadata *srcType,
                               OpaqueValue *&srcValue,
@@ -932,6 +932,7 @@ static void unwrapExistential(OpaqueValue *src,
     }
   }
 }
+#endif
 
 /******************************************************************************/
 /****************************** Main Entrypoint *******************************/
