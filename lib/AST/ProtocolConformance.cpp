@@ -187,8 +187,8 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
 
 
 static bool classifyRequirement(ModuleDecl *module, 
-                         ProtocolConformance *reqConformance, 
-                         ValueDecl *requiredFn) {
+                                ProtocolConformance *reqConformance, 
+                                ValueDecl *requiredFn) {
   auto DC = reqConformance->getDeclContext();
   auto reqTy = reqConformance->getType();
   auto declRef = reqConformance->getWitnessDeclRef(requiredFn);
@@ -210,10 +210,13 @@ static bool classifyRequirement(ModuleDecl *module,
   return false;
 }
 
+// classify the type requirements of a given prottocol type with a function
+// requirement as throws or not. This will detect if the signature of the 
+// function is throwing or not depending on associated types.
 static bool classifyTypeRequirement(ModuleDecl *module, Type protoType, 
-                             ValueDecl *requiredFn, 
-                             ProtocolConformance *conformance,
-                             ProtocolDecl *requiredProtocol) {
+                                    ValueDecl *requiredFn, 
+                                    ProtocolConformance *conformance,
+                                    ProtocolDecl *requiredProtocol) {
   auto reqProtocol = cast<ProtocolDecl>(requiredFn->getDeclContext());
   ProtocolConformance *reqConformance;
 
@@ -222,7 +225,7 @@ static bool classifyTypeRequirement(ModuleDecl *module, Type protoType,
     reqConformance = conformance;
   } else {
     auto reqConformanceRef = 
-    conformance->getAssociatedConformance(protoType, reqProtocol);
+      conformance->getAssociatedConformance(protoType, reqProtocol);
     if (!reqConformanceRef.isConcrete()) {
       return true;
     }

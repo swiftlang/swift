@@ -46,7 +46,6 @@ enum class RequirementKind : unsigned {
   // when adding enumerators.
 };
 
-
 /// A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {

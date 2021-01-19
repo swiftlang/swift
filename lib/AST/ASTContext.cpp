@@ -65,7 +65,6 @@
 #include <algorithm>
 #include <memory>
 
-
 using namespace swift;
 
 #define DEBUG_TYPE "ASTContext"
