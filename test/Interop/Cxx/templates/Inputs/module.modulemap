@@ -30,6 +30,7 @@ module ExplicitClassSpecialization {
 
 module ClassTemplateInstantionExistingSpecialization {
   header "class-template-instantiation-existing-specialization.h"
+  requires cplusplus
 }
 
 module FunctionTemplates {
@@ -49,10 +50,12 @@ module ClassTemplateEagerInstantiationProblems {
 
 module ClassTemplateInstantiation {
   header "class-template-instantiation.h"
+  requires cplusplus
 }
 
 module ClassTemplateForSwiftModule {
   header "class-template-for-swift-module.h"
+  requires cplusplus
 }
 
 module Mangling {
@@ -67,6 +70,7 @@ module LinkageOfSwiftSymbolsForImportedTypes {
 
 module ClassTemplateInstantiationErrors {
   header "class-template-instantiation-errors.h"
+  requires cplusplus
 }
 
 module ClassTemplateVariadic {
