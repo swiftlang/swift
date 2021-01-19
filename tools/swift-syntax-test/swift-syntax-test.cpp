@@ -819,7 +819,7 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
     auto SF = info.SF;
     auto BufferId = *SF->getBufferID();
     auto Root = SF->getSyntaxRoot();
-    auto AbPos = Root.getEOFToken().getAbsolutePosition();
+    auto AbPos = Root.getEOFToken().getAbsolutePositionAfterLeadingTrivia();
 
     SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
     auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);

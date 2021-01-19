@@ -28,19 +28,20 @@ namespace swift {
 namespace syntax {
 
 class TokenSyntax final : public Syntax {
-protected:
   void validate() const {
     assert(getRaw()->isToken());
   }
 public:
-  TokenSyntax(const SyntaxData Data) : Syntax(Data) {}
+  TokenSyntax(const SyntaxData &Data) : Syntax(Data) {}
 
   static TokenSyntax missingToken(const tok Kind, OwnedString Text) {
     return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text));
   }
 
   StringRef getLeadingTrivia() const { return getRaw()->getLeadingTrivia(); }
-  Trivia getLeadingTriviaPieces() const { return getRaw()->getLeadingTriviaPieces(); }
+  Trivia getLeadingTriviaPieces() const {
+    return getRaw()->getLeadingTriviaPieces();
+  }
 
   StringRef getTrailingTrivia() const { return getRaw()->getTrailingTrivia(); }
   Trivia getTrailingTriviaPieces() const {
@@ -57,27 +58,11 @@ public:
     return TokenSyntax(getData().replacingSelf(NewRaw));
   }
 
-  /* TODO: If we really need them.
-  bool isKeyword() const;
+  bool isMissing() const { return getRaw()->isMissing(); }
 
-  bool isPunctuation() const;
+  tok getTokenKind() const { return getRaw()->getTokenKind(); }
 
-  bool isOperator() const;
-
-  bool isLiteral() const;
-  */
-
-  bool isMissing() const {
-    return getRaw()->isMissing();
-  }
-
-  tok getTokenKind() const {
-    return getRaw()->getTokenKind();
-  }
-
-  StringRef getText() const {
-    return getRaw()->getTokenText();
-  }
+  StringRef getText() const { return getRaw()->getTokenText(); }
 
   StringRef getIdentifierText() const {
     StringRef text = getText();
@@ -88,13 +73,52 @@ public:
     return text;
   }
 
-  static bool kindof(SyntaxKind Kind) {
-    return isTokenKind(Kind);
+  static bool kindof(SyntaxKind Kind) { return isTokenKind(Kind); }
+
+  static bool classof(const Syntax *S) { return kindof(S->getKind()); }
+};
+
+/// \c TokenSyntaxRef duplicates some code from \c TokenSyntax. For all other
+/// nodes, this code is gyb-generated but since we don't generate \c TokenSyntax
+/// the easiest way is to just duplicate it.
+class TokenSyntaxRef final : public SyntaxRef {
+  void validate() const { assert(getRawRef()->isToken()); }
+
+public:
+  TokenSyntaxRef(const SyntaxDataRef &Data) : SyntaxRef(Data) {}
+
+  TokenSyntaxRef(const TokenSyntax &Token) : SyntaxRef(Token.getData()) {}
+
+  StringRef getLeadingTrivia() const { return getRawRef()->getLeadingTrivia(); }
+  Trivia getLeadingTriviaPieces() const {
+    return getRawRef()->getLeadingTriviaPieces();
   }
 
-  static bool classof(const Syntax *S) {
-    return kindof(S->getKind());
+  StringRef getTrailingTrivia() const {
+    return getRawRef()->getTrailingTrivia();
   }
+  Trivia getTrailingTriviaPieces() const {
+    return getRawRef()->getTrailingTriviaPieces();
+  }
+
+  bool isMissing() const { return getRawRef()->isMissing(); }
+
+  tok getTokenKind() const { return getRawRef()->getTokenKind(); }
+
+  StringRef getText() const { return getRawRef()->getTokenText(); }
+
+  StringRef getIdentifierText() const {
+    StringRef text = getText();
+    if (text.front() == '`') {
+      assert(text.back() == '`');
+      return text.slice(1, text.size() - 1);
+    }
+    return text;
+  }
+
+  static bool kindof(SyntaxKind Kind) { return isTokenKind(Kind); }
+
+  static bool classof(const SyntaxRef *S) { return kindof(S->getKind()); }
 };
 
 } // end namespace syntax

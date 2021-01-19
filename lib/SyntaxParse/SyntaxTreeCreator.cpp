@@ -62,8 +62,8 @@ class SyntaxVerifier: public SyntaxVisitor {
 
   template<class T>
   SourceLoc getSourceLoc(T Node) {
-    return SourceMgr.getLocForOffset(BufferID,
-      Node.getAbsolutePosition().getOffset());
+    return SourceMgr.getLocForOffset(
+        BufferID, Node.getAbsolutePositionAfterLeadingTrivia().getOffset());
   }
 public:
   SyntaxVerifier( SourceManager &SM, unsigned bufID, DiagnosticEngine &diags)

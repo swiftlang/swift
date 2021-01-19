@@ -249,7 +249,7 @@ public:
   }
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> &getRaw() const { return getAbsoluteRaw().getRaw(); }
+  RC<RawSyntax> getRaw() const { return getAbsoluteRaw().getRaw(); }
 
   // MARK: - Retrieving related nodes
 
