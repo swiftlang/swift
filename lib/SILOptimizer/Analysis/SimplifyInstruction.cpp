@@ -735,36 +735,6 @@ case BuiltinValueKind::id:
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-static SILBasicBlock::iterator
-replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
-                            std::function<void(SILInstruction *)> eraseNotify) {
-  assert(svi != newValue && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!svi->use_empty()) {
-    Operand *use = *svi->use_begin();
-    SILInstruction *user = use->getUser();
-    // Erase the end of scope marker.
-    if (isEndOfScopeMarker(user)) {
-      if (&*nextii == user)
-        ++nextii;
-      if (eraseNotify)
-        eraseNotify(user);
-      else
-        user->eraseFromParent();
-      continue;
-    }
-    use->set(newValue);
-  }
-  if (eraseNotify)
-    eraseNotify(svi);
-  else
-    svi->eraseFromParent();
-
-  return nextii;
-}
-
 /// Replace an instruction with a simplified result, including any debug uses,
 /// and erase the instruction. If the instruction initiates a scope, do not
 /// replace the end of its scope; it will be deleted along with its parent.
@@ -775,21 +745,19 @@ replaceAllUsesAndEraseInner(SingleValueInstruction *svi, SILValue newValue,
 /// before this is called. It will perform fixups as necessary to preserve OSSA.
 ///
 /// Return an iterator to the next (nondeleted) instruction.
-SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
-    SILInstruction *i, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify,
-    std::function<void(SILInstruction *)> newInstNotify,
-    DeadEndBlocks *deadEndBlocks) {
+SILBasicBlock::iterator
+swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
+                                        InstModCallbacks &callbacks,
+                                        DeadEndBlocks *deadEndBlocks) {
   auto *svi = cast<SingleValueInstruction>(i);
   assert(svi != result && "Cannot RAUW a value with itself");
 
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
-    OwnershipFixupContext ctx{eraseNotify, newInstNotify, *deadEndBlocks,
-                              computer};
-    return ctx.replaceAllUsesAndEraseFixingOwnership(svi, result);
+    OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
+    return ctx.replaceAllUsesAndErase(svi, result);
   }
-  return replaceAllUsesAndEraseInner(svi, result, eraseNotify);
+  return replaceAllUsesAndErase(svi, result, callbacks);
 }
 
 /// Simplify invocations of builtin operations that may overflow.

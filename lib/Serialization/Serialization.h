@@ -105,6 +105,8 @@ class Serializer : public SerializerBase {
   uint32_t /*IdentifierID*/ LastUniquedStringID =
       serialization::NUM_SPECIAL_IDS - 1;
 
+  SmallVector<DeclID, 16> exportedPrespecializationDecls;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting

@@ -632,6 +632,8 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
+  void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
+
   /// Finds top-level decls of this module filtered by their attributes.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -725,6 +727,10 @@ public:
   ReverseFullNameIterator getReverseFullModuleName() const {
     return ReverseFullNameIterator(this);
   }
+
+  /// Calls \p callback for each source file of the module.
+  void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback);
 
   SourceRange getSourceRange() const { return SourceRange(); }
 

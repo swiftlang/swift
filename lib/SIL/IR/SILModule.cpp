@@ -366,10 +366,6 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::ApplyDerivative;
   else if (OperationName.startswith("applyTranspose_"))
     Info.ID = BuiltinValueKind::ApplyTranspose;
-  else if (OperationName.startswith("differentiableFunction_"))
-    Info.ID = BuiltinValueKind::DifferentiableFunction;
-  else if (OperationName.startswith("linearFunction_"))
-    Info.ID = BuiltinValueKind::LinearFunction;
   else
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, attrs) .Case(name, BuiltinValueKind::id)
@@ -515,9 +511,8 @@ void SILModule::eraseFunction(SILFunction *F) {
 
   // This opens dead-function-removal opportunities for called functions.
   // (References are not needed anymore.)
-  F->dropAllReferences();
+  F->clear();
   F->dropDynamicallyReplacedFunction();
-  F->getBlocks().clear();
   // Drop references for any _specialize(target:) functions.
   F->clearSpecializeAttrs();
 }

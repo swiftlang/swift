@@ -167,8 +167,11 @@ class Product(object):
         """toolchain_path() -> string
 
         Returns the path to the toolchain that is being created as part of this
-        build.
+        build, or to a native prebuilt toolchain that was passed in.
         """
+        if self.args.native_swift_tools_path is not None:
+            return os.path.split(self.args.native_swift_tools_path)[0]
+
         install_destdir = self.args.install_destdir
         if self.args.cross_compile_hosts:
             build_root = os.path.dirname(self.build_dir)

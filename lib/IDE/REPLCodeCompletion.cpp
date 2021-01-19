@@ -38,8 +38,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     switch (C.getKind()) {
     case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::Keyword:

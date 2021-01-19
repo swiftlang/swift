@@ -265,6 +265,7 @@ cmake^
     -DSWIFT_BUILD_SOURCEKIT:BOOL=YES^
     -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
+    -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^

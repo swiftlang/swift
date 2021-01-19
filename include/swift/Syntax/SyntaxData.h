@@ -295,30 +295,4 @@ public:
 } // end namespace syntax
 } // end namespace swift
 
-// DenseMapInfo for RC<SyntaxData>, used for a Syntax Node -> lib/AST mapping.
-namespace llvm {
-  using SD = swift::syntax::SyntaxData;
-  using RCSD = swift::RC<SD>;
-  template <> struct DenseMapInfo<RCSD> {
-    static inline RCSD getEmptyKey() {
-      return SD::make(nullptr, nullptr, 0);
-    }
-    static inline RCSD getTombstoneKey() {
-        return SD::make(nullptr, nullptr, 0);
-    }
-    static unsigned getHashValue(const RCSD Value) {
-      unsigned H = 0;
-      H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<const uintptr_t>(Value->getRaw().get()));
-      H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<const uintptr_t>(Value->getParent()));
-      H ^= DenseMapInfo<swift::syntax::CursorIndex>::getHashValue(Value->getIndexInParent());
-      return H;
-    }
-    static bool isEqual(const RCSD LHS, const RCSD RHS) {
-      return LHS->getRaw().get() == RHS->getRaw().get() &&
-             LHS->getParent() == RHS->getParent() &&
-             LHS->getIndexInParent() == RHS->getIndexInParent();
-    }
-  };
-}
-
 #endif // SWIFT_SYNTAX_SYNTAXDATA_H

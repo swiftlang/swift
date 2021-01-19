@@ -171,7 +171,6 @@ struct SubscriptMethod: Differentiable {
   subscript(explicit x: Float) -> Float {
     @differentiable // ok
     get { return x }
-    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
     @differentiable
     set {}
   }
@@ -179,7 +178,6 @@ struct SubscriptMethod: Differentiable {
   subscript(x: Float, y: Float) -> Float {
     @differentiable // ok
     get { return x + y }
-    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
     @differentiable
     set {}
   }
@@ -394,7 +392,7 @@ struct TF_521<T: FloatingPoint> {
 }
 // expected-error @+1 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
 extension TF_521: Differentiable where T: Differentiable {
-  // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' does not conform to 'AdditiveArithmetic'}}
+  // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' (aka 'TF_521<T>') does not conform to 'AdditiveArithmetic'}}
   typealias TangentVector = TF_521
 }
 // expected-error @+1 {{result type 'TF_521<Float>' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
@@ -700,7 +698,6 @@ struct Accessors: Differentiable {
 
   var stored: Float
   var computed: Float {
-    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
     @differentiable
     set { stored = newValue }
 

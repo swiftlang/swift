@@ -92,6 +92,11 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   if (!nsErrorDomain.empty())
     return;
 
+  if (decl->isScoped()) {
+    kind = EnumKind::NonFrozenEnum;
+    return;
+  }
+
   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
   // then we don't need to check the macros.
   for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {

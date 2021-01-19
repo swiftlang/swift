@@ -105,14 +105,14 @@ enum class NodeMatchReason: uint8_t {
   // The second node is missing.
   Removed,
 
-  // The nodes are considered a pair becuase they have same/similar name.
+  // The nodes are considered a pair because they have same/similar name.
   Name,
 
   // The nodes are matched because they're in the same order, e.g. ith child of
   // a type declaration.
   Sequential,
 
-  // The first node is a function and it chanaged to a propery as the second
+  // The first node is a function and it chanaged to a property as the second
   // node.
   FuncToProperty,
 

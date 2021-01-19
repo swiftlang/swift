@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
-var mutableGlobal: String = "can't touch this" // expected-note 2{{var declared here}}
+var mutableGlobal: String = "can't touch this" // expected-note 3{{var declared here}}
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
@@ -44,7 +44,7 @@ extension MyActor {
     set { }
   }
 
-  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}}
+  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}} {{none}}
   @actorIndependent func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
     _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from an '@actorIndependent' context}}
@@ -162,6 +162,11 @@ extension MyActor {
       }
     }
 
+    acceptEscapingClosure {
+      localFn1()
+      localFn2()
+    }
+
     localVar = 0
 
     // Partial application
@@ -261,8 +266,8 @@ struct GenericStruct<T> {
     f() // okay
   }
 
-  // expected-note@+2 {{add '@asyncHandler' to function 'h()' to create an implicit asynchronous context}}
-  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}}
+  // expected-note@+2 {{add '@asyncHandler' to function 'h()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
+  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}} {{none}}
   @GenericGlobalActor<String> func h() {
     f() // expected-error{{'async' in a function that does not support concurrency}}
     _ = f // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
@@ -303,4 +308,118 @@ func testGlobalRestrictions(actor: MyActor) async {
   // Operations on non-instances are permitted.
   MyActor.synchronousStatic()
   MyActor.synchronousClass()
+
+  // Global mutable state cannot be accessed.
+  _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+
+  // Local mutable variables cannot be accessed from concurrently-executing
+  // code.
+  var i = 17 // expected-note{{var declared here}}
+  acceptEscapingClosure {
+    i = 42 // expected-warning{{local var 'i' is unsafe to reference in code that may execute concurrently}}
+  }
+  print(i)
+}
+
+// ----------------------------------------------------------------------
+// Local function isolation restrictions
+// ----------------------------------------------------------------------
+func checkLocalFunctions() async {
+  var i = 0
+  var j = 0 // expected-note{{var declared here}}
+
+  func local1() {
+    i = 17
+  }
+
+  func local2() {
+    j = 42 // expected-warning{{local var 'j' is unsafe to reference in code that may execute concurrently}}
+  }
+
+  // Okay to call locally.
+  local1()
+  local2()
+
+  // Non-concurrent closures don't cause problems.
+  acceptClosure {
+    local1()
+    local2()
+  }
+
+  // Escaping closures can make the local function execute concurrently.
+  acceptEscapingClosure {
+    local2()
+  }
+
+  print(i)
+  print(j)
+
+  var k = 17 // expected-note{{var declared here}}
+  func local4() {
+    acceptEscapingClosure {
+      local3()
+    }
+  }
+
+  func local3() {
+    k = 25 // expected-warning{{local var 'k' is unsafe to reference in code that may execute concurrently}}
+  }
+
+  print(k)
+}
+
+// ----------------------------------------------------------------------
+// Lazy properties with initializers referencing 'self'
+// ----------------------------------------------------------------------
+
+actor class LazyActor {
+    var v: Int = 0
+    // expected-note@-1 5 {{mutable state is only available within the actor instance}}
+
+    let l: Int = 0
+
+    lazy var l11: Int = { v }()
+    lazy var l12: Int = v
+    lazy var l13: Int = { self.v }()
+    lazy var l14: Int = self.v
+    lazy var l15: Int = { [unowned self] in self.v }()
+
+    lazy var l21: Int = { l }()
+    lazy var l22: Int = l
+    lazy var l23: Int = { self.l }()
+    lazy var l24: Int = self.l
+    lazy var l25: Int = { [unowned self] in self.l }()
+
+    @actorIndependent lazy var l31: Int = { v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l32: Int = v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l33: Int = { self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l34: Int = self.v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    @actorIndependent lazy var l35: Int = { [unowned self] in self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+
+    @actorIndependent lazy var l41: Int = { l }()
+    @actorIndependent lazy var l42: Int = l
+    @actorIndependent lazy var l43: Int = { self.l }()
+    @actorIndependent lazy var l44: Int = self.l
+    @actorIndependent lazy var l45: Int = { [unowned self] in self.l }()
+}
+
+// Infer global actors from context only for instance members.
+@MainActor
+class SomeClassInActor {
+  enum ID: String { case best }
+
+  func inActor() { } // expected-note{{calls to instance method 'inActor()' from outside of its actor context are implicitly asynchronous}}
+}
+
+extension SomeClassInActor.ID {
+  func f(_ object: SomeClassInActor) { // expected-note{{add '@MainActor' to make instance method 'f' part of global actor 'MainActor'}}
+    // expected-note@-1{{add 'async' to function 'f' to make it asynchronous}}
+    // expected-note@-2{{add '@asyncHandler' to function 'f' to create an implicit asynchronous context}}
+    object.inActor() // expected-error{{'async' in a function that does not support concurrency}}
+  }
 }

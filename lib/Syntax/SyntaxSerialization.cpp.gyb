@@ -1,5 +1,9 @@
 %{
   from gyb_syntax_support import *
+  from gyb_syntax_support.kinds import SYNTAX_BASE_KINDS
+  grouped_nodes = { kind: [] for kind in SYNTAX_BASE_KINDS }
+  for node in SYNTAX_NODES:
+    grouped_nodes[node.base_kind].append(node)
   # Ignore the following admonition; it applies to the resulting .cpp file only
 }%
 //// Automatically Generated From SyntaxSerialization.cpp.gyb.
@@ -19,27 +23,41 @@
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 
 namespace swift {
-namespace byteTree {
-void ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>>::write(
-    ByteTreeWriter &Writer, const ArrayRef<RC<syntax::RawSyntax>> &Layout,
-    UserInfoMap &UserInfo) {
-  for (unsigned I = 0, E = Layout.size(); I < E; ++I) {
-    if (Layout[I]) {
-      Writer.write(*Layout[I], /*Index=*/I);
-    } else {
-      Writer.write(llvm::None, /*Index=*/I);
-    }
+namespace serialization {
+
+uint16_t getNumericValue(syntax::SyntaxKind Kind) {
+  switch (Kind) {
+  case syntax::SyntaxKind::Token:
+    return 0;
+  case syntax::SyntaxKind::Unknown:
+    return 1;
+% for name, nodes in grouped_nodes.items():
+%   for node in nodes:
+  case syntax::SyntaxKind::${node.syntax_kind}:
+    return ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]};
+%   end
+% end
   }
+  llvm_unreachable("unhandled kind");
 }
 
-uint8_t WrapperTypeTraits<tok>::numericValue(const tok &Value) {
+uint8_t getNumericValue(syntax::TriviaKind Kind) {
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case syntax::TriviaKind::${trivia.name}: return ${trivia.serialization_code};
+% end
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+uint8_t getNumericValue(tok Value) {
   switch (Value) {
     case tok::eof: return 0;
 
 % for token in SYNTAX_TOKENS:
     case tok::${token.kind}: return ${token.serialization_code};
 % end
-  
+
     case tok::kw_undef:
     case tok::kw_sil:
     case tok::kw_sil_stage:
@@ -61,5 +79,6 @@ uint8_t WrapperTypeTraits<tok>::numericValue(const tok &Value) {
   }
   llvm_unreachable("unhandled token");
 }
-} // namespace byteTree
-} // namespace swift
+
+} // end namespace serialization
+} // end namespace swift

@@ -7,7 +7,7 @@ enum PictureData {
 }
 
 func test_cancellation_checkCancellation() async throws {
-  await try Task.checkCancellation()
+  try await Task.checkCancellation()
 }
 
 func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
@@ -26,7 +26,7 @@ func test_cancellation_withCancellationHandler(_ anything: Any) async -> Picture
   let handle = Task.runDetached { () -> PictureData in
     let file = SomeFile()
 
-    return await try Task.withCancellationHandler(
+    return try await Task.withCancellationHandler(
       handler: { file.close() },
       operation: {
       await test_cancellation_guard_isCancelled(file)

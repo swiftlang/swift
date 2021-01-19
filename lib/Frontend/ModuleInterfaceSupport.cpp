@@ -414,6 +414,11 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
+    /// is this nominal specifically an 'actor class'?
+    bool actorClass = false;
+    if (auto klass = dyn_cast<ClassDecl>(nominal))
+      actorClass = klass->isActor();
+
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
 
     // First record all protocols that have already been handled.
@@ -437,6 +442,15 @@ public:
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
           return TypeWalker::Action::SkipChildren;
+
+        // If 'nominal' is an 'actor class', we do not synthesize its 
+        // conformance to the Actor protocol through a dummy extension.
+        // There is a special restriction on the Actor protocol in that
+        // it is only valid to conform to Actor on an 'actor class' decl,
+        // not extensions of that 'actor class'.
+        if (actorClass &&
+            inherited->isSpecificProtocol(KnownProtocolKind::Actor))
+          return TypeWalker::Action::Continue; 
 
         if (isPublicOrUsableFromInline(inherited) &&
             conformanceDeclaredInModule(M, nominal, inherited)) {

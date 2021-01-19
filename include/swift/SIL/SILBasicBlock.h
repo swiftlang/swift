@@ -56,7 +56,7 @@ private:
 
   void operator delete(void *Ptr, size_t) = delete;
 
-  SILBasicBlock(SILFunction *F, SILBasicBlock *relativeToBB, bool after);
+  SILBasicBlock(SILFunction *parent) : Parent(parent), PredList(nullptr) { }
 
 public:
   ~SILBasicBlock();
@@ -142,12 +142,6 @@ public:
   /// stay as part of the original basic block. The old basic block is left
   /// without a terminator.
   SILBasicBlock *split(iterator I);
-
-  /// Move the basic block to after the specified basic block in the IR.
-  ///
-  /// Assumes that the basic blocks must reside in the same function. In asserts
-  /// builds, an assert verifies that this is true.
-  void moveAfter(SILBasicBlock *After);
 
   /// Moves the instruction to the iterator in this basic block.
   void moveTo(SILBasicBlock::iterator To, SILInstruction *I);
@@ -313,6 +307,10 @@ public:
   }
   const_succblock_iterator succblock_end() const {
     return getTerminator()->succblock_end();
+  }
+  
+  unsigned getNumSuccessors() const {
+    return getTerminator()->getNumSuccessors();
   }
 
   SILBasicBlock *getSingleSuccessorBlock() {

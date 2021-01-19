@@ -15,7 +15,11 @@ var DifferentialOperatorTestSuite = TestSuite("DifferentialOperator")
 
 % params = ', '.join(['_ x%d: Float' % i for i in range(arity)])
 % pb_return_type = '(' + ', '.join(['Float' for _ in range(arity)]) + ')'
-func exampleVJP_${arity}(${params}) -> (Float, (Float) -> ${pb_return_type}) {
+func exampleDiffFunc_${arity}(${params}) -> Float {
+    fatalError()
+}
+@derivative(of: exampleDiffFunc_${arity})
+func exampleVJP_${arity}(${params}) -> (value: Float, pullback: (Float) -> ${pb_return_type}) {
   (
     ${' + '.join(['x%d * x%d' % (i, i) for i in range(arity)])},
     { (${', '.join(['2 * x%d * $0' % i for i in range(arity)])}) }
@@ -28,49 +32,31 @@ func exampleVJP_${arity}(${params}) -> (Float, (Float) -> ${pb_return_type}) {
 % expectedGradientValues = [2 * v for v in argValues]
 % expectedGradients = '(' + ', '.join([str(g) for g in expectedGradientValues]) + ')'
 
-DifferentialOperatorTestSuite.test("differentiableFunction_callOriginal_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  expectEqual(${expectedValue}, f(${args}))
-}
-
 DifferentialOperatorTestSuite.test("valueWithPullback_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  let (value, pb) = valueWithPullback(at: ${args}, in: f)
+  let (value, pb) = valueWithPullback(at: ${args}, in: exampleDiffFunc_${arity})
   expectEqual(${expectedValue}, value)
   expectEqual(${expectedGradients}, pb(1))
 }
 
 DifferentialOperatorTestSuite.test("pullback_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  let pb = pullback(at: ${args}, in: f)
+  let pb = pullback(at: ${args}, in: exampleDiffFunc_${arity})
   expectEqual(${expectedGradients}, pb(1))
 }
 
 DifferentialOperatorTestSuite.test("gradient_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  let grad = gradient(at: ${args}, in: f)
+  let grad = gradient(at: ${args}, in: exampleDiffFunc_${arity})
   expectEqual(${expectedGradients}, grad)
 }
 
 DifferentialOperatorTestSuite.test("valueWithGradient_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  let (value, grad) = valueWithGradient(at: ${args}, in: f)
+  let (value, grad) = valueWithGradient(at: ${args}, in: exampleDiffFunc_${arity})
   expectEqual(${expectedValue}, value)
   expectEqual(${expectedGradients}, grad)
 }
 
 DifferentialOperatorTestSuite.test("gradient_curried_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  let gradF = gradient(of: f)
+  let gradF = gradient(of: exampleDiffFunc_${arity})
   expectEqual(${expectedGradients}, gradF(${args}))
-}
-
-DifferentialOperatorTestSuite.test("valueWithGradient_curried_${arity}") {
-  let f = differentiableFunction(from: exampleVJP_${arity})
-  let valueWithGradF = valueWithGradient(of: f)
-  let (value, grad) = valueWithGradF(${args})
-  expectEqual(${expectedValue}, value)
-  expectEqual(${expectedGradients}, grad)
 }
 
 % end

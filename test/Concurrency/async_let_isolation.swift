@@ -30,7 +30,7 @@ actor class MyActor {
 
 func outside() async {
   let a = MyActor()
-  async let x = a.synchronous() // expected-error {{call is 'async' in an 'async let' initializer that is not marked with 'await'}}
+  async let x = a.synchronous() // okay, await is implicit
   async let y = await a.synchronous()
   _ = await x
   _ = await y

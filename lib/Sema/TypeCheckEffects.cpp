@@ -1382,11 +1382,8 @@ public:
     if (!Function)
       return;
 
-    auto func = dyn_cast_or_null<FuncDecl>(Function->getAbstractFunctionDecl());
-    if (!func)
-      return;
-
-    addAsyncNotes(func);
+    if (auto func = Function->getAbstractFunctionDecl())
+      addAsyncNotes(func);
   }
 
   void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {
@@ -1535,10 +1532,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.set(ContextFlags::IsTryCovered);
       Self.Flags.clear(ContextFlags::HasTryThrowSite);
     }
-    
+
     void enterAwait() {
       Self.Flags.set(ContextFlags::IsAsyncCovered);
       Self.Flags.clear(ContextFlags::HasAnyAsyncSite);
+    }
+
+    void enterAsyncLet() {
+      Self.Flags.set(ContextFlags::IsTryCovered);
+      Self.Flags.set(ContextFlags::IsAsyncCovered);
     }
 
     void refineLocalContext(Context newContext) {
@@ -1582,10 +1584,22 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
+    void preserveDiagnoseErrorOnTryFlag() {
+      // The "DiagnoseErrorOnTry" flag is a bit of mutable state
+      // in the Context itself, used to postpone diagnostic emission
+      // to a parent "try" expression. If something was diagnosed
+      // during this ContextScope, the flag may have been set, and
+      // we need to preseve its value when restoring the old Context.
+      bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
+      OldContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
+    }
+
     void preserveCoverageFromAwaitOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::throwFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+
+      preserveDiagnoseErrorOnTryFlag();
     }
 
     void preserveCoverageFromTryOperand() {
@@ -1604,22 +1618,16 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::HasAnyAsyncSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyAwait, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+
+      preserveDiagnoseErrorOnTryFlag();
     }
-    
+
     bool wasTopLevelDebuggerFunction() const {
       return OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction);
     }
 
     ~ContextScope() {
-      // The "DiagnoseErrorOnTry" flag is a bit of mutable state
-      // in the Context itself, used to postpone diagnostic emission
-      // to a parent "try" expression. If something was diagnosed
-      // during this ContextScope, the flag may have been set, and
-      // we need to preseve its value when restoring the old Context.
-      bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
       Self.CurContext = OldContext;
-      Self.CurContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
-
       Self.RethrowsDC = OldRethrowsDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
@@ -1681,6 +1689,7 @@ private:
 
     case AutoClosureExpr::Kind::AsyncLet:
       scope.resetCoverage();
+      scope.enterAsyncLet();
       shouldPreserveCoverage = false;
       break;
     }
@@ -1820,10 +1829,11 @@ private:
   }
 
   ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
-      // Diagnose async calls in a context that doesn't handle async.
-      if (!CurContext.handlesAsync()) {
-        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
-      }
+    // Diagnose async let in a context that doesn't handle async.
+    if (!CurContext.handlesAsync()) {
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
+    }
+
     return ShouldRecurse;
   }
 
@@ -2011,6 +2021,20 @@ private:
   }
 };
 
+// Find nested functions and perform effects checking on them.
+struct LocalFunctionEffectsChecker : ASTWalker {
+  bool walkToDeclPre(Decl *D) override {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (func->getDeclContext()->isLocalContext())
+        TypeChecker::checkFunctionEffects(func);
+
+      return false;
+    }
+
+    return true;
+  }
+};
+
 } // end anonymous namespace
 
 void TypeChecker::checkTopLevelEffects(TopLevelCodeDecl *code) {
@@ -2022,6 +2046,7 @@ void TypeChecker::checkTopLevelEffects(TopLevelCodeDecl *code) {
     checker.setTopLevelThrowWithoutTry();
 
   code->getBody()->walk(checker);
+  code->getBody()->walk(LocalFunctionEffectsChecker());
 }
 
 void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
@@ -2041,7 +2066,9 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
 
   if (auto body = fn->getBody()) {
     body->walk(checker);
+    body->walk(LocalFunctionEffectsChecker());
   }
+
   if (auto ctor = dyn_cast<ConstructorDecl>(fn))
     if (auto superInit = ctor->getSuperInitCall())
       superInit->walk(checker);
@@ -2052,6 +2079,7 @@ void TypeChecker::checkInitializerEffects(Initializer *initCtx,
   auto &ctx = initCtx->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forInitializer(initCtx));
   init->walk(checker);
+  init->walk(LocalFunctionEffectsChecker());
 }
 
 /// Check the correctness of effects within the given enum
@@ -2066,6 +2094,7 @@ void TypeChecker::checkEnumElementEffects(EnumElementDecl *elt, Expr *E) {
   auto &ctx = elt->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forEnumElementInitializer(elt));
   E->walk(checker);
+  E->walk(LocalFunctionEffectsChecker());
 }
 
 void TypeChecker::checkPropertyWrapperEffects(
@@ -2073,6 +2102,7 @@ void TypeChecker::checkPropertyWrapperEffects(
   auto &ctx = binding->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forPatternBinding(binding));
   expr->walk(checker);
+  expr->walk(LocalFunctionEffectsChecker());
 }
 
 bool TypeChecker::canThrow(Expr *expr) {

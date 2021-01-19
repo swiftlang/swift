@@ -207,6 +207,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
+  global :== global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
@@ -228,6 +229,7 @@ types where the metadata itself has unknown layout.)
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
+  global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function
 
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
@@ -269,6 +271,16 @@ are always non-polymorphic ``<impl-function-type>`` types.
 
 ``<VALUE-WITNESS-KIND>`` differentiates the kinds of value
 witness functions for a type.
+
+::
+
+  AUTODIFF-FUNCTION-KIND ::= 'f'        // JVP (forward-mode derivative)
+  AUTODIFF-FUNCTION-KIND ::= 'r'        // VJP (reverse-mode derivative)
+  AUTODIFF-FUNCTION-KIND ::= 'd'        // differential
+  AUTODIFF-FUNCTION-KIND ::= 'p'        // pullback
+
+``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions assocaited
+with a differentiable function used for differentiable programming.
 
 ::
 
@@ -493,6 +505,7 @@ Types
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
+  type ::= 'BD'                              // Builtin.DefaultActorStorage
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral
@@ -1001,6 +1014,13 @@ Numbers and Indexes
 
 ``<INDEX>`` is a production for encoding numbers in contexts that can't
 end in a digit; it's optimized for encoding smaller numbers.
+
+::
+
+  INDEX-SUBSET ::= ('S' | 'U')+
+
+``<INDEX-SUBSET>`` is encoded like a bit vector and is optimized for encoding
+indices with a small upper bound.
 
 Function Specializations
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -263,6 +263,7 @@ end of the callee. This means that if one writes a function like the following:
 ::
 
   func append_one(_ a: [Int]) -> [Int] {
+    var a = a
     a.append(1)
     return a
   }
@@ -547,7 +548,7 @@ alive.
     }
 
 
-.. _Unmanaged.swift: https://github.com/apple/swift/blob/master/stdlib/public/core/Unmanaged.swift
+.. _Unmanaged.swift: https://github.com/apple/swift/blob/main/stdlib/public/core/Unmanaged.swift
 
 Protocols
 =========

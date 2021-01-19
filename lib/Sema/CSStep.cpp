@@ -342,7 +342,7 @@ StepResult ComponentStep::take(bool prevFailed) {
       (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.
     return suspend(
-        std::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
+        std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
     return suspend(

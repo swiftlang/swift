@@ -86,6 +86,9 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
+  /// Number of retry opening an input file if the previous opening returns
+  /// bad file descriptor error.
+  unsigned BadFileDescriptorRetryCount = 0;
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
@@ -134,7 +137,6 @@ public:
     DumpPCM, ///< Dump information about a precompiled Clang module
 
     ScanDependencies,        ///< Scan dependencies of Swift source files
-    ScanClangDependencies,   ///< Scan dependencies of a Clang module
     PrintVersion,       ///< Print version information.
     PrintFeature,       ///< Print supported feature of this compiler
   };
@@ -183,6 +185,11 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
+
+  /// Emit parseable-output directly from the frontend, instead of relying
+  /// the driver to emit it. This is used in context where frontend jobs are executed by
+  /// clients other than the driver.
+  bool FrontendParseableOutput = false;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -370,8 +377,6 @@ public:
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
-  static bool canActionEmitSwiftRanges(ActionType);
-  static bool canActionEmitCompiledSource(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);

@@ -378,11 +378,10 @@ BridgedProperty::outline(SILModule &M) {
   Fun->setInlineStrategy(NoInline);
 
   // Move the blocks into the new function.
-  auto &FromBlockList = OutlinedEntryBB->getParent()->getBlocks();
-  Fun->getBlocks().splice(Fun->begin(), FromBlockList, OldMergeBB);
-  Fun->getBlocks().splice(Fun->begin(), FromBlockList, switchInfo.NoneBB);
-  Fun->getBlocks().splice(Fun->begin(), FromBlockList, switchInfo.SomeBB);
-  Fun->getBlocks().splice(Fun->begin(), FromBlockList, OutlinedEntryBB);
+  Fun->moveBlockFromOtherFunction(OldMergeBB, Fun->begin());
+  Fun->moveBlockFromOtherFunction(switchInfo.NoneBB, Fun->begin());
+  Fun->moveBlockFromOtherFunction(switchInfo.SomeBB, Fun->begin());
+  Fun->moveBlockFromOtherFunction(OutlinedEntryBB, Fun->begin());
 
   // Create the function argument and return.
   auto *Load = dyn_cast<LoadInst>(FirstInst);
@@ -919,13 +918,12 @@ void BridgedReturn::outline(SILFunction *Fun, ApplyInst *NewOutlinedCall) {
   assert(Fun->begin() != Fun->end() &&
          "The entry block must already have been created");
   SILBasicBlock *EntryBB = &*Fun->begin();
-  auto &FromBlockList = OutlinedEntryBB->getParent()->getBlocks();
-  Fun->getBlocks().splice(Fun->begin(), FromBlockList, OldMergeBB);
-  OldMergeBB->moveAfter(EntryBB);
+  Fun->moveBlockFromOtherFunction(OldMergeBB, Fun->begin());
+  Fun->moveBlockAfter(OldMergeBB, EntryBB);
 	auto InsertPt = SILFunction::iterator(OldMergeBB);
-  Fun->getBlocks().splice(InsertPt, FromBlockList, OutlinedEntryBB);
-  Fun->getBlocks().splice(InsertPt, FromBlockList, switchInfo.NoneBB);
-  Fun->getBlocks().splice(InsertPt, FromBlockList, switchInfo.SomeBB);
+  Fun->moveBlockFromOtherFunction(OutlinedEntryBB, InsertPt);
+  Fun->moveBlockFromOtherFunction(switchInfo.NoneBB, InsertPt);
+  Fun->moveBlockFromOtherFunction(switchInfo.SomeBB, InsertPt);
 
 	SILBuilder Builder (EntryBB);
   Builder.createBranch(Loc, OutlinedEntryBB);

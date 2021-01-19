@@ -3242,6 +3242,11 @@ SetTestSuite.test("formSymmetricDifference")
 
   // Removing all elements should cause an identity change
   expectNotEqual(identity1, s1._rawIdentifier())
+
+  // Without a fixLifetime here, the (non-ObjC) optimizer destroys
+  // 's1' after its last uses and recycles the storage so the identity
+  // check above fails.
+  _fixLifetime(s1_copy)
 }
 
 SetTestSuite.test("removeFirst") {

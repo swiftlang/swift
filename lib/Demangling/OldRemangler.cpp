@@ -740,6 +740,18 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
 }
 
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  Buffer << "<autodiff-function>";
+}
+
+void Remangler::mangleAutoDiffFunctionKind(Node *node) {
+  Buffer << "<autodiff-function-kind>";
+}
+
+void Remangler::mangleIndexSubset(Node *node) {
+  Buffer << "<index-subset>";
+}
+
 void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
   Buffer << "TS";
   mangleSingleChildNode(node); // entity
@@ -814,6 +826,10 @@ void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
                                                  EntityContext &ctx) {
   mangleNamedEntity(node, 'I', "A", ctx);
+}
+
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
 }
 
 void Remangler::mangleDeallocator(Node *node, EntityContext &ctx) {
@@ -2177,8 +2193,8 @@ void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
 }
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
-  Buffer << "MM";
   mangleSingleChildNode(node); // type
+  Buffer << "MM";
 }
 
 void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(

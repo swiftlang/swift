@@ -1417,3 +1417,17 @@ bb3(%fUnknown : @owned $@callee_owned () -> ()):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil [ossa] @unowned_to_ref_is_unowned_instant_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = unowned_to_ref %1 : $@sil_unowned Builtin.NativeObject to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+sil [ossa] @unmanaged_to_ref_is_unowned_instant_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = ref_to_unmanaged %0 : $Builtin.NativeObject to $@sil_unmanaged Builtin.NativeObject
+  %2 = unmanaged_to_ref %1 : $@sil_unmanaged Builtin.NativeObject to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}

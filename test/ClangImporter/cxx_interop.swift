@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules -module-cache-path %t -enable-cxx-interop
+// RUN: %target-swiftxx-frontend -typecheck %s -I %S/Inputs/custom-modules
 
 import CXXInterop
 

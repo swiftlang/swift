@@ -44,8 +44,7 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func currentPriority() async -> Priority {
-    let flags = getJobFlags(Builtin.getCurrentAsyncTask())
-    return flags.priority
+    getJobFlags(Builtin.getCurrentAsyncTask()).priority
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -123,7 +122,7 @@ extension Task {
     /// and throwing a specific error or using `checkCancellation` the error
     /// thrown out of the task will be re-thrown here.
     public func get() async throws -> Success {
-      return await try _taskFutureGetThrowing(task)
+      return try await _taskFutureGetThrowing(task)
     }
 
     /// Attempt to cancel the task.
@@ -148,7 +147,7 @@ extension Task {
   /// This is a port of the C++ FlagSet.
   struct JobFlags {
     /// Kinds of schedulable jobs.
-    enum Kind : Int {
+    enum Kind: Int {
       case task = 0
     };
 
@@ -209,60 +208,28 @@ extension Task {
         }
       }
     }
+
+    /// Whether this is a channel.
+    var isTaskGroup: Bool {
+      get {
+        (bits & (1 << 26)) != 0
+      }
+
+      set {
+        if newValue {
+          bits = bits | 1 << 26
+        } else {
+          bits = (bits & ~(1 << 26))
+        }
+      }
+    }
+
   }
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
 
 extension Task {
-  /// Run given `operation` as part of a new top-level task.
-  ///
-  /// Creating detached tasks should, generally, be avoided in favor of using
-  /// `async` functions, `async let` declarations and `await` expressions - as
-  /// those benefit from structured, bounded concurrency which is easier to reason
-  /// about, as well as automatically inheriting the parent tasks priority,
-  /// task-local storage, deadlines, as well as being cancelled automatically
-  /// when their parent task is cancelled. Detached tasks do not get any of those
-  /// benefits, and thus should only be used when an operation is impossible to
-  /// be modelled with child tasks.
-  ///
-  /// ### Cancellation
-  /// A detached task always runs to completion unless it is explicitly cancelled.
-  /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
-  /// cancel given task.
-  ///
-  /// Canceling a task must be performed explicitly via `handle.cancel()`.
-  ///
-  /// - Note: it is generally preferable to use child tasks rather than detached
-  ///   tasks. Child tasks automatically carry priorities, task-local state,
-  ///   deadlines and have other benefits resulting from the structured
-  ///   concurrency concepts that they model. Consider using detached tasks only
-  ///   when strictly necessary and impossible to model operations otherwise.
-  ///
-  /// - Parameters:
-  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
-  ///   - operation: the operation to execute
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
-  ///     tasks result or `cancel` it.
-  public static func runDetached<T>(
-    priority: Priority = .default,
-    operation: @escaping () async -> T
-  ) -> Handle<T> {
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority
-    flags.isFuture = true
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-    return Handle<T>(task: task)
-  }
-
   /// Run given throwing `operation` as part of a new top-level task.
   ///
   /// Creating detached tasks should, generally, be avoided in favor of using
@@ -288,7 +255,7 @@ extension Task {
   ///   when strictly necessary and impossible to model operations otherwise.
   ///
   /// - Parameters:
-  ///   - priority: priority of the task TODO: reword and define more explicitly once we have priorities well-defined
+  ///   - priority: priority of the task
   ///   - operation: the operation to execute
   /// - Returns: handle to the task, allowing to `await handle.get()` on the
   ///     tasks result or `cancel` it. If the operation fails the handle will
@@ -350,8 +317,26 @@ func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
 
+@_silgen_name("swift_task_isCancelled")
+func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
+
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
+
+@_silgen_name("swift_task_asyncMainDrainQueue")
+public func _asyncMainDrainQueue() -> Never
+
+public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+  let _ = Task.runDetached {
+    do {
+      try await asyncFun()
+      exit(0)
+    } catch {
+      _errorInMain(error)
+    }
+  }
+  _asyncMainDrainQueue()
+}
 
 @_silgen_name("swift_task_future_wait")
 func _taskFutureWait(
@@ -363,8 +348,7 @@ public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
   assert(!rawResult.hadErrorResult)
 
   // Take the value.
-  let storagePtr =
-    rawResult.storage.bindMemory(to: T.self, capacity: 1)
+  let storagePtr = rawResult.storage.bindMemory(to: T.self, capacity: 1)
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
@@ -383,9 +367,9 @@ public func _taskFutureGetThrowing<T>(
   return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
 }
 
-public func _runChildTask<T>(operation: @escaping () async throws -> T) async
-    -> Builtin.NativeObject
-{
+public func _runChildTask<T>(
+  operation: @escaping () async throws -> T
+) async -> Builtin.NativeObject {
   let currentTask = Builtin.getCurrentAsyncTask()
 
   // Set up the job flags for a new task.
@@ -404,6 +388,35 @@ public func _runChildTask<T>(operation: @escaping () async throws -> T) async
 
   return task
 }
+
+public func _runGroupChildTask<T>(
+  overridingPriority priorityOverride: Task.Priority? = nil,
+  operation: @escaping () async throws -> T
+) async -> Builtin.NativeObject {
+  let currentTask = Builtin.getCurrentAsyncTask()
+
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = priorityOverride ?? getJobFlags(currentTask).priority
+  flags.isFuture = true
+  flags.isChildTask = true
+
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(
+      flags.bits, currentTask, operation)
+
+  // Enqueue the resulting job.
+  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
+  return task
+}
+
+@_silgen_name("swift_task_cancel")
+func _taskCancel(_ task: Builtin.NativeObject)
+
+@_silgen_name("swift_task_isCancelled")
+func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 #if _runtime(_ObjC)
 

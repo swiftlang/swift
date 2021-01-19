@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -enable-resilience -emit-sil -verify %s
-// REQUIRES: asserts
 
 // SR-12641: SILGen verification error regarding `ImmutableAddressUseVerifier` and AutoDiff-generated code.
 

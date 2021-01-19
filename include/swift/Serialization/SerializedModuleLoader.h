@@ -398,6 +398,9 @@ public:
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
+  virtual void getExportedPrespecializations(
+      SmallVectorImpl<Decl *> &results) const override;
+
   virtual void
   getTopLevelDeclsWhereAttributesMatch(
       SmallVectorImpl<Decl*> &Results,
@@ -442,6 +445,9 @@ public:
                 override;
 
   StringRef getTargetTriple() const;
+
+  virtual void collectBasicSourceFileInfo(
+      llvm::function_ref<void(const BasicSourceFileInfo &)>) const override;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;

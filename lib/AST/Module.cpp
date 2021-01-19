@@ -792,6 +792,11 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
+void ModuleDecl::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &Results) const {
+  FORWARD(getExportedPrespecializations, (Results));
+}
+
 void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &Results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
@@ -1094,6 +1099,30 @@ Fingerprint SourceFile::getInterfaceHash() const {
   return Fingerprint{std::move(result)};
 }
 
+Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
+  /// FIXME: Gross. Hashing multiple "hash" values.
+  llvm::MD5 hash;
+  hash.update(getInterfaceHash().getRawValue());
+
+  std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
+      [&](IterableDeclContext *IDC) {
+        if (auto fp = IDC->getBodyFingerprint())
+          hash.update(fp->getRawValue());
+        for (auto *member : IDC->getParsedMembers())
+          if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
+            hashTypeBodyFingerprints(childIDC);
+      };
+
+  for (auto *D : getTopLevelDecls()) {
+    if (auto IDC = dyn_cast<IterableDeclContext>(D))
+      hashTypeBodyFingerprints(IDC);
+  }
+
+  llvm::MD5::MD5Result result;
+  hash.final(result);
+  return Fingerprint{std::move(result)};
+}
+
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
   assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
   auto &eval = getASTContext().evaluator;
@@ -1104,7 +1133,7 @@ syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
 
 void DirectOperatorLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
-    TinyPtrVector<OperatorDecl *> ops) const {
+    const TinyPtrVector<OperatorDecl *> &ops) const {
   auto &desc = std::get<0>(getStorage());
   reqTracker.addTopLevelName(desc.name);
 }
@@ -1139,7 +1168,7 @@ void SourceFile::lookupOperatorDirect(
 
 void DirectPrecedenceGroupLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
-    TinyPtrVector<PrecedenceGroupDecl *> groups) const {
+    const TinyPtrVector<PrecedenceGroupDecl *> &groups) const {
   auto &desc = std::get<0>(getStorage());
   reqTracker.addTopLevelName(desc.name);
 }
@@ -1507,6 +1536,20 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
       return Mod;
   }
   return nullptr;
+}
+
+void ModuleDecl::collectBasicSourceFileInfo(
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) {
+  for (FileUnit *fileUnit : getFiles()) {
+    if (SourceFile *SF = dyn_cast<SourceFile>(fileUnit)) {
+      BasicSourceFileInfo info;
+      if (info.populate(SF))
+        continue;
+      callback(info);
+    } else if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
+      serialized->collectBasicSourceFileInfo(callback);
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2342,8 +2385,6 @@ bool SourceFile::hasDelayedBodyParsing() const {
 
   // Not supported right now.
   if (Kind == SourceFileKind::SIL)
-    return false;
-  if (hasInterfaceHash())
     return false;
   if (shouldCollectTokens())
     return false;

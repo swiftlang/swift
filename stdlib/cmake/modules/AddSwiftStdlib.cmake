@@ -105,20 +105,6 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
-
-    set(add_explicit_version TRUE)
-
-    # iOS-like and zippered libraries get their deployment version from the
-    # target triple
-    if(maccatalyst_build_flavor STREQUAL "ios-like" OR
-        maccatalyst_build_flavor STREQUAL "zippered")
-      set(add_explicit_version FALSE)
-    endif()
-
-    if(add_explicit_version)
-      list(APPEND result
-        "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
-     endif()
   endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
@@ -265,26 +251,11 @@ function(_add_target_variant_c_compile_flags)
   # uses a spin lock for this, so to get reasonable behavior we have to
   # implement it ourselves using _InterlockedCompareExchange128.
   # clang-cl requires us to enable the `cx16` feature to use this intrinsic.
-  if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
+  if(CFLAGS_ARCH STREQUAL x86_64)
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result /clang:-mcx16)
     else()
       list(APPEND result -mcx16)
-    endif()
-  endif()
-
-  if(${CFLAGS_SDK} STREQUAL ANDROID)
-    if(${CFLAGS_ARCH} STREQUAL x86_64)
-      # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
-      # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
-      # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
-      # in Clang.  This is being fixed in the current master Clang and will
-      # hopefully make it into Clang 9.0.  In the mean time, workaround this in
-      # the build.
-      if(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION
-          VERSION_LESS 9.0.0)
-        list(APPEND result -mcx16)
-      endif()
     endif()
   endif()
 
@@ -1669,7 +1640,8 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
   endif()
 
-  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
+  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
+     NOT SWIFT_PREBUILT_CLANG)
     list(APPEND SWIFTLIB_DEPENDS clang)
   endif()
 

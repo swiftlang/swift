@@ -22,8 +22,15 @@
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
 
+#include <dispatch/dispatch.h>
+
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
+
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
+using GroupFragment = AsyncTask::GroupFragment;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -65,64 +72,15 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     waitingTask->getNextWaitingTask() = queueHead.getTask();
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
     if (fragment->waitQueue.compare_exchange_weak(
-            queueHead, newQueueHead, std::memory_order_release,
-            std::memory_order_acquire)) {
+            queueHead, newQueueHead,
+            /*success*/ std::memory_order_release,
+            /*failure*/ std::memory_order_acquire)) {
       // Escalate the priority of this task based on the priority
       // of the waiting task.
       swift_task_escalate(this, waitingTask->Flags.getPriority());
       return FutureFragment::Status::Executing;
     }
   }
-}
-
-
-namespace {
-
-/// An asynchronous context within a task that describes a general "Future".
-/// task.
-///
-/// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
-/// futures.
-class TaskFutureWaitAsyncContext : public AsyncContext {
-public:
-  // Error result is always present.
-  SwiftError *errorResult = nullptr;
-
-  // No indirect results.
-
-  TaskFutureWaitResult result;
-
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
-  void* Self;
-
-  // Arguments.
-  AsyncTask *task;
-
-  using AsyncContext::AsyncContext;
-};
-
-}
-
-/// Run the given task, privoding it with the result of the future.
-static void runTaskWithFutureResult(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    FutureFragment *futureFragment, bool hadErrorResult) {
-  auto waitingTaskContext =
-      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
-
-  waitingTaskContext->result.hadErrorResult = hadErrorResult;
-  if (hadErrorResult) {
-    waitingTaskContext->result.storage =
-        reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-  } else {
-    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
-  }
-
-  // TODO: schedule this task on the executor rather than running it
-  // directly.
-  waitingTask->run(executor);
 }
 
 void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
@@ -149,6 +107,15 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
       newQueueHead, std::memory_order_acquire);
   assert(queueHead.getStatus() == Status::Executing);
 
+  // If this is task group child, notify the parent group about the completion.
+  if (isTaskGroupChild()) {
+    // then we must offer into the parent group that we completed,
+    // so it may `next()` poll completed child tasks in completion order.
+    auto parent = childFragment()->getParent();
+    assert(parent->isTaskGroup());
+    parent->groupOffer(this, context, executor);
+  }
+
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
@@ -166,6 +133,11 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
+
+  // For a group, destroy the queues and results.
+  if (task->isTaskGroup()) {
+    task->groupFragment()->destroy();
+  }
 
   // For a future, destroy the result.
   if (task->isFuture()) {
@@ -201,8 +173,8 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
 SWIFT_CC(swift)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
                          AsyncContext *context) {
-  // Tear down the task-local allocator immediately; there's no need
-  // to wait for the object to be destroyed.
+  // Tear down the task-local allocator immediately;
+  // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
 
   // Complete the future.
@@ -214,8 +186,8 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   // TODO: notify the parent somehow?
   // TODO: remove this task from the child-task chain?
 
-  // Release the task, balancing the retain that a running task
-  // has on itself.
+  // Release the task, balancing the retain that a running task has on itself.
+  // If it was a group child task, it will remain until the group returns it.
   swift_release(task);
 }
 
@@ -252,7 +224,14 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
-  if (parent) headerSize += sizeof(AsyncTask::ChildFragment);
+
+  if (parent) {
+    headerSize += sizeof(AsyncTask::ChildFragment);
+  }
+
+  if (flags.task_isTaskGroup()) {
+    headerSize += sizeof(AsyncTask::GroupFragment);
+  }
 
   if (futureResultType) {
     headerSize += FutureFragment::fragmentSize(futureResultType);
@@ -285,8 +264,15 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
+  // Initialize the channel fragment if applicable.
+  if (flags.task_isTaskGroup()) {
+    auto groupFragment = task->groupFragment();
+    new (groupFragment) GroupFragment();
+  }
+
   // Initialize the future fragment if applicable.
   if (futureResultType) {
+    assert(task->isFuture());
     auto futureFragment = task->futureFragment();
     new (futureFragment) FutureFragment(futureResultType);
 
@@ -324,9 +310,10 @@ void swift::swift_task_future_wait(
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
-  // Wait on the future.
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
+
+  // Wait on the future.
   assert(task->isFuture());
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
@@ -537,4 +524,29 @@ void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *erro
   context->ErrorResult = error;
   
   resumeTaskAfterContinuation(task, context);
+}
+
+bool swift::swift_task_isCancelled(AsyncTask *task) {
+  return task->isCancelled();
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_logFailedCheck(const char *message) {
+  swift_reportError(0, message);
+}
+
+void swift::swift_task_asyncMainDrainQueue() {
+#if !defined(_WIN32)
+  auto runLoop =
+      reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
+  if (runLoop)
+    runLoop();
+  else
+    dispatch_main();
+#else
+  // TODO: I don't have a windows box to get this working right now.
+  //       We need to either pull in the CFRunLoop if it's available, or do
+  //       something that will drain the main queue. Exploding for now.
+  abort();
+#endif
 }

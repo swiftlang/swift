@@ -147,7 +147,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.3")
+set(SWIFT_VERSION "5.4")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -481,10 +481,12 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
 endif()
 message(STATUS "")
 
-if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
-  set(SWIFT_CROSS_COMPILING FALSE)
+# Check if a prebuilt clang path was passed in, as this variable will be
+# assigned if not, in SwiftSharedCMakeConfig.
+if("${SWIFT_NATIVE_CLANG_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_PREBUILT_CLANG FALSE)
 else()
-  set(SWIFT_CROSS_COMPILING TRUE)
+  set(SWIFT_PREBUILT_CLANG TRUE)
 endif()
 
 include(SwiftSharedCMakeConfig)
@@ -605,8 +607,12 @@ if(SWIFT_HOST_VARIANT_ARCH)
 else()
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
-    set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+    if(SWIFT_HOST_VARIANT_SDK_default STREQUAL OSX)
+      set(SWIFT_HOST_VARIANT_ARCH_default "arm64")
+    else()
+      set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
+    endif()
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
     set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
@@ -649,9 +655,10 @@ endif()
 #
 
 if(XCODE)
-  # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
-  # insists on passing -mmacosx-version-min to the compiler, and we need
-  # to pass -mios-version-min.  Clang sees both options and complains.
+  # FIXME: It used to be the case that Xcode would force
+  # -m${platform}-version-min flags that would conflict with those computed
+  # by build-script. version-min flags are deprecated in favor of -target since
+  # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
 endif()
 
@@ -772,7 +779,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   #
   # Primary variant is always OSX; even on iOS hosts.
   set(SWIFT_PRIMARY_VARIANT_SDK_default "OSX")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${CMAKE_HOST_SYSTEM_PROCESSOR}")
 
 endif()
 

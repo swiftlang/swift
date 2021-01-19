@@ -179,6 +179,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringMatch
     single-source/StringRemoveDupes
     single-source/StringReplaceSubrange
+    single-source/StringSwitch
     single-source/StringTests
     single-source/StringWalk
     single-source/Substring

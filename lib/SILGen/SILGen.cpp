@@ -1200,7 +1200,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto setDerivativeInDifferentiabilityWitness =
       [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
         auto derivativeThunk = getOrCreateCustomDerivativeThunk(
-            derivative, originalFunction, silConfig, kind);
+            originalAFD, originalFunction, derivative, silConfig, kind);
         // Check for existing same derivative.
         // TODO(TF-835): Remove condition below and simplify assertion to
         // `!diffWitness->getDerivative(kind)` after `@derivative` attribute
@@ -2089,37 +2089,32 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
 
 static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
                                                Decl *d) {
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(d)) {
-    for (auto ad : asd->getAllAccessors()) {
-      transferSpecializeAttributeTargets(SGM, M, ad);
+  auto *vd = cast<AbstractFunctionDecl>(d);
+  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+    auto *SA = cast<SpecializeAttr>(A);
+    // Filter _spi.
+    auto spiGroups = SA->getSPIGroups();
+    auto hasSPIGroup = !spiGroups.empty();
+    if (hasSPIGroup) {
+      if (vd->getModuleContext() != M.getSwiftModule() &&
+          !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
+        continue;
+      }
     }
-  } else if (auto *vd = dyn_cast<AbstractFunctionDecl>(d)) {
-    for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
-      // Filter _spi.
-      auto spiGroups = SA->getSPIGroups();
-      auto hasSPIGroup = !spiGroups.empty();
+    if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
+      auto target = SILDeclRef(targetFunctionDecl);
+      auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      Identifier spiGroupIdent;
       if (hasSPIGroup) {
-        if (vd->getModuleContext() != M.getSwiftModule() &&
-            !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
-          continue;
-        }
+        spiGroupIdent = spiGroups[0];
       }
-      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-        auto target = SILDeclRef(targetFunctionDecl);
-        auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
-        auto kind = SA->getSpecializationKind() ==
-                            SpecializeAttr::SpecializationKind::Full
-                        ? SILSpecializeAttr::SpecializationKind::Full
-                        : SILSpecializeAttr::SpecializationKind::Partial;
-        Identifier spiGroupIdent;
-        if (hasSPIGroup) {
-          spiGroupIdent = spiGroups[0];
-        }
-        targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-            M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-            spiGroupIdent, vd->getModuleContext()));
-      }
+      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+          spiGroupIdent, vd->getModuleContext()));
     }
   }
 }
@@ -2143,14 +2138,11 @@ void SILGenModule::visitImportDecl(ImportDecl *import) {
   if (module->isNonSwiftModule())
     return;
 
-  SmallVector<Decl*, 16> topLevelDecls;
-  module->getTopLevelDecls(topLevelDecls);
-  for (auto *t : topLevelDecls) {
-    if (auto *vd = dyn_cast<AbstractFunctionDecl>(t)) {
+  SmallVector<Decl*, 16> prespecializations;
+  module->getExportedPrespecializations(prespecializations);
+  for (auto *p : prespecializations) {
+    if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
       transferSpecializeAttributeTargets(*this, M, vd);
-    } else if (auto *extension = dyn_cast<ExtensionDecl>(t)) {
-      for (auto *d : extension->getMembers())
-        transferSpecializeAttributeTargets(*this, M, d);
     }
   }
 }

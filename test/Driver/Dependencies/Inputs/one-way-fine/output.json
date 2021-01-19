@@ -8,8 +8,8 @@
   "./other.swift": {
     "object": "./other.o",
     "swift-dependencies": "./other.swiftdeps",
-    "swiftmodule": "./main.swiftmodule",
-    "swiftdoc": "./main.swiftdoc",
+    "swiftmodule": "./other.swiftmodule",
+    "swiftdoc": "./other.swiftdoc",
   },
   "": {
     "swift-dependencies": "./main~buildrecord.swiftdeps"

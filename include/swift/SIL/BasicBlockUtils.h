@@ -62,35 +62,31 @@ void mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 /// This utility is needed to determine if the a value definition can have a
 /// lack of users ignored along a specific path.
 class DeadEndBlocks {
-  llvm::SetVector<const SILBasicBlock *> ReachableBlocks;
-  const SILFunction *F;
-  bool isComputed = false;
+  llvm::SetVector<const SILBasicBlock *> reachableBlocks;
+  const SILFunction *f;
+  bool didComputeValue = false;
 
   void compute();
 
 public:
-  DeadEndBlocks(const SILFunction *F) : F(F) {}
+  DeadEndBlocks(const SILFunction *f) : f(f) {}
 
   /// Returns true if \p BB is a dead-end block.
   bool isDeadEnd(const SILBasicBlock *block) {
-    if (!isComputed) {
+    if (!didComputeValue) {
       // Lazily compute the dataflow.
       compute();
-      isComputed = true;
+      didComputeValue = true;
     }
-    return ReachableBlocks.count(block) == 0;
+    return reachableBlocks.count(block) == 0;
   }
 
-  bool empty() {
-    if (!isComputed) {
-      // Lazily compute the dataflow.
-      compute();
-      isComputed = true;
-    }
-    return ReachableBlocks.empty();
-  }
+  /// Return true if this dead end blocks has computed its internal cache yet.
+  ///
+  /// Used to determine if we need to verify a DeadEndBlocks.
+  bool isComputed() const { return didComputeValue; }
 
-  const SILFunction *getFunction() const { return F; }
+  const SILFunction *getFunction() const { return f; }
 };
 
 /// A struct that contains the intermediate state used in computing

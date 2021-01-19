@@ -47,6 +47,15 @@ public struct UnsafeThrowingContinuation<T> {
   public func resume(returning: __owned T)
   @_silgen_name("swift_continuation_throwingResumeWithError")
   public func resume(throwing: __owned Error)
+
+  public func resume<E: Error>(with result: Result<T, E>) {
+    switch result {
+      case .success(let val):
+        self.resume(returning: val)
+      case .failure(let err):
+        self.resume(throwing: err)
+    }
+  }
 }
 
 #if _runtime(_ObjC)
@@ -98,7 +107,7 @@ public func withUnsafeContinuation<T>(
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeThrowingContinuation<T>) -> Void
 ) async throws -> T {
-  return await try Builtin.withUnsafeThrowingContinuation {
+  return try await Builtin.withUnsafeThrowingContinuation {
     fn(UnsafeThrowingContinuation<T>($0))
   }
 }

@@ -344,20 +344,23 @@ ${TestSuite}.test("init(uncheckedBounds:)")
   expectEqual(upperInt, r.upperBound.value)
 }
 
-${TestSuite}.test("init(uncheckedBounds:) with invalid values")
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // Debug check was introduced in https://github.com/apple/swift/pull/34961
+  ${TestSuite}.test("init(uncheckedBounds:) with invalid values")
   .xfail(
     .custom(
       { _isDebugAssertConfiguration() },
       reason: "unchecked initializer still checks its input in Debug mode"))
   .code {
-  let low = 2
-  let up = 1
-  // Check that 'init(uncheckedBounds:)' does not perform precondition checks,
-  // allowing to create ranges that break invariants.
-  let r = ${Self}(
-    uncheckedBounds: (lower: ${Bound}(low), upper: ${Bound}(up)))
-  expectEqual(low, r.lowerBound.value)
-  expectEqual(up, r.upperBound.value)
+    let low = 2
+    let up = 1
+    // Check that 'init(uncheckedBounds:)' does not perform precondition checks,
+    // allowing to create ranges that break invariants.
+    let r = ${Self}(
+      uncheckedBounds: (lower: ${Bound}(low), upper: ${Bound}(up)))
+    expectEqual(low, r.lowerBound.value)
+    expectEqual(up, r.upperBound.value)
+  }
 }
 
 %   for (DestinationSelf, _, _, _) in all_range_types:

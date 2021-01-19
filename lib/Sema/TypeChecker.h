@@ -998,6 +998,12 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
+/// Same as \c checkDeclarationAvailability but doesn't give a reason for
+/// unavailability.
+bool isDeclarationUnavailable(
+    const Decl *D, const DeclContext *referenceDC,
+    llvm::function_ref<AvailabilityContext()> getAvailabilityContext);
+
 /// Checks whether a declaration should be considered unavailable when
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is

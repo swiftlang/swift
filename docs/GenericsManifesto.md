@@ -27,7 +27,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
-*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md) and is tracked by [SR-1445](https://bugs.swift.org/browse/SR-1445).*
+*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md) and is tracked by [SR-1445](https://bugs.swift.org/browse/SR-1445).*
 
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
@@ -77,7 +77,7 @@ There are a number of Swift declarations that currently cannot have generic para
 
 ### Generic typealiases
 
-*This feature has been accepted in [SE-0048](https://github.com/apple/swift-evolution/blob/master/proposals/0048-generic-typealias.md) and was released with Swift 3.*
+*This feature has been accepted in [SE-0048](https://github.com/apple/swift-evolution/blob/main/proposals/0048-generic-typealias.md) and was released with Swift 3.*
 
 Typealiases could be allowed to carry generic parameters. They would still be aliases (i.e., they would not introduce new types). For example:
 
@@ -114,7 +114,7 @@ Note: generic associatedtypes address many use cases also addressed by higher-ki
 
 ### Generic subscripts
 
-*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), was tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
+*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/main/proposals/0148-generic-subscripts.md), was tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
 
 Subscripts could be allowed to have generic parameters. For example, we could introduce a generic subscript on a `Collection` that allows us to pull out the values at an arbitrary set of indices:
 
@@ -210,7 +210,7 @@ There are a number of minor extensions we can make to the generics system that d
 
 ### Arbitrary requirements in protocols (*)
 
-*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md) and was released with Swift 4.*
+*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/main/proposals/0142-associated-types-constraints.md) and was released with Swift 4.*
 
 Currently, a new protocol can inherit from other protocols, introduce new associated types, and add new conformance constraints to associated types (by redeclaring an associated type from an inherited protocol). However, one cannot express more general constraints. Building on the example from "Recursive protocol constraints", we really want the element type of a `Sequence`'s `SubSequence` to be the same as the element type of the `Sequence`, e.g.,
 
@@ -226,7 +226,7 @@ Hanging the `where` clause off the associated type protocol is not ideal, but th
 
 ### Typealiases in protocols and protocol extensions (*)
 
-*This feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/master/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
+*This feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/main/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
 
 Now that associated types have their own keyword (thanks!), it's reasonable to bring back `typealias`. Again with the `Sequence` protocol:
 
@@ -253,7 +253,7 @@ var p3: Promise = getRandomPromise() // p3 has type Promise<Int, Error> due to t
 
 ### Generalized `class` constraints
 
-*This feature is a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md) and was released with Swift 4.*
+*This feature is a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/main/proposals/0156-subclass-existentials.md) and was released with Swift 4.*
 
 The `class` constraint can currently only be used for defining protocols. We could generalize it to associated type and type parameter declarations, e.g.,
 
@@ -322,7 +322,7 @@ Unlike the minor extensions, major extensions to the generics model provide more
 
 ### Conditional conformances (*)
 
-*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md) and is implemented in Swift 4.2.*
+*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/main/proposals/0143-conditional-conformances.md) and is implemented in Swift 4.2.*
 
 Conditional conformances express the notion that a generic type will conform to a particular protocol only under certain circumstances. For example, `Array` is `Equatable` only when its elements are `Equatable`:
 
@@ -496,7 +496,7 @@ extension Bag {
 
 ### Moving the `where` clause outside of the angle brackets (*)
 
-*Accepted in [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md) and  implemented in Swift 3.*
+*Accepted in [SE-0081](https://github.com/apple/swift-evolution/blob/main/proposals/0081-move-where-expression.md) and  implemented in Swift 3.*
 
 The `where` clause of generic functions comes very early in the declaration, although it is generally of much less concern to the client than the function parameters and result type that follow it. This is one of the things that contributes to "angle bracket blindness". For example, consider the `containsAll` signature above:
 
@@ -513,7 +513,7 @@ func containsAll<S: Sequence>(elements: S) -> Bool
 
 ### Renaming `protocol<...>` to `Any<...>` (*)
 
-*Accepted in [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md) as "Replace `protocol<P1,P2>` syntax with `P1 & P2` syntax" and implemented in Swift 3.*
+*Accepted in [SE-0095](https://github.com/apple/swift-evolution/blob/main/proposals/0095-any-as-existential.md) as "Replace `protocol<P1,P2>` syntax with `P1 & P2` syntax" and implemented in Swift 3.*
 
 The `protocol<...>` syntax is a bit of an oddity in Swift. It is used to compose protocols together, mostly to create values of existential type, e.g.,
 
@@ -730,7 +730,7 @@ The generics system doesn't seem like a good candidate for a reduction in scope;
 
 ### Associated type inference
 
-*[SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md), a proposal to remove this feature, was rejected.*
+*[SE-0108](https://github.com/apple/swift-evolution/blob/main/proposals/0108-remove-assoctype-inference.md), a proposal to remove this feature, was rejected.*
 
 Associated type inference is the process by which we infer the type bindings for associated types from other requirements. For example:
 

@@ -15,7 +15,7 @@ import Swift
 
 // =============================================================================
 // Definitions of proxy functions that mimic a generic function signature in the
-// standard library and are annotated with the standard libary's
+// standard library and are annotated with the standard library's
 // actual generic function name. The "prespecialize" annotation forces
 // the actual generic function to be specialized based on the argument
 // types passed to the proxy function.

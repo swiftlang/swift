@@ -63,7 +63,7 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
   if (!BS->empty()) {
     auto element = BS->getLastElement();
     if (auto expr = element.dyn_cast<Expr *>()) {
-      if (expr->getType()->isEqual(ResTy)) {
+      if (expr->getType()->getRValueType()->isEqual(ResTy)) {
         Context.Diags.diagnose(
           expr->getStartLoc(),
           diag::missing_return_last_expr, ResTy,

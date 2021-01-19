@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// Remove with rdar://problem/72439642
+// UNSUPPORTED: asan
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -70,7 +73,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 
   // Wait until all of the workers have finished.
   for worker in workers {
-    await try! worker.get()
+    try! await worker.get()
   }
 
   // Clear out the scratch buffer.

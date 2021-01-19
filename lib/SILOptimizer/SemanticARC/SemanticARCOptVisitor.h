@@ -49,13 +49,14 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   Context ctx;
 
-  explicit SemanticARCOptVisitor(SILFunction &fn, bool onlyGuaranteedOpts)
-      : ctx(fn, onlyGuaranteedOpts,
+  explicit SemanticARCOptVisitor(SILFunction &fn, DeadEndBlocks &deBlocks,
+                                 bool onlyGuaranteedOpts)
+      : ctx(fn, deBlocks, onlyGuaranteedOpts,
             InstModCallbacks(
                 [this](SILInstruction *inst) { eraseInstruction(inst); },
-                [](SILInstruction *) {}, [](SILValue, SILValue) {},
-                [this](SingleValueInstruction *i, SILValue value) {
-                  eraseAndRAUWSingleValueInstruction(i, value);
+                [this](Operand *use, SILValue newValue) {
+                  use->set(newValue);
+                  worklist.insert(newValue);
                 })) {}
 
   void reset() {
@@ -118,18 +119,11 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     drainVisitedSinceLastMutationIntoWorklist();
   }
 
-  InstModCallbacks getCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *inst) { eraseInstruction(inst); },
-        [](SILInstruction *) {}, [](SILValue, SILValue) {},
-        [this](SingleValueInstruction *i, SILValue value) {
-          eraseAndRAUWSingleValueInstruction(i, value);
-        });
-  }
+  InstModCallbacks &getCallbacks() { return ctx.instModCallbacks; }
 
   bool visitSILInstruction(SILInstruction *i) {
     assert((isa<OwnershipForwardingTermInst>(i) ||
-            !isa<OwnershipForwardingInst>(i)) &&
+            !OwnershipForwardingMixin::isa(i)) &&
            "Should have forwarding visitor for all ownership forwarding "
            "non-term instructions");
     return false;
@@ -139,7 +133,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool visitValueBase(ValueBase *v) {
     auto *inst = v->getDefiningInstruction();
     (void)inst;
-    assert((!inst || !isa<OwnershipForwardingInst>(inst)) &&
+    assert((!inst || !OwnershipForwardingMixin::isa(inst)) &&
            "Should have forwarding visitor for all ownership forwarding "
            "instructions");
     return false;

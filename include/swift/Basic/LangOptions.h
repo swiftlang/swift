@@ -116,7 +116,7 @@ namespace swift {
     std::string RequireExplicitAvailabilityTarget;
 
     // Availability macros definitions to be expanded at parsing.
-    SmallVector<StringRef, 4> AvailabilityMacros;
+    SmallVector<std::string, 4> AvailabilityMacros;
 
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
@@ -218,15 +218,11 @@ namespace swift {
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
     
-    /// The path to which we should emit GraphViz output for the complete
-    /// request-evaluator graph.
-    std::string RequestEvaluatorGraphVizPath;
-    
+    /// Whether to record request references for incremental builds.
+    bool RecordRequestReferences = true;
+
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
-
-    /// Whether to build a request dependency graph for debugging.
-    bool BuildRequestDependencyGraph = false;
 
     /// Enable SIL type lowering
     bool EnableSubstSILFunctionTypesForFunctionValues = true;

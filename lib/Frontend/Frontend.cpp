@@ -20,7 +20,6 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
-#include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
@@ -103,16 +102,6 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
-}
-std::string
-CompilerInvocation::getSwiftRangesFilePathForPrimary(StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.SwiftRangesFilePath;
-}
-std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
-    StringRef filename) const {
-  return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.CompiledSourceFilePath;
 }
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
@@ -204,6 +193,11 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     // ASTContext at this level.
     return false;
   }
+
+  // For the time being, we only need to record dependencies in batch mode
+  // and single file builds.
+  Invocation.getLangOptions().RecordRequestReferences
+    = !isWholeModuleCompilation();
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
@@ -321,21 +315,10 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-void CompilerInstance::setUpModuleDependencyCacheIfNeeded() {
-  const auto &Invocation = getInvocation();
-  const auto &opts = Invocation.getFrontendOptions();
-  if (opts.RequestedAction == FrontendOptions::ActionType::ScanDependencies ||
-      opts.RequestedAction == FrontendOptions::ActionType::ScanClangDependencies) {
-    ModDepCache = std::make_unique<ModuleDependenciesCache>();
-  }
-}
-
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
   setupDependencyTrackerIfNeeded();
-
-  setUpModuleDependencyCacheIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -674,8 +657,13 @@ Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
-                                                          input.getFileName());
+  FileOrError inputFileOrErr =
+    swift::vfs::getFileOrSTDIN(getFileSystem(), input.getFileName(),
+                              /*FileSize*/-1,
+                              /*RequiresNullTerminator*/true,
+                              /*IsVolatile*/false,
+      /*Bad File Descriptor Retry*/getInvocation().getFrontendOptions()
+                               .BadFileDescriptorRetryCount);
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                          input.getFileName(),
@@ -1210,21 +1198,4 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
-}
-
-bool CompilerInstance::emitSwiftRanges(DiagnosticEngine &diags,
-                                       SourceFile *primaryFile,
-                                       StringRef outputPath) const {
-  return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile,
-                                                SourceMgr, diags)
-      .emit();
-  return false;
-}
-
-bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
-                                          const SourceFile *primaryFile,
-                                          StringRef outputPath) const {
-  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile,
-                                                   SourceMgr, diags)
-      .emit();
 }

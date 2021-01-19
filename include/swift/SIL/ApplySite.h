@@ -337,7 +337,7 @@ public:
   }
 
   /// Return the SILArgumentConvention for the given applied argument operand.
-  SILArgumentConvention getArgumentConvention(Operand &oper) const {
+  SILArgumentConvention getArgumentConvention(const Operand &oper) const {
     unsigned calleeArgIdx =
         getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
@@ -615,7 +615,8 @@ public:
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const {
-    return getCalleeArgIndex(op) < getNumIndirectSILResults();
+    return isArgumentOperand(op)
+      && (getCalleeArgIndex(op) < getNumIndirectSILResults());
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

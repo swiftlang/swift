@@ -487,6 +487,14 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
                               b);
 }
 
+void IRGenModule::addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
+                                                 unsigned argIndex) {
+  llvm::AttrBuilder b;
+  b.addAttribute(llvm::Attribute::SwiftAsync);
+  attrs = attrs.addAttributes(this->getLLVMContext(),
+                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+}
+
 void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   llvm::AttrBuilder b;
@@ -1515,6 +1523,9 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       switch (FI.getExtParameterInfo(i).getABI()) {
       case clang::ParameterABI::Ordinary:
         break;
+      case clang::ParameterABI::SwiftAsyncContext:
+        IGM.addSwiftAsyncContextAttributes(Attrs, getCurParamIndex());
+        break;
       case clang::ParameterABI::SwiftContext:
         IGM.addSwiftSelfAttributes(Attrs, getCurParamIndex());
         break;
@@ -2448,6 +2459,18 @@ public:
       }
       auto fieldLayout = layout.getLocalContextLayout();
       saveValue(fieldLayout, localExplosion, isOutlined);
+    }
+    if (auto selfMetadata = witnessMetadata->SelfMetadata) {
+      Explosion selfMetadataExplosion;
+      selfMetadataExplosion.add(selfMetadata);
+      auto fieldLayout = layout.getSelfMetadataLayout();
+      saveValue(fieldLayout, selfMetadataExplosion, isOutlined);
+    }
+    if (auto selfWitnessTable = witnessMetadata->SelfWitnessTable) {
+      Explosion selfWitnessTableExplosion;
+      selfWitnessTableExplosion.add(selfWitnessTable);
+      auto fieldLayout = layout.getSelfWitnessTableLayout();
+      saveValue(fieldLayout, selfWitnessTableExplosion, isOutlined);
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
@@ -3652,22 +3675,22 @@ llvm::Value *irgen::emitTaskCreate(
   // Determine the size of the async context for the closure.
   ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  AnyFunctionType *taskFunctionType;
+  CanSILFunctionType taskFunctionType;
+  CanSILFunctionType substTaskFunctionType;
   if (futureResultType) {
     auto genericParam = GenericTypeParamType::get(0, 0, ctx);
     auto genericSig = GenericSignature::get({genericParam}, {});
-    taskFunctionType = GenericFunctionType::get(
-        genericSig, { }, genericParam, extInfo);
+    auto *ty = GenericFunctionType::get(genericSig, { }, genericParam, extInfo);
 
-    taskFunctionType = Type(taskFunctionType).subst(subs)->castTo<FunctionType>();
+    taskFunctionType = IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
+    substTaskFunctionType = taskFunctionType->withInvocationSubstitutions(subs);
   } else {
-    taskFunctionType = FunctionType::get(
-        { }, ctx.TheEmptyTupleType, extInfo);
+    auto *ty = FunctionType::get({ }, ctx.TheEmptyTupleType, extInfo);
+    taskFunctionType = IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
+    substTaskFunctionType = taskFunctionType;
   }
-  CanSILFunctionType taskFunctionCanSILType =
-      IGF.IGM.getLoweredType(taskFunctionType).castTo<SILFunctionType>();
   auto layout = getAsyncContextLayout(
-      IGF.IGM, taskFunctionCanSILType, taskFunctionCanSILType, subs);
+      IGF.IGM, taskFunctionType, substTaskFunctionType, subs);
 
   CanSILFunctionType taskContinuationFunctionTy = [&]() {
     ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
@@ -3688,7 +3711,7 @@ llvm::Value *irgen::emitTaskCreate(
   llvm::CallInst *result;
   llvm::Value *theSize, *theFunction;
   auto taskFunctionPointer = FunctionPointer::forExplosionValue(
-      IGF, taskFunction, taskFunctionCanSILType);
+      IGF, taskFunction, substTaskFunctionType);
   std::tie(theFunction, theSize) =
       getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
                               taskFunctionPointer, localContextInfo);

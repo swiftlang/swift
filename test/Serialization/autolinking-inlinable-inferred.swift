@@ -55,13 +55,11 @@ bfunc()
 // CHECK-NORMAL-SAME: [[PUBLIC:![0-9]+]],
 // CHECK-NORMAL-SAME: [[SWIFTONONESUPPORT:![0-9]+]],
 // CHECK-NORMAL-SAME: [[SWIFTCORE:![0-9]+]],
-// CHECK-NORMAL-windows-msvc-SAME: [[STDIO:![0-9]+]],
 
 // This is the same set as the above, just in a different order due to a
 // different traversal of the transitive import graph.
 // CHECK-IMPL_ONLY-SAME: [[SWIFTONONESUPPORT:![0-9]+]],
 // CHECK-IMPL_ONLY-SAME: [[SWIFTCORE:![0-9]+]],
-// CHECK-IMPL_ONLY-windows-msvc-SAME: [[STDIO:![0-9]+]],
 // CHECK-IMPL_ONLY-SAME: [[MODULE:![0-9]+]],
 // CHECK-IMPL_ONLY-SAME: [[PUBLIC:![0-9]+]],
 
@@ -77,7 +75,6 @@ bfunc()
 // CHECK-DAG: [[PUBLIC]] = !{!{{"-lautolinking_public"|"/DEFAULTLIB:autolinking_public.lib"}}}
 // CHECK-DAG: [[SWIFTONONESUPPORT]] = !{!{{"-lswiftSwiftOnoneSupport"|"/DEFAULTLIB:swiftSwiftOnoneSupport.lib"}}}
 // CHECK-DAG: [[SWIFTCORE]] = !{!{{"-lswiftCore"|"/DEFAULTLIB:swiftCore.lib"}}}
-// CHECK-windows-msvc-DAG: [[STDIO]] = !{!"/DEFAULTLIB:legacy_stdio_definitions.lib"}
 // CHECK-DAG: [[OTHER]] = !{!{{"-lautolinking_other"|"/DEFAULTLIB:autolinking_other.lib"}}}
 // CHECK-DAG: [[OTHER2]] = !{!{{"-lautolinking_other2"|"/DEFAULTLIB:autolinking_other2.lib"}}}
 // CHECK-DAG: [[OBJC]] = !{!{{"-lobjc"|"/DEFAULTLIB:objc.lib"}}}

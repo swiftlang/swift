@@ -136,7 +136,7 @@ SemaTest::inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar) {
       continue;
 
     auto &bindings = cachedBindings->getSecond();
-    bindings.finalize(cs, cache);
+    bindings.finalize(cache);
   }
 
   auto result = cache.find(typeVar);

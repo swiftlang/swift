@@ -120,7 +120,6 @@ struct CodeCompletionInfo {
   struct DescriptionStructure {
     IndexRange baseName;
     IndexRange parameterRange;
-    IndexRange throwsRange;
   };
 
   Optional<DescriptionStructure> descriptionStructure;
@@ -231,8 +230,6 @@ enum class SyntaxTreeTransferMode {
   /// Always transfer the entire syntax tree
   Full
 };
-
-enum class SyntaxTreeSerializationFormat { JSON, ByteTree };
 
 class EditorConsumer {
   virtual void anchor();

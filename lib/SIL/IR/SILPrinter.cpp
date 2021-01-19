@@ -1070,7 +1070,7 @@ public:
       const MultipleValueInstructionResult *result) {
     // This should really only happen during debugging.
     if (result->getParent()->getNumResults() == 1) {
-      *this << "**" << Ctx.getID(result) << "** = ";
+      *this << "**" << Ctx.getID(result) << "**";
     } else {
       *this << '(';
       llvm::interleave(

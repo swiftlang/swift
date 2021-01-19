@@ -748,6 +748,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'c';
   } else if (text == BUILTIN_TYPE_NAME_JOB) {
     Buffer << 'j';
+  } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
+    Buffer << 'D';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
@@ -833,6 +835,10 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node) {
   mangleChildNode(node, 0);
   Buffer << "fA";
   mangleChildNode(node, 1);
+}
+
+void Remangler::mangleAsyncFunctionPointer(Node *node) {
+  Buffer << "Tu";
 }
 
 void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
@@ -1382,6 +1388,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
+      case Node::Kind::AsyncFunctionPointer:
         mangleInReverseOrder = true;
         break;
       default:
@@ -2111,6 +2118,27 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
 void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   mangleChildNodesReversed(node);
   Buffer << "Ty";
+}
+
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  auto childIt = node->begin();
+  mangle(*childIt++); // original
+  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
+    mangleDependentGenericSignature(*childIt++);
+  Buffer << "TJ";
+  mangle(*childIt++); // kind
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+}
+
+void Remangler::mangleAutoDiffFunctionKind(Node *node) {
+  Buffer << (char)node->getIndex();
+}
+
+void Remangler::mangleIndexSubset(Node *node) {
+  Buffer << node->getText();
 }
 
 void Remangler::mangleReadAccessor(Node *node) {

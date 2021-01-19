@@ -560,10 +560,10 @@ getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
-    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
+    AutoDiffConfig desiredConfig, AutoDiffConfig actualConfig) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
-             << " from " << actualIndices << " to " << desiredIndices << '\n');
+             << " from " << actualConfig << " to " << desiredConfig << '\n');
 
   assert(!linearMapType->getCombinedSubstitutions());
   assert(!targetType->getCombinedSubstitutions());
@@ -592,7 +592,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
               mangler.mangleReabstractionThunkHelper(
                   thunkType, fromInterfaceType, toInterfaceType,
                   dynamicSelfType, parentThunk->getModule().getSwiftModule()) +
-              "_" + desiredIndices.mangle() + "_" + thunkName;
+              "_" + desiredConfig.mangle() + "_" + thunkName;
   thunkName += "_index_subset_thunk";
 
   auto loc = parentThunk->getLocation();
@@ -642,10 +642,11 @@ getOrCreateSubsetParametersThunkForLinearMap(
     }
   };
 
-  // `actualIndices` and `desiredIndices` are with respect to the original
-  // function. However, the differential parameters and pullback results may
-  // already be w.r.t. a subset. We create a map between the original function's
-  // actual parameter indices and the linear map's actual indices.
+  // The indices in `actualConfig` and `desiredConfig` are with respect to the
+  // original function. However, the differential parameters and pullback
+  // results may already be w.r.t. a subset. We create a map between the
+  // original function's actual parameter indices and the linear map's actual
+  // indices.
   // Example:
   //   Original: (T0, T1, T2) -> R
   //   Actual indices: 0, 2
@@ -654,17 +655,17 @@ getOrCreateSubsetParametersThunkForLinearMap(
   //   Desired indices w.r.t. original: 2
   //   Desired indices w.r.t. linear map: 1
   SmallVector<unsigned, 4> actualParamIndicesMap(
-      actualIndices.parameters->getCapacity(), UINT_MAX);
+      actualConfig.parameterIndices->getCapacity(), UINT_MAX);
   {
     unsigned indexInBitVec = 0;
-    for (auto index : actualIndices.parameters->getIndices()) {
+    for (auto index : actualConfig.parameterIndices->getIndices()) {
       actualParamIndicesMap[index] = indexInBitVec;
       ++indexInBitVec;
     }
   }
   auto mapOriginalParameterIndex = [&](unsigned index) -> unsigned {
     auto mappedIndex = actualParamIndicesMap[index];
-    assert(mappedIndex < actualIndices.parameters->getCapacity());
+    assert(mappedIndex < actualConfig.parameterIndices->getCapacity());
     return mappedIndex;
   };
 
@@ -682,9 +683,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto toArgIter = thunk->getArgumentsWithoutIndirectResults().begin();
     auto useNextArgument = [&]() { arguments.push_back(*toArgIter++); };
     // Iterate over actual indices.
-    for (unsigned i : actualIndices.parameters->getIndices()) {
+    for (unsigned i : actualConfig.parameterIndices->getIndices()) {
       // If index is desired, use next argument.
-      if (desiredIndices.isWrtParameter(i)) {
+      if (desiredConfig.isWrtParameter(i)) {
         useNextArgument();
       }
       // Otherwise, construct and use a zero argument.
@@ -710,7 +711,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     };
     // Collect pullback arguments.
     unsigned pullbackResultIndex = 0;
-    for (unsigned i : actualIndices.parameters->getIndices()) {
+    for (unsigned i : actualConfig.parameterIndices->getIndices()) {
       auto origParamInfo = origFnType->getParameters()[i];
       // Skip original `inout` parameters. All non-indirect-result pullback
       // arguments (including `inout` arguments) are appended to `arguments`
@@ -725,7 +726,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
       if (resultInfo.isFormalDirect())
         continue;
       // If index is desired, use next pullback indirect result.
-      if (desiredIndices.isWrtParameter(i)) {
+      if (desiredConfig.isWrtParameter(i)) {
         useNextIndirectResult();
         continue;
       }
@@ -765,7 +766,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   // Collect pullback `inout` arguments in type order.
   unsigned inoutArgIdx = 0;
   SILFunctionConventions origConv(origFnType, thunk->getModule());
-  for (auto paramIdx : actualIndices.parameters->getIndices()) {
+  for (auto paramIdx : actualConfig.parameterIndices->getIndices()) {
     auto paramInfo = origConv.getParameters()[paramIdx];
     if (!paramInfo.isIndirectMutating())
       continue;
@@ -773,19 +774,19 @@ getOrCreateSubsetParametersThunkForLinearMap(
     unsigned mappedParamIdx = mapOriginalParameterIndex(paramIdx);
     allResults.insert(allResults.begin() + mappedParamIdx, inoutArg);
   }
-  assert(allResults.size() == actualIndices.parameters->getNumIndices() &&
+  assert(allResults.size() == actualConfig.parameterIndices->getNumIndices() &&
          "Number of pullback results should match number of differentiability "
          "parameters");
 
   SmallVector<SILValue, 8> results;
-  for (unsigned i : actualIndices.parameters->getIndices()) {
+  for (unsigned i : actualConfig.parameterIndices->getIndices()) {
     unsigned mappedIndex = mapOriginalParameterIndex(i);
     // If result is desired:
     // - Do nothing if result is indirect.
     //   (It was already forwarded to the `apply` instruction).
     // - Push it to `results` if result is direct.
     auto result = allResults[mappedIndex];
-    if (desiredIndices.isWrtParameter(i)) {
+    if (desiredConfig.isWrtParameter(i)) {
       if (result->getType().isObject())
         results.push_back(result);
     }
@@ -809,12 +810,12 @@ getOrCreateSubsetParametersThunkForLinearMap(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
-    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
-    SILAutoDiffIndices actualIndices) {
+    AutoDiffDerivativeFunctionKind kind, AutoDiffConfig desiredConfig,
+    AutoDiffConfig actualConfig) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for derivative function "
              << derivativeFn << " of the original function " << origFnOperand
-             << " from " << actualIndices << " to " << desiredIndices << '\n');
+             << " from " << actualConfig << " to " << desiredConfig << '\n');
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = fb.getModule();
@@ -823,8 +824,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
-      desiredIndices.parameters, desiredIndices.results, kind, module.Types,
-      lookupConformance);
+      desiredConfig.parameterIndices, desiredConfig.resultIndices, kind,
+      module.Types, lookupConformance);
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType =
@@ -878,7 +879,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
               mangler.mangleReabstractionThunkHelper(
                   thunkType, fromInterfaceType, toInterfaceType,
                   dynamicSelfType, module.getSwiftModule()) +
-              "_" + desiredIndices.mangle() + "_" + thunkName;
+              "_" + desiredConfig.mangle() + "_" + thunkName;
   thunkName += "_subset_parameters_thunk";
 
   auto loc = origFnOperand.getLoc();
@@ -964,7 +965,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
           fb, thunk, origFnType, unsubstLinearMapType,
-          unsubstLinearMapTargetType, kind, desiredIndices, actualIndices);
+          unsubstLinearMapTargetType, kind, desiredConfig, actualConfig);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
   SILValue thunkedLinearMap = linearMap;

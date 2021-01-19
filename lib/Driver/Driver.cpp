@@ -457,7 +457,6 @@ static std::string
 populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
                      StringRef argsHashStr, const InputFileList &inputs,
                      StringRef buildRecordPath,
-                     const bool EnableSourceRangeDependencies,
                      const bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
@@ -675,7 +674,6 @@ static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
                                   const bool ShowIncrementalBuildDecisions) {
   // If a file was removed, we've lost its dependency info. Rebuild everything.
   // FIXME: Can we do better?
-  // Yes, for range-based recompilation.
   if (ShowIncrementalBuildDecisions)
     showRemovedInputs(removedInputs);
 }
@@ -916,18 +914,8 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  const bool EnableSourceRangeDependencies =
-      ArgList->hasArg(options::OPT_enable_source_range_dependencies);
-  const bool CompareIncrementalSchemes =
-      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes) ||
-      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes_path);
-  const StringRef CompareIncrementalSchemesPath = ArgList->getLastArgValue(
-      options::OPT_driver_compare_incremental_schemes_path);
-
   Optional<OutputFileMap> OFM = buildOutputFileMap(
-      *TranslatedArgList, workingDirectory,
-      /*addEntriesForSourceFileDependencies=*/EnableSourceRangeDependencies ||
-          CompareIncrementalSchemes);
+      *TranslatedArgList, workingDirectory);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -960,7 +948,6 @@ Driver::buildCompilation(const ToolChain &TC,
                 ? "no build record path"
                 : populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash,
                                        Inputs, buildRecordPath,
-                                       EnableSourceRangeDependencies,
                                        ShowIncrementalBuildDecisions);
   // FIXME: Distinguish errors from "file removed", which is benign.
 
@@ -1045,9 +1032,6 @@ Driver::buildCompilation(const ToolChain &TC,
         OnlyOneDependencyFile,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
-        EnableSourceRangeDependencies,
-        CompareIncrementalSchemes,
-        CompareIncrementalSchemesPath,
         EnableCrossModuleDependencies);
     // clang-format on
   }
@@ -1844,10 +1828,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
                               options::OPT_disable_batch_mode,
                               false);
 
-  // For best unparsed ranges, want non-batch mode, standard compile
-  const Arg *ArgRequiringSinglePrimaryCompile =
-      Args.getLastArg(options::OPT_enable_source_range_dependencies);
-
   // AST dump doesn't work with `-wmo`. Since it's not common to want to dump
   // the AST, we assume that's the priority and ignore `-wmo`, but we warn the
   // user about this decision.
@@ -1867,9 +1847,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
       Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
                      ArgRequiringSingleCompile->getOption().getPrefixedName());
     }
-    if (ArgRequiringSinglePrimaryCompile)
-      Diags.diagnose(SourceLoc(), diag::warn_ignoring_source_range_dependencies,
-                     ArgRequiringSingleCompile->getOption().getPrefixedName());
     return OutputInfo::Mode::SingleCompile;
   }
 
@@ -2040,8 +2017,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
-      case file_types::TY_SwiftRanges:
-      case file_types::TY_CompiledSource:
       case file_types::TY_Remapping:
       case file_types::TY_IndexData:
       case file_types::TY_PCH:
@@ -2371,15 +2346,14 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
 Optional<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
-                           StringRef workingDirectory,
-                           bool addEntriesForSourceFileDependencies) const {
+                           StringRef workingDirectory) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
     return None;
 
   // TODO: perform some preflight checks to ensure the file exists.
   llvm::Expected<OutputFileMap> OFM = OutputFileMap::loadFromPath(
-      A->getValue(), workingDirectory, addEntriesForSourceFileDependencies);
+      A->getValue(), workingDirectory);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
                    llvm::toString(std::move(Err)), A->getValue());
@@ -3330,8 +3304,7 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
   }
   if (C.getIncrementalBuildEnabled()) {
     file_types::forEachIncrementalOutputType([&](file_types::ID type) {
-      if (C.getEnableSourceRangeDependencies() || C.IncrementalComparator ||
-          type == file_types::TY_SwiftDeps)
+      if (type == file_types::TY_SwiftDeps)
         addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
     });
   }

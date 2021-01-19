@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
@@ -184,9 +185,6 @@ Solution ConstraintSystem::finalize() {
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
 
-  for (auto &e : CheckedConformances)
-    solution.Conformances.push_back({e.first, e.second});
-
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
   }
@@ -271,10 +269,6 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     if (!getCaseLabelItemInfo(info.first))
       setCaseLabelItemInfo(info.first, info.second);
   }
-
-  // Register the conformances checked along the way to arrive to solution.
-  for (auto &conformance : solution.Conformances)
-    CheckedConformances.push_back(conformance);
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
     resultBuilderTransformed.push_back(transformed);
@@ -476,7 +470,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
-  numCheckedConformances = cs.CheckedConformances.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numResultBuilderTransformed = cs.resultBuilderTransformed.size();
@@ -553,9 +546,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
       cs.NodeTypes.erase(node);
   }
   truncate(cs.addedNodeTypes, numAddedNodeTypes);
-
-  // Remove any conformances checked along the current path.
-  truncate(cs.CheckedConformances, numCheckedConformances);
 
   /// Remove any builder transformed closures.
   truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
@@ -2287,10 +2277,27 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     return;
 
   auto bindings = cs.inferBindingsFor(typeVar);
-  if (bindings.involvesTypeVariables() || bindings.Bindings.size() != 1)
+
+  auto numBindings =
+      bindings.Bindings.size() + bindings.getNumViableLiteralBindings();
+  if (bindings.isHole() || bindings.involvesTypeVariables() || numBindings != 1)
     return;
 
-  auto conversionType = bindings.Bindings[0].BindingType;
+  Type conversionType;
+
+  // There is either a single direct/transitive binding, or
+  // a single literal default.
+  if (!bindings.Bindings.empty()) {
+    conversionType = bindings.Bindings[0].BindingType;
+  } else {
+    for (const auto &literal : bindings.Literals) {
+      if (literal.second.viableAsBinding()) {
+        conversionType = literal.second.getDefaultType();
+        break;
+      }
+    }
+  }
+
   auto constraints = cs.CG.gatherConstraints(
       typeVar,
       ConstraintGraph::GatheringKind::EquivalenceClass,

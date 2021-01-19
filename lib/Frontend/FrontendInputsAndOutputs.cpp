@@ -101,6 +101,14 @@ bool FrontendInputsAndOutputs::forEachPrimaryInput(
   return false;
 }
 
+bool FrontendInputsAndOutputs::forEachPrimaryInputWithIndex(
+    llvm::function_ref<bool(const InputFile &, unsigned index)> fn) const {
+  for (unsigned i : PrimaryInputsInOrder)
+    if (fn(AllInputs[i], i))
+      return true;
+  return false;
+}
+
 bool FrontendInputsAndOutputs::forEachNonPrimaryInput(
     llvm::function_ref<bool(const InputFile &)> fn) const {
   return forEachInput([&](const InputFile &f) -> bool {
@@ -425,18 +433,6 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.ReferenceDependenciesFilePath;
-      });
-}
-bool FrontendInputsAndOutputs::hasSwiftRangesPath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.SwiftRangesFilePath;
-      });
-}
-bool FrontendInputsAndOutputs::hasCompiledSourcePath() const {
-  return hasSupplementaryOutputPath(
-      [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.CompiledSourceFilePath;
       });
 }
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {

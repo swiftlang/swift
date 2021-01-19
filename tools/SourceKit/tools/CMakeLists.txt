@@ -5,8 +5,10 @@ include_directories(
 )
 
 add_swift_lib_subdirectory(sourcekitd)
-add_swift_tool_subdirectory(sourcekitd-test)
 if(LibEdit_FOUND AND LibEdit_HAS_UNICODE)
   add_swift_tool_subdirectory(sourcekitd-repl)
 endif()
-add_swift_tool_subdirectory(complete-test)
+if(SWIFT_INCLUDE_TESTS)
+  add_swift_tool_subdirectory(sourcekitd-test)
+  add_swift_tool_subdirectory(complete-test)
+endif()

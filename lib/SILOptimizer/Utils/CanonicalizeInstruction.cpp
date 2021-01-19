@@ -93,11 +93,8 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // Erase the simplified instruction and any instructions that end its
   // scope. Nothing needs to be added to the worklist except for Result,
   // because the instruction and all non-replaced users will be deleted.
-  auto nextII = replaceAllSimplifiedUsesAndErase(
-      inst, result,
-      [&pass](SILInstruction *deleted) { pass.killInstruction(deleted); },
-      [&pass](SILInstruction *newInst) { pass.notifyNewInstruction(newInst); },
-      &pass.deadEndBlocks);
+  auto nextII = replaceAllSimplifiedUsesAndErase(inst, result, pass.callbacks,
+                                                 &pass.deadEndBlocks);
 
   // Push the new instruction and any users onto the worklist.
   pass.notifyHasNewUsers(result);
@@ -542,7 +539,7 @@ eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
 static Optional<SILBasicBlock::iterator>
 tryEliminateUnneededForwardingInst(SILInstruction *i,
                                    CanonicalizeInstruction &pass) {
-  assert(isa<OwnershipForwardingInst>(i) &&
+  assert(OwnershipForwardingMixin::isa(i) &&
          "Must be an ownership forwarding inst");
   if (auto *svi = dyn_cast<SingleValueInstruction>(i))
     if (svi->getNumOperands() == 1)
@@ -579,7 +576,7 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   // diagnostics.
   auto *fn = inst->getFunction();
   if (fn->hasOwnership() && fn->getModule().getStage() != SILStage::Raw) {
-    if (isa<OwnershipForwardingInst>(inst))
+    if (OwnershipForwardingMixin::isa(inst))
       if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
         return *newNext;
   }

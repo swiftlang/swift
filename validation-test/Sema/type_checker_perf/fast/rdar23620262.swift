@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asan
-// REQUIRES: rdar38378503,no_asan
 
 // expected-no-diagnostics
 

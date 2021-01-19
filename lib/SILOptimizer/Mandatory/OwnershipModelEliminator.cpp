@@ -22,12 +22,14 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -119,7 +121,16 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(i);
   }
 
-  bool visitSILInstruction(SILInstruction *) { return false; }
+  bool visitSILInstruction(SILInstruction *inst) {
+    // Make sure this wasn't a forwarding instruction in case someone adds a new
+    // forwarding instruction but does not update this code.
+    if (OwnershipForwardingMixin::isa(inst)) {
+      llvm::errs() << "Found unhandled forwarding inst: " << *inst;
+      llvm_unreachable("standard error handler");
+    }
+    return false;
+  }
+
   bool visitLoadInst(LoadInst *li);
   bool visitStoreInst(StoreInst *si);
   bool visitStoreBorrowInst(StoreBorrowInst *si);
@@ -164,6 +175,37 @@ struct OwnershipModelEliminatorVisitor
 
   void splitDestructure(SILInstruction *destructure,
                         SILValue destructureOperand);
+
+#define HANDLE_FORWARDING_INST(Cls)                                            \
+  bool visit##Cls##Inst(Cls##Inst *i) {                                        \
+    OwnershipForwardingMixin::get(i)->setOwnershipKind(OwnershipKind::None);   \
+    return true;                                                               \
+  }
+  HANDLE_FORWARDING_INST(ConvertFunction)
+  HANDLE_FORWARDING_INST(Upcast)
+  HANDLE_FORWARDING_INST(UncheckedRefCast)
+  HANDLE_FORWARDING_INST(RefToBridgeObject)
+  HANDLE_FORWARDING_INST(BridgeObjectToRef)
+  HANDLE_FORWARDING_INST(ThinToThickFunction)
+  HANDLE_FORWARDING_INST(UnconditionalCheckedCast)
+  HANDLE_FORWARDING_INST(Struct)
+  HANDLE_FORWARDING_INST(Object)
+  HANDLE_FORWARDING_INST(Tuple)
+  HANDLE_FORWARDING_INST(Enum)
+  HANDLE_FORWARDING_INST(UncheckedEnumData)
+  HANDLE_FORWARDING_INST(SelectEnum)
+  HANDLE_FORWARDING_INST(SelectValue)
+  HANDLE_FORWARDING_INST(OpenExistentialRef)
+  HANDLE_FORWARDING_INST(InitExistentialRef)
+  HANDLE_FORWARDING_INST(MarkDependence)
+  HANDLE_FORWARDING_INST(DifferentiableFunction)
+  HANDLE_FORWARDING_INST(LinearFunction)
+  HANDLE_FORWARDING_INST(StructExtract)
+  HANDLE_FORWARDING_INST(TupleExtract)
+  HANDLE_FORWARDING_INST(LinearFunctionExtract)
+  HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
+  HANDLE_FORWARDING_INST(MarkUninitialized)
+#undef HANDLE_FORWARDING_INST
 };
 
 } // end anonymous namespace
@@ -295,6 +337,8 @@ bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
 
 bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
     CheckedCastBranchInst *cbi) {
+  cbi->setOwnershipKind(OwnershipKind::None);
+
   // In ownership qualified SIL, checked_cast_br must pass its argument to the
   // fail case so we can clean it up. In non-ownership qualified SIL, we expect
   // no argument from the checked_cast_br in the default case. The way that we
@@ -313,6 +357,8 @@ bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
 
 bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
     SwitchEnumInst *swei) {
+  swei->setOwnershipKind(OwnershipKind::None);
+
   // In ownership qualified SIL, switch_enum must pass its argument to the fail
   // case so we can clean it up. In non-ownership qualified SIL, we expect no
   // argument from the switch_enum in the default case. The way that we handle
@@ -340,7 +386,6 @@ void OwnershipModelEliminatorVisitor::splitDestructure(
 
   // First before we destructure anything, see if we can simplify any of our
   // instruction operands.
-
   SILModule &M = destructureInst->getModule();
   SILType opType = destructureOperand->getType();
 
@@ -435,10 +480,10 @@ static bool stripOwnership(SILFunction &func) {
     if (!value.hasValue())
       continue;
     if (SILValue newValue = simplifyInstruction(*value)) {
-      replaceAllSimplifiedUsesAndErase(*value, newValue,
-                                       [&](SILInstruction *instToErase) {
-                                         visitor.eraseInstruction(instToErase);
-                                       });
+      InstModCallbacks callbacks([&](SILInstruction *instToErase) {
+        visitor.eraseInstruction(instToErase);
+      });
+      replaceAllSimplifiedUsesAndErase(*value, newValue, callbacks);
       madeChange = true;
     }
   }

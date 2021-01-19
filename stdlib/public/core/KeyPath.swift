@@ -748,7 +748,7 @@ internal enum KeyPathComponent: Hashable {
 internal final class ClassHolder<ProjectionType> {
 
   /// The type of the scratch record passed to the runtime to record
-  /// accesses to guarantee exlcusive access.
+  /// accesses to guarantee exclusive access.
   internal typealias AccessRecord = Builtin.UnsafeValueBuffer
 
   internal var previous: AnyObject?

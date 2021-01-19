@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
-// REQUIRES: asserts
 
 // SR-12656: Differentiation transform crashes for original function with opaque
 // result type.

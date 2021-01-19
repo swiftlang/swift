@@ -85,7 +85,7 @@ struct YieldInDefer {
       defer { // expected-warning {{'defer' statement at end of scope always executes immediately}}{{7-12=do}}
         // FIXME: this recovery is terrible
         yield ""
-        // expected-error@-1 {{expression resolves to an unused function}}
+        // expected-error@-1 {{function is unused}}
         // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
         // expected-warning@-3 {{string literal is unused}}
       }

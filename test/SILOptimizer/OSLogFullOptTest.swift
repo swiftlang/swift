@@ -140,6 +140,7 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK: [[NOT_ENABLED]]:
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: tail call void @llvm.objc.release
+    // CHECK-NEXT: tail call void @llvm.objc.release
     // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
 
     // CHECK: [[ENABLED]]:
@@ -170,7 +171,7 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: [[BITCASTED_SRC2:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
     // CHECK-64-NEXT: store %TSo7NSArrayC* [[BITCASTED_SRC2]], %TSo7NSArrayC** [[BITCASTED_DEST2]], align 8
     // CHECK-32-NEXT: store %TSo7NSArrayC* [[BITCASTED_SRC2]], %TSo7NSArrayC** [[BITCASTED_DEST2]], align 4
-
+    // CHECK-NEXT: tail call void @llvm.objc.release
     // CHECK-64-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
     // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
     // CHECK-NEXT: [[BITCASTED_OBJ_STORAGE:%.+]] = bitcast i8* [[OBJ_STORAGE]] to %swift.opaque*
@@ -181,7 +182,6 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: br label %[[EXIT]]
   
     // CHECK: [[EXIT]]:
-    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
     // CHECK-NEXT: ret void
 }
 
@@ -349,7 +349,7 @@ func testMetatypeInterpolation<T>(of type: T.Type) {
 
     // CHECK: [[NOT_ENABLED]]:
     // CHECK-NEXT: call void @swift_release
-    // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
+    // CHECK: br label %[[EXIT:[0-9]+]]
 
     // CHECK: [[ENABLED]]:
     //

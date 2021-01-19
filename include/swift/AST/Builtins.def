@@ -498,12 +498,6 @@ BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 /// applyTranspose
 BUILTIN_SIL_OPERATION(ApplyTranspose, "applyTranspose", Special)
 
-/// differentiableFunction
-BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
-
-/// linearFunction
-BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
-
 /// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> T
 ///
 /// Unsafely capture the current continuation and pass it to the given

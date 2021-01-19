@@ -1267,6 +1267,10 @@ SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);
 }
 
+void SerializedASTFile::getExportedPrespecializations(
+    SmallVectorImpl<Decl *> &results) const {
+  File.getExportedPrespecializations(results);
+}
 void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
@@ -1322,4 +1326,9 @@ SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   Identifier discriminator = File.getDiscriminatorForPrivateValue(D);
   assert(!discriminator.empty() && "no discriminator found for value");
   return discriminator;
+}
+
+void SerializedASTFile::collectBasicSourceFileInfo(
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
+  File.collectBasicSourceFileInfo(callback);
 }

@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -49,17 +50,20 @@ class SILCombiner :
 
   DominanceAnalysis *DA;
 
-  // Determine the set of types a protocol conforms to in whole-module
-  // compilation mode.
+  /// Determine the set of types a protocol conforms to in whole-module
+  /// compilation mode.
   ProtocolConformanceAnalysis *PCA;
 
-  // Class hierarchy analysis needed to confirm no derived classes of a sole
-  // conforming class.
+  /// Class hierarchy analysis needed to confirm no derived classes of a sole
+  /// conforming class.
   ClassHierarchyAnalysis *CHA;
 
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+  /// A cache of "dead end blocks" through which all paths it is known that the
+  /// program will terminate. This means that we are allowed to leak
+  /// objects.
   DeadEndBlocks deadEndBlocks;
 
   /// Variable to track if the SILCombiner made any changes.
@@ -81,6 +85,23 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
+  /// Centralized InstModCallback that we use for certain utility methods.
+  InstModCallbacks instModCallbacks;
+
+  /// Dead end blocks cache. SILCombine is already not allowed to mess with CFG
+  /// edges so it is safe to use this here.
+  DeadEndBlocks deBlocks;
+
+  /// A utility struct used by OwnershipFixupContext to map sets of partially
+  /// post-dominating blocks to a full jointly post-dominating set.
+  JointPostDominanceSetComputer jPostDomComputer;
+
+  /// A utility that we use to perform erase+RAUW that fixes up ownership for us
+  /// afterwards by lifetime extending/copy values as appropriate. We rely on
+  /// later optimizations to chew through this traffic. This ensures we can use
+  /// one code base for both OSSA and non-OSSA.
+  OwnershipFixupContext ownershipRAUWHelper;
+
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
@@ -100,7 +121,20 @@ public:
               replaceInstUsesWith(*I, V);
             },
             /* EraseAction */
-            [&](SILInstruction *I) { eraseInstFromFunction(*I); }) {}
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        instModCallbacks(
+            [&](SILInstruction *instToDelete) {
+              eraseInstFromFunction(*instToDelete);
+            },
+            [&](SILInstruction *newlyCreatedInst) {
+              Worklist.add(newlyCreatedInst);
+            },
+            [&](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              Worklist.add(use->getUser());
+            }),
+        deBlocks(&B.getFunction()), jPostDomComputer(deBlocks),
+        ownershipRAUWHelper(instModCallbacks, deBlocks, jPostDomComputer) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -108,6 +142,41 @@ public:
     Iteration = 0;
     Worklist.resetChecked();
     MadeChange = false;
+  }
+
+  /// A "syntactic" high level function that combines our insertPt with the main
+  /// builder's builder context.
+  ///
+  /// Since this is syntactic and we assume that our caller is passing in a
+  /// lambda that if we inline will be eliminated, we mark this function always
+  /// inline.
+  ///
+  /// What is nice about this formulation is it enables one to really concisely
+  /// create a SILBuilder that uses the SILCombiner's builder context but at a
+  /// different use point. Example:
+  ///
+  /// SILBuilderWithScope builder(insertPt);
+  /// builder.createInst1(insertPt->getLoc(), ...);
+  /// builder.createInst2(insertPt->getLoc(), ...);
+  /// builder.createInst3(insertPt->getLoc(), ...);
+  /// auto *finalValue = builder.createInst4(insertPt->getLoc(), ...);
+  ///
+  /// Thats a lot of typing! Instead, using this API, one can write:
+  ///
+  /// auto *finalValue = withBuilder(insertPt, [&](auto &b, auto l) {
+  ///   b.createInst1(l, ...);
+  ///   b.createInst2(l, ...);
+  ///   b.createInst3(l, ...);
+  ///   return b.createInst4(l, ...);
+  /// });
+  ///
+  /// Since this is meant to be just be syntactic, we always inline this method.
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SingleValueInstruction *
+  withBuilder(SILInstruction *insertPt,
+              llvm::function_ref<SingleValueInstruction * (SILBuilder &, SILLocation)> visitor) {
+    SILBuilderWithScope builder(insertPt, Builder);
+    return visitor(builder, insertPt->getLoc());
   }
 
   // Insert the instruction New before instruction Old in Old's parent BB. Add
@@ -123,6 +192,12 @@ public:
   // so that the combiner will know that I was modified.
   void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
     return Worklist.replaceInstUsesWith(I, V);
+  }
+
+  /// Perform use->set(value) and add use->user to the worklist.
+  void setUseValue(Operand *use, SILValue value) {
+    use->set(value);
+    Worklist.add(use->getUser());
   }
 
   // This method is to be used when a value is found to be dead,
@@ -182,8 +257,12 @@ public:
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
-  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
+
+  // NOTE: The load optimized in this method is a load [trivial].
+  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
+
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
@@ -260,6 +339,12 @@ public:
   bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
                                   KeyPathInst *kp);
 
+  /// Sinks owned forwarding instructions to their uses if they do not have
+  /// non-debug non-consuming uses. Deletes any debug_values and destroy_values
+  /// when this is done. Returns true if we deleted svi and thus we should not
+  /// try to visit it.
+  bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
@@ -268,16 +353,26 @@ public:
   bool optimizeIdentityCastComposition(ApplyInst *FInverse,
                                        StringRef FInverseName, StringRef FName);
 
-private:
-  InstModCallbacks getInstModCallbacks() {
-    return InstModCallbacks(
-        [this](SILInstruction *DeadInst) { eraseInstFromFunction(*DeadInst); },
-        [this](SILInstruction *NewInst) { Worklist.add(NewInst); },
-        [this](SILValue oldValue, SILValue newValue) {
-          replaceValueUsesWith(oldValue, newValue);
-        });
-  }
+  /// Let \p user and \p value be two forwarding single value instructions with
+  /// the property that \p user, through potentially a chain of forwarding
+  /// instructions.
+  ///
+  /// Let \p user and \p value be two forwarding single value instructions  with
+  /// the property that \p value is the value that \p user forwards. In this
+  /// case, this helper routine will eliminate \p value if it can rewrite user
+  /// in terms of \p newValue. This is intended to handle cases where we have
+  /// completely different types so we need to actually create a new instruction
+  /// with a different result type.
+  ///
+  /// \param newValueGenerator Generator that produces the new value to
+  /// use. Conditionally called if we can perform the optimization.
+  SILInstruction *tryFoldComposedUnaryForwardingInstChain(
+      SingleValueInstruction *user, SingleValueInstruction *value,
+      function_ref<SILValue()> newValueGenerator);
 
+  InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
+
+private:
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);

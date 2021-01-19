@@ -148,6 +148,40 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitSignature::FunctionType
 swift_task_future_wait;
 
+/// Wait for a readyQueue of a Channel to become non empty.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_wait_next(on groupTask: Builtin.NativeObject) async
+///     -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+TaskFutureWaitSignature::FunctionType
+swift_task_group_wait_next;
+
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_add_pending(
+///     _ groupTask: Builtin.NativeObject)
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void
+swift_task_group_add_pending(AsyncTask *groupTask);
+
+/// Check the readyQueue of a Channel, return true if it has no pending tasks.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_is_empty(on groupTask: Builtin.NativeObject) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool
+swift_task_group_is_empty(AsyncTask *task);
+
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
 ///
@@ -187,6 +221,9 @@ bool swift_task_removeStatusRecord(AsyncTask *task,
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCancelled(AsyncTask* task);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {
@@ -262,6 +299,14 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueMainExecutor(Job *job);
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_MainActor_register(HeapObject *actor);
+
 /// A hook to take over global enqueuing.
 /// TODO: figure out a better abstraction plan than this.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -308,6 +353,15 @@ void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
                                                 void *continuation,
                                                 const Metadata *resumeType);
 
+/// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
+extern "C" SWIFT_CC(swift)
+void swift_continuation_logFailedCheck(const char *message);
+
+/// Drain the queue
+/// If the binary links CoreFoundation, uses CFRunLoopRun
+/// Otherwise it uses dispatchMain.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_asyncMainDrainQueue();
 }
 
 #endif
