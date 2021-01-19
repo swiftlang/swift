@@ -1,4 +1,5 @@
-// RUN: not --crash %target-swift-emit-ir %s -I %S/Inputs
+// Check that IRGen doesn't crash. rdar://72999296
+// RUN: %target-swift-emit-ir %s -I %S/Inputs
 
 import AtomicBoolModule
 
