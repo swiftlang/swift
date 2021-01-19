@@ -410,12 +410,12 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @optimize_nested_index_addr
-// XHECK:      bb0(%0 : $Builtin.RawPointer):
-// XHECK-NEXT:   %1 = pointer_to_address %0
-// XHECK-NEXT:   %2 = integer_literal $Builtin.Word, 10
-// XHECK-NEXT:   %3 = index_addr %1 : $*UInt8, %2
-// XHECK-NEXT:   %4 = address_to_pointer %3
-// XHECK-NEXT:   return %4
+// CHECK:      bb0(%0 : $Builtin.RawPointer):
+// CHECK-NEXT:   %1 = pointer_to_address %0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Word, 10
+// CHECK-NEXT:   %3 = index_addr %1 : $*UInt8, %2
+// CHECK-NEXT:   %4 = address_to_pointer %3
+// CHECK-NEXT:   return %4
 sil [ossa] @optimize_nested_index_addr : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 3
@@ -528,11 +528,12 @@ bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
-// CHECK-LABEL: sil [ossa] @cond_fail_applied_to_zero_removal
-// XHECK: bb0
-// XHECK-NEXT: cond_fail
-// XHECK-NEXT: tuple ()
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @cond_fail_applied_to_zero_removal :
+// CHECK: bb0
+// CHECK-NEXT: cond_fail
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'cond_fail_applied_to_zero_removal'
 sil [ossa] @cond_fail_applied_to_zero_removal : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1
@@ -2051,10 +2052,11 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
-// CHECK-LABEL: @remove_pointer_compare_to_zero_NE
-// XHECK-NOT: apply
-// XHECK: cond_fail
-// XHECK: unreachable
+// CHECK-LABEL: @remove_pointer_compare_to_zero_NE :
+// CHECK-NOT: apply
+// CHECK: cond_fail
+// CHECK: unreachable
+// CHECK: } // end sil function 'remove_pointer_compare_to_zero_NE'
 sil [ossa] @remove_pointer_compare_to_zero_NE : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = string_literal utf8 "ss"
@@ -2701,11 +2703,11 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContai
 }
 
 
-// CHECK-LABEL:   sil [ossa] @remove_dead_code_after_cond_fail
-// XHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
-// XHECK-NEXT:      cond_fail [[Ref]]
-// XHECK-NEXT:      unreachable
-
+// CHECK-LABEL:   sil [ossa] @remove_dead_code_after_cond_fail :
+// CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:      cond_fail [[Ref]]
+// CHECK-NEXT:      unreachable
+// CHECK: } // end sil function 'remove_dead_code_after_cond_fail'
 sil [ossa] @remove_dead_code_after_cond_fail : $@convention(thin) () -> (Int32) {
 bb0:
   %0 = integer_literal $Builtin.Int32, -2
@@ -2717,12 +2719,12 @@ bb0:
 
 
 // CHECK-LABEL:   sil [ossa] @dont_remove_code_after_cond_fail
-// XHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
-// XHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Int32, -2
-// XHECK-NEXT:      cond_fail [[Cond]]
-// XHECK-NEXT:      [[Ret:%.*]] = struct $Int32 ([[Ref]] : $Builtin.Int32)
-// XHECK-NEXT:      return [[Ret]]
-
+// CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
+// CHECK-NEXT:      [[Ref:%.*]] = integer_literal $Builtin.Int32, -2
+// CHECK-NEXT:      cond_fail [[Cond]]
+// CHECK-NEXT:      [[Ret:%.*]] = struct $Int32 ([[Ref]] : $Builtin.Int32)
+// CHECK-NEXT:      return [[Ret]]
+// CHECK: } // end sil function 'dont_remove_code_after_cond_fail'
 sil [ossa] @dont_remove_code_after_cond_fail : $@convention(thin) (Builtin.Int1) -> (Int32) {
 bb0(%0 : $Builtin.Int1):
   %1 = integer_literal $Builtin.Int32, -2
@@ -4078,11 +4080,12 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
 
 // Test to see if we can constant fold a classify_bridge_object on a Swift class
 // to false.
-// CHECK-LABEL: sil [ossa] @test_classify_fold
-// XHECK-NOT: classify_bridge_object
-// XHECK: integer_literal $Builtin.Int1, 0
-// XHECK-NEXT: destroy_value
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @test_classify_fold :
+// CHECK-NOT: classify_bridge_object
+// CHECK: destroy_value
+// CHECK: [[LITERAL:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK: return [[LITERAL]]
+// CHECK: } // end sil function 'test_classify_fold'
 sil [ossa] @test_classify_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> Builtin.Int1 {
 bb0(%0 : @owned $_ContiguousArrayStorage<B>):
   %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
@@ -4092,10 +4095,11 @@ bb0(%0 : @owned $_ContiguousArrayStorage<B>):
   return %3 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil [ossa] @bridge_cast_noop_fold
-// XHECK: bb0(%0
-// XHECK-NEXT: %1 = upcast %0
-// XHECK-NEXT: return %1
+// CHECK-LABEL: sil [ossa] @bridge_cast_noop_fold :
+// CHECK: bb0(%0
+// CHECK-NEXT: %1 = upcast %0
+// CHECK-NEXT: return %1
+// CHECK: } // end sil function 'bridge_cast_noop_fold'
 sil [ossa] @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> @owned __ContiguousArrayStorageBase {
 bb0(%0 : @owned $_ContiguousArrayStorage<B>):
   %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
@@ -4178,8 +4182,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @conversion_to_and_from_bridge_object
-// XHECK:      bb0(%0 : $Builtin.Int64):
-// XHECK-NEXT:   return %0
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:   return %0
+// CHECK: } // end sil function 'conversion_to_and_from_bridge_object'
 sil [ossa] @conversion_to_and_from_bridge_object : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
   %1 = struct $UInt64 (%0 : $Builtin.Int64)
