@@ -21,7 +21,7 @@ protocol WithAssocOther {
 }
 
 extension GenericClass : WithAssocOther {
-  typealias Other = [T] // expected-error{{type 'GenericClass<T>.Other' involving Objective-C type parameter 'T' cannot be used for associated type 'Other' of protocol 'WithAssocOther'}}
+  typealias Other = [T] // expected-error{{type 'GenericClass<T>.Other' (aka 'Array<T>') involving Objective-C type parameter 'T' cannot be used for associated type 'Other' of protocol 'WithAssocOther'}}
 }
 
 protocol WithAssocSeparate {
@@ -31,7 +31,7 @@ protocol WithAssocSeparate {
 extension GenericClass {
   typealias Separate = T // expected-note {{'Separate' declared here}}
 }
-extension GenericClass : WithAssocSeparate { // expected-error {{type 'GenericClass<T>.Separate' involving Objective-C type parameter 'T' cannot be used for associated type 'Separate' of protocol 'WithAssocSeparate'}}
+extension GenericClass : WithAssocSeparate { // expected-error {{type 'GenericClass<T>.Separate' (aka 'T') involving Objective-C type parameter 'T' cannot be used for associated type 'Separate' of protocol 'WithAssocSeparate'}}
 }
 
 protocol WithAssocElement {
