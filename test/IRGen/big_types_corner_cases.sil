@@ -276,6 +276,15 @@ bb0(%0 : $*BigStruct):
   return %12 : $()
 }
 
+sil @dontCrashWithLabeledSingleElementTupleOfClosure : $@convention(thin) () -> @callee_guaranteed () -> @owned BigStruct {
+bb0:
+  %f = function_ref @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+  %thick = thin_to_thick_function %f : $@convention(thin) () -> @owned BigStruct to $@callee_guaranteed () -> @owned BigStruct
+  %38 = tuple $(closure: @callee_guaranteed () -> @owned BigStruct) (%thick)
+  %99 = tuple_extract %38 : $(closure: @callee_guaranteed () -> @owned BigStruct), 0
+  return %99 : $@callee_guaranteed () -> @owned BigStruct
+}
+
 sil_vtable SuperBase {
 }
 
