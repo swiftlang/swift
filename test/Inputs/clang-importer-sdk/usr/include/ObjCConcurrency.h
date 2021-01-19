@@ -77,4 +77,6 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)missingAtAttributeMethod __attribute__((__swift_attr__("asyncHandler")));
 @end
 
+#define MAGIC_NUMBER 42
+
 #pragma clang assume_nonnull end
