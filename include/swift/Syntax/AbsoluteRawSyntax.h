@@ -213,21 +213,54 @@ public:
 
 /// A \c RawSyntax node that is enrichted with information of its position
 /// within the syntax tree it lives in.
-struct AbsoluteRawSyntax {
-  const RC<RawSyntax> Raw;
+///
+/// A \c AbsoluteRawSyntaxRef can store its \c RawSyntax either
+/// reference-counted or as a plain pointer, if it can be guaranteed that \c
+/// RawSyntax stays alive. If performance is not a critical concern and
+/// memory-safety plays a prevailing role, use \c AbsoluteRawSyntax instead,
+/// which guarantees that the \c RawSyntax is always stored ref-counted.
+///
+/// By having \c AbsoluteRawSyntax as a subclass of \c AbsoluteRawSyntaxRef
+/// we can efficiently demote a reference-counted \c AbsoluteRawSyntax to a
+/// potentially unowned \c AbsoluteRawSyntaxRef.
+class AbsoluteRawSyntaxRef {
+  friend class AbsoluteRawSyntax;
+
+  /// The reference to the \c RawSyntax can either be stored reference-counted
+  /// (for safe access) or unowned (for faster access if it can be guaranteed
+  /// that the raw syntax stays alive). Only one of the two following fields can
+  /// be non-null at a time.
+  const RC<RawSyntax> RefCountedRaw;
+  const RawSyntax *UnownedRaw;
+
   const AbsoluteSyntaxInfo Info;
 
 public:
-  AbsoluteRawSyntax(const RC<RawSyntax> &Raw, AbsoluteSyntaxInfo Info)
-      : Raw(Raw), Info(Info) {}
-
-  /// Construct a \c AbsoluteRawSyntax for a \c RawSyntax node that represents
-  /// the syntax tree's root.
-  static AbsoluteRawSyntax forRoot(const RC<RawSyntax> &Raw) {
-    return AbsoluteRawSyntax(Raw, AbsoluteSyntaxInfo::forRoot());
+  /// Create a reference-counted \c AbsoluteRawSyntaxRef.
+  /// \p Raw must not be \c nullptr.
+  AbsoluteRawSyntaxRef(const RC<RawSyntax> &Raw, AbsoluteSyntaxInfo Info)
+      : RefCountedRaw(Raw), UnownedRaw(nullptr), Info(Info) {
+    assert(Raw != nullptr && "AbsoluteRawSyntax must have a RawSyntax");
   }
 
-  const RC<RawSyntax> &getRaw() const { return Raw; }
+  /// Create an unowned \c AbsoluteRawSyntaxRef. \p Raw must not be \c nullptr.
+  AbsoluteRawSyntaxRef(const RawSyntax *Raw, AbsoluteSyntaxInfo Info)
+      : RefCountedRaw(nullptr), UnownedRaw(Raw), Info(Info) {
+    assert(Raw != nullptr && "AbsoluteRawSyntax must have a RawSyntax");
+  }
+
+  /// Whether the \c RawSyntax that provides this node's data is stored
+  /// reference-counted or not.
+  bool isRefCounted() const { return UnownedRaw == nullptr; }
+
+  /// Get a reference to the \c RawSyntax of this node.
+  const RawSyntax *getRawRef() const {
+    if (UnownedRaw) {
+      return UnownedRaw;
+    } else {
+      return RefCountedRaw.get();
+    }
+  }
 
   AbsoluteSyntaxInfo getInfo() const { return Info; }
 
@@ -238,6 +271,45 @@ public:
 
   AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
     return getPosition().getIndexInParent();
+  }
+
+  size_t getNumChildren() const { return getRawRef()->getLayout().size(); }
+
+  /// Get the child at \p Index.
+  Optional<AbsoluteRawSyntaxRef>
+  getChildRef(AbsoluteSyntaxPosition::IndexInParentType Index) const;
+
+  /// Get the first non-missing token node in this tree. Return \c None if
+  /// this node does not contain non-missing tokens.
+  Optional<AbsoluteRawSyntaxRef> getFirstTokenRef() const;
+
+  /// Get the last non-missing token node in this tree. Return \c None if
+  /// this node does not contain non-missing tokens.
+  Optional<AbsoluteRawSyntaxRef> getLastTokenRef() const;
+};
+
+class AbsoluteRawSyntax : public AbsoluteRawSyntaxRef {
+public:
+  AbsoluteRawSyntax(const RC<RawSyntax> &Raw, AbsoluteSyntaxInfo Info)
+      : AbsoluteRawSyntaxRef(Raw, Info) {}
+
+  /// Cast a \c AbsoluteRawSyntaxRef to a \c AbsoluteRawSyntax. This requires
+  /// that \p Raw is known to be ref-counted at runtime.
+  explicit AbsoluteRawSyntax(const AbsoluteRawSyntaxRef &Raw)
+      : AbsoluteRawSyntaxRef(Raw.RefCountedRaw, Raw.Info) {
+    assert(Raw.isRefCounted());
+  }
+
+  /// Construct a \c AbsoluteRawSyntax for a \c RawSyntax node that represents
+  /// the syntax tree's root.
+  static AbsoluteRawSyntax forRoot(const RC<RawSyntax> &Raw) {
+    return AbsoluteRawSyntax(Raw, AbsoluteSyntaxInfo::forRoot());
+  }
+
+  const RC<RawSyntax> &getRaw() const {
+    assert(isRefCounted() &&
+           "AbsoluteRawSyntax should only ever contain ref-counted RawSyntax");
+    return RefCountedRaw;
   }
 
   /// Construct a new \c AbsoluteRawSyntax node that has the same info as the
@@ -251,6 +323,9 @@ public:
     AbsoluteSyntaxInfo NewInfo(Info.getPosition(), NewNodeId);
     return AbsoluteRawSyntax(NewRaw, NewInfo);
   }
+
+  Optional<AbsoluteRawSyntax>
+  getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const;
 };
 
 } // end namespace syntax

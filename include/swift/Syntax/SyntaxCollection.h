@@ -64,7 +64,7 @@ private:
       List.push_back(Elt.getRaw());
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, List,
                                             SourcePresence::Present);
-    return SyntaxData::make(AbsoluteRawSyntax::forRoot(Raw));
+    return SyntaxData(AbsoluteRawSyntax::forRoot(Raw), /*Parent=*/nullptr);
   }
 
 public:

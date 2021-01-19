@@ -40,7 +40,7 @@ struct SyntaxVisitor;
 class SourceFileSyntax;
 
 template <typename SyntaxNode> SyntaxNode makeRoot(RC<RawSyntax> Raw) {
-  auto Data = SyntaxData::make(AbsoluteRawSyntax::forRoot(Raw));
+  auto Data = SyntaxData(AbsoluteRawSyntax::forRoot(Raw), /*Parent=*/nullptr);
   return SyntaxNode(Data);
 }
 

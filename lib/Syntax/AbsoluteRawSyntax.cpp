@@ -60,6 +60,89 @@ AbsoluteSyntaxPosition::reversedBy(const RC<RawSyntax> &Raw) const {
   return AbsoluteSyntaxPosition(NewOffset, NewIndexInParent);
 }
 
+Optional<AbsoluteRawSyntaxRef> AbsoluteRawSyntaxRef::getChildRef(
+    AbsoluteSyntaxPosition::IndexInParentType Index) const {
+  auto Raw = getRawRef();
+  auto RawChildRef = Raw->getChildRef(Index);
+  if (!RawChildRef) {
+    return None;
+  }
+
+  AbsoluteSyntaxPosition Position = getPosition().advancedToFirstChild();
+  SyntaxIdentifier NodeId = getNodeId().advancedToFirstChild();
+
+  for (size_t I = 0; I < Index; ++I) {
+    Position = Position.advancedBy(Raw->getChild(I));
+    NodeId = NodeId.advancedBy(Raw->getChild(I));
+  }
+
+  AbsoluteSyntaxInfo Info(Position, NodeId);
+  return AbsoluteRawSyntaxRef(RawChildRef, Info);
+}
+
+Optional<AbsoluteRawSyntaxRef> AbsoluteRawSyntaxRef::getFirstTokenRef() const {
+  if (getRawRef()->isToken() && !getRawRef()->isMissing()) {
+    return *this;
+  }
+
+  size_t NumChildren = getNumChildren();
+  for (size_t I = 0; I < NumChildren; ++I) {
+    if (auto Child = getChildRef(I)) {
+      if (Child->getRawRef()->isMissing()) {
+        continue;
+      }
+
+      if (auto Token = Child->getFirstTokenRef()) {
+        return Token;
+      }
+    }
+  }
+  return None;
+}
+
+Optional<AbsoluteRawSyntaxRef> AbsoluteRawSyntaxRef::getLastTokenRef() const {
+  if (getRawRef()->isToken() && !getRawRef()->isMissing()) {
+    return *this;
+  }
+
+  size_t NumChildren = getNumChildren();
+  if (NumChildren == 0) {
+    return None;
+  }
+  for (int I = NumChildren - 1; I >= 0; --I) {
+    if (auto Child = getChildRef(I)) {
+      if (Child->getRawRef()->isMissing()) {
+        continue;
+      }
+
+      if (auto Token = Child->getLastTokenRef()) {
+        return Token;
+      }
+    }
+  }
+  return None;
+}
+
+Optional<AbsoluteRawSyntax> AbsoluteRawSyntax::getChild(
+    AbsoluteSyntaxPosition::IndexInParentType Index) const {
+  auto Raw = getRawRef();
+  auto RawChild = Raw->getChild(Index);
+  if (!RawChild) {
+    return None;
+  }
+
+  AbsoluteSyntaxPosition Position = getPosition().advancedToFirstChild();
+  SyntaxIdentifier NodeId = getNodeId().advancedToFirstChild();
+
+  for (size_t I = 0; I < Index; ++I) {
+    Position = Position.advancedBy(Raw->getChild(I));
+    NodeId = NodeId.advancedBy(Raw->getChild(I));
+  }
+
+  AbsoluteSyntaxInfo Info(Position, NodeId);
+  return AbsoluteRawSyntax(RawChild, Info);
+}
+
 raw_ostream &llvm::operator<<(raw_ostream &OS,
                               swift::syntax::AbsoluteOffsetPosition Pos) {
   OS << "Offset " << Pos.getOffset();

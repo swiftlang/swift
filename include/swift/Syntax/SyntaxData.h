@@ -72,48 +72,194 @@ public:
 ///
 /// It is essentially a wrapper around \c AbsoluteRawSyntax that also keeps
 /// track of the parent.
-class SyntaxData {
-  const AbsoluteRawSyntax AbsoluteRaw;
-  RC<RefCountedBox<SyntaxData>> Parent;
+///
+/// The parent can either be stored ref-counted for memory-safety access or as
+/// a plain pointer if it can be guaranteed that the parent will always outlive
+/// the child.
+/// If memory-safety should be guranteed, use \c SyntaxData, which gurantees
+/// that the parent is always stored ref-counted.
+///
+/// Having \c SyntaxData be a sublcass of \c SyntaxDataRef means that we can
+/// write algorithms that operate on \c SyntaxDataRef. When invoking those with
+/// a \c SyntaxData node, we can efficiently demote the \c SyntaxData node to a
+/// \c SyntaxDataRef.
+///
+/// We also uphold the following invariant: If a node's parent is ref-counted,
+/// then all of its parent's parents are also ref-counted. This means that we
+/// can address a subtree of a ref-counted syntax tree in a fast, but unsafe
+/// unowned way, but we can never address a subtree of an unowned tree as
+/// ref-counted.
+class SyntaxDataRef {
+  friend class SyntaxData;
 
-  SyntaxData(AbsoluteRawSyntax AbsoluteRaw,
-             const RC<RefCountedBox<SyntaxData>> &Parent)
-      : AbsoluteRaw(AbsoluteRaw), Parent(Parent) {}
+  const AbsoluteRawSyntaxRef AbsoluteRaw;
+
+  /// The parent can be stored either ref-counted or unsafe by a direct pointer.
+  /// Either of those must always be \c nullptr. If both are \c nullptr, then
+  /// the node does not have a parent.
+  const RC<RefCountedBox<SyntaxDataRef>> RefCountedParent;
+  const SyntaxDataRef *UnownedParent;
+
+  /// Create a reference-counted \c SyntaxDataRef. \p AbsoluteRaw must be
+  /// reference-counted and \p Parent must be \c nullptr or also ref-counted.
+  SyntaxDataRef(AbsoluteRawSyntaxRef AbsoluteRaw,
+                const RC<RefCountedBox<SyntaxDataRef>> &Parent)
+      : AbsoluteRaw(AbsoluteRaw), RefCountedParent(Parent),
+        UnownedParent(nullptr) {
+    assert(AbsoluteRaw.isRefCounted() &&
+           "If parent is ref-counted, AbsoluteRaw must also be ref-counted");
+    assert((Parent == nullptr || Parent->Data.isRefCounted()) &&
+           "Cannot address a subtree of an unowned tree as ref-counted");
+  }
+
+  /// Create an unowned \c SyntaxDataRef.
+  /// \p AbsoluteRaw must not be reference-counted.
+  SyntaxDataRef(AbsoluteRawSyntaxRef AbsoluteRaw, const SyntaxDataRef *Parent)
+      : AbsoluteRaw(AbsoluteRaw), RefCountedParent(nullptr),
+        UnownedParent(Parent) {
+    if (Parent != nullptr) {
+      assert(!AbsoluteRaw.isRefCounted() &&
+             "If parent is unowned, AbsoluteRaw must also be unowned");
+    }
+  }
 
 public:
-  // MARK: - Creating new SyntaxData
-
-  /// Make a new \c SyntaxData node for the tree's root.
-  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw) {
-    return make(AbsoluteRaw, nullptr);
-  }
-  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw,
-                         const RC<RefCountedBox<SyntaxData>> &Parent);
-
   // MARK: - Retrieving underlying storage
 
-  const AbsoluteRawSyntax &getAbsoluteRaw() const { return AbsoluteRaw; }
+  bool isRefCounted() const {
+    bool IsRefCounted = (UnownedParent == nullptr);
+    assert(IsRefCounted == getAbsoluteRawRef().isRefCounted() &&
+           "Either both AbsoluteRawSyntax and the parent reference should be "
+           "reference-counted or none of them");
+    return IsRefCounted;
+  }
+
+  const AbsoluteRawSyntaxRef &getAbsoluteRawRef() const { return AbsoluteRaw; }
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> &getRaw() const { return AbsoluteRaw.getRaw(); }
+  const RawSyntax *getRawRef() const { return getAbsoluteRawRef().getRawRef(); }
 
   // MARK: - Retrieving related nodes
 
-  /// Returns true if this syntax node has a parent.
-  bool hasParent() const { return Parent != nullptr; }
-
-  /// Return the parent syntax if there is one.
-  Optional<SyntaxData> getParent() const {
-    if (Parent) {
-      return Parent->Data;
+  Optional<SyntaxDataRef> getParentRef() const {
+    if (UnownedParent) {
+      return *UnownedParent;
+    } else if (RefCountedParent) {
+      return RefCountedParent->Data;
     } else {
       return None;
     }
   }
 
-  /// Returns the number of children this SyntaxData represents.
-  size_t getNumChildren() const {
-    return AbsoluteRaw.getRaw()->getLayout().size();
+  /// Returns true if this syntax node has a parent.
+  bool hasParent() const { return getParentRef().hasValue(); }
+
+  /// Returns the number of children this SyntaxData has.
+  size_t getNumChildren() const { return getRawRef()->getLayout().size(); }
+
+  /// Gets the child at the index specified by the provided cursor.
+  template <typename CursorType>
+  Optional<SyntaxDataRef> getChildRef(CursorType Cursor) const {
+    return getChildRef(
+        (AbsoluteSyntaxPosition::IndexInParentType)cursorIndex(Cursor));
+  }
+
+  /// Gets the child at the specified \p Index.
+  Optional<SyntaxDataRef>
+  getChildRef(AbsoluteSyntaxPosition::IndexInParentType Index) const;
+
+  /// Returns the child index of this node in its parent, if it has a parent,
+  /// otherwise 0.
+  AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
+    return getAbsoluteRawRef().getPosition().getIndexInParent();
+  }
+
+  // MARK: - Retrieving source locations
+
+  /// Get the offset at which the leading trivia of this node starts.
+  AbsoluteOffsetPosition getAbsolutePositionBeforeLeadingTrivia() const;
+
+  /// Get the offset at which the content of this node (excluding leading
+  /// trivia) starts.
+  AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const;
+
+  /// Get the offset at which the content (excluding trailing trivia) of this
+  /// node ends.
+  AbsoluteOffsetPosition getAbsoluteEndPositionBeforeTrailingTrivia() const;
+
+  /// Get the offset at chiwh the trailing trivia of this node ends.
+  AbsoluteOffsetPosition getAbsoluteEndPositionAfterTrailingTrivia() const;
+
+  // MARK: - Getting the node's kind
+
+  /// Returns the kind of syntax node this is.
+  SyntaxKind getKind() const { return getRawRef()->getKind(); }
+
+  /// Returns true if the data node represents type syntax.
+  bool isType() const { return getRawRef()->isType(); }
+
+  /// Returns true if the data node represents statement syntax.
+  bool isStmt() const { return getRawRef()->isStmt(); }
+
+  /// Returns true if the data node represents declaration syntax.
+  bool isDecl() const { return getRawRef()->isDecl(); }
+
+  /// Returns true if the data node represents expression syntax.
+  bool isExpr() const { return getRawRef()->isExpr(); }
+
+  /// Returns true if the data node represents pattern syntax.
+  bool isPattern() const { return getRawRef()->isPattern(); }
+
+  /// Returns true if this syntax is of some "unknown" kind.
+  bool isUnknown() const { return getRawRef()->isUnknown(); }
+
+  // MARK: - Miscellaneous
+
+  /// Dump a debug description of the syntax data for debugging to
+  /// standard error.
+  void dump(llvm::raw_ostream &OS) const;
+
+  SWIFT_DEBUG_DUMP;
+};
+
+class SyntaxData : public SyntaxDataRef {
+
+  SyntaxData(AbsoluteRawSyntax AbsoluteRaw, const SyntaxData &Parent)
+      : SyntaxDataRef(AbsoluteRaw, RefCountedBox<SyntaxDataRef>::make(Parent)) {
+  }
+
+public:
+  // MARK: - Creating new SyntaxData
+
+  /// Create a \c SyntaxData for a tree's root (i.e. a node without a parent).
+  SyntaxData(AbsoluteRawSyntax AbsoluteRaw, std::nullptr_t Parent)
+      : SyntaxDataRef(AbsoluteRaw, nullptr) {}
+
+  /// Cast a \c SyntaxDataRef to a \c SyntaxData. This requires that \c Ref is
+  /// known to be reference counted.
+  explicit SyntaxData(const SyntaxDataRef &Ref)
+      : SyntaxDataRef(Ref.AbsoluteRaw, Ref.RefCountedParent) {
+    assert(Ref.isRefCounted());
+  }
+
+  // MARK: - Retrieving underlying storage
+
+  AbsoluteRawSyntax getAbsoluteRaw() const {
+    return AbsoluteRawSyntax(getAbsoluteRawRef());
+  }
+
+  /// Returns the raw syntax node for this syntax node.
+  const RC<RawSyntax> &getRaw() const { return getAbsoluteRaw().getRaw(); }
+
+  // MARK: - Retrieving related nodes
+
+  /// Return the parent syntax if there is one.
+  Optional<SyntaxData> getParent() const {
+    if (auto ParentRef = getParentRef()) {
+      return SyntaxData(*ParentRef);
+    } else {
+      return None;
+    }
   }
 
   /// Gets the child at the index specified by the provided cursor.
@@ -127,17 +273,11 @@ public:
   Optional<SyntaxData>
   getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const;
 
-  /// Returns the child index of this node in its parent, if it has a parent,
-  /// otherwise 0.
-  AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
-    return AbsoluteRaw.getPosition().getIndexInParent();
-  }
-
-  /// Get the node immediately before this current node that does contain a
+  /// Get the node immediately before this current node that contains a
   /// non-missing token. Return \c None if we cannot find such node.
   Optional<SyntaxData> getPreviousNode() const;
 
-  /// Get the node immediately after this current node that does contain a
+  /// Get the node immediately after this current node that contains a
   /// non-missing token. Return \c None if we cannot find such node.
   Optional<SyntaxData> getNextNode() const;
 
@@ -148,45 +288,6 @@ public:
   /// Get the last non-missing token node in this tree. Return \c None if
   /// this node does not contain non-missing tokens.
   Optional<SyntaxData> getLastToken() const;
-
-  // MARK: - Retrieving source locations
-
-  /// Get the offset at which the leading trivia of this node starts.
-  AbsoluteOffsetPosition getAbsolutePositionBeforeLeadingTrivia() const;
-
-  /// Get the offset at which the content (excluding trailing trivia) of this
-  /// node ends.
-  AbsoluteOffsetPosition getAbsoluteEndPositionBeforeTrailingTrivia() const;
-
-  /// Get the offset at which the content of this node (excluding leading
-  /// trivia) starts.
-  AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const;
-
-  /// Get the offset at chiwh the trailing trivia of this node ends.
-  AbsoluteOffsetPosition getAbsoluteEndPositionAfterTrailingTrivia() const;
-
-  // MARK: - Getting the node's kind
-
-  /// Returns the kind of syntax node this is.
-  SyntaxKind getKind() const { return AbsoluteRaw.getRaw()->getKind(); }
-
-  /// Returns true if the data node represents type syntax.
-  bool isType() const { return getRaw()->isType(); }
-
-  /// Returns true if the data node represents statement syntax.
-  bool isStmt() const { return getRaw()->isStmt(); }
-
-  /// Returns true if the data node represents declaration syntax.
-  bool isDecl() const { return getRaw()->isDecl(); }
-
-  /// Returns true if the data node represents expression syntax.
-  bool isExpr() const { return getRaw()->isExpr(); }
-
-  /// Returns true if the data node represents pattern syntax.
-  bool isPattern() const { return getRaw()->isPattern(); }
-
-  /// Returns true if this syntax is of some "unknown" kind.
-  bool isUnknown() const { return getRaw()->isUnknown(); }
 
   // MARK: - Modifying node
 
@@ -199,17 +300,9 @@ public:
   template <typename CursorType>
   SyntaxData replacingChild(const RC<RawSyntax> &RawChild,
                             CursorType ChildCursor) const {
-    auto NewRaw = AbsoluteRaw.getRaw()->replacingChild(ChildCursor, RawChild);
+    auto NewRaw = getRaw()->replacingChild(ChildCursor, RawChild);
     return replacingSelf(NewRaw);
   }
-
-  // MARK: - Miscellaneous
-
-  /// Dump a debug description of the syntax data for debugging to
-  /// standard error.
-  void dump(llvm::raw_ostream &OS) const;
-
-  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace syntax
