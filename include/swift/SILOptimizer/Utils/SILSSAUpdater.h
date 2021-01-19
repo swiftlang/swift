@@ -49,6 +49,8 @@ class SILSSAUpdater {
 
   SILType type;
 
+  ValueOwnershipKind ownershipKind;
+
   // The SSAUpdaterTraits specialization uses this sentinel to mark 'new' phi
   // nodes (all the incoming edge arguments have this sentinel set).
   std::unique_ptr<SILUndef, void (*)(SILUndef *)> phiSentinel;
@@ -69,8 +71,8 @@ public:
     insertedPhis = inputInsertedPhis;
   }
 
-  /// Initialize for a use of a value of type.
-  void initialize(SILType type);
+  /// Initialize for a use of a value of type and ownershipKind
+  void initialize(SILType type, ValueOwnershipKind ownershipKind);
 
   bool hasValueForBlock(SILBasicBlock *block) const;
   void addAvailableValue(SILBasicBlock *block, SILValue value);
