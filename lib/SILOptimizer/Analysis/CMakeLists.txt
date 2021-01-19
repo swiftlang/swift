@@ -10,8 +10,9 @@ target_sources(swiftSILOptimizer PRIVATE
   ClassHierarchyAnalysis.cpp
   ClosureScope.cpp
   ColdBlockInfo.cpp
-  DifferentiableActivityAnalysis.cpp
+  DeadEndBlocksAnalysis.cpp
   DestructorAnalysis.cpp
+  DifferentiableActivityAnalysis.cpp
   EscapeAnalysis.cpp
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp

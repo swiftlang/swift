@@ -32,7 +32,7 @@ namespace semanticarc {
 struct LLVM_LIBRARY_VISIBILITY Context {
   SILFunction &fn;
   ARCTransformKind transformKind = ARCTransformKind::All;
-  Optional<DeadEndBlocks> deadEndBlocks;
+  DeadEndBlocks &deadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   SmallMultiMapCache<SILValue, Operand *> addressToExhaustiveWriteListCache;
 
@@ -117,14 +117,11 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   using FrozenMultiMapRange =
       decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
-  DeadEndBlocks &getDeadEndBlocks() {
-    if (!deadEndBlocks)
-      deadEndBlocks.emplace(&fn);
-    return *deadEndBlocks;
-  }
+  DeadEndBlocks &getDeadEndBlocks() { return deadEndBlocks; }
 
-  Context(SILFunction &fn, bool onlyGuaranteedOpts, InstModCallbacks callbacks)
-      : fn(fn), deadEndBlocks(), lifetimeFrontier(),
+  Context(SILFunction &fn, DeadEndBlocks &deBlocks, bool onlyGuaranteedOpts,
+          InstModCallbacks callbacks)
+      : fn(fn), deadEndBlocks(deBlocks), lifetimeFrontier(),
         addressToExhaustiveWriteListCache(constructCacheValue),
         onlyGuaranteedOpts(onlyGuaranteedOpts), instModCallbacks(callbacks) {}
 
