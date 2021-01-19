@@ -1963,3 +1963,53 @@ SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
 
   return nextII;
 }
+
+SILValue swift::makeCopiedValueAvailable(
+    SILValue value, SILBasicBlock *inBlock,
+    JointPostDominanceSetComputer *jointPostDomComputer) {
+  if (!value->getFunction()->hasOwnership())
+    return value;
+
+  if (value->getType().isTrivial(*value->getFunction()))
+    return value;
+
+  auto insertPt = getInsertAfterPoint(value).getValue();
+  auto *copy =
+      SILBuilderWithScope(insertPt).createCopyValue(insertPt->getLoc(), value);
+
+  return makeNewValueAvailable(copy, inBlock, jointPostDomComputer);
+}
+
+SILValue swift::makeNewValueAvailable(
+    SILValue value, SILBasicBlock *inBlock,
+    JointPostDominanceSetComputer *jointPostDomComputer) {
+  if (!value->getFunction()->hasOwnership())
+    return value;
+
+  if (value->getType().isTrivial(*value->getFunction()))
+    return value;
+
+  assert(value->getUses().empty() &&
+         value.getOwnershipKind() == OwnershipKind::Owned);
+
+  // Use \p jointPostDomComputer to:
+  // 1. Create a control equivalent copy at \p inBlock if needed
+  // 2. Insert destroy_value at leaking blocks
+  SILValue controlEqCopy;
+  jointPostDomComputer->findJointPostDominatingSet(
+      value->getParentBlock(), inBlock,
+      [&](SILBasicBlock *loopBlock) {
+        assert(loopBlock == inBlock);
+        auto front = loopBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        controlEqCopy = newBuilder.createCopyValue(front->getLoc(), value);
+      },
+      [&](SILBasicBlock *postDomBlock) {
+        // Insert a destroy_value in the leaking block
+        auto front = postDomBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        newBuilder.createDestroyValue(front->getLoc(), value);
+      });
+
+  return controlEqCopy ? controlEqCopy : value;
+}
