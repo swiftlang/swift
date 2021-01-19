@@ -1090,6 +1090,17 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
   return true;
 }
 
+void AbstractionPattern::normalizeClangType() {
+  if (!(getKind() == Kind::Type))
+    return;
+  auto type = getType();
+  auto *fnTy = type->getAs<AnyFunctionType>();
+  if (!(fnTy && fnTy->hasNonDerivableClangType()))
+    return;
+  auto *clangTy = fnTy->getCanonicalClangTypeInfo().getType();
+  initClangType(getGenericSignature(), type, clangTy);
+}
+
 AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
                                             CanType origMemberInterfaceType)

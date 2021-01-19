@@ -276,7 +276,7 @@ namespace swift {
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
     /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
-    bool UseClangFunctionTypes = false;
+    bool UseClangFunctionTypes = true;
 
     /// Whether to use the import as member inference system
     ///

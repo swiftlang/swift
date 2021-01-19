@@ -329,7 +329,7 @@ struct PrintOptions {
   /// Whether to print function @convention attribute on function types.
   // [TODO: Clang-type-plumbing] Print the full type in the swiftinterface.
   FunctionRepresentationMode PrintFunctionRepresentationAttrs =
-    FunctionRepresentationMode::NameOnly;
+    FunctionRepresentationMode::Full;
 
   /// Whether to print storage representation attributes on types, e.g.
   /// '@sil_weak', '@sil_unmanaged'.

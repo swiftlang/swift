@@ -6,7 +6,7 @@ func makeMetatype() -> Struct1.Type { return Struct1.self }
 
 // CHECK-LABEL: sil [ossa] @$s10cf_members17importAsUnaryInityyF
 public func importAsUnaryInit() {
-  // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
+  // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c{{.+}}) () -> @owned CCPowerSupply
   var a = CCPowerSupply(dangerous: ())
   let f: (()) -> CCPowerSupply = CCPowerSupply.init(dangerous:)
   a = f(())
@@ -59,7 +59,7 @@ public func foo(_ x: Double) {
   // CHECK: [[WRITE:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[WRITE]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c{{.+}}) (@in Struct1, Double) -> Struct1
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
@@ -127,12 +127,12 @@ public func foo(_ x: Double) {
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: [[ZVAL_2:%.*]] = load [trivial] [[ZTMP]]
   // CHECK: store [[ZVAL_2]] to [trivial] [[ZTMP_2:%.*]] :
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c{{.+}}) (@in Struct1) -> Double
   // CHECK: apply [[GET]]([[ZTMP_2]])
   _ = z.radius
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetRadius : $@convention(c) (Struct1, Double) -> ()
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetRadius : $@convention(c{{.+}}) (Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[ZVAL]], [[X]])
   z.radius = x
 
@@ -142,7 +142,7 @@ public func foo(_ x: Double) {
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c{{.+}}) (@inout Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[WRITE]], [[X]])
   z.altitude = x
   
@@ -217,7 +217,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c) (Int32, Float, Struct1, Double) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c{{.+}}) (Int32, Float, Struct1, Double) -> ()
   // CHECK: apply [[FN]]({{.*}}, {{.*}}, [[ZVAL]], [[X]])
   z.selfComesThird(a: y, b: 0, x: x)
   let n: (Int32, Float, Double) -> () = z.selfComesThird(a:b:x:)
@@ -270,15 +270,15 @@ public func foo(_ x: Double) {
 
 // CHECK-LABEL: sil [ossa] @$s10cf_members3bar{{[_0-9a-zA-Z]*}}F
 public func bar(_ x: Double) {
-  // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c) (Double) -> @owned CCPowerSupply
+  // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c{{.+}}) (Double) -> @owned CCPowerSupply
   let ps = CCPowerSupply(watts: x)
-  // CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (CCPowerSupply) -> @owned CCRefrigerator
+  // CHECK: function_ref @CCRefrigeratorCreate : $@convention(c{{.+}}) (CCPowerSupply) -> @owned CCRefrigerator
   let fridge = CCRefrigerator(powerSupply: ps)
   // CHECK: function_ref @CCRefrigeratorOpen : $@convention(c) (CCRefrigerator) -> ()
   fridge.open()
   // CHECK: function_ref @CCRefrigeratorGetPowerSupply : $@convention(c) (CCRefrigerator) -> @autoreleased CCPowerSupply
   let ps2 = fridge.powerSupply
-  // CHECK: function_ref @CCRefrigeratorSetPowerSupply : $@convention(c) (CCRefrigerator, CCPowerSupply) -> ()
+  // CHECK: function_ref @CCRefrigeratorSetPowerSupply : $@convention(c{{.+}}) (CCRefrigerator, CCPowerSupply) -> ()
   fridge.powerSupply = ps2
 
   let a: (Double) -> CCPowerSupply = CCPowerSupply.init(watts:)

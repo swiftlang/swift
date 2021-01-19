@@ -358,8 +358,9 @@ getParameterTypes(AnyFunctionType::CanParamArrayRef params,
 static CanAnyFunctionType
 getBridgedBlockType(SILGenModule &SGM, CanAnyFunctionType blockType,
                     SILFunctionTypeRepresentation silRep) {
-  return SGM.Types.getBridgedFunctionType(
-      AbstractionPattern(blockType), blockType, Bridgeability::Full, silRep);
+  auto pattern = AbstractionPattern(blockType);
+  return SGM.Types.getBridgedFunctionType(pattern, blockType,
+                                          Bridgeability::Full, silRep);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,

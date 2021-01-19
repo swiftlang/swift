@@ -19,7 +19,7 @@ hasNoPrototype()
 // -- Referencing unapplied C function goes through a thunk
 // CHECK:   [[NSANSE:%.*]] = function_ref @$sSo6NSAnseySo7AnsibleCSgADFTO : $@convention(thin) (@guaranteed Optional<Ansible>) -> @owned Optional<Ansible>
 // -- Referencing unprototyped C function passes no parameters
-// CHECK:   [[NOPROTO:%.*]] = function_ref @hasNoPrototype : $@convention(c) () -> ()
+// CHECK:   [[NOPROTO:%.*]] = function_ref @hasNoPrototype : $@convention(c, cType: "void (*)()") () -> ()
 // CHECK:   apply [[NOPROTO]]()
 
 // -- Constructors for imported NSObject

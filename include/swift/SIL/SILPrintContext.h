@@ -74,7 +74,7 @@ public:
   ///
   /// DebugInfo will be set according to the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose = false,
-                  bool SortedSIL = false, bool PrintFullConvention = false);
+                  bool SortedSIL = false, bool PrintFullConvention = true);
 
   /// Constructor based on SILOptions.
   ///

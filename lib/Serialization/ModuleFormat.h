@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 590; // differentiable_function_extract explicit extractee type
+const uint16_t SWIFTMODULE_VERSION_MINOR = 591; // serialize Clang function types
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -267,7 +267,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
-  
+
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
@@ -394,7 +394,7 @@ enum class SelfAccessKind : uint8_t {
   Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
-  
+
 /// Translates an operator decl fixity to a Serialization fixity, whose values
 /// are guaranteed to be stable.
 static inline OperatorKind getStableFixity(OperatorFixity fixity) {
@@ -1024,19 +1024,19 @@ namespace decls_block {
     OPENED_ARCHETYPE_TYPE,
     TypeIDField         // the existential type
   >;
-  
+
   using OpaqueArchetypeTypeLayout = BCRecordLayout<
     OPAQUE_ARCHETYPE_TYPE,
     DeclIDField,           // the opaque type decl
     SubstitutionMapIDField // the arguments
   >;
-  
+
   using NestedArchetypeTypeLayout = BCRecordLayout<
     NESTED_ARCHETYPE_TYPE,
     TypeIDField, // root archetype
     TypeIDField // interface type relative to root
   >;
-  
+
   using DynamicSelfTypeLayout = BCRecordLayout<
     DYNAMIC_SELF_TYPE,
     TypeIDField          // self type
@@ -1090,7 +1090,7 @@ namespace decls_block {
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
   >;
-  
+
   using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,
     TypeIDField            // capture type
@@ -1337,7 +1337,7 @@ namespace decls_block {
     // - the foreign error convention, if any
     // - inlinable body text, if any
   >;
-  
+
   using OpaqueTypeLayout = BCRecordLayout<
     OPAQUE_TYPE_DECL,
     DeclContextIDField, // decl context
@@ -1670,7 +1670,7 @@ namespace decls_block {
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
   >;
-  
+
   using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
     XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
     IdentifierIDField // mangled name of defining decl
@@ -1736,7 +1736,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCVBR<8>    // alignment
   >;
-  
+
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
     SwiftNativeObjCRuntimeBase_DECL_ATTR,
     BCFixed<1>, // implicit flag
