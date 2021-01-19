@@ -45,10 +45,11 @@ reflect(enum: optionalAnyNonNil)
 // CHECK-64:  (protocol_composition)
 // CHECK-64: )
 
-// CHECK-32: Reflecting an object.
+// CHECK-32: Reflecting an enum.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
-// CHECK-32: (class reflect_Enum_SingleCaseIntPayload.ClassWithSingleCaseIntPayloadEnum)
+// CHECK-32: (bound_generic_enum Swift.Optional
+// CHECK-32:  (protocol_composition))
 
 // CHECK-32: Type info:
 // CHECK-32: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
@@ -92,10 +93,11 @@ reflect(enum: optionalAnyNil)
 // CHECK-64: (enum_value name=none index=1)
 
 
-// CHECK-32: Reflecting an object.
+// CHECK-32: Reflecting an enum.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
-// CHECK-32: (class reflect_Enum_SingleCaseIntPayload.ClassWithSingleCaseIntPayloadEnum)
+// CHECK-32: (bound_generic_enum Swift.Optional
+// CHECK-32:   (protocol_composition))
 
 // CHECK-32: Type info:
 // CHECK-32: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
@@ -140,7 +142,7 @@ reflect(enum: optionalOptionalAnyNil)
 // CHECK-64: Enum value:
 // CHECK-64: (enum_value name=none index=1)
 
-// CHECK-32: Reflecting an object.
+// CHECK-32: Reflecting an enum.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
 // CHECK-32: (bound_generic_enum Swift.Optional
@@ -196,7 +198,7 @@ reflect(enum: optionalOptionalAnySomeNil)
 // CHECK-64:   (protocol_composition))
 // CHECK-64: )
 
-// CHECK-32: Reflecting an object.
+// CHECK-32: Reflecting an enum.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
 // CHECK-32: (bound_generic_enum Swift.Optional
@@ -255,7 +257,7 @@ reflect(enum: optionalOptionalAnyNonNil)
 // CHECK-64:   (protocol_composition))
 // CHECK-64: )
 
-// CHECK-32: Reflecting an object.
+// CHECK-32: Reflecting an enum.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
 // CHECK-32: (bound_generic_enum Swift.Optional
