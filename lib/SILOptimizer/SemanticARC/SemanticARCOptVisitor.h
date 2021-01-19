@@ -49,8 +49,9 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   Context ctx;
 
-  explicit SemanticARCOptVisitor(SILFunction &fn, bool onlyGuaranteedOpts)
-      : ctx(fn, onlyGuaranteedOpts,
+  explicit SemanticARCOptVisitor(SILFunction &fn, DeadEndBlocks &deBlocks,
+                                 bool onlyGuaranteedOpts)
+      : ctx(fn, deBlocks, onlyGuaranteedOpts,
             InstModCallbacks(
                 [this](SILInstruction *inst) { eraseInstruction(inst); },
                 [this](Operand *use, SILValue newValue) {
