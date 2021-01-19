@@ -38,6 +38,7 @@
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
@@ -5295,8 +5296,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   return false;
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(
-    ConstraintSystem::PotentialBindings &bindings)
+TypeVarBindingProducer::TypeVarBindingProducer(PotentialBindings &bindings)
     : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
       TypeVar(bindings.TypeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
@@ -5406,7 +5406,7 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
   return false;
 }
 
-ConstraintSystem::PotentialBinding
+PotentialBinding
 TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
   assert(constraint->getKind() == ConstraintKind::Defaultable ||
          constraint->getKind() == ConstraintKind::DefaultClosureType);

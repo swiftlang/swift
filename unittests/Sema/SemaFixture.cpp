@@ -26,6 +26,7 @@
 
 using namespace swift;
 using namespace swift::unittest;
+using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
     : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
@@ -120,10 +121,9 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
   return ProtocolType::get(PD, parent, Context);
 }
 
-ConstraintSystem::PotentialBindings
-SemaTest::inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar) {
-  llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
-      cache;
+PotentialBindings SemaTest::inferBindings(ConstraintSystem &cs,
+                                          TypeVariableType *typeVar) {
+  llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> cache;
 
   for (auto *typeVar : cs.getTypeVariables()) {
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
