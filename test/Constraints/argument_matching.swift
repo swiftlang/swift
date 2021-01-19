@@ -1752,10 +1752,10 @@ func rdar70764991() {
     static var foo: S { get { S() } }
   }
 
-  func bar(_: Any, foo: String) {
+  func bar(_: Any, _: String) {
   }
 
   func test(_ str: String) {
-    bar(str, foo: S.foo) // expected-error {{unnamed argument #1 must precede argument 'foo'}}  {{9-12=}} {{14-14=str, }}
+    bar(str, S.foo) // expected-error {{unnamed argument #1 must precede unnamed argument #2}}  {{9-12=}} {{14-14=str}}
   }
 }

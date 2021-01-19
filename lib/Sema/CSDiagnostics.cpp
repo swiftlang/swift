@@ -4825,9 +4825,14 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     SourceRange removalRange{Lexer::getLocForEndOfToken(SM, removalStartLoc),
                              firstRange.End};
 
+    // Move requires postfix comma only if argument is moved in-between
+    // other arguments.
+    bool requiresComma = !isExpr<BinaryExpr>(anchor) &&
+                         PrevArgIdx != tuple->getNumElements() - 1;
+
     diag.fixItRemove(removalRange);
     diag.fixItInsert(secondRange.Start,
-                     text.str() + (isExpr<BinaryExpr>(anchor) ? "" : ", "));
+                     text.str() + (requiresComma ? ", " : ""));
   };
 
   // There are 4 diagnostic messages variations depending on
