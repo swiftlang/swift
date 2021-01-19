@@ -424,10 +424,6 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   if (type->isCanonical())
     return false;
 
-  // Don't show generic type parameters.
-  if (type->getCanonicalType()->hasTypeParameter())
-    return false;
-
   // Only show 'aka' if there's a typealias involved; other kinds of sugar
   // are easy enough for people to read on their own.
   if (!type.findIf(isInterestingTypealias))
@@ -457,6 +453,19 @@ static bool typeSpellingIsAmbiguous(Type type,
     }
   }
   return false;
+}
+
+/// Walks the type recursivelly desugaring  types to display, but skipping
+/// `GenericTypeParamType` because we would lose association with its original
+/// declaration and end up presenting the parameter in τ_0_0 format on
+/// diagnostic.
+static Type getAkaTypeForDisplay(Type type) {
+  return type.transform([](Type visitTy) -> Type {
+    if (isa<SugarType>(visitTy.getPointer()) &&
+        !isa<GenericTypeParamType>(visitTy.getPointer()))
+      return getAkaTypeForDisplay(visitTy->getDesugaredType());
+    return visitTy;
+  });
 }
 
 /// Format a single diagnostic argument and write it to the given
@@ -577,7 +586,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
       if (shouldShowAKA(type, typeName)) {
         llvm::SmallString<256> AkaText;
         llvm::raw_svector_ostream OutAka(AkaText);
-        OutAka << type->getCanonicalType();
+
+        OutAka << getAkaTypeForDisplay(type);
         Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
                             typeName.c_str(), AkaText.c_str());
       } else {
