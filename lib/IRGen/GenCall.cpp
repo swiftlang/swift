@@ -4146,7 +4146,10 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
       if (explosionTy != elt->getType()) {
         if (isa<llvm::IntegerType>(explosionTy) &&
             isa<llvm::IntegerType>(elt->getType())) {
-          elt = IGF.Builder.CreateTrunc(elt, explosionTy);
+          // [HACK: Atomic-Bool-IRGen] In the case of _Atomic(_Bool), Clang
+          // treats it as i8 whereas Swift works with i1, so we need to zext
+          // in that case.
+          elt = IGF.Builder.CreateZExtOrTrunc(elt, explosionTy);
         } else {
           elt = IGF.coerceValue(elt, explosionTy, DataLayout);
         }
@@ -4278,10 +4281,14 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
       auto *elt = fromNonNative.claimNext();
       if (nativeTy != elt->getType()) {
         if (isa<llvm::IntegerType>(nativeTy) &&
-            isa<llvm::IntegerType>(elt->getType()))
-          elt = IGF.Builder.CreateZExt(elt, nativeTy);
-        else
+            isa<llvm::IntegerType>(elt->getType())) {
+          // [HACK: Atomic-Bool-IRGen] In the case of _Atomic(_Bool), Clang
+          // treats it as i8 whereas Swift works with i1, so we need to trunc
+          // in that case.
+          elt = IGF.Builder.CreateZExtOrTrunc(elt, nativeTy);
+        } else {
           elt = IGF.coerceValue(elt, nativeTy, DataLayout);
+        }
       }
       nativeExplosion.add(elt);
       return nativeExplosion;
