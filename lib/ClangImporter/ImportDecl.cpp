@@ -3585,19 +3585,6 @@ namespace {
       return VisitCXXRecordDecl(def);
     }
 
-    Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
-      // When loading a namespace's sub-decls, we won't add template
-      // specilizations, so make sure to do that here.
-      for (auto spec : decl->specializations()) {
-        if (auto importedSpec = Impl.importDecl(spec, getVersion())) {
-          if (auto namespaceDecl =
-                  dyn_cast<EnumDecl>(importedSpec->getDeclContext()))
-            namespaceDecl->addMember(importedSpec);
-        }
-      }
-      return nullptr;
-    }
-
     Decl *VisitClassTemplatePartialSpecializationDecl(
         const clang::ClassTemplatePartialSpecializationDecl *decl) {
       // Note: partial template specializations are not imported.
@@ -4254,6 +4241,16 @@ namespace {
     }
 
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
+      // When loading a namespace's sub-decls, we won't add template
+      // specilizations, so make sure to do that here.
+      for (auto spec : decl->specializations()) {
+        if (auto importedSpec = Impl.importDecl(spec, getVersion())) {
+          if (auto namespaceDecl =
+                  dyn_cast<EnumDecl>(importedSpec->getDeclContext()))
+            namespaceDecl->addMember(importedSpec);
+        }
+      }
+
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);
       auto name = importedName.getDeclName().getBaseIdentifier();
