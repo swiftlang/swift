@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -disable-availability-checking -module-name main -enable-subst-sil-function-types-for-function-values %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -disable-availability-checking -module-name main %s | %FileCheck %s
 
 func generic<T, U>(_ f: @escaping (T) -> U) -> (T) -> U { return f }
 

@@ -163,9 +163,6 @@ public:
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
-  /// Enable large loadable types IRGen pass.
-  bool EnableLargeLoadableTypes = true;
-
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
