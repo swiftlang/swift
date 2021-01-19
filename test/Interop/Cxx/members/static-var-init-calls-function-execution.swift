@@ -2,7 +2,7 @@
 //
 // REQUIRES: executable_test
 
-// TODO: See why -validate-tbd-against-ir=none is needed here
+// TODO: See why -validate-tbd-against-ir=none is needed here (SR-14069)
 
 import StaticVarInitCallsFunction
 import StdlibUnittest

@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop -validate-tbd-against-ir=none | %FileCheck %s
 
-// TODO: See why -validate-tbd-against-ir=none is needed here
+// TODO: See why -validate-tbd-against-ir=none is needed here (SR-14069)
 
 import StaticVarInitCallsFunction
 
