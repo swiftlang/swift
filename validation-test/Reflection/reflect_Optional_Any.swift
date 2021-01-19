@@ -52,11 +52,11 @@ reflect(enum: optionalAnyNonNil)
 // CHECK-32:   (protocol_composition))
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
+// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
 // CHECK-32:   (case name=some index=0 offset=0
-// CHECK-32:     (opaque_existential size=16 alignment=8 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4096 bitwise_takable=1
 // CHECK-32:       (field name=metadata offset=12
-// CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1))))
+// CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))
 // CHECK-32:   (case name=none index=1))
 
 // CHECK-32: Mangled name: $sypSg
@@ -100,11 +100,11 @@ reflect(enum: optionalAnyNil)
 // CHECK-32:   (protocol_composition))
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
+// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
 // CHECK-32:   (case name=some index=0 offset=0
-// CHECK-32:     (opaque_existential size=16 alignment=8 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4096 bitwise_takable=1
 // CHECK-32:       (field name=metadata offset=12
-// CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1))))
+// CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))
 // CHECK-32:   (case name=none index=1))
 
 // CHECK-32: Mangled name: $sypSg
@@ -150,13 +150,13 @@ reflect(enum: optionalOptionalAnyNil)
 // CHECK-32:     (protocol_composition)))
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4093 bitwise_takable=1
+// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
 // CHECK-32:   (case name=some index=0 offset=0
-// CHECK-32:     (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
+// CHECK-32:     (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
 // CHECK-32:       (case name=some index=0 offset=0
-// CHECK-32:         (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:         (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4096 bitwise_takable=1
 // CHECK-32:           (field name=metadata offset=12
-// CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1))))
+// CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))
 // CHECK-32:       (case name=none index=1)))
 // CHECK-32:   (case name=none index=1))
 
@@ -206,13 +206,13 @@ reflect(enum: optionalOptionalAnySomeNil)
 // CHECK-32:     (protocol_composition)))
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4093 bitwise_takable=1
+// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
 // CHECK-32:   (case name=some index=0 offset=0
-// CHECK-32:     (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
+// CHECK-32:     (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
 // CHECK-32:       (case name=some index=0 offset=0
-// CHECK-32:         (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:         (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4096 bitwise_takable=1
 // CHECK-32:           (field name=metadata offset=12
-// CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1))))
+// CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))
 // CHECK-32:       (case name=none index=1)))
 // CHECK-32:   (case name=none index=1))
 
@@ -265,13 +265,13 @@ reflect(enum: optionalOptionalAnyNonNil)
 // CHECK-32:     (protocol_composition)))
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4093 bitwise_takable=1
+// CHECK-32: (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
 // CHECK-32:   (case name=some index=0 offset=0
-// CHECK-32:     (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4094 bitwise_takable=1
+// CHECK-32:     (single_payload_enum size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
 // CHECK-32:       (case name=some index=0 offset=0
-// CHECK-32:         (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:         (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4096 bitwise_takable=1
 // CHECK-32:           (field name=metadata offset=12
-// CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1))))
+// CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))
 // CHECK-32:       (case name=none index=1)))
 // CHECK-32:   (case name=none index=1))
 
