@@ -190,7 +190,7 @@ private:
   bool pruneDebug;
 
   NonLocalAccessBlockAnalysis *accessBlockAnalysis;
-  // Lazilly initialize accessBlocks only when
+  // Lazily initialize accessBlocks only when
   // extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
