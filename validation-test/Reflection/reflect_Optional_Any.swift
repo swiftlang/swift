@@ -27,7 +27,7 @@ reflect(enum: optionalAnyNonNil)
 // CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-64: Type reference:
 // CHECK-64: (bound_generic_enum Swift.Optional
-// CHECK-64:  (protocol_composition))
+// CHECK-64:   (protocol_composition))
 
 // CHECK-64: Type info:
 // CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483646 bitwise_takable=1
