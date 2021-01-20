@@ -593,10 +593,30 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   // the stmt to have a try loc
   if (stmt->getAwaitLoc().isValid()) {
     auto Ty = sequence->getType();
-    if (Ty.isNull()) { return failed(); }
-    auto context = sequence->getType()->getNominalOrBoundGenericNominal();
-    if (!context) { return failed(); }
-    auto module = context->getParentModule();
+    if (Ty.isNull()) { 
+      auto DRE = dyn_cast<DeclRefExpr>(sequence);
+      if (DRE) {
+        Ty = DRE->getDecl()->getInterfaceType();
+      }
+      if (Ty.isNull()) {
+        return failed();
+      }
+    }
+    auto context = Ty->getNominalOrBoundGenericNominal();
+    if (!context) {
+      // if no nominal type can be determined then we must consider this to be
+      // a potential throwing source and concequently this must have a valid try
+      // location to account for that potential ambiguity.
+      if (stmt->getTryLoc().isInvalid()) {
+        auto &diags = dc->getASTContext().Diags;
+        diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled);
+        return failed();
+      } else {
+        return false;
+      }
+       
+    }
+    auto module = dc->getParentModule();
     auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
     
     if (conformanceRef.classifyAsThrows(module) && 
