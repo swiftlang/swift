@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -295,6 +296,10 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
 
+  if (auto *Copy = dyn_cast<CopyValueInst>(SelfVal)) {
+    // look through one level
+    SelfVal = Copy->getOperand();
+  }
   if (auto LI = dyn_cast<LoadInst>(SelfVal)) {
     // Are we loading a value from an address in a struct defined at a point
     // dominating the hoist point.
@@ -354,18 +359,28 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
   return false;
 }
 
-/// Copy the array load to the insert point.
-static SILValue copyArrayLoad(SILValue ArrayStructValue,
-                               SILInstruction *InsertBefore,
-                               DominanceInfo *DT) {
+/// Copy the array self value to the insert point.
+static SILValue copySelfValue(SILValue ArrayStructValue,
+                              SILInstruction *InsertBefore, DominanceInfo *DT) {
+  auto *func = InsertBefore->getFunction();
   if (DT->dominates(ArrayStructValue->getParentBlock(),
-                    InsertBefore->getParent()))
+                    InsertBefore->getParent())) {
+    assert(!func->hasOwnership() ||
+           ArrayStructValue.getOwnershipKind() == OwnershipKind::Owned ||
+           ArrayStructValue.getOwnershipKind() == OwnershipKind::Guaranteed);
     return ArrayStructValue;
+  }
 
-  auto *LI = cast<LoadInst>(ArrayStructValue);
+  assert(!func->hasOwnership() ||
+         ArrayStructValue.getOwnershipKind() == OwnershipKind::Owned);
 
-  // Recursively move struct_element_addr.
-  ValueBase *Val = LI->getOperand();
+  SILValue Val;
+  if (auto *Load = dyn_cast<LoadInst>(ArrayStructValue)) {
+    Val = Load->getOperand();
+  } else {
+    auto *Copy = cast<CopyValueInst>(ArrayStructValue);
+    Val = cast<LoadInst>(Copy->getOperand())->getOperand();
+  }
   auto *InsertPt = InsertBefore;
   while (!DT->dominates(Val->getParentBlock(), InsertBefore->getParent())) {
     auto *Inst = cast<StructElementAddrInst>(Val);
@@ -374,7 +389,16 @@ static SILValue copyArrayLoad(SILValue ArrayStructValue,
     InsertPt = Inst;
   }
 
-  return cast<LoadInst>(LI->clone(InsertBefore));
+  if (!ArrayStructValue->getFunction()->hasOwnership()) {
+    return cast<LoadInst>(ArrayStructValue)->clone(InsertBefore);
+  }
+  if (auto *Load = dyn_cast<LoadInst>(ArrayStructValue)) {
+    return Load->clone(InsertBefore);
+  }
+  auto *Copy = cast<CopyValueInst>(ArrayStructValue);
+  auto Addr = cast<LoadInst>(Copy->getOperand())->getOperand();
+  return SILBuilderWithScope(InsertPt).createLoad(InsertPt->getLoc(), Addr,
+                                                  LoadOwnershipQualifier::Copy);
 }
 
 static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,
@@ -404,17 +428,16 @@ static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
 
   auto Self = SemanticsCall->getSelfArgument();
   bool IsOwnedSelf = SelfConvention == ParameterConvention::Direct_Owned;
+  auto *Func = SemanticsCall->getFunction();
 
   // Emit matching release for owned self if we are moving the original call.
   if (!LeaveOriginal && IsOwnedSelf) {
     SILBuilderWithScope Builder(SemanticsCall);
-    Builder.createReleaseValue(SemanticsCall->getLoc(), Self, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(SemanticsCall->getLoc(), Self);
   }
-
-  auto NewArrayStructValue = copyArrayLoad(Self, InsertBefore, DT);
-
-  // Retain the array.
-  if (IsOwnedSelf) {
+  auto NewArrayStructValue = copySelfValue(Self, InsertBefore, DT);
+  if (!Func->hasOwnership() && IsOwnedSelf) {
+    // Retain the array.
     SILBuilderWithScope Builder(InsertBefore, SemanticsCall);
     Builder.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue,
                               Builder.getDefaultAtomicity());
@@ -512,8 +535,7 @@ void swift::ArraySemanticsCall::removeCall() {
   if (getSelfParameterConvention(SemanticsCall) ==
       ParameterConvention::Direct_Owned) {
     SILBuilderWithScope Builder(SemanticsCall);
-    Builder.createReleaseValue(SemanticsCall->getLoc(), getSelf(),
-                               Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(SemanticsCall->getLoc(), getSelf());
   }
 
   switch (getKind()) {

@@ -31,11 +31,6 @@ where
   Scalar.TangentVector: BinaryFloatingPoint
 {
   public typealias TangentVector = SIMD${n}
-
-  @inlinable
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    { .init(repeating: 0) }
-  }
 }
 
 //===----------------------------------------------------------------------===//

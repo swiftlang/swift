@@ -169,6 +169,45 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Closure,
 };
 
+/// Returns true if the function with this convention doesn't carry a context.
+constexpr bool
+isThinRepresentation(FunctionTypeRepresentation rep) {
+  switch (rep) {
+    case FunctionTypeRepresentation::Swift:
+    case FunctionTypeRepresentation::Block:
+      return false;
+    case FunctionTypeRepresentation::Thin:
+    case FunctionTypeRepresentation::CFunctionPointer:
+      return true;
+  }
+  llvm_unreachable("Unhandled FunctionTypeRepresentation in switch.");
+}
+
+/// Returns true if the function with this convention doesn't carry a context.
+constexpr bool
+isThinRepresentation(SILFunctionTypeRepresentation rep) {
+  switch (rep) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Block:
+    return false;
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Closure:
+    return true;
+  }
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
+}
+
+/// Returns true if the function with this convention carries a context.
+template <typename Repr>
+constexpr bool
+isThickRepresentation(Repr repr) {
+  return !isThinRepresentation(repr);
+}
+
 constexpr SILFunctionTypeRepresentation
 convertRepresentation(FunctionTypeRepresentation rep) {
   switch (rep) {
@@ -350,19 +389,7 @@ public:
 
   /// True if the function representation carries context.
   constexpr bool hasContext() const {
-    switch (getSILRepresentation()) {
-    case SILFunctionTypeRepresentation::Thick:
-    case SILFunctionTypeRepresentation::Block:
-      return true;
-    case SILFunctionTypeRepresentation::Thin:
-    case SILFunctionTypeRepresentation::Method:
-    case SILFunctionTypeRepresentation::ObjCMethod:
-    case SILFunctionTypeRepresentation::WitnessMethod:
-    case SILFunctionTypeRepresentation::CFunctionPointer:
-    case SILFunctionTypeRepresentation::Closure:
-      return false;
-    }
-    llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
+    return isThickRepresentation(getSILRepresentation());
   }
 
   // Note that we don't have setters. That is by design, use
