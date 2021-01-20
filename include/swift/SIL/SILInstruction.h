@@ -9048,6 +9048,11 @@ SILValue ApplyInstBase<Impl, Base, false>::getCalleeOrigin() const {
       Callee = CETN->getOperand();
       continue;
     }
+    // convert_escape_to_noescape's are within a borrow scope.
+    if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(Callee)) {
+      Callee = beginBorrow->getOperand();
+      continue;
+    }
     return Callee;
   }
 }
