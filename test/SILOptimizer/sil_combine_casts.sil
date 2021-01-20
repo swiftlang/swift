@@ -29,8 +29,7 @@ bb0:
 //
 // CHECK-LABEL: sil [ossa] @optimize_convert_escape_to_noescape_ossa :
 // CHECK: [[FN:%.*]] = function_ref @returnInt
-// CHECK: [[TTTFI:%.*]] = thin_to_thick_function [[FN]]
-// CHECK: apply [[TTTFI]]()
+// CHECK: apply [[FN]]()
 // CHECK: } // end sil function 'optimize_convert_escape_to_noescape_ossa'
 sil [ossa] @optimize_convert_escape_to_noescape_ossa : $@convention(thin) () -> Builtin.Int32 {
 bb0:

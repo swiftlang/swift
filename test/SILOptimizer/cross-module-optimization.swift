@@ -2,16 +2,17 @@
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-submodule.swift -c -o %t/submodule.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/PrivateSubmodule.swiftmodule -module-name=PrivateSubmodule %S/Inputs/cross-private-submodule.swift -c -o %t/privatesubmodule.o
 // RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t %S/Inputs/cross-module.swift -c -o %t/test.o
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -c -o %t/main.o
-// RUN: %target-swiftc_driver %t/main.o %t/test.o %t/submodule.o -o %t/a.out
+// RUN: %target-swiftc_driver %t/main.o %t/test.o %t/submodule.o %t/privatesubmodule.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // Check if it also works if the main module is compiled with -Onone:
 
 // RUN: %target-build-swift -Onone -wmo -module-name=Main -I%t %s -c -o %t/main-onone.o
-// RUN: %target-swiftc_driver %t/main-onone.o %t/test.o %t/submodule.o -o %t/a.out
+// RUN: %target-swiftc_driver %t/main-onone.o %t/test.o %t/submodule.o %t/privatesubmodule.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
@@ -29,19 +30,19 @@ import Test
 func testNestedTypes() {
   let c = Container()
 
-  // CHECK-OUTPUT: [Test.Container.Base]
+  // CHECK-OUTPUT [Test.Container.Base]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV9testclassyxxlFSi_Tg5
   print(c.testclass(27))
-  // CHECK-OUTPUT: [Test.Container.Base]
+  // CHECK-OUTPUT [Test.Container.Base]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test9ContainerV13testclass_genyxxlF
   print(c.testclass_gen(27))
-  // CHECK-OUTPUT: [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT [Test.PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV8testenumyxxlFSi_Tg5
   print(c.testenum(27))
-  // CHECK-OUTPUT: [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT [Test.PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test9ContainerV12testenum_genyxxlF
   print(c.testenum_gen(27))
@@ -141,6 +142,15 @@ func testGlobal() {
   // CHECK-SIL2: } // end sil function '$s4Main10testGlobalyyF'
 }
 
+// CHECK-SIL2-LABEL: sil hidden [noinline] @$s4Main22testImplementationOnlyyyF
+@inline(never)
+func testImplementationOnly() {
+  // CHECK-OUTPUT: 27
+  // CHECK-SIL2: function_ref @$s4Test22callImplementationOnlyyxxlF
+  print(callImplementationOnly(27))
+  // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -150,4 +160,5 @@ testClosures()
 testKeypath()
 testMisc()
 testGlobal()
+testImplementationOnly()
 

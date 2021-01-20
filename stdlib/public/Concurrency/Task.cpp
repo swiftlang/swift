@@ -22,6 +22,12 @@
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
 
+#include <dispatch/dispatch.h>
+
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
+
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using GroupFragment = AsyncTask::GroupFragment;
@@ -527,4 +533,20 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
+}
+
+void swift::swift_task_asyncMainDrainQueue() {
+#if !defined(_WIN32)
+  auto runLoop =
+      reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
+  if (runLoop)
+    runLoop();
+  else
+    dispatch_main();
+#else
+  // TODO: I don't have a windows box to get this working right now.
+  //       We need to either pull in the CFRunLoop if it's available, or do
+  //       something that will drain the main queue. Exploding for now.
+  abort();
+#endif
 }

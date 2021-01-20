@@ -29,7 +29,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Fingerprint &fp) {
   out << fp.getRawValue();
 }
 
-Fingerprint Fingerprint::fromString(StringRef value) {
+Optional<Fingerprint> Fingerprint::fromString(StringRef value) {
   assert(value.size() == Fingerprint::DIGEST_LENGTH &&
          "Only supports 32-byte hash values!");
   auto fp = Fingerprint::ZERO();
@@ -41,6 +41,10 @@ Fingerprint Fingerprint::fromString(StringRef value) {
     std::istringstream s(value.drop_front(Fingerprint::DIGEST_LENGTH/2).str());
     s >> std::hex >> fp.core.second;
   }
+  // If the input string is not valid hex, the conversion above can fail.
+  if (value != fp.getRawValue())
+    return None;
+
   return fp;
 }
 
@@ -49,6 +53,5 @@ llvm::SmallString<Fingerprint::DIGEST_LENGTH> Fingerprint::getRawValue() const {
   llvm::raw_svector_ostream Res(Str);
   Res << llvm::format_hex_no_prefix(core.first, 16);
   Res << llvm::format_hex_no_prefix(core.second, 16);
-  assert(*this == Fingerprint::fromString(Str));
   return Str;
 }

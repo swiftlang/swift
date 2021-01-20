@@ -95,6 +95,24 @@ printJobsForDebugging(const std::vector<const driver::Job *> &jobs);
 
 } // end namespace mocking_fine_grained_dependency_graphs
 } // namespace fine_grained_dependencies
+
+/// Aborts if unconvertible, returns \c None for an empty string.
+inline Optional<Fingerprint> mockFingerprintFromString(llvm::StringRef value) {
+  auto contents = value.str();
+  const auto n = value.size();
+  if (n == 0 || n > Fingerprint::DIGEST_LENGTH)
+    return None;
+  // Insert at start so that "1" and "10" are distinct
+  contents.insert(0, Fingerprint::DIGEST_LENGTH - n, '0');
+  auto fingerprint = Fingerprint::fromString(contents);
+    if (!fingerprint) {
+    llvm::errs() << "unconvertable fingerprint from switdeps ':"
+                 << contents << "'\n";
+    abort();
+  }
+  return fingerprint;
+}
+
 } // end namespace swift
 
 #endif /* MOCKING_FINE_GRAINED_DEPENDENCY_GRAPHS_H */

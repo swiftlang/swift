@@ -217,6 +217,9 @@ struct BorrowingOperand {
   /// over a region of code instead of just for a single instruction, visit
   /// those uses.
   ///
+  /// Returns true if all visitor invocations returns true. Exits early if a
+  /// visitor returns false.
+  ///
   /// Example: An apply performs an instantaneous recursive borrow of a
   /// guaranteed value but a begin_apply borrows the value over the entire
   /// region of code corresponding to the coroutine.
@@ -669,7 +672,17 @@ struct InteriorPointerOperand {
   /// requirements to ensure that the underlying class is alive at all use
   /// points.
   bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
-                       std::function<void(Operand *)> *onError = nullptr);
+                       std::function<void(Operand *)> *onError = nullptr) {
+    return getImplicitUsesForAddress(getProjectedAddress(), foundUses, onError);
+  }
+
+  /// The algorithm that is used to determine what the verifier will consider to
+  /// be implicit uses of the given address. Used to implement \see
+  /// getImplicitUses.
+  static bool
+  getImplicitUsesForAddress(SILValue address,
+                            SmallVectorImpl<Operand *> &foundUses,
+                            std::function<void(Operand *)> *onError = nullptr);
 
   Operand *operator->() { return operand; }
   const Operand *operator->() const { return operand; }

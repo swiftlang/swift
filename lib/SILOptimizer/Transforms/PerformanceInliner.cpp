@@ -987,7 +987,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   mergeBasicBlocks(Caller);
 
   if (invalidatedStackNesting) {
-    StackNesting().correctStackNesting(Caller);
+    StackNesting::fixNesting(Caller);
   }
 
   // If we were asked to verify our caller after inlining all callees we could

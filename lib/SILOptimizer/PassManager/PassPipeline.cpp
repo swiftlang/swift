@@ -304,6 +304,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // We earlier eliminated ownership if we are not compiling the stdlib. Now
   // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  P.addCopyPropagation();
   P.addSemanticARCOpts();
   P.addNonTransparentFunctionOwnershipModelEliminator();
 
@@ -384,6 +385,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   } else {
     P.addRedundantLoadElimination();
   }
+  // Optimize copies created during RLE.
+  P.addSemanticARCOpts();
 
   P.addCOWOpts();
   P.addPerformanceConstantPropagation();
@@ -455,6 +458,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
+  P.addCopyPropagation();
   P.addSemanticARCOpts();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
@@ -727,9 +731,8 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
-  if (Options.EnableLargeLoadableTypes) {
-    P.addLoadableByAddress();
-  }
+  P.addLoadableByAddress();
+
   return P;
 }
 

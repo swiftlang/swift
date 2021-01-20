@@ -49,35 +49,11 @@ extension Optional: Differentiable where Wrapped: Differentiable {
         self.value?.move(along: value)
       }
     }
-
-    @noDerivative
-    public var zeroTangentVectorInitializer: () -> TangentVector {
-      switch value {
-      case nil:
-        return { Self(nil) }
-      case let x?:
-        return { [zeroTanInit = x.zeroTangentVectorInitializer] in
-          Self(zeroTanInit())
-        }
-      }
-    }
   }
 
   public mutating func move(along direction: TangentVector) {
     if let value = direction.value {
       self?.move(along: value)
-    }
-  }
-
-  @noDerivative
-  public var zeroTangentVectorInitializer: () -> TangentVector {
-    switch self {
-    case nil:
-      return { TangentVector(nil) }
-    case let x?:
-      return { [zeroTanInit = x.zeroTangentVectorInitializer] in
-        TangentVector(zeroTanInit())
-      }
     }
   }
 }

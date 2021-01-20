@@ -17,6 +17,8 @@
 #include "Transforms.h"
 
 #include "swift/Basic/Defer.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -149,7 +151,9 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    SemanticARCOptVisitor visitor(f, guaranteedOptsOnly);
+    auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+    SemanticARCOptVisitor visitor(f, *deBlocksAnalysis->get(&f),
+                                  guaranteedOptsOnly);
 
 #ifndef NDEBUG
     // If we are being asked for testing purposes to run a series of transforms

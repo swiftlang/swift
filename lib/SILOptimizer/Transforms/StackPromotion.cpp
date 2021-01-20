@@ -73,8 +73,7 @@ void StackPromotion::run() {
     return;
 
   // Make sure that all stack allocating instructions are nested correctly.
-  StackNesting SN;
-  if (SN.correctStackNesting(F) == StackNesting::Changes::CFG) {
+  if (StackNesting::fixNesting(F) == StackNesting::Changes::CFG) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
   } else {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

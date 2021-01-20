@@ -783,6 +783,66 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
   DeclLocsList.emit(scratch, Writer.Buffer);
 }
 
+static void emitFileListRecord(llvm::BitstreamWriter &Out,
+                               ModuleOrSourceFile MSF, StringWriter &FWriter) {
+  assert(MSF);
+
+  struct SourceFileListWriter {
+    StringWriter &FWriter;
+
+    llvm::SmallString<0> Buffer;
+    llvm::StringSet<> seenFilenames;
+
+    void emitSourceFileInfo(const BasicSourceFileInfo &info) {
+      // Make 'FilePath' absolute for serialization;
+      SmallString<128> absolutePath = info.FilePath;
+      llvm::sys::fs::make_absolute(absolutePath);
+
+      // Don't emit duplicated files.
+      if (!seenFilenames.insert(info.FilePath).second)
+        return;
+
+      auto fileID = FWriter.getTextOffset(absolutePath);
+      auto fingerprintStr = info.InterfaceHash.getRawValue();
+      auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           info.LastModified.time_since_epoch())
+                           .count();
+
+      llvm::raw_svector_ostream out(Buffer);
+      endian::Writer writer(out, little);
+      // FilePath.
+      writer.write<uint32_t>(fileID);
+      // InterfaceHash (fixed length string).
+      assert(fingerprintStr.size() == Fingerprint::DIGEST_LENGTH);
+      out << fingerprintStr;
+      // LastModified (nanoseconds since epoch).
+      writer.write<uint64_t>(timestamp);
+      // FileSize (num of bytes).
+      writer.write<uint64_t>(info.FileSize);
+    }
+
+    SourceFileListWriter(StringWriter &FWriter) : FWriter(FWriter) {
+      Buffer.reserve(1024);
+    }
+  } writer(FWriter);
+
+  if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
+    BasicSourceFileInfo info;
+    if (info.populate(SF))
+      return;
+    writer.emitSourceFileInfo(info);
+  } else {
+    auto *M = MSF.get<ModuleDecl *>();
+    M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+      writer.emitSourceFileInfo(info);
+    });
+  }
+
+  const decl_locs_block::SourceFileListLayout FileList(Out);
+  SmallVector<uint64_t, 8> scratch;
+  FileList.emit(scratch, writer.Buffer);
+}
+
 class SourceInfoSerializer : public SerializerBase {
 public:
   using SerializerBase::SerializerBase;
@@ -807,6 +867,7 @@ public:
     BLOCK_RECORD(control_block, TARGET);
 
     BLOCK(DECL_LOCS_BLOCK);
+    BLOCK_RECORD(decl_locs_block, SOURCE_FILE_LIST);
     BLOCK_RECORD(decl_locs_block, BASIC_DECL_LOCS);
     BLOCK_RECORD(decl_locs_block, DECL_USRS);
     BLOCK_RECORD(decl_locs_block, TEXT_DATA);
@@ -849,6 +910,7 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       DeclUSRsTableWriter USRWriter;
       StringWriter FPWriter;
       DocRangeWriter DocWriter;
+      emitFileListRecord(S.Out, DC, FPWriter);
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
       // Emit USR table mapping from a USR to USR Id.
       // The basic locs record uses USR Id instead of actual USR, so that we

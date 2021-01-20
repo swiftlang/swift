@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -c -enable-large-loadable-types -Xllvm -sil-verify-after-pass=loadable-address %s
+// RUN: %target-swift-frontend -c -Xllvm -sil-verify-after-pass=loadable-address %s
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s -check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend -c -Xllvm -sil-print-after=loadable-address %s 2>&1 | %FileCheck %s -check-prefix=CHECK-LBA-SIL
 // RUN: %target-run-simple-swift

@@ -19,6 +19,7 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/BasicBlockData.h"
 
 namespace swift {
 
@@ -307,9 +308,6 @@ public:
 
   /// Basic-block specific information used for dataflow analysis.
   struct BlockState {
-    /// The backlink to the SILBasicBlock.
-    SILBasicBlock *block;
-
     /// The bits valid at the entry (i.e. the first instruction) of the block.
     Bits entrySet;
 
@@ -333,7 +331,9 @@ public:
     /// This is only computed if exitReachableAnalysis is called.
     ExitReachability exitReachability = ExitReachability::InInfiniteLoop;
 
-    BlockState(SILBasicBlock *block = nullptr) : block(block) { }
+    BlockState(unsigned numLocations) :
+      entrySet(numLocations), exitSet(numLocations),
+      genSet(numLocations), killSet(numLocations) {}
 
     // Utility functions for setting and clearing gen- and kill-bits.
 
@@ -361,13 +361,12 @@ public:
   };
 
 private:
-  /// All block states.
-  std::vector<BlockState> blockStates;
-
-  /// Getting from SILBasicBlock to BlockState.
-  llvm::DenseMap<SILBasicBlock *, BlockState *> block2State;
+  BasicBlockData<BlockState> blockStates;
 
 public:
+
+  using iterator = BasicBlockData<BlockState>::iterator;
+
   /// Sets up the BlockState datastructures and associates all basic blocks with
   /// a state.
   MemoryDataflow(SILFunction *function, unsigned numLocations);
@@ -375,14 +374,12 @@ public:
   MemoryDataflow(const MemoryDataflow &) = delete;
   MemoryDataflow &operator=(const MemoryDataflow &) = delete;
 
-  using iterator = std::vector<BlockState>::iterator;
-
   iterator begin() { return blockStates.begin(); }
   iterator end() { return blockStates.end(); }
 
   /// Returns the state of a block.
-  BlockState *getState(SILBasicBlock *block) {
-    return block2State[block];
+  BlockState &operator[] (SILBasicBlock *block) {
+    return blockStates[block];
   }
 
   /// Calculates the BlockState::reachableFromEntry flags.

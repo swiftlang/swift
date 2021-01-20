@@ -26,9 +26,11 @@
 #define DEBUG_TYPE "copy-propagation"
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 
@@ -49,9 +51,26 @@ public:
 };
 } // end anonymous namespace
 
+static bool isCopyDead(CopyValueInst *copy, bool pruneDebug) {
+  for (Operand *use : copy->getUses()) {
+    auto *user = use->getUser();
+    if (isa<DestroyValueInst>(user)) {
+      continue;
+    }
+    if (pruneDebug && isa<DebugValueInst>(user)) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 /// Top-level pass driver.
 void CopyPropagation::run() {
   auto *f = getFunction();
+  auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+  auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+  auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
 
   // Debug label for unit testing.
   LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
@@ -70,9 +89,23 @@ void CopyPropagation::run() {
     }
   }
   // Perform copy propgation for each copied value.
-  CanonicalizeOSSALifetime canonicalizer(pruneDebug);
+  CanonicalizeOSSALifetime canonicalizer(pruneDebug, accessBlockAnalysis,
+                                         dominanceAnalysis,
+                                         deBlocksAnalysis->get(f));
+  // Cleanup dead copies. If getCanonicalCopiedDef returns a copy (because the
+  // copy's source operand is unrecgonized), then the copy is itself treated
+  // like a def and may be dead after canonicalization.
+  llvm::SmallVector<CopyValueInst *, 4> deadCopies;
   for (auto &def : copiedDefs) {
+    // Canonicalized this def.
     canonicalizer.canonicalizeValueLifetime(def);
+
+    if (auto *copy = dyn_cast<CopyValueInst>(def)) {
+      if (isCopyDead(copy, pruneDebug)) {
+        deadCopies.push_back(copy);
+      }
+    }
+    // Canonicalize any new outer copy.
     if (SILValue outerCopy = canonicalizer.createdOuterCopy()) {
       SILValue outerDef = canonicalizer.getCanonicalCopiedDef(outerCopy);
       canonicalizer.canonicalizeValueLifetime(outerDef);
@@ -80,10 +113,16 @@ void CopyPropagation::run() {
     // TODO: also canonicalize any lifetime.persistentCopies like separate owned
     // live ranges.
   }
-  if (canonicalizer.hasChanged()) {
+  if (canonicalizer.hasChanged() || !deadCopies.empty()) {
+    InstructionDeleter deleter;
+    for (auto *copy : deadCopies) {
+      deleter.recursivelyDeleteUsersIfDead(copy);
+    }
+    // Preserves NonLocalAccessBlockAnalysis.
+    accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    DeadEndBlocks deBlocks(f);
-    f->verifyOwnership(&deBlocks);
+    accessBlockAnalysis->unlockInvalidation();
+    f->verifyOwnership(deBlocksAnalysis->get(f));
   }
 }
 

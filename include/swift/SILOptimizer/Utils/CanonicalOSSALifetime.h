@@ -93,10 +93,12 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
+#include "swift/SILOptimizer/Utils/PrunedLiveness.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Utils/PrunedLiveness.h"
 
 namespace swift {
 
@@ -187,6 +189,15 @@ private:
   /// liveness may be pruned during canonicalization.
   bool pruneDebug;
 
+  NonLocalAccessBlockAnalysis *accessBlockAnalysis;
+  // Lazily initialize accessBlocks only when
+  // extendLivenessThroughOverlappingAccess is invoked.
+  NonLocalAccessBlocks *accessBlocks = nullptr;
+
+  DominanceAnalysis *dominanceAnalysis;
+
+  DeadEndBlocks *deBlocks;
+
   /// Current copied def for which this state describes the liveness.
   SILValue currentDef;
 
@@ -208,7 +219,7 @@ private:
   /// Record all interesting debug_value instructions here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie
   /// outisde the pruned liveness at the time it is discovered.
-  llvm::SmallDenseSet<DebugValueInst *, 8> debugValues;
+  llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Reuse a general worklist for def-use traversal.
   SmallSetVector<SILValue, 8> defUseWorklist;
@@ -226,12 +237,20 @@ private:
   CanonicalOSSAConsumeInfo consumes;
 
 public:
-  CanonicalizeOSSALifetime(bool pruneDebug) : pruneDebug(pruneDebug) {}
+  CanonicalizeOSSALifetime(bool pruneDebug,
+                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                           DominanceAnalysis *dominanceAnalysis,
+                           DeadEndBlocks *deBlocks)
+    : pruneDebug(pruneDebug), accessBlockAnalysis(accessBlockAnalysis),
+      dominanceAnalysis(dominanceAnalysis), deBlocks(deBlocks) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
   void initDef(SILValue def) {
     assert(consumingBlocks.empty() && debugValues.empty() && liveness.empty());
+    // Clear the cached analysis pointer just in case the client invalidates the
+    // analysis, freeing its memory.
+    accessBlocks = nullptr;
     consumes.clear();
 
     currentDef = def;
@@ -277,9 +296,13 @@ protected:
 
   bool computeBorrowLiveness();
 
-  void consolidateBorrowScope();
+  bool consolidateBorrowScope();
 
   bool computeCanonicalLiveness();
+
+  bool endsAccessOverlappingPrunedBoundary(SILInstruction *inst);
+
+  void extendLivenessThroughOverlappingAccess();
 
   void findOrInsertDestroyInBlock(SILBasicBlock *bb);
 

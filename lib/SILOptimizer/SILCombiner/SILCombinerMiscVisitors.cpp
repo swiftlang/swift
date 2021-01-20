@@ -937,9 +937,6 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 /// ->
 ///    %2 = index_addr %ptr, x+y
 SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
-  if (IA->getFunction()->hasOwnership())
-    return nullptr;
-
   unsigned index = 0;
   SILValue base = isConstIndexAddr(IA, index);
   if (!base)
@@ -1069,9 +1066,6 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 }
 
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
-  if (CFI->getFunction()->hasOwnership())
-    return nullptr;
-
   // Remove runtime asserts such as overflow checks and bounds checks.
   if (RemoveCondFails)
     return eraseInstFromFunction(*CFI);
@@ -1105,6 +1099,37 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   // Add an `unreachable` to be the new terminator for this block
   Builder.setInsertionPoint(CFI->getParent());
   Builder.createUnreachable(ArtificialUnreachableLocation());
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *cvi) {
+  assert(cvi->getFunction()->hasOwnership());
+
+  // Sometimes when RAUWing code we get copy_value on .none values (consider
+  // transformations around function types that result in given a copy_value a
+  // thin_to_thick_function argument). In such a case, just RAUW with the
+  // copy_value's operand since it is a no-op.
+  if (cvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
+    replaceInstUsesWith(*cvi, cvi->getOperand());
+    return eraseInstFromFunction(*cvi);
+  }
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
+  assert(dvi->getFunction()->hasOwnership());
+
+  // Sometimes when RAUWing code we get destroy_value on .none values. In such a
+  // case, just delete the destroy_value.
+  //
+  // As an example, consider transformations around function types that result
+  // in a thin_to_thick_function being passed to a destroy_value.
+  if (dvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
+    eraseInstFromFunction(*dvi);
+    return nullptr;
+  }
 
   return nullptr;
 }
@@ -1881,19 +1906,16 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
 }
 
 SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
-  if (TEI->getFunction()->hasOwnership())
-    return nullptr;
-
   // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
   // if it can be proven that no overflow can happen.
-  if (TEI->getFieldIndex() != 1)
-    return nullptr;
+  if (TEI->getFieldIndex() == 1) {
+    Builder.setCurrentDebugScope(TEI->getDebugScope());
+    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
+      if (!canOverflow(BI))
+        return Builder.createIntegerLiteral(TEI->getLoc(), TEI->getType(),
+                                            APInt(1, 0));
+  }
 
-  Builder.setCurrentDebugScope(TEI->getDebugScope());
-  if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
-    if (!canOverflow(BI))
-      return Builder.createIntegerLiteral(TEI->getLoc(), TEI->getType(),
-                                          APInt(1, 0));
   return nullptr;
 }
 
@@ -2036,26 +2058,20 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   return nullptr;
 }
 
-
-SILInstruction *SILCombiner::
-visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
-  if (CBOI->getFunction()->hasOwnership())
+SILInstruction *
+SILCombiner::visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *cboi) {
+  auto *urc = dyn_cast<UncheckedRefCastInst>(cboi->getOperand());
+  if (!urc)
     return nullptr;
 
-  auto *URC = dyn_cast<UncheckedRefCastInst>(CBOI->getOperand());
-  if (!URC)
-    return nullptr;
-
-  auto type = URC->getOperand()->getType().getASTType();
+  auto type = urc->getOperand()->getType().getASTType();
   if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
     if (!cd->isObjC()) {
       auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
-      SILValue zero = Builder.createIntegerLiteral(CBOI->getLoc(),
-                                                   int1Ty, 0);
-      return Builder.createTuple(CBOI->getLoc(), { zero, zero });
+      SILValue zero = Builder.createIntegerLiteral(cboi->getLoc(), int1Ty, 0);
+      return Builder.createTuple(cboi->getLoc(), {zero, zero});
     }
   }
 
   return nullptr;
 }
-

@@ -40,7 +40,8 @@ public class MyGizmo {
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned String, Int, Optional<AnyObject>, Gizmo) -> @owned Optional<String>
 // CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject>
-// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@guaranteed Array<String>, Gizmo) -> @owned Optional<AnyObject>
+// CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembnn_
+// CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject>
 // CHECK: return
 // CHECK: } // end sil function '$s8outliner13testOutliningyyF'
 public func testOutlining() {

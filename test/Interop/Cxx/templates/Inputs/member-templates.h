@@ -1,7 +1,7 @@
 struct HasMemberTemplates {
-  template <class T> T add(T a, T b) { return a + b; }
+  template <class T> T addSameTypeParams(T a, T b) { return a + b; }
 
-  template <class T, class U> T addTwoTemplates(T a, U b) { return a + b; }
+  template <class T, class U> T addMixedTypeParams(T a, U b) { return a + b; }
 
   template <class T, class U> int addAll(int a, T b, U c) { return a + b + c; }
 
