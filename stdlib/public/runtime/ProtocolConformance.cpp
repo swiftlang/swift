@@ -472,12 +472,10 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   // Scan conformance records.
   auto processSection = [&](const ConformanceSection &section) {
     // Eagerly pull records for nondependent witnesses into our cache.
-    for (const auto &record : section) {
-      auto &descriptor = *record.get();
-
+    auto processDescriptor = [&](const ProtocolConformanceDescriptor &descriptor) {
       // We only care about conformances for this protocol.
       if (descriptor.getProtocol() != protocol)
-        continue;
+        return;
 
       // If there's a matching type, record the positive result and return it.
       // The matching type is exact, so they can't go stale, and we should
@@ -487,6 +485,14 @@ swift_conformsToProtocolImpl(const Metadata *const type,
         auto witness = descriptor.getWitnessTable(matchingType);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
       }
+    };
+
+    if (C.scanSectionsBackwards) {
+      for (const auto &record : llvm::reverse(section))
+        processDescriptor(*record.get());
+    } else {
+      for (const auto &record : section)
+        processDescriptor(*record.get());
     }
   };
 
