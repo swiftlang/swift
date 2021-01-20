@@ -224,7 +224,7 @@ void DCE::markValueLive(SILValue V) {
 }
 
 void DCE::markInstructionLive(SILInstruction *Inst) {
-  if (!LiveValues.insert(Inst).second)
+  if (!LiveValues.insert(Inst->asSILNode()).second)
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
@@ -492,7 +492,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
 }
 
 void DCE::endLifetimeOfLiveValue(SILValue value, SILInstruction *insertPt) {
-  if (!LiveValues.count(value->getRepresentativeSILNodeInObject())) {
+  if (!LiveValues.count(value)) {
     return;
   }
   SILBuilderWithScope builder(insertPt);
@@ -539,7 +539,7 @@ bool DCE::removeDead(SILFunction &F) {
           auto insertPt = getInsertAfterPoint(arg).getValue();
           SILBuilderWithScope builder(insertPt);
           auto *destroy = builder.createDestroyValue(insertPt->getLoc(), arg);
-          LiveValues.insert(destroy->getRepresentativeSILNodeInObject());
+          LiveValues.insert(destroy->asSILNode());
         }
         i++;
         Changed = true;
@@ -565,7 +565,7 @@ bool DCE::removeDead(SILFunction &F) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto *Inst = &*I;
       ++I;
-      if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
+      if (LiveValues.count(Inst->asSILNode()) || isa<BranchInst>(Inst))
         continue;
 
       // We want to replace dead terminators with unconditional branches to

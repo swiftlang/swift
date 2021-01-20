@@ -1034,7 +1034,7 @@ namespace llvm {
       std::string Label;
       raw_string_ostream O(Label);
       SILInstruction *Inst = I.baseIter->FAS.getInstruction();
-      O << '%' << Node->CG->InstToIDMap[Inst];
+      O << '%' << Node->CG->InstToIDMap[Inst->asSILNode()];
       return Label;
     }
 

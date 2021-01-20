@@ -771,7 +771,7 @@ public:
     return printUserList(values, inst, printedSlashes);
   }
 
-  bool printUserList(ArrayRef<SILValue> values, const SILNode *node,
+  bool printUserList(ArrayRef<SILValue> values, SILNodePointer node,
                      bool printedSlashes) {
     // If the set of values is empty, we need to print the ID of
     // the instruction.  Otherwise, if none of the values has a use,
@@ -1100,7 +1100,7 @@ public:
   }
 
   void printInContext(const SILNode *node) {
-    auto sortByID = [&](const SILNode *a, const SILNode *b) {
+    auto sortByID = [&](SILNodePointer a, SILNodePointer b) {
       return Ctx.getID(a).Number < Ctx.getID(b).Number;
     };
 
@@ -3129,7 +3129,7 @@ void SILInstruction::dumpInContext() const {
 }
 void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
-  SILPrinter(Ctx).printInContext(this);
+  SILPrinter(Ctx).printInContext(asSILNode());
 }
 
 void SILVTableEntry::print(llvm::raw_ostream &OS) const {
@@ -3593,11 +3593,11 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
   return R;
 }
 
-ID SILPrintContext::getID(const SILNode *node) {
+ID SILPrintContext::getID(SILNodePointer node) {
   if (node == nullptr)
     return {ID::Null, ~0U};
 
-  if (isa<SILUndef>(node))
+  if (isa<SILUndef>(node.get()))
     return {ID::SILUndef, 0};
   
   SILBasicBlock *BB = node->getParentBlock();
@@ -3626,7 +3626,7 @@ ID SILPrintContext::getID(const SILNode *node) {
   unsigned idx = 0;
   for (auto &I : *BB) {
     // Give the instruction itself the next ID.
-    ValueToIDMap[&I] = idx;
+    ValueToIDMap[I.asSILNode()] = idx;
 
     // If there are no results, make sure we don't reuse that ID.
     auto results = I.getResults();
