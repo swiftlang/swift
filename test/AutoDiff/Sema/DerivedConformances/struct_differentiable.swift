@@ -13,7 +13,6 @@ func testEmpty() {
 
 struct EmptyWithConcreteNonmutatingMoveAlong: Differentiable {
   typealias TangentVector = Empty.TangentVector
-  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
   func move(along _: TangentVector) {}
   static func proof_that_i_have_nonmutating_move_along() {
     let empty = Self()
@@ -28,7 +27,6 @@ extension DifferentiableWithNonmutatingMoveAlong {
 
 struct EmptyWithInheritedNonmutatingMoveAlong: DifferentiableWithNonmutatingMoveAlong {
   typealias TangentVector = Empty.TangentVector
-  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
   static func proof_that_i_have_nonmutating_move_along() {
     let empty = Self()
     empty.move(along: .init())
@@ -424,8 +422,6 @@ struct WrappedProperties: Differentiable {
 
 extension OtherFileNonconforming: Differentiable {}
 // expected-error @-1 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
-// expected-error @-2 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}
 
 extension GenericOtherFileNonconforming: Differentiable {}
 // expected-error @-1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
-// expected-error @-2 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}

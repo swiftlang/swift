@@ -317,10 +317,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
-    // Differentiable.zeroTangentVectorInitializer
-    if (name.isSimpleName(ctx.Id_zeroTangentVectorInitializer))
-      return getRequirement(KnownProtocolKind::Differentiable);
-
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
