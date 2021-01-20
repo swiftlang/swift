@@ -167,7 +167,7 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
-  HelpText<"Disable building Swift modules explicitly by the compiler">;
+  HelpText<"Disable building Swift modules implicitly by the compiler">;
 
 def swift_module_file
   : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
