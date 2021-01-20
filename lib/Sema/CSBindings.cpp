@@ -1118,11 +1118,11 @@ bool PotentialBindings::infer(Constraint *constraint) {
     break;
   }
   case ConstraintKind::KeyPathApplication: {
-    // If this variable is in the application projected result type, mark the
-    // result as `FullyBound` to ensure we delay binding until we've bound
-    // other type variables in the KeyPathApplication constraint. This ensures
-    // we try to bind the key path type first, which can allow us to discover
-    // additional bindings for the result type.
+    // If this variable is in the application projected result type, delay
+    // binding until we've bound other type variables in the key-path
+    // application constraint. This ensures we try to bind the key path type
+    // first, which can allow us to discover additional bindings for the result
+    // type.
     SmallPtrSet<TypeVariableType *, 4> typeVars;
     findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
                           typeVars);
