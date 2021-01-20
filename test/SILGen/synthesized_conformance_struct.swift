@@ -7,30 +7,30 @@ struct Struct<T> {
 
 // CHECK-LABEL: struct Struct<T> {
 // CHECK:   @_hasStorage var x: T { get set }
-// CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
 // CHECK-RESILIENT: static func == (a: Struct<T>.CodingKeys, b: Struct<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
 // CHECK:     func hash(into hasher: inout Hasher)
-// CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
-// CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
+// CHECK:     var hashValue: Int { get }
+// CHECK:     var intValue: Int? { get }
+// CHECK:     var stringValue: String { get }
 // CHECK:   }
+// CHECK:   init(x: T)
 // CHECK: }
 // CHECK-LABEL: extension Struct : Equatable where T : Equatable {
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_struct_equals(_ a: Struct<T>, _ b: Struct<T>) -> Bool
 // CHECK-RESILIENT: static func == (a: Struct<T>, b: Struct<T>) -> Bool
 // CHECK: }
 // CHECK-LABEL: extension Struct : Hashable where T : Hashable {
-// CHECK:   var hashValue: Int { get }
 // CHECK:   func hash(into hasher: inout Hasher)
+// CHECK:   var hashValue: Int { get }
 // CHECK: }
 // CHECK-LABEL: extension Struct : Decodable & Encodable where T : Decodable, T : Encodable {
-// CHECK:   init(from decoder: Decoder) throws
 // CHECK:   func encode(to encoder: Encoder) throws
+// CHECK:   init(from decoder: Decoder) throws
 // CHECK: }
 
 extension Struct: Equatable where T: Equatable {}
