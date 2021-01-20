@@ -2551,8 +2551,8 @@ struct SortedDeclList {
 } // end namespace
 
 ArrayRef<Decl *>
-SemanticMembersRequest::evaluate(Evaluator &evaluator,
-                                IterableDeclContext *idc) const {
+ABIMembersRequest::evaluate(
+    Evaluator &evaluator, IterableDeclContext *idc) const {
   auto dc = cast<DeclContext>(idc->getDecl());
   auto &Context = dc->getASTContext();
   SmallVector<Decl *, 8> result;

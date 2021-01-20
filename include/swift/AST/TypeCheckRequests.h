@@ -1220,8 +1220,8 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
-class SemanticMembersRequest :
-    public SimpleRequest<SemanticMembersRequest,
+class ABIMembersRequest :
+    public SimpleRequest<ABIMembersRequest,
                          ArrayRef<Decl *>(IterableDeclContext *),
                          RequestFlags::Cached> {
 public:
