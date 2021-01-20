@@ -2934,6 +2934,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     aliasDecl->setUnderlyingType(type);
     
     aliasDecl->setImplicit();
+    aliasDecl->setSynthesized();
     if (type->hasError())
       aliasDecl->setInvalid();
 
