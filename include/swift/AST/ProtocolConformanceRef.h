@@ -171,8 +171,11 @@ public:
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
 
-  bool classifyAsThrows(ModuleDecl *module);
+  bool classifyAsThrows() const;
 };
+
+void simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef);
+SourceLoc extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef);
 
 } // end namespace swift
 

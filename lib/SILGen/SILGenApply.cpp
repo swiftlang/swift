@@ -4973,7 +4973,12 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   bool markedAsRethrows = call->getAttrs().hasAttribute<swift::RethrowsAttr>();
   FunctionRethrowingKind rethrowingKind = call->getRethrowingKind();
   if (rethrowingKind == FunctionRethrowingKind::ByConformance) {
-    throws = call->getModuleContext()->classifyWitnessAsThrows(subs);  
+    for (auto conformanceRef : subs.getConformances()) {
+      if (conformanceRef.classifyAsThrows()) {
+        throws = true;
+        break;
+      }
+    }
   } else if (markedAsRethrows && 
              rethrowingKind == FunctionRethrowingKind::Throws) {
     throws = true;

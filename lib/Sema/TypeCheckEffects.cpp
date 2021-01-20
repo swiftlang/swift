@@ -524,7 +524,15 @@ public:
 
     if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
       auto substitutions = fnRef.getDeclRef().getSubstitutions();
-      if (fnRef.getModuleContext()->classifyWitnessAsThrows(substitutions)) {
+      bool classifiedAsThrows = false;
+      for (auto conformanceRef : substitutions.getConformances()) {
+        if (conformanceRef.classifyAsThrows()) {
+          classifiedAsThrows = true;
+          break;
+        }
+      }
+
+      if (classifiedAsThrows) {
         return Classification::forRethrowingOnly(
           PotentialThrowReason::forRethrowsConformance(E), isAsync);
       }

@@ -730,8 +730,6 @@ public:
 
   SourceRange getSourceRange() const { return SourceRange(); }
 
-  bool classifyWitnessAsThrows(SubstitutionMap substitutions);
-
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())
       return classof(D);

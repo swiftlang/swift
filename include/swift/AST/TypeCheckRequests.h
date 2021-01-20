@@ -330,6 +330,25 @@ public:
   bool isCached() const { return true; }
 };
 
+class ProtocolConformanceRefClassifyAsThrowsRequest : 
+    public SimpleRequest<ProtocolConformanceRefClassifyAsThrowsRequest,
+                         bool(ProtocolConformanceRef),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool 
+  evaluate(Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
