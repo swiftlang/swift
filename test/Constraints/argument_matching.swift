@@ -1745,3 +1745,17 @@ func --- (_ lhs: String, _ rhs: String) -> Bool { true }
 
 let x = 1
 x --- x // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+// rdar://problem/70764991 - out-of-order diagnostic crashes the compiler
+func rdar70764991() {
+  struct S {
+    static var foo: S { get { S() } }
+  }
+
+  func bar(_: Any, _: String) {
+  }
+
+  func test(_ str: String) {
+    bar(str, S.foo) // expected-error {{unnamed argument #1 must precede unnamed argument #2}}  {{9-12=}} {{14-14=str}}
+  }
+}
