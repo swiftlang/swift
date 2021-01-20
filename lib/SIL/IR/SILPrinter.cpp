@@ -761,17 +761,18 @@ public:
 
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
-  bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
-    llvm::SmallVector<SILValue, 8> values;
-    if (auto *value = dyn_cast<ValueBase>(node)) {
-      values.push_back(value);
-    } else if (auto *inst = dyn_cast<SILInstruction>(node)) {
-      assert(!isa<SingleValueInstruction>(inst) && "SingleValueInstruction was "
-                                                   "handled by the previous "
-                                                   "value base check.");
-      llvm::copy(inst->getResults(), std::back_inserter(values));
-    }
+  bool printUsersOfValue(SILValue value, bool printedSlashes) {
+    return printUserList({value}, value, printedSlashes);
+  }
 
+  bool printUsersOfInstruction(const SILInstruction *inst, bool printedSlashes) {
+    llvm::SmallVector<SILValue, 8> values;
+    llvm::copy(inst->getResults(), std::back_inserter(values));
+    return printUserList(values, inst, printedSlashes);
+  }
+
+  bool printUserList(ArrayRef<SILValue> values, const SILNode *node,
+                     bool printedSlashes) {
     // If the set of values is empty, we need to print the ID of
     // the instruction.  Otherwise, if none of the values has a use,
     // we don't need to do anything.
@@ -1011,7 +1012,7 @@ public:
     printedSlashes = printTypeDependentOperands(I);
 
     // Print users, or id for valueless instructions.
-    printedSlashes = printUsersOfSILNode(I, printedSlashes);
+    printedSlashes = printUsersOfInstruction(I, printedSlashes);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
@@ -1056,7 +1057,7 @@ public:
           << Ctx.getID(arg->getParent()) << " : " << arg->getType();
 
     // Print users.
-    (void) printUsersOfSILNode(arg, false);
+    (void) printUsersOfValue(arg, false);
 
     *this << '\n';
   }
@@ -1093,7 +1094,7 @@ public:
     visit(static_cast<SILInstruction *>(nonConstParent));
 
     // Print users.
-    (void)printUsersOfSILNode(result, false);
+    (void)printUsersOfValue(result, false);
 
     *this << '\n';
   }
