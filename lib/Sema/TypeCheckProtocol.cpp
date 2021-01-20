@@ -4641,7 +4641,7 @@ ConformanceChecker::getObjCRequirements(ObjCMethodKey key) {
 
   // Fill in the data structure if we haven't done so yet.
   if (!computedObjCMethodRequirements) {
-    for (auto requirement : proto->getSemanticMembers()) {
+    for (auto requirement : proto->getABIMembers()) {
       auto funcRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
       if (!funcRequirement)
         continue;
