@@ -1,0 +1,326 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -dce %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {
+
+}
+
+struct NonTrivialStruct {
+  var val:Klass
+}
+
+sil [ossa] @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
+sil [ossa] @$use_klass1 : $@convention(thin) (@owned Klass) -> ()
+sil [ossa] @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+sil [ossa] @$use_nontrivialstruct1 : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil [ossa] @$use_nontrivialstruct2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+
+// We cannot DCE a function argument
+// CHECK-LABEL: sil [ossa] @dce_dontoptarg1 :
+// CHECK: destroy_value %0
+// CHECK-LABEL: } // end sil function 'dce_dontoptarg1'
+sil [ossa] @dce_dontoptarg1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  destroy_value %0 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_dontoptarg2 :
+// CHECK: copy_value
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'dce_dontoptarg2'
+sil [ossa] @dce_dontoptarg2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  br bb1(%1 : $Klass)
+
+bb1(%2 : @owned $Klass):
+  %3 = copy_value %2 : $Klass
+  %4 = function_ref @$use_klass1 : $@convention(thin) (@owned Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// Don't dce due to a useful dependency due to apply
+// CHECK-LABEL: sil [ossa] @dce_dontoptrevdep1 :
+// CHECK: [[RES:%.*]] = load_borrow %0
+// CHECK: end_borrow [[RES]]
+// CHECK-LABEL: } // end sil function 'dce_dontoptrevdep1'
+sil [ossa] @dce_dontoptrevdep1 : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = load_borrow %0 : $*Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1 : $Klass
+  destroy_addr %0 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// Don't dce due to a useful dependency due to apply
+// CHECK-LABEL: sil [ossa] @dce_dontoptendborrow1 :
+// CHECK: [[RES:%.*]] = begin_borrow %0
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'dce_dontoptendborrow1'
+sil [ossa] @dce_dontoptendborrow1 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = begin_borrow %0 : $Klass
+  br bb1(%1 : $Klass)
+
+bb1(%2 : @guaranteed $Klass):
+  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// Cannot optimize dead non phi args
+// CHECK-LABEL: sil [ossa] @dce_dontoptarg3 :
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'dce_dontoptarg3'
+sil [ossa] @dce_dontoptarg3 : $@convention(thin) (@guaranteed Klass) -> @error Error {
+bb0(%0 : @guaranteed $Klass):
+  %2 = function_ref @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
+  try_apply %2() : $@convention(thin) () -> (@owned Klass, @error Error), normal bb1, error bb2
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  %res = tuple ()
+  return %res : $()
+
+bb2(%4 : $Error):
+  throw %4 : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadcopy1 :
+// CHECK-NOT: copy_value
+// CHECK: destroy_value %0
+// CHECK-LABEL: } // end sil function 'dce_deadcopy1'
+sil [ossa] @dce_deadcopy1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  destroy_value %0 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadcopy2 :
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'dce_deadcopy2'
+sil [ossa] @dce_deadcopy2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadcopy3 :
+// CHECK: bb0([[ARG:%.*]])
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: [[RES:%.*]] = tuple ()
+// CHECK-NEXT: return [[RES]]
+// CHECK-LABEL: } // end sil function 'dce_deadcopy3'
+sil [ossa] @dce_deadcopy3 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  br bb1(%1 : $Klass)
+
+bb1(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadcopy4 :
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'dce_deadcopy4'
+sil [ossa] @dce_deadcopy4 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Klass)
+
+bb2:
+  br bb3(%1 : $Klass)
+
+bb3(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadcopy5 :
+// CHECK: bb0([[ARG:%.*]])
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: [[RES:%.*]] = tuple ()
+// CHECK-NEXT: return [[RES]]
+// CHECK-LABEL: } // end sil function 'dce_deadcopy5'
+sil [ossa] @dce_deadcopy5 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  cond_br undef, bb1, bb2
+
+bb3(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+
+bb1:
+  br bb3(%1 : $Klass)
+
+bb2:
+  br bb3(%1 : $Klass)
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadcopy6 :
+// CHECK: bb0([[ARG:%.*]])
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: [[RES:%.*]] = tuple ()
+// CHECK-NEXT: return [[RES]]
+// CHECK-LABEL: } // end sil function 'dce_deadcopy6'
+sil [ossa] @dce_deadcopy6 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  cond_br undef, bb1a, bb2a
+
+bb1a:
+  br bb1(%1 : $Klass)
+
+bb2a:
+  br bb2(%1 : $Klass)
+
+bb1(%1a : @owned $Klass):
+  br bb3(%1a : $Klass)
+
+bb2(%1b : @owned $Klass):
+  br bb3(%1b : $Klass)
+
+bb3(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_destructure1 :
+// CHECK: bb0(%0 : {{.*}})
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: [[RES:%.*]] = tuple ()
+// CHECK-NEXT: return [[RES]]
+// CHECK-LABEL: } // end sil function 'dce_destructure1'
+sil [ossa] @dce_destructure1 : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  (%1) = destructure_struct %0 : $NonTrivialStruct
+  destroy_value %1 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_destructure2 :
+// CHECK: bb0(%0 : {{.*}})
+// CHECK-NEXT: [[RES:%.*]] = tuple ()
+// CHECK-NEXT: return [[RES]]
+// CHECK-LABEL: } // end sil function 'dce_destructure2'
+sil [ossa] @dce_destructure2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  (%1) = destructure_struct %0 : $NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_destructure3 :
+// CHECK: bb0(%0 : {{.*}})
+// CHECK-NOT: destructure_struct
+// CHECK-LABEL: } // end sil function 'dce_destructure3'
+sil [ossa] @dce_destructure3 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %1 = copy_value %0 : $NonTrivialStruct
+  %func = function_ref @$use_nontrivialstruct2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %funcres = apply %func(%1) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  (%2) = destructure_struct %1 : $NonTrivialStruct
+  destroy_value %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// This test shows that when we delete a dead instruction which has lifetime ending ops,
+// we need to insert destroys of ops to end their lifetime correctly
+// CHECK-LABEL: sil [ossa] @dce_insertdestroy1 :
+// CHECK-NOT: struct
+// CHECK-LABEL: } // end sil function 'dce_insertdestroy1'
+sil [ossa] @dce_insertdestroy1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0 : $Klass
+  %func = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %funcres = apply %func(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = struct $NonTrivialStruct(%1 : $Klass)
+  destroy_value %3 : $NonTrivialStruct
+  destroy_value %0 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// This test shows that when we delete a dead phi arg and its incoming values are live,
+// we need to insert destroys of the incoming values in its pred blocks.
+// CHECK-LABEL: sil [ossa] @dce_insertdestroy2 :
+// CHECK: bb1(%3 : {{.*}})
+// CHECK-NEXT: destroy_value %3
+// CHECK-NEXT: br bb3
+// CHECK-LABEL: } // end sil function 'dce_insertdestroy2'
+sil [ossa] @dce_insertdestroy2 : $@convention(thin) (@guaranteed Klass) -> @error Error {
+bb0(%0 : @guaranteed $Klass):
+  %2 = function_ref @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
+  try_apply %2() : $@convention(thin) () -> (@owned Klass, @error Error), normal bb1, error bb2
+
+bb1(%3 : @owned $Klass):
+  br bb3(%3 : $Klass)
+
+bb2(%4 : $Error):
+  throw %4 : $Error
+
+bb3(%5 : @owned $Klass):
+  destroy_value %5 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_multiplerevdepdests :
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'dce_multiplerevdepdests'
+sil [ossa] @dce_multiplerevdepdests : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  br bb1(%1 : $Klass)
+
+bb1(%2 : @owned $Klass):
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_value %2 : $Klass
+  br bb4
+
+bb3:
+  destroy_value %2 : $Klass
+  br bb4
+
+bb4:
+  %res = tuple()
+  return %res : $()
+}
+
