@@ -815,7 +815,7 @@ private:
           ->getKey();
 
     Type Ty = DbgTy.getType();
-    if (!Ty->hasTypeParameter())
+    if (Ty->hasArchetype())
       Ty = Ty->mapTypeOutOfContext();
 
     // Strip off top level of type sugar (except for type aliases).
@@ -841,7 +841,8 @@ private:
         IGM.getSILModule());
 
     Mangle::ASTMangler Mangler;
-    std::string Result = Mangler.mangleTypeForDebugger(Ty, nullptr);
+    GenericSignature Sig = IGM.getCurGenericContext();
+    std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
     if (!Opts.DisableRoundTripDebugTypes) {
       // Make sure we can reconstruct mangled types for the debugger.
