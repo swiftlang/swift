@@ -66,6 +66,8 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONFORM_SEQUENCE | %FileCheck %s -check-prefix=CONFORM_SEQUENCE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_CLOSUREARG | %FileCheck %s -check-prefix=GENERIC_CLOSUREARG
+
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE: End completions
 
@@ -291,3 +293,13 @@ class TestSequence : Sequence {
 // CONFORM_SEQUENCE-DAG: Decl[InstanceMethod]/Super/IsSystem: func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {|};
 // CONFORM_SEQUENCE: End completions
 }
+
+public func rdar_70057258<T>(_ f: T) {}
+extension Result {
+  public init(_ value: Success?) {
+    self = value.map(#^GENERIC_CLOSUREARG^#)
+  }
+}
+// GENERIC_CLOSUREARG: Begin completions
+// GENERIC_CLOSUREARG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: rdar_70057258(_:)[#<T> (T) -> ()#]; name=rdar_70057258(_:)
+// GENERIC_CLOSUREARG: End completions
