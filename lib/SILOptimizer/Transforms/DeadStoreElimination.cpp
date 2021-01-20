@@ -68,6 +68,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
+#include "swift/SIL/BasicBlockData.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -215,10 +216,10 @@ class DSEContext;
 class BlockState {
 public:
   /// The basic block this BlockState represents.
-  SILBasicBlock *BB;
+  SILBasicBlock *BB = nullptr;
 
   /// Keep the number of LSLocations in the LocationVault.
-  unsigned LocationNum;
+  unsigned LocationNum = 0;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
@@ -267,15 +268,12 @@ public:
   llvm::DenseMap<SILValue, SILValue> LiveStores;
 
   /// Constructors.
-  BlockState(SILBasicBlock *B, unsigned LocationNum, bool Optimistic) 
-      : BB(B), LocationNum(LocationNum) {
-    init(LocationNum, Optimistic);
-  }
+  BlockState() = default;
 
   void dump();
 
   /// Initialize the bitvectors for the current basic block.
-  void init(unsigned LocationNum, bool Optimistic);
+  void init(SILBasicBlock *BB, unsigned LocationNum, bool Optimistic);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
@@ -345,11 +343,8 @@ private:
   /// Epilogue release analysis.
   EpilogueARCFunctionInfo *EAFI;
 
-  /// The allocator we are using.
-  llvm::SpecificBumpPtrAllocator<BlockState> &BPA;
-
   /// Map every basic block to its location state.
-  llvm::SmallDenseMap<SILBasicBlock *, BlockState *> BBToLocState;
+  BasicBlockData<BlockState> BBToLocState;
 
   /// Keeps all the locations for the current function. The BitVector in each
   /// BlockState is then laid on top of it to keep track of which LSLocation
@@ -374,7 +369,7 @@ private:
   LSLocationBaseMap BaseToLocIndex;
 
   /// Return the BlockState for the basic block this basic block belongs to.
-  BlockState *getBlockState(SILBasicBlock *B) { return BBToLocState[B]; }
+  BlockState *getBlockState(SILBasicBlock *B) { return &BBToLocState[B]; }
 
   /// Return the BlockState for the basic block this instruction belongs to.
   BlockState *getBlockState(SILInstruction *I) {
@@ -451,7 +446,7 @@ public:
              AliasAnalysis *AA, TypeExpansionAnalysis *TE,
              EpilogueARCFunctionInfo *EAFI,
              llvm::SpecificBumpPtrAllocator<BlockState> &BPA) 
-    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BPA(BPA) {}
+    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BBToLocState(F) {}
 
   void dump();
 
@@ -494,7 +489,10 @@ void BlockState::dump() {
                << ", gen=" << BBGenSet << ", kill=" << BBKillSet << '\n';
 }
 
-void BlockState::init(unsigned LocationNum, bool Optimistic) {
+void BlockState::init(SILBasicBlock *BB, unsigned LocationNum, bool Optimistic) {
+  this->BB = BB;
+  this->LocationNum = LocationNum;
+
   // For function that requires just 1 iteration of the data flow to converge
   // we set the initial state of BBWriteSetIn to 0.
   //
@@ -1209,10 +1207,9 @@ bool DSEContext::run() {
   //
   // Initialize the BBToLocState mapping.
   unsigned LocationNum = this->getLocationVault().size();
-  for (auto &B : *F) {
-    auto *State = new (BPA.Allocate()) BlockState(&B, LocationNum, Optimistic);
-    BBToLocState[&B] = State;
-    State->initStoreSetAtEndOfBlock(*this);
+  for (auto bs : BBToLocState) {
+    bs.data.init(&bs.block, LocationNum, Optimistic);
+    bs.data.initStoreSetAtEndOfBlock(*this);
   }
 
   // We perform dead store elimination in the following phases.
@@ -1247,12 +1244,11 @@ bool DSEContext::run() {
 
   // Finally, delete the dead stores and create the live stores.
   bool Changed = false;
-  for (SILBasicBlock &BB : *F) {
+  for (auto bs : BBToLocState) {
     // Create the stores that are alive due to partial dead stores.
-    auto *S = getBlockState(&BB);
-    for (auto &X : S->LiveAddr) {
+    for (auto &X : bs.data.LiveAddr) {
       Changed = true;
-      auto I = S->LiveStores.find(X);
+      auto I = bs.data.LiveStores.find(X);
       SILInstruction *Inst = I->first->getDefiningInstruction();
       auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
@@ -1260,7 +1256,7 @@ bool DSEContext::run() {
                           StoreOwnershipQualifier::Unqualified);
     }
     // Delete the dead stores.
-    for (auto &I : getBlockState(&BB)->DeadStores) {
+    for (auto &I : getBlockState(&bs.block)->DeadStores) {
       Changed = true;
       LLVM_DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       // This way, we get rid of pass dependence on DCE.

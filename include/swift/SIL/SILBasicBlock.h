@@ -33,6 +33,8 @@ public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
   friend class SILGlobalVariable;
+  template <typename Data, typename Vector> friend class BasicBlockData;
+
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -49,6 +51,11 @@ private:
 
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
+
+  /// Used by BasicBlockData to index the Data vector.
+  ///
+  /// A value of -1 means that the index is not initialized yet.
+  int index = -1;
 
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}

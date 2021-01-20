@@ -43,6 +43,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -302,11 +303,6 @@ struct BlockInfo {
   /// recursive call.
   bool reachableFromEntry;
 
-  // Make DenseMap<...,BlockInfo> compilable.
-  BlockInfo() {
-    llvm_unreachable("DenseMap should not construct an empty BlockInfo");
-  }
-
   /// Get block information with expected \p invariants.
   BlockInfo(SILBasicBlock *block, Invariants invariants) :
       recursiveCall(nullptr),
@@ -380,35 +376,31 @@ struct BlockInfo {
 ///   }
 ///
 class InfiniteRecursionAnalysis {
-  SILFunction *function;
-  llvm::DenseMap<SILBasicBlock *, BlockInfo> blockInfos;
+  Invariants invariants;
+  BasicBlockData<BlockInfo> blockInfos;
 
-  InfiniteRecursionAnalysis(SILFunction *function) :
-    function(function),
-    // Reserve enough space in the map. Though, SILFunction::size() iterates
-    // over all blocks. But this is still better than to risk multiple mallocs.
-    blockInfos(function->size()) { }
-
-  BlockInfo &info(SILBasicBlock *block) { return blockInfos[block]; }
+  InfiniteRecursionAnalysis(SILFunction *function, Invariants invariants) :
+    invariants(invariants), blockInfos(function,
+      [&](SILBasicBlock *block) -> BlockInfo {
+        return BlockInfo(block, invariants);
+      }) { }
 
   /// Propagates the `reachesReturn` flags up the control flow and returns true
   /// if the flag reaches the entry block.
-  bool isEntryReachableFromReturn(Invariants invariants) {
+  bool isEntryReachableFromReturn() {
     // Contains blocks for which the `reachesReturn` flag is set.
     SmallVector<SILBasicBlock *, 32> workList;
 
-    // First, initialize the block infos.
-    for (SILBasicBlock &block : *function) {
-      BlockInfo blockInfo(&block, invariants);
-      blockInfos.insert({&block, blockInfo});
-      if (blockInfo.reachesReturn)
-        workList.push_back(&block);
+    // Initialize the workList with all function-return blocks.
+    for (auto bd : blockInfos) {
+      if (bd.data.reachesReturn)
+        workList.push_back(&bd.block);
     }
 
     while (!workList.empty()) {
       SILBasicBlock *block = workList.pop_back_val();
       for (auto *pred : block->getPredecessorBlocks()) {
-        BlockInfo &predInfo = info(pred);
+        BlockInfo &predInfo = blockInfos[pred];
         if (predInfo.reachesReturn ||
             // Recursive calls block the flag propagation.
             predInfo.recursiveCall != nullptr)
@@ -432,7 +424,7 @@ class InfiniteRecursionAnalysis {
         workList.push_back(pred);
       }
     }
-    return info(function->getEntryBlock()).reachesReturn;
+    return blockInfos.entry().data.reachesReturn;
   }
 
   /// Propagates the `reachableFromEntry` flags down the control flow and
@@ -440,22 +432,22 @@ class InfiniteRecursionAnalysis {
   /// Returns true, if at least one recursive call is found.
   bool findRecursiveCallsAndDiagnose() {
     SmallVector<SILBasicBlock *, 32> workList;
-    SILBasicBlock *entryBlock = function->getEntryBlock();
-    info(entryBlock).reachableFromEntry = true;
-    workList.push_back(entryBlock);
+    auto entry = blockInfos.entry();
+    entry.data.reachableFromEntry = true;
+    workList.push_back(&entry.block);
 
     bool foundInfiniteRecursion = false;
     while (!workList.empty()) {
       SILBasicBlock *block = workList.pop_back_val();
-      if (auto *recursiveCall = info(block).recursiveCall) {
-        function->getModule().getASTContext().Diags.diagnose(
+      if (auto *recursiveCall = blockInfos[block].recursiveCall) {
+        blockInfos.getFunction()->getModule().getASTContext().Diags.diagnose(
                  recursiveCall->getLoc().getSourceLoc(),
                  diag::warn_infinite_recursive_call);
         foundInfiniteRecursion = true;
         continue;
       }
       for (auto *succ : block->getSuccessorBlocks()) {
-        BlockInfo &succInfo = info(succ);
+        BlockInfo &succInfo = blockInfos[succ];
         if (!succInfo.reachesReturn && !succInfo.reachableFromEntry) {
           succInfo.reachableFromEntry = true;
           workList.push_back(succ);
@@ -468,17 +460,16 @@ class InfiniteRecursionAnalysis {
 public:
 
   LLVM_ATTRIBUTE_USED void dump() {
-    for (SILBasicBlock &block : *function) {
-      BlockInfo &blockInfo = info(&block);
-      llvm::dbgs() << "bb" << block.getDebugID()
-                   << ": numSuccs= " << blockInfo.numSuccsNotReachingReturn;
-      if (blockInfo.recursiveCall)
+    for (auto bd : blockInfos) {
+      llvm::dbgs() << "bb" << bd.block.getDebugID()
+                   << ": numSuccs= " << bd.data.numSuccsNotReachingReturn;
+      if (bd.data.recursiveCall)
         llvm::dbgs() << " hasRecursiveCall";
-      if (blockInfo.hasInvariantCondition)
+      if (bd.data.hasInvariantCondition)
         llvm::dbgs() << " hasInvariantCondition";
-      if (blockInfo.reachesReturn)
+      if (bd.data.reachesReturn)
         llvm::dbgs() << " reachesReturn";
-      if (blockInfo.reachableFromEntry)
+      if (bd.data.reachableFromEntry)
         llvm::dbgs() << " reachesRecursiveCall";
       llvm::dbgs() << '\n';
     }
@@ -487,8 +478,8 @@ public:
   /// Performs the analysis and issues a warnings for recursive calls.
   /// Returns true, if at least one recursive call is found.
   static bool analyzeAndDiagnose(SILFunction *function, Invariants invariants) {
-    InfiniteRecursionAnalysis analysis(function);
-    if (analysis.isEntryReachableFromReturn(invariants))
+    InfiniteRecursionAnalysis analysis(function, invariants);
+    if (analysis.isEntryReachableFromReturn())
       return false;
 
     // Now we know that the function never returns.

@@ -6,8 +6,9 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil [ossa] @a_function1 :
-// XHECK-NOT: partial_apply
-// XHECK: return
+// CHECK-NOT: partial_apply
+// CHECK: return
+// CHECK: } // end sil function 'a_function1'
 sil [ossa] @a_function1 : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = function_ref @our_closure_function1 : $@convention(thin) (Int64) -> Bool // user: %2
@@ -20,22 +21,24 @@ bb0(%0 : $Int64):
 class K {
 }
 
-// CHECK-LABEL: sil [ossa] @a_function2
 // The release_value of $K is optimized to a destroy_value.
+//
+// CHECK-LABEL: sil [ossa] @a_function2 :
+// CHECK-NOT: partial_apply  
+// CHECK: br
+// CHECK: destroy_value
+// CHECK: return
+// CHECK: } // end sil function 'a_function2'
 sil [ossa] @a_function2 : $@convention(thin) (@owned K) -> () {
 bb0(%0 : @owned $K):
   %1 = alloc_ref $K
   %2 = function_ref @our_closure_function2 : $@convention(thin) (@owned K) -> Bool // user: %2
-//XHECK-NOT: partial_apply
   %3 = partial_apply %2(%0) : $@convention(thin) (@owned K) -> Bool // user: %3
-//XHECK: br
   br bb1
  bb1:
-//XHECK: destroy_value
   destroy_value %3 : $@callee_owned () -> Bool   // id: %3
   destroy_value %1 : $K
   %5 = tuple ()                                   // user: %5
-//XHECK: return
   return %5 : $()                                 // id: %5
 }
 
