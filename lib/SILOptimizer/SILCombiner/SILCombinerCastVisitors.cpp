@@ -739,9 +739,6 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
 SILInstruction *
 SILCombiner::
 visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
-  if (UBCI->getFunction()->hasOwnership())
-    return nullptr;
-
   // (unchecked_bitwise_cast Y->Z (unchecked_bitwise_cast X->Y x))
   // OR (unchecked_trivial_cast Y->Z (unchecked_bitwise_cast X->Y x))
   //   ->
@@ -750,20 +747,55 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   if (match(UBCI->getOperand(),
             m_CombineOr(m_UncheckedBitwiseCastInst(m_SILValue(Oper)),
                         m_UncheckedTrivialBitCastInst(m_SILValue(Oper))))) {
-    return Builder.createUncheckedBitwiseCast(UBCI->getLoc(), Oper,
-                                              UBCI->getType());
+    if (!Builder.hasOwnership()) {
+      return Builder.createUncheckedBitwiseCast(UBCI->getLoc(), Oper,
+                                                UBCI->getType());
+    }
+
+    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, Oper);
+    if (helper) {
+      auto *transformedOper = Builder.createUncheckedBitwiseCast(
+          UBCI->getLoc(), Oper, UBCI->getType());
+      helper.perform(transformedOper);
+      return nullptr;
+    }
   }
-  if (UBCI->getType().isTrivial(*UBCI->getFunction()))
-    return Builder.createUncheckedTrivialBitCast(UBCI->getLoc(),
-                                                 UBCI->getOperand(),
-                                                 UBCI->getType());
+
+  if (UBCI->getType().isTrivial(*UBCI->getFunction())) {
+    // If our result is trivial, we can always just RAUW.
+    return Builder.createUncheckedTrivialBitCast(
+        UBCI->getLoc(), UBCI->getOperand(), UBCI->getType());
+  }
 
   if (!SILType::canRefCast(UBCI->getOperand()->getType(), UBCI->getType(),
                            Builder.getModule()))
     return nullptr;
 
-  return Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
-                                        UBCI->getType());
+  if (!Builder.hasOwnership()) {
+    return Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
+                                          UBCI->getType());
+  }
+
+  {
+    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, UBCI->getOperand());
+    if (helper) {
+      auto *newInst = Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
+                                                     UBCI->getType());
+      // If we have an operand with owned ownership, we change our
+      // unchecked_ref_cast to explicitly pass the owned operand as an unowned
+      // value. This is because otherwise, we would consume the owned value
+      // creating breaking OSSA. In contrast, if we have a guaranteed value, we
+      // are going to be replacing an UnownedInstantaneousUse with an
+      // InstantaneousUse which is always safe for a guaranteed value.
+      if (newInst->getOwnershipKind() == OwnershipKind::Owned) {
+        newInst->setOwnershipKind(OwnershipKind::Unowned);
+      }
+      helper.perform(newInst);
+      return nullptr;
+    }
+  }
+
+  return nullptr;
 }
 
 SILInstruction *
