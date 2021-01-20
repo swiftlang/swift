@@ -134,11 +134,6 @@ public:
     return declRef;
   }
 
-  ModuleDecl *getModuleContext() {
-    assert(getKind() == Kind::Function);
-    return TheFunction->getModuleContext();
-  }
-
   static AbstractFunction decomposeApply(ApplyExpr *apply,
                                          SmallVectorImpl<Expr*> &args) {
     Expr *fn;
@@ -1037,7 +1032,6 @@ public:
     if (!fn)
       return false;
 
-    
     return fn->getRethrowingKind() == FunctionRethrowingKind::ByClosure;
   }
 
@@ -2042,8 +2036,6 @@ private:
   }
   
   ShouldRecurse_t checkTry(TryExpr *E) {
-    
-
     // Walk the operand.
     ContextScope scope(*this, None);
     scope.enterTry();
