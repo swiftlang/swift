@@ -117,7 +117,7 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
   if (!EnableRewriteBorrows) {
     return false;
   }
-  borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
+  borrowedVal->visitLocalScopeEndingUses([this](Operand *use) {
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ true);
   });
 
