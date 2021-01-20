@@ -94,6 +94,7 @@ endlocal
 :: It supposes the %CD% is the source root.
 setlocal enableextensions enabledelayedexpansion
 
+if defined ghprbTargetBranch SET "scheme_arg=--scheme %ghprbTargetBranch%"
 if defined REPO_SCHEME SET "scheme_arg=--scheme %REPO_SCHEME%"
 
 git -C "%source_root%\swift" config --local core.autocrlf input
