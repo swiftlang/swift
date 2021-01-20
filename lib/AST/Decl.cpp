@@ -7590,7 +7590,8 @@ bool VarDecl::isDistributedActorAddressName(ASTContext &ctx, DeclName name) {
 
 bool VarDecl::isDistributedActorTransportName(ASTContext &ctx, DeclName name) {
   assert(name.getArgumentNames().size() == 0);
-  return name.getBaseName() == ctx.Id_actorTransport;
+  return name.getBaseName() == ctx.Id_transport ||
+    name.getBaseName() == ctx.Id_actorTransport;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

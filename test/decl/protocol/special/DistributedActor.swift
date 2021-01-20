@@ -7,15 +7,14 @@ distributed actor class D1 {
   var x: Int = 17
 
   // ==== DistributedActor state -----------------------------------------------
-//  let actorTransport: ActorTransport // TODO; make it automagically
-//  let actorAddress: ActorAddress // TODO; make it automagically
   var actorTransport: ActorTransport { fatalError() }
+  @actorIndependent
   var actorAddress: ActorAddress { fatalError() }
   // ==== End of DistributedActor state ----------------------------------------
 
 //  required init(transport: ActorTransport) {
 //     self.actorTransport = transport
-//     self.actorAddress = transport.makeAddress(forType: Self.self)
+//     self.actorAddress = transport.assignAddress(self)
 //     transport.register(self)
 //  }
 

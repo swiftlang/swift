@@ -9,6 +9,22 @@ actor class LocalActor_1 {
 struct NotCodableValue { }
 
 distributed actor class DistributedActor_1 {
+
+//  let _actorTransport: ActorTransport // TODO: synthesize instead
+//  @actorIndependent
+//  var actorTransport: ActorTransport { // TODO: synthesize instead
+//    _actorTransport
+//  }
+
+  // TODO: synthesize instead
+//  required init(transport actorTransport: ActorTransport) {
+//    self._actorTransport = actorTransport
+//  }
+
+  required init(resolve address: ActorAddress, using transport: ActorTransport) { // TODO: synthesize instead
+    self.actorAddress = address // JUST CHECKING
+  }
+
   let name: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
   var mutable: String = "alice" // expected -note{{mutable-state is only available within the actor instance}}
   var computedMutable: String {
@@ -26,6 +42,10 @@ distributed actor class DistributedActor_1 {
 
   func async() async -> Int {
     42
+  }
+
+  func hello() async {
+    print("Hello, by: \(self.actorAddress)")
   }
 
   distributed func distVoid1() async throws { } // ok
@@ -71,6 +91,7 @@ func test(
 }
 
 // ==== Codable parameters and return types ------------------------------------
+
 func test_params(
   distributed: DistributedActor_1
 ) async throws {
