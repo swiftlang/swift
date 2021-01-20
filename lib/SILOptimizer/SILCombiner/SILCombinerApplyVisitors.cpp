@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+
 #include "SILCombiner.h"
+
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -29,6 +31,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1510,11 +1513,10 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *fInverseApply,
     // First perform an ownership RAUW+erase of arg0 and inverse apply. The OSSA
     // RAUW helper will copy arg0 if needed. We need to do this before anything
     // else since the utility assumes OSSA is in correct form.
-    if (!decltype(ownershipRAUWHelper)::canFixUpOwnershipForRAUW(fInverseApply,
-                                                                 arg0)) {
+    OwnershipRAUWHelper helper(ownershipFixupContext, fInverseApply, arg0);
+    if (!helper)
       return false;
-    }
-    ownershipRAUWHelper.replaceAllUsesAndErase(fInverseApply, arg0);
+    helper.perform();
 
     // Now remove the apply, inserting a destroy_value if we need to it arg0.
     if (fApply->getArgumentRef(0).isLifetimeEnding()) {
