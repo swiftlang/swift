@@ -1003,9 +1003,8 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
 
     if (fixupClosureLifetimes(*getFunction(), checkStackNesting, modifiedCFG)) {
       if (checkStackNesting){
-        StackNesting sn;
         modifiedCFG |=
-            sn.correctStackNesting(getFunction()) == StackNesting::Changes::CFG;
+          StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;
       }
       if (modifiedCFG)
         invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

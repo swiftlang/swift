@@ -87,6 +87,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SIL/BasicBlockData.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/None.h"
@@ -468,7 +469,7 @@ private:
   llvm::DenseMap<LSValue, unsigned> ValToBitIndex;
 
   /// A map from each BasicBlock to its BlockState.
-  llvm::SmallDenseMap<SILBasicBlock *, BlockState, 16> BBToLocState;
+  BasicBlockData<BlockState> BBToLocState;
 
   /// Keeps a list of basic blocks that have LoadInsts. If a basic block does
   /// not have LoadInst, we do not actually perform the last iteration where
@@ -1211,7 +1212,7 @@ RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
                        EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads,
                        JointPostDominanceSetComputer &computer)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI),
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI), BBToLocState(F),
       ArrayType(disableArrayLoads
                     ? F->getModule().getASTContext().getArrayDecl()
                     : nullptr),
@@ -1592,10 +1593,9 @@ bool RLEContext::run() {
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit
   // vector to the appropriate size.
-  for (auto &B : *Fn) {
-    BBToLocState[&B] = BlockState();
-    BBToLocState[&B].init(&B, LocationVault.size(), Optimistic &&
-                          BBToProcess.find(&B) != BBToProcess.end());
+  for (auto bs : BBToLocState) {
+    bs.data.init(&bs.block, LocationVault.size(), Optimistic &&
+                 BBToProcess.find(&bs.block) != BBToProcess.end());
   }
 
   LLVM_DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {
@@ -1613,9 +1613,8 @@ bool RLEContext::run() {
   // Finally, perform the redundant load replacements.
   llvm::SmallVector<SILInstruction *, 16> InstsToDelete;
   bool SILChanged = false;
-  for (auto &B : *Fn) {
-    auto &State = BBToLocState[&B];
-    auto &Loads = State.getRL();
+  for (auto bs : BBToLocState) {
+    auto &Loads = bs.data.getRL();
     // Nothing to forward.
     if (Loads.empty())
       continue;
@@ -1624,7 +1623,7 @@ bool RLEContext::run() {
     //
     // NOTE: we could end up with different SIL depending on the ordering load
     // forwarding is performed.
-    for (auto I = B.rbegin(), E = B.rend(); I != E; ++I) {
+    for (auto I = bs.block.rbegin(), E = bs.block.rend(); I != E; ++I) {
       auto V = dyn_cast<SingleValueInstruction>(&*I);
       if (!V)
         continue;

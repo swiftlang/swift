@@ -1095,8 +1095,7 @@ class AllocBoxToStack : public SILFunctionTransform {
       auto Count = rewritePromotedBoxes(pass);
       NumStackPromoted += Count;
       if (Count) {
-        StackNesting SN;
-        if (SN.correctStackNesting(getFunction()) == StackNesting::Changes::CFG)
+        if (StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG)
           pass.CFGChanged = true;
       }
 
