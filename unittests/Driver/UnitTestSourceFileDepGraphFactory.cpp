@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "UnitTestSourceFileDepGraphFactory.h"
+#include "MockingFineGrainedDependencyGraphs.h"
 
 using namespace swift;
 using namespace swift::fine_grained_dependencies;
@@ -55,7 +56,7 @@ void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
     return;
   auto fingerprintString = s.split(fingerprintSeparator).second.str();
   const Optional<Fingerprint> fingerprint =
-    Fingerprint::mockFromString(fingerprintString);
+    swift::mockFingerprintFromString(fingerprintString);
 
   AbstractSourceFileDepGraphFactory::addADefinedDecl(key.getValue(),
                                                      fingerprint);

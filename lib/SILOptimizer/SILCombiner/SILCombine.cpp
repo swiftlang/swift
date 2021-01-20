@@ -172,7 +172,7 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
     svi->moveBefore(consumingUser);
     MadeChange = true;
 
-    // NOTE: We return nullptr here so that our caller doesn't delete the
+    // NOTE: We return false here so that our caller doesn't delete the
     // instruction and instead tries to simplify it.
     return false;
   }

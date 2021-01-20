@@ -43,7 +43,7 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
   auto swiftDeps =
     cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps).str();
   auto swiftDepsFingerprint =
-    Fingerprint::mockFromString(swiftDeps).getValue();
+    swift::mockFingerprintFromString(swiftDeps).getValue();
   auto interfaceHash = interfaceHashIfNonEmpty.getValueOr(swiftDepsFingerprint);
 
   SourceManager sm;

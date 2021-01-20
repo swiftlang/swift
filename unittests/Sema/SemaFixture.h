@@ -28,6 +28,7 @@
 #include <string>
 
 using namespace swift::constraints;
+using namespace swift::constraints::inference;
 
 namespace swift {
 namespace unittest {
@@ -75,8 +76,8 @@ protected:
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
-  static ConstraintSystem::PotentialBindings
-  inferBindings(ConstraintSystem &cs, TypeVariableType *typeVar);
+  static PotentialBindings inferBindings(ConstraintSystem &cs,
+                                         TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

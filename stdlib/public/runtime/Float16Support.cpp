@@ -119,20 +119,6 @@ SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
 
 #endif
 
-static unsigned long long toEncoding(double d) {
-  unsigned long long e;
-  static_assert(sizeof e == sizeof d, "double and ull must have the same size");
-  __builtin_memcpy(&e, &d, sizeof d);
-  return e;
-}
-
-static double fromEncoding(unsigned long long e) {
-  double d;
-  static_assert(sizeof d == sizeof e, "double and ull must have the same size");
-  __builtin_memcpy(&d, &e, sizeof e);
-  return d;
-}
-
 // Input in xmm0, result in di. We can get that calling convention in C++
 // by returning uint16 instead of Float16, which we don't have (or else
 // we wouldn't need this function).
