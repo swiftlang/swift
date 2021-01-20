@@ -1018,6 +1018,26 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }
 }
+
+swift::ide::SourceEditTextConsumer::
+SourceEditTextConsumer(llvm::raw_ostream &OS) : OS(OS) { }
+
+void swift::ide::SourceEditTextConsumer::
+accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
+  for (const auto &Replacement: Replacements) {
+    CharSourceRange Range = Replacement.Range;
+    unsigned BufID = SM.findBufferContainingLoc(Range.getStart());
+    auto Path(SM.getIdentifierForBuffer(BufID));
+    auto Start = SM.getLineAndColumnInBuffer(Range.getStart());
+    auto End = SM.getLineAndColumnInBuffer(Range.getEnd());
+
+    OS << "// " << Path.str() << " ";
+    OS << "[" << Start.first << ":" << Start.second << ", ";
+    OS << End.first << ":" << End.second << ")\n";
+    OS << Replacement.Text << "\n";
+  }
+}
+
 namespace {
 class ClangFileRewriterHelper {
   unsigned InterestedId;

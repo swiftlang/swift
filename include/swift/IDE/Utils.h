@@ -547,6 +547,7 @@ public:
   }
 };
 
+/// Outputs replacements as JSON, see `writeEditsInJson`
 class SourceEditJsonConsumer : public SourceEditConsumer {
   struct Implementation;
   Implementation &Impl;
@@ -556,6 +557,25 @@ public:
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
 
+/// Outputs replacements to `OS` in the form
+/// ```
+/// // </path/to/file> [startLine:startCol, endLine:endCol)
+/// text
+/// to
+/// replace
+///
+/// ```
+class SourceEditTextConsumer : public SourceEditConsumer {
+  llvm::raw_ostream &OS;
+
+public:
+  SourceEditTextConsumer(llvm::raw_ostream &OS);
+
+  void accept(SourceManager &SM, RegionType RegionType,
+              ArrayRef<Replacement> Replacements) override;
+};
+
+/// Outputs the rewritten buffer to `OS` with RUN and CHECK lines removed
 class SourceEditOutputConsumer : public SourceEditConsumer {
   struct Implementation;
   Implementation &Impl;
