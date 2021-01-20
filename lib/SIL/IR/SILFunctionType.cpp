@@ -2137,9 +2137,6 @@ static CanSILFunctionType getSILFunctionType(
                                  substFormalResultType);
 
   bool shouldBuildSubstFunctionType = [&]{
-    if (!TC.Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues)
-      return false;
-
     // We always use substituted function types for coroutines that are
     // being lowered in the context of another coroutine, which is to say,
     // for class override thunks.  This is required to make the yields
