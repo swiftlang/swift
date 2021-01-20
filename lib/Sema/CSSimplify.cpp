@@ -7472,11 +7472,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           if (!paramDecl)
             continue;
 
-          auto descriptor = UnqualifiedLookupDescriptor(
+          auto descriptor = UnqualifiedLookupDescriptor{
               DeclNameRef(param->getName()),
-              paramDecl->getDeclContext()->getParentSourceFile(),
+              paramDecl->getDeclContext()->getModuleScopeContext(),
               SourceLoc(),
-              UnqualifiedLookupFlags::TypeLookup);
+              UnqualifiedLookupFlags::TypeLookup};
           auto lookup = evaluateOrDefault(
               Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
           for (auto &result : lookup) {
