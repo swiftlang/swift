@@ -1692,7 +1692,7 @@ ERROR(where_nongeneric_toplevel,none,
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
       "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' were unable to be "
+      "The following Swift type(s) provided to '%0' could not be "
       "converted: %1.",
       (StringRef, StringRef))
 
