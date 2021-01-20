@@ -2050,24 +2050,29 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
                                   bool openBracket,
                                   bool closeBracket) {
   llvm::SmallVector<Decl *, 3> Members;
-  auto AddDeclFunc = [&](ArrayRef<Decl *> Range) {
-    for (auto RD : Range)
-      Members.push_back(RD);
+  auto AddMembers = [&](IterableDeclContext *idc) {
+    if (Options.PrintCurrentMembersOnly) {
+      for (auto RD : idc->getMembers())
+        Members.push_back(RD);
+    } else {
+      for (auto RD : idc->getAllMembers())
+        Members.push_back(RD);
+    }
   };
 
   if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-    AddDeclFunc(Ext->getAllMembers());
+    AddMembers(Ext);
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-    AddDeclFunc(NTD->getAllMembers());
+    AddMembers(NTD);
     for (auto Ext : NTD->getExtensions()) {
       if (Options.printExtensionContentAsMembers(Ext))
-        AddDeclFunc(Ext->getAllMembers());
+        AddMembers(Ext);
     }
     if (Options.PrintExtensionFromConformingProtocols) {
       for (auto Conf : NTD->getAllConformances()) {
         for (auto Ext : Conf->getProtocol()->getExtensions()) {
           if (Options.printExtensionContentAsMembers(Ext))
-            AddDeclFunc(Ext->getAllMembers());
+            AddMembers(Ext);
         }
       }
     }

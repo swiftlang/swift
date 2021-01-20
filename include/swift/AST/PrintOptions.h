@@ -304,6 +304,11 @@ struct PrintOptions {
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
 
+  /// Whether to limit ourselves to printing only the "current" set of members
+  /// in a nominal type or extension, which is semantically unstable but can
+  /// prevent printing from doing "extra" work.
+  bool PrintCurrentMembersOnly = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
                                               DAK_FixedLayout,
@@ -517,6 +522,7 @@ struct PrintOptions {
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
+    result.PrintCurrentMembersOnly = true;
     return result;
   }
 
@@ -538,6 +544,7 @@ struct PrintOptions {
     result.SkipUnderscoredKeywords = true;
     result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
     result.MapCrossImportOverlaysToDeclaringModule = true;
+    result.PrintCurrentMembersOnly = false;
     return result;
   }
 
