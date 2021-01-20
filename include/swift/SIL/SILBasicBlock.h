@@ -35,7 +35,7 @@ public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
   friend class SILGlobalVariable;
-  template <typename Data, typename Vector> friend class BasicBlockData;
+  template <typename, unsigned> friend class BasicBlockData;
   friend class BasicBlockBitfield;
 
 public:
