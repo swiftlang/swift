@@ -672,7 +672,17 @@ struct InteriorPointerOperand {
   /// requirements to ensure that the underlying class is alive at all use
   /// points.
   bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
-                       std::function<void(Operand *)> *onError = nullptr);
+                       std::function<void(Operand *)> *onError = nullptr) {
+    return getImplicitUsesForAddress(getProjectedAddress(), foundUses, onError);
+  }
+
+  /// The algorithm that is used to determine what the verifier will consider to
+  /// be implicit uses of the given address. Used to implement \see
+  /// getImplicitUses.
+  static bool
+  getImplicitUsesForAddress(SILValue address,
+                            SmallVectorImpl<Operand *> &foundUses,
+                            std::function<void(Operand *)> *onError = nullptr);
 
   Operand *operator->() { return operand; }
   const Operand *operator->() const { return operand; }
