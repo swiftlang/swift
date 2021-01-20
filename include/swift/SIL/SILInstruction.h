@@ -405,8 +405,7 @@ public:
     return SILInstructionKind(SILNode::getKind());
   }
 
-  const SILBasicBlock *getParent() const { return ParentBB; }
-  SILBasicBlock *getParent() { return ParentBB; }
+  SILBasicBlock *getParent() const { return ParentBB; }
 
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
