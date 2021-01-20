@@ -2566,72 +2566,77 @@ static ArrayRef<Decl *> evaluateMembersRequest(
   auto &ctx = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
-  // Ensure that we add any synthesized members.
-  if (dc->getParentSourceFile()) {
-    auto nominal = dyn_cast<NominalTypeDecl>(idc);
+  // If there's no parent source file, everything is already in order.
+  if (!dc->getParentSourceFile()) {
+    for (auto *member : idc->getMembers())
+      result.push_back(member);
 
-    if (nominal) {
-      // We need to add implicit initializers because they
-      // affect vtable layout.
-      TypeChecker::addImplicitConstructors(nominal);
+    return ctx.AllocateCopy(result);
+  }
+
+  auto nominal = dyn_cast<NominalTypeDecl>(idc);
+
+  if (nominal) {
+    // We need to add implicit initializers because they
+    // affect vtable layout.
+    TypeChecker::addImplicitConstructors(nominal);
+  }
+
+  // Force any conformances that may introduce more members.
+  for (auto conformance : idc->getLocalConformances()) {
+    auto proto = conformance->getProtocol();
+    bool isDerivable =
+      conformance->getState() == ProtocolConformanceState::Incomplete &&
+      proto->getKnownDerivableProtocolKind();
+
+    switch (kind) {
+    case MembersRequestKind::ABI:
+      // Force any derivable conformances in this context.
+      if (isDerivable)
+        break;
+
+      continue;
+
+    case MembersRequestKind::All:
+      // Force any derivable conformances.
+      if (isDerivable)
+        break;
+
+      // If there are any associated types in the protocol, they might add
+      // type aliases here.
+      if (!proto->getAssociatedTypeMembers().empty())
+        break;
+
+      continue;
     }
 
-    // Force any conformances that may introduce more members.
-    for (auto conformance : idc->getLocalConformances()) {
-      auto proto = conformance->getProtocol();
-      bool isDerivable =
-        conformance->getState() == ProtocolConformanceState::Incomplete &&
-        proto->getKnownDerivableProtocolKind();
+    TypeChecker::checkConformance(conformance->getRootNormalConformance());
+  }
 
-      switch (kind) {
-      case MembersRequestKind::ABI:
-        // Force any derivable conformances in this context.
-        if (isDerivable)
-          break;
-
-        continue;
-
-      case MembersRequestKind::All:
-        // Force any derivable conformances.
-        if (isDerivable)
-          break;
-
-        // If there are any associated types in the protocol, they might add
-        // type aliases here.
-        if (!proto->getAssociatedTypeMembers().empty())
-          break;
-
-        continue;
-      }
-
-      TypeChecker::checkConformance(conformance->getRootNormalConformance());
-    }
-
-    // If the type conforms to Encodable or Decodable, even via an extension,
-    // the CodingKeys enum is synthesized as a member of the type itself.
-    // Force it into existence.
-    if (nominal) {
-      (void) evaluateOrDefault(
-        ctx.evaluator,
-        ResolveImplicitMemberRequest{nominal,
-                   ImplicitMemberAction::ResolveCodingKeys},
-        {});
-    }
-
-    // If the decl has a @main attribute, we need to force synthesis of the
-    // $main function.
+  // If the type conforms to Encodable or Decodable, even via an extension,
+  // the CodingKeys enum is synthesized as a member of the type itself.
+  // Force it into existence.
+  if (nominal) {
     (void) evaluateOrDefault(
-        ctx.evaluator,
-        SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
-        nullptr);
+      ctx.evaluator,
+      ResolveImplicitMemberRequest{nominal,
+                 ImplicitMemberAction::ResolveCodingKeys},
+      {});
+  }
 
-    for (auto *member : idc->getMembers()) {
-      if (auto *var = dyn_cast<VarDecl>(member)) {
-        // The projected storage wrapper ($foo) might have
-        // dynamically-dispatched accessors, so force them to be synthesized.
-        if (var->hasAttachedPropertyWrapper())
-          (void) var->getPropertyWrapperBackingProperty();
-      }
+  // If the decl has a @main attribute, we need to force synthesis of the
+  // $main function.
+  (void) evaluateOrDefault(
+      ctx.evaluator,
+      SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
+      nullptr);
+
+  for (auto *member : idc->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      // The projected storage wrapper ($foo) might have
+      // dynamically-dispatched accessors, so force them to be synthesized.
+      if (var->hasAttachedPropertyWrapper())
+        (void) var->getPropertyWrapperBackingProperty();
     }
   }
 
