@@ -299,6 +299,7 @@ Casting from a function type F1 to a function type F2 will succeed iff the follo
 * Corresponding arguments have identical types
 * The return types are identical
 * If F1 is a throwing function type, then F2 must be a throwing function type.  If F1 is not throwing, then F2 may be a throwing or non-throwing function type.
+* F1 and F2 have the same calling convention.
 
 Note that it is _not_ sufficient for argument and return types to be castable; they must actually be identical.
 

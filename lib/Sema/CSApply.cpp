@@ -6013,6 +6013,11 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
     if (auto closure = dyn_cast<ClosureExpr>(semanticExpr))
       return;
 
+    // Diagnose cases like:
+    //   func f() { print(w) }; func g(_ : @convention(c) () -> ()) {}
+    //   let k = f; g(k) // error
+    //   func m() { let x = 0; g({ print(x) }) } // error
+    // (See also: [NOTE: diagnose-swift-to-c-convention-change])
     de.diagnose(expr->getLoc(),
                 diag::invalid_c_function_pointer_conversion_expr);
   }
