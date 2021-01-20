@@ -36,7 +36,6 @@ extension DifferentiableWithNonmutatingMoveAlong {
 
 class EmptyWithInheritedNonmutatingMoveAlong: DifferentiableWithNonmutatingMoveAlong {
   typealias TangentVector = Empty.TangentVector
-  var zeroTangentVectorInitializer: () -> TangentVector { { .init() } }
   static func proof_that_i_have_nonmutating_move_along() {
     let empty = EmptyWithInheritedNonmutatingMoveAlong()
     empty.move(along: .init())
@@ -608,8 +607,6 @@ class WrappedProperties: Differentiable {
 
 extension OtherFileNonconforming: Differentiable {}
 // expected-error @-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
-// expected-error @-2 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}
 
 extension GenericOtherFileNonconforming: Differentiable {}
 // expected-error @-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(along:)' for protocol 'Differentiable'}}
-// expected-error @-2 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'zeroTangentVectorInitializer' for protocol 'Differentiable'}}
