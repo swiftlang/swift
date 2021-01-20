@@ -1239,6 +1239,24 @@ public:
   bool isCached() const { return true; }
 };
 
+class AllMembersRequest :
+    public SimpleRequest<AllMembersRequest,
+                         ArrayRef<Decl *>(IterableDeclContext *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *>
+  evaluate(Evaluator &evaluator, IterableDeclContext *idc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class IsImplicitlyUnwrappedOptionalRequest :
     public SimpleRequest<IsImplicitlyUnwrappedOptionalRequest,
                          bool(ValueDecl *),

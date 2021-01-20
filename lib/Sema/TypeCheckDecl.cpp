@@ -2550,14 +2550,23 @@ struct SortedDeclList {
 
 } // end namespace
 
-ArrayRef<Decl *>
-ABIMembersRequest::evaluate(
-    Evaluator &evaluator, IterableDeclContext *idc) const {
+namespace {
+  enum class MembersRequestKind {
+    ABI,
+    All,
+  };
+
+}
+
+/// Evaluate a request for a particular set of members of an iterable
+/// declaration context.
+static ArrayRef<Decl *> evaluateMembersRequest(
+  IterableDeclContext *idc, MembersRequestKind kind) {
   auto dc = cast<DeclContext>(idc->getDecl());
-  auto &Context = dc->getASTContext();
+  auto &ctx = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
-  // Esnure that we add any synthesized members.
+  // Ensure that we add any synthesized members.
   if (dc->getParentSourceFile()) {
     auto nominal = dyn_cast<NominalTypeDecl>(idc);
 
@@ -2567,12 +2576,35 @@ ABIMembersRequest::evaluate(
       TypeChecker::addImplicitConstructors(nominal);
     }
 
-    // Force any derivable conformances in this context. This ensures that any
-    // synthesized members will approach in the member list.
+    // Force any conformances that may introduce more members.
     for (auto conformance : idc->getLocalConformances()) {
-      if (conformance->getState() == ProtocolConformanceState::Incomplete &&
-          conformance->getProtocol()->getKnownDerivableProtocolKind())
-        TypeChecker::checkConformance(conformance->getRootNormalConformance());
+      auto proto = conformance->getProtocol();
+      bool isDerivable =
+        conformance->getState() == ProtocolConformanceState::Incomplete &&
+        proto->getKnownDerivableProtocolKind();
+
+      switch (kind) {
+      case MembersRequestKind::ABI:
+        // Force any derivable conformances in this context.
+        if (isDerivable)
+          break;
+
+        continue;
+
+      case MembersRequestKind::All:
+        // Force any derivable conformances.
+        if (isDerivable)
+          break;
+
+        // If there are any associated types in the protocol, they might add
+        // type aliases here.
+        if (!proto->getAssociatedTypeMembers().empty())
+          break;
+
+        continue;
+      }
+
+      TypeChecker::checkConformance(conformance->getRootNormalConformance());
     }
 
     // If the type conforms to Encodable or Decodable, even via an extension,
@@ -2580,7 +2612,7 @@ ABIMembersRequest::evaluate(
     // Force it into existence.
     if (nominal) {
       (void) evaluateOrDefault(
-        Context.evaluator,
+        ctx.evaluator,
         ResolveImplicitMemberRequest{nominal,
                    ImplicitMemberAction::ResolveCodingKeys},
         {});
@@ -2589,7 +2621,7 @@ ABIMembersRequest::evaluate(
     // If the decl has a @main attribute, we need to force synthesis of the
     // $main function.
     (void) evaluateOrDefault(
-        Context.evaluator,
+        ctx.evaluator,
         SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
         nullptr);
 
@@ -2633,7 +2665,19 @@ ABIMembersRequest::evaluate(
       result.push_back(pair.second);
   }
 
-  return Context.AllocateCopy(result);
+  return ctx.AllocateCopy(result);
+}
+
+ArrayRef<Decl *>
+ABIMembersRequest::evaluate(
+    Evaluator &evaluator, IterableDeclContext *idc) const {
+  return evaluateMembersRequest(idc, MembersRequestKind::ABI);
+}
+
+ArrayRef<Decl *>
+AllMembersRequest::evaluate(
+    Evaluator &evaluator, IterableDeclContext *idc) const {
+  return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,

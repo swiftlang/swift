@@ -766,6 +766,14 @@ ArrayRef<Decl *> IterableDeclContext::getABIMembers() const {
       ArrayRef<Decl *>());
 }
 
+ArrayRef<Decl *> IterableDeclContext::getAllMembers() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AllMembersRequest{const_cast<IterableDeclContext *>(this)},
+      ArrayRef<Decl *>());
+}
+
 void IterableDeclContext::addMemberPreservingSourceOrder(Decl *member) {
   auto &SM = getASTContext().SourceMgr;
 
