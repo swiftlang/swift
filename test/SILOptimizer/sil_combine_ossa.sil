@@ -1531,14 +1531,15 @@ bb0(%0 : @owned $E):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> @owned B {
-// XHECK: bb0(%0 : $*FakeOptional<B>):
-// XHECK-NEXT: [[BORROW:%.*]] = load_borrow
-// XHECK-NEXT: switch_enum [[BORROW]]
-// XHECK: bb1([[GUARANTEED:%.*]] : @guaranteed
-// XHECK-NEXT: end_borrow [[BORROW]]
+// CHECK: bb0(%0 : $*FakeOptional<B>):
+// CHECK-NEXT: [[BORROW:%.*]] = load_borrow
+// CHECK-NEXT: switch_enum [[BORROW]]
+// CHECK: bb1([[GUARANTEED:%.*]] : @guaranteed
+// CHECK-NEXT: end_borrow [[BORROW]]
 // XHECK-NEXT: load
 // XHECK-NEXT: unchecked_enum_data
 // XHECK-NEXT: return
+// CHECK: } /
 sil [ossa] @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> @owned B {
 bb0(%0 : $*FakeOptional<B>):
   switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
@@ -2477,10 +2478,11 @@ struct FakeInt32 {
 }
 
 // CHECK-LABEL: sil [ossa] @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
-// XHECK-NOT: switch_enum_addr
-// XHECK: load
-// XHECK-NEXT: switch_enum
-// XHECK-NOT: switch_enum_addr
+// CHECK-NOT: switch_enum_addr
+// CHECK: load
+// CHECK-NEXT: switch_enum
+// CHECK-NOT: switch_enum_addr
+// CHECK: } // end sil function 'loadable_switchenumaddr_promotion'
 sil [ossa] @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
   switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2

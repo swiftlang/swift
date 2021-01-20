@@ -20,10 +20,10 @@ enum Numerals {
 
 sil [ossa] @external_func: $@convention(thin) () -> ()
 
-// CHECK-LABEL: eliminate_sw_enum_addr
-// XHECK-NOT: switch_enum_addr
-// XHECK: switch_enum
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
+// CHECK-NOT: switch_enum_addr
+// CHECK: switch_enum {{%.*}} :
+// CHECK: } // end sil function 'eliminate_sw_enum_addr'
 sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>, var, name "x" // users: %2, %4, %5, %17, %19
