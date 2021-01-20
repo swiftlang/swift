@@ -204,9 +204,9 @@ SWIFT_REQUEST(TypeChecker, RequiresOpaqueAccessorsRequest, bool(VarDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequiresOpaqueModifyCoroutineRequest,
               bool(AbstractStorageDecl *), SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, FunctionRethrowingKindRequest,
-              FragileFunctionKind(DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, FragileFunctionKindRequest,
+              FragileFunctionKind(DeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, FunctionRethrowingKindRequest,
               FunctionRethrowingKind(AbstractFunctionDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SelfAccessKindRequest, SelfAccessKind(FuncDecl *),
               SeparatelyCached, NoLocationInfo)
