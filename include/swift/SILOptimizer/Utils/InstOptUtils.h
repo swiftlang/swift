@@ -400,6 +400,10 @@ public:
   }
 
   bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
+
+  /// Set \p wereAnyCallbacksInvoked to false. Useful if one wants to reuse an
+  /// InstModCallback in between iterations.
+  void resetHadCallbackInvocation() { wereAnyCallbacksInvoked = false; }
 };
 
 /// Get all consumed arguments of a partial_apply.
