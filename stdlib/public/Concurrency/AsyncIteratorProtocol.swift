@@ -16,5 +16,4 @@ import Swift
 public protocol AsyncIteratorProtocol {
   associatedtype Element
   mutating func next() async throws -> Element?
-  mutating func cancel()
 }
