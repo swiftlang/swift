@@ -322,7 +322,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   }
 
   if (invalidatedStackNesting) {
-    StackNesting().correctStackNesting(&F);
+    StackNesting::fixNesting(&F);
   }
 
   // Cleanup the builder and return whether or not we made any changes.

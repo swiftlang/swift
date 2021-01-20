@@ -13,10 +13,9 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_STACKNESTING_H
 #define SWIFT_SILOPTIMIZER_UTILS_STACKNESTING_H
 
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/BasicBlockData.h"
 #include "llvm/ADT/SmallBitVector.h"
-
-#include <vector>
 
 namespace swift {
 
@@ -48,17 +47,25 @@ namespace swift {
 ///
 class StackNesting {
 
+public:
+
+  /// The possible return values of fixNesting().
+  enum class Changes {
+    /// No changes are made.
+    None,
+
+    /// Only instructions were inserted or deleted.
+    Instructions,
+
+    /// Instructions were inserted or deleted and new blocks were inserted.
+    CFG
+  };
+
+private:
   typedef SmallBitVector BitVector;
 
   /// Data stored for each block (actually for each block which is not dead).
   struct BlockInfo {
-
-    /// Back-link to the block.
-    SILBasicBlock *Block;
-
-    /// The cached list of successors.
-    llvm::SmallVector<BlockInfo *, 8> Successors;
-
     /// The list of stack allocating/deallocating instructions in the block.
     llvm::SmallVector<SILInstruction *, 8> StackInsts;
 
@@ -68,7 +75,8 @@ class StackNesting {
     /// The bit-set of alive stack locations at the block exit.
     BitVector AliveStackLocsAtExit;
 
-    BlockInfo(SILBasicBlock *Block) : Block(Block) { }
+    /// Used in the setup function to walk over the CFG.
+    bool visited = false;
   };
 
   /// Data stored for each stack location (= allocation).
@@ -93,45 +101,34 @@ class StackNesting {
   /// number in the bit-sets.
   llvm::SmallVector<StackLoc, 8> StackLocs;
 
-  /// Block data for all (non-dead) blocks.
-  std::vector<BlockInfo> BlockInfos;
+  BasicBlockData<BlockInfo> BlockInfos;
 
-public:
-
-  /// The possible return values of correctStackNesting().
-  enum class Changes {
-    /// No changes are made.
-    None,
-
-    /// Only instructions were inserted or deleted.
-    Instructions,
-
-    /// Instructions were inserted or deleted and new blocks were inserted.
-    CFG
-  };
-
-  StackNesting() { }
+  StackNesting(SILFunction *F) : BlockInfos(F) { }
 
   /// Performs correction of stack nesting by moving stack-deallocation
   /// instructions down the control flow.
   ///
   /// Returns the status of what changes were made.
-  Changes correctStackNesting(SILFunction *F);
+  Changes run();
   
   /// For debug dumping.
   void dump() const;
 
   static void dumpBits(const BitVector &Bits);
 
-private:
   /// Initializes the data structures.
-  void setup(SILFunction *F);
+  void setup();
 
   /// Solves the dataflow problem.
   ///
   /// Returns true if there is a nesting of locations in any way, which can
   /// potentially in the wrong order.
   bool solve();
+
+  bool analyze() {
+    setup();
+    return solve();
+  }
 
   /// Insert deallocation instructions for all locations which are alive before
   /// the InsertionPoint (AliveBefore) but not alive after the InsertionPoint
@@ -161,7 +158,15 @@ private:
   /// Modifies the SIL to end up with a correct stack nesting.
   ///
   /// Returns the status of what changes were made.
-  bool adaptDeallocs();
+  Changes adaptDeallocs();
+
+public:
+
+  /// Performs correction of stack nesting by moving stack-deallocation
+  /// instructions down the control flow.
+  ///
+  /// Returns the status of what changes were made.
+  static Changes fixNesting(SILFunction *F);
 };
 
 } // end namespace swift

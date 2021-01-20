@@ -180,7 +180,7 @@ public:
     }
 
     if (invalidatedStackNesting) {
-      StackNesting().correctStackNesting(&function);
+      StackNesting::fixNesting(&function);
     }
 
     return changed;

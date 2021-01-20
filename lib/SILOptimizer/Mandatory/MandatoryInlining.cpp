@@ -1000,7 +1000,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
   }
 
   if (invalidatedStackNesting) {
-    StackNesting().correctStackNesting(F);
+    StackNesting::fixNesting(F);
     changedFunctions.insert(F);
   }
 
