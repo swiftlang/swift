@@ -37,6 +37,7 @@ class SILInstruction;
 class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
+class BasicBlockBitfield;
 
 namespace Lowering {
 class TypeLowering;
@@ -148,6 +149,7 @@ private:
   friend class SILModule;
   friend class SILFunctionBuilder;
   template <typename Data, typename Vector> friend class BasicBlockData;
+  friend class BasicBlockBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -191,6 +193,16 @@ private:
   SILFunction *ReplacedFunction = nullptr;
 
   Identifier ObjCReplacementFor;
+
+  /// The head of a single-linked list of currently alive BasicBlockBitfield.
+  BasicBlockBitfield *newestAliveBitfield = nullptr;
+
+  /// A monotonically increasing ID which is incremented whenever a
+  /// BasicBlockBitfield is constructed.
+  /// Usually this stays below 1000, so a 32-bit unsigned is more than
+  /// sufficient.
+  /// For details see BasicBlockBitfield::bitfieldID;
+  unsigned currentBitfieldID = 1;
 
   /// The function's set of semantics attributes.
   ///
@@ -1012,9 +1024,6 @@ public:
   /// Transfer all blocks of \p F into this function, at the begin of the block
   /// list.
   void moveAllBlocksFromOtherFunction(SILFunction *F) {
-    for (SILBasicBlock &block : *F) {
-      block.index = -1;
-    }
     BlockList.splice(begin(), F->BlockList);
   }
   
@@ -1026,7 +1035,6 @@ public:
     assert(otherFunc != this);
     BlockList.splice(insertPointInThisFunction, otherFunc->BlockList,
                      blockInOtherFunction);
-    blockInOtherFunction->index = -1;
   }
 
   /// Move block \p BB to immediately before the iterator \p IP.

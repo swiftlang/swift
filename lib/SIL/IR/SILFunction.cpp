@@ -210,6 +210,8 @@ SILFunction::~SILFunction() {
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+  assert(!newestAliveBitfield &&
+         "Not all BasicBlockBitfields deleted at function destruction");
 }
 
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
