@@ -4812,13 +4812,27 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     auto text = SM.extractText(
         Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
 
-    auto removalRange =
-        SourceRange(Lexer::getLocForEndOfToken(
-                        SM, tuple->getElement(ArgIdx - 1)->getEndLoc()),
-                    firstRange.End);
+    SourceLoc removalStartLoc;
+    // For the first argument, start is always next token after `(`.
+    if (ArgIdx == 0) {
+      removalStartLoc = tuple->getLParenLoc();
+    } else {
+      // For all other arguments, start is the next token past
+      // the previous argument.
+      removalStartLoc = tuple->getElement(ArgIdx - 1)->getEndLoc();
+    }
+
+    SourceRange removalRange{Lexer::getLocForEndOfToken(SM, removalStartLoc),
+                             firstRange.End};
+
+    // Move requires postfix comma only if argument is moved in-between
+    // other arguments.
+    bool requiresComma = !isExpr<BinaryExpr>(anchor) &&
+                         PrevArgIdx != tuple->getNumElements() - 1;
+
     diag.fixItRemove(removalRange);
     diag.fixItInsert(secondRange.Start,
-                     text.str() + (isExpr<BinaryExpr>(anchor) ? "" : ", "));
+                     text.str() + (requiresComma ? ", " : ""));
   };
 
   // There are 4 diagnostic messages variations depending on
