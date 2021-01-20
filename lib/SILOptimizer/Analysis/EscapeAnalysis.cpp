@@ -1553,8 +1553,8 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
         const char *Separator = "";
         for (unsigned VIdx = Nd->UsePoints.find_first(); VIdx != -1u;
              VIdx = Nd->UsePoints.find_next(VIdx)) {
-          auto node = UsePointTable[VIdx];
-          OS << Separator << '%' << InstToIDMap[node];
+          SILInstruction *inst = UsePointTable[VIdx];
+          OS << Separator << '%' << InstToIDMap[inst->asSILNode()];
           Separator = ",";
         }
         break;

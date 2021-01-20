@@ -121,23 +121,6 @@ SILModule *SILNode::getModule() const {
   return nullptr;
 }
 
-const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
-  assert(getStorageLoc() != SILNodeStorageLocation::Instruction);
-
-  if (isa<SingleValueInstruction>(this)) {
-    assert(hasMultipleSILNodeBases(getKind()));
-    return &static_cast<const SILInstruction &>(
-        static_cast<const SingleValueInstruction &>(
-            static_cast<const ValueBase &>(*this)));
-  }
-
-  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
-    return MVR->getParent();
-  }
-
-  llvm_unreachable("Invalid value for slow path");
-}
-
 /// Get a location for this value.
 SILLocation SILValue::getLoc() const {
   if (auto *instr = Value->getDefiningInstruction())
