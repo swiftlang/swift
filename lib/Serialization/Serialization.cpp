@@ -2712,7 +2712,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   /// \param members The decls within the context.
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
-  void writeMembers(DeclID parentID, DeclRange members, bool isClass) {
+  void writeMembers(DeclID parentID, ArrayRef<Decl *> members, bool isClass) {
     using namespace decls_block;
 
     SmallVector<DeclID, 16> memberIDs;
@@ -2853,7 +2853,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     SmallVector<DeclID, 16> witnessIDs;
 
-    for (auto member : proto->getMembers()) {
+    for (auto member : proto->getAllMembers()) {
       if (auto *value = dyn_cast<ValueDecl>(member)) {
         auto witness = proto->getDefaultWitness(value);
         if (!witness)
@@ -3032,7 +3032,7 @@ public:
     for (auto *genericParams : llvm::reverse(allGenericParams))
       writeGenericParams(genericParams);
 
-    writeMembers(id, extension->getMembers(), isClassExtension);
+    writeMembers(id, extension->getAllMembers(), isClassExtension);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3248,7 +3248,7 @@ public:
 
 
     writeGenericParams(theStruct->getGenericParams());
-    writeMembers(id, theStruct->getMembers(), false);
+    writeMembers(id, theStruct->getAllMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3305,7 +3305,7 @@ public:
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theEnum->getGenericParams());
-    writeMembers(id, theEnum->getMembers(), false);
+    writeMembers(id, theEnum->getAllMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3364,7 +3364,7 @@ public:
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theClass->getGenericParams());
-    writeMembers(id, theClass->getMembers(), true);
+    writeMembers(id, theClass->getAllMembers(), true);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3413,7 +3413,7 @@ public:
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
-    writeMembers(id, proto->getMembers(), true);
+    writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
 
@@ -5149,7 +5149,7 @@ static void collectInterestingNestedDeclarations(
 
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
-      collectInterestingNestedDeclarations(S, iterable->getMembers(),
+      collectInterestingNestedDeclarations(S, iterable->getAllMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
                                            derivativeConfigs,
@@ -5231,7 +5231,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         if (auto bodyFP = IDC->getBodyFingerprint()) {
           declFingerprints.insert({addDeclRef(D), *bodyFP});
         }
-        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+        collectInterestingNestedDeclarations(*this, IDC->getAllMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs);
@@ -5264,7 +5264,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         if (auto bodyFP = IDC->getBodyFingerprint()) {
           declFingerprints.insert({addDeclRef(TD), *bodyFP});
         }
-        collectInterestingNestedDeclarations(*this, IDC->getMembers(),
+        collectInterestingNestedDeclarations(*this, IDC->getAllMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs,
