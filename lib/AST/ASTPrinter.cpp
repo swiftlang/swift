@@ -735,7 +735,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printType(Type T) { printTypeWithOptions(T, Options); }
 
   void printTransformedTypeWithOptions(Type T, PrintOptions options) {
-    if (CurrentType) {
+    if (CurrentType && Current) {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
@@ -1527,7 +1527,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     (flags & SwapSelfAndDependentMemberType);
 
   SubstitutionMap subMap;
-  if (CurrentType) {
+  if (CurrentType && Current) {
     if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
       auto *M = DC->getParentModule();
