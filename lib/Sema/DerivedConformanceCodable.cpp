@@ -978,13 +978,15 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
         }
       }
     } else if (!elt->hasAssociatedValues()) {
-      auto *encodeNilExpr = UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_encodeNil, {C.Id_forKey});
+      auto *encodeExpr = UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_encode, {Identifier(), C.Id_forKey});
       auto *metaTyRef = TypeExpr::createImplicit(
               funcDC->mapTypeIntoContext(codingKeysEnum->getDeclaredInterfaceType()),
               C);
       auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), codingKeyCase,
                                             DeclNameLoc(), /*Implicit=*/true);
-      auto *callExpr = CallExpr::createImplicit(C, encodeNilExpr, {keyExpr}, {C.Id_forKey});
+      auto *trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(), /*Implicit=*/true);
+
+      auto *callExpr = CallExpr::createImplicit(C, encodeExpr, {trueExpr, keyExpr}, {Identifier(), C.Id_forKey});
       auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
               /*Implicit=*/true);
       caseStatements.push_back(tryExpr);
