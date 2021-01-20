@@ -260,9 +260,18 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
                                               int *extraInhabitantIndex) const {
   switch (SubKind) {
   case RecordKind::Invalid:
-  case RecordKind::OpaqueExistential:
   case RecordKind::ClosureContext:
     return false;
+
+  case RecordKind::OpaqueExistential: {
+    if (Fields.size() != 1) {
+      return false;
+    }
+    auto metadata = Fields[0];
+    auto metadataFieldAddress = address + metadata.Offset;
+    return metadata.TI.readExtraInhabitantIndex(
+      reader, metadataFieldAddress, extraInhabitantIndex);
+  }
 
   case RecordKind::ThickFunction: {
     if (Fields.size() != 2) {
