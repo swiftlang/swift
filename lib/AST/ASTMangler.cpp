@@ -538,7 +538,7 @@ static Type getTypeForDWARFMangling(Type t) {
     SubstFlags::AllowLoweredTypes);
 }
 
-std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
 
@@ -548,9 +548,7 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
 
   Ty = getTypeForDWARFMangling(Ty);
 
-  if (DC)
-    bindGenericParameters(DC);
-
+  bindGenericParameters(sig);
   appendType(Ty);
   appendOperator("D");
   return finalize();
@@ -676,7 +674,9 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
-  bindGenericParameters(Decl->getDeclContext());
+
+  auto Sig = Decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+  bindGenericParameters(Sig);
 
   if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
@@ -1369,15 +1369,9 @@ void ASTMangler::appendOpWithGenericParamIndex(StringRef Op,
 
 
 /// Bind the generic parameters from the given signature.
-void ASTMangler::bindGenericParameters(CanGenericSignature sig) {
+void ASTMangler::bindGenericParameters(GenericSignature sig) {
   if (sig)
-    CurGenericSignature = sig;
-}
-
-/// Bind the generic parameters from the given context and its parents.
-void ASTMangler::bindGenericParameters(const DeclContext *DC) {
-  if (auto sig = DC->getGenericSignatureOfContext())
-    bindGenericParameters(sig.getCanonicalSignature());
+    CurGenericSignature = sig.getCanonicalSignature();
 }
 
 void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs) {
@@ -2853,12 +2847,13 @@ void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
                                       const AbstractStorageDecl *decl,
                                       bool isStatic) {
   appendContextOf(decl);
-  bindGenericParameters(decl->getDeclContext());
-  if (isa<VarDecl>(decl)) {
+  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+    bindGenericParameters(varDecl->getDeclContext()->getGenericSignatureOfContext());
     appendDeclName(decl);
     appendDeclType(decl);
     appendOperator("v", accessorKindCode);
-  } else if (isa<SubscriptDecl>(decl)) {
+  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl)) {
+    bindGenericParameters(subscriptDecl->getGenericSignature());
     appendDeclType(decl);
 
     StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
