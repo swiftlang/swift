@@ -83,6 +83,9 @@ public:
 
   ArraySemanticsCall() : SemanticsCall(nullptr) {}
 
+  /// Return the SemanticsCall
+  ApplyInst *getInstruction() { return SemanticsCall; }
+
   /// Can we hoist this call.
   bool canHoist(SILInstruction *To, DominanceInfo *DT) const;
 
