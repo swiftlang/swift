@@ -784,6 +784,12 @@ public:
   /// The resulting list of members will be stable across translation units.
   ArrayRef<Decl *> getABIMembers() const;
 
+  /// Get all of the members within this context, including any
+  /// implicitly-synthesized members.
+  ///
+  /// The resulting list of members will be stable across translation units.
+  ArrayRef<Decl *> getAllMembers() const;
+
   /// Retrieve the set of members in this context without loading any from the
   /// associated lazy loader; this should only be used as part of implementing
   /// abstractions on top of member loading, such as a name lookup table.
