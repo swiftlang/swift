@@ -1239,25 +1239,11 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 static std::pair<BraceStmt *, bool>
 deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   // struct Foo : Codable {
-  //   var x: Int
-  //   var y: String
-  //
-  //   // Already derived by this point if possible.
-  //   @derived enum CodingKeys : CodingKey {
-  //     case x
-  //     case y
-  //   }
-  //
-  //   @derived init(from decoder: Decoder) throws {
-  //     let container = try decoder.container(keyedBy: CodingKeys.self)
-  //     x = try container.decode(Type.self, forKey: .x)
-  //     y = try container.decode(Type.self, forKey: .y)
-  //   }
-  // }
 
   // The enclosing type decl.
   auto conformanceDC = initDecl->getDeclContext();
   auto *targetDecl = conformanceDC->getSelfNominalTypeDecl();
+  auto targetType = targetDecl->getInterfaceType();
 
   auto *funcDC = cast<DeclContext>(initDecl);
   auto &C = funcDC->getASTContext();

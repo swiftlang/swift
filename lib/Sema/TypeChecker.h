@@ -542,7 +542,7 @@ bool checkContextualRequirements(GenericTypeDecl *decl,
                                  DeclContext *dc);
 
 /// Add any implicitly-defined constructors required for the given
-/// struct or class.
+/// struct, class or actor.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
 /// Fold the given sequence expression into an (unchecked) expression

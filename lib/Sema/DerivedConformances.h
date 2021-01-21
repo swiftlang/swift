@@ -311,6 +311,11 @@ public:
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,
                          Type propertyContextType, bool isStatic, bool isFinal);
 
+  /// Declare a stored (let) property.
+  std::pair<VarDecl *, PatternBindingDecl *>
+  declareDerivedConstantProperty(Identifier name, Type propertyInterfaceType,
+                         Type propertyContextType, bool isStatic, bool isFinal);
+
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
   addGetterToReadOnlyDerivedProperty(VarDecl *property,

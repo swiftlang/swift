@@ -2159,20 +2159,20 @@ namespace {
             }
           }
 
-          // no value declaration may be accessed directly on distributed actor
-//            ctx.Diags.diagnose(
-//                memberLoc, diag::distributed_actor_isolated_non_self_reference,
-//                member->getDescriptiveKind(),
-//                member->getName(),
-//                isolation.getActorClass() ==
-//                getNearestEnclosingActorContext(getDeclContext()));
+          // no property except actorAddress may be accessed directly on distributed actor
+          if (auto decl = dyn_cast<VarDecl>(member))
+            if (decl->isLet() &&
+                member->getName() == member->getASTContext().Id_actorAddress)
+              // the actorAddress field is special, and guaranteed to be present
+              // always, regardless is local or remote actor.
+              return false;
+
           ctx.Diags.diagnose(
               memberLoc, diag::distributed_actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
               member->getName());
           noteIsolatedActorMember(member);
           return true;
-//          }
         }
 
         // continue checking as if it was actor self isolated

@@ -20,7 +20,7 @@ import Swift
 /// which involves enqueuing new partial tasks to be executed at some
 /// point. Actor classes implicitly conform to this protocol as part of their
 /// primary class definition.
-public protocol DistributedActor: Actor, Codable {
+public protocol DistributedActor: Actor {
 
   /// Creates new (local) distributed actor instance, bound to the passed transport.
   ///
@@ -41,7 +41,7 @@ public protocol DistributedActor: Actor, Codable {
   ///
   /// - Parameter address:
   /// - Parameter transport:
-  init(resolve address: ActorAddress, using transport: ActorTransport) // TODO: async
+  init(resolve address: ActorAddress, using transport: ActorTransport)
 
 //  /// Decode an actor (remote or local) reference using the transport stored
 //  /// within the passed decoder. The transport's `resolve` function is called to
@@ -59,13 +59,13 @@ public protocol DistributedActor: Actor, Codable {
 //  //    func encode(to encoder: Encoder) throws
 //  //         ^
 
-  @actorIndependent
+  // @actorIndependent
   var actorTransport: ActorTransport { get }
 
   /// Logical address which this distributed actor represents.
   ///
-  /// An address is always uniquely pointing at a specific actor instance
-  @actorIndependent
+  /// An address is always uniquely pointing at a specific actor instance.
+  // @actorIndependent
   var actorAddress: ActorAddress { get }
 }
 
@@ -107,7 +107,7 @@ public protocol ActorTransport {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
-    throws -> Act where Act: DistributedActor
+    throws -> ActorResolved<Act> where Act: DistributedActor
 
   /// Create an `ActorAddress` for the passed actor type.
   ///
@@ -119,23 +119,20 @@ public protocol ActorTransport {
   /// E.g. if an actor is created under address `addr1` then immediately invoking
   /// `transport.resolve(address: addr1, as: Greeter.self)` MUST return a reference
   /// to the same actor.
-  func assignAddress<Act>(forType: Act.Type, onActorCreated: (Act) -> ()) -> ActorAddress
+  func assignAddress<Act>(
+    _ actorType: Act.Type
+//    ,
+//    onActorCreated: (Act) -> ()
+  ) -> ActorAddress
     where Act: DistributedActor
 
-  // TODO: remove?
-  func send<Message>(
-    _ message: Message,
-    to recipient: ActorAddress
-  ) async throws where Message: Codable
-
-  // TODO: remove?
-  func request<Request, Reply>(
-    replyType: Reply.Type,
-    _ request: Request,
-    from recipient: ActorAddress
-  ) async throws where Request: Codable, Reply: Codable
+  // FIXME: call from deinit
+//  func resignAddress(address: ActorAddress)
+//    from recipient: ActorAddress
+//  ) async throws where Request: Codable, Reply: Codable
 }
 
+// TODO: make into a protocol
 public struct ActorAddress: Equatable, Codable {
   /// Uniquely specifies the actor transport and the protocol used by it.
   ///
@@ -158,6 +155,12 @@ public struct ActorAddress: Equatable, Codable {
     self.path = "/example"
     self.uid = 123123
   }
+}
+
+@frozen
+public enum ActorResolved<Act: DistributedActor> {
+  case resolved(Act)
+  case makeProxy
 }
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch)
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -12,7 +12,34 @@ import Darwin
 import Glibc
 #endif
 
-distributed actor class DistributedActor_1 {
+protocol DA {
+  @actorIndependent
+  var actorTransport: ActorTransport { get }
+}
+
+actor class XXX: DA {
+  let actorTransport: ActorTransport
+//  @actorIndependent(unsafe) var actorTransport: ActorTransport {
+//    self._actorTransport
+//  }
+  init(transport: ActorTransport) {
+    self.actorTransport = transport
+  }
+}
+
+protocol P {
+  var field: String { get }
+}
+
+actor class P1: P {
+  let field: String = "hello"
+}
+
+
+distributed actor class SomeSpecificDistributedActor {
+//  // @derived let actorTransport: ActorTransport
+//  // @derived let actorAddress: ActorAddress
+
 //  // @derived
 //  required init(transport: ActorTransport) {
 //    self.actorTransport = transport
@@ -25,6 +52,8 @@ distributed actor class DistributedActor_1 {
 //  }
 
   distributed func hello() async throws {
+    _ = self.actorTransport
+    _ = self.actorAddress
     print("hello from \(self.actorAddress)")
   }
 }
@@ -32,10 +61,15 @@ distributed actor class DistributedActor_1 {
 // ==== Fake Transport ---------------------------------------------------------
 
 struct FakeTransport: ActorTransport {
-  func resolve<Act>(address: ActorAddress, as actorType: Act.Type) throws -> Act where Act : DistributedActor {
+  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
+    throws -> ActorResolved<Act> where Act: DistributedActor {
     fatalError()
   }
-  func assignAddress<Act>(forType: Act.Type, onActorCreated: (Act) -> ()) -> ActorAddress where Act : DistributedActor {
+  func assignAddress<Act>(
+    _ actorType: Act.Type
+//    ,
+//    onActorCreated: (Act) -> ()
+  ) -> ActorAddress where Act : DistributedActor {
     fatalError()
   }
   func send<Message>(_ message: Message, to recipient: ActorAddress) async throws where Message : Decodable, Message : Encodable {
@@ -47,14 +81,23 @@ struct FakeTransport: ActorTransport {
 }
 
 // ==== Execute ----------------------------------------------------------------
+let address = ActorAddress(parse: "")
+let transport = FakeTransport()
 
-func run() async {
-  let address = ActorAddress(parse: "")
-  let actor = DistributedActor_1(resolve: address, using: FakeTransport())
+func test_initializers() {
+  _ = SomeSpecificDistributedActor(transport: transport)
+  _ = SomeSpecificDistributedActor(resolve: address, using: transport)
+}
 
+func test_address() {
+  let actor = SomeSpecificDistributedActor(transport: transport)
+  _ = actor.actorAddress
+}
+
+func test_run() {
   print("before")
 //  try! await actor.hello() // CHECK: hell
   print("after")
 }
 
-runAsyncAndBlock(run)
+//runAsyncAndBlock(run)

@@ -463,6 +463,33 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   return getterDecl;
 }
 
+// TODO: intense duplication with declareDerivedProperty
+std::pair<VarDecl *, PatternBindingDecl *>
+DerivedConformance::declareDerivedConstantProperty(Identifier name,
+                                           Type propertyInterfaceType,
+                                           Type propertyContextType,
+                                           bool isStatic, bool isFinal) {
+  auto parentDC = getConformanceContext();
+
+  VarDecl *propDecl = new (Context)
+      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Let,
+                           SourceLoc(), name, parentDC);
+  propDecl->setImplicit();
+  propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
+  propDecl->setInterfaceType(propertyInterfaceType);
+
+  Pattern *propPat = NamedPattern::createImplicit(Context, propDecl);
+  propPat->setType(propertyContextType);
+
+  propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
+  propPat->setType(propertyContextType);
+
+  auto *pbDecl = PatternBindingDecl::createImplicit(
+      Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
+      parentDC);
+  return {propDecl, pbDecl};
+}
+
 std::pair<VarDecl *, PatternBindingDecl *>
 DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,

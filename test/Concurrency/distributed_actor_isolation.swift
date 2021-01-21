@@ -10,21 +10,6 @@ struct NotCodableValue { }
 
 distributed actor class DistributedActor_1 {
 
-//  let _actorTransport: ActorTransport // TODO: synthesize instead
-//  @actorIndependent
-//  var actorTransport: ActorTransport { // TODO: synthesize instead
-//    _actorTransport
-//  }
-
-  // TODO: synthesize instead
-//  required init(transport actorTransport: ActorTransport) {
-//    self._actorTransport = actorTransport
-//  }
-
-  required init(resolve address: ActorAddress, using transport: ActorTransport) { // TODO: synthesize instead
-    self.actorAddress = address // JUST CHECKING
-  }
-
   let name: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
   var mutable: String = "alice" // expected -note{{mutable-state is only available within the actor instance}}
   var computedMutable: String {
@@ -64,6 +49,18 @@ distributed actor class DistributedActor_1 {
     fatalError()
   }
 
+  distributed func distReturnGeneric<T: Codable>(int: Int) async throws -> T { // ok
+    fatalError()
+  }
+  distributed func distReturnGenericWhere<T>(int: Int) async throws -> T
+    where T: Codable { // ok
+    fatalError()
+  }
+  distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
+    // expected-error@-1 {{distributed function result type 'T' does not conform to 'Codable'}}
+    fatalError()
+  }
+
   func test() async throws {
     _ = self.name
     _ = self.computedMutable
@@ -88,6 +85,9 @@ func test(
   //
   //    _ = await distributed.async() // expected -error{{actor-isolated instance method 'dist()' can only be referenced inside the distributed actor}}
   try await distributed.distVoid1() // ok
+  
+  // special: the actorAddress may always be referred to
+  _ = distributed.actorAddress
 }
 
 // ==== Codable parameters and return types ------------------------------------

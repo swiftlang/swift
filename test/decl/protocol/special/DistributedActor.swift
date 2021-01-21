@@ -55,8 +55,8 @@ distributed actor class D1 {
 // ==== "Fake" impls -----------------------------------------------------------
 
 struct FakeTransport: ActorTransport {
-  func resolve<A>(address: ActorAddress, as actorType: A.Type)
-    where A : DistributedActor {
+  func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
+  throws -> ActorResolved<Act> where Act: DistributedActor {
     fatalError("\(#function) is not implemented yet")
   }
 
