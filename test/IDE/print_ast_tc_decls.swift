@@ -241,8 +241,8 @@ struct d0100_FooStruct {
   static func overloadedStaticFunc2(x: Double) -> Int { return 0 }
 // PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc2(x: Double) -> Int{{$}}
 }
-// PASS_COMMON-NEXT: {{^}}  init(instanceVar1: Int = 0){{$}}
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
+// PASS_COMMON-NEXT: {{^}}  init(instanceVar1: Int = 0){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 extension d0100_FooStruct {
@@ -596,8 +596,8 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}  enum `enum` {{{$}}
 // PASS_COMMON-NEXT: {{^}}    case `case`{{$}}
 // PASS_COMMON-NEXT: {{^}}    {{.*}}static func __derived_enum_equals(_ a: d0200_EscapedIdentifiers.`enum`, _ b: d0200_EscapedIdentifiers.`enum`) -> Bool
-// PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}    func hash(into hasher: inout Hasher)
+// PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   class `class` {}
@@ -613,8 +613,8 @@ struct d0200_EscapedIdentifiers {
   class `extension` : `class` {}
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension` : `class` {{{$}}
-// PASS_COMMON:      {{^}}    @objc deinit{{$}}
-// PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
+// PASS_COMMON:      {{^}}    {{(override )?}}init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where`>(
@@ -1025,8 +1025,8 @@ enum d2000_EnumDecl1 {
 // PASS_COMMON-NEXT: {{^}}  case ED1_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case ED1_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  {{.*}}static func __derived_enum_equals(_ a: d2000_EnumDecl1, _ b: d2000_EnumDecl1) -> Bool
-// PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
+// PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 enum d2100_EnumDecl2 {
@@ -1179,8 +1179,8 @@ struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1
 
 // PASS_COMMON: {{^}}struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1 {{{$}}
 // PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Int{{$}}
-// PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias TA1 = Int
+// PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 //===---

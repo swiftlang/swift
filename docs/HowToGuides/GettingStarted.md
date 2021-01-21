@@ -60,8 +60,8 @@ toolchain as a one-off, there are a couple of differences:
 
 1. Create a directory for the whole project:
    ```sh
-   mkdir -p swift-project/swift
-   cd swift-project/swift
+   mkdir swift-project
+   cd swift-project
    ```
 2. Clone the sources:
    - Via SSH (recommended):

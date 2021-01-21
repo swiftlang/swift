@@ -239,6 +239,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
   enumDecl->setImplicit();
+  enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);
 
   // For classes which inherit from something Encodable or Decodable, we
@@ -349,6 +350,7 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
   auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, introducer,
                                         SourceLoc(), C.Id_container, DC);
   containerDecl->setImplicit();
+  containerDecl->setSynthesized();
   containerDecl->setInterfaceType(containerType);
   return containerDecl;
 }

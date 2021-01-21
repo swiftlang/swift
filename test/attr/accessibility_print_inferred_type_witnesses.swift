@@ -27,8 +27,8 @@ fileprivate protocol FilePrivateAssocTypeProto {
 private class PrivateImpl: PublicAssocTypeProto, FilePrivateAssocTypeProto {
   fileprivate var publicValue: InternalStruct?
   fileprivate var filePrivateValue: Int?
-  // CHECK-DAG: {{^}} fileprivate typealias PublicValue
   // CHECK-DAG: {{^}} fileprivate typealias FilePrivateValue
+  // CHECK-DAG: {{^}} fileprivate typealias PublicValue
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: public{{(\*/)?}} class PublicImpl : PublicAssocTypeProto, FilePrivateAssocTypeProto {
@@ -36,6 +36,6 @@ public class PublicImpl: PublicAssocTypeProto, FilePrivateAssocTypeProto {
   public var publicValue: Int?
   fileprivate var filePrivateValue: InternalStruct?
   // CHECK-DAG: {{^}} public typealias PublicValue
-  // CHECK-4-DAG: {{^}} internal typealias FilePrivateValue
   // CHECK-5-DAG: {{^}} fileprivate typealias FilePrivateValue
+  // CHECK-4-DAG: {{^}} internal typealias FilePrivateValue
 } // CHECK: {{^[}]}}

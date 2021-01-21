@@ -15,8 +15,8 @@ enum NoValues {
 // CHECK:   case a, b
 // CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
 // CHECK-RESILIENT: static func == (a: NoValues, b: NoValues) -> Bool
-// CHECK:   var hashValue: Int { get }
 // CHECK:   func hash(into hasher: inout Hasher)
+// CHECK:   var hashValue: Int { get }
 // CHECK: }
 
 // CHECK-LABEL: extension Enum : Equatable where T : Equatable {
@@ -24,8 +24,8 @@ enum NoValues {
 // CHECK-RESILIENT: static func == (a: Enum<T>, b: Enum<T>) -> Bool
 // CHECK: }
 // CHECK-LABEL: extension Enum : Hashable where T : Hashable {
-// CHECK:   var hashValue: Int { get }
 // CHECK:   func hash(into hasher: inout Hasher)
+// CHECK:   var hashValue: Int { get }
 // CHECK: }
 
 // CHECK-LABEL: extension NoValues : CaseIterable {

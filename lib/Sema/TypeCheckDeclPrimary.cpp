@@ -2129,7 +2129,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    for (Decl *Member : CD->getSemanticMembers())
+    for (Decl *Member : CD->getABIMembers())
       visit(Member);
 
     TypeChecker::checkPatternBindingCaptures(CD);
