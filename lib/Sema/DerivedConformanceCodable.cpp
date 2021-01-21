@@ -413,6 +413,8 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
   auto *conformanceDC = derived.getConformanceContext();
   auto *codingKeysEnum = lookupEvaluatedCodingKeysEnum(C, target);
 
+  llvm::SmallVector<EnumDecl*, 4> codingKeys;
+
   // Only derive CodingKeys enum if it is not already defined
   if (!codingKeysEnum) {
     auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
@@ -430,9 +432,8 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
     // Forcibly derive conformance to CodingKey.
     TypeChecker::checkConformancesInContext(enumDecl);
 
-    // Add to the type.
-    target->addMember(enumDecl);
     codingKeysEnum = enumDecl;
+    codingKeys.push_back(enumDecl);
   }
 
   llvm::SmallSetVector<Identifier, 4> caseNames;
@@ -440,7 +441,8 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
     if (!caseNames.insert(elementDecl->getBaseIdentifier())) {
       elementDecl->diagnose(diag::codable_enum_duplicate_case_name_here,
                         derived.getProtocolType(), target->getDeclaredType(), elementDecl->getBaseIdentifier());
-      return false;
+      allConform = false;
+      continue;
     }
     auto enumIdentifier = caseCodingKeyIdentifier(C, elementDecl);
 
@@ -495,12 +497,16 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
     if (conforms) {
       // Forcibly derive conformance to CodingKey.
       TypeChecker::checkConformancesInContext(caseEnum);
-      target->addMember(caseEnum);
+      codingKeys.push_back(caseEnum);
     }
   }
 
   if (!allConform)
     return false;
+
+  for (auto* codingKeysEnum : codingKeys) {
+    target->addMember(codingKeysEnum);
+  }
 
   return true;
 }
