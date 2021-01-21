@@ -26,7 +26,7 @@
 #include <dispatch/dispatch.h>
 #endif
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32) && !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dlfcn.h>
 #endif
 
@@ -538,7 +538,7 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 }
 
 void swift::swift_task_asyncMainDrainQueue() {
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32) && !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
   if (runLoop)
