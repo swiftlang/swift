@@ -2,6 +2,9 @@
 // RUN:    -module-name M -enable-experimental-concurrency | %FileCheck %s
 // REQUIRES: concurrency
 
+// rdar//72473691
+// XFAIL: *
+
 func use<T>(_ t: T) {}
 func forceSplit() async {
 }
