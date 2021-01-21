@@ -499,6 +499,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isExported())
         ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+      if (Dep.isImplementationOnly())
+        ID->getAttrs().add(
+            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false));
+
       ImportDecls.push_back(ID);
     }
     Bits.ComputedImportDecls = true;

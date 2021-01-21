@@ -607,6 +607,9 @@ void swift::ide::printModuleInterface(
     }
 
     auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
+      if (ImportD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+        return false;
+
       if (!TargetClangMod)
         return true;
       if (ImportD->getModule() == TargetMod)
