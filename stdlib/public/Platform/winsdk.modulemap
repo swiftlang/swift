@@ -161,9 +161,13 @@ module WinSDK [system] {
   explicit module DirectX {
     module Direct3D11 {
       header "d3d11.h"
+      header "d3d11_1.h"
+      header "d3d11_2.h"
+      header "d3d11_3.h"
+      header "d3d11_4.h"
       export *
 
-      link "d3d12.lib"
+      link "d3d11.lib"
       link "dxgi.lib"
     }
 
