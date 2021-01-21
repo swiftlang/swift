@@ -536,7 +536,8 @@ class SR8536 {
   func baz() {}
 
   init() {
-     // expected-warning@+1{{assignment of member 'baz' to closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-warning@+2{{call to method 'baz' in autoclosure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@+1{{reference 'self.' explicitly}}
     sr8536_closure = baz
   }
 }
