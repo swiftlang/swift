@@ -360,8 +360,8 @@ void ArrayInfo::getLastDestroys(
   // copy_values, using ValueLifetimeAnalysis. The frontier is a list of
   // instructions that mark the exits of the flow of control from the
   // \c destroys.
-  ValueLifetimeAnalysis lifetimeAnalysis =
-      ValueLifetimeAnalysis(arrayValue->getDefiningInstruction(), destroys);
+  ValueLifetimeAnalysis lifetimeAnalysis(arrayValue->getDefiningInstruction(),
+                                         destroys);
   ValueLifetimeAnalysis::Frontier frontier;
   lifetimeAnalysis.computeFrontier(frontier,
                                    ValueLifetimeAnalysis::DontModifyCFG);
