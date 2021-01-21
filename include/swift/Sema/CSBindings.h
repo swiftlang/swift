@@ -231,7 +231,8 @@ struct PotentialBindings {
   /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
   /// reachable through subtype/conversion  relationship e.g.
   /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
-  llvm::SmallPtrSet<TypeVariableType *, 2> AdjacentVars;
+  llvm::SmallDenseSet<std::pair<TypeVariableType *, Constraint *>, 2>
+      AdjacentVars;
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 

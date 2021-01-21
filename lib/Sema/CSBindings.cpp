@@ -119,8 +119,8 @@ bool PotentialBindings::involvesTypeVariables() const {
   // on each step of the solver, but once bindings are computed
   // incrementally it becomes more important to double-check that
   // any adjacent type variables found previously are still unresolved.
-  return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
-    return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
+  return llvm::any_of(AdjacentVars, [](const auto &adjacent) {
+    return !adjacent.first->getImpl().getFixedType(/*record=*/nullptr);
   });
 }
 
@@ -983,7 +983,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     findInferableTypeVars(second, typeVars);
 
     if (typeVars.erase(TypeVar)) {
-      AdjacentVars.insert(typeVars.begin(), typeVars.end());
+      for (auto *typeVar : typeVars)
+        AdjacentVars.insert({typeVar, constraint});
     }
 
     return None;
@@ -1016,9 +1017,21 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   if (type->getWithoutSpecifierType()
           ->lookThroughAllOptionalTypes()
           ->is<DependentMemberType>()) {
-    type->getTypeVariables(AdjacentVars);
+    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    type->getTypeVariables(referencedVars);
 
-    bool containsSelf = AdjacentVars.erase(TypeVar);
+    bool containsSelf = false;
+    for (auto *var : referencedVars) {
+      // Add all type variables encountered in the type except
+      // to the current type variable.
+      if (var != TypeVar) {
+        AdjacentVars.insert({var, constraint});
+        continue;
+      }
+
+      containsSelf = true;
+    }
+
     // If inferred type doesn't contain the current type variable,
     // let's mark bindings as delayed until dependent member type
     // is resolved.
@@ -1043,15 +1056,20 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // Check whether we can perform this binding.
   if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
     type = *boundType;
-    if (type->hasTypeVariable())
-      type->getTypeVariables(AdjacentVars);
+    if (type->hasTypeVariable()) {
+      llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+      type->getTypeVariables(referencedVars);
+      for (auto *var : referencedVars) {
+        AdjacentVars.insert({var, constraint});
+      }
+    }
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
     if (!bindingTypeVar)
       return None;
 
-    AdjacentVars.insert(bindingTypeVar);
+    AdjacentVars.insert({bindingTypeVar, constraint});
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
