@@ -2881,7 +2881,7 @@ sil [ossa] @alloc_ref_dynamic_with_upcast_metatype : $@convention(thin) () -> @o
   return %3 : $B
 }
 
-// CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br
+// CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br :
 // XHECK: checked_cast_br
 // XHECK: bb1
 // XHECK-NOT: alloc_ref_dynamic
@@ -3029,13 +3029,13 @@ struct T : Q {
 }
 
 // CHECK-LABEL: sil [ossa] @silcombine_checked_cast_addr_br_on_metatype_into_checked_cast_br_on_metatype
-// XHECK: bb0:
-// XHECK: metatype $@thick T.Type
-// XHECK-NOT: checked_cast_addr_br
-// XHECK: checked_cast_br
-// XHECK: bb1(%[[ARG:[0-9]+]] : $@thick Q.Type)
-// XHECK: store %[[ARG]] to {{.*}} : $*@thick Q.Type
-// XHECK: }
+// CHECK: bb0:
+// CHECK: metatype $@thick T.Type
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: checked_cast_br
+// CHECK: bb1(%[[ARG:[0-9]+]] : $@thick Q.Type)
+// CHECK: store %[[ARG]] to {{.*}} : $*@thick Q.Type
+// CHECK: }
 sil [ossa] @silcombine_checked_cast_addr_br_on_metatype_into_checked_cast_br_on_metatype : $@convention(thin) () -> Bool {
 bb0:
   %1 = metatype $@thick T.Type
@@ -3213,18 +3213,18 @@ struct OtherError: Error {
 }
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast :
-// XHECK:  bb0([[ERROR:%.*]] : @guaranteed
-// XHECK:      [[ERROR_COPY_2:%.*]] = copy_value [[ERROR]]
-// XHECK:      [[BOX:%.*]] = alloc_existential_box
-// XHECK:      [[ERROR_COPY_1:%.*]] = copy_value [[ERROR]]
-// XHECK:      [[E:%[0-9]+]] = alloc_stack $Error
-// XHECK:      [[BOX_COPY:%.*]] = copy_value [[BOX]]
-// XHECK:      store [[BOX_COPY]] to [init] [[E]]
-// XHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// XHECK-NEXT: destroy_addr [[E]]
-// XHECK-NEXT: store [[ERROR_COPY_2]] to [init] [[T]]
-// XHECK-NEXT: struct_element_addr
-// XHECK:   } // end sil function 'unconditional_existential_box_cast'
+// CHECK:  bb0([[ERROR:%.*]] : @guaranteed
+// CHECK:      [[ERROR_COPY_2:%.*]] = copy_value [[ERROR]]
+// CHECK:      [[BOX:%.*]] = alloc_existential_box
+// CHECK:      [[ERROR_COPY_1:%.*]] = copy_value [[ERROR]]
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[BOX_COPY:%.*]] = copy_value [[BOX]]
+// CHECK:      store [[BOX_COPY]] to [init] [[E]]
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK-NEXT: destroy_addr [[E]]
+// CHECK-NEXT: store [[ERROR_COPY_2]] to [init] [[T]]
+// CHECK-NEXT: struct_element_addr
+// CHECK:   } // end sil function 'unconditional_existential_box_cast'
 sil [ossa] @unconditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3248,8 +3248,8 @@ bb0(%0 : @guaranteed $TestError):
 sil [ossa] @unknown_use_of_TestError : $@convention(thin) (@inout TestError) -> ()
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_unknown_user1
-// XHECK:   unconditional_checked_cast_addr
-// XHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user1'
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user1'
 sil [ossa] @unconditional_existential_box_cast_unknown_user1 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3275,8 +3275,8 @@ bb0(%0 : @guaranteed $TestError):
 sil [ossa] @unknown_use_of_box : $@convention(thin) (Error) -> ()
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_unknown_user2
-// XHECK:   unconditional_checked_cast_addr
-// XHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user2'
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user2'
 sil [ossa] @unconditional_existential_box_cast_unknown_user2 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3302,8 +3302,8 @@ bb0(%0 : @guaranteed $TestError):
 sil [ossa] @unknown_use_of_Error : $@convention(thin) (@inout Error) -> ()
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_unknown_user3
-// XHECK:   unconditional_checked_cast_addr
-// XHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user3'
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_unknown_user3'
 sil [ossa] @unconditional_existential_box_cast_unknown_user3 : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3327,8 +3327,8 @@ bb0(%0 : @guaranteed $TestError):
 }
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_multiple_stores1
-// XHECK:   unconditional_checked_cast_addr
-// XHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores1'
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores1'
 sil [ossa] @unconditional_existential_box_cast_multiple_stores1 : $@convention(thin) (@guaranteed TestError, @guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError, %0a : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3352,8 +3352,8 @@ bb0(%0 : @guaranteed $TestError, %0a : @guaranteed $TestError):
 }
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_multiple_stores2
-// XHECK:   unconditional_checked_cast_addr
-// XHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores2'
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_multiple_stores2'
 sil [ossa] @unconditional_existential_box_cast_multiple_stores2 : $@convention(thin) (@guaranteed TestError, @owned Error) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError, %0a : @owned $Error):
   %1 = alloc_existential_box $Error, $TestError
@@ -3374,8 +3374,8 @@ bb0(%0 : @guaranteed $TestError, %0a : @owned $Error):
 }
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_wrong_type
-// XHECK:   unconditional_checked_cast_addr
-// XHECK: } // end sil function 'unconditional_existential_box_cast_wrong_type'
+// CHECK:   unconditional_checked_cast_addr
+// CHECK: } // end sil function 'unconditional_existential_box_cast_wrong_type'
 sil [ossa] @unconditional_existential_box_cast_wrong_type : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3397,8 +3397,8 @@ bb0(%0 : @guaranteed $TestError):
 }
 
 // CHECK-LABEL: sil [ossa] @unconditional_existential_box_cast_not_dominating :
-// XHECK-NOT: unconditional_checked_cast_addr
-// XHECK:   } // end sil function 'unconditional_existential_box_cast_not_dominating'
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK:   } // end sil function 'unconditional_existential_box_cast_not_dominating'
 sil [ossa] @unconditional_existential_box_cast_not_dominating : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3437,13 +3437,13 @@ bb4:
 }
 
 // CHECK-LABEL: sil [ossa] @conditional_existential_box_cast :
-// XHECK:      [[LIFETIME_EXTENDING_COPY:%.*]] = copy_value %0
-// XHECK:      [[E:%[0-9]+]] = alloc_stack $Error
-// XHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// XHECK:      store [[LIFETIME_EXTENDING_COPY]] to [init] [[T]]
-// XHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// XHECK-NEXT: cond_br [[I]], bb1, bb2
-// XHECK:   } // end sil function 'conditional_existential_box_cast'
+// CHECK:      [[LIFETIME_EXTENDING_COPY:%.*]] = copy_value %0
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK:      store [[LIFETIME_EXTENDING_COPY]] to [init] [[T]]
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK:   } // end sil function 'conditional_existential_box_cast'
 sil [ossa] @conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError
@@ -3473,14 +3473,14 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @taking_conditional_existential_box_cast :
-// XHECK:      [[LIFETIME_EXTENDING_COPY:%.*]] = copy_value %0
-// XHECK:      [[E:%[0-9]+]] = alloc_stack $Error
-// XHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
-// XHECK:      destroy_addr [[E]]
-// XHECK-NEXT: store [[LIFETIME_EXTENDING_COPY]] to [init] [[T]]
-// XHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// XHECK-NEXT: cond_br [[I]], bb1, bb2
-// XHECK:   } // end sil function 'taking_conditional_existential_box_cast'
+// CHECK:      [[LIFETIME_EXTENDING_COPY:%.*]] = copy_value %0
+// CHECK:      [[E:%[0-9]+]] = alloc_stack $Error
+// CHECK:      [[T:%[0-9]+]] = alloc_stack $TestError
+// CHECK:      destroy_addr [[E]]
+// CHECK-NEXT: store [[LIFETIME_EXTENDING_COPY]] to [init] [[T]]
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: cond_br [[I]], bb1, bb2
+// CHECK:   } // end sil function 'taking_conditional_existential_box_cast'
 sil [ossa] @taking_conditional_existential_box_cast : $@convention(thin) (@guaranteed TestError) -> @owned AnyObject {
 bb0(%0 : @guaranteed $TestError):
   %1 = alloc_existential_box $Error, $TestError

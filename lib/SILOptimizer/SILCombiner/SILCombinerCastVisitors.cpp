@@ -567,13 +567,8 @@ static bool canBeUsedAsCastDestination(SILValue value, CastInst *castInst,
          DA->get(castInst->getFunction())->properlyDominates(value, castInst);
 }
 
-
-SILInstruction *
-SILCombiner::
-visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
-  if (UCCAI->getFunction()->hasOwnership())
-    return nullptr;
-
+SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
+    UnconditionalCheckedCastAddrInst *uccai) {
   // Optimize the unconditional_checked_cast_addr in this pattern:
   //
   //   %box = alloc_existential_box $Error, $ConcreteError
@@ -593,20 +588,36 @@ visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
   //
   // This lets the alloc_existential_box become dead and it can be removed in
   // following optimizations.
-  SILValue val = getConcreteValueOfExistentialBoxAddr(UCCAI->getSrc(), UCCAI);
-  if (canBeUsedAsCastDestination(val, UCCAI, DA)) {
-    SILBuilderContext builderCtx(Builder.getModule(), Builder.getTrackingList());
-    SILBuilderWithScope builder(UCCAI, builderCtx);
-    SILLocation loc = UCCAI->getLoc();
-    builder.createRetainValue(loc, val, builder.getDefaultAtomicity());
-    builder.createDestroyAddr(loc, UCCAI->getSrc());
-    builder.createStore(loc, val, UCCAI->getDest(),
-                        StoreOwnershipQualifier::Unqualified);
-    return eraseInstFromFunction(*UCCAI);
+  SILValue val = getConcreteValueOfExistentialBoxAddr(uccai->getSrc(), uccai);
+  while (auto *cvi = dyn_cast_or_null<CopyValueInst>(val))
+    val = cvi->getOperand();
+  if (canBeUsedAsCastDestination(val, uccai, DA)) {
+    // We need to copy the value at its insertion point.
+    {
+      auto *valInsertPt = val->getDefiningInsertionPoint();
+      if (!valInsertPt)
+        return nullptr;
+      auto valInsertPtIter = valInsertPt->getIterator();
+      // If our value is defined by an instruction (not an argument), we want to
+      // insert the copy after that. Otherwise, we have an argument and we want
+      // to insert the copy right at the beginning of the block.
+      if (val->getDefiningInstruction())
+        valInsertPtIter = std::next(valInsertPtIter);
+      SILBuilderWithScope builder(valInsertPtIter, Builder);
+      val = builder.emitCopyValueOperation(valInsertPtIter->getLoc(), val);
+    }
+
+    // Then we insert the destroy value/store at the cast location.
+    SILBuilderWithScope builder(uccai, Builder);
+    SILLocation loc = uccai->getLoc();
+    builder.createDestroyAddr(loc, uccai->getSrc());
+    builder.emitStoreValueOperation(loc, val, uccai->getDest(),
+                                    StoreOwnershipQualifier::Init);
+    return eraseInstFromFunction(*uccai);
   }
 
   // Perform the purly type-based cast optimization.
-  if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI))
+  if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(uccai))
     MadeChange = true;
 
   return nullptr;
@@ -615,9 +626,6 @@ visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  if (UCCI->getFunction()->hasOwnership())
-    return nullptr;
-
   if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
     MadeChange = true;
     return nullptr;
@@ -770,9 +778,6 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-  if (CBI->getFunction()->hasOwnership())
-    return nullptr;
-
   if (CastOpt.optimizeCheckedCastBranchInst(CBI))
     MadeChange = true;
 
@@ -782,9 +787,6 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-  if (CCABI->getFunction()->hasOwnership())
-    return nullptr;
-
   // Optimize the checked_cast_addr_br in this pattern:
   //
   //   %box = alloc_existential_box $Error, $ConcreteError
@@ -808,11 +810,27 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   //
   // TODO: Also handle the WillFail case.
   SILValue val = getConcreteValueOfExistentialBoxAddr(CCABI->getSrc(), CCABI);
+  while (auto *cvi = dyn_cast_or_null<CopyValueInst>(val))
+    val = cvi->getOperand();
   if (canBeUsedAsCastDestination(val, CCABI, DA)) {
-    SILBuilderContext builderCtx(Builder.getModule(), Builder.getTrackingList());
-    SILBuilderWithScope builder(CCABI, builderCtx);
+    // We need to insert the copy after the defining instruction of val or at
+    // the top of the block if val is an argument.
+    {
+      auto *valInsertPt = val->getDefiningInsertionPoint();
+      if (!valInsertPt)
+        return nullptr;
+      auto valInsertPtIter = valInsertPt->getIterator();
+      // If our value is defined by an instruction (not an argument), we want to
+      // insert the copy after that. Otherwise, we have an argument and we want
+      // to insert the copy right at the beginning of the block.
+      if (val->getDefiningInstruction())
+        valInsertPtIter = std::next(valInsertPtIter);
+      SILBuilderWithScope builder(valInsertPtIter, Builder);
+      val = builder.emitCopyValueOperation(valInsertPtIter->getLoc(), val);
+    }
+
+    SILBuilderWithScope builder(CCABI, Builder);
     SILLocation loc = CCABI->getLoc();
-    builder.createRetainValue(loc, val, builder.getDefaultAtomicity());
     switch (CCABI->getConsumptionKind()) {
       case CastConsumptionKind::TakeAlways:
       case CastConsumptionKind::TakeOnSuccess:
@@ -823,9 +841,9 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
       case CastConsumptionKind::BorrowAlways:
         llvm_unreachable("BorrowAlways is not supported on addresses");
     }
-    builder.createStore(loc, val, CCABI->getDest(),
-                        StoreOwnershipQualifier::Unqualified);
-                        
+    builder.emitStoreValueOperation(loc, val, CCABI->getDest(),
+                                    StoreOwnershipQualifier::Init);
+
     // Replace the cast with a constant conditional branch.
     // Don't just create an unconditional branch to not change the CFG in
     // SILCombine. SimplifyCFG will clean that up.
