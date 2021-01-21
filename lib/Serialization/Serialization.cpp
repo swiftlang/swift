@@ -1885,19 +1885,12 @@ void Serializer::writeCrossReference(const Decl *D) {
   if (D->hasClangNode()) {
     if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(
             D->getClangDecl())) {
-      auto *clangModuleLoader = D->getASTContext().getClangModuleLoader();
       abbrCode = DeclTypeAbbrCodes[XRefClangTemplateInstantiationLayout::Code];
-      SmallVector<IdentifierID, 4> arguments;
-      for (auto &param : ctsd->getTemplateArgs().asArray()) {
-        arguments.push_back(
-            addDeclBaseNameRef(clangModuleLoader->lookupIdentifier(
-                param.getAsType().getBaseTypeIdentifier())));
-      }
+      auto clangTypeID = addClangTypeRef(ctsd->getTypeForDecl());
+
       XRefClangTemplateInstantiationLayout::emitRecord(
-          Out, ScratchRecord, abbrCode,
-          addDeclBaseNameRef(
-              clangModuleLoader->lookupIdentifier(ctsd->getDeclName().getAsIdentifierInfo())),
-          arguments);
+          Out, ScratchRecord, abbrCode, clangTypeID);
+
       return;
     }
   }

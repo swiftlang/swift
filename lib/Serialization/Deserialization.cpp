@@ -1301,6 +1301,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                            importedFromClang, isStatic);
 
     DeclBaseName name = getDeclBaseName(IID);
+    llvm::errs() << "YOYOYOOOOO " << name <<"\n";
     pathTrace.addValue(name);
     if (privateDiscriminator)
       pathTrace.addValue(getIdentifier(privateDiscriminator));
@@ -1394,40 +1395,35 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   case XREF_CLANG_TEMPLATE_INSTANTIATION: {
     auto &astContext = getContext();
     auto clangModuleLoader = astContext.getClangModuleLoader();
+    auto clangImporter = static_cast<ClangImporter *>(clangModuleLoader);
     auto &clangASTContext = clangModuleLoader->getClangASTContext();
 
-    IdentifierID templateId;
-    ArrayRef<uint64_t> argumentIds;
-    XRefClangTemplateInstantiationLayout::readRecord(scratch, templateId, argumentIds);
+    ClangTypeID clangTypeId;
+    XRefClangTemplateInstantiationLayout::readRecord(scratch, clangTypeId);
 
-    auto templateIdent = getIdentifier(templateId);
-    SmallVector<ValueDecl*, 4> templateDeclResults;
-    VectorDeclConsumer templateDeclConsumer(templateDeclResults);
-    clangModuleLoader->lookupValue(templateIdent, templateDeclConsumer);
-    assert(templateDeclResults.size() == 1);
-    auto *templateDecl = templateDeclResults[0];
-    auto *classTemplateDecl = const_cast<clang::ClassTemplateDecl *>(
-        dyn_cast<clang::ClassTemplateDecl>(templateDecl->getClangDecl()));
-    assert(classTemplateDecl);
-
-    SmallVector<ValueDecl*, 2> arguments;
-    VectorDeclConsumer argumentsConsumer(arguments);
-    unsigned counter = 0;
-    for (auto id : argumentIds) {
-      auto argIdent = getIdentifier(id);
-      clangModuleLoader->lookupValue(argIdent, argumentsConsumer);
-      assert(arguments.size() == ++counter);
-    }
-    SmallVector<clang::TemplateArgument, 2> templateArguments;
-    for (auto &decl : arguments) {
-      templateArguments.push_back(
-          clang::TemplateArgument(clangASTContext.getTagDeclType(
-              dyn_cast<clang::TagDecl>(decl->getClangDecl()))));
+    const clang::Type *clangInstantiationType = nullptr;
+    auto loadedClangType = getClangType(clangTypeId);
+    if (!loadedClangType) {
+      return loadedClangType.takeError();
+      clangInstantiationType = loadedClangType.get();
     }
 
-    auto *instantiation = clangModuleLoader->instantiateCXXClassTemplate(
-        classTemplateDecl, templateArguments);
-    return instantiation;
+    auto decl = clangInstantiationType->getAsCXXRecordDecl();
+    decl->dump();
+
+    llvm_unreachable("only in a nominal or function");
+    return nullptr;
+
+    // clangInstantiationType
+    // clangModuleLoader->lookup(clangInstantiationType);
+
+    // auto *classTemplateDecl = const_cast<clang::ClassTemplateDecl *>(
+    //     dyn_cast<clang::ClassTemplateDecl>(templateDecl->getClangDecl()));
+    // assert(classTemplateDecl);
+
+    // auto *instantiation = clangModuleLoader->instantiateCXXClassTemplate(
+    //     classTemplateDecl, templateArguments);
+    // return instantiation;
   }
   default:
     // Unknown xref kind.

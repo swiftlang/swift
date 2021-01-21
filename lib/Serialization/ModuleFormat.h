@@ -1716,8 +1716,7 @@ namespace decls_block {
 
   using XRefClangTemplateInstantiationLayout = BCRecordLayout<
     XREF_CLANG_TEMPLATE_INSTANTIATION,
-    IdentifierIDField, // template name
-    BCArray<IdentifierIDField> // template args
+    ClangTypeIDField
   >;
 
   using SILGenNameDeclAttrLayout = BCRecordLayout<
