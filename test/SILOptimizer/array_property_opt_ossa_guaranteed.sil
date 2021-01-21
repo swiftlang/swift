@@ -1,0 +1,325 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -array-property-opt | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+enum MyBool{
+  case True
+  case False
+}
+
+class MyClass {
+}
+
+sil public_external [ossa] [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool {
+bb0(%0: @guaranteed $MyArray<MyClass>):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @load_and_copy_within_loop : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb7, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'load_and_copy_within_loop'
+sil [ossa] @load_and_copy_within_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %4 = load [trivial] %1 : $*MyBool
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %3 : $MyArray<MyClass>
+  return %4 : $MyBool
+}
+
+// CHECK-LABEL: sil [ossa] @test_simple : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb7, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'test_simple'
+sil [ossa] @test_simple : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %4 = load [trivial] %1 : $*MyBool
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %3 : $MyArray<MyClass>
+  return %4 : $MyBool
+}
+
+// CHECK-LABEL: sil [ossa] @clone_switch_enum_exit : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb11, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'clone_switch_enum_exit'
+/// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
+/// after cloning.
+sil [ossa] @clone_switch_enum_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %4 = load [trivial] %1 : $*MyBool
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb5, case #MyBool.True!enumelt: bb2
+
+bb2:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+ br bb6
+
+bb5:
+ br bb6
+
+bb6:
+  destroy_value %3 : $MyArray<MyClass>
+  return %4 : $MyBool
+}
+
+protocol AProtocol : class {
+}
+
+// Make sure we can handle try_apply when splitting edges. This test used to crash.
+
+sil [ossa] @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
+
+// CHECK-LABEL: sil [ossa] @clone_try_apply_exit : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb10, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'clone_try_apply_exit'
+sil [ossa] @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error Error) {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %4 = load [trivial] %1 : $*MyBool
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
+  try_apply %7() : $@convention(thin) () -> (MyBool, @error Error), normal bb2, error bb5
+
+bb2(%8 : $MyBool):
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+  destroy_value %3 : $MyArray<MyClass>
+  return %4 : $MyBool
+
+bb5(%9 : $Error):
+  destroy_value %3 : $MyArray<MyClass>
+  throw %9 : $Error
+}
+
+// CHECK-LABEL: sil [ossa] @dominator_update_outside_non_exit_block : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb16, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block'
+sil [ossa] @dominator_update_outside_non_exit_block : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %4 = load [trivial] %1 : $*Builtin.Int1
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  cond_br %4, bb2, bb7
+
+bb2:
+  cond_br undef, bb3, bb6
+
+bb3:
+  %6 = integer_literal $Builtin.Int1, -1
+  cond_br %6, bb4, bb5
+
+bb4:
+  br bb1
+
+bb5:
+  br bb10
+
+bb6: // Exit block; b1 dom b4
+  br bb10
+
+bb7: // Exit block; b1 dom b4
+  cond_br undef, bb8, bb9
+
+bb8:
+  br bb10
+
+bb9:
+  br bb10
+
+bb10:
+  destroy_value %3 : $MyArray<MyClass>
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @dominator_update_outside_non_exit_block_2 : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}, bb17, bb2
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK_LABEL: } // end sil function 'dominator_update_outside_non_exit_block_2'
+sil [ossa] @dominator_update_outside_non_exit_block_2 : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %4 = load [trivial] %1 : $*Builtin.Int1
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  cond_br %4, bb2, bb5
+
+bb2:
+ cond_br undef, bb3, bb9
+
+bb3:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb4, bb10
+
+bb4:
+  br bb1
+
+bb5: // Exit block; b1 dom b4
+ cond_br undef, bb6, bb7
+
+bb6: // Exit Block; b1 dom b4
+ br bb8
+
+bb7:
+  br bb8
+
+bb8: // Non-exit Dominated by bb1
+ br bb11
+
+bb9: // Exit dominated by bb3
+ br bb11
+
+bb10: // Exit dominated by bb3
+ br bb11
+
+bb11: // Non-exit dominated by bb1
+ destroy_value %3 : $MyArray<MyClass> 
+ return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @test_does_not_dominate : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK-NOT: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK-NOT: apply [[FUNC2]]
+// CHECK-LABEL: } // end sil function 'test_does_not_dominate'
+sil [ossa] @test_does_not_dominate : $@convention(thin) (@inout MyArray<MyClass>, @inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyArray<MyClass>, %2 : $*MyBool):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  br bb3(%3 : $MyArray<MyClass>)
+
+bb2:
+  %4 = load [copy] %1 : $*MyArray<MyClass>
+  br bb3(%4 : $MyArray<MyClass>)
+
+bb3(%5 : @owned $MyArray<MyClass>):
+  %func = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %6 = load [trivial] %2 : $*MyBool
+  %res = apply %func(%5) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  switch_enum %6 : $MyBool, case #MyBool.False!enumelt: bb4, case #MyBool.True!enumelt: bb7
+
+bb4:
+ cond_br undef, bb5, bb6
+
+bb5:
+  br bb3(%5 : $MyArray<MyClass>)
+
+bb6:
+ destroy_value %5 : $MyArray<MyClass>
+ br bb8
+
+bb7:
+ destroy_value %5 : $MyArray<MyClass>
+ br bb8
+
+bb8:
+  return %6 : $MyBool
+}
