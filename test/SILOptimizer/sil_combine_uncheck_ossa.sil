@@ -16,9 +16,9 @@ class E {
 }
 
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast
-// XHECK: bb0
-// XHECK-NEXT: unchecked_ref_cast
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: return
 sil [ossa] @test_unconditional_checked_cast : $@convention(thin) <T_0_0, T_0_1> (@owned RawBuffer) -> @owned HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : @owned $RawBuffer):
   %3 = unconditional_checked_cast %0 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
@@ -26,9 +26,9 @@ bb0(%0 : @owned $RawBuffer):
 }
 
 // CHECK-LABEL: sil [ossa] @test_cond_fail
-// XHECK: bb0
-// XHECK-NEXT: tuple ()
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
 sil [ossa] @test_cond_fail : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1
@@ -37,12 +37,12 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_addr_fail
-// XHECK: bb0
-// XHECK-NEXT: store undef
-// XHECK-NEXT: destroy_addr
-// XHECK-NEXT: builtin "int_trap"
-// XHECK: unreachable
-// XHECK: }
+// CHECK: bb0
+// CHECK-NEXT: store undef
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: builtin "int_trap"
+// CHECK: unreachable
+// CHECK: }
 sil [ossa] @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@in E, @in D) -> @out D {
 bb0(%0 : $*D, %1 : $*E, %2 : $*D):
   unconditional_checked_cast_addr E in %1 : $*E to D in %0 : $*D
@@ -53,10 +53,10 @@ bb0(%0 : $*D, %1 : $*E, %2 : $*D):
 }
 
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_other_use
-// XHECK: bb0([[ARG:%.*]] : @owned $C
-// XHECK-NEXT:  [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// XHECK-NEXT:  destroy_value [[ARG]]
-// XHECK-NEXT:  return [[COPY_ARG]]
+// CHECK: bb0([[ARG:%.*]] : @owned $C
+// CHECK-NEXT:  [[COPY_ARG:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:  destroy_value [[ARG]]
+// CHECK-NEXT:  return [[COPY_ARG]]
 sil [ossa] @test_unconditional_checked_cast_other_use : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : @owned $C):
   %0a = copy_value %0 : $C
@@ -72,8 +72,8 @@ class G : Class {
 }
 
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_class_exist
-// XHECK: unchecked_ref_cast
-// XHECK: return
+// CHECK: unchecked_ref_cast
+// CHECK: return
 sil [ossa] @test_unconditional_checked_cast_class_exist : $@convention(thin) (@owned Class) -> @owned G {
 bb0(%0 : @owned $Class):
   %0a = copy_value %0 : $Class

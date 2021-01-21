@@ -131,8 +131,8 @@ bb0(%0 : $*_HeapBuffer<C, Int>):
 // because Foundation is not imported yet.
 // Therefore the cast may succeed from the compiler point of view.
 // CHECK-LABEL: sil [ossa] @cast_of_class_to_int
-// XHECK: unconditional_checked_cast_addr
-// XHECK: return
+// CHECK: unconditional_checked_cast_addr
+// CHECK: return
 sil [ossa] @cast_of_class_to_int : $@convention(thin) (@owned C) -> Int {
 bb0(%0 : @owned $C):
   %1 = alloc_stack $Int
