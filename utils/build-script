@@ -600,6 +600,9 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
+        
+        if args.swift_disable_dead_stripping:
+            args.extra_cmake_options.append('-DSWIFT_DISABLE_DEAD_STRIPPING:BOOL=TRUE')
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
