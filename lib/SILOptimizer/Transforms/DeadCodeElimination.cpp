@@ -524,7 +524,7 @@ bool DCE::removeDead(SILFunction &F) {
 
       arg->replaceAllUsesWithUndef();
 
-      if (!F.hasOwnership() || arg->getType().isTrivial(F)) {
+      if (!F.hasOwnership() || arg->getOwnershipKind() == OwnershipKind::None) {
         i++;
         Changed = true;
         BranchesChanged = true;
