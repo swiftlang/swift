@@ -46,6 +46,8 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_ERROR | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MULTICLOSURE_FUNCBUILDER_FIXME | %FileCheck %s --check-prefix=NORESULTS
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=REGULAR_MULTICLOSURE_APPLIED | %FileCheck %s --check-prefix=POINT_MEMBER
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER2 | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER
 
 
 struct A {
@@ -438,3 +440,23 @@ takesClosureOfPoint { p in
     if p.#^REGULAR_MULTICLOSURE_APPLIED^# {}
   }
 }
+
+enum Enum123 {
+    case enumElem
+}
+struct Struct123: Equatable {
+    var structMem = Enum123.enumElem
+}
+func testNoBestSolutionFilter() {
+  let a = Struct123();
+  let b = [Struct123]().first(where: { $0 == a && 1 + 90 * 5 / 8 == 45 * -10 })?.structMem != .#^BEST_SOLUTION_FILTER^#
+  let c = min(10.3, 10 / 10.4) < 6 + 5 / (10 - 3) ? true : Optional(a)?.structMem != .#^BEST_SOLUTION_FILTER2^#
+}
+
+// BEST_SOLUTION_FILTER: Begin completions
+// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: enumElem[#Enum123#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Enum123#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Enum123?#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Enum123>#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Enum123#})[#Optional<Enum123>#]{{; name=.+$}}
+// BEST_SOLUTION_FILTER: End completions
