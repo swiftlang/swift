@@ -2934,6 +2934,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     aliasDecl->setUnderlyingType(type);
     
     aliasDecl->setImplicit();
+    aliasDecl->setSynthesized();
     if (type->hasError())
       aliasDecl->setInvalid();
 
@@ -4650,7 +4651,7 @@ ConformanceChecker::getObjCRequirements(ObjCMethodKey key) {
 
   // Fill in the data structure if we haven't done so yet.
   if (!computedObjCMethodRequirements) {
-    for (auto requirement : proto->getSemanticMembers()) {
+    for (auto requirement : proto->getABIMembers()) {
       auto funcRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
       if (!funcRequirement)
         continue;

@@ -189,7 +189,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             localModule->isImportedImplementationOnly(nominalModule)) {
 
           bool shouldPrintMembers = llvm::any_of(
-                                      ED->getMembers(),
+                                      ED->getAllMembers(),
                                       [&](const Decl *member) -> bool {
             return shouldPrint(member, options);
           });
@@ -1750,7 +1750,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     getInheritedForPrinting(Ext, Options, ProtocolsToPrint);
     if (ProtocolsToPrint.empty()) {
       bool HasMemberToPrint = false;
-      for (auto Member : Ext->getMembers()) {
+      for (auto Member : Ext->getAllMembers()) {
         if (shouldPrint(Member, Options)) {
           HasMemberToPrint = true;
           break;
@@ -2050,24 +2050,29 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
                                   bool openBracket,
                                   bool closeBracket) {
   llvm::SmallVector<Decl *, 3> Members;
-  auto AddDeclFunc = [&](DeclRange Range) {
-    for (auto RD : Range)
-      Members.push_back(RD);
+  auto AddMembers = [&](IterableDeclContext *idc) {
+    if (Options.PrintCurrentMembersOnly) {
+      for (auto RD : idc->getMembers())
+        Members.push_back(RD);
+    } else {
+      for (auto RD : idc->getAllMembers())
+        Members.push_back(RD);
+    }
   };
 
   if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-    AddDeclFunc(Ext->getMembers());
+    AddMembers(Ext);
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-    AddDeclFunc(NTD->getMembers());
+    AddMembers(NTD);
     for (auto Ext : NTD->getExtensions()) {
       if (Options.printExtensionContentAsMembers(Ext))
-        AddDeclFunc(Ext->getMembers());
+        AddMembers(Ext);
     }
     if (Options.PrintExtensionFromConformingProtocols) {
       for (auto Conf : NTD->getAllConformances()) {
         for (auto Ext : Conf->getProtocol()->getExtensions()) {
           if (Options.printExtensionContentAsMembers(Ext))
-            AddDeclFunc(Ext->getMembers());
+            AddMembers(Ext);
         }
       }
     }
