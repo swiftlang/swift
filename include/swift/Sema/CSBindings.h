@@ -464,7 +464,7 @@ private:
   Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
 
 public:
-  bool infer(Constraint *constraint);
+  void infer(Constraint *constraint);
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
