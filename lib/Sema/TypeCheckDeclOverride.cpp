@@ -1009,8 +1009,8 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl)) {
-    // NSObject.hashValue and NSObject.hash(into:) was made non-overridable in
-    // Swift 5; one should override NSObject.hash instead.
+    // NSObject.hashValue and NSObject.hash(into:) is not overridable;
+    // one should override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
       diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
         .fixItReplace(SourceRange(decl->getNameLoc()), "hash");
@@ -1814,9 +1814,13 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if ((isNSObjectHashValue(base) || isNSObjectHashMethod(base)) &&
         !base->hasOpenAccess(override->getDeclContext()))
       return true;
+
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
+    auto nominal = base->getDeclContext()->getSelfNominalTypeDecl();
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
-                   !isa<ExtensionDecl>(base->getDeclContext()));
+                   !isa<ExtensionDecl>(base->getDeclContext()),
+                   override->getDescriptiveKind(), override->getName(),
+                   nominal->getName());
     // If the base and the override come from the same module, try to fix
     // the base declaration. Otherwise we can wind up diagnosing into e.g. the
     // SDK overlay modules.
