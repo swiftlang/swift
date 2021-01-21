@@ -1295,11 +1295,12 @@ size_t swift_dtoa_optimal_float80_p(const void *d, char *dest, size_t length)
         return 0;
     } else if (exponentBitPattern == exponentMask) { // NaN or Infinity
       // Following 80387 semantics as documented in Wikipedia.org "Extended Precision"
+      // Also see Intel's "Floating Point Reference Sheet"
+      // https://software.intel.com/content/dam/develop/external/us/en/documents/floating-point-reference-sheet.pdf
       int selector = significandBitPattern >> 62; // Top 2 bits
-      uint64_t payload = significandBitPattern & (((uint64_t)1 << 61) - 1); // bottom 62 bits
+      uint64_t payload = significandBitPattern & (((uint64_t)1 << 62) - 1); // bottom 62 bits
       switch (selector) {
       case 0: // ∞ or snan on 287, invalid on 387
-        break;
       case 1: // Pseudo-NaN: snan on 287, invalid on 387
         break;
       case 2:
@@ -1310,12 +1311,12 @@ size_t swift_dtoa_optimal_float80_p(const void *d, char *dest, size_t length)
         }
         break;
       case 3:
-        // Zero payload is "indefinite" (form of qnan),
-        // non-zero payload is qNan on 387, sNaN on 287
+        // Zero payload and sign bit set is "indefinite" (treated as qNaN here),
+        // Otherwise qNan on 387, sNaN on 287
         return nan_details(dest, length, negative, 1 /* quiet */, 0, payload);
       }
-      // Handle "invalid" patterns as snan here
-      return nan_details(dest, length, negative, 0 /* quiet */, 0, payload);
+      // Handle "invalid" patterns as plain "nan"
+      return nan_details(dest, length, 0 /* negative */, 1 /* quiet */, 0, payload);
     } else if (exponentBitPattern == 0) {
         if (significandBitPattern == 0) { // Zero
           return zero(dest, length, negative);
@@ -1327,14 +1328,9 @@ size_t swift_dtoa_optimal_float80_p(const void *d, char *dest, size_t length)
         binaryExponent = exponentBitPattern - exponentBias;
         significand = significandBitPattern;
     } else {
-        // "Unnormal" values are rejected as invalid by 80387 and later.
-        // Treat them like NaNs here
-        if (length < 4) {
-          dest[0] = '\0';
-          return 0;
-        }
-        memcpy(dest, "nan", 4);
-        return 3;
+        // Invalid pattern rejected by 80387 and later.
+        // Handle "invalid" patterns as plain "nan"
+        return nan_details(dest, length, 0 /* negative */, 1 /* quiet */, 0, 0);
     }
 
     // Step 2: Determine the exact unscaled target interval
