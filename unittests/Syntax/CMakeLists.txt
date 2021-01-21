@@ -4,7 +4,6 @@ add_swift_unittest(SwiftSyntaxTests
   GenericSyntaxTests.cpp
   StmtSyntaxTests.cpp
   SyntaxCollectionTests.cpp
-  ThreadSafeCachingTests.cpp
   TriviaTests.cpp
   TypeSyntaxTests.cpp
   UnknownSyntaxTests.cpp
