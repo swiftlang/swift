@@ -812,13 +812,8 @@ PotentialBindings ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
   auto constraints = CG.gatherConstraints(
       typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
 
-  for (auto *constraint : constraints) {
-    bool failed = bindings.infer(constraint);
-
-    // Upon inference failure let's produce an empty set of bindings.
-    if (failed)
-      return {*this, typeVar};
-  }
+  for (auto *constraint : constraints)
+    bindings.infer(constraint);
 
   if (finalize) {
     llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> inferred;
@@ -1068,7 +1063,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-bool PotentialBindings::infer(Constraint *constraint) {
+void PotentialBindings::infer(Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -1152,8 +1147,10 @@ bool PotentialBindings::infer(Constraint *constraint) {
     // [existential] metatype.
     auto dynamicType = constraint->getFirstType();
     if (auto *tv = dynamicType->getAs<TypeVariableType>()) {
-      if (tv->getImpl().getRepresentative(nullptr) == TypeVar)
-        return true;
+      if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
+        DelayedBy.push_back(constraint);
+        break;
+      }
     }
 
     // This is right-hand side, let's continue.
@@ -1174,19 +1171,14 @@ bool PotentialBindings::infer(Constraint *constraint) {
     // associated with closure literal (e.g. coercion to some other
     // type) let's delay resolving the closure until the disjunction
     // is attempted.
-    if (TypeVar->getImpl().isClosureType())
-      return true;
-
     DelayedBy.push_back(constraint);
     break;
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol: {
     auto protocolTy = constraint->getSecondType();
-    if (!protocolTy->is<ProtocolType>())
-      return false;
-
-    Protocols.push_back(constraint);
+    if (protocolTy->is<ProtocolType>())
+      Protocols.push_back(constraint);
     break;
   }
 
@@ -1247,15 +1239,15 @@ bool PotentialBindings::infer(Constraint *constraint) {
     // side of a one-way binding.
     auto firstType = constraint->getFirstType();
     if (auto *tv = firstType->getAs<TypeVariableType>()) {
-      if (tv->getImpl().getRepresentative(nullptr) == TypeVar)
-        return true;
+      if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
+        DelayedBy.push_back(constraint);
+        break;
+      }
     }
 
     break;
   }
   }
-
-  return false;
 }
 
 LiteralBindingKind PotentialBindings::getLiteralKind() const {
