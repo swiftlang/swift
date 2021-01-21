@@ -31,7 +31,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN:      == -req=cursor -pos=205:67 | %FileCheck -check-prefix=CHECK1 %s
+// RUN:      == -req=cursor -pos=204:67 | %FileCheck -check-prefix=CHECK1 %s
 // The cursor points to 'FooClassBase' inside the list of base classes, see 'gen_clang_module.swift.response'
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
@@ -47,7 +47,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN:      == -req=cursor -pos=232:20 | %FileCheck -check-prefix=CHECK2 %s
+// RUN:      == -req=cursor -pos=231:20 | %FileCheck -check-prefix=CHECK2 %s
 // The cursor points inside the interface, see 'gen_clang_module.swift.response'
 
 // CHECK2: source.lang.swift.decl.function.method.instance ({{.*}}Foo.framework/Headers/Foo.h:170:10-170:27)
@@ -61,7 +61,7 @@ var x: FooClassBase
 // RUN:      == -req=find-usr -usr "c:objc(cs)FooClassDerived(im)fooInstanceFunc0" | %FileCheck -check-prefix=CHECK-USR %s
 // The returned line:col points inside the interface, see 'gen_clang_module.swift.response'
 
-// CHECK-USR: (232:15-232:33)
+// CHECK-USR: (231:15-231:33)
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
@@ -73,14 +73,10 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN:      == -req=cursor -pos=1:8 \
-// RUN:      == -req=cursor -pos=2:8 == -req=cursor -pos=2:12 \
-// RUN:      == -req=cursor -pos=3:8 | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN:      == -req=cursor -pos=1:8 == -req=cursor -pos=1:12 \
+// RUN:      == -req=cursor -pos=2:8 | %FileCheck -check-prefix=CHECK-IMPORT %s
 // The cursors point to module names inside the imports, see 'gen_clang_module.swift.response'
 
-// CHECK-IMPORT: 	  source.lang.swift.ref.module ()
-// CHECK-IMPORT-NEXT: Foo{{$}}
-// CHECK-IMPORT-NEXT: Foo{{$}}
 // CHECK-IMPORT: 	  source.lang.swift.ref.module ()
 // CHECK-IMPORT-NEXT: Foo{{$}}
 // CHECK-IMPORT-NEXT: Foo{{$}}

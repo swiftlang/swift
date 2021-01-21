@@ -609,6 +609,9 @@ void swift::ide::printModuleInterface(
     auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
       if (!TargetClangMod)
         return true;
+      if (ImportD->getModule() == TargetMod)
+        return false;
+
       auto ImportedMod = ImportD->getClangModule();
       if (!ImportedMod)
         return true;
