@@ -1440,6 +1440,9 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
       return true;
     }
   }
+  if (isa<EndBorrowInst>(use->getUser())) {
+    return true;
+  }
   // We weren't able to "see through" any more address conversions; so
   // record this as a use.
 
