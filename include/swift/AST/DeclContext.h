@@ -778,10 +778,17 @@ public:
   /// the implementation.
   ArrayRef<Decl *> getParsedMembers() const;
 
-  /// Get all the members that are semantically within this context,
-  /// including any implicitly-synthesized members.
+  /// Get all of the members within this context that can affect ABI, including
+  /// any implicitly-synthesized members.
+  ///
   /// The resulting list of members will be stable across translation units.
-  ArrayRef<Decl *> getSemanticMembers() const;
+  ArrayRef<Decl *> getABIMembers() const;
+
+  /// Get all of the members within this context, including any
+  /// implicitly-synthesized members.
+  ///
+  /// The resulting list of members will be stable across translation units.
+  ArrayRef<Decl *> getAllMembers() const;
 
   /// Retrieve the set of members in this context without loading any from the
   /// associated lazy loader; this should only be used as part of implementing

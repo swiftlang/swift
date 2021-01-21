@@ -319,6 +319,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   // Mark implicit.
   ctor->setImplicit();
+  ctor->setSynthesized();
   ctor->setAccess(accessLevel);
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
