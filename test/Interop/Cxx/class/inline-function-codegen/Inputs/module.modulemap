@@ -1,0 +1,31 @@
+module ConstructorCallsFunction {
+  header "constructor-calls-function.h"
+}
+
+module ConstructorCallsFunctionFromNestedStruct {
+  header "constructor-calls-function-from-nested-struct.h"
+}
+
+module ConstructorCallsMethod {
+  header "constructor-calls-method.h"
+}
+
+module FieldInitCallsFunction {
+  header "field-init-calls-function.h"
+}
+
+module MethodCallsFunction {
+  header "method-calls-function.h"
+}
+
+module MethodCallsMethod {
+  header "method-calls-method.h"
+}
+
+module MethodCallsMethodFromNestedStruct {
+  header "method-calls-method-from-nested-struct.h"
+}
+
+module StaticVarInitCallsFunction {
+  header "static-var-init-calls-function.h"
+}
