@@ -19,3 +19,10 @@
 // CHECK: }
 
 // CHECK: typealias IntWrapper = __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE
+
+// CHECK: struct HasStaticMemberTemplates {
+// CHECK:   init()
+// CHECK:   static func add<T>(_ a: T, _ b: T) -> T
+// CHECK:   static func addTwoTemplates<T, U>(_ a: T, _ b: U) -> T
+// CHECK:   static func removeReference<T>(_ a: UnsafeMutablePointer<T>) -> T
+// CHECK: }
