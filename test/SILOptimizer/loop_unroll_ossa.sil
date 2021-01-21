@@ -1,0 +1,717 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-unroll %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct UInt {
+  var value: Builtin.Word
+}
+struct Int {
+  var value: Builtin.Word
+}
+struct Bool {
+  var value: Builtin.Int1
+}
+struct Int64 {
+  var value: Builtin.Int64
+}
+struct UInt64 {
+  var value: Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_1 :
+// CHECK: bb0
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2
+// CHECK:  br bb7
+// CHECK: bb3
+// CHECK:  br bb4
+// CHECK: bb4
+// CHECK:  builtin "sadd_with_overflow_Int64
+// CHECK:  br bb5
+// CHECK: bb5
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK-LABEL: } // end sil function 'loop_unroll_1'
+sil [ossa] @loop_unroll_1 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_2 :
+// CHECK: bb0:
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
+// CHECK:  br bb7
+// CHECK: bb3:
+// CHECK:  br bb4
+// CHECK: bb4
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  br bb5
+// CHECK: bb5:
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK-LABEL: } // end sil function 'loop_unroll_2'
+sil [ossa] @loop_unroll_2 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_3 :
+// CHECK: bb0:
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
+// CHECK:  br bb7
+// CHECK: bb3:
+// CHECK:  br bb4
+// CHECK: bb4
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  br bb5
+// CHECK: bb5:
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK-LABEL: } // end sil function 'loop_unroll_3'
+sil [ossa] @loop_unroll_3 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_sge_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_4 :
+// CHECK: bb0:
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
+// CHECK:  br bb7
+// CHECK: bb3:
+// CHECK:  br bb4
+// CHECK: bb4
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  br bb5
+// CHECK: bb5:
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK-LABEL: } // end sil function 'loop_unroll_4'
+sil [ossa] @loop_unroll_4 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 1
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_sgt_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_5 :
+// CHECK:      bb5:
+// CHECK-NEXT:   br bb4
+// CHECK: bb6:
+// CHECK-NEXT:  br bb7
+// CHECK: bb7:
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-LABEL: } // end sil function 'loop_unroll_5'
+sil [ossa] @loop_unroll_5 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_slt_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_6 :
+// CHECK:      bb5:
+// CHECK-NEXT:   br bb4
+// CHECK: bb6:
+// CHECK-NEXT:  br bb7
+// CHECK: bb7:
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'loop_unroll_6'
+sil [ossa] @loop_unroll_6 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 1
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_sle_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loop_unroll_7 :
+// CHECK:      bb5:
+// CHECK-NEXT:   br bb4
+// CHECK: bb6:
+// CHECK-NEXT:  br bb7
+// CHECK: bb7:
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'loop_unroll_7'
+sil [ossa] @loop_unroll_7 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_ne_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_with_exit_block_arg_1 :
+// CHECK: bb1({{.*}}):
+// CHECK:   cond_br {{.*}}, bb4, bb2
+// CHECK: bb2:
+// CHECK:   br bb3({{.*}})
+// CHECK: bb3({{.*}}):
+// CHECK:   br bb11({{.*}})
+// CHECK: bb4:
+// CHECK:   br bb8({{.*}})
+// CHECK: bb8({{.*}}):
+// CHECK:   cond_br {{.*}}, bb9, bb10
+// CHECK: bb10:
+// CHECK:   br bb11({{.*}})
+// CHECK: bb11({{.*}}):
+// CHECK:   return
+// CHECK-LABEL: } // end sil function 'unroll_with_exit_block_arg_1'
+sil [ossa] @unroll_with_exit_block_arg_1 : $@convention(thin) () -> () {
+bb0:
+  %27 = integer_literal $Builtin.Int64, 1
+  %28 = integer_literal $Builtin.Int64, 4
+  %56 = integer_literal $Builtin.Int1, -1
+  br bb4(%27 : $Builtin.Int64, %28 : $Builtin.Int64)
+
+bb4(%58 : $Builtin.Int64, %59 : $Builtin.Int64):
+  %60 = builtin "sadd_with_overflow_Int64"(%58 : $Builtin.Int64, %27 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %61 = tuple_extract %60 : $(Builtin.Int64, Builtin.Int1), 0
+  %64 = builtin "smul_with_overflow_Int64"(%59 : $Builtin.Int64, %28 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %65 = tuple_extract %64 : $(Builtin.Int64, Builtin.Int1), 0
+  %70 = builtin "cmp_slt_Int64"(%61 : $Builtin.Int64, %28 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %70, bb5, bb6(%61 : $Builtin.Int64)
+
+bb5:
+  br bb4(%61 : $Builtin.Int64, %65 : $Builtin.Int64)
+
+bb6(%72 : $Builtin.Int64):
+  %401 = tuple ()
+  return %401 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unroll_with_exit_block_arg_2 :
+// CHECK: bb1({{.*}}):
+// CHECK:   cond_br {{.*}}, bb4, bb2
+// CHECK: bb2:
+// CHECK:   br bb3{{.*}}
+// CHECK: bb3({{.*}}):
+// CHECK:   br bb11{{.*}}
+// CHECK: bb4:
+// CHECK:   br bb8{{.*}}
+// CHECK: bb8({{.*}}):
+// CHECK:   cond_br {{.*}}, bb9, bb10
+// CHECK: bb10:
+// CHECK:   br bb11({{.*}})
+// CHECK: bb11({{.*}}):
+// CHECK-LABEL: } // end sil function 'unroll_with_exit_block_arg_2'
+sil [ossa] @unroll_with_exit_block_arg_2 : $@convention(thin) () -> () {
+bb0:
+  %27 = integer_literal $Builtin.Int64, 1
+  %28 = integer_literal $Builtin.Int64, 4
+  %56 = integer_literal $Builtin.Int1, -1
+  br bb4(%27 : $Builtin.Int64, %28 : $Builtin.Int64)
+
+bb4(%58 : $Builtin.Int64, %59 : $Builtin.Int64):
+  %60 = builtin "sadd_with_overflow_Int64"(%58 : $Builtin.Int64, %27 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %61 = tuple_extract %60 : $(Builtin.Int64, Builtin.Int1), 0
+  %64 = builtin "smul_with_overflow_Int64"(%59 : $Builtin.Int64, %28 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %65 = tuple_extract %64 : $(Builtin.Int64, Builtin.Int1), 0
+  %70 = builtin "cmp_slt_Int64"(%61 : $Builtin.Int64, %28 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %70, bb5, bb6(%61 : $Builtin.Int64)
+
+bb5:
+  br bb4(%61 : $Builtin.Int64, %65 : $Builtin.Int64)
+
+bb6(%72 : $Builtin.Int64):
+  %401 = tuple ()
+  return %401 : $()
+}
+
+
+class B {}
+
+// CHECK-LABEL: sil [ossa] @unroll_with_stack_allocation :
+// CHECK: = alloc_ref [stack]
+// CHECK: dealloc_ref [stack]
+// CHECK: = alloc_ref [stack]
+// CHECK: dealloc_ref [stack]
+// CHECK-LABEL: } // end sil function 'unroll_with_stack_allocation'
+sil [ossa] @unroll_with_stack_allocation : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %a = alloc_ref [stack] $B
+  br bb2
+
+bb2:
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  dealloc_ref [stack] %a : $B
+  cond_br %7, bb4, bb3
+
+bb3:
+  br bb1(%6 : $Builtin.Int64)
+
+bb4:
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_stack_allocation_with_dealloc_outside_loop :
+// CHECK:   = alloc_ref [stack]
+// CHECK: bb2:
+// CHECK:   dealloc_ref [stack]
+// CHECK: bb3:
+// CHECK:   dealloc_ref [stack]
+// CHECK-NEXT: tuple
+// CHECK-LABEL: } // end sil function 'dont_copy_stack_allocation_with_dealloc_outside_loop'
+sil [ossa] @dont_copy_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %a = alloc_ref [stack] $B
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  dealloc_ref [stack] %a : $B
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+  dealloc_ref [stack] %a : $B
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil [ossa] @big_func: $@convention(thin) () -> Builtin.Int64 {
+bb0:
+   %x0 = integer_literal $Builtin.Int64, 1
+   %overflow_check = integer_literal $Builtin.Int1, 0
+   %sum1 = builtin "sadd_with_overflow_Int64"(%x0 : $Builtin.Int64, %x0 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x1 = tuple_extract %sum1 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb1
+
+bb1:
+   %sum2 = builtin "sadd_with_overflow_Int64"(%x1 : $Builtin.Int64, %x1 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x2 = tuple_extract %sum2 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb2
+
+bb2:
+   %sum3 = builtin "sadd_with_overflow_Int64"(%x2 : $Builtin.Int64, %x2 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x3 = tuple_extract %sum3 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb3
+
+bb3:
+   %sum4 = builtin "sadd_with_overflow_Int64"(%x3 : $Builtin.Int64, %x3 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x4 = tuple_extract %sum4 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb4
+
+bb4:
+   %sum5 = builtin "sadd_with_overflow_Int64"(%x4 : $Builtin.Int64, %x4 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x5 = tuple_extract %sum5 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb5
+
+bb5:
+   %sum6 = builtin "sadd_with_overflow_Int64"(%x5 : $Builtin.Int64, %x5 : $Builtin.Int64, %overflow_check : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+   %x6 = tuple_extract %sum6 : $(Builtin.Int64, Builtin.Int1), 0
+   br bb6
+
+bb6:
+   return %x6 : $Builtin.Int64 
+}
+
+// Check that the compiler does not unroll loops containing calls
+// of big inlinable functions.
+//
+// CHECK-LABEL: sil [ossa] @unroll_with_apply :
+// CHECK: apply
+// CHECK-LABEL: } // end sil function 'unroll_with_apply'
+sil [ossa] @unroll_with_apply : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 20
+ %3 = integer_literal $Builtin.Int1, 1
+ %f = function_ref @big_func: $@convention(thin) () -> Builtin.Int64 
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %r = apply %f() : $@convention(thin) () -> Builtin.Int64
+  br bb2
+
+bb2:
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb4, bb3
+
+bb3:
+  br bb1(%6 : $Builtin.Int64)
+
+bb4:
+  %8 = tuple()
+  return %8 : $()
+}
+
+class Klass {
+  var id: Int64
+}
+
+sil [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int64, Bool, @guaranteed Array<Klass>) -> _DependenceToken
+
+sil [_semantics "array.get_element"] @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+
+// CHECK-LABEL: sil [ossa] @sumKlassId :
+// CHECK: [[FUNC:%.*]] = function_ref @getElement :
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK-LABEL: } // end sil function 'sumKlassId'
+sil [ossa] @sumKlassId : $@convention(thin) (@guaranteed Array<Klass>) -> Int64 {
+bb0(%0 : @guaranteed $Array<Klass>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = struct $Bool (%1 : $Builtin.Int1)
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = integer_literal $Builtin.Int64, 4
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %15 = struct $_DependenceToken ()
+  br bb1(%3 : $Builtin.Int64, %3 : $Builtin.Int64)
+
+bb1(%17 : $Builtin.Int64, %18 : $Builtin.Int64):
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
+  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %borrow = begin_borrow %22 : $Klass
+  %23 = ref_element_addr %borrow : $Klass, #Klass.id
+  %24 = load [trivial] %23 : $*Int64
+  end_borrow %borrow : $Klass
+  destroy_value %22 : $Klass
+  %26 = struct_extract %24 : $Int64, #Int64.value
+  %27 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int64, %26 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %28 = tuple_extract %27 : $(Builtin.Int64, Builtin.Int1), 0
+  %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %31, bb3, bb2
+
+bb2:
+  br bb1(%28 : $Builtin.Int64, %21 : $Builtin.Int64)
+
+bb3:
+  %34 = struct $Int64 (%28 : $Builtin.Int64)
+  return %34 : $Int64
+}
+
+sil [ossa] @collectKlass : $@convention(thin) (@owned Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @testWithCopy : 
+// CHECK: [[FUNC:%.*]] = function_ref @getElement :
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK-LABEL: } // end sil function 'testWithCopy'
+sil [ossa] @testWithCopy : $@convention(thin) (@guaranteed Array<Klass>) -> () {
+bb0(%0 : @guaranteed $Array<Klass>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = struct $Bool (%1 : $Builtin.Int1)
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = integer_literal $Builtin.Int64, 4
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
+  %15 = struct $_DependenceToken ()
+  br bb1(%3 : $Builtin.Int64)
+
+bb1(%18 : $Builtin.Int64):
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
+  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %copy = copy_value %22 : $Klass
+  %res = apply %8(%copy) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %22 : $Klass
+  %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %31, bb3, bb2
+
+bb2:
+  br bb1(%21 : $Builtin.Int64)
+
+bb3:
+  %tup = tuple ()
+  return %tup : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testWithEarlyExit : 
+// CHECK: [[FUNC:%.*]] = function_ref @getElement :
+// CHECK: apply [[FUNC]] 
+// CHECK-NOT: apply [[FUNC]] 
+// CHECK-LABEL: } // end sil function 'testWithEarlyExit'
+sil [ossa] @testWithEarlyExit : $@convention(thin) (@guaranteed Array<Klass>) -> () {
+bb0(%0 : @guaranteed $Array<Klass>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = struct $Bool (%1 : $Builtin.Int1)
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = integer_literal $Builtin.Int64, 4
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
+  %15 = struct $_DependenceToken ()
+  br bb1(%3 : $Builtin.Int64)
+
+bb1(%18 : $Builtin.Int64):
+  cond_br undef, bb6, bb2
+
+bb2:
+  br bb3
+
+bb3:
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
+  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %copy = copy_value %22 : $Klass
+  %res = apply %8(%copy) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %22 : $Klass
+  %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %31, bb4, bb3a
+
+bb3a:
+  br bb5
+
+bb4:
+  br bb1(%21 : $Builtin.Int64)
+
+bb6:
+  br bb5
+
+bb5:
+  %tup = tuple ()
+  return %tup : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testWithNonTrivialBBArg1 : 
+// CHECK: [[FUNC:%.*]] = function_ref @getElement :
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK-LABEL: } // end sil function 'testWithNonTrivialBBArg1'
+sil [ossa] @testWithNonTrivialBBArg1 : $@convention(thin) (@owned Array<Klass>) -> () {
+bb0(%0 : @owned $Array<Klass>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = struct $Bool (%1 : $Builtin.Int1)
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = integer_literal $Builtin.Int64, 4
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
+  %15 = struct $_DependenceToken ()
+  br bb1
+
+bb1:
+  %borrow = begin_borrow %0 : $Array<Klass>
+  br bb2(%borrow : $Array<Klass>, %3 : $Builtin.Int64)
+
+bb2(%newArr : @guaranteed $Array<Klass>, %18 : $Builtin.Int64):
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
+  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  destroy_value %22 : $Klass
+  %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  end_borrow %newArr : $Array<Klass>
+  cond_br %31, bb3, bb2a
+
+bb2a:
+  %newborrow = begin_borrow %0 : $Array<Klass>
+  br bb2(%newborrow : $Array<Klass>, %21 : $Builtin.Int64)
+
+bb3:
+  destroy_value %0 : $Array<Klass>
+  %tup = tuple ()
+  return %tup : $()
+}
+
+// CHECK-LABEL: sil [ossa] @$testWithNonTrivialBBArg2 : 
+// CHECK: [[FUNC:%.*]] = function_ref @getElement :
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK: apply [[FUNC]] 
+// CHECK-LABEL: } // end sil function '$testWithNonTrivialBBArg2'
+sil [ossa] @$testWithNonTrivialBBArg2 : $@convention(thin) (@guaranteed Array<Klass>) -> () {
+bb0(%0 : @guaranteed $Array<Klass>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = struct $Bool (%1 : $Builtin.Int1)
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = integer_literal $Builtin.Int64, 4
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
+  %15 = struct $_DependenceToken ()
+  br bb1
+
+bb1:
+  %copy1 = copy_value %0 : $Array<Klass>
+  br bb2(%copy1 : $Array<Klass>, %3 : $Builtin.Int64)
+
+bb2(%newArr : @owned $Array<Klass>, %18 : $Builtin.Int64):
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
+  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  destroy_value %22 : $Klass
+  %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %31, bb3, bb2a
+
+bb2a:
+  %copy2 = copy_value %newArr : $Array<Klass>
+  destroy_value %newArr : $Array<Klass>
+  br bb2(%copy2 : $Array<Klass>, %21 : $Builtin.Int64)
+
+bb3:
+  destroy_value %newArr : $Array<Klass>
+  %tup = tuple ()
+  return %tup : $()
+}
+
