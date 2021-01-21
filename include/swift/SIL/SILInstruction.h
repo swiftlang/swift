@@ -9053,6 +9053,10 @@ SILValue ApplyInstBase<Impl, Base, false>::getCalleeOrigin() const {
       Callee = beginBorrow->getOperand();
       continue;
     }
+    if (auto *copy = dyn_cast<CopyValueInst>(Callee)) {
+      Callee = copy->getOperand();
+      continue;
+    }
     return Callee;
   }
 }
