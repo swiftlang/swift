@@ -145,9 +145,6 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 # define SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif
 
-// Bring in visibility attribute macros
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
-
 // Define mappings for calling conventions.
 
 // Annotation for specifying a calling convention of
