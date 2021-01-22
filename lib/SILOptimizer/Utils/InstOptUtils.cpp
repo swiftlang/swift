@@ -14,6 +14,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -701,11 +702,9 @@ SILValue swift::
 getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
                                   SILInstruction *ignoreUser) {
   StoreInst *singleStore = nullptr;
-  SmallVector<Operand *, 32> worklist;
-  SmallPtrSet<Operand *, 8> addedToWorklistPreviously;
+  SmallPtrSetVector<Operand *, 32> worklist;
   for (auto *use : getNonDebugUses(existentialBox)) {
-    worklist.push_back(use);
-    addedToWorklistPreviously.insert(use);
+    worklist.insert(use);
   }
 
   while (!worklist.empty()) {
@@ -722,8 +721,7 @@ getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
       // Look through copy_value, begin_borrow
       for (SILValue result : user->getResults())
         for (auto *transitiveUse : result->getUses())
-          if (!addedToWorklistPreviously.insert(transitiveUse).second)
-            worklist.push_back(use);
+          worklist.insert(transitiveUse);
       break;
     case SILInstructionKind::ProjectExistentialBoxInst: {
       auto *projectedAddr = cast<ProjectExistentialBoxInst>(user);
