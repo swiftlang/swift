@@ -40,6 +40,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -931,6 +932,21 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       // that we don't encounter cases where we try to resolve a cross-reference
       // into a partial module that failed to load.
       MainModule->setFailedToLoad();
+    }
+
+    if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
+      auto bufferOrError =
+          swift::vfs::getFileOrSTDIN(getFileSystem(),
+                               Invocation.getFrontendOptions().AccessNotesPath);
+      // FIXME: Diagnose properly
+      auto buffer = cantFail(llvm::errorOrToExpected(std::move(bufferOrError)),
+                             "can't open access notes file");
+
+      auto expectedAccessNotes = AccessNotes::load(*Context, buffer.get());
+      // FIXME: Diagnose properly
+      MainModule->getAccessNotes() = cantFail(std::move(expectedAccessNotes),
+                                              "invalid access notes:");
+
     }
   }
   return MainModule;

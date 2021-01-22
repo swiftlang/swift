@@ -33,6 +33,9 @@ def supplementary_output_file_map : Separate<["-"], "supplementary-output-file-m
 def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
   HelpText<"Emit textual output in a parseable format">;
 
+def access_notes : Separate<["-"], "access-notes">, MetaVarName<"<path>">,
+  HelpText<"Specify YAML file to override attributes on Swift declarations in this module">;
+
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
            "comments">;
