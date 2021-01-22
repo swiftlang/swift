@@ -1,3 +1,5 @@
+// REQUIRES: concurrency
+
 // BEGIN MyModule.swift
 public actor class MyActor {
   public func asyncFunc(fn: () async -> Void) async throws {}
