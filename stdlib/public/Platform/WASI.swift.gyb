@@ -64,6 +64,8 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
-// WebAssembly's error.h uses a macro that Swift can't import.
-public let EINTR:Int32 = 27
-public let EINVAL:Int32 = 28
+// wasi-libc's error.h uses a macro that Swift can't import.
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EINTR'.")
+public let EINTR: Int32 = 27
+@available(*, deprecated, message: "Please use 'POSIXErrorCode.EINVAL'.")
+public let EINVAL: Int32 = 28
