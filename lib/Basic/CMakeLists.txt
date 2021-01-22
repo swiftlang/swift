@@ -64,6 +64,7 @@ add_swift_host_library(swiftBasic STATIC
   Program.cpp
   QuotedString.cpp
   SourceLoc.cpp
+  StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
   TaskQueue.cpp

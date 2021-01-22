@@ -206,7 +206,7 @@ ParseSourceFileRequest::getCachedResult() const {
     syntaxRoot.emplace(*rootPtr);
 
   return SourceFileParsingResult{*decls, SF->AllCollectedTokens,
-                                 SF->InterfaceHash, syntaxRoot};
+                                 SF->InterfaceHasher, syntaxRoot};
 }
 
 void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
@@ -214,7 +214,7 @@ void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
   assert(!SF->Decls);
   SF->Decls = result.TopLevelDecls;
   SF->AllCollectedTokens = result.CollectedTokens;
-  SF->InterfaceHash = result.InterfaceHash;
+  SF->InterfaceHasher = result.InterfaceHasher;
 
   if (auto &root = result.SyntaxRoot)
     SF->SyntaxRoot = std::make_unique<SourceFileSyntax>(std::move(*root));

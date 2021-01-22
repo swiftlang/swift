@@ -4800,7 +4800,8 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 
   // If we're hashing the type body separately, record the curly braces but
   // nothing inside for the interface hash.
-  llvm::SaveAndRestore<Optional<llvm::MD5>> MemberHashingScope{CurrentTokenHash, llvm::MD5()};
+  llvm::SaveAndRestore<Optional<StableHasher>> MemberHashingScope{
+      CurrentTokenHash, StableHasher::defaultHasher()};
   recordTokenHash("{");
   recordTokenHash("}");
 
@@ -4833,9 +4834,9 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
   if (RBLoc.isInvalid())
     hadError = true;
 
-  llvm::MD5::MD5Result result;
-  CurrentTokenHash->final(result);
-  return std::make_pair(decls, Fingerprint{std::move(result)});
+  // Clone the current hasher and extract a Fingerprint.
+  StableHasher currentHash{*CurrentTokenHash};
+  return std::make_pair(decls, Fingerprint{std::move(currentHash)});
 }
 
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
@@ -6725,7 +6726,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   recordTokenHash("{");
   recordTokenHash("}");
 
-  llvm::SaveAndRestore<Optional<llvm::MD5>> T(CurrentTokenHash, None);
+  llvm::SaveAndRestore<Optional<StableHasher>> T(CurrentTokenHash, None);
 
   // If we can delay parsing this body, or this is the first pass of code
   // completion, skip until the end. If we encounter a code completion token
