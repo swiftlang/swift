@@ -134,6 +134,20 @@ class LinkEntity {
     /// a ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
 
+    /// An async function pointer for a method dispatch thunk.  The pointer is
+    /// a FuncDecl* inside a protocol or a class.
+    DispatchThunkAsyncFunctionPointer,
+
+    /// An async function pointer for a method dispatch thunk for an
+    /// initializing constructor.  The pointer is a ConstructorDecl* inside a
+    /// class.
+    DispatchThunkInitializerAsyncFunctionPointer,
+
+    /// An async function pointer for a method dispatch thunk for an allocating
+    /// constructor.  The pointer is a ConstructorDecl* inside a protocol or
+    /// a class.
+    DispatchThunkAllocatorAsyncFunctionPointer,
+
     /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
     /// or a class.
     MethodDescriptor,
@@ -1103,13 +1117,28 @@ public:
 
   static LinkEntity forAsyncFunctionPointer(LinkEntity other) {
     LinkEntity entity;
+    entity.Pointer = other.Pointer;
+    entity.SecondaryPointer = nullptr;
 
     switch (other.getKind()) {
     case LinkEntity::Kind::SILFunction:
-      entity.Pointer = other.getSILFunction();
-      entity.SecondaryPointer = nullptr;
       entity.Data = LINKENTITY_SET_FIELD(
           Kind, unsigned(LinkEntity::Kind::AsyncFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunk:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAsyncFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkInitializerAsyncFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocator:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAllocatorAsyncFunctionPointer));
       break;
 
     default:
@@ -1122,6 +1151,39 @@ public:
   static LinkEntity forAsyncFunctionPointer(AbstractFunctionDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::AsyncFunctionPointerAST, decl);
+    return entity;
+  }
+
+  LinkEntity getUnderlyingEntityForAsyncFunctionPointer() const {
+    LinkEntity entity;
+    entity.Pointer = Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (getKind()) {
+    case LinkEntity::Kind::AsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::SILFunction));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunk));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializerAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkInitializer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocatorAsyncFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAllocator));
+      break;
+
+    default:
+      llvm_unreachable("Link entity is not an async function pointer");
+    }
+
     return entity;
   }
 

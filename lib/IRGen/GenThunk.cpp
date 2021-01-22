@@ -81,6 +81,13 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
     return layout;
   };
 
+  if (funcTy->isAsync()) {
+    auto layout = getAsyncContextLayout();
+    auto entity = LinkEntity::forDispatchThunk(declRef);
+    emitAsyncFunctionEntry(IGF, layout, entity);
+    emitAsyncFunctionPointer(IGF.IGM, IGF.CurFn, entity, layout.getSize());
+  }
+
   // Protocol case.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {
     // Find the witness table.
@@ -163,11 +170,17 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
 }
 
 llvm::Constant *
+IRGenModule::getAddrOfAsyncFunctionPointer(LinkEntity entity) {
+  return getAddrOfLLVMVariable(
+    LinkEntity::forAsyncFunctionPointer(entity),
+    NotForDefinition, DebugTypeInfo());
+}
+
+llvm::Constant *
 IRGenModule::getAddrOfAsyncFunctionPointer(SILFunction *function) {
   (void)getAddrOfSILFunction(function, NotForDefinition);
-  auto entity = LinkEntity::forAsyncFunctionPointer(
+  return getAddrOfAsyncFunctionPointer(
       LinkEntity::forSILFunction(function));
-  return getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
 }
 
 llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,

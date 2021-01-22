@@ -1722,7 +1722,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   if (funcTy->isAsync()) {
-    emitAsyncFunctionEntry(IGF, IGF.CurSILFn);
+    emitAsyncFunctionEntry(IGF,
+                           getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
+                           LinkEntity::forSILFunction(IGF.CurSILFn));
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());

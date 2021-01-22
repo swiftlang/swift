@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Runtime/Config.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
@@ -379,7 +380,7 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args
   auto *calleeContext = Builder.CreateExtractValue(id,
       (unsigned)AsyncFunctionArgumentIndex::Context);
   llvm::Constant *projectFn = cast<llvm::Constant>(args[1])->stripPointerCasts();
-  // Get the caller context from the calle context.
+  // Get the caller context from the callee context.
   llvm::Value *context = Builder.CreateCall(projectFn, {calleeContext});
   context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
   Builder.CreateStore(context, asyncContextLocation);
@@ -3586,9 +3587,10 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
 }
 
 void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
-                                   SILFunction *asyncFunction) {
+                                   const AsyncContextLayout &layout,
+                                   LinkEntity asyncFunction) {
   auto &IGM = IGF.IGM;
-  auto size = getAsyncContextLayout(IGM, asyncFunction).getSize();
+  auto size = layout.getSize();
   auto asyncFuncPointer = IGF.Builder.CreateBitOrPointerCast(
       IGM.getAddrOfAsyncFunctionPointer(asyncFunction), IGM.Int8PtrTy);
   auto *id = IGF.Builder.CreateIntrinsicCall(

@@ -1396,6 +1396,7 @@ public:
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
 
+  llvm::Constant *getAddrOfAsyncFunctionPointer(LinkEntity entity);
   llvm::Constant *getAddrOfAsyncFunctionPointer(SILFunction *function);
   llvm::Constant *defineAsyncFunctionPointer(LinkEntity entity,
                                              ConstantInit init);
