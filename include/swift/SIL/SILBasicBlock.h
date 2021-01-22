@@ -22,6 +22,7 @@
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
@@ -49,7 +50,9 @@ private:
   SILSuccessor *PredList;
 
   /// This is the list of basic block arguments for this block.
-  std::vector<SILArgument *> ArgumentList;
+  /// A TinyPtrVector is the right choice, because ~98% of blocks have 0 or 1
+  /// arguments.
+  TinyPtrVector<SILArgument *> ArgumentList;
 
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
@@ -178,8 +181,8 @@ public:
   // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  using arg_iterator = std::vector<SILArgument *>::iterator;
-  using const_arg_iterator = std::vector<SILArgument *>::const_iterator;
+  using arg_iterator = TinyPtrVector<SILArgument *>::iterator;
+  using const_arg_iterator = TinyPtrVector<SILArgument *>::const_iterator;
 
   bool args_empty() const { return ArgumentList.empty(); }
   size_t args_size() const { return ArgumentList.size(); }

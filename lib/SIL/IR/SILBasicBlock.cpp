@@ -193,7 +193,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
-  ArgumentList[i] = NewArg;
+  *(ArgumentList.begin() + i) = NewArg;
 
   return NewArg;
 }
@@ -219,7 +219,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
-  ArgumentList[i] = NewArg;
+  *(ArgumentList.begin() + i) = NewArg;
 
   return NewArg;
 }
