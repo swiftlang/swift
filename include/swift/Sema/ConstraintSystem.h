@@ -2164,6 +2164,11 @@ private:
   std::vector<std::pair<ConstraintLocator*, unsigned>>
       DisjunctionChoices;
 
+  /// A map from applied disjunction constraints to the corresponding
+  /// argument function type.
+  llvm::SmallMapVector<ConstraintLocator *, const FunctionType *, 4>
+      AppliedDisjunctions;
+
   /// For locators associated with call expressions, the trailing closure
   /// matching rule that was applied.
   std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
@@ -2652,6 +2657,9 @@ public:
 
     /// The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
+
+    /// The length of \c AppliedDisjunctions.
+    unsigned numAppliedDisjunctions;
 
     /// The length of \c trailingClosureMatchingChoices;
     unsigned numTrailingClosureMatchingChoices;
@@ -4954,6 +4962,21 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
+  /// Partition the choices in the range \c first to \c last into groups and
+  /// order the groups in the best order to attempt based on the argument
+  /// function type that the operator is applied to.
+  void partitionGenericOperators(ArrayRef<Constraint *> Choices,
+                                 SmallVectorImpl<unsigned>::iterator first,
+                                 SmallVectorImpl<unsigned>::iterator last,
+                                 ConstraintLocator *locator);
+
+  // If the given constraint is an applied disjunction, get the argument function
+  // that the disjunction is applied to.
+  const FunctionType *getAppliedDisjunctionArgumentFunction(Constraint *disjunction) {
+    assert(disjunction->getKind() == ConstraintKind::Disjunction);
+    return AppliedDisjunctions[disjunction->getLocator()];
+  }
+
   /// The overload sets that have already been resolved along the current path.
   const llvm::MapVector<ConstraintLocator *, SelectedOverload> &
   getResolvedOverloads() const {
@@ -5454,7 +5477,11 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
 
   bool IsExplicitConversion;
 
+  Constraint *Disjunction;
+
   unsigned Index = 0;
+
+  bool needsGenericOperatorOrdering = true;
 
 public:
   using Element = DisjunctionChoice;
@@ -5464,7 +5491,8 @@ public:
                                 ? disjunction->getLocator()
                                 : nullptr),
         Choices(disjunction->getNestedConstraints()),
-        IsExplicitConversion(disjunction->isExplicitConversion()) {
+        IsExplicitConversion(disjunction->isExplicitConversion()),
+        Disjunction(disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
@@ -5472,14 +5500,8 @@ public:
     CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
   }
 
-  DisjunctionChoiceProducer(ConstraintSystem &cs,
-                            ArrayRef<Constraint *> choices,
-                            ConstraintLocator *locator, bool explicitConversion)
-      : BindingProducer(cs, locator), Choices(choices),
-        IsExplicitConversion(explicitConversion) {
-
-    // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+  void setNeedsGenericOperatorOrdering(bool flag) {
+    needsGenericOperatorOrdering = flag;
   }
 
   Optional<Element> operator()() override {
@@ -5493,6 +5515,20 @@ public:
       ++PartitionIndex;
 
     ++Index;
+
+    auto choice = DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
+                                    IsExplicitConversion, isBeginningOfPartition);
+    // Partition the generic operators before producing the first generic
+    // operator disjunction choice.
+    if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
+      unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
+                                     PartitionBeginning[PartitionIndex] : Ordering.size());
+      CS.partitionGenericOperators(Choices,
+                                   Ordering.begin() + currIndex,
+                                   Ordering.begin() + nextPartitionIndex,
+                                   Disjunction->getLocator());
+      needsGenericOperatorOrdering = false;
+    }
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);

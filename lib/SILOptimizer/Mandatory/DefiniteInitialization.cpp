@@ -17,6 +17,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/BasicBlockData.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -136,7 +138,12 @@ namespace {
     //   T,F -> Partial
     SmallBitVector Data;
   public:
-    AvailabilitySet(unsigned NumElts) {
+    AvailabilitySet() {}
+  
+    AvailabilitySet(unsigned NumElts) { init(NumElts); }
+    
+    void init(unsigned NumElts) {
+      Data.set();
       Data.resize(NumElts*2, true);
     }
 
@@ -270,11 +277,15 @@ namespace {
     /// plus the information merged-in from the predecessor blocks.
     Optional<DIKind> OutSelfInitialized;
 
-    LiveOutBlockState(unsigned NumElements)
-      : HasNonLoadUse(false),
-        isInWorkList(false),
-        LocalAvailability(NumElements),
-        OutAvailability(NumElements) {
+    LiveOutBlockState() { init(0); }
+
+    void init(unsigned NumElements) {
+      HasNonLoadUse = false;
+      isInWorkList = false;
+      LocalAvailability.init(NumElements);
+      OutAvailability.init(NumElements);
+      LocalSelfInitialized = None;
+      OutSelfInitialized = None;
     }
 
     /// Sets all unknown elements to not-available.
@@ -371,9 +382,8 @@ namespace {
     DIKind SelfInitialized;
   };
 
-} // end anonymous namespace
+  using BlockStates = BasicBlockData<LiveOutBlockState>;
 
-namespace {
   /// LifetimeChecker - This is the main heavy lifting for definite
   /// initialization checking of a memory object.
   class LifetimeChecker {
@@ -390,7 +400,8 @@ namespace {
     SmallVector<unsigned, 8> NeedsUpdateForInitState;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
-    llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
+    BlockStates &blockStates;
+    BasicBlockFlag blockStateInitialized;
 
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
@@ -427,7 +438,8 @@ namespace {
     
   public:
     LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
-                    DIElementUseInfo &UseInfo);
+                    DIElementUseInfo &UseInfo,
+                    BlockStates &blockStates);
 
     void doIt();
 
@@ -436,9 +448,10 @@ namespace {
     void emitSelfConsumedDiagnostic(SILInstruction *Inst);
 
     LiveOutBlockState &getBlockInfo(SILBasicBlock *BB) {
-      return PerBlockInfo
-          .insert({BB, LiveOutBlockState(TheMemory.getNumElements())})
-          .first->second;
+      auto &state = blockStates.get(BB, []() { return LiveOutBlockState(); });
+      if (!blockStateInitialized.testAndSet(BB))
+        state.init(TheMemory.getNumElements());
+      return state;
     }
 
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
@@ -514,10 +527,12 @@ namespace {
 } // end anonymous namespace
 
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
-                                 DIElementUseInfo &UseInfo)
+                                 DIElementUseInfo &UseInfo,
+                                 BlockStates &blockStates)
     : F(TheMemory.getFunction()), Module(TheMemory.getModule()),
       TheMemory(TheMemory), Uses(UseInfo.Uses),
-      StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases) {
+      StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases),
+      blockStates(blockStates), blockStateInitialized(&F) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -3087,7 +3102,8 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //                           Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void processMemoryObject(MarkUninitializedInst *I) {
+static void processMemoryObject(MarkUninitializedInst *I,
+                                BlockStates &blockStates) {
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
@@ -3097,7 +3113,7 @@ static void processMemoryObject(MarkUninitializedInst *I) {
   // Walk the use list of the pointer, collecting them into the Uses array.
   collectDIElementUsesFrom(MemInfo, UseInfo);
 
-  LifetimeChecker(MemInfo, UseInfo).doIt();
+  LifetimeChecker(MemInfo, UseInfo, blockStates).doIt();
 }
 
 /// Check that all memory objects that require initialization before use are
@@ -3107,6 +3123,8 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                           <<  Fn.getName() << "\n");
   bool Changed = false;
+
+  BlockStates blockStates(&Fn);
 
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E;) {
@@ -3119,7 +3137,7 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
       }
 
       // Then process the memory object.
-      processMemoryObject(MUI);
+      processMemoryObject(MUI, blockStates);
 
       // Move off of the MUI only after we have processed memory objects. The
       // lifetime checker may rewrite instructions, so it is important to not
