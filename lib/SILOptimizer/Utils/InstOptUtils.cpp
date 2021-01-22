@@ -1997,7 +1997,7 @@ SILValue swift::makeCopiedValueAvailable(
   if (!value->getFunction()->hasOwnership())
     return value;
 
-  if (value->getType().isTrivial(*value->getFunction()))
+  if (value.getOwnershipKind() == OwnershipKind::None)
     return value;
 
   auto insertPt = getInsertAfterPoint(value).getValue();
@@ -2013,7 +2013,7 @@ SILValue swift::makeNewValueAvailable(
   if (!value->getFunction()->hasOwnership())
     return value;
 
-  if (value->getType().isTrivial(*value->getFunction()))
+  if (value.getOwnershipKind() == OwnershipKind::None)
     return value;
 
   assert(value->getUses().empty() &&

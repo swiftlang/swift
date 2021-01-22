@@ -1349,7 +1349,9 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
   // the SSAUpdater.
   Updater.initialize(
       L.getType(&BB->getModule(), TypeExpansionContext(*BB->getParent()))
-          .getObjectType());
+          .getObjectType(),
+      Values[0].second.getOwnershipKind());
+
   for (auto V : Values) {
     Updater.addAvailableValue(V.first, V.second);
   }
