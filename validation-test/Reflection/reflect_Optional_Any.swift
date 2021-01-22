@@ -8,7 +8,6 @@
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=tvos || OS=watchos || OS=ios
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
