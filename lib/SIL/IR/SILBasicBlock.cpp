@@ -309,6 +309,8 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
   // If splicing blocks not in the same function, update the parent pointers.
   for (; First != Last; ++First) {
     First->Parent = Parent;
+    First->index = -1;
+    First->lastInitializedBitfieldID = 0;
     for (auto &II : *First)
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
   }

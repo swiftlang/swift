@@ -1619,8 +1619,8 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
   // Verify that all pointer nodes are still mapped, otherwise the process of
   // merging nodes may have lost information. Only visit reachable blocks,
   // because the graph builder only mapped values from reachable blocks.
-  ReachableBlocks reachable;
-  reachable.visit(F, [this](SILBasicBlock *bb) {
+  ReachableBlocks reachable(F);
+  reachable.visit([this](SILBasicBlock *bb) {
     for (auto &i : *bb) {
       if (isNonWritableMemoryAddress(&i))
         continue;
@@ -1748,8 +1748,8 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
   assert(ConGraph->isEmpty());
 
   // Visit the blocks in dominance order.
-  ReachableBlocks reachable;
-  reachable.visit(ConGraph->F, [&](SILBasicBlock *bb) {
+  ReachableBlocks reachable(ConGraph->F);
+  reachable.visit([&](SILBasicBlock *bb) {
     // Create edges for the instructions.
     for (auto &i : *bb) {
       analyzeInstruction(&i, FInfo, BottomUpOrder, RecursionDepth);
