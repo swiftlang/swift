@@ -87,7 +87,7 @@ public:
 struct SourceFileParsingResult {
   ArrayRef<Decl *> TopLevelDecls;
   Optional<ArrayRef<Token>> CollectedTokens;
-  Optional<llvm::MD5> InterfaceHash;
+  Optional<StableHasher> InterfaceHasher;
   Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 

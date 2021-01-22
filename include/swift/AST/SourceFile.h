@@ -105,9 +105,10 @@ private:
   SourceLoc MainDeclDiagLoc;
 
   /// A hash of all interface-contributing tokens that have been lexed for
-  /// this source file so far.
+  /// this source file.
+  ///
   /// We only collect interface hash for primary input files.
-  llvm::Optional<llvm::MD5> InterfaceHash;
+  llvm::Optional<StableHasher> InterfaceHasher;
 
   /// The ID for the memory buffer containing this file's source.
   ///
