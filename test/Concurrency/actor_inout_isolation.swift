@@ -110,8 +110,8 @@ extension TestActor {
 
   func callMutatingFunctionOnStruct() async {
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
-    // expected-error@+2:38{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
-    // expected-error@+1:58{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+2:51{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:71{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &nextPosition.x, y: &nextPosition.y)
 
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}

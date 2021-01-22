@@ -637,42 +637,6 @@ static bool isAsyncCall(const ApplyExpr *call) {
   return funcType->isAsync();
 }
 
-/// Extract the correct expression for diagnosing actor state being passed inout
-///
-/// This unwraps most expression types, working toward an offending DeclRefExpr
-/// or to the LookupExpr before the DeclRef.
-///
-/// The return will either be a LookupExpr or a DeclRefExpr.
-/// If part of the sub-expression isn't interesting, returns nullptr
-static const Expr *getInoutTopExpr(const InOutExpr *arg) {
-  const Expr * currentExpr = arg->getSubExpr();
-  while (currentExpr) {
-    if (const InOutExpr *inout = dyn_cast<InOutExpr>(currentExpr)) {
-      return nullptr; // The AST walker will hit this again
-    } else if (const LookupExpr *baseArg = dyn_cast<LookupExpr>(currentExpr)) {
-      if (isa<DeclRefExpr>(baseArg->getBase()))
-        return baseArg;
-      currentExpr = baseArg->getBase();
-    } else if (const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(currentExpr))
-      return declRef;
-    else if (const BindOptionalExpr *bindingOp =
-                 dyn_cast<BindOptionalExpr>(currentExpr))
-      currentExpr = bindingOp->getSubExpr();
-    else if (const ForceValueExpr *forceOp =
-                 dyn_cast<ForceValueExpr>(currentExpr))
-      currentExpr = forceOp->getSubExpr();
-    else if (const ImplicitConversionExpr *convExpr =
-                 dyn_cast<ImplicitConversionExpr>(currentExpr))
-      currentExpr = convExpr->getSubExpr();
-    else if (const IdentityExpr *identExpr =
-                 dyn_cast<IdentityExpr>(currentExpr))
-      currentExpr = identExpr->getSubExpr();
-    else
-      return currentExpr;
-  }
-  llvm_unreachable("The current expression is a nullptr!");
-}
-
 /// Determine whether we should diagnose data races within the current context.
 ///
 /// By default, we do this only in code that makes use of concurrency
@@ -998,55 +962,65 @@ namespace {
       if (!isAsyncCall(call))
         return false;
 
-      const Expr *subArg = getInoutTopExpr(arg);
-      if (subArg == nullptr) // Subexpression isn't interesting
-        return false;
-      ValueDecl *valueDecl = nullptr;
-      if (const DeclRefExpr *declExpr = dyn_cast<DeclRefExpr>(subArg))
-        valueDecl = declExpr->getDecl();
-      else if (const LookupExpr * member = dyn_cast<LookupExpr>(subArg))
-        valueDecl = member->getMember().getDecl();
-      else
-        llvm_unreachable("Unhandled expression type");
-      auto isolation = ActorIsolationRestriction::forDeclaration(valueDecl);
-      switch (isolation) {
-      case ActorIsolationRestriction::Unrestricted:
-      case ActorIsolationRestriction::LocalCapture:
-      case ActorIsolationRestriction::Unsafe:
-        break;
-      case ActorIsolationRestriction::GlobalActor: {
-        ctx.Diags.diagnose(call->getLoc(),
-                           diag::actor_isolated_inout_state,
-                           valueDecl->getDescriptiveKind(),
-                           valueDecl->getName(),
-                           call->implicitlyAsync());
-        valueDecl->diagnose(diag::kind_declared_here,
-                            valueDecl->getDescriptiveKind());
-        return true;
-      }
-      case ActorIsolationRestriction::ActorSelf: {
-        if (isPartialApply) {
-          // The partially applied InoutArg is a property of actor. This can
-          // really only happen when the property is a struct with a mutating
-          // async method.
-          if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
-            ValueDecl *fnDecl =
-                cast<DeclRefExpr>(partialApply->getFn())->getDecl();
-            ctx.Diags.diagnose(
-                call->getLoc(), diag::actor_isolated_mutating_func,
-                fnDecl->getName(), valueDecl->getDescriptiveKind(),
-                valueDecl->getName());
-            return true;
-          }
-        } else {
-          ctx.Diags.diagnose(
-              subArg->getLoc(), diag::actor_isolated_inout_state,
-              valueDecl->getDescriptiveKind(), valueDecl->getName(), call->implicitlyAsync());
-          return true;
+      bool result = false;
+      auto checkDiagnostic = [this, call, isPartialApply,
+                              &result](ValueDecl *decl, SourceLoc argLoc) {
+        auto isolation = ActorIsolationRestriction::forDeclaration(decl);
+        switch (isolation) {
+        case ActorIsolationRestriction::Unrestricted:
+        case ActorIsolationRestriction::LocalCapture:
+        case ActorIsolationRestriction::Unsafe:
+          break;
+        case ActorIsolationRestriction::GlobalActor: {
+          ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
+                             decl->getDescriptiveKind(), decl->getName(),
+                             call->implicitlyAsync());
+          decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
+          result = true;
+          break;
         }
-      }
-      }
-      return false;
+        case ActorIsolationRestriction::ActorSelf: {
+          if (isPartialApply) {
+            // The partially applied InoutArg is a property of actor. This
+            // can really only happen when the property is a struct with a
+            // mutating async method.
+            if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
+              ValueDecl *fnDecl =
+                  cast<DeclRefExpr>(partialApply->getFn())->getDecl();
+              ctx.Diags.diagnose(call->getLoc(),
+                                 diag::actor_isolated_mutating_func,
+                                 fnDecl->getName(), decl->getDescriptiveKind(),
+                                 decl->getName());
+              result = true;
+            }
+          } else {
+            ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
+                               decl->getDescriptiveKind(), decl->getName(),
+                               call->implicitlyAsync());
+            result = true;
+          }
+          break;
+        }
+        }
+      };
+      auto expressionWalker = [baseArg = arg->getSubExpr(),
+                               checkDiagnostic](Expr *expr) -> Expr * {
+        if (isa<InOutExpr>(expr))
+          return nullptr; // AST walker will hit this again
+        if (LookupExpr *lookup = dyn_cast<LookupExpr>(expr)) {
+          if (isa<DeclRefExpr>(lookup->getBase())) {
+            checkDiagnostic(lookup->getMember().getDecl(), baseArg->getLoc());
+            return nullptr; // Diagnosed. Don't keep walking
+          }
+        }
+        if (DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr)) {
+          checkDiagnostic(declRef->getDecl(), baseArg->getLoc());
+          return nullptr; // Diagnosed. Don't keep walking
+        }
+        return expr;
+      };
+      arg->getSubExpr()->forEachChildExpr(expressionWalker);
+      return result;
     }
 
     /// Get the actor isolation of the innermost relevant context.
