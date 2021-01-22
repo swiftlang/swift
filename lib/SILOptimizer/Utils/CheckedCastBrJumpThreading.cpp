@@ -86,7 +86,6 @@ class CheckedCastBrJumpThreading {
       SuccessArg(SuccessArg), InvertSuccess(InvertSuccess),
       hasUnknownPreds(hasUnknownPreds) { }
 
-    void modifyCFGForUnknownPreds();
     void modifyCFGForFailurePreds(BasicBlockCloner &Cloner);
     void modifyCFGForSuccessPreds(BasicBlockCloner &Cloner);
   };
@@ -220,24 +219,6 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     }
 
     Value = IncomingValues[0];
-  }
-}
-
-void CheckedCastBrJumpThreading::Edit::modifyCFGForUnknownPreds() {
-  if (!hasUnknownPreds)
-    return;
-  // Check the FailureBB if it is a BB that contains a class_method
-  // referring to the same value as a condition. This pattern is typical
-  // for method chaining code like obj.method1().method2().etc()
-  auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
-  SILInstruction *Inst = &*CCBI->getFailureBB()->begin();
-  if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
-    if (CMI->getOperand() == stripClassCasts(CCBI->getOperand())) {
-      // Replace checked_cast_br by branch to FailureBB.
-      SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
-                                             CCBI->getFailureBB());
-      CCBI->eraseFromParent();
-    }
   }
 }
 
@@ -687,8 +668,6 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     // Create a copy of the BB or reuse BB as
     // a landing basic block for all SuccessPreds.
     edit->modifyCFGForSuccessPreds(Cloner);
-    // Handle unknown preds.
-    edit->modifyCFGForUnknownPreds();
 
     if (Cloner.wasCloned()) {
       Cloner.updateSSAAfterCloning();
