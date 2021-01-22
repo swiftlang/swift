@@ -1411,7 +1411,7 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
     char *log;
     swift_asprintf(
         &log, "%.*s: file %.*s, line %" PRIu32 ", column %" PRIu32 " \n",
-        messageLength, message, filenameLength, filename, line, column);
+        (int)messageLength, message, filenameLength, filename, line, column);
 
     printCurrentBacktrace(2/*framesToSkip*/);
 
