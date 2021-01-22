@@ -226,7 +226,7 @@ extension Task {
     ///
     /// - SeeAlso: `Task.addCancellationHandler`
     /// - SeeAlso: `Task.checkCancelled`
-    /// - SeeAlso: `Task.isCanceled`
+    /// - SeeAlso: `Task.isCancelled`
     public mutating func cancelAll() {
       _taskCancel(self.task) // TODO: do we also have to go over all child tasks and cancel there?
     }

@@ -24,8 +24,8 @@ extension Task {
   ///
   /// - SeeAlso: `checkCancellation()`
   /* @instantaneous */
-  public static func isCanceled() async -> Bool {
-     _taskIsCanceled(Builtin.getCurrentAsyncTask())
+  public static func isCancelled() async -> Bool {
+     _taskIsCancelled(Builtin.getCurrentAsyncTask())
   }
 
   /// Check if the task is cancelled and throw an `CancellationError` if it was.
@@ -41,10 +41,10 @@ extension Task {
   /// ### Suspension
   /// This function returns instantly and will never suspend.
   ///
-  /// - SeeAlso: `isCanceled()`
+  /// - SeeAlso: `isCancelled()`
   /* @instantaneous */
   public static func checkCancellation() async throws {
-    if await Task.isCanceled() {
+    if await Task.isCancelled() {
       throw CancellationError()
     }
   }
@@ -108,7 +108,7 @@ extension Task {
   /// regardless of the inner deadlines of the specific child tasks.
   ///
   /// Cancellation is co-operative and must be checked for by the operation, e.g.
-  /// by invoking `Task.checkCancellation`, or `Task.isCanceled`.
+  /// by invoking `Task.checkCancellation`, or `Task.isCancelled`.
   ///
   /// ### Suspension
   /// This function returns instantly and will never suspend.
@@ -135,7 +135,7 @@ extension Task {
   /// regardless of the inner deadlines of the specific child tasks.
   ///
   /// Cancellation is co-operative and must be checked for by the operation, e.g.
-  /// by invoking `Task.checkCancellation` or `Task.isCanceled`.
+  /// by invoking `Task.checkCancellation` or `Task.isCancelled`.
   ///
   /// ### Suspension
   /// This function returns instantly and will never suspend.

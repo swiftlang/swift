@@ -39,7 +39,7 @@ func test_taskGroup_throws() async {
         print("error caught in group: \(error)")
 
         await group.add { () async -> Int in
-          print("task 3 (cancelled: \(await Task.isCanceled()))")
+          print("task 3 (cancelled: \(await Task.isCancelled()))")
           return 3
         }
 

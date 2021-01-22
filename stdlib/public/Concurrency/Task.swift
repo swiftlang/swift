@@ -317,7 +317,7 @@ func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
 
-@_silgen_name("swift_task_isCanceled")
+@_silgen_name("swift_task_isCancelled")
 func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_runAndBlockThread")
@@ -415,8 +415,8 @@ public func _runGroupChildTask<T>(
 @_silgen_name("swift_task_cancel")
 func _taskCancel(_ task: Builtin.NativeObject)
 
-@_silgen_name("swift_task_isCanceled")
-func _taskIsCanceled(_ task: Builtin.NativeObject) -> Bool
+@_silgen_name("swift_task_isCancelled")
+func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 #if _runtime(_ObjC)
 
