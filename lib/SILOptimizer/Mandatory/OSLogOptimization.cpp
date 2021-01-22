@@ -881,8 +881,7 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
   SILInstruction *valueDefinition = value->getDefiningInstruction();
   SILInstruction *def =
       valueDefinition ? valueDefinition : &(value->getParentBlock()->front());
-  ValueLifetimeAnalysis lifetimeAnalysis =
-      ValueLifetimeAnalysis(def, transitiveUsers);
+  ValueLifetimeAnalysis lifetimeAnalysis(def, transitiveUsers);
   ValueLifetimeAnalysis::Frontier frontier;
   bool hasCriticlEdges = lifetimeAnalysis.computeFrontier(
       frontier, ValueLifetimeAnalysis::DontModifyCFG);

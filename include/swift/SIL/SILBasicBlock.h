@@ -34,6 +34,7 @@ public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILFunction;
   friend class SILGlobalVariable;
   template <typename Data, typename Vector> friend class BasicBlockData;
+  friend class BasicBlockBitfield;
 
 public:
   using InstListType = llvm::iplist<SILInstruction>;
@@ -56,6 +57,25 @@ private:
   ///
   /// A value of -1 means that the index is not initialized yet.
   int index = -1;
+
+  /// Custom bits managed by BasicBlockBitfield.
+  uint32_t customBits = 0;
+  
+  /// The BasicBlockBitfield ID of the last initialized bitfield in customBits.
+  /// Example:
+  ///
+  ///                   Last initialized field:
+  ///           lastInitializedBitfieldID == C.bitfieldID
+  ///                              |
+  ///                              V
+  /// customBits:  <unused> EE DDD C BB AAA
+  ///              31         ...         0
+  ///
+  /// -> AAA, BB and C are initialized,
+  ///    DD and EEE are uninitialized
+  ///
+  /// See also: BasicBlockBitfield::bitfieldID, SILFunction::currentBitfieldID.
+  uint64_t lastInitializedBitfieldID = 0;
 
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}

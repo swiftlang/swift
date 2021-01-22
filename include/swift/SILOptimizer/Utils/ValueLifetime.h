@@ -20,6 +20,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace swift {
@@ -34,7 +35,10 @@ class ValueLifetimeAnalysis {
   PointerUnion<SILInstruction *, SILArgument *> defValue;
 
   /// The set of blocks where the value is live.
-  llvm::SmallSetVector<SILBasicBlock *, 16> liveBlocks;
+  llvm::SmallVector<SILBasicBlock *, 16> liveBlocks;
+  
+  /// True for blocks which are in liveBlocks.
+  BasicBlockFlag inLiveBlocks;
 
   /// The set of instructions where the value is used, or the users-list
   /// provided with the constructor.
@@ -66,7 +70,7 @@ public:
   /// iterators.
   template <typename RangeTy>
   ValueLifetimeAnalysis(SILArgument *def, const RangeTy &useRange)
-      : defValue(def), userSet() {
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
     for (SILInstruction *use : useRange)
       userSet.insert(use);
     propagateLiveness();
@@ -75,7 +79,7 @@ public:
   ValueLifetimeAnalysis(
       SILArgument *def,
       llvm::iterator_range<ValueBaseUseIterator> useRange)
-      : defValue(def), userSet() {
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
     for (Operand *use : useRange)
       userSet.insert(use->getUser());
     propagateLiveness();
@@ -84,7 +88,7 @@ public:
   template <typename RangeTy>
   ValueLifetimeAnalysis(
       SILInstruction *def, const RangeTy &useRange)
-      : defValue(def), userSet() {
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
     for (SILInstruction *use : useRange)
       userSet.insert(use);
     propagateLiveness();
@@ -93,7 +97,7 @@ public:
   ValueLifetimeAnalysis(
       SILInstruction *def,
       llvm::iterator_range<ValueBaseUseIterator> useRange)
-      : defValue(def), userSet() {
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
     for (Operand *use : useRange)
       userSet.insert(use->getUser());
     propagateLiveness();
@@ -144,7 +148,7 @@ public:
 
   /// Returns true if the value is alive at the begin of block \p bb.
   bool isAliveAtBeginOfBlock(SILBasicBlock *bb) {
-    return liveBlocks.count(bb) &&
+    return inLiveBlocks.get(bb) &&
            (hasUsersBeforeDef || bb != getDefValueParentBlock());
   }
 
