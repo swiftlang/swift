@@ -21,6 +21,8 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILArgument.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
@@ -48,7 +50,9 @@ private:
   SILSuccessor *PredList;
 
   /// This is the list of basic block arguments for this block.
-  std::vector<SILArgument *> ArgumentList;
+  /// A TinyPtrVector is the right choice, because ~98% of blocks have 0 or 1
+  /// arguments.
+  TinyPtrVector<SILArgument *> ArgumentList;
 
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
@@ -177,8 +181,8 @@ public:
   // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  using arg_iterator = std::vector<SILArgument *>::iterator;
-  using const_arg_iterator = std::vector<SILArgument *>::const_iterator;
+  using arg_iterator = TinyPtrVector<SILArgument *>::iterator;
+  using const_arg_iterator = TinyPtrVector<SILArgument *>::const_iterator;
 
   bool args_empty() const { return ArgumentList.empty(); }
   size_t args_size() const { return ArgumentList.size(); }
@@ -241,13 +245,9 @@ public:
                                               const ValueDecl *D = nullptr,
                                               bool disableEntryBlockVerification = false);
 
-  SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
+  SILFunctionArgument *insertFunctionArgument(unsigned AtArgPos, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,
-                                              const ValueDecl *D = nullptr) {
-    arg_iterator Pos = ArgumentList.begin();
-    std::advance(Pos, Index);
-    return insertFunctionArgument(Pos, Ty, OwnershipKind, D);
-  }
+                                              const ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th Function arg with a new Function arg with SILType \p
   /// Ty and ValueDecl \p D.
@@ -277,18 +277,10 @@ public:
                                     const ValueDecl *D = nullptr);
 
   /// Insert a new SILPhiArgument with type \p Ty and \p Decl at position \p
-  /// Pos.
-  SILPhiArgument *insertPhiArgument(arg_iterator Pos, SILType Ty,
+  /// AtArgPos.
+  SILPhiArgument *insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                     ValueOwnershipKind Kind,
                                     const ValueDecl *D = nullptr);
-
-  SILPhiArgument *insertPhiArgument(unsigned Index, SILType Ty,
-                                    ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr) {
-    arg_iterator Pos = ArgumentList.begin();
-    std::advance(Pos, Index);
-    return insertPhiArgument(Pos, Ty, Kind, D);
-  }
 
   /// Remove all block arguments.
   void dropAllArguments() { ArgumentList.clear(); }
@@ -456,12 +448,6 @@ private:
   void insertArgument(arg_iterator Iter, SILArgument *Arg) {
     ArgumentList.insert(Iter, Arg);
   }
-
-  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
-  /// \p Pos.
-  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
-                                              ValueOwnershipKind OwnershipKind,
-                                              const ValueDecl *D = nullptr);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
