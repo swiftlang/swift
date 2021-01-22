@@ -1019,9 +1019,8 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // within region check. If we succeed, clear our extra state so we perform a
   // normal RAUW.
   SmallVector<Operand *, 8> scratchSpace;
-  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   if (borrowedValue.areUsesWithinScope(oldValueUses, scratchSpace,
-                                       visitedBlocks, ctx->deBlocks)) {
+                                       ctx->deBlocks)) {
     // We do not need to copy the base value! Clear the extra info we have.
     ctx->extraAddressFixupInfo.clear();
   }

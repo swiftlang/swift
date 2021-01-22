@@ -404,12 +404,10 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 bool BorrowedValue::areUsesWithinScope(
     ArrayRef<Operand *> uses, SmallVectorImpl<Operand *> &scratchSpace,
-    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
     DeadEndBlocks &deadEndBlocks) const {
   // Make sure that we clear our scratch space/utilities before we exit.
   SWIFT_DEFER {
     scratchSpace.clear();
-    visitedBlocks.clear();
   };
 
   // First make sure that we actually have a local scope. If we have a non-local
@@ -425,7 +423,7 @@ bool BorrowedValue::areUsesWithinScope(
   visitLocalScopeTransitiveEndingUses(
       [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
 
-  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  LinearLifetimeChecker checker(deadEndBlocks);
   return checker.validateLifetime(value, scratchSpace, uses);
 }
 
