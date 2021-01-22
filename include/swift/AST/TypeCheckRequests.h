@@ -1900,6 +1900,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether the first function decl is a refinement of the second,
+/// meaning the two functions have the same structure, and the requirements
+/// of the first are refining the requirements of the second.
+class IsDeclRefinementOfRequest
+    : public SimpleRequest<IsDeclRefinementOfRequest,
+                           bool(ValueDecl *, ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *declA, ValueDecl *declB) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether this declaration inherits its superclass' designated and
 /// convenience initializers.
 class InheritsSuperclassInitializersRequest
