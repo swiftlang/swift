@@ -163,12 +163,15 @@ SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
   return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
 }
 
-SILFunctionArgument *SILBasicBlock::insertFunctionArgument(arg_iterator Iter,
+SILFunctionArgument *SILBasicBlock::insertFunctionArgument(unsigned AtArgPos,
                                                            SILType Ty,
                                                            ValueOwnershipKind OwnershipKind,
                                                            const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
-  return new (getModule()) SILFunctionArgument(this, Iter, Ty, OwnershipKind, D);
+  auto *arg = new (getModule()) SILFunctionArgument(Ty, OwnershipKind, D);
+  arg->parentBlock = this;
+  insertArgument(ArgumentList.begin() + AtArgPos, arg);
+  return arg;
 }
 
 SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
@@ -190,7 +193,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
-  ArgumentList[i] = NewArg;
+  *(ArgumentList.begin() + i) = NewArg;
 
   return NewArg;
 }
@@ -216,7 +219,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
-  ArgumentList[i] = NewArg;
+  *(ArgumentList.begin() + i) = NewArg;
 
   return NewArg;
 }
@@ -255,13 +258,16 @@ SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
   return new (getModule()) SILPhiArgument(this, Ty, Kind, D);
 }
 
-SILPhiArgument *SILBasicBlock::insertPhiArgument(arg_iterator Iter, SILType Ty,
+SILPhiArgument *SILBasicBlock::insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
     Kind = OwnershipKind::None;
-  return new (getModule()) SILPhiArgument(this, Iter, Ty, Kind, D);
+  auto *arg = new (getModule()) SILPhiArgument(Ty, Kind, D);
+  arg->parentBlock = this;
+  insertArgument(ArgumentList.begin() + AtArgPos, arg);
+  return arg;
 }
 
 void SILBasicBlock::eraseArgument(int Index) {
