@@ -300,14 +300,6 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 }
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // (pointer_to_address strict (address_to_pointer x)) -> x
-  //
-  // NOTE: We can not perform this optimization in OSSA without dealing with
-  // interior pointers since we may be escaping an interior pointer address from
-  // a borrow scope.
-  if (PTAI->getFunction()->hasOwnership())
-    return SILValue();
-
   // If this address is not strict, then it cannot be replaced by an address
   // that may be strict.
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
@@ -755,7 +747,8 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
   if (svi->getFunction()->hasOwnership()) {
     JointPostDominanceSetComputer computer(*deadEndBlocks);
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
-    return ctx.replaceAllUsesAndErase(svi, result);
+    OwnershipRAUWHelper helper(ctx, svi, result);
+    return helper.perform();
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
 }
@@ -779,19 +772,39 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
 ///
 /// NOTE: We assume that the insertion point associated with the SILValue must
 /// dominate \p i.
-SILValue swift::simplifyInstruction(SILInstruction *i) {
-  SILValue result = InstSimplifier().visit(i);
-  if (!result)
-    return SILValue();
+static SILValue simplifyInstruction(SILInstruction *i) {
+  return InstSimplifier().visit(i);
+}
 
-  // If we have a result, we know that we must have a single value instruction
-  // by assumption since we have not implemented support in the rest of inst
-  // simplify for non-single value instructions. We put the cast here so that
-  // this code is not updated at this point in time.
-  auto *svi = cast<SingleValueInstruction>(i);
-  if (svi->getFunction()->hasOwnership())
-    if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(svi, result))
-      return SILValue();
+SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
+    SILInstruction *i, InstModCallbacks &callbacks,
+    DeadEndBlocks *deadEndBlocks) {
+  auto next = std::next(i->getIterator());
+  auto *svi = dyn_cast<SingleValueInstruction>(i);
+  if (!svi)
+    return next;
+  SILValue result = simplifyInstruction(i);
 
-  return result;
+  // If we fail to simplify or the simplified value returned is our passed in
+  // value, just return std::next since we can't simplify.
+  if (!result || svi == result)
+    return next;
+
+  if (!svi->getFunction()->hasOwnership())
+    return replaceAllUsesAndErase(svi, result, callbacks);
+
+  // If we weren't passed a dead end blocks, we can't optimize without ownership
+  // enabled.
+  if (!deadEndBlocks)
+    return next;
+
+  JointPostDominanceSetComputer computer(*deadEndBlocks);
+  OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
+  OwnershipRAUWHelper helper(ctx, svi, result);
+
+  // If our RAUW helper is invalid, we do not support RAUWing this case, so
+  // just return next.
+  if (!helper.isValid())
+    return next;
+  return helper.perform();
 }

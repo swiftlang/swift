@@ -6,7 +6,7 @@ allNodes:
       aspect:          interface
       context:         ''
       name:            main.swiftdeps
-    fingerprint:     afterachangewasmadetoswiftsource
+    fingerprint:     88888888888888888888888888888888
     sequenceNumber:  0
     defsIDependUpon: [ 2, 4 ]
     isProvides:      true
@@ -15,7 +15,7 @@ allNodes:
       aspect:          implementation
       context:         ''
       name:            main.swiftdeps
-    fingerprint:     afterachangewasmadetoswiftsource
+    fingerprint:     88888888888888888888888888888888
     sequenceNumber:  1
     defsIDependUpon: [  ]
     isProvides:      true

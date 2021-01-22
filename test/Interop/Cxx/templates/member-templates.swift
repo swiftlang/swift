@@ -19,8 +19,8 @@ TemplatesTestSuite.test("Set value - IntWrapper") {
 
 TemplatesTestSuite.test("Templated Add") {
   var h = HasMemberTemplates()
-  expectEqual(h.add(2, 1), 3)
-  expectEqual(h.addTwoTemplates(2, 1), 3)
+  expectEqual(h.addSameTypeParams(2, 1), 3)
+  expectEqual(h.addMixedTypeParams(2, 1), 3)
 }
 
 runAllTests()

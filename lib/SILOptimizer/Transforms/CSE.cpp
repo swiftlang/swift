@@ -583,7 +583,7 @@ public:
 
   DeadEndBlocks &DeadEndBBs;
 
-  OwnershipFixupContext &FixupCtx;
+  OwnershipFixupContext &RAUWFixupContext;
 
   /// The set of calls to lazy property getters which can be replace by a direct
   /// load of the property value.
@@ -591,9 +591,10 @@ public:
 
   CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
       SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs,
-      OwnershipFixupContext &FixupCtx)
+      OwnershipFixupContext &RAUWFixupContext)
       : SEA(SEA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
-        FixupCtx(FixupCtx), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+        RAUWFixupContext(RAUWFixupContext),
+        RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
@@ -937,7 +938,6 @@ static bool isLazyPropertyGetter(ApplyInst *ai) {
 
 bool CSE::processNode(DominanceInfoNode *Node) {
   SILBasicBlock *BB = Node->getBlock();
-  InstModCallbacks callbacks;
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
@@ -961,12 +961,12 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
     // If the instruction can be simplified (e.g. X+0 = X) then replace it with
     // its simpler value.
-    if (SILValue V = simplifyInstruction(Inst)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V << '\n');
-      nextI = replaceAllSimplifiedUsesAndErase(Inst, V, callbacks, &DeadEndBBs);
-      Changed = true;
+    InstModCallbacks callbacks;
+    nextI = simplifyAndReplaceAllSimplifiedUsesAndErase(Inst, callbacks,
+                                                        &DeadEndBBs);
+    if (callbacks.hadCallbackInvocation()) {
       ++NumSimplify;
+      Changed = true;
       continue;
     }
 
@@ -1018,14 +1018,14 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         // extend it here as well
         if (!isa<SingleValueInstruction>(Inst))
           continue;
-        if (!OwnershipFixupContext::canFixUpOwnershipForRAUW(
-                cast<SingleValueInstruction>(Inst),
-                cast<SingleValueInstruction>(AvailInst)))
+
+        OwnershipRAUWHelper helper(RAUWFixupContext,
+                                   cast<SingleValueInstruction>(Inst),
+                                   cast<SingleValueInstruction>(AvailInst));
+        if (!helper.isValid())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
-        nextI = FixupCtx.replaceAllUsesAndErase(
-            cast<SingleValueInstruction>(Inst),
-            cast<SingleValueInstruction>(AvailInst));
+        nextI = helper.perform();
         Changed = true;
         ++NumCSE;
         continue;

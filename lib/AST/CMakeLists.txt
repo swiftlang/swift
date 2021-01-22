@@ -73,7 +73,6 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
-  SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp

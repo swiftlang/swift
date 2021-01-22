@@ -17,15 +17,6 @@ OptionalDifferentiationTests.test("Optional operations") {
     none.move(along: .init(3))
     expectEqual(nil, none)
   }
-
-  // Differentiable.zeroTangentVectorInitializer
-  do {
-    let some: [Float]? = [1, 2, 3]
-    expectEqual(.init([0, 0, 0]), some.zeroTangentVectorInitializer())
-
-    let none: [Float]? = nil
-    expectEqual(.init(nil), none.zeroTangentVectorInitializer())
-  }
 }
 
 OptionalDifferentiationTests.test("Optional.TangentVector operations") {
@@ -46,21 +37,6 @@ OptionalDifferentiationTests.test("Optional.TangentVector operations") {
     var nestedNone: Optional<Optional<Float>>.TangentVector = .init(.init(nil))
     nestedNone.move(along: .init(.init(3)))
     expectEqual(.init(nil), nestedNone.value)
-  }
-
-  // Differentiable.zeroTangentVectorInitializer
-  do {
-    let some: [Float]? = [1, 2, 3]
-    expectEqual(.init([0, 0, 0]), some.zeroTangentVectorInitializer())
-
-    let none: [Float]? = nil
-    expectEqual(.init(nil), none.zeroTangentVectorInitializer())
-
-    let nestedSome: [Float]?? = [1, 2, 3]
-    expectEqual(.init(.init([0, 0, 0])), nestedSome.zeroTangentVectorInitializer())
-
-    let nestedNone: [Float]?? = nil
-    expectEqual(.init(nil), nestedNone.zeroTangentVectorInitializer())
   }
 
   // AdditiveArithmetic.zero

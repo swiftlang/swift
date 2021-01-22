@@ -1692,7 +1692,7 @@ ERROR(where_nongeneric_toplevel,none,
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
       "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' were unable to be "
+      "The following Swift type(s) provided to '%0' could not be "
       "converted: %1.",
       (StringRef, StringRef))
 
@@ -3785,9 +3785,14 @@ WARNING(guard_always_succeeds,none,
 ERROR(expression_unused_closure,none,
       "closure expression is unused", ())
 ERROR(expression_unused_function,none,
-      "expression resolves to an unused function", ())
+      "function is unused", ())
 WARNING(expression_unused_lvalue,none,
-        "expression resolves to an unused %select{variable|property|subscript}0", (unsigned))
+      "%select{"
+        "variable|"
+        "property is accessed but result|"
+        "subscript is accessed but result"
+      "}0 is unused",
+      (unsigned))
 WARNING(expression_unused_result_call,none,
         "result of call to %0 is unused", (DeclName))
 WARNING(expression_unused_result_operator,none,

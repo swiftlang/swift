@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+
 #include "SILCombiner.h"
+
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -29,6 +31,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -78,41 +81,37 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   return true;
 }
 
-SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
-  if (PAI->getFunction()->hasOwnership())
-    return nullptr;
-
+SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *pai) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function. thin_to_thick_function supports only thin operands.
-  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0) &&
-      PAI->getSubstCalleeType()->getRepresentation() ==
+  if (!pai->hasSubstitutions() && (pai->getNumArguments() == 0) &&
+      pai->getSubstCalleeType()->getRepresentation() ==
           SILFunctionTypeRepresentation::Thin) {
-    if (!PAI->isOnStack())
-      return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
-                                               PAI->getType());
+    if (!pai->isOnStack())
+      return Builder.createThinToThickFunction(pai->getLoc(), pai->getCallee(),
+                                               pai->getType());
 
     // Remove dealloc_stack of partial_apply [stack].
     // Iterating while delete use a copy.
-    SmallVector<Operand *, 8> Uses(PAI->getUses());
-    for (auto *Use : Uses)
-      if (auto *dealloc = dyn_cast<DeallocStackInst>(Use->getUser()))
+    SmallVector<Operand *, 8> uses(pai->getUses());
+    for (auto *use : uses)
+      if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser()))
         eraseInstFromFunction(*dealloc);
     auto *thinToThick = Builder.createThinToThickFunction(
-        PAI->getLoc(), PAI->getCallee(), PAI->getType());
-    replaceInstUsesWith(*PAI, thinToThick);
-    eraseInstFromFunction(*PAI);
+        pai->getLoc(), pai->getCallee(), pai->getType());
+    replaceInstUsesWith(*pai, thinToThick);
+    eraseInstFromFunction(*pai);
     return nullptr;
   }
-
 
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
   // -> %closure_typeB
-  if (foldInverseReabstractionThunks(PAI, this))
+  if (foldInverseReabstractionThunks(pai, this))
     return nullptr;
 
   bool argsAreKeptAlive = tryOptimizeApplyOfPartialApply(
-      PAI, Builder.getBuilderContext(), getInstModCallbacks());
+      pai, Builder.getBuilderContext(), getInstModCallbacks());
   if (argsAreKeptAlive)
     invalidatedStackNesting = true;
 
@@ -120,7 +119,7 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // In case it became dead because of tryOptimizeApplyOfPartialApply, we don't
   // need to copy all arguments again (to extend their lifetimes), because it
   // was already done in tryOptimizeApplyOfPartialApply.
-  if (tryDeleteDeadClosure(PAI, getInstModCallbacks(), !argsAreKeptAlive))
+  if (tryDeleteDeadClosure(pai, getInstModCallbacks(), !argsAreKeptAlive))
     invalidatedStackNesting = true;
 
   return nullptr;
@@ -570,13 +569,13 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
 
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
-    if (isa<RefCountingInst>(Inst) ||
-        isa<DebugValueInst>(Inst)) {
+    if (isa<RefCountingInst>(Inst) || isa<DestroyValueInst>(Inst) ||
+        isa<DebugValueInst>(Inst) || isa<EndBorrowInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
     }
-    if (isa<TupleExtractInst>(Inst) ||
-        isa<StructExtractInst>(Inst) ||
+    if (isa<TupleExtractInst>(Inst) || isa<StructExtractInst>(Inst) ||
+        isa<CopyValueInst>(Inst) || isa<BeginBorrowInst>(Inst) ||
         isa<PointerToAddressInst>(Inst)) {
       Uses.push_back(Inst);
       if (recursivelyCollectARCUsers(Uses, cast<SingleValueInstruction>(Inst)))
@@ -628,10 +627,8 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       switch (PI.getConvention()) {
         case ParameterConvention::Indirect_In:
         case ParameterConvention::Indirect_In_Constant:
-          Builder.createDestroyAddr(FAS.getLoc(), Arg);
-          break;
         case ParameterConvention::Direct_Owned:
-          Builder.createReleaseValue(FAS.getLoc(), Arg, Builder.getDefaultAtomicity());
+          Builder.emitDestroyOperation(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Indirect_In_Guaranteed:
         case ParameterConvention::Indirect_Inout:
@@ -741,10 +738,33 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   // Prepare the code by adding UncheckedCast instructions that cast opened
   // existentials to concrete types. Set the ConcreteValue of CEI.
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(OAI.OpenedArchetypeValue)) {
-    SoleCEI.ConcreteValue =
-        Builder.createUncheckedRefCast(OER->getLoc(), OER, concreteSILType);
+    // If we have an owned open_existential_ref, we only optimize for now if our
+    // open_existential_ref has a single non-debug consuming use that is a
+    // destroy_value.
+    if (OER->getOwnershipKind() != OwnershipKind::Owned) {
+      // We use OER as the insertion point so that
+      SILBuilderWithScope b(std::next(OER->getIterator()), Builder);
+      auto loc = RegularLocation::getAutoGeneratedLocation();
+      SoleCEI.ConcreteValue =
+          b.createUncheckedRefCast(loc, OER, concreteSILType);
+      return COAI;
+    }
+
+    auto *consumingUse = OER->getSingleConsumingUse();
+    if (!consumingUse || !isa<DestroyValueInst>(consumingUse->getUser())) {
+      return None;
+    }
+
+    // We use std::next(OER) as the insertion point so that we can reuse the
+    // destroy_value of consumingUse.
+    SILBuilderWithScope b(std::next(OER->getIterator()), Builder);
+    auto loc = RegularLocation::getAutoGeneratedLocation();
+    auto *uri = b.createUncheckedRefCast(loc, OER, concreteSILType);
+    SoleCEI.ConcreteValue = uri;
+    replaceInstUsesWith(*OER, uri);
     return COAI;
   }
+
   if (auto *OEA = dyn_cast<OpenExistentialAddrInst>(OAI.OpenedArchetypeValue)) {
     // Bail if ConcreteSILType is not the same SILType as the type stored in the
     // existential after maximal reabstraction.
@@ -1246,6 +1266,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                                     WitnessMethodInst *WMI) {
+  // We do not perform this optimization in OSSA. In OSSA, we will have opaque
+  // values we will redo this.
+  if (WMI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Check if it is legal to perform the propagation.
   if (WMI->getConformance().isConcrete())
     return nullptr;
@@ -1327,6 +1352,9 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
 /// ==> apply %f<C : P>(%ref)
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
+  if (Apply.getFunction()->hasOwnership())
+    return nullptr;
+
   // This optimization requires a generic argument.
   if (!Apply.hasSubstitutions())
     return nullptr;
@@ -1354,19 +1382,30 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
 /// Check that all users of the apply are retain/release ignoring one
 /// user.
 static bool
-hasOnlyRetainReleaseUsers(ApplyInst *AI, SILInstruction *IgnoreUser,
-                          SmallVectorImpl<SILInstruction *> &Users) {
-  for (auto *Use : getNonDebugUses(AI)) {
-    if (Use->getUser() == IgnoreUser)
+hasOnlyRecursiveOwnershipUsers(ApplyInst *ai, SILInstruction *ignoreUser,
+                               SmallVectorImpl<SILInstruction *> &foundUsers) {
+  SmallVector<Operand *, 32> worklist(getNonDebugUses(ai));
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    auto *user = use->getUser();
+    if (user == ignoreUser)
       continue;
 
-    if (!isa<RetainValueInst>(Use->getUser()) &&
-        !isa<ReleaseValueInst>(Use->getUser()) &&
-        !isa<StrongRetainInst>(Use->getUser()) &&
-        !isa<StrongReleaseInst>(Use->getUser()))
+    if (!isa<RetainValueInst>(user) && !isa<ReleaseValueInst>(user) &&
+        !isa<StrongRetainInst>(user) && !isa<StrongReleaseInst>(user) &&
+        !isa<CopyValueInst>(user) && !isa<DestroyValueInst>(user) &&
+        !isa<BeginBorrowInst>(user) && !isa<EndBorrowInst>(user) &&
+        !user->isDebugInstruction())
       return false;
 
-    Users.push_back(Use->getUser());
+    if (auto *cvi = dyn_cast<CopyValueInst>(user))
+      for (auto *use : cvi->getUses())
+        worklist.push_back(use);
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(user))
+      for (auto *use : bbi->getUses())
+        worklist.push_back(use);
+
+    foundUsers.push_back(user);
   }
   return true;
 };
@@ -1416,11 +1455,11 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
          "Expect a @owned return");
   assert(Call->getNumArguments() == 1 && "Expect a unary call");
 
-  // Emit a retain for the @owned return.
+  // Emit a copy for the @owned return.
   SILBuilderWithScope Builder(Call);
   OnX = Builder.emitCopyValueOperation(Call->getLoc(), OnX);
 
-  // Emit a release for the @owned parameter, or none for a @guaranteed
+  // Emit a destroy for the @owned parameter, or none for a @guaranteed
   // parameter.
   auto Params = FnTy->getParameters();
   (void) Params;
@@ -1433,79 +1472,108 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
     Builder.emitDestroyValueOperation(Call->getLoc(), OnX);
 }
 
-/// Replace an application of a cast composition f_inverse(f(x)) by x.
-bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
-                                              StringRef FInverseName,
-                                              StringRef FName) {
+// Replace an application of a cast composition f_inverse(f(x)) by x.
+//
+// NOTE: The instruction we are actually folding is f_inverse.
+bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *fInverseApply,
+                                                  StringRef fInverseName,
+                                                  StringRef fName) {
   // Needs to have a known semantics.
-  if (!FInverse->hasSemantics(FInverseName))
+  if (!fInverseApply->hasSemantics(fInverseName))
     return false;
 
   // We need to know how to replace the call by reference counting instructions.
-  if (!knowHowToEmitReferenceCountInsts(FInverse))
+  if (!knowHowToEmitReferenceCountInsts(fInverseApply))
     return false;
 
   // Need to have a matching 'f'.
-  auto *F = dyn_cast<ApplyInst>(FInverse->getArgument(0));
-  if (!F)
+  auto fInverseArg0 = lookThroughOwnershipInsts(fInverseApply->getArgument(0));
+  auto *fApply = dyn_cast<ApplyInst>(fInverseArg0);
+  if (!fApply)
     return false;
-  if (!F->hasSemantics(FName))
+  if (!fApply->hasSemantics(fName))
     return false;
-  if (!knowHowToEmitReferenceCountInsts(F))
+  if (!knowHowToEmitReferenceCountInsts(fApply))
     return false;
 
   // The types must match.
-  if (F->getArgument(0)->getType() != FInverse->getType())
+  if (fApply->getArgument(0)->getType() != fInverseApply->getType())
     return false;
 
-  // Retains, releases of the result of F.
-  SmallVector<SILInstruction *, 16> RetainReleases;
-  if (!hasOnlyRetainReleaseUsers(F, FInverse, RetainReleases))
+  // Gather up all retain
+  SmallVector<SILInstruction *, 16> foundOwnershipUsers;
+  if (!hasOnlyRecursiveOwnershipUsers(fApply, fInverseApply /*user to ignore*/,
+                                      foundOwnershipUsers))
     return false;
 
   // Okay, now we know we can remove the calls.
-  auto X = F->getArgument(0);
+  auto arg0 = fApply->getArgument(0);
 
-  // Redirect f's result's retains/releases to affect x.
-  for (auto *User : RetainReleases) {
-    // X might not be strong_retain/release'able. Replace it by a
-    // retain/release_value on X instead.
-    if (isa<StrongRetainInst>(User)) {
-      SILBuilderWithScope Builder(User);
-      Builder.createRetainValue(User->getLoc(), X,
-                                cast<StrongRetainInst>(User)->getAtomicity());
-      eraseInstFromFunction(*User);
-      continue;
+  if (fApply->getFunction()->hasOwnership()) {
+    // First perform an ownership RAUW+erase of arg0 and inverse apply. The OSSA
+    // RAUW helper will copy arg0 if needed. We need to do this before anything
+    // else since the utility assumes OSSA is in correct form.
+    OwnershipRAUWHelper helper(ownershipFixupContext, fInverseApply, arg0);
+    if (!helper)
+      return false;
+    helper.perform();
+
+    // Now remove the apply, inserting a destroy_value if we need to it arg0.
+    if (fApply->getArgumentRef(0).isLifetimeEnding()) {
+      SILBuilderWithScope b(fApply, Builder);
+      if (arg0.getOwnershipKind() == OwnershipKind::Owned) {
+        b.emitDestroyValueOperation(fApply->getLoc(), arg0);
+      } else if (arg0.getOwnershipKind() == OwnershipKind::Guaranteed) {
+        b.emitEndBorrowOperation(fApply->getLoc(), arg0);
+      }
     }
-    if (isa<StrongReleaseInst>(User)) {
-      SILBuilderWithScope Builder(User);
-      Builder.createReleaseValue(User->getLoc(), X,
-                                 cast<StrongReleaseInst>(User)->getAtomicity());
-      eraseInstFromFunction(*User);
-      continue;
-    }
-    User->setOperand(0, X);
+    eraseInstIncludingUsers(fApply);
+
+    return true;
   }
 
-  // Simulate the reference count effects of the calls before removing
-  // them.
-  emitMatchingRCAdjustmentsForCall(F, X);
-  emitMatchingRCAdjustmentsForCall(FInverse, X);
+  // Redirect f's result's retains/releases to affect x.
+  //
+  // NOTE: This part of the code is only used in non-ownership SIL since we
+  // represent ARC operations there with copy_value, destroy_value that work
+  // with all types.
+  for (auto *ownershipUser : foundOwnershipUsers) {
+    // X might not be strong_retain/release'able. Replace it by a
+    // retain/release_value on X instead.
+    if (isa<StrongRetainInst>(ownershipUser)) {
+      SILBuilderWithScope b(ownershipUser, Builder);
+      b.createRetainValue(
+          ownershipUser->getLoc(), arg0,
+          cast<StrongRetainInst>(ownershipUser)->getAtomicity());
+      eraseInstFromFunction(*ownershipUser);
+      continue;
+    }
+    if (isa<StrongReleaseInst>(ownershipUser)) {
+      SILBuilderWithScope b(ownershipUser, Builder);
+      b.createReleaseValue(
+          ownershipUser->getLoc(), arg0,
+          cast<StrongReleaseInst>(ownershipUser)->getAtomicity());
+      eraseInstFromFunction(*ownershipUser);
+      continue;
+    }
+    ownershipUser->setOperand(0, arg0);
+    // Simulate the reference count effects of the calls before removing
+    // them.
+    emitMatchingRCAdjustmentsForCall(fApply, arg0);
+    emitMatchingRCAdjustmentsForCall(fInverseApply, arg0);
+  }
 
   // Replace users of f_inverse by x.
-  replaceInstUsesWith(*FInverse, X);
+  replaceInstUsesWith(*fInverseApply, arg0);
 
   // Remove the calls.
-  eraseInstFromFunction(*FInverse);
-  eraseInstFromFunction(*F);
+  eraseInstFromFunction(*fInverseApply);
+  eraseInstFromFunction(*fApply);
 
   return true;
 }
 
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
-  if (AI->getFunction()->hasOwnership())
-    return nullptr;
-
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1581,9 +1649,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 }
 
 SILInstruction *SILCombiner::visitBeginApplyInst(BeginApplyInst *BAI) {
-  if (BAI->getFunction()->hasOwnership())
-    return nullptr;
-
   if (tryOptimizeInoutKeypath(BAI))
     return nullptr;
   return nullptr;
@@ -1639,9 +1704,6 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
 }
 
 SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
-  if (AI->getFunction()->hasOwnership())
-    return nullptr;
-
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))

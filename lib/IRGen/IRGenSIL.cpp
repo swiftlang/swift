@@ -3162,6 +3162,10 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
 }
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
+  if (isAsync()) {
+    emitCoroutineOrAsyncExit();
+    return;
+  }
   Builder.CreateUnreachable();
 }
 

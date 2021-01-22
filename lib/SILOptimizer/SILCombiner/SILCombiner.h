@@ -96,11 +96,8 @@ class SILCombiner :
   /// post-dominating blocks to a full jointly post-dominating set.
   JointPostDominanceSetComputer jPostDomComputer;
 
-  /// A utility that we use to perform erase+RAUW that fixes up ownership for us
-  /// afterwards by lifetime extending/copy values as appropriate. We rely on
-  /// later optimizations to chew through this traffic. This ensures we can use
-  /// one code base for both OSSA and non-OSSA.
-  OwnershipFixupContext ownershipRAUWHelper;
+  /// External context struct used by \see ownershipRAUWHelper.
+  OwnershipFixupContext ownershipFixupContext;
 
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
@@ -134,7 +131,7 @@ public:
               Worklist.add(use->getUser());
             }),
         deBlocks(&B.getFunction()), jPostDomComputer(deBlocks),
-        ownershipRAUWHelper(instModCallbacks, deBlocks, jPostDomComputer) {}
+        ownershipFixupContext(instModCallbacks, deBlocks, jPostDomComputer) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -255,6 +252,8 @@ public:
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
+  SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
 
@@ -353,10 +352,6 @@ public:
   bool optimizeIdentityCastComposition(ApplyInst *FInverse,
                                        StringRef FInverseName, StringRef FName);
 
-  /// Let \p user and \p value be two forwarding single value instructions with
-  /// the property that \p user, through potentially a chain of forwarding
-  /// instructions.
-  ///
   /// Let \p user and \p value be two forwarding single value instructions  with
   /// the property that \p value is the value that \p user forwards. In this
   /// case, this helper routine will eliminate \p value if it can rewrite user

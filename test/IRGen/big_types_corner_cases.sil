@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
@@ -274,6 +274,15 @@ bb0(%0 : $*BigStruct):
   %10 = apply %5(%8) : $@noescape @callee_owned (@owned BigStruct) -> ()
   %12 = tuple ()
   return %12 : $()
+}
+
+sil @dontCrashWithLabeledSingleElementTupleOfClosure : $@convention(thin) () -> @callee_guaranteed () -> @owned BigStruct {
+bb0:
+  %f = function_ref @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+  %thick = thin_to_thick_function %f : $@convention(thin) () -> @owned BigStruct to $@callee_guaranteed () -> @owned BigStruct
+  %38 = tuple $(closure: @callee_guaranteed () -> @owned BigStruct) (%thick)
+  %99 = tuple_extract %38 : $(closure: @callee_guaranteed () -> @owned BigStruct), 0
+  return %99 : $@callee_guaranteed () -> @owned BigStruct
 }
 
 sil_vtable SuperBase {

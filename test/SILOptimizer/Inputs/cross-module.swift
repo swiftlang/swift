@@ -1,4 +1,5 @@
 import Submodule
+@_implementationOnly import PrivateSubmodule
 
 private enum PE<T> {
   case A
@@ -266,5 +267,12 @@ public func callUnrelated<T>(_ t: T) -> T {
   unrelated(43)
   return t
 }
+
+public func callImplementationOnly<T>(_ t: T) -> T {
+  let p = PrivateStr(i: 27)
+  print(p.test())
+  return t
+}
+
 
 public let globalLet = 529387

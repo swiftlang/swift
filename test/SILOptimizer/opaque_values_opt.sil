@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -O -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
+// REQUIRES: atrick-to-look-at
 
 import Builtin
 

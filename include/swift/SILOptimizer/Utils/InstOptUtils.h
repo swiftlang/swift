@@ -20,6 +20,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -399,6 +400,10 @@ public:
   }
 
   bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
+
+  /// Set \p wereAnyCallbacksInvoked to false. Useful if one wants to reuse an
+  /// InstModCallback in between iterations.
+  void resetHadCallbackInvocation() { wereAnyCallbacksInvoked = false; }
 };
 
 /// Get all consumed arguments of a partial_apply.
@@ -687,6 +692,20 @@ SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
 ///    ensured that we can end \p newValue's lifetime.
 SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
                                          InstModCallbacks &callbacks);
+
+/// Creates a copy of \p value and inserts additional control equivalent copy
+/// and destroy at leaking blocks to adjust ownership and make available for use
+/// at \p inBlock.
+SILValue
+makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock,
+                         JointPostDominanceSetComputer *jointPostDomComputer);
+
+/// Given a newly created @owned value \p value without any uses, this utility
+/// inserts control equivalent copy and destroy at leaking blocks to adjust
+/// ownership and make \p value available for use at \p inBlock.
+SILValue
+makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock,
+                      JointPostDominanceSetComputer *jointPostDomComputer);
 
 } // end namespace swift
 

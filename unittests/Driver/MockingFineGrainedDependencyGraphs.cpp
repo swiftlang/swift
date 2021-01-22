@@ -42,10 +42,9 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
     const bool hadCompilationError) {
   auto swiftDeps =
     cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps).str();
-  assert(!swiftDeps.empty());
-  swiftDeps.resize(Fingerprint::DIGEST_LENGTH, 'X');
-  auto interfaceHash =
-    interfaceHashIfNonEmpty.getValueOr(Fingerprint::fromString(swiftDeps));
+  auto swiftDepsFingerprint =
+    swift::mockFingerprintFromString(swiftDeps).getValue();
+  auto interfaceHash = interfaceHashIfNonEmpty.getValueOr(swiftDepsFingerprint);
 
   SourceManager sm;
   DiagnosticEngine diags(sm);

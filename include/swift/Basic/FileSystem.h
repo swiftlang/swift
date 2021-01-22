@@ -80,7 +80,8 @@ namespace swift {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
     getFileOrSTDIN(llvm::vfs::FileSystem &FS,
                    const llvm::Twine &Name, int64_t FileSize = -1,
-                   bool RequiresNullTerminator = true, bool IsVolatile = false);
+                   bool RequiresNullTerminator = true, bool IsVolatile = false,
+                   unsigned BADFRetry = 0);
   } // end namespace vfs
 
 } // end namespace swift
