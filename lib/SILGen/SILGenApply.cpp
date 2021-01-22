@@ -4969,7 +4969,7 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);
   auto subs = declRef.getSubstitutions();
-  bool throws;
+  bool throws = false;
   bool markedAsRethrows = call->getAttrs().hasAttribute<swift::RethrowsAttr>();
   FunctionRethrowingKind rethrowingKind = call->getRethrowingKind();
   if (rethrowingKind == FunctionRethrowingKind::ByConformance) {
@@ -4982,8 +4982,6 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   } else if (markedAsRethrows && 
              rethrowingKind == FunctionRethrowingKind::Throws) {
     throws = true;
-  } else {
-    throws = false;
   }
   
   // Scope any further writeback just within this operation.

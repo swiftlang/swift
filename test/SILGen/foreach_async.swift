@@ -54,10 +54,6 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
     mutating func next() async -> S.Element? {
       return iterator?.next()
     }
-
-    mutating func cancel() {
-      iterator = nil
-    }
   }
 
   var sequence: S
@@ -192,7 +188,6 @@ func trivialStructBreak(_ xx: AsyncLazySequence<[Int]>) async {
 
 // CHECK: [[COND_TRUE]]:
 // CHECK:   loopBreakEnd
-// CHECK:   cancel
 // CHECK:   br [[LOOP_EXIT:bb[0-9]+]]
 
 // CHECK: [[COND_FALSE]]:
