@@ -41,13 +41,13 @@ namespace swift {
 /// long as the invalidation mechanism ensures that the analysis data is not
 /// retrieved after the function's block list changed.
 ///
-/// The Vector template argument specifies how the data is stored. By default
-/// it's a SmallVector with an inline-size of 4. This avoids memory allocation
-/// for about 70% of all functions.
-template <typename Data, typename Vector = llvm::SmallVector<Data, 4>>
+/// The template argument \p N specifies how many Data elements can be stored
+/// inline in the data vector. The default value of 32 avoids malloc for about
+/// 90% of all functions.
+template <typename Data, unsigned N = 32>
 class BasicBlockData {
   SILFunction *function;
-  Vector data;
+  llvm::SmallVector<Data, N> data;
 
   /// The data is valid if validForBlockOrder matches the function's
   /// BlockListChangeIdx.
@@ -198,6 +198,19 @@ public:
 
   /// Gets a constant reference to a block's data.
   const Data &operator[] (SILBasicBlock *block) const {
+    return data[getIndex(block)];
+  }
+  
+  /// If \p block is a new block, i.e. created after this BasicBlockData was
+  /// constructed, creates a new Data with \p init and returns it.
+  Data &get(SILBasicBlock *block, llvm::function_ref<Data()> init) {
+    if (block->index < 0) {
+      assert(validForBlockOrder == function->BlockListChangeIdx &&
+             "BasicBlockData invalid because the function's block list changed");
+      validForBlockOrder = ++function->BlockListChangeIdx;
+      block->index = data.size();
+      data.push_back(init());
+    }
     return data[getIndex(block)];
   }
 };
