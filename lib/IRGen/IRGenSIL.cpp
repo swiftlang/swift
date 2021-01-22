@@ -31,6 +31,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
@@ -2007,7 +2008,7 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Invariant: for every block in the work queue, we have visited all
   // of its dominators.
-  llvm::SmallPtrSet<SILBasicBlock*, 8> visitedBlocks;
+  BasicBlockSet visitedBlocks(CurSILFn);
   SmallVector<SILBasicBlock*, 8> workQueue; // really a stack
 
   // Queue up the entry block, for which the invariant trivially holds.
@@ -2042,7 +2043,7 @@ void IRGenSILFunction::emitSILFunction() {
     // Therefore the invariant holds of all the successors, and we can
     // queue them up if we haven't already visited them.
     for (auto *succBB : bb->getSuccessorBlocks()) {
-      if (visitedBlocks.insert(succBB).second)
+      if (visitedBlocks.insert(succBB))
         workQueue.push_back(succBB);
     }
   }
@@ -2050,7 +2051,7 @@ void IRGenSILFunction::emitSILFunction() {
   // If there are dead blocks in the SIL function, we might have left
   // invalid blocks in the IR.  Do another pass and kill them off.
   for (SILBasicBlock &bb : *CurSILFn)
-    if (!visitedBlocks.count(&bb))
+    if (!visitedBlocks.contains(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
 
 }
