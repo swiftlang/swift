@@ -148,7 +148,7 @@ private:
   friend class SILBasicBlock;
   friend class SILModule;
   friend class SILFunctionBuilder;
-  template <typename Data, typename Vector> friend class BasicBlockData;
+  template <typename, unsigned> friend class BasicBlockData;
   friend class BasicBlockBitfield;
 
   /// Module - The SIL module that the function belongs to.
