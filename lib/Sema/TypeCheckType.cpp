@@ -869,6 +869,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
           const_cast<clang::ClassTemplateDecl *>(classTemplateDecl),
           templateArguments);
       if (instantiatedDecl) {
+        instantiatedDecl->setTemplateInstantiationType(result);
         return instantiatedDecl->getDeclaredInterfaceType();
       } else {
         diags.diagnose(loc, diag::cxx_class_instantiation_failed);

@@ -177,7 +177,7 @@ public:
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
   /// Instantiate and import class template.
-  virtual NominalTypeDecl *
+  virtual StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
 

@@ -3392,11 +3392,16 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl final : public NominalTypeDecl {
   SourceLoc StructLoc;
+  Type TemplateInstantiationType;
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
              ArrayRef<TypeLoc> Inherited,
              GenericParamList *GenericParams, DeclContext *DC);
+
+  StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
+             ArrayRef<TypeLoc> Inherited,
+             GenericParamList *GenericParams, DeclContext *DC, Type templateInstantiationType);
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceRange getSourceRange() const {
@@ -3436,6 +3441,9 @@ public:
   bool isCxxNonTrivial() const { return Bits.StructDecl.IsCxxNonTrivial; }
 
   void setIsCxxNonTrivial(bool v) { Bits.StructDecl.IsCxxNonTrivial = v; }
+
+  Type getTemplateInstantiationType() const { return TemplateInstantiationType; }
+  void setTemplateInstantiationType(Type t) { TemplateInstantiationType = t; }
 };
 
 /// This is the base type for AncestryOptions. Each flag describes possible

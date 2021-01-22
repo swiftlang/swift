@@ -3974,14 +3974,20 @@ void EnumDecl::setRawType(Type rawType) {
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        ArrayRef<TypeLoc> Inherited,
-                       GenericParamList *GenericParams, DeclContext *Parent)
+                       GenericParamList *GenericParams, DeclContext *Parent, Type TemplateInstantiationType)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, NameLoc, Inherited,
                     GenericParams),
-    StructLoc(StructLoc)
+    StructLoc(StructLoc), TemplateInstantiationType(TemplateInstantiationType)
 {
   Bits.StructDecl.HasUnreferenceableStorage = false;
   Bits.StructDecl.IsCxxNonTrivial = false;
 }
+
+StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
+                       ArrayRef<TypeLoc> Inherited,
+                       GenericParamList *GenericParams, DeclContext *Parent)
+  : StructDecl(StructLoc, Name, NameLoc, Inherited, GenericParams, Parent, Type())
+{}
 
 bool NominalTypeDecl::hasMemberwiseInitializer() const {
   // Currently only structs can have memberwise initializers.

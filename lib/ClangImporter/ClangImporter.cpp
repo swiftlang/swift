@@ -4151,7 +4151,7 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   return spec;
 }
 
-NominalTypeDecl *
+StructDecl *
 ClangImporter::instantiateCXXClassTemplate(
     clang::ClassTemplateDecl *decl,
     ArrayRef<clang::TemplateArgument> arguments) {
@@ -4169,7 +4169,7 @@ ClangImporter::instantiateCXXClassTemplate(
   assert(isa<clang::RecordType>(CanonType) &&
           "type of non-dependent specialization is not a RecordType");
 
-  return dyn_cast_or_null<NominalTypeDecl>(
+  return dyn_cast_or_null<StructDecl>(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
 

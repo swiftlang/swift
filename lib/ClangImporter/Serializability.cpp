@@ -23,6 +23,7 @@
 
 #include "ImporterImpl.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
+#include "clang/AST/DeclTemplate.h"
 
 using namespace swift;
 
@@ -72,9 +73,12 @@ private:
       // easier to just avoid doing so and fall into the external-path code.
       if (!isa<TypeAliasDecl>(swiftDecl)) {
         // Only accept this declaration if it round-trips.
-        if (auto swiftClangDecl = swiftDecl->getClangDecl())
-          if (isSameDecl(decl, swiftClangDecl))
-            return swiftDecl;
+        if (auto swiftClangDecl = swiftDecl->getClangDecl()) {
+          if (!isa<clang::ClassTemplateSpecializationDecl>(swiftClangDecl)) {
+            if (isSameDecl(decl, swiftClangDecl))
+              return swiftDecl;
+          }
+        }
       }
     }
 
@@ -102,7 +106,7 @@ private:
   bool findExternalPath(const clang::TagDecl *decl, ExternalPath &path) {
     // We can't handle class template specializations right now.
     if (isa<clang::ClassTemplateSpecializationDecl>(decl))
-      return false;
+      decl->dump();
 
     // Named tags are straightforward.
     if (auto name = decl->getIdentifier()) {

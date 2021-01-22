@@ -240,7 +240,7 @@ public:
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
 
-  NominalTypeDecl *
+  StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
 

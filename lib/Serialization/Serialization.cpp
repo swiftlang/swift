@@ -1886,12 +1886,12 @@ void Serializer::writeCrossReference(const Decl *D) {
     if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(
             D->getClangDecl())) {
       abbrCode = DeclTypeAbbrCodes[XRefClangTemplateInstantiationLayout::Code];
-      auto clangTypeID = addClangTypeRef(ctsd->getTypeForDecl());
+      // auto clangTypeID = addClangTypeRef(ctsd->getTypeForDecl());
 
-      XRefClangTemplateInstantiationLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, clangTypeID);
+      // XRefClangTemplateInstantiationLayout::emitRecord(
+      //     Out, ScratchRecord, abbrCode, clangTypeID);
 
-      return;
+      // return;
     }
   }
 
@@ -2218,6 +2218,13 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
       return;
     if (contextDependsOn(nominal, excluding))
       return;
+    if (auto clangDecl = nominal->getClangDecl()) {
+      auto &clangASTContext = nominal->getClangDecl()->getASTContext();
+      if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
+        seen.insert(dyn_cast<StructDecl>(nominal)->getTemplateInstantiationType());
+        return;
+      }
+    }
     seen.insert(nominal->getDeclaredInterfaceType());
   });
 }
