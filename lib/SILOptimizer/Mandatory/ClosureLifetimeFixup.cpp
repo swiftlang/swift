@@ -245,7 +245,9 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // lifetime respecting loops.
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy);
+  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
+                                                    ? OwnershipKind::Owned
+                                                    : OwnershipKind::None);
 
   // Create an Optional<() -> ()>.none in the entry block of the function and
   // add it as an available value to the SSAUpdater.
@@ -850,7 +852,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy);
+  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
+                                                    ? OwnershipKind::Owned
+                                                    : OwnershipKind::None);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;

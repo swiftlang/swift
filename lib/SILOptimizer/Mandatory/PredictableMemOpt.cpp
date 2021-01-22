@@ -684,7 +684,8 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   // have multiple insertion points if we are storing exactly the same value
   // implying that we can just copy firstVal at each insertion point.
   SILSSAUpdater updater(&insertedPhiNodes);
-  updater.initialize(loadTy);
+  updater.initialize(loadTy, B.hasOwnership() ? OwnershipKind::Owned
+                                              : OwnershipKind::None);
 
   Optional<SILValue> singularValue;
   for (auto *insertPt : insertPts) {
@@ -860,7 +861,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // never have the same value along all paths unless we have a trivial value
   // meaning the SSA updater given a non-trivial value must /always/ be used.
   SILSSAUpdater updater(&insertedPhiNodes);
-  updater.initialize(loadTy);
+  updater.initialize(loadTy, B.hasOwnership() ? OwnershipKind::Owned
+                                              : OwnershipKind::None);
 
   Optional<SILValue> singularValue;
   for (auto *i : insertPts) {

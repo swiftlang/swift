@@ -559,7 +559,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.initialize(StVal->getType());
+  SSAUp.initialize(StVal->getType(), StVal.getOwnershipKind());
 
   for (auto *Store : Stores)
     SSAUp.addAvailableValue(Store->getParent(), Store->getSrc());

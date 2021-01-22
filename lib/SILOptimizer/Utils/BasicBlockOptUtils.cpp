@@ -101,7 +101,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
 
   SILSSAUpdater ssaUpdater;
   for (auto availValPair : availVals) {
-    ValueBase *inst = availValPair.first;
+    auto inst = availValPair.first;
     if (inst->use_empty())
       continue;
 
@@ -112,7 +112,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
     for (auto *use : inst->getUses())
       useList.push_back(UseWrapper(use));
 
-    ssaUpdater.initialize(inst->getType());
+    ssaUpdater.initialize(inst->getType(), inst.getOwnershipKind());
     ssaUpdater.addAvailableValue(origBB, inst);
     ssaUpdater.addAvailableValue(getNewBB(), newResult);
 
