@@ -23,6 +23,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_BASICBLOCKOPTUTILS_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -35,9 +36,11 @@ class SILLoopInfo;
 
 /// Compute the set of reachable blocks.
 class ReachableBlocks {
-  SmallPtrSet<SILBasicBlock *, 32> visited;
+  BasicBlockSet visited;
 
 public:
+  ReachableBlocks(SILFunction *function) : visited(function) {}
+
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before
   /// uses except for phi-type block args). The \p visitor takes a block
@@ -45,10 +48,10 @@ public:
   /// continue visiting blocks.
   ///
   /// Returns true if all reachable blocks were visited.
-  bool visit(SILFunction *f, function_ref<bool(SILBasicBlock *)> visitor);
+  bool visit(function_ref<bool(SILBasicBlock *)> visitor);
 
   /// Return true if \p bb has been visited.
-  bool isVisited(SILBasicBlock *bb) const { return visited.count(bb); }
+  bool isVisited(SILBasicBlock *bb) const { return visited.contains(bb); }
 };
 
 /// Remove all instructions in the body of \p bb in safe manner by using
