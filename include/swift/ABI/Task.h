@@ -93,9 +93,9 @@ static_assert(alignof(Job) == 2 * alignof(void*),
 /// The current state of a task's status records.
 class ActiveTaskStatus {
   enum : uintptr_t {
-    IsCancelled = 0x1,
+    IsCanceled = 0x1,
     IsLocked = 0x2,
-    RecordMask = ~uintptr_t(IsCancelled | IsLocked)
+    RecordMask = ~uintptr_t(IsCanceled | IsLocked)
   };
 
   uintptr_t Value;
@@ -106,10 +106,10 @@ public:
                    bool cancelled, bool locked)
     : Value(reinterpret_cast<uintptr_t>(innermostRecord)
                 + (locked ? IsLocked : 0)
-                + (cancelled ? IsCancelled : 0)) {}
+                + (cancelled ? IsCanceled : 0)) {}
 
   /// Is the task currently cancelled?
-  bool isCancelled() const { return Value & IsCancelled; }
+  bool isCanceled() const { return Value & IsCanceled; }
 
   /// Is there an active lock on the cancellation information?
   bool isLocked() const { return Value & IsLocked; }
@@ -178,8 +178,8 @@ public:
 
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
-  bool isCancelled() const {
-    return Status.load(std::memory_order_relaxed).isCancelled();
+  bool isCanceled() const {
+    return Status.load(std::memory_order_relaxed).isCanceled();
   }
 
   /// A fragment of an async task structure that happens to be a child task.
