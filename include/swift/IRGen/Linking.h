@@ -130,8 +130,8 @@ class LinkEntity {
     /// is a ConstructorDecl* inside a class.
     DispatchThunkInitializer,
 
-    /// A method dispatch thunk for an allocating constructor.  The pointer is a
-    /// ConstructorDecl* inside a protocol or a class.
+    /// A method dispatch thunk for an allocating constructor.  The pointer is
+    /// a ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
 
     /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
@@ -295,7 +295,7 @@ class LinkEntity {
 
     /// The same as AsyncFunctionPointer but with a different stored value, for
     /// use by TBDGen.
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is an AbstractFunctionDecl*.
     AsyncFunctionPointerAST,
 
     /// The pointer is a SILFunction*.
@@ -861,7 +861,8 @@ public:
   }
 
   static LinkEntity
-  forSILFunction(SILFunction *F, bool IsDynamicallyReplaceableImplementation) {
+  forSILFunction(SILFunction *F,
+                 bool IsDynamicallyReplaceableImplementation=false) {
     LinkEntity entity;
     entity.Pointer = F;
     entity.SecondaryPointer = nullptr;
@@ -1100,12 +1101,21 @@ public:
     return entity;
   }
 
-  static LinkEntity forAsyncFunctionPointer(SILFunction *silFunction) {
+  static LinkEntity forAsyncFunctionPointer(LinkEntity other) {
     LinkEntity entity;
-    entity.Pointer = silFunction;
-    entity.SecondaryPointer = nullptr;
-    entity.Data = LINKENTITY_SET_FIELD(
-        Kind, unsigned(LinkEntity::Kind::AsyncFunctionPointer));
+
+    switch (other.getKind()) {
+    case LinkEntity::Kind::SILFunction:
+      entity.Pointer = other.getSILFunction();
+      entity.SecondaryPointer = nullptr;
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::AsyncFunctionPointer));
+      break;
+
+    default:
+      llvm_unreachable("Link entity kind cannot have an async function pointer");
+    }
+
     return entity;
   }
 

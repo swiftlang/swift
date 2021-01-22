@@ -165,15 +165,16 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
 llvm::Constant *
 IRGenModule::getAddrOfAsyncFunctionPointer(SILFunction *function) {
   (void)getAddrOfSILFunction(function, NotForDefinition);
-  auto entity = LinkEntity::forAsyncFunctionPointer(function);
+  auto entity = LinkEntity::forAsyncFunctionPointer(
+      LinkEntity::forSILFunction(function));
   return getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
 }
 
-llvm::Constant *IRGenModule::defineAsyncFunctionPointer(SILFunction *function,
+llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
                                                         ConstantInit init) {
-  auto entity = LinkEntity::forAsyncFunctionPointer(function);
+  auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
-      getAddrOfLLVMVariable(entity, init, DebugTypeInfo()));
+      getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
   setTrueConstGlobal(var);
   return var;
 }

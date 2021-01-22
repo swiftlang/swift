@@ -1397,7 +1397,7 @@ public:
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
 
   llvm::Constant *getAddrOfAsyncFunctionPointer(SILFunction *function);
-  llvm::Constant *defineAsyncFunctionPointer(SILFunction *function,
+  llvm::Constant *defineAsyncFunctionPointer(LinkEntity entity,
                                              ConstantInit init);
   SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
 

@@ -26,6 +26,7 @@
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -1943,9 +1944,12 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
   auto funcTy = CurSILFn->getLoweredFunctionType();
-  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift)
-    emitAsyncFunctionPointer(IGM, CurSILFn,
+  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift) {
+    emitAsyncFunctionPointer(IGM,
+                             CurFn,
+                             LinkEntity::forSILFunction(CurSILFn),
                              getAsyncContextLayout(*this).getSize());
+  }
 
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager
@@ -2278,14 +2282,14 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
-  llvm::Value *value;
+  llvm::Constant *value;
   auto isSpecialAsyncWithoutCtxtSize =
       fn->isAsync() && (
           fn->getName().equals("swift_task_future_wait") ||
           fn->getName().equals("swift_task_group_wait_next"));
   if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
-    value = Builder.CreateBitCast(value, fnPtr->getType());
+    value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
   }
