@@ -6,7 +6,7 @@ func asyncThrowsFunc() async throws -> Int { 42 }
 func asyncThrowsOnCancel() async throws -> Int {
   // terrible suspend-spin-loop -- do not do this
   // only for purposes of demonstration
-  while await !Task.isCanceled() {
+  while await !Task.isCancelled() {
     await Task.sleep(until: Task.Deadline.in(.seconds(1)))
   }
 
