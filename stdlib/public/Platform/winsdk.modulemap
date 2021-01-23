@@ -165,6 +165,9 @@ module WinSDK [system] {
       header "d3d11_2.h"
       header "d3d11_3.h"
       header "d3d11_4.h"
+
+      header "../shared/dxgi1_6.h"
+
       export *
 
       link "d3d11.lib"
