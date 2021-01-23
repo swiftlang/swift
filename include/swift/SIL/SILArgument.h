@@ -117,6 +117,9 @@ public:
   /// opposed to a cast or projection.
   bool isPhiArgument() const;
 
+  /// Return true if this block argument is a terminator result.
+  bool isTerminatorResult() const;
+
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
   SILValue getIncomingPhiValue(SILBasicBlock *predBlock) const;
@@ -208,6 +211,9 @@ public:
   /// opposed to a cast or projection.
   bool isPhiArgument() const;
 
+  /// Return true if this block argument is a terminator result.
+  bool isTerminatorResult() const { return !isPhiArgument(); }
+
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
   ///
@@ -283,6 +289,10 @@ public:
   /// terminator has a single operand, return that terminator.
   TermInst *getSingleTerminator() const;
 
+  /// Return the terminator instruction of which this argument is a result or
+  /// nullptr.
+  TermInst *getTransformingTerminator() const;
+
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
   static bool classof(SILNodePointer node) {
@@ -341,6 +351,16 @@ inline bool SILArgument::isPhiArgument() const {
   switch (getKind()) {
   case SILArgumentKind::SILPhiArgument:
     return cast<SILPhiArgument>(this)->isPhiArgument();
+  case SILArgumentKind::SILFunctionArgument:
+    return false;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline bool SILArgument::isTerminatorResult() const {
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->isTerminatorResult();
   case SILArgumentKind::SILFunctionArgument:
     return false;
   }
