@@ -333,7 +333,7 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1+1,
     AlreadyInLookupTable : 1,
 
     /// Whether we have already checked whether this declaration is a 
@@ -342,7 +342,11 @@ protected:
 
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
-    IsUserAccessible : 1
+    IsUserAccessible : 1,
+
+    /// Whether this member was synthesized as part of a derived
+    /// protocol conformance.
+    Synthesized : 1
   );
 
   SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1,
@@ -387,7 +391,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -405,10 +409,6 @@ protected:
 
     /// Whether the function body throws.
     Throws : 1,
-
-    /// Whether this member was synthesized as part of a derived
-    /// protocol conformance.
-    Synthesized : 1,
 
     /// Whether this member's body consists of a single expression.
     HasSingleExpressionBody : 1,
@@ -2020,6 +2020,7 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
+    Bits.ValueDecl.Synthesized = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2055,6 +2056,14 @@ public:
 
   bool isUserAccessible() const {
     return Bits.ValueDecl.IsUserAccessible;
+  }
+
+  bool isSynthesized() const {
+    return Bits.ValueDecl.Synthesized;
+  }
+
+  void setSynthesized(bool value = true) {
+    Bits.ValueDecl.Synthesized = value;
   }
 
   bool hasName() const { return bool(Name); }
@@ -3532,7 +3541,7 @@ class ClassDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
-  friend class SemanticMembersRequest;
+  friend class ABIMembersRequest;
   friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
 
@@ -5577,7 +5586,6 @@ protected:
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Async = Async;
     Bits.AbstractFunctionDecl.Throws = Throws;
-    Bits.AbstractFunctionDecl.Synthesized = false;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
     Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = false;
   }
@@ -5783,14 +5791,6 @@ public:
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;
-
-  bool isSynthesized() const {
-    return Bits.AbstractFunctionDecl.Synthesized;
-  }
-
-  void setSynthesized(bool value = true) {
-    Bits.AbstractFunctionDecl.Synthesized = value;
-  }
 
 public:
   /// Retrieve the source range of the function body.

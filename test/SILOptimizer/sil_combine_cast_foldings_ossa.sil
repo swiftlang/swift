@@ -36,8 +36,8 @@ entry(%0 : @owned $AnyObject):
 // We will handle this in a future commit.
 //
 // CHECK-LABEL: sil [ossa] @function_cast_nothrow_to_nothrow :
-// XHECK:         load
-// XHECK:         store
+// CHECK:         load
+// CHECK:         store
 // CHECK: } // end sil function 'function_cast_nothrow_to_nothrow'
 sil [ossa] @function_cast_nothrow_to_nothrow : $@convention(thin) <T> () -> () {
 entry:
@@ -66,7 +66,7 @@ entry:
 // We will handle this in a future commit.
 //
 // CHECK-LABEL: sil [ossa] @function_cast_throw_to_nothrow :
-// XHECK:         builtin "int_trap"
+// CHECK:         builtin "int_trap"
 // CHECK: } // end sil function 'function_cast_throw_to_nothrow'
 sil [ossa] @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
 entry:
@@ -87,8 +87,8 @@ entry:
 // We will handle this in a future commit.
 //
 // CHECK-LABEL: sil [ossa] @function_cast_throw_to_throw :
-// XHECK:         load
-// XHECK:         store
+// CHECK:         load
+// CHECK:         store
 // CHECK: } // end sil function 'function_cast_throw_to_throw'
 sil [ossa] @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
 entry:
@@ -126,7 +126,7 @@ bb0:
 // We will handle this in a future commit.
 //
 // CHECK-LABEL: sil [ossa] @destroy_source_of_removed_cast :
-// XHECK: destroy_addr %0
+// CHECK: destroy_addr %0
 // CHECK: } // end sil function 'destroy_source_of_removed_cast'
 sil [ossa] @destroy_source_of_removed_cast : $@convention(thin) (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
@@ -144,11 +144,11 @@ protocol P {}
 //
 // CHECK-LABEL: sil [ossa] @remove_dead_checked_cast :
 // CHECK: bb0(%0 : $*AnyObject):
-// XHECK-NEXT: alloc_stack
-// XHECK-NEXT: destroy_addr %0
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: destroy_addr %0
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 // CHECK: } // end sil function 'remove_dead_checked_cast'
 sil [ossa] @remove_dead_checked_cast : $@convention(thin) (@in AnyObject) -> () {
 bb0(%0 : $*AnyObject):
@@ -164,8 +164,8 @@ bb0(%0 : $*AnyObject):
 //
 // CHECK-LABEL: sil [ossa] @testIOU :
 // CHECK: bb0(%0 : $*Optional<AnyObject>, %1 : $*Optional<AnyObject>):
-// XHECK:  [[TMP:%.*]] = load [take] %1 : $*Optional<AnyObject>
-// XHECK:  store [[TMP]] to [init] %0 : $*Optional<AnyObject>
+// CHECK:  [[TMP:%.*]] = load [take] %1 : $*Optional<AnyObject>
+// CHECK:  store [[TMP]] to [init] %0 : $*Optional<AnyObject>
 // CHECK: } // end sil function 'testIOU'
 sil [ossa] @testIOU : $@convention(thin) (@in Optional<AnyObject>) -> (@out Optional<AnyObject>) {
 bb0(%0 : $*Optional<AnyObject>, %1: $*Optional<AnyObject>):

@@ -110,6 +110,10 @@ public:
     return isOperatorSlow();
   }
 
+  bool isArithmeticOperator() const {
+    return is("+") || is("-") || is("*") || is("/") || is("%");
+  }
+
   // Returns whether this is a standard comparison operator,
   // such as '==', '>=' or '!=='.
   bool isStandardComparisonOperator() const {

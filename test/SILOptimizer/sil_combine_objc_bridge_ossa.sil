@@ -219,15 +219,15 @@ bb0(%0 : @owned $AnNSArray):
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
-// XHECK: function_ref @$sSa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
-// XHECK-NOT: retain
-// XHECK: apply
-// XHECK: destroy_value
-// XHECK: upcast %{{.*}} : $NSArray to $NSObject
-// XHECK: store
-// XHECK: return
-sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
+// CHECK-LABEL: sil shared [ossa] @bridge_from_swift_array_to_NSObject_cast
+// CHECK: function_ref @$sSa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK-NOT: copy_value
+// CHECK: apply
+// CHECK: destroy_value
+// CHECK: upcast %{{.*}} : $NSArray to $NSObject
+// CHECK: store
+// CHECK: return
+sil shared [ossa] @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
 bb0(%0 : $*NSObject, %1 : $*Array<String>):
   %2 = alloc_stack $Array<String>
   copy_addr %1 to [initialization] %2 : $*Array<String>
@@ -246,13 +246,13 @@ enum AddressOnlyError : Error {
 // Test that we emit a copy_addr for the address-only value initialization.
 
 // CHECK-LABEL: sil [ossa] @unconditional_checked_cast_addr_address_only_type
-// XHECK: alloc_stack $Error
-// XHECK: alloc_stack $AddressOnlyError
-// XHECK:  copy_addr
-// XHECK: alloc_existential_box
-// XHECK: project_existential_box
-// XHECK: copy_addr
-// XHECK: store
+// CHECK: alloc_stack $Error
+// CHECK: alloc_stack $AddressOnlyError
+// CHECK:  copy_addr
+// CHECK: alloc_existential_box
+// CHECK: project_existential_box
+// CHECK: copy_addr
+// CHECK: store
 sil [ossa] @unconditional_checked_cast_addr_address_only_type: $@convention(thin) (@in_guaranteed AddressOnlyError) -> @owned Error {
 bb0(%0 : $*AddressOnlyError):
   %1 = alloc_stack $Error

@@ -1590,6 +1590,10 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   // C function pointers cannot capture anything from their context.
   auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
 
+  // Catch cases like:
+  //   func g(_ : @convention(c) () -> ()) {}
+  //   func q() { let z = 0; func r() { print(z) }; g(r); } // error
+  // (See also: [NOTE: diagnose-swift-to-c-convention-change])
   if (!captures.getCaptures().empty() ||
       captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||

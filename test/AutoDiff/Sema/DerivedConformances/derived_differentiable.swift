@@ -10,12 +10,12 @@ struct GenericTangentVectorMember<T: Differentiable>: Differentiable,
 
 // CHECK-AST-LABEL: internal struct GenericTangentVectorMember<T> : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} where T : Differentiable
 // CHECK-AST:   internal var x: T.TangentVector
-// CHECK-AST:   internal init(x: T.TangentVector)
-// CHECK-AST:   internal typealias TangentVector = GenericTangentVectorMember<T>
-// CHECK-AST:   internal static var zero: GenericTangentVectorMember<T> { get }
 // CHECK-AST:   internal static func + (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
 // CHECK-AST:   internal static func - (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
 // CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTangentVectorMember<T>, _ b: GenericTangentVectorMember<T>) -> Bool
+// CHECK-AST:   internal typealias TangentVector = GenericTangentVectorMember<T>
+// CHECK-AST:   internal init(x: T.TangentVector)
+// CHECK-AST:   internal static var zero: GenericTangentVectorMember<T> { get }
 
 public struct ConditionallyDifferentiable<T> {
   public var x: T
@@ -69,17 +69,17 @@ final class AdditiveArithmeticClass<T: AdditiveArithmetic & Differentiable>: Add
 public struct FrozenStruct: Differentiable {}
 
 // CHECK-AST-LABEL: @frozen public struct FrozenStruct : Differentiable {
-// CHECK-AST:   internal init()
 // CHECK-AST:   @frozen public struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
+// CHECK-AST:   internal init()
 
 @usableFromInline
 struct UsableFromInlineStruct: Differentiable {}
 
 // CHECK-AST-LABEL: @usableFromInline
 // CHECK-AST: struct UsableFromInlineStruct : Differentiable {
-// CHECK-AST:   internal init()
 // CHECK-AST:   @usableFromInline
 // CHECK-AST:   struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
+// CHECK-AST:   internal init()
 
 // Test property wrappers.
 

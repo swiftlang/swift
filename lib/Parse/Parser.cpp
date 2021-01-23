@@ -34,7 +34,6 @@
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -148,7 +147,7 @@ void Parser::performCodeCompletionSecondPassImpl(
   SyntaxContext->disable();
 
   // Disable updating the interface hash
-  llvm::SaveAndRestore<Optional<llvm::MD5>> CurrentTokenHashSaver(
+  llvm::SaveAndRestore<Optional<StableHasher>> CurrentTokenHashSaver(
       CurrentTokenHash, None);
 
   auto BufferID = L->getBufferID();
@@ -540,7 +539,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 
   // If the interface hash is enabled, set up the initial hash.
   if (SF.hasInterfaceHash())
-    CurrentTokenHash.emplace();
+    CurrentTokenHash.emplace(StableHasher::defaultHasher());
 
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
@@ -590,10 +589,9 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
 void Parser::recordTokenHash(StringRef token) {
   assert(!token.empty());
   if (CurrentTokenHash) {
-    CurrentTokenHash->update(token);
+    CurrentTokenHash->combine(token);
     // Add null byte to separate tokens.
-    uint8_t a[1] = {0};
-    CurrentTokenHash->update(a);
+    CurrentTokenHash->combine(uint8_t{0});
   }
 }
 

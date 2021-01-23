@@ -335,7 +335,7 @@ updateSSA(SILModule &M, SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.initialize(OrigValue->getType());
+    SSAUp.initialize(OrigValue->getType(), OrigValue.getOwnershipKind());
     SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);
@@ -347,10 +347,11 @@ updateSSA(SILModule &M, SILLoop *Loop,
 }
 
 /// Try to fully unroll the loop if we can determine the trip count and the trip
-/// count lis below a threshold.
+/// count is below a threshold.
 static bool tryToUnrollLoop(SILLoop *Loop) {
   assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
 
+  LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
@@ -364,11 +365,15 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
 
   Optional<uint64_t> MaxTripCount =
       getMaxLoopTripCount(Loop, Preheader, Header, Latch);
-  if (!MaxTripCount)
+  if (!MaxTripCount) {
+    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
     return false;
+  }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.getValue()))
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.getValue())) {
+    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
+  }
 
   // TODO: We need to split edges from non-condbr exits for the SSA updater. For
   // now just don't handle loops containing such exits.
@@ -443,7 +448,6 @@ class LoopUnrolling : public SILFunctionTransform {
 
   void run() override {
     bool Changed = false;
-
     auto *Fun = getFunction();
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
 
@@ -461,6 +465,12 @@ class LoopUnrolling : public SILFunctionTransform {
           InnermostLoops.push_back(L);
       }
     }
+
+    if (InnermostLoops.empty())
+      return;
+
+    LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
+                            << Fun->getName() << "\n");
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)

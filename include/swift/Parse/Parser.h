@@ -127,7 +127,7 @@ public:
 
   /// The current token hash, or \c None if the parser isn't computing a hash
   /// for the token stream.
-  Optional<llvm::MD5> CurrentTokenHash;
+  Optional<StableHasher> CurrentTokenHash;
 
   void recordTokenHash(const Token Tok) {
     if (!Tok.getText().empty())

@@ -1326,7 +1326,8 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
 
       if (!storeAddr) {
         storeAddr = SI->getDest();
-        ssaUpdater.initialize(storeAddr->getType().getObjectType());
+        ssaUpdater.initialize(storeAddr->getType().getObjectType(),
+                              storeAddr.getOwnershipKind());
       } else if (SI->getDest()->getType() != storeAddr->getType()) {
         // This transformation assumes that the values of all stores in the loop
         // must be interchangeable. It won't work if stores different types
