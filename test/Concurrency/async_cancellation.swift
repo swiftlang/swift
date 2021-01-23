@@ -10,8 +10,8 @@ func test_cancellation_checkCancellation() async throws {
   try await Task.checkCancellation()
 }
 
-func test_cancellation_guard_isCanceled(_ any: Any) async -> PictureData {
-  guard await !Task.isCanceled() else {
+func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
+  guard await !Task.isCancelled() else {
     return PictureData.failedToLoadImagePlaceholder
   }
 
@@ -29,7 +29,7 @@ func test_cancellation_withCancellationHandler(_ anything: Any) async -> Picture
     return try await Task.withCancellationHandler(
       handler: { file.close() },
       operation: {
-      await test_cancellation_guard_isCanceled(file)
+      await test_cancellation_guard_isCancelled(file)
     })
   }
 
@@ -41,7 +41,7 @@ func test_cancellation_loop() async -> Int {
 
   let tasks = [SampleTask(), SampleTask()]
   var processed = 0
-  for t in tasks where await !Task.isCanceled() {
+  for t in tasks where await !Task.isCancelled() {
     await t.process()
     processed += 1
   }
