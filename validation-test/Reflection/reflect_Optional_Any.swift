@@ -4,11 +4,10 @@
 // RUN: %target-build-swift -g -lswiftSwiftReflectionTest %s -o %t/reflect_Optional_Any
 // RUN: %target-codesign %t/reflect_Optional_Any
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Optional_Any | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Optional_Any | %FileCheck %s --check-prefix=CHECK-%target-ptrsize %add_num_extra_inhabitants
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=tvos || OS=watchos || OS=ios
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
@@ -31,11 +30,11 @@ reflect(enum: optionalAnyNonNil)
 // CHECK-64:   (protocol_composition))
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:   (case name=some index=0 offset=0
-// CHECK-64:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=metadata offset=24
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))
+// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))
 // CHECK-64:   (case name=none index=1))
 
 // CHECK-64: Mangled name: $sypSg
@@ -80,11 +79,11 @@ reflect(enum: optionalAnyNil)
 // CHECK-64:   (protocol_composition))
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:   (case name=some index=0 offset=0
-// CHECK-64:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:       (field name=metadata offset=24
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))
+// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))
 // CHECK-64:   (case name=none index=1))
 
 // CHECK-64: Mangled name: $sypSg
@@ -127,13 +126,13 @@ reflect(enum: optionalOptionalAnyNil)
 // CHECK-64:     (protocol_composition)))
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483645 bitwise_takable=1
+// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-2]] bitwise_takable=1
 // CHECK-64:   (case name=some index=0 offset=0
-// CHECK-64:     (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
-// CHECK-64:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:           (field name=metadata offset=24
-// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))
+// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (case name=none index=1))
 
@@ -180,13 +179,13 @@ reflect(enum: optionalOptionalAnySomeNil)
 // CHECK-64:     (protocol_composition)))
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483645 bitwise_takable=1
+// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-2]] bitwise_takable=1
 // CHECK-64:   (case name=some index=0 offset=0
-// CHECK-64:     (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
-// CHECK-64:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:           (field name=metadata offset=24
-// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))
+// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (case name=none index=1))
 
@@ -239,13 +238,13 @@ reflect(enum: optionalOptionalAnyNonNil)
 // CHECK-64:     (protocol_composition)))
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483645 bitwise_takable=1
+// CHECK-64: (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-2]] bitwise_takable=1
 // CHECK-64:   (case name=some index=0 offset=0
-// CHECK-64:     (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-1]] bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
-// CHECK-64:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1
 // CHECK-64:           (field name=metadata offset=24
-// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))
+// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit]] bitwise_takable=1))))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (case name=none index=1))
 
