@@ -59,7 +59,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   }
 
   // Allocate the new node.
-  auto nodePtr = new ConstraintGraphNode(typeVar);
+  auto nodePtr = new ConstraintGraphNode(CS, typeVar);
   unsigned index = TypeVariables.size();
   impl.setGraphNode(nodePtr);
   impl.setGraphIndex(index);
@@ -107,6 +107,7 @@ void ConstraintGraphNode::addConstraint(Constraint *constraint) {
   assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
+  Bindings.infer(constraint);
 }
 
 void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
@@ -117,6 +118,8 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   auto index = pos->second;
   ConstraintIndex.erase(pos);
   assert(Constraints[index] == constraint && "Mismatched constraint");
+
+  Bindings.retract(constraint);
 
   // If this is the last constraint, just pop it off the list and we're done.
   unsigned lastIndex = Constraints.size()-1;

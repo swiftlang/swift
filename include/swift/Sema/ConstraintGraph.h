@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Sema/CSBindings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -47,13 +48,14 @@ class ConstraintSystem;
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
-  explicit ConstraintGraphNode(TypeVariableType *typeVar) : TypeVar(typeVar) { }
+  explicit ConstraintGraphNode(ConstraintSystem &cs, TypeVariableType *typeVar)
+      : Bindings(cs, typeVar) {}
 
   ConstraintGraphNode(const ConstraintGraphNode&) = delete;
   ConstraintGraphNode &operator=(const ConstraintGraphNode&) = delete;
 
   /// Retrieve the type variable this node represents.
-  TypeVariableType *getTypeVariable() const { return TypeVar; }
+  TypeVariableType *getTypeVariable() const { return Bindings.TypeVar; }
 
   /// Retrieve the set of constraints that mention this type variable.
   ///
@@ -74,6 +76,8 @@ public:
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
+
+  inference::PotentialBindings &getBindings() { return Bindings; }
 
 private:
   /// Determines whether the type variable associated with this node
@@ -112,8 +116,8 @@ private:
   /// Remove a type variable which used to reference this type variable.
   void removeReferencedBy(TypeVariableType *typeVar);
 
-  /// The type variable this node represents.
-  TypeVariableType *TypeVar;
+  /// The set of bindings associated with this type variable.
+  inference::PotentialBindings Bindings;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
