@@ -167,6 +167,7 @@ void SILModule::checkForLeaks() const {
 }
 
 void SILModule::checkForLeaksAfterDestruction() {
+#ifndef NDEBUG
   int numAllocated = SILInstruction::getNumCreatedInstructions() -
                      SILInstruction::getNumDeletedInstructions();
 
@@ -174,6 +175,7 @@ void SILModule::checkForLeaksAfterDestruction() {
     llvm::errs() << "Leaking " << numAllocated << " instructions!\n";
     llvm_unreachable("leaking instructions");
   }
+#endif
 }
 
 std::unique_ptr<SILModule> SILModule::createEmptyModule(
