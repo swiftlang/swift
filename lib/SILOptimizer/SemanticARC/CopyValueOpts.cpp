@@ -331,7 +331,7 @@ static bool canJoinIfCopyDiesInFunctionExitingBlock(
 }
 
 static Operand *lookThroughSingleForwardingUse(Operand *use) {
-  auto forwardingOperand = ForwardingOperand::get(use);
+  ForwardingOperand forwardingOperand(use);
   if (!forwardingOperand)
     return nullptr;
   auto forwardedValue = forwardingOperand.getSingleForwardedValue();
@@ -423,7 +423,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // If not, see if this use did have a forwardedValue but that forwardedValue
     // has multiple end lifetime uses. In that case, we can optimize if there
     // aren't any uses/etc
-    auto forwardingOperand = ForwardingOperand::get(currentForwardingUse);
+    ForwardingOperand forwardingOperand(currentForwardingUse);
     if (!forwardingOperand)
       return false;
     auto forwardedValue = forwardingOperand.getSingleForwardedValue();
