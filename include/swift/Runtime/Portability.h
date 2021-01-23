@@ -28,7 +28,10 @@ size_t _swift_strlcpy(char *dst, const char *src, size_t maxlen);
 #ifdef SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 #endif
-__attribute((__format__(__printf__, 2, 3))) inline static int
+#ifdef __clang__
+__attribute((__format__(__printf__, 2, 3)))
+#endif
+inline static int
 swift_asprintf(char **strp, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
