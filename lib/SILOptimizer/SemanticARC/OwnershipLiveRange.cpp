@@ -228,7 +228,7 @@ void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   while (!ownershipForwardingUses.empty()) {
     auto *use = ownershipForwardingUses.back();
     ownershipForwardingUses = ownershipForwardingUses.drop_back();
-    auto operand = ForwardingOperand::get(use);
+    ForwardingOperand operand(use);
     operand.replaceOwnershipKind(OwnershipKind::Owned,
                                  OwnershipKind::Guaranteed);
   }
