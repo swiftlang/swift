@@ -99,70 +99,88 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
   return phiArg;
 }
 
-static void getAllNonTrivialUsePointsOfBorrowedValue(
-    SILValue value, SmallVectorImpl<Operand *> &usePoints,
-    SmallVectorImpl<BorrowingOperand> &reborrowPoints) {
+static bool findTransitiveBorrowedUses(
+  SILValue value, SmallVectorImpl<Operand *> &usePoints,
+  SmallVectorImpl<BorrowingOperand> &reborrowPoints) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
 
   unsigned firstOffset = usePoints.size();
-  llvm::copy(value->getUses(), std::back_inserter(usePoints));
-
-  if (usePoints.size() == firstOffset)
-    return;
+  for (Operand *use : value->getUses()) {
+    if (use->getOperandOwnership() != OperandOwnership::NonUse)
+      usePoints.push_back(use);
+  }
 
   // NOTE: Use points resizes in this loop so usePoints.size() may be
   // different every time.
   for (unsigned i = firstOffset; i < usePoints.size(); ++i) {
-    if (auto fOperand = ForwardingOperand::get(usePoints[i])) {
-      fOperand.visitForwardedValues([&](SILValue transitiveValue) {
-        // Do not include transitive uses with 'none' ownership
-        if (transitiveValue.getOwnershipKind() == OwnershipKind::None)
-          return true;
-        for (auto *transitiveUse : transitiveValue->getUses())
-          usePoints.push_back(transitiveUse);
-        return true;
-      });
-      continue;
-    }
+    Operand *use = usePoints[i];
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      llvm_unreachable("this operand cannot handle a guaranteed use");
 
-    if (auto borrowingOp = BorrowingOperand::get(usePoints[i])) {
-      // If we have a reborrow, we have no further work to do, our reborrow is
-      // already a use and we will handle the reborrow separately.
-      if (borrowingOp.isReborrow())
-        continue;
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return false;
 
-      // Otherwise, try to grab additional end scope instructions to find more
-      // liveness info. Stash any reborrow uses so that we can eliminate the
-      // reborrow before we are done processing.
-      borrowingOp.visitLocalEndScopeUses([&](Operand *scopeEndingUse) {
-        if (auto scopeEndingBorrowingOp =
-                BorrowingOperand::get(scopeEndingUse)) {
-          if (scopeEndingBorrowingOp.isReborrow()) {
-            reborrowPoints.push_back(scopeEndingUse);
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::BitwiseEscape:
+    case OperandOwnership::EndBorrow:
+    case OperandOwnership::Reborrow:
+      break;
+
+    case OperandOwnership::InteriorPointer:
+      // If our base guaranteed value does not have any consuming uses (consider
+      // function arguments), we need to be sure to include interior pointer
+      // operands since we may not get a use from a end_scope instruction.
+      if (!InteriorPointerOperand(use).findTransitiveUses(usePoints)) {
+        return false;
+      }
+      break;
+
+    case OperandOwnership::ForwardingBorrow:
+      ForwardingOperand(use).visitForwardedValues(
+        [&](SILValue transitiveValue) {
+          // Do not include transitive uses with 'none' ownership
+          if (transitiveValue.getOwnershipKind() == OwnershipKind::None)
             return true;
+          for (auto *transitiveUse : transitiveValue->getUses()) {
+            if (transitiveUse->getOperandOwnership()
+                != OperandOwnership::NonUse) {
+              usePoints.push_back(transitiveUse);
+            }
           }
-        }
-        usePoints.push_back(scopeEndingUse);
-        return true;
-      });
+          return true;
+        });
+      break;
 
-      // Now break up all of the reborrows
-      continue;
-    }
-
-    // If our base guaranteed value does not have any consuming uses (consider
-    // function arguments), we need to be sure to include interior pointer
-    // operands since we may not get a use from a end_scope instruction.
-    if (auto intPtrOperand = InteriorPointerOperand::get(usePoints[i])) {
-      intPtrOperand.getImplicitUses(usePoints);
-      continue;
+    case OperandOwnership::Borrow:
+      // Try to grab additional end scope instructions to find more liveness
+      // info. Stash any reborrow uses so that we can eliminate the reborrow
+      // before we are done processing.
+      BorrowingOperand(use).visitLocalEndScopeUses(
+        [&](Operand *scopeEndingUse) {
+          if (auto scopeEndingBorrowingOp = BorrowingOperand(scopeEndingUse)) {
+            if (scopeEndingBorrowingOp.isReborrow()) {
+              reborrowPoints.push_back(scopeEndingUse);
+              return true;
+            }
+          }
+          usePoints.push_back(scopeEndingUse);
+          return true;
+        });
     }
   }
+  return true;
 }
 
-// All callers of our RAUW routines must ensure that their values return true
-// from this.
-static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue) {
+// Determine whether it is valid to replace \p oldValue with \p newValue by
+// directly checking ownership requirements. This does not determine whether the
+// scope of the newValue can be fully extended.
+static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue) {
   auto newOwnershipKind = newValue.getOwnershipKind();
 
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
@@ -170,6 +188,18 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue) {
   // replace any value with a ValueOwnershipKind::None value.
   if (newOwnershipKind == OwnershipKind::None)
     return true;
+
+  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
+  // not, we may need to do more work that has not been implemented yet. So
+  // bail.
+  //
+  // Due to our requirement that types line up, this can only occur given a
+  // non-trivial typed value with None ownership. This can only happen when
+  // oldValue is a trivial payloaded or no-payload non-trivially typed
+  // enum. That doesn't occur that often so we just bail on it today until we
+  // implement this functionality.
+  if (oldValue.getOwnershipKind() == OwnershipKind::None)
+    return false;
 
   // First check if oldValue is SILUndef. If it is, then we know that:
   //
@@ -193,23 +223,26 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue) {
   if (m->getStage() == SILStage::Raw)
     return false;
 
-  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
-  // not, we may need to do more work that has not been implemented yet. So
-  // bail.
-  //
-  // Due to our requirement that types line up, this can only occur given a
-  // non-trivial typed value with None ownership. This can only happen when
-  // oldValue is a trivial payloaded or no-payload non-trivially typed
-  // enum. That doesn't occur that often so we just bail on it today until we
-  // implement this functionality.
-  auto oldOwnershipKind = SILValue(oldValue).getOwnershipKind();
-  if (oldOwnershipKind != OwnershipKind::None)
-    return true;
+  return true;
+}
 
-  // Ok, we have an old ownership kind that is OwnershipKind::None and a new
-  // ownership kind that is not OwnershipKind::None. In that case, for now, do
-  // not perform this transform.
-  return false;
+// Determine whether it is valid to replace \p oldValue with \p newValue and
+// extend the lifetime of \p oldValue to cover the new uses.
+//
+// This updates the OwnershipFixupContext, populating transitiveBorrowedUses and
+// recursiveReborrows.
+static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
+                                     OwnershipFixupContext &context) {
+  if (!hasValidRAUWOwnership(oldValue, newValue))
+    return false;
+
+  if (oldValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    // Check that the old lifetime can be extended and record the necessary
+    // book-keeping in the OwnershipFixupContext.
+    return findTransitiveBorrowedUses(oldValue, context.transitiveBorrowedUses,
+                                      context.recursiveReborrows);
+  }
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -651,19 +684,17 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
   // Otherwise, we need to actually modify the IR. We first always first
   // lifetime extend newValue to oldValue's transitive uses to set our
   // workspace.
-  SmallVector<Operand *, 32> usePoints;
-  SmallVector<BorrowingOperand, 8> recursiveBorrowScopeReborrows;
-  getAllNonTrivialUsePointsOfBorrowedValue(oldValue, usePoints,
-                                           recursiveBorrowScopeReborrows);
 
   // If we have any transitive reborrows on sub-borrows.
-  if (recursiveBorrowScopeReborrows.size())
-    eliminateReborrowsOfRecursiveBorrows(recursiveBorrowScopeReborrows,
-                                         usePoints, ctx.callbacks);
+  if (ctx.recursiveReborrows.size())
+    eliminateReborrowsOfRecursiveBorrows(ctx.recursiveReborrows,
+                                         ctx.transitiveBorrowedUses,
+                                         ctx.callbacks);
 
   auto extender = getLifetimeExtender();
   SILValue newBorrowedValue =
-      extender.createPlusZeroBorrow<ArrayRef<Operand *>>(newValue, usePoints);
+      extender.createPlusZeroBorrow<ArrayRef<Operand *>>(
+          newValue, ctx.transitiveBorrowedUses);
 
   // Now we need to handle reborrows by eliminating the reborrows from any
   // borrowing operands that use old value as well as from oldvalue itself. We
@@ -696,8 +727,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
 
 SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   assert(oldValue->getFunction()->hasOwnership());
-  assert(
-      canFixUpOwnershipForRAUW(oldValue, newValue) &&
+  assert(hasValidRAUWOwnership(oldValue, newValue) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to do it so just RAUW
   // and return.
@@ -888,7 +918,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
-  if (!canFixUpOwnershipForRAUW(oldValue, newValue)) {
+  if (!canFixUpOwnershipForRAUW(oldValue, newValue, inputCtx)) {
     ctx = nullptr;
     return;
   }
@@ -964,8 +994,8 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
 
   // For now, just gather up uses
   auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
-  if (InteriorPointerOperand::getImplicitUsesForAddress(oldValue,
-                                                        oldValueUses)) {
+  if (InteriorPointerOperand::findTransitiveUsesForAddress(oldValue,
+                                                           oldValueUses)) {
     // If we found an error, invalidate and return!
     ctx = nullptr;
     return;

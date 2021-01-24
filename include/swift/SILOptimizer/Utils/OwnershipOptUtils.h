@@ -38,6 +38,9 @@ struct OwnershipFixupContext {
   DeadEndBlocks &deBlocks;
   JointPostDominanceSetComputer &jointPostDomSetComputer;
 
+  SmallVector<Operand *, 8> transitiveBorrowedUses;
+  SmallVector<BorrowingOperand, 8> recursiveReborrows;
+
   /// Extra state initialized by OwnershipRAUWFixupHelper::get() that we use
   /// when RAUWing addresses. This ensures we do not need to recompute this
   /// state when we perform the actual RAUW.
@@ -67,6 +70,8 @@ struct OwnershipFixupContext {
 
   void clear() {
     jointPostDomSetComputer.clear();
+    transitiveBorrowedUses.clear();
+    recursiveReborrows.clear();
     extraAddressFixupInfo.allAddressUsesFromOldValue.clear();
     extraAddressFixupInfo.intPtrOp = InteriorPointerOperand();
   }
