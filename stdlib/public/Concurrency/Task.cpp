@@ -554,11 +554,17 @@ void swift::swift_task_asyncMainDrainQueue() {
 
   pfndispatch_main();
 #else
+  // CFRunLoop is not available on non-Darwin targets.  Foundation has an
+  // implementation, but CoreFoundation is not meant to be exposed.  We can only
+  // assume the existence of `CFRunLoopRun` on Darwin platforms, where the
+  // system provides an implementation of CoreFoundation.
+#if defined(__APPLE__)
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
   if (runLoop)
-    runLoop();
-  else
+    return runLoop();
+#endif
+
     dispatch_main();
 #endif
 }
