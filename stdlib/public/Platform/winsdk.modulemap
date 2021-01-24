@@ -165,9 +165,6 @@ module WinSDK [system] {
       header "d3d11_2.h"
       header "d3d11_3.h"
       header "d3d11_4.h"
-
-      header "../shared/dxgi1_6.h"
-
       export *
 
       link "d3d11.lib"
@@ -180,6 +177,23 @@ module WinSDK [system] {
 
       link "d3d12.lib"
       link "dxgi.lib"
+    }
+
+    // FIXME(compnerd) DXGI is part of the Direct3D interfaces currently; we
+    // should split it out, but because it is part of the D3D11 interfaces, this
+    // separate module is meant to augment the uncovered portions only.
+    module _DXGI {
+      header "../shared/dxgi1_6.h"
+      export *
+
+      link "dxgi.lib"
+    }
+
+    module D3DCompiler {
+      header "d3dcompiler.h"
+      export *
+
+      link "d3dcompiler.lib"
     }
 
     module XAudio29 {
