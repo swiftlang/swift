@@ -520,7 +520,7 @@ bool BorrowedValue::visitInteriorPointerOperands(
 //                           InteriorPointerOperand
 //===----------------------------------------------------------------------===//
 
-bool InteriorPointerOperand::getImplicitUsesForAddress(
+bool InteriorPointerOperand::findTransitiveUsesForAddress(
     SILValue projectedAddress, SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *onError) {
   SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
@@ -882,12 +882,12 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
 //                             Forwarding Operand
 //===----------------------------------------------------------------------===//
 
-ForwardingOperand ForwardingOperand::get(Operand *use) {
+ForwardingOperand::ForwardingOperand(Operand *use) {
   if (use->isTypeDependent())
-    return nullptr;
+    return;
 
   if (!OwnershipForwardingMixin::isa(use->getUser())) {
-    return nullptr;
+    return;
   }
 #ifndef NDEBUG
   switch (use->getOperandOwnership()) {
@@ -909,7 +909,7 @@ ForwardingOperand ForwardingOperand::get(Operand *use) {
     llvm_unreachable("this isn't the operand being forwarding!");
   }
 #endif
-  return {use};
+  this->use = use;
 }
 
 ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
@@ -1008,7 +1008,7 @@ void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
     return;
   }
 
-  llvm_unreachable("Out of sync with ForwardingOperand::get?!");
+  llvm_unreachable("Out of sync with OperandOwnership");
 }
 
 void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
@@ -1075,7 +1075,7 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
     return;
   }
 
-  llvm_unreachable("Missing Case! Out of sync with ForwardingOperand::get?!");
+  llvm_unreachable("Missing Case! Out of sync with OperandOwnership");
 }
 
 SILValue ForwardingOperand::getSingleForwardedValue() const {
