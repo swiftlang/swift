@@ -1,3 +1,8 @@
+module FunctionTemplates {
+  header "function-templates.h"
+  requires cplusplus
+}
+
 module ClassTemplateWithPrimitiveArgument {
   header "class-template-with-primitive-argument.h"
   requires cplusplus
@@ -30,11 +35,6 @@ module ExplicitClassSpecialization {
 
 module ClassTemplateInstantionExistingSpecialization {
   header "class-template-instantiation-existing-specialization.h"
-  requires cplusplus
-}
-
-module FunctionTemplates {
-  header "function-templates.h"
   requires cplusplus
 }
 
@@ -95,6 +95,11 @@ module ClassTemplateWithTypedef {
 
 module ClassTemplateInNamespace {
   header "class-template-in-namespace.h"
+  requires cplusplus
+}
+
+module ClassTemplateInNamespaceForSwiftModule {
+  header "class-template-in-namespace-for-swift-module.h"
   requires cplusplus
 }
 

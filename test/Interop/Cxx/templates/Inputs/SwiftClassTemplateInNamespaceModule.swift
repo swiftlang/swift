@@ -1,4 +1,4 @@
-import ClassTemplateInNamespace
+import ClassTemplateInNamespaceForSwiftModule
 
 public func receiveShip(_ i: inout Space.Ship<Bool>) {}
 
