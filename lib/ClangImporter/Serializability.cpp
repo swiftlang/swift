@@ -73,8 +73,8 @@ private:
       if (!isa<TypeAliasDecl>(swiftDecl)) {
         // Only accept this declaration if it round-trips.
         if (auto swiftClangDecl = swiftDecl->getClangDecl())
-            if (isSameDecl(decl, swiftClangDecl))
-              return swiftDecl;
+          if (isSameDecl(decl, swiftClangDecl))
+            return swiftDecl;
       }
     }
 

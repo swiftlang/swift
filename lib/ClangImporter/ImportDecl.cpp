@@ -3977,10 +3977,6 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
-      if (decl->isInvalidDecl()) {
-        return nullptr;
-      }
-
       return result;
     }
 

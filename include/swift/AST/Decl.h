@@ -3396,7 +3396,7 @@ class StructDecl final : public NominalTypeDecl {
   // with a name prefixed with `__CxxTemplateInst`. However for proper
   // serialization we need to have an access to the bound generic type
   // that would have produced this instantiation. This field contains
-  // such type.
+  // that type.
   //
   // The field is set during the typechecking at the time when we
   // instantiate the C++ class template.
