@@ -193,5 +193,8 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
 REMARK(remark_forwarding_to_new_driver, none,
        "new Swift driver at '%0' will be used", (StringRef))
 
+REMARK(remark_forwarding_driver_not_there, none,
+      "new Swift driver at '%0' cannot be found; C++ driver will be used", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
