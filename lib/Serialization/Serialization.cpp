@@ -75,6 +75,21 @@ using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
 
+
+static Type getResultInterfaceTypeForSerialization(Type t) {
+  if (!t)
+    return t;
+  if (auto nominalDecl = t->getAnyNominal()) {
+    if (auto structDecl = dyn_cast<StructDecl>(nominalDecl)) {
+      if (auto templateInstantiationType =
+              structDecl->getTemplateInstantiationType()) {
+        return templateInstantiationType;
+      }
+    }
+  }
+  return t;
+}
+
 ASTContext &SerializerBase::getASTContext() {
   return M->getASTContext();
 }
@@ -628,13 +643,14 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
+  auto tyToSerialize = getResultInterfaceTypeForSerialization(ty);
 #ifndef NDEBUG
-  PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
+  PrettyStackTraceType trace(M->getASTContext(), "serializing", tyToSerialize);
   assert(M->getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
-         !ty || !ty->hasError() && "serializing type with an error");
+         !tyToSerialize || !ty->hasError() && "serializing type with an error");
 #endif
 
-  return TypesToSerialize.addRef(ty);
+  return TypesToSerialize.addRef(tyToSerialize);
 }
 
 serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
@@ -1882,19 +1898,6 @@ void Serializer::writeCrossReference(const Decl *D) {
     return;
   }
 
-  if (D->hasClangNode()) {
-    if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(
-            D->getClangDecl())) {
-      abbrCode = DeclTypeAbbrCodes[XRefClangTemplateInstantiationLayout::Code];
-      // auto clangTypeID = addClangTypeRef(ctsd->getTypeForDecl());
-
-      // XRefClangTemplateInstantiationLayout::emitRecord(
-      //     Out, ScratchRecord, abbrCode, clangTypeID);
-
-      // return;
-    }
-  }
-
   bool isProtocolExt = D->getDeclContext()->getExtendedProtocolDecl();
   if (auto type = dyn_cast<TypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
@@ -2218,13 +2221,6 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
       return;
     if (contextDependsOn(nominal, excluding))
       return;
-    if (auto clangDecl = nominal->getClangDecl()) {
-      auto &clangASTContext = nominal->getClangDecl()->getASTContext();
-      if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
-        seen.insert(dyn_cast<StructDecl>(nominal)->getTemplateInstantiationType());
-        return;
-      }
-    }
     seen.insert(nominal->getDeclaredInterfaceType());
   });
 }
@@ -4688,7 +4684,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
-  registerDeclTypeAbbr<XRefClangTemplateInstantiationLayout>();
 
   registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();

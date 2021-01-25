@@ -1301,7 +1301,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                            importedFromClang, isStatic);
 
     DeclBaseName name = getDeclBaseName(IID);
-    llvm::errs() << "YOYOYOOOOO " << name <<"\n";
     pathTrace.addValue(name);
     if (privateDiscriminator)
       pathTrace.addValue(getIdentifier(privateDiscriminator));
@@ -5389,16 +5388,12 @@ public:
     }
 
     if (auto clangDecl = nominal->getClangDecl()) {
-      nominal->dump();
       if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
-        ctd->dump();
-        ctd->dump();
         auto clangImporter = static_cast<ClangImporter *>(nominal->getASTContext().getClangModuleLoader());
-        auto genericParams = nominal->getGenericParams();
 
         SmallVector<Type, 2> typesOfgenericArgs;
-        for (auto arg : *genericParams) {
-          typesOfgenericArgs.push_back(arg->getDeclaredInterfaceType());
+        for (auto arg : genericArgs) {
+          typesOfgenericArgs.push_back(arg);
         }
 
         SmallVector<clang::TemplateArgument, 2> templateArguments;
