@@ -1560,8 +1560,7 @@ isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
 /// Returns true if `constraint rep1 rep2` is satisfied.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          FunctionTypeRepresentation rep2,
-                                         ConstraintKind kind,
-                                         ConstraintLocatorBuilder locator) {
+                                         ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
@@ -1570,13 +1569,8 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     return rep1 == rep2;
       
   case ConstraintKind::Subtype: {
-    auto last = locator.last();
-    if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
-      return true;
-
     return isSubtypeOf(rep1, rep2);
   }
-
 
   // [NOTE: diagnose-swift-to-c-convention-change]: @convention(swift) ->
   // @convention(c) conversions are permitted only in certain cases.
@@ -1916,7 +1910,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   if (!matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
                                     func2->getExtInfo().getRepresentation(),
-                                    kind, locator)) {
+                                    kind)) {
     return getTypeMatchFailure(locator);
   }
 
