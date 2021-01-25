@@ -15,14 +15,15 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/SIL/SILArgumentConvention.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILFunctionConventions.h"
 
 namespace swift {
 
 class SILBasicBlock;
 class SILModule;
 class SILUndef;
+class TermInst;
 
 // Map an argument index onto a SILArgumentConvention.
 inline SILArgumentConvention
@@ -72,17 +73,12 @@ protected:
               SILType type, ValueOwnershipKind ownershipKind,
               const ValueDecl *inputDecl = nullptr);
 
-  SILArgument(ValueKind subClassKind, SILBasicBlock *inputParentBlock,
-              SILBasicBlock::arg_iterator positionInArgumentArray, SILType type,
-              ValueOwnershipKind ownershipKind,
-              const ValueDecl *inputDecl = nullptr);
-
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg and replaceFunctionArg.
   explicit SILArgument(ValueKind subClassKind, SILType type,
                        ValueOwnershipKind ownershipKind,
                        const ValueDecl *inputDecl = nullptr)
-      : ValueBase(subClassKind, type, IsRepresentative::Yes),
+      : ValueBase(subClassKind, type),
         parentBlock(nullptr), decl(inputDecl) {
     Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
   }
@@ -110,19 +106,12 @@ public:
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
-  static bool classof(const SILNode *node) {
+  static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_SILArgument &&
            node->getKind() <= SILNodeKind::Last_SILArgument;
   }
 
-  unsigned getIndex() const {
-    for (auto p : llvm::enumerate(getParent()->getArguments())) {
-      if (p.value() == this) {
-        return p.index();
-      }
-    }
-    llvm_unreachable("SILArgument not argument of its parent BB");
-  }
+  unsigned getIndex() const;
 
   /// Return true if this block argument is actually a phi argument as
   /// opposed to a cast or projection.
@@ -208,14 +197,6 @@ class SILPhiArgument : public SILArgument {
                  const ValueDecl *decl = nullptr)
       : SILArgument(ValueKind::SILPhiArgument, parentBlock, type, ownershipKind,
                     decl) {}
-
-  SILPhiArgument(SILBasicBlock *parentBlock,
-                 SILBasicBlock::arg_iterator argArrayInsertPt, SILType type,
-                 ValueOwnershipKind ownershipKind,
-                 const ValueDecl *decl = nullptr)
-      : SILArgument(ValueKind::SILPhiArgument, parentBlock, argArrayInsertPt,
-                    type, ownershipKind, decl) {}
-
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg.
   explicit SILPhiArgument(SILType type, ValueOwnershipKind ownershipKind,
@@ -298,7 +279,7 @@ public:
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
-  static bool classof(const SILNode *node) {
+  static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::SILPhiArgument;
   }
 };
@@ -311,13 +292,6 @@ class SILFunctionArgument : public SILArgument {
                       const ValueDecl *decl = nullptr)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl) {}
-  SILFunctionArgument(SILBasicBlock *parentBlock,
-                      SILBasicBlock::arg_iterator argArrayInsertPt,
-                      SILType type, ValueOwnershipKind ownershipKind,
-                      const ValueDecl *decl = nullptr)
-      : SILArgument(ValueKind::SILFunctionArgument, parentBlock,
-                    argArrayInsertPt, type, ownershipKind, decl) {}
-
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceFunctionArg.
   explicit SILFunctionArgument(SILType type, ValueOwnershipKind ownershipKind,
@@ -326,22 +300,14 @@ class SILFunctionArgument : public SILArgument {
   }
 
 public:
-  bool isIndirectResult() const {
-    auto numIndirectResults =
-        getFunction()->getConventions().getNumIndirectSILResults();
-    return getIndex() < numIndirectResults;
-  }
+  bool isIndirectResult() const;
 
-  SILArgumentConvention getArgumentConvention() const {
-    return getFunction()->getConventions().getSILArgumentConvention(getIndex());
-  }
+  SILArgumentConvention getArgumentConvention() const;
 
   /// Given that this is an entry block argument, and given that it does
   /// not correspond to an indirect result, return the corresponding
   /// SILParameterInfo.
-  SILParameterInfo getKnownParameterInfo() const {
-    return getFunction()->getConventions().getParamInfoForSILArg(getIndex());
-  }
+  SILParameterInfo getKnownParameterInfo() const;
 
   /// Returns true if this SILArgument is the self argument of its
   /// function. This means that this will return false always for SILArguments
@@ -356,7 +322,7 @@ public:
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
-  static bool classof(const SILNode *node) {
+  static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::SILFunctionArgument;
   }
 };

@@ -527,6 +527,31 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
+// CHECK-LABEL: @testCopiedNoEscape
+// CHECK:   [read] Stack %3 = alloc_stack $Int
+sil [ossa] @testCopiedNoEscape : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %s1 = alloc_stack $Int
+  store %0 to [trivial] %s1 : $*Int
+  %s2 = alloc_stack $Int
+  store %0 to [trivial] %s2 : $*Int
+  %f = function_ref @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%s2) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %copy = copy_value %pa : $@callee_guaranteed (@inout Int) -> ()
+  %borrow = begin_borrow %copy : $@callee_guaranteed (@inout Int) -> ()
+  %npa = convert_escape_to_noescape %borrow : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [dynamic] %s1 : $*Int
+  %call = apply %npa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  end_borrow %borrow : $@callee_guaranteed (@inout Int) -> ()
+  destroy_value %copy : $@callee_guaranteed (@inout Int) -> ()
+  destroy_value %pa : $@callee_guaranteed (@inout Int) -> ()
+  dealloc_stack %s2 : $*Int
+  dealloc_stack %s1 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK: @testDirectlyAppliedClosure
 // CHECK:   [read] Argument %1 = argument of bb0 : $*Int
 sil private @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {

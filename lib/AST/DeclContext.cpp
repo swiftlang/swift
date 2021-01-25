@@ -758,11 +758,19 @@ ArrayRef<Decl *> IterableDeclContext::getParsedMembers() const {
     .members;
 }
 
-ArrayRef<Decl *> IterableDeclContext::getSemanticMembers() const {
+ArrayRef<Decl *> IterableDeclContext::getABIMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
       ctx.evaluator,
-      SemanticMembersRequest{const_cast<IterableDeclContext *>(this)},
+      ABIMembersRequest{const_cast<IterableDeclContext *>(this)},
+      ArrayRef<Decl *>());
+}
+
+ArrayRef<Decl *> IterableDeclContext::getAllMembers() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AllMembersRequest{const_cast<IterableDeclContext *>(this)},
       ArrayRef<Decl *>());
 }
 

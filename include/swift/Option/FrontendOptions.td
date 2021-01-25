@@ -165,7 +165,7 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
-  HelpText<"Disable building Swift modules explicitly by the compiler">;
+  HelpText<"Disable building Swift modules implicitly by the compiler">;
 
 def swift_module_file
   : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
@@ -376,17 +376,10 @@ def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
   
-def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
-  HelpText<"Enable Large Loadable types IRGen pass">;
-
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
-def enable_subst_sil_function_types_for_function_values :
-  Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
-  HelpText<"Use substituted function types for SIL type lowering of function values">;
-  
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -405,9 +398,6 @@ def enable_conformance_availability_errors : Flag<["-"],
 def disable_conformance_availability_errors : Flag<["-"],
   "disable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as warnings">;
-
-def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
-  HelpText<"Deprecated, will be removed in future versions.">;
 
 def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,

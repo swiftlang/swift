@@ -99,13 +99,10 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 
 // Assert that all subclasses of ValueBase implement classof.
 #define NODE(CLASS, PARENT) \
-  ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(const SILNode*));
+  ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
 #include "swift/SIL/SILNodes.def"
 
-SILFunction *SILInstruction::getFunction() {
-  return getParent()->getParent();
-}
-const SILFunction *SILInstruction::getFunction() const {
+SILFunction *SILInstruction::getFunction() const {
   return getParent()->getParent();
 }
 
@@ -1134,7 +1131,6 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case SILInstructionKind::DestroyValueInst:
-    assert(!SILModuleConventions(getModule()).useLoweredAddresses());
     return true;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
@@ -1541,7 +1537,7 @@ MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
 MultipleValueInstructionResult::MultipleValueInstructionResult(
     ValueKind valueKind, unsigned index, SILType type,
     ValueOwnershipKind ownershipKind)
-    : ValueBase(valueKind, type, IsRepresentative::No) {
+    : ValueBase(valueKind, type) {
   setOwnershipKind(ownershipKind);
   setIndex(index);
 }

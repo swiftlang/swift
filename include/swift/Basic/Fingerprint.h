@@ -13,10 +13,10 @@
 #ifndef SWIFT_BASIC_FINGERPRINT_H
 #define SWIFT_BASIC_FINGERPRINT_H
 
+#include "swift/Basic/StableHasher.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/MD5.h"
 
 #include <string>
 
@@ -52,11 +52,6 @@ namespace swift {
 /// iterable decl contexts to detect when the tokens in their bodies have
 /// changed. This makes them a coarse - yet safe - overapproximation for when a
 /// decl has changed semantically.
-///
-/// \c Fingerprints are currently implemented as a thin wrapper around an MD5
-/// hash. MD5 is known to be neither the fastest nor the most
-/// cryptographically capable algorithm, but it does afford us the avalanche
-/// effect we desire. We should revisit the modeling decision here.
 class Fingerprint final {
 public:
   /// The size (in bytes) of the raw value of all fingerprints.
@@ -65,6 +60,8 @@ public:
   using Core = std::pair<uint64_t, uint64_t>;
 private:
   Core core;
+
+  friend struct StableHasher::Combiner<swift::Fingerprint>;
 
 public:
   /// Creates a fingerprint value from a pair of 64-bit integers.
@@ -76,13 +73,9 @@ public:
   /// Strings that violate this invariant will return a null optional.
   static llvm::Optional<Fingerprint> fromString(llvm::StringRef value);
 
-  /// For mocking only:
-  /// Aborts if unconvertible, returns None for an empty string.
-  static llvm::Optional<Fingerprint> mockFromString(llvm::StringRef value);
-
- /// Creates a fingerprint value by consuming the given \c MD5Result from LLVM.
-  explicit Fingerprint(llvm::MD5::MD5Result &&MD5Value)
-      : core{MD5Value.words()} {}
+  /// Creates a fingerprint value by consuming the given \c StableHasher.
+  explicit Fingerprint(StableHasher &&stableHasher)
+      : core{std::move(stableHasher).finalize()} {}
 
 public:
   /// Retrieve the raw underlying bytes of this fingerprint.
@@ -104,7 +97,7 @@ public:
 public:
   /// The fingerprint value consisting of 32 bytes of zeroes.
   ///
-  /// This fingerprint is a perfectly fine value for an MD5 hash, but it is
+  /// This fingerprint is a perfectly fine value for a hash, but it is
   /// completely arbitrary.
   static Fingerprint ZERO() {
     return Fingerprint(Fingerprint::Core{0, 0});
@@ -120,6 +113,22 @@ private:
 };
 
 void simple_display(llvm::raw_ostream &out, const Fingerprint &fp);
+}; // namespace swift
+
+namespace swift {
+
+template <> struct StableHasher::Combiner<Fingerprint> {
+  static void combine(StableHasher &hasher, const Fingerprint &Val) {
+    // Our underlying buffer is already byte-swapped. Combine the
+    // raw bytes from the core by hand.
+    uint8_t buffer[8];
+    memcpy(buffer, &Val.core.first, sizeof(buffer));
+    hasher.combine<sizeof(buffer)>(buffer);
+    memcpy(buffer, &Val.core.second, sizeof(buffer));
+    hasher.combine<sizeof(buffer)>(buffer);
+  }
+};
+
 }; // namespace swift
 
 namespace llvm {

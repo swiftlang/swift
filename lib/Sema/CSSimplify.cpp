@@ -1535,31 +1535,29 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
-// Determine whether conversion is allowed between two function types
-// based on their representations.
+/// Check where a representation is a subtype of another.
+///
+/// The subtype relationship is defined as:
+/// 1. any representation R is a sub-type of itself.
+/// 2. a thin representation is a subtype of any other representation.
+/// 3. a thick representation is a subtype of any other thick representation.
+///
+/// For example, since `@convention(c)` is a thin representation, and
+/// `@convention(swift)` is a thick representation,
+/// `@convention(c) (A) -> B` is a sub-type of `(A) -> B`.
+///
+/// NOTE: Unlike typical subtyping relationships, this is not anti-symmetric.
+/// For example, @convention(c) and @convention(thin) are subtypes of each other
+/// but not equal.
 static bool
-isConversionAllowedBetween(FunctionTypeRepresentation rep1,
-                           FunctionTypeRepresentation rep2) {
-  auto isThin = [](FunctionTypeRepresentation rep) {
-    return rep == FunctionTypeRepresentation::CFunctionPointer ||
-        rep == FunctionTypeRepresentation::Thin;
-  };
-  
-  // Allowing "thin" (c, thin) to "thin" conventions
-  if (isThin(rep1) && isThin(rep2))
-    return true;
-  
-  // Allowing all to "thick" (swift, block) conventions
-  // "thin" (c, thin) to "thick" or "thick" to "thick"
-  if (rep2 == FunctionTypeRepresentation::Swift ||
-      rep2 == FunctionTypeRepresentation::Block)
-    return true;
-  
-  return rep1 == rep2;
+isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
+            FunctionTypeRepresentation potentialSuperRepr) {
+  return (potentialSubRepr == potentialSuperRepr)
+       || isThinRepresentation(potentialSubRepr)
+       || isThickRepresentation(potentialSuperRepr);
 }
 
-// Returns 'false' (i.e. no error) if it is legal to match functions with the
-// corresponding function type representations and the given match kind.
+/// Returns true if `constraint rep1 rep2` is satisfied.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          FunctionTypeRepresentation rep2,
                                          ConstraintKind kind,
@@ -1569,23 +1567,37 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
-    return rep1 != rep2;
+    return rep1 == rep2;
       
   case ConstraintKind::Subtype: {
     auto last = locator.last();
     if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
-      return false;
-    
-    // Inverting the result because matchFunctionRepresentations
-    // returns false in conversions are allowed.
-    return !isConversionAllowedBetween(rep1, rep2);
+      return true;
+
+    return isSubtypeOf(rep1, rep2);
   }
 
-  case ConstraintKind::OpaqueUnderlyingType:
+
+  // [NOTE: diagnose-swift-to-c-convention-change]: @convention(swift) ->
+  // @convention(c) conversions are permitted only in certain cases.
+  //
+  //   var w = 3; func f() { print(w) }; func g(_ : @convention(c) () -> ()) {}
+  //   g(f); // OK
+  //   let h = f as @convention(c) () -> (); g(h) // OK
+  //   let k = f; g(k) // error
+  //   func m() { let x = 0; g({ print(x) }) } // error
+  //   func n() { let y = 0; func p() { }; g(p); } // OK
+  //   func q() { let z = 0; func r() { print(z) }; g(r); } // error
+  //
+  // Since checking for disallowed cases requires access to captures,
+  // it is simpler to defer diagnosing (to CSApply/SILGen) and return true here.
   case ConstraintKind::Conversion:
-  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+    return true;
+
+  case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::BridgingConversion:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload:
@@ -1609,7 +1621,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
-    return false;
+    return true;
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -1902,9 +1914,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
-  if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
-                                   func2->getExtInfo().getRepresentation(),
-                                   kind, locator)) {
+  if (!matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
+                                    func2->getExtInfo().getRepresentation(),
+                                    kind, locator)) {
     return getTypeMatchFailure(locator);
   }
 
@@ -7478,11 +7490,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           if (!paramDecl)
             continue;
 
-          auto descriptor = UnqualifiedLookupDescriptor(
+          auto descriptor = UnqualifiedLookupDescriptor{
               DeclNameRef(param->getName()),
-              paramDecl->getDeclContext()->getParentSourceFile(),
+              paramDecl->getDeclContext()->getModuleScopeContext(),
               SourceLoc(),
-              UnqualifiedLookupFlags::TypeLookup);
+              UnqualifiedLookupFlags::TypeLookup};
           auto lookup = evaluateOrDefault(
               Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
           for (auto &result : lookup) {
@@ -8907,6 +8919,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   auto *applicableFn = result->first;
   auto *fnTypeVar = applicableFn->getSecondType()->castTo<TypeVariableType>();
   auto argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
+  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       /*numOptionalUnwraps*/ result->second,
                                       locator);
@@ -8926,6 +8939,8 @@ bool ConstraintSystem::simplifyAppliedOverloads(
       getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
   if (!disjunction)
     return false;
+
+  AppliedDisjunctions[disjunction->getLocator()] = argFnType;
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       numOptionalUnwraps, locator);
 }

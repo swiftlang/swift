@@ -38,12 +38,7 @@ using namespace swift;
 using namespace swift::constraints;
 
 static bool isArithmeticOperatorDecl(ValueDecl *vd) {
-  return vd && 
-  (vd->getBaseName() == "+" ||
-   vd->getBaseName() == "-" ||
-   vd->getBaseName() == "*" ||
-   vd->getBaseName() == "/" ||
-   vd->getBaseName() == "%");
+  return vd && vd->getBaseIdentifier().isArithmeticOperator();
 }
 
 static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,

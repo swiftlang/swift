@@ -19,13 +19,10 @@ using namespace swift;
 
 /// Invoke \p visitor for each reachable block in \p f in worklist order (at
 /// least one predecessor has been visited).
-bool ReachableBlocks::visit(SILFunction *f,
-                            function_ref<bool(SILBasicBlock *)> visitor) {
-  assert(visited.empty() && "blocks already visited");
-
+bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   // Walk over the CFG, starting at the entry block, until all reachable blocks
   // are visited.
-  SILBasicBlock *entryBB = f->getEntryBlock();
+  SILBasicBlock *entryBB = visited.getFunction()->getEntryBlock();
   SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
   visited.insert(entryBB);
   while (!worklist.empty()) {
@@ -34,7 +31,7 @@ bool ReachableBlocks::visit(SILFunction *f,
       return false;
 
     for (auto &succ : bb->getSuccessors()) {
-      if (visited.insert(succ).second)
+      if (visited.insert(succ))
         worklist.push_back(succ);
     }
   }
@@ -71,9 +68,9 @@ void swift::removeDeadBlock(SILBasicBlock *bb) {
 }
 
 bool swift::removeUnreachableBlocks(SILFunction &f) {
-  ReachableBlocks reachable;
+  ReachableBlocks reachable(&f);
   // Visit all the blocks without doing any extra work.
-  reachable.visit(&f, [](SILBasicBlock *) { return true; });
+  reachable.visit([](SILBasicBlock *) { return true; });
 
   // Remove the blocks we never reached. Assume the entry block is visited.
   // Reachable's visited set contains dangling pointers during this loop.
@@ -101,7 +98,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
 
   SILSSAUpdater ssaUpdater;
   for (auto availValPair : availVals) {
-    ValueBase *inst = availValPair.first;
+    auto inst = availValPair.first;
     if (inst->use_empty())
       continue;
 
@@ -112,7 +109,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
     for (auto *use : inst->getUses())
       useList.push_back(UseWrapper(use));
 
-    ssaUpdater.initialize(inst->getType());
+    ssaUpdater.initialize(inst->getType(), inst.getOwnershipKind());
     ssaUpdater.addAvailableValue(origBB, inst);
     ssaUpdater.addAvailableValue(getNewBB(), newResult);
 

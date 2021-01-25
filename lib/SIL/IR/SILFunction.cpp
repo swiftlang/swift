@@ -210,6 +210,8 @@ SILFunction::~SILFunction() {
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+  assert(!newestAliveBitfield &&
+         "Not all BasicBlockBitfields deleted at function destruction");
 }
 
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
@@ -244,10 +246,10 @@ void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
     for (auto &I : BB) {
       auto results = I.getResults();
       if (results.empty()) {
-        ValueToNumberMap[&I] = idx++;
+        ValueToNumberMap[I.asSILNode()] = idx++;
       } else {
         // Assign the instruction node the first result ID.
-        ValueToNumberMap[&I] = idx;
+        ValueToNumberMap[I.asSILNode()] = idx;
         for (auto result : results) {
           ValueToNumberMap[result] = idx++;
         }

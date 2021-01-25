@@ -17,7 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-temp-rvalue-opt"
+
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -749,6 +751,7 @@ void TempRValueOptPass::run() {
 #endif
   };
 
+  DeadEndBlocks deBlocks(getFunction());
   for (auto *deadCopy : deadCopies) {
     assert(changed);
     auto *srcInst = deadCopy->getSrc()->getDefiningInstruction();
@@ -756,9 +759,7 @@ void TempRValueOptPass::run() {
     // Simplify any access scope markers that were only used by the dead
     // copy_addr and other potentially unused addresses.
     if (srcInst) {
-      if (SILValue result = simplifyInstruction(srcInst)) {
-        replaceAllSimplifiedUsesAndErase(srcInst, result, callbacks);
-      }
+      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks, &deBlocks);
     }
   }
   if (changed) {

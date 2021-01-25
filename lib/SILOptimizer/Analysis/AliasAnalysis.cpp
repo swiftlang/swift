@@ -539,8 +539,6 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
 }
 
 void AliasAnalysis::handleDeleteNotification(SILNode *node) {
-  assert(node->isRepresentativeSILNodeInObject());
-
   // The pointer 'node' is going away.  We can't scan the whole cache
   // and remove all of the occurrences of the pointer. Instead we remove
   // the pointer from the index caches.

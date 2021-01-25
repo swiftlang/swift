@@ -389,9 +389,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
-  Opts.EnableSubstSILFunctionTypesForFunctionValues |=
-    Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
-
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
 
@@ -1181,7 +1178,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
-  Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 

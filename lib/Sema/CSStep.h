@@ -565,8 +565,8 @@ protected:
 };
 
 class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
-  using BindingContainer = ConstraintSystem::PotentialBindings;
-  using Binding = ConstraintSystem::PotentialBinding;
+  using BindingContainer = inference::PotentialBindings;
+  using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
 
@@ -683,6 +683,20 @@ private:
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
 
+  bool shouldSkipGenericOperators() const {
+    if (!BestNonGenericScore)
+      return false;
+
+    // Let's skip generic overload choices only in case if
+    // non-generic score indicates that there were no forced
+    // unwrappings of optional(s), no unavailable overload
+    // choices present in the solution, no fixes required,
+    // and there are no non-trivial function conversions.
+    auto &score = BestNonGenericScore->Data;
+    return (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
+            score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0);
+  }
+
   /// Attempt to apply given disjunction choice to constraint system.
   /// This action is going to establish "active choice" of this disjunction
   /// to point to a given choice.
@@ -732,7 +746,9 @@ private:
 
   // Figure out which of the solutions has the smallest score.
   static Optional<Score> getBestScore(SmallVectorImpl<Solution> &solutions) {
-    assert(!solutions.empty());
+    if (solutions.empty())
+      return None;
+
     Score bestScore = solutions.front().getFixedScore();
     if (solutions.size() == 1)
       return bestScore;

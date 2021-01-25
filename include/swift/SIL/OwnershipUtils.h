@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -75,12 +76,10 @@ inline bool isForwardingConsume(SILValue value) {
 }
 
 class ForwardingOperand {
-  Operand *use;
-
-  ForwardingOperand(Operand *use) : use(use) {}
+  Operand *use = nullptr;
 
 public:
-  static ForwardingOperand get(Operand *use);
+  explicit ForwardingOperand(Operand *use);
 
   OwnershipConstraint getOwnershipConstraint() const {
     // We use a force unwrap since a ForwardingOperand should always have an
@@ -216,6 +215,9 @@ struct BorrowingOperand {
   /// If this borrowing operand results in the underlying value being borrowed
   /// over a region of code instead of just for a single instruction, visit
   /// those uses.
+  ///
+  /// Returns true if all visitor invocations returns true. Exits early if a
+  /// visitor returns false.
   ///
   /// Example: An apply performs an instantaneous recursive borrow of a
   /// guaranteed value but a begin_apply borrows the value over the entire
@@ -661,15 +663,26 @@ struct InteriorPointerOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// Compute the list of implicit uses that this interior pointer operand puts
-  /// on its parent guaranted value.
+  /// Transitively compute the list of uses that this interior pointer operand
+  /// puts on its parent guaranted value.
   ///
   /// Example: Uses of a ref_element_addr can not occur outside of the lifetime
   /// of the instruction's operand. The uses of that address act as liveness
   /// requirements to ensure that the underlying class is alive at all use
   /// points.
-  bool getImplicitUses(SmallVectorImpl<Operand *> &foundUses,
-                       std::function<void(Operand *)> *onError = nullptr);
+  bool findTransitiveUses(SmallVectorImpl<Operand *> &foundUses,
+                          std::function<void(Operand *)> *onError = nullptr) {
+    return findTransitiveUsesForAddress(getProjectedAddress(), foundUses,
+                                        onError);
+  }
+
+  /// The algorithm that is used to determine what the verifier will consider to
+  /// be transitive uses of the given address. Used to implement \see
+  /// findTransitiveUses.
+  static bool
+  findTransitiveUsesForAddress(SILValue address,
+                               SmallVectorImpl<Operand *> &foundUses,
+                               std::function<void(Operand *)> *onError = nullptr);
 
   Operand *operator->() { return operand; }
   const Operand *operator->() const { return operand; }

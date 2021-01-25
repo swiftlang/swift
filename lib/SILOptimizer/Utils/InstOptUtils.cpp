@@ -14,6 +14,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -701,41 +702,55 @@ SILValue swift::
 getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
                                   SILInstruction *ignoreUser) {
   StoreInst *singleStore = nullptr;
-  for (Operand *use : getNonDebugUses(existentialBox)) {
+  SmallPtrSetVector<Operand *, 32> worklist;
+  for (auto *use : getNonDebugUses(existentialBox)) {
+    worklist.insert(use);
+  }
+
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
     SILInstruction *user = use->getUser();
     switch (user->getKind()) {
-      case SILInstructionKind::StrongRetainInst:
-      case SILInstructionKind::StrongReleaseInst:
-        break;
-      case SILInstructionKind::ProjectExistentialBoxInst: {
-        auto *projectedAddr = cast<ProjectExistentialBoxInst>(user);
-        for (Operand *addrUse : getNonDebugUses(projectedAddr)) {
-          if (auto *store = dyn_cast<StoreInst>(addrUse->getUser())) {
-            assert(store->getSrc() != projectedAddr &&
-                   "cannot store an address");
-            // Bail if there are multiple stores.
-            if (singleStore)
-              return SILValue();
-            singleStore = store;
-            continue;
-          }
-          // If there are other users to the box value address then bail out.
-          return SILValue();
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndBorrowInst:
+      break;
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::BeginBorrowInst:
+      // Look through copy_value, begin_borrow
+      for (SILValue result : user->getResults())
+        for (auto *transitiveUse : result->getUses())
+          worklist.insert(transitiveUse);
+      break;
+    case SILInstructionKind::ProjectExistentialBoxInst: {
+      auto *projectedAddr = cast<ProjectExistentialBoxInst>(user);
+      for (Operand *addrUse : getNonDebugUses(projectedAddr)) {
+        if (auto *store = dyn_cast<StoreInst>(addrUse->getUser())) {
+          assert(store->getSrc() != projectedAddr && "cannot store an address");
+          // Bail if there are multiple stores.
+          if (singleStore)
+            return SILValue();
+          singleStore = store;
+          continue;
         }
-        break;
+        // If there are other users to the box value address then bail out.
+        return SILValue();
       }
-      case SILInstructionKind::BuiltinInst: {
-        auto *builtin = cast<BuiltinInst>(user);
-        if (KeepWillThrowCall ||
-            builtin->getBuiltinInfo().ID != BuiltinValueKind::WillThrow) {
-          return SILValue();
-        }
-        break;
+      break;
+    }
+    case SILInstructionKind::BuiltinInst: {
+      auto *builtin = cast<BuiltinInst>(user);
+      if (KeepWillThrowCall ||
+          builtin->getBuiltinInfo().ID != BuiltinValueKind::WillThrow) {
+        return SILValue();
       }
-      default:
-        if (user != ignoreUser)
-          return SILValue();
-        break;
+      break;
+    }
+    default:
+      if (user != ignoreUser)
+        return SILValue();
+      break;
     }
   }
   if (!singleStore)
@@ -753,47 +768,46 @@ getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) 
   for (Operand *stackUse : stackLoc->getUses()) {
     SILInstruction *stackUser = stackUse->getUser();
     switch (stackUser->getKind()) {
-      case SILInstructionKind::DeallocStackInst:
-      case SILInstructionKind::DebugValueAddrInst:
-      case SILInstructionKind::LoadInst:
-        break;
-      case SILInstructionKind::StoreInst: {
-        auto *store = cast<StoreInst>(stackUser);
-        assert(store->getSrc() != stackLoc && "cannot store an address");
-        // Bail if there are multiple stores.
-        if (singleStackStore)
+    case SILInstructionKind::DestroyAddrInst: {
+      // Make sure the destroy_addr is the instruction before one of our
+      // dealloc_stack insts and is directly on the stack location.
+      auto next = std::next(stackUser->getIterator());
+      if (auto *dsi = dyn_cast<DeallocStackInst>(next))
+        if (dsi->getOperand() != stackLoc)
           return SILValue();
-        singleStackStore = store;
-        break;
-      }
-      default:
-        if (stackUser != ignoreUser)
-          return SILValue();
-        break;
+      break;
+    }
+    case SILInstructionKind::DeallocStackInst:
+    case SILInstructionKind::DebugValueAddrInst:
+    case SILInstructionKind::LoadInst:
+      break;
+    case SILInstructionKind::StoreInst: {
+      auto *store = cast<StoreInst>(stackUser);
+      assert(store->getSrc() != stackLoc && "cannot store an address");
+      // Bail if there are multiple stores.
+      if (singleStackStore)
+        return SILValue();
+      singleStackStore = store;
+      break;
+    }
+    default:
+      if (stackUser != ignoreUser)
+        return SILValue();
+      break;
     }
   }
   if (!singleStackStore)
     return SILValue();
 
-  auto *box = dyn_cast<AllocExistentialBoxInst>(singleStackStore->getSrc());
+  // Look through copy value insts.
+  SILValue val = singleStackStore->getSrc();
+  while (auto *cvi = dyn_cast<CopyValueInst>(val))
+    val = cvi->getOperand();
+  auto *box = dyn_cast<AllocExistentialBoxInst>(val);
   if (!box)
     return SILValue();
 
   return getConcreteValueOfExistentialBox(box, singleStackStore);
-}
-
-// Devirtualization of functions with covariant return types produces
-// a result that is not an apply, but takes an apply as an
-// argument. Attempt to dig the apply out from this result.
-FullApplySite swift::findApplyFromDevirtualizedResult(SILValue v) {
-  if (auto Apply = FullApplySite::isa(v))
-    return Apply;
-
-  if (isa<UpcastInst>(v) || isa<EnumInst>(v) || isa<UncheckedRefCastInst>(v))
-    return findApplyFromDevirtualizedResult(
-        cast<SingleValueInstruction>(v)->getOperand(0));
-
-  return FullApplySite();
 }
 
 bool swift::mayBindDynamicSelf(SILFunction *F) {
@@ -1458,12 +1472,9 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
     if (!svi)
       continue;
 
-    SILValue S = simplifyInstruction(svi);
-    if (!S)
-      continue;
-
-    replaceAllSimplifiedUsesAndErase(svi, S, callbacks);
-    changed = true;
+    callbacks.resetHadCallbackInvocation();
+    simplifyAndReplaceAllSimplifiedUsesAndErase(svi, callbacks);
+    changed |= callbacks.hadCallbackInvocation();
   }
 
   return changed;
@@ -1962,4 +1973,54 @@ SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
   callbacks.setUseValue(use, newValue);
 
   return nextII;
+}
+
+SILValue swift::makeCopiedValueAvailable(
+    SILValue value, SILBasicBlock *inBlock,
+    JointPostDominanceSetComputer *jointPostDomComputer) {
+  if (!value->getFunction()->hasOwnership())
+    return value;
+
+  if (value.getOwnershipKind() == OwnershipKind::None)
+    return value;
+
+  auto insertPt = getInsertAfterPoint(value).getValue();
+  auto *copy =
+      SILBuilderWithScope(insertPt).createCopyValue(insertPt->getLoc(), value);
+
+  return makeNewValueAvailable(copy, inBlock, jointPostDomComputer);
+}
+
+SILValue swift::makeNewValueAvailable(
+    SILValue value, SILBasicBlock *inBlock,
+    JointPostDominanceSetComputer *jointPostDomComputer) {
+  if (!value->getFunction()->hasOwnership())
+    return value;
+
+  if (value.getOwnershipKind() == OwnershipKind::None)
+    return value;
+
+  assert(value->getUses().empty() &&
+         value.getOwnershipKind() == OwnershipKind::Owned);
+
+  // Use \p jointPostDomComputer to:
+  // 1. Create a control equivalent copy at \p inBlock if needed
+  // 2. Insert destroy_value at leaking blocks
+  SILValue controlEqCopy;
+  jointPostDomComputer->findJointPostDominatingSet(
+      value->getParentBlock(), inBlock,
+      [&](SILBasicBlock *loopBlock) {
+        assert(loopBlock == inBlock);
+        auto front = loopBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        controlEqCopy = newBuilder.createCopyValue(front->getLoc(), value);
+      },
+      [&](SILBasicBlock *postDomBlock) {
+        // Insert a destroy_value in the leaking block
+        auto front = postDomBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        newBuilder.createDestroyValue(front->getLoc(), value);
+      });
+
+  return controlEqCopy ? controlEqCopy : value;
 }

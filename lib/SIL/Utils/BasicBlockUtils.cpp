@@ -197,7 +197,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -206,7 +207,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
@@ -215,7 +217,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -225,7 +228,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     if (!succBB->getNumArguments())
       return;
     args.push_back(newEdgeBB->createPhiArgument(
-        succBB->getArgument(0)->getType(), OwnershipKind::Owned));
+        succBB->getArgument(0)->getType(),
+        succBB->getArgument(0)->getOwnershipKind()));
     return;
   }
 
@@ -363,22 +367,22 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 //===----------------------------------------------------------------------===//
 
 void DeadEndBlocks::compute() {
-  assert(ReachableBlocks.empty() && "Computed twice");
+  assert(reachableBlocks.empty() && "Computed twice");
 
   // First step: find blocks which end up in a no-return block (terminated by
   // an unreachable instruction).
   // Search for function-exiting blocks, i.e. return and throw.
-  for (const SILBasicBlock &BB : *F) {
+  for (const SILBasicBlock &BB : *f) {
     const TermInst *TI = BB.getTerminator();
     if (TI->isFunctionExiting())
-      ReachableBlocks.insert(&BB);
+      reachableBlocks.insert(&BB);
   }
   // Propagate the reachability up the control flow graph.
   unsigned Idx = 0;
-  while (Idx < ReachableBlocks.size()) {
-    const SILBasicBlock *BB = ReachableBlocks[Idx++];
+  while (Idx < reachableBlocks.size()) {
+    const SILBasicBlock *BB = reachableBlocks[Idx++];
     for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
-      ReachableBlocks.insert(Pred);
+      reachableBlocks.insert(Pred);
   }
 }
 
@@ -463,6 +467,13 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
     for (auto *predBlock : block->getPredecessorBlocks()) {
       if (initialBlocks.count(predBlock)) {
         reachableInputBlocks.push_back(predBlock);
+        for (auto *succBlock : predBlock->getSuccessorBlocks()) {
+          if (visitedBlocks.count(succBlock))
+            continue;
+          if (deadEndBlocks.isDeadEnd(succBlock))
+            continue;
+          blocksThatLeakIfNeverVisited.insert(succBlock);
+        }
       }
       if (visitedBlocks.insert(predBlock).second)
         worklist.push_back(predBlock);

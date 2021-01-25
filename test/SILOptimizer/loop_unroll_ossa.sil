@@ -5,6 +5,22 @@ sil_stage canonical
 import Builtin
 import Swift
 
+struct UInt {
+  var value: Builtin.Word
+}
+struct Int {
+  var value: Builtin.Word
+}
+struct Bool {
+  var value: Builtin.Int1
+}
+struct Int64 {
+  var value: Builtin.Int64
+}
+struct UInt64 {
+  var value: Builtin.Int64
+}
+
 // CHECK-LABEL: sil [ossa] @loop_unroll_1 :
 // CHECK: bb0
 // CHECK:  br bb1
@@ -471,12 +487,12 @@ bb4:
 }
 
 class Klass {
-  var id: Int
+  var id: Int64
 }
 
-sil [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int, Bool, @guaranteed Array<Klass>) -> _DependenceToken
+sil [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int64, Bool, @guaranteed Array<Klass>) -> _DependenceToken
 
-sil [_semantics "array.get_element"] @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+sil [_semantics "array.get_element"] @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
 
 // CHECK-LABEL: sil [ossa] @sumKlassId :
 // CHECK: [[FUNC:%.*]] = function_ref @getElement :
@@ -485,7 +501,7 @@ sil [_semantics "array.get_element"] @getElement : $@convention(method) (Int, Bo
 // CHECK: apply [[FUNC]] 
 // CHECK: apply [[FUNC]] 
 // CHECK-LABEL: } // end sil function 'sumKlassId'
-sil [ossa] @sumKlassId : $@convention(thin) (@guaranteed Array<Klass>) -> Int {
+sil [ossa] @sumKlassId : $@convention(thin) (@guaranteed Array<Klass>) -> Int64 {
 bb0(%0 : @guaranteed $Array<Klass>):
   %1 = integer_literal $Builtin.Int1, -1
   %2 = struct $Bool (%1 : $Builtin.Int1)
@@ -493,21 +509,21 @@ bb0(%0 : @guaranteed $Array<Klass>):
   %4 = integer_literal $Builtin.Int64, 4
   %5 = integer_literal $Builtin.Int1, -1
   %6 = integer_literal $Builtin.Int64, 1
-  %7 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %15 = struct $_DependenceToken ()
   br bb1(%3 : $Builtin.Int64, %3 : $Builtin.Int64)
 
 bb1(%17 : $Builtin.Int64, %18 : $Builtin.Int64):
-  %19 = struct $Int (%18 : $Builtin.Int64)
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
   %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
-  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %borrow = begin_borrow %22 : $Klass
   %23 = ref_element_addr %borrow : $Klass, #Klass.id
-  %24 = load [trivial] %23 : $*Int
+  %24 = load [trivial] %23 : $*Int64
   end_borrow %borrow : $Klass
   destroy_value %22 : $Klass
-  %26 = struct_extract %24 : $Int, #Int._value
+  %26 = struct_extract %24 : $Int64, #Int64.value
   %27 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int64, %26 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %28 = tuple_extract %27 : $(Builtin.Int64, Builtin.Int1), 0
   %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
@@ -517,8 +533,8 @@ bb2:
   br bb1(%28 : $Builtin.Int64, %21 : $Builtin.Int64)
 
 bb3:
-  %34 = struct $Int (%28 : $Builtin.Int64)
-  return %34 : $Int
+  %34 = struct $Int64 (%28 : $Builtin.Int64)
+  return %34 : $Int64
 }
 
 sil [ossa] @collectKlass : $@convention(thin) (@owned Klass) -> ()
@@ -538,16 +554,16 @@ bb0(%0 : @guaranteed $Array<Klass>):
   %4 = integer_literal $Builtin.Int64, 4
   %5 = integer_literal $Builtin.Int1, -1
   %6 = integer_literal $Builtin.Int64, 1
-  %7 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
   %15 = struct $_DependenceToken ()
   br bb1(%3 : $Builtin.Int64)
 
 bb1(%18 : $Builtin.Int64):
-  %19 = struct $Int (%18 : $Builtin.Int64)
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
   %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
-  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %copy = copy_value %22 : $Klass
   %res = apply %8(%copy) : $@convention(thin) (@owned Klass) -> ()
   destroy_value %22 : $Klass
@@ -575,7 +591,7 @@ bb0(%0 : @guaranteed $Array<Klass>):
   %4 = integer_literal $Builtin.Int64, 4
   %5 = integer_literal $Builtin.Int1, -1
   %6 = integer_literal $Builtin.Int64, 1
-  %7 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
   %15 = struct $_DependenceToken ()
   br bb1(%3 : $Builtin.Int64)
@@ -587,10 +603,10 @@ bb2:
   br bb3
 
 bb3:
-  %19 = struct $Int (%18 : $Builtin.Int64)
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
   %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
-  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %22 = apply %7(%19, %2, %15, %0) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %copy = copy_value %22 : $Klass
   %res = apply %8(%copy) : $@convention(thin) (@owned Klass) -> ()
   destroy_value %22 : $Klass
@@ -626,7 +642,7 @@ bb0(%0 : @owned $Array<Klass>):
   %4 = integer_literal $Builtin.Int64, 4
   %5 = integer_literal $Builtin.Int1, -1
   %6 = integer_literal $Builtin.Int64, 1
-  %7 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
   %15 = struct $_DependenceToken ()
   br bb1
@@ -636,10 +652,10 @@ bb1:
   br bb2(%borrow : $Array<Klass>, %3 : $Builtin.Int64)
 
 bb2(%newArr : @guaranteed $Array<Klass>, %18 : $Builtin.Int64):
-  %19 = struct $Int (%18 : $Builtin.Int64)
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
   %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
-  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   destroy_value %22 : $Klass
   %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
   end_borrow %newArr : $Array<Klass>
@@ -670,7 +686,7 @@ bb0(%0 : @guaranteed $Array<Klass>):
   %4 = integer_literal $Builtin.Int64, 4
   %5 = integer_literal $Builtin.Int1, -1
   %6 = integer_literal $Builtin.Int64, 1
-  %7 = function_ref @getElement : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
   %15 = struct $_DependenceToken ()
   br bb1
@@ -680,10 +696,10 @@ bb1:
   br bb2(%copy1 : $Array<Klass>, %3 : $Builtin.Int64)
 
 bb2(%newArr : @owned $Array<Klass>, %18 : $Builtin.Int64):
-  %19 = struct $Int (%18 : $Builtin.Int64)
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
   %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
-  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   destroy_value %22 : $Klass
   %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
   cond_br %31, bb3, bb2a

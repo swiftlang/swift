@@ -255,10 +255,27 @@ public:
   ///
   /// In the case where we have a single value this can be materialized by
   /// applying Path to the Base.
-  SILValue materialize(SILInstruction *Inst) {
+  SILValue materialize(SILInstruction *Inst,
+                       JointPostDominanceSetComputer *jointPostDomComputer) {
     if (CoveringValue)
       return SILValue();
-    return Path.getValue().createExtract(Base, Inst, true);
+    auto Val = Base;
+    auto InsertPt = getInsertAfterPoint(Base).getValue();
+    SILBuilderWithScope Builder(InsertPt);
+    if (Inst->getFunction()->hasOwnership() && !Path.getValue().empty()) {
+      // We have to create a @guaranteed scope with begin_borrow in order to
+      // create a struct_extract in OSSA
+      Val = Builder.emitBeginBorrowOperation(InsertPt->getLoc(), Base);
+    }
+    auto Res = Path.getValue().createExtract(Val, &*InsertPt, true);
+    if (Val != Base) {
+      Res = makeCopiedValueAvailable(Res, Inst->getParent(),
+                                     jointPostDomComputer);
+      Builder.emitEndBorrowOperation(InsertPt->getLoc(), Val);
+      // Insert a destroy on the Base
+      SILBuilderWithScope(Inst).emitDestroyValueOperation(Inst->getLoc(), Base);
+    }
+    return Res;
   }
 
   void print(llvm::raw_ostream &os) override {
@@ -279,9 +296,11 @@ public:
   /// location holds. This may involve extracting and aggregating available
   /// values.
   static void reduceInner(LSLocation &B, SILModule *M, LSLocationValueMap &Vals,
-                          SILInstruction *InsertPt);
+                          SILInstruction *InsertPt,
+                          JointPostDominanceSetComputer *jointPostDomComputer);
   static SILValue reduce(LSLocation &B, SILModule *M, LSLocationValueMap &Vals,
-                         SILInstruction *InsertPt);
+                         SILInstruction *InsertPt,
+                         JointPostDominanceSetComputer *jointPostDomComputer);
 };
 
 static inline llvm::hash_code hash_value(const LSValue &V) {

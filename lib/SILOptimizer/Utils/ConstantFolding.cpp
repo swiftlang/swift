@@ -1496,6 +1496,38 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
   return false;
 }
 
+static bool isApplyOfKnownAvailability(SILInstruction &I) {
+  auto apply = FullApplySite::isa(&I);
+  if (!apply)
+    return false;
+  auto callee = apply.getReferencedFunctionOrNull();
+  if (!callee)
+    return false;
+  if (!callee->hasSemanticsAttr("availability.osversion"))
+    return false;
+  auto &context = I.getFunction()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  if (apply.getNumArguments() != 3)
+    return false;
+  auto arg0 = dyn_cast<IntegerLiteralInst>(apply.getArgument(0));
+  if (!arg0)
+    return false;
+  auto arg1 = dyn_cast<IntegerLiteralInst>(apply.getArgument(1));
+  if (!arg1)
+    return false;
+  auto arg2 = dyn_cast<IntegerLiteralInst>(apply.getArgument(2));
+  if (!arg2)
+    return false;
+
+  auto version = VersionRange::allGTE(llvm::VersionTuple(
+      arg0->getValue().getLimitedValue(), arg1->getValue().getLimitedValue(),
+      arg2->getValue().getLimitedValue()));
+
+  auto callAvailability = AvailabilityContext(version);
+  return deploymentAvailability.isContainedIn(callAvailability);
+}
+
 static bool isApplyOfStringConcat(SILInstruction &I) {
   if (auto *AI = dyn_cast<ApplyInst>(&I))
     if (auto *Fn = AI->getReferencedFunctionOrNull())
@@ -1586,6 +1618,11 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
 
       if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer) ||
           isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete)) {
+        WorkList.insert(inst);
+        continue;
+      }
+
+      if (isApplyOfKnownAvailability(*inst)) {
         WorkList.insert(inst);
         continue;
       }
@@ -1731,6 +1768,19 @@ ConstantFolder::processWorkList() {
           continue;
         }
       }
+    // Replace a known availability.version semantic call.
+    if (isApplyOfKnownAvailability(*I)) {
+      if (auto apply = dyn_cast<ApplyInst>(I)) {
+        SILBuilderWithScope B(I);
+        auto tru = B.createIntegerLiteral(apply->getLoc(), apply->getType(), 1);
+        apply->replaceAllUsesWith(tru);
+        eliminateDeadInstruction(
+            I, [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
+        WorkList.insert(tru);
+        InvalidateInstructions = true;
+      }
+      continue;
+    }
 
     // If we have a cast instruction, try to optimize it.
     if (isa<CheckedCastBranchInst>(I) || isa<CheckedCastAddrBranchInst>(I) ||

@@ -472,12 +472,10 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   // Scan conformance records.
   auto processSection = [&](const ConformanceSection &section) {
     // Eagerly pull records for nondependent witnesses into our cache.
-    for (const auto &record : section) {
-      auto &descriptor = *record.get();
-
+    auto processDescriptor = [&](const ProtocolConformanceDescriptor &descriptor) {
       // We only care about conformances for this protocol.
       if (descriptor.getProtocol() != protocol)
-        continue;
+        return;
 
       // If there's a matching type, record the positive result and return it.
       // The matching type is exact, so they can't go stale, and we should
@@ -487,6 +485,14 @@ swift_conformsToProtocolImpl(const Metadata *const type,
         auto witness = descriptor.getWitnessTable(matchingType);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
       }
+    };
+
+    if (C.scanSectionsBackwards) {
+      for (const auto &record : llvm::reverse(section))
+        processDescriptor(*record.get());
+    } else {
+      for (const auto &record : section)
+        processDescriptor(*record.get());
     }
   };
 
@@ -681,9 +687,9 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
                                &witnessTable)) {
         const char *protoName =
             req.getProtocol() ? req.getProtocol().getName() : "<null>";
-        return TypeLookupError(
-            "subject type %s does not conform to protocol %s", req.getParam(),
-            protoName);
+        return TYPE_LOOKUP_ERROR_FMT(
+            "subject type %.*s does not conform to protocol %s",
+            (int)req.getParam().size(), req.getParam().data(), protoName);
       }
 
       // If we need a witness table, add it.
@@ -708,8 +714,10 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
 
       // Check that the types are equivalent.
       if (subjectType != otherType)
-        return TypeLookupError("subject type %s does not match %s",
-                               req.getParam(), req.getMangledTypeName());
+        return TYPE_LOOKUP_ERROR_FMT(
+            "subject type %.*s does not match %.*s", (int)req.getParam().size(),
+            req.getParam().data(), (int)req.getMangledTypeName().size(),
+            req.getMangledTypeName().data());
 
       continue;
     }
@@ -718,14 +726,14 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
       switch (req.getLayout()) {
       case GenericRequirementLayoutKind::Class:
         if (!subjectType->satisfiesClassConstraint())
-          return TypeLookupError(
-              "subject type %s does not satisfy class constraint",
-              req.getParam());
+          return TYPE_LOOKUP_ERROR_FMT(
+              "subject type %.*s does not satisfy class constraint",
+              (int)req.getParam().size(), req.getParam().data());
         continue;
       }
 
       // Unknown layout.
-      return TypeLookupError("unknown layout kind %u", req.getLayout());
+      return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
     }
 
     case GenericRequirementKind::BaseClass: {
@@ -747,8 +755,10 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
       }
 
       if (!isSubclass(subjectType, baseType))
-        return TypeLookupError("%s is not subclass of %s", req.getParam(),
-                               req.getMangledTypeName());
+        return TYPE_LOOKUP_ERROR_FMT(
+            "%.*s is not subclass of %.*s", (int)req.getParam().size(),
+            req.getParam().data(), (int)req.getMangledTypeName().size(),
+            req.getMangledTypeName().data());
 
       continue;
     }
@@ -760,8 +770,8 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
     }
 
     // Unknown generic requirement kind.
-    return TypeLookupError("unknown generic requirement kind %u",
-                           req.getKind());
+    return TYPE_LOOKUP_ERROR_FMT("unknown generic requirement kind %u",
+                                 (unsigned)req.getKind());
   }
 
   // Success!

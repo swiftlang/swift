@@ -913,6 +913,7 @@ MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
                     MultipleValueInstruction, None, DoesNotRelease)
 INST_RANGE(MultipleValueInstruction, BeginApplyInst, DestructureTupleInst)
+NODE_RANGE(NonSingleValueInstruction, UnreachableInst, DestructureTupleInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
 NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)

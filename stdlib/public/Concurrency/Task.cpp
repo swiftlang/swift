@@ -536,17 +536,29 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 }
 
 void swift::swift_task_asyncMainDrainQueue() {
-#if !defined(_WIN32)
+#if defined(_WIN32)
+  static void(FAR *pfndispatch_main)(void) = NULL;
+
+  if (pfndispatch_main)
+    return pfndispatch_main();
+
+  HMODULE hModule = LoadLibraryW(L"dispatch.dll");
+  if (hModule == NULL)
+    abort();
+
+  pfndispatch_main =
+      reinterpret_cast<void (FAR *)(void)>(GetProcAddress(hModule,
+                                                          "dispatch_main"));
+  if (pfndispatch_main == NULL)
+    abort();
+
+  pfndispatch_main();
+#else
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
   if (runLoop)
     runLoop();
   else
     dispatch_main();
-#else
-  // TODO: I don't have a windows box to get this working right now.
-  //       We need to either pull in the CFRunLoop if it's available, or do
-  //       something that will drain the main queue. Exploding for now.
-  abort();
 #endif
 }

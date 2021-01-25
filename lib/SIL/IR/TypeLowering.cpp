@@ -3164,8 +3164,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // We might still want to conditionalize this behavior even after we commit
   // substituted function types, to avoid bloating
   // IR for platforms that don't differentiate function type representations.
-  bool DifferentFunctionTypesHaveDifferentRepresentation
-    = Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues;
+  bool DifferentFunctionTypesHaveDifferentRepresentation = true;
   
   // TODO: For C language types we should consider the attached Clang types.
   if (fnTy1->getLanguage() == SILFunctionLanguage::C)

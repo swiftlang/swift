@@ -317,10 +317,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
-    // Differentiable.zeroTangentVectorInitializer
-    if (name.isSimpleName(ctx.Id_zeroTangentVectorInitializer))
-      return getRequirement(KnownProtocolKind::Differentiable);
-
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
@@ -468,6 +464,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
       VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
               SourceLoc(), name, parentDC);
   propDecl->setImplicit();
+  propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 

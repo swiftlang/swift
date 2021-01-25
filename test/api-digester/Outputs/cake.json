@@ -539,23 +539,6 @@
           "moduleName": "cake"
         },
         {
-          "kind": "TypeAlias",
-          "name": "RawValue",
-          "printedName": "RawValue",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Swift.Int",
-              "usr": "s:Si"
-            }
-          ],
-          "declKind": "TypeAlias",
-          "usr": "s:4cake6NumberO8RawValuea",
-          "moduleName": "cake",
-          "implicit": true
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(rawValue:)",
@@ -589,6 +572,23 @@
             "Inlinable"
           ],
           "init_kind": "Designated"
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "RawValue",
+          "printedName": "RawValue",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Swift.Int",
+              "usr": "s:Si"
+            }
+          ],
+          "declKind": "TypeAlias",
+          "usr": "s:4cake6NumberO8RawValuea",
+          "moduleName": "cake",
+          "implicit": true
         },
         {
           "kind": "Var",

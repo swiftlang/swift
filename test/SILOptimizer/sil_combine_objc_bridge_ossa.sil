@@ -45,14 +45,9 @@ sil [_semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
 sil [_semantics "convertToObjectiveC"] @bridgeToObjectiveC:
   $@convention(method) <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
 
-// CHECK-LABEL: sil [ossa] @bridge_from_to_owned
-// XHECK-NOT: apply
-// XHECK: strong_retain
-// XHECK-NOT: apply
-// XHECK: strong_release
-// XHECK-NOT: apply
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @bridge_from_to_owned :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_from_to_owned'
 sil [ossa] @bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : @owned $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
@@ -62,6 +57,29 @@ bb0(%0 : @owned $AnNSArray):
   %3 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
   %4 = apply %3<AnyObject>(%2a) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
   return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil [ossa] @bridge_from_to_owned_different_blocks : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_from_to_owned_different_blocks'
+sil [ossa] @bridge_from_to_owned_different_blocks : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : @owned $AnNSArray):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2a = copy_value %2 : $AnArray<AnyObject>
+  destroy_value %2 : $AnArray<AnyObject>
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2a) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  br bb3(%4 : $AnNSArray)
+
+bb2:
+  br bb3(%0 : $AnNSArray)
+
+bb3(%result : @owned $AnNSArray):
+  return %result : $AnNSArray
 }
 
 sil [_semantics "convertFromObjectiveC"] [dynamically_replacable] @bridgeFromObjectiveC2 :
@@ -81,14 +99,9 @@ bb0(%0 : @owned $AnNSArray):
   %4 = apply %3<AnyObject>(%2a) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
-// CHECK-LABEL: sil [ossa] @bridge_to_from_owned
-// XHECK-NOT: apply
-// XHECK: retain_value
-// XHECK-NOT: apply
-// XHECK: destroy_value
-// XHECK-NOT: apply
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @bridge_to_from_owned :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_to_from_owned'
 sil [ossa] @bridge_to_from_owned : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
 bb0(%0 : @owned $AnArray<AnyObject>):
   %1 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
@@ -107,14 +120,9 @@ sil [_semantics "convertFromObjectiveC"] @bridgeFromObjectiveCGuaranteed :
 sil [_semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
   $@convention(method) <τ_0_0> (@guaranteed AnArray<τ_0_0>) -> @owned AnNSArray
 
-// CHECK-LABEL: sil [ossa] @bridge_from_to_guaranteed
-// XHECK-NOT: apply
-// XHECK: strong_retain
-// XHECK-NOT: apply
-// XHECK: strong_release
-// XHECK-NOT: apply
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @bridge_from_to_guaranteed :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_from_to_guaranteed'
 sil [ossa] @bridge_from_to_guaranteed : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : @owned $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveCGuaranteed : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
@@ -126,14 +134,9 @@ bb0(%0 : @owned $AnNSArray):
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil [ossa] @bridge_to_from_guaranteed
-// XHECK-NOT: apply
-// XHECK: retain_value
-// XHECK-NOT: apply
-// XHECK: destroy_value
-// XHECK-NOT: apply
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @bridge_to_from_guaranteed :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_to_from_guaranteed'
 sil [ossa] @bridge_to_from_guaranteed : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
 bb0(%0 : @owned $AnArray<AnyObject>):
   %1 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
@@ -145,13 +148,38 @@ bb0(%0 : @owned $AnArray<AnyObject>):
   return %4 : $AnArray<AnyObject>
 }
 
+// CHECK-LABEL: sil [ossa] @bridge_from_owned_to_guaranteed :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_from_owned_to_guaranteed'
+sil [ossa] @bridge_from_owned_to_guaranteed : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : @owned $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %3 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  destroy_value %2 : $AnArray<AnyObject>
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil [ossa] @bridge_to_owned_from_guaranteed :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'bridge_to_owned_from_guaranteed'
+sil [ossa] @bridge_to_owned_from_guaranteed : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+bb0(%0 : @owned $AnArray<AnyObject>):
+  %1 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  destroy_value %0 : $AnArray<AnyObject>
+  %3 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  return %4 : $AnArray<AnyObject>
+}
+
 struct PlainStruct {
 }
 
-// CHECK-LABEL: sil [ossa] @plain_struct_bridge_from_to_owned
-// XHECK-NOT: apply
-// XHECK-NOT: apply
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @plain_struct_bridge_from_to_owned :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'plain_struct_bridge_from_to_owned'
 sil [ossa] @plain_struct_bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : @owned $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <PlainStruct> (@owned AnNSArray) -> @owned AnArray<PlainStruct>
@@ -163,11 +191,9 @@ bb0(%0 : @owned $AnNSArray):
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil [ossa] @plain_struct_bridge_from_to_owned_generic
-// XHECK-NOT: apply
-// XHECK-NOT: apply
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @plain_struct_bridge_from_to_owned_generic :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'plain_struct_bridge_from_to_owned_generic'
 sil [ossa] @plain_struct_bridge_from_to_owned_generic : $@convention(thin) <T>(@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : @owned $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
@@ -179,11 +205,9 @@ bb0(%0 : @owned $AnNSArray):
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil [ossa] @plain_struct_from_to_owned_recursive_type
-// XHECK-NOT: apply
-// XHECK-NOT: apply
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @plain_struct_from_to_owned_recursive_type :
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'plain_struct_from_to_owned_recursive_type'
 sil [ossa] @plain_struct_from_to_owned_recursive_type : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : @owned $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
@@ -195,15 +219,15 @@ bb0(%0 : @owned $AnNSArray):
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
-// XHECK: function_ref @$sSa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
-// XHECK-NOT: retain
-// XHECK: apply
-// XHECK: destroy_value
-// XHECK: upcast %{{.*}} : $NSArray to $NSObject
-// XHECK: store
-// XHECK: return
-sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
+// CHECK-LABEL: sil shared [ossa] @bridge_from_swift_array_to_NSObject_cast
+// CHECK: function_ref @$sSa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK-NOT: copy_value
+// CHECK: apply
+// CHECK: destroy_value
+// CHECK: upcast %{{.*}} : $NSArray to $NSObject
+// CHECK: store
+// CHECK: return
+sil shared [ossa] @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
 bb0(%0 : $*NSObject, %1 : $*Array<String>):
   %2 = alloc_stack $Array<String>
   copy_addr %1 to [initialization] %2 : $*Array<String>
@@ -222,13 +246,13 @@ enum AddressOnlyError : Error {
 // Test that we emit a copy_addr for the address-only value initialization.
 
 // CHECK-LABEL: sil [ossa] @unconditional_checked_cast_addr_address_only_type
-// XHECK: alloc_stack $Error
-// XHECK: alloc_stack $AddressOnlyError
-// XHECK:  copy_addr
-// XHECK: alloc_existential_box
-// XHECK: project_existential_box
-// XHECK: copy_addr
-// XHECK: store
+// CHECK: alloc_stack $Error
+// CHECK: alloc_stack $AddressOnlyError
+// CHECK:  copy_addr
+// CHECK: alloc_existential_box
+// CHECK: project_existential_box
+// CHECK: copy_addr
+// CHECK: store
 sil [ossa] @unconditional_checked_cast_addr_address_only_type: $@convention(thin) (@in_guaranteed AddressOnlyError) -> @owned Error {
 bb0(%0 : $*AddressOnlyError):
   %1 = alloc_stack $Error

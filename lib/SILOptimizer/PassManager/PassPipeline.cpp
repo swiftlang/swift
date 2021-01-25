@@ -242,6 +242,9 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   // Optimize access markers for better LICM: might merge accesses
   // It will also set the no_nested_conflict for dynamic accesses
+  // AccessEnforcementReleaseSinking results in non-canonical OSSA.
+  // It is only used to expose opportunities in AccessEnforcementOpts
+  // before CanonicalOSSA re-hoists destroys.
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addHighLevelLICM();
@@ -250,6 +253,9 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // LICM might have added new merging potential by hoisting
   // we don't want to restart the pipeline - ignore the
   // potential of merging out of two loops
+  // AccessEnforcementReleaseSinking results in non-canonical OSSA.
+  // It is only used to expose opportunities in AccessEnforcementOpts
+  // before CanonicalOSSA re-hoists destroys.
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   // Start of loop unrolling passes.
@@ -385,6 +391,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   } else {
     P.addRedundantLoadElimination();
   }
+  // Optimize copies created during RLE.
+  P.addSemanticARCOpts();
 
   P.addCOWOpts();
   P.addPerformanceConstantPropagation();
@@ -721,9 +729,8 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
-  if (Options.EnableLargeLoadableTypes) {
-    P.addLoadableByAddress();
-  }
+  P.addLoadableByAddress();
+
   return P;
 }
 

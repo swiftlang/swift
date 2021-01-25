@@ -391,6 +391,10 @@ public:
     }
   }
 
+  static bool isAddressToAddressProjection(SILValue v) {
+    return isAddressProjection(v) && !isObjectToAddressProjection(v);
+  }
+
   /// Returns true if this instruction projects from an object type into an
   /// address subtype.
   static bool isObjectToAddressProjection(SILValue V) {

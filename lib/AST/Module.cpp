@@ -1092,22 +1092,21 @@ Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
-  auto md5 = *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
-                  .InterfaceHash;
-  llvm::MD5::MD5Result result;
-  md5.final(result);
-  return Fingerprint{std::move(result)};
+  Optional<StableHasher> interfaceHasher =
+      evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .InterfaceHasher;
+  return Fingerprint{StableHasher{interfaceHasher.getValue()}.finalize()};
 }
 
 Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
   /// FIXME: Gross. Hashing multiple "hash" values.
-  llvm::MD5 hash;
-  hash.update(getInterfaceHash().getRawValue());
+  auto hash = StableHasher::defaultHasher();
+  hash.combine(getInterfaceHash());
 
   std::function<void(IterableDeclContext *)> hashTypeBodyFingerprints =
       [&](IterableDeclContext *IDC) {
         if (auto fp = IDC->getBodyFingerprint())
-          hash.update(fp->getRawValue());
+          hash.combine(*fp);
         for (auto *member : IDC->getParsedMembers())
           if (auto *childIDC = dyn_cast<IterableDeclContext>(member))
             hashTypeBodyFingerprints(childIDC);
@@ -1118,9 +1117,7 @@ Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
       hashTypeBodyFingerprints(IDC);
   }
 
-  llvm::MD5::MD5Result result;
-  hash.final(result);
-  return Fingerprint{std::move(result)};
+  return Fingerprint{std::move(hash)};
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
@@ -2053,6 +2050,30 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   }
 
   return true;
+}
+
+bool ModuleDecl::
+canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const {
+  ModuleDecl *moduleOfNominal = nominal->getParentModule();
+
+  // If the nominal is defined in the same module, it's fine.
+  if (moduleOfNominal == this)
+    return true;
+
+  // See if nominal is imported in a "regular" way, i.e. not with
+  // @_implementationOnly or @_spi.
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default};
+  SmallVector<ImportedModule, 4> results;
+  getImportedModules(results, filter);
+
+  auto &imports = getASTContext().getImportCache();
+  for (auto &desc : results) {
+    if (imports.isImportedBy(moduleOfNominal, desc.importedModule))
+      return true;
+  }
+  return false;
 }
 
 void SourceFile::lookupImportedSPIGroups(

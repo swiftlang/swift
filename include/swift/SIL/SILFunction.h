@@ -37,6 +37,7 @@ class SILInstruction;
 class SILModule;
 class SILFunctionBuilder;
 class SILProfiler;
+class BasicBlockBitfield;
 
 namespace Lowering {
 class TypeLowering;
@@ -147,6 +148,8 @@ private:
   friend class SILBasicBlock;
   friend class SILModule;
   friend class SILFunctionBuilder;
+  template <typename, unsigned> friend class BasicBlockData;
+  friend class BasicBlockBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -191,6 +194,16 @@ private:
 
   Identifier ObjCReplacementFor;
 
+  /// The head of a single-linked list of currently alive BasicBlockBitfield.
+  BasicBlockBitfield *newestAliveBitfield = nullptr;
+
+  /// A monotonically increasing ID which is incremented whenever a
+  /// BasicBlockBitfield is constructed.
+  /// Usually this stays below 1000, so a 32-bit unsigned is more than
+  /// sufficient.
+  /// For details see BasicBlockBitfield::bitfieldID;
+  unsigned currentBitfieldID = 1;
+
   /// The function's set of semantics attributes.
   ///
   /// TODO: Why is this using a std::string? Why don't we use uniqued
@@ -213,6 +226,11 @@ private:
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
+
+  /// Used to verify if a BasicBlockData is not valid anymore.
+  /// This counter is incremented every time a BasicBlockData re-assigns new
+  /// block indices.
+  unsigned BlockListChangeIdx = 0;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.

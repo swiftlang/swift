@@ -927,7 +927,7 @@ void ClosureSpecCloner::populateCloned() {
     }
   }
   if (invalidatedStackNesting) {
-    StackNesting().correctStackNesting(Cloned);
+    StackNesting::fixNesting(Cloned);
   }
 }
 
@@ -992,7 +992,7 @@ void SILClosureSpecializerTransform::run() {
     }
 
     if (invalidatedStackNesting) {
-      StackNesting().correctStackNesting(F);
+      StackNesting::fixNesting(F);
     }
   }
 

@@ -363,7 +363,7 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
   // Instructions that we do not recognize (and thus will not move) and that
   // *must* use RCIdentity, implies we are always known safe as long as meet
   // over all path constraints are satisfied.
-  if (isRCStateTransitionUnknown(PotentialGuaranteedUser))
+  if (isRCStateTransitionUnknown(PotentialGuaranteedUser->asSILNode()))
     if (mustUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
       FoundNonARCUser = true;
 
@@ -422,7 +422,7 @@ bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
   // Instructions that we do not recognize (and thus will not move) and that
   // *must* use RCIdentity, implies we are always known safe as long as meet
   // over all path constraints are satisfied.
-  if (isRCStateTransitionUnknown(PotentialUser))
+  if (isRCStateTransitionUnknown(PotentialUser->asSILNode()))
     if (mustUseValue(PotentialUser, getRCRoot(), AA))
       FoundNonARCUser = true;
 

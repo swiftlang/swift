@@ -8,10 +8,10 @@ import MemberTemplates
 
 // CHECK-LABEL: sil hidden @$s4main9basicTestyyF : $@convention(thin) () -> ()
 
-// CHECK: [[ADD:%.*]] = function_ref @_ZN18HasMemberTemplates3addIiEET_S1_S1_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK: [[ADD:%.*]] = function_ref @_ZN18HasMemberTemplates3addSameTypeParamsIiEET_S1_S1_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 // CHECK: apply [[ADD]]({{.*}}) : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK: [[ADD_TWO_TEMPLATES:%.*]] = function_ref @_ZN18HasMemberTemplates15addTwoTemplatesIiiEET_S1_T0_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32 // user: %26
+// CHECK: [[ADD_TWO_TEMPLATES:%.*]] = function_ref @_ZN18HasMemberTemplates15addMixedTypeParamsIiiEET_S1_T0_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32 // user: %26
 // CHECK: apply [[ADD_TWO_TEMPLATES]]({{.*}}) : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
 // CHECK: [[ADD_ALL:%.*]] = function_ref @_ZN18HasMemberTemplates6addAllIiiEEiiT_T0_ : $@convention(c) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32 // user: %39
@@ -24,15 +24,15 @@ import MemberTemplates
 func basicTest() {
   var i: Int32 = 0
   var obj = HasMemberTemplates()
-  obj.add(i, i)
-  obj.addTwoTemplates(i, i)
+  obj.addSameTypeParams(i, i)
+  obj.addMixedTypeParams(i, i)
   obj.addAll(i, i, i)
   obj.doNothingConstRef(&i)
 }
 
-// CHECK-LABEL: sil hidden_external [clang HasMemberTemplates._ZN18HasMemberTemplates3addIiEET_S1_S1_] @_ZN18HasMemberTemplates3addIiEET_S1_S1_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK-LABEL: sil hidden_external [clang HasMemberTemplates._ZN18HasMemberTemplates3addSameTypeParamsIiEET_S1_S1_] @_ZN18HasMemberTemplates3addSameTypeParamsIiEET_S1_S1_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK-LABEL: sil hidden_external [clang HasMemberTemplates._ZN18HasMemberTemplates15addTwoTemplatesIiiEET_S1_T0_] @_ZN18HasMemberTemplates15addTwoTemplatesIiiEET_S1_T0_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK-LABEL: sil hidden_external [clang HasMemberTemplates._ZN18HasMemberTemplates15addMixedTypeParamsIiiEET_S1_T0_] @_ZN18HasMemberTemplates15addMixedTypeParamsIiiEET_S1_T0_ : $@convention(c) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
 // CHECK-LABEL: sil hidden_external [clang HasMemberTemplates._ZN18HasMemberTemplates6addAllIiiEEiiT_T0_] @_ZN18HasMemberTemplates6addAllIiiEEiiT_T0_ : $@convention(c) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 

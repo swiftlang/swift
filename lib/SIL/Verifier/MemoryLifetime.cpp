@@ -393,64 +393,50 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
 //                     MemoryDataflow members
 //===----------------------------------------------------------------------===//
 
-MemoryDataflow::MemoryDataflow(SILFunction *function, unsigned numLocations) {
-  // Resizing is mandatory! Just adding states with push_back would potentially
-  // invalidate previous pointers to states, which are stored in block2State.
-  blockStates.resize(function->size());
-
-  unsigned idx = 0;
-  unsigned numBits = numLocations;
-  for (SILBasicBlock &BB : *function) {
-    BlockState *st = &blockStates[idx++];
-    st->block = &BB;
-    st->entrySet.resize(numBits);
-    st->genSet.resize(numBits);
-    st->killSet.resize(numBits);
-    st->exitSet.resize(numBits);
-    block2State[&BB] = st;
-  }
-}
+MemoryDataflow::MemoryDataflow(SILFunction *function, unsigned numLocations) :
+  blockStates(function, [numLocations](SILBasicBlock *block) {
+    return BlockState(numLocations);
+  }) {}
 
 void MemoryDataflow::entryReachabilityAnalysis() {
-  llvm::SmallVector<BlockState *, 16> workList;
-  BlockState *entryState = &blockStates[0];
-  assert(entryState ==
-         block2State[entryState->block->getParent()->getEntryBlock()]);
-  entryState->reachableFromEntry = true;
-  workList.push_back(entryState);
+  llvm::SmallVector<SILBasicBlock *, 16> workList;
+  auto entry = blockStates.entry();
+  entry.data.reachableFromEntry = true;
+  workList.push_back(&entry.block);
 
   while (!workList.empty()) {
-    BlockState *state = workList.pop_back_val();
-    for (SILBasicBlock *succ : state->block->getSuccessorBlocks()) {
-      BlockState *succState = block2State[succ];
-      if (!succState->reachableFromEntry) {
-        succState->reachableFromEntry = true;
-        workList.push_back(succState);
+    SILBasicBlock *block = workList.pop_back_val();
+    for (SILBasicBlock *succ : block->getSuccessorBlocks()) {
+      BlockState &succState = blockStates[succ];
+      if (!succState.reachableFromEntry) {
+        succState.reachableFromEntry = true;
+        workList.push_back(succ);
       }
     }
   }
 }
 
 void MemoryDataflow::exitReachableAnalysis() {
-  llvm::SmallVector<BlockState *, 16> workList;
-  for (BlockState &state : blockStates) {
-    if (state.block->getTerminator()->isFunctionExiting()) {
-      state.exitReachability = ExitReachability::ReachesExit;
-      workList.push_back(&state);
-    } else if (isa<UnreachableInst>(state.block->getTerminator())) {
-      state.exitReachability = ExitReachability::ReachesUnreachable;
-      workList.push_back(&state);
+  llvm::SmallVector<SILBasicBlock *, 16> workList;
+  for (auto bd : blockStates) {
+    if (bd.block.getTerminator()->isFunctionExiting()) {
+      bd.data.exitReachability = ExitReachability::ReachesExit;
+      workList.push_back(&bd.block);
+    } else if (isa<UnreachableInst>(bd.block.getTerminator())) {
+      bd.data.exitReachability = ExitReachability::ReachesUnreachable;
+      workList.push_back(&bd.block);
     }
   }
   while (!workList.empty()) {
-    BlockState *state = workList.pop_back_val();
-    for (SILBasicBlock *pred : state->block->getPredecessorBlocks()) {
-      BlockState *predState = block2State[pred];
-      if (predState->exitReachability < state->exitReachability) {
+    SILBasicBlock *block = workList.pop_back_val();
+    BlockState &state = blockStates[block];
+    for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
+      BlockState &predState = blockStates[pred];
+      if (predState.exitReachability < state.exitReachability) {
         // As there are 3 states, each block can be put into the workList 2
         // times maximum.
-        predState->exitReachability = state->exitReachability;
-        workList.push_back(predState);
+        predState.exitReachability = state.exitReachability;
+        workList.push_back(pred);
       }
     }
   }
@@ -462,18 +448,18 @@ void MemoryDataflow::solveForward(JoinOperation join) {
   bool firstRound = true;
   do {
     changed = false;
-    for (BlockState &st : blockStates) {
-      Bits bits = st.entrySet;
+    for (auto bd : blockStates) {
+      Bits bits = bd.data.entrySet;
       assert(!bits.empty());
-      for (SILBasicBlock *pred : st.block->getPredecessorBlocks()) {
-        join(bits, block2State[pred]->exitSet);
+      for (SILBasicBlock *pred : bd.block.getPredecessorBlocks()) {
+        join(bits, blockStates[pred].exitSet);
       }
-      if (firstRound || bits != st.entrySet) {
+      if (firstRound || bits != bd.data.entrySet) {
         changed = true;
-        st.entrySet = bits;
-        bits |= st.genSet;
-        bits.reset(st.killSet);
-        st.exitSet = bits;
+        bd.data.entrySet = bits;
+        bits |= bd.data.genSet;
+        bits.reset(bd.data.killSet);
+        bd.data.exitSet = bits;
       }
     }
     firstRound = false;
@@ -498,18 +484,18 @@ void MemoryDataflow::solveBackward(JoinOperation join) {
   bool firstRound = true;
   do {
     changed = false;
-    for (BlockState &st : llvm::reverse(blockStates)) {
-      Bits bits = st.exitSet;
+    for (auto bd : llvm::reverse(blockStates)) {
+      Bits bits = bd.data.exitSet;
       assert(!bits.empty());
-      for (SILBasicBlock *succ : st.block->getSuccessorBlocks()) {
-        join(bits, block2State[succ]->entrySet);
+      for (SILBasicBlock *succ : bd.block.getSuccessorBlocks()) {
+        join(bits, blockStates[succ].entrySet);
       }
-      if (firstRound || bits != st.exitSet) {
+      if (firstRound || bits != bd.data.exitSet) {
         changed = true;
-        st.exitSet = bits;
-        bits |= st.genSet;
-        bits.reset(st.killSet);
-        st.entrySet = bits;
+        bd.data.exitSet = bits;
+        bits |= bd.data.genSet;
+        bits.reset(bd.data.killSet);
+        bd.data.entrySet = bits;
       }
     }
     firstRound = false;
@@ -529,12 +515,12 @@ void MemoryDataflow::solveBackwardWithUnion() {
 }
 
 void MemoryDataflow::dump() const {
-  for (const BlockState &st : blockStates) {
-    llvm::dbgs() << "bb" << st.block->getDebugID() << ":\n"
-                 << "    entry: " << st.entrySet << '\n'
-                 << "    gen:   " << st.genSet << '\n'
-                 << "    kill:  " << st.killSet << '\n'
-                 << "    exit:  " << st.exitSet << '\n';
+    for (auto bd : blockStates) {
+    llvm::dbgs() << "bb" << bd.block.getDebugID() << ":\n"
+                 << "    entry: " << bd.data.entrySet << '\n'
+                 << "    gen:   " << bd.data.genSet << '\n'
+                 << "    kill:  " << bd.data.killSet << '\n'
+                 << "    exit:  " << bd.data.exitSet << '\n';
   }
 }
 
@@ -585,7 +571,7 @@ class MemoryLifetimeVerifier {
   void initDataflow(MemoryDataflow &dataFlow);
 
   /// Initializes the data flow bits sets in the block state for a single block.
-  void initDataflowInBlock(BlockState &state);
+  void initDataflowInBlock(SILBasicBlock *block, BlockState &state);
 
   /// Helper function to set bits for function arguments and returns.
   void setFuncOperandBits(BlockState &state, Operand &op,
@@ -658,36 +644,37 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
 void MemoryLifetimeVerifier::initDataflow(MemoryDataflow &dataFlow) {
   // Initialize the entry and exit sets to all-bits-set. Except for the function
   // entry.
-  for (BlockState &st : dataFlow) {
-    if (st.block == function->getEntryBlock()) {
-      st.entrySet.reset();
+  for (auto bs : dataFlow) {
+      if (&bs.block == function->getEntryBlock()) {
+      bs.data.entrySet.reset();
       for (SILArgument *arg : function->getArguments()) {
         SILFunctionArgument *funcArg = cast<SILFunctionArgument>(arg);
         if (funcArg->getArgumentConvention() !=
               SILArgumentConvention::Indirect_Out) {
-          locations.setBits(st.entrySet, arg);
+          locations.setBits(bs.data.entrySet, arg);
         }
       }
     } else {
-      st.entrySet.set();
+      bs.data.entrySet.set();
     }
-    st.exitSet.set();
+    bs.data.exitSet.set();
 
     // Anything weired can happen in unreachable blocks. So just ignore them.
     // Note: while solving the dataflow, unreachable blocks are implicitly
     // ignored, because their entry/exit sets are all-ones and their gen/kill
     // sets are all-zeroes.
-    if (st.reachableFromEntry)
-      initDataflowInBlock(st);
+    if (bs.data.reachableFromEntry)
+      initDataflowInBlock(&bs.block, bs.data);
   }
 }
 
-void MemoryLifetimeVerifier::initDataflowInBlock(BlockState &state) {
+void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
+                                                 BlockState &state) {
   // Initialize the genSet with special cases, like the @out results of an
   // try_apply in the predecessor block.
-  setBitsOfPredecessor(state.genSet, state.block);
+  setBitsOfPredecessor(state.genSet, block);
 
-  for (SILInstruction &I : *state.block) {
+  for (SILInstruction &I : *block) {
     switch (I.getKind()) {
       case SILInstructionKind::LoadInst: {
         auto *LI = cast<LoadInst>(&I);
@@ -809,38 +796,38 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
 
   const Bits &nonTrivialLocations = locations.getNonTrivialLocations();
   Bits bits(locations.getNumLocations());
-  for (BlockState &st : dataFlow) {
-    if (!st.reachableFromEntry || !st.exitReachable())
+  for (auto bs : dataFlow) {
+    if (!bs.data.reachableFromEntry || !bs.data.exitReachable())
       continue;
 
     // Check all instructions in the block.
-    bits = st.entrySet;
-    checkBlock(st.block, bits);
+    bits = bs.data.entrySet;
+    checkBlock(&bs.block, bits);
 
     // Check if there is a mismatch in location lifetime at the merge point.
-    for (SILBasicBlock *pred : st.block->getPredecessorBlocks()) {
-      BlockState *predState = dataFlow.getState(pred);
-      if (predState->reachableFromEntry) {
-        require((st.entrySet ^ predState->exitSet) & nonTrivialLocations,
-          "lifetime mismatch in predecessors", &*st.block->begin());
+    for (SILBasicBlock *pred : bs.block.getPredecessorBlocks()) {
+      BlockState &predState = dataFlow[pred];
+      if (predState.reachableFromEntry) {
+        require((bs.data.entrySet ^ predState.exitSet) & nonTrivialLocations,
+          "lifetime mismatch in predecessors", &*bs.block.begin());
       }
     }
 
     // Check the bits at function exit.
-    TermInst *term = st.block->getTerminator();
-    assert(bits == st.exitSet || isa<TryApplyInst>(term));
+    TermInst *term = bs.block.getTerminator();
+    assert(bits == bs.data.exitSet || isa<TryApplyInst>(term));
     switch (term->getKind()) {
       case SILInstructionKind::ReturnInst:
       case SILInstructionKind::UnwindInst:
-        require(expectedReturnBits & ~st.exitSet,
+        require(expectedReturnBits & ~bs.data.exitSet,
           "indirect argument is not alive at function return", term);
-        require(st.exitSet & ~expectedReturnBits & nonTrivialLocations,
+        require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
           "memory is initialized at function return but shouldn't", term);
         break;
       case SILInstructionKind::ThrowInst:
-        require(expectedThrowBits & ~st.exitSet,
+        require(expectedThrowBits & ~bs.data.exitSet,
           "indirect argument is not alive at throw", term);
-        require(st.exitSet & ~expectedThrowBits & nonTrivialLocations,
+        require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
           "memory is initialized at throw but shouldn't", term);
         break;
       default:

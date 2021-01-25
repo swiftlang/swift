@@ -1692,7 +1692,7 @@ ERROR(where_nongeneric_toplevel,none,
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
       "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' were unable to be "
+      "The following Swift type(s) provided to '%0' could not be "
       "converted: %1.",
       (StringRef, StringRef))
 
@@ -2454,8 +2454,10 @@ NOTE(overridden_near_match_here,none,
      "potential overridden %0 %1 here",
       (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
-      "overriding %select{|non-@objc }0declarations "
-      "%select{in extensions|from extensions}0 is not supported", (bool, bool))
+      "%select{|non-@objc}0 %2 %3 %select{"
+      "is declared in extension of %4 and cannot be overriden|"
+      "declared in %4 cannot be overriden from extension}1", 
+      (bool, bool, DescriptiveDeclKind, DeclName, DeclName))
 NOTE(overridden_here,none,
      "overridden declaration is here", ())
 NOTE(overridden_here_can_be_objc,none,
@@ -5354,6 +5356,10 @@ WARNING(non_exhaustive_switch_unknown_only,none,
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())
+
+ERROR(override_nsobject_hash_error,none,
+      "`NSObject.hash(into:)` is not overridable; "
+      "subclasses can customize hashing by overriding the `hash` property", ())
 
 WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "

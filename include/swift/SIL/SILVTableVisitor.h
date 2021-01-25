@@ -148,7 +148,7 @@ protected:
     if (!theClass->hasKnownSwiftImplementation())
       return;
 
-    for (auto member : theClass->getSemanticMembers())
+    for (auto member : theClass->getABIMembers())
       maybeAddMember(member);
   }
 };

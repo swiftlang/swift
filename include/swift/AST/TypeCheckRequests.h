@@ -1220,8 +1220,26 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
-class SemanticMembersRequest :
-    public SimpleRequest<SemanticMembersRequest,
+class ABIMembersRequest :
+    public SimpleRequest<ABIMembersRequest,
+                         ArrayRef<Decl *>(IterableDeclContext *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *>
+  evaluate(Evaluator &evaluator, IterableDeclContext *idc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class AllMembersRequest :
+    public SimpleRequest<AllMembersRequest,
                          ArrayRef<Decl *>(IterableDeclContext *),
                          RequestFlags::Cached> {
 public:
@@ -1876,6 +1894,27 @@ private:
   bool evaluate(Evaluator &evaluator, DeclContext *DC,
                 ValueDecl *VD1, ValueDecl *VD2,
                 bool dynamic) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether the first function decl is a refinement of the second,
+/// meaning the two functions have the same structure, and the requirements
+/// of the first are refining the requirements of the second.
+class IsDeclRefinementOfRequest
+    : public SimpleRequest<IsDeclRefinementOfRequest,
+                           bool(ValueDecl *, ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *declA, ValueDecl *declB) const;
 
 public:
   // Caching.

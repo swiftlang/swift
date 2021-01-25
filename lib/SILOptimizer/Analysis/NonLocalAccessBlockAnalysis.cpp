@@ -15,7 +15,8 @@
 
 using namespace swift;
 
-// Populate this->accessBlocks with
+// Populate this->accessBlocks with all blocks containing a non-local
+// end_access.
 void NonLocalAccessBlocks::compute() {
   for (SILBasicBlock &block : *this->function) {
     for (SILInstruction &inst : block) {
