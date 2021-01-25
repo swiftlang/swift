@@ -316,7 +316,7 @@ TermInst *SILPhiArgument::getSingleTerminator() const {
   return const_cast<SILBasicBlock *>(predBlock)->getTerminator();
 }
 
-TermInst *getTransformingTerminator() const {
+TermInst *SILPhiArgument::getTerminatorForResultArg() const {
   if (auto *termInst = getSingleTerminator()) {
     if (!isa<BranchInst>(termInst) && !isa<CondBranchInst>(termInst))
       return termInst;
