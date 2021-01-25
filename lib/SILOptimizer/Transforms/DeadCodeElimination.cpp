@@ -552,13 +552,12 @@ bool DCE::removeDead(SILFunction &F) {
       // This is not necessary in non-OSSA, and will infact be incorrect.
       // Because, passing a value as a phi argument does not imply end of
       // lifetime in non-OSSA.
-      BB.eraseArgument(i);
       for (auto *pred : BB.getPredecessorBlocks()) {
         auto *predTerm = pred->getTerminator();
         auto predArg = predTerm->getAllOperands()[i].get();
         endLifetimeOfLiveValue(predArg, predTerm);
-        deleteEdgeValue(pred->getTerminator(), &BB, i);
       }
+      erasePhiArgument(&BB, i);
       Changed = true;
       BranchesChanged = true;
     }
