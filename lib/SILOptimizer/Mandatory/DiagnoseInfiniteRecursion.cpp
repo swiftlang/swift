@@ -158,15 +158,13 @@ class Invariants {
   /// Recursively walks the use-def chain starting at \p value and returns
   /// true if all visited values are invariant.
   bool isInvariantValue(SILValue value,
-                        SmallPtrSetImpl<SILNode *> &visited) const {
-    SILNode *node = value->getRepresentativeSILNodeInObject();
+                        SmallPtrSetImpl<SILInstruction *> &visited) const {
+    if (SILInstruction *inst = value->getDefiningInstruction()) {
+      // Avoid exponential complexity in case a value is used by multiple
+      // operands.
+      if (!visited.insert(inst).second)
+        return true;
 
-    // Avoid exponential complexity in case a value is used by multiple
-    // operands.
-    if (!visited.insert(node).second)
-      return true;
-
-    if (auto *inst = dyn_cast<SILInstruction>(node)) {
       if (!isMemoryInvariant() && inst->mayReadFromMemory())
         return false;
 
@@ -228,7 +226,7 @@ public:
     case TermKind::SwitchEnumInst:
     case TermKind::CheckedCastBranchInst:
     case TermKind::CheckedCastValueBranchInst: {
-      SmallPtrSet<SILNode *, 16> visited;
+      SmallPtrSet<SILInstruction *, 16> visited;
       return isInvariantValue(term->getOperand(0), visited);
     }
     default:

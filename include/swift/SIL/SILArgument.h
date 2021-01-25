@@ -78,7 +78,7 @@ protected:
   explicit SILArgument(ValueKind subClassKind, SILType type,
                        ValueOwnershipKind ownershipKind,
                        const ValueDecl *inputDecl = nullptr)
-      : ValueBase(subClassKind, type, IsRepresentative::Yes),
+      : ValueBase(subClassKind, type),
         parentBlock(nullptr), decl(inputDecl) {
     Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
   }
@@ -106,7 +106,7 @@ public:
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
-  static bool classof(const SILNode *node) {
+  static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_SILArgument &&
            node->getKind() <= SILNodeKind::Last_SILArgument;
   }
@@ -279,7 +279,7 @@ public:
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
-  static bool classof(const SILNode *node) {
+  static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::SILPhiArgument;
   }
 };
@@ -322,7 +322,7 @@ public:
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
-  static bool classof(const SILNode *node) {
+  static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::SILFunctionArgument;
   }
 };

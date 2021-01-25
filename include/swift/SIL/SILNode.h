@@ -18,7 +18,6 @@
 #define SWIFT_SIL_SILNODE_H
 
 #include "llvm/Support/Compiler.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
@@ -29,9 +28,12 @@ namespace swift {
 class SILBasicBlock;
 class SILFunction;
 class SILInstruction;
-class SILModule;
 class SingleValueInstruction;
+class NonSingleValueInstruction;
+class SILModule;
 class ValueBase;
+class SILNode;
+class SILValue;
 
 /// An enumeration which contains values for all the nodes in SILNodes.def.
 /// Other enumerators, like ValueKind and SILInstructionKind, ultimately
@@ -49,6 +51,26 @@ enum { NumSILNodeKindBits =
   countBitsUsed(static_cast<unsigned>(SILNodeKind::Last_SILNode)) };
 
 enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type;
+
+/// A SILNode pointer which makes it possible to implicitly cast from all kind
+/// of nodes, values and instructions (note: there is no implicit cast from
+/// SILInstruction* to SILNode*).
+/// It's mainly used to simplify classof-functions, but it can be used for other
+/// SILNode-taking APIs, too.
+/// Currently there is only a const-version of it.
+class SILNodePointer {
+  const SILNode *node;
+public:
+  SILNodePointer(const SILNode *node) : node(node) { }
+  SILNodePointer(const SILInstruction *inst);
+  SILNodePointer(const SingleValueInstruction *svi);
+  SILNodePointer(const NonSingleValueInstruction *nsvi);
+  SILNodePointer(SILValue value);
+  
+  const SILNode *get() const { return node; }
+  const SILNode *operator->() const { return node; }
+  operator const SILNode *() const { return node; }
+};
 
 /// A SILNode is a node in the use-def graph of a SILFunction.  It is
 /// either an instruction or a defined value which can be used by an
@@ -104,10 +126,8 @@ public:
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
-    Kind : bitmax(NumSILNodeKindBits,8),
-    StorageLoc : 1,
-    IsRepresentativeNode : 1
+  SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8),
+    Kind : bitmax(NumSILNodeKindBits,8)
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(ValueBase, SILNode);
@@ -391,69 +411,16 @@ protected:
 
   } Bits;
 
-  enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
-
-  enum class IsRepresentative : bool {
-    No = false,
-    Yes = true,
-  };
-
-private:
-
-  SILNodeStorageLocation getStorageLoc() const {
-    return SILNodeStorageLocation(Bits.SILNode.StorageLoc);
-  }
-
-  const SILNode *getRepresentativeSILNodeSlowPath() const;
-
 protected:
-  SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc,
-          IsRepresentative isRepresentative) {
+  SILNode(SILNodeKind kind) {
     Bits.OpaqueBits = 0;
     Bits.SILNode.Kind = unsigned(kind);
-    Bits.SILNode.StorageLoc = unsigned(storageLoc);
-    Bits.SILNode.IsRepresentativeNode = unsigned(isRepresentative);
   }
 
 public:
-  /// Does the given kind of node inherit from multiple multiple SILNode base
-  /// classes?
-  ///
-  /// This enables one to know if their is a diamond in the inheritence
-  /// hierarchy for this SILNode.
-  static bool hasMultipleSILNodeBases(SILNodeKind kind) {
-    // Currently only SingleValueInstructions.  Note that multi-result
-    // instructions shouldn't return true for this.
-    return kind >= SILNodeKind::First_SingleValueInstruction &&
-           kind <= SILNodeKind::Last_SingleValueInstruction;
-  }
-
-  /// Is this SILNode the representative SILNode subobject in this object?
-  bool isRepresentativeSILNodeInObject() const {
-    return Bits.SILNode.IsRepresentativeNode;
-  }
-
-  /// Return a pointer to the representative SILNode subobject in this object.
-  SILNode *getRepresentativeSILNodeInObject() {
-    if (isRepresentativeSILNodeInObject())
-      return this;
-    return const_cast<SILNode *>(getRepresentativeSILNodeSlowPath());
-  }
-
-  const SILNode *getRepresentativeSILNodeInObject() const {
-    if (isRepresentativeSILNodeInObject())
-      return this;
-    return getRepresentativeSILNodeSlowPath();
-  }
-
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
     return SILNodeKind(Bits.SILNode.Kind);
-  }
-
-  /// Return the SILNodeKind of this node's representative SILNode.
-  SILNodeKind getKindOfRepresentativeSILNodeInObject() const {
-    return getRepresentativeSILNodeInObject()->getKind();
   }
 
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
@@ -483,14 +450,13 @@ public:
   // Cast to SingleValueInstruction.  This is an implementation detail
   // of the cast machinery.  At a high level, all you need to know is to
   // never use static_cast to downcast a SILNode.
-  SingleValueInstruction *castToSingleValueInstruction();
-  const SingleValueInstruction *castToSingleValueInstruction() const {
-    return const_cast<SILNode*>(this)->castToSingleValueInstruction();
-  }
+  SILInstruction *castToInstruction();
+  const SILInstruction *castToInstruction() const;
+  
+  static SILNode *instAsNode(SILInstruction *inst);
+  static const SILNode *instAsNode(const SILInstruction *inst);
 
-  static bool classof(const SILNode *node) {
-    return true;
-  }
+  static bool classof(SILNodePointer node) { return true; }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -499,67 +465,46 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS;
 }
 
-template <class To> struct cast_sil_node_is_unambiguous {
-  // The only ambiguity right now is between the value and instruction
-  // nodes on a SingleValueInstruction.
-  static constexpr bool value =
-    // If the destination type isn't a subclass of ValueBase or
-    // SILInstruction, there's no ambiguity.
-       (!std::is_base_of<SILInstruction, To>::value &&
-        !std::is_base_of<ValueBase, To>::value)
+// Simply do a pointer cast from a SILNode to a SILNode. This is always
+// possible, except the To-type is SILInstruction itself.
+template <class To>
+struct cast_from_SILNode {
+  static To *doit(SILNode *node) { return &static_cast<To&>(*node); }
+};
 
-    // If the destination type is a proper subclass of ValueBase
-    // that isn't a subclass of SILInstruction, there's no ambiguity.
-    || (std::is_base_of<ValueBase, To>::value &&
-        !std::is_same<ValueBase, To>::value &&
-        !std::is_base_of<SILInstruction, To>::value)
-
-    // If the destination type is a proper subclass of SILInstruction
-    // that isn't a subclass of ValueBase, there's no ambiguity.
-    || (std::is_base_of<SILInstruction, To>::value &&
-        !std::is_same<SILInstruction, To>::value &&
-        !std::is_base_of<ValueBase, To>::value);
+// Handle the special case of casting a SILNode to SILInstruction itself.
+// This does not apply to sub-classes of SILInstruction, because all sub-classes
+// from SILInstructions are derived from SILNode.
+template <>
+struct cast_from_SILNode<SILInstruction> {
+  static SILInstruction *doit(SILNode *node) {
+    return &static_cast<SILInstruction&>(*node->castToInstruction());
+  }
+};
+template <>
+struct cast_from_SILNode<const SILInstruction> {
+  static const SILInstruction *doit(SILNode *node) {
+    return &static_cast<SILInstruction&>(*node->castToInstruction());
+  }
 };
 
 template <class To,
-          bool IsSingleValueInstruction =
-            std::is_base_of<SingleValueInstruction, To>::value,
-          bool IsKnownUnambiguous =
-            cast_sil_node_is_unambiguous<To>::value>
-struct cast_sil_node;
+          bool IsSILInstruction = std::is_base_of<SILInstruction, To>::value>
+struct cast_from_SILInstruction;
 
-// If all complete objects of the destination type are known to only
-// contain a single node, we can just use a static_cast.
+// Simply do a pointer cast from a SILInstruction to a SILInstruction.
 template <class To>
-struct cast_sil_node<To, /*single value*/ false, /*unambiguous*/ true> {
-  static To *doit(SILNode *node) {
-    return &static_cast<To&>(*node);
+struct cast_from_SILInstruction<To, /*IsSILInstruction*/ true> {
+  static To *doit(SILInstruction *inst) {
+    return &static_cast<To&>(*inst);
   }
 };
 
-// If we're casting to a subclass of SingleValueInstruction, we don't
-// need to dynamically check whether the node is an SVI.  In fact,
-// we can't, because the static_cast will be ambiguous.
+// Cast from a SILInstruction to a SILNode, which is not a SILInstruction.
 template <class To>
-struct cast_sil_node<To, /*single value*/ true, /*unambiguous*/ false> {
-  static To *doit(SILNode *node) {
-    auto svi = node->castToSingleValueInstruction();
-    return &static_cast<To&>(*svi);
-  }
-};
-
-// Otherwise, we need to dynamically check which case we're in.
-template <class To>
-struct cast_sil_node<To, /*single value*/ false, /*unambiguous*/ false> {
-  static To *doit(SILNode *node) {
-    // If the node isn't dynamically a SingleValueInstruction, then this
-    // is indeed the SILNode subobject that's statically observable in To.
-    if (!SILNode::hasMultipleSILNodeBases(node->getKind())) {
-      return &static_cast<To&>(*node);
-    }
-
-    auto svi = node->castToSingleValueInstruction();
-    return &static_cast<To&>(*svi);
+struct cast_from_SILInstruction<To, /*IsSILInstruction*/ false> {
+  static To *doit(SILInstruction *inst) {
+    return &static_cast<To&>(*SILNode::instAsNode(inst));
   }
 };
 
@@ -567,20 +512,36 @@ struct cast_sil_node<To, /*single value*/ false, /*unambiguous*/ false> {
 
 namespace llvm {
 
-/// Completely take over cast<>'ing from SILNode*.  A static_cast to
-/// ValueBase* or SILInstruction* can be quite wrong.
+/// Completely take over cast<>'ing from SILNode* and SILInstruction*.
+/// A static_cast to ValueBase* or SILInstruction* can be quite wrong.
 template <class To>
 struct cast_convert_val<To, swift::SILNode*, swift::SILNode*> {
   using ret_type = typename cast_retty<To, swift::SILNode*>::ret_type;
   static ret_type doit(swift::SILNode *node) {
-    return swift::cast_sil_node<To>::doit(node);
+    return swift::cast_from_SILNode<To>::doit(node);
   }
 };
 template <class To>
 struct cast_convert_val<To, const swift::SILNode *, const swift::SILNode *> {
   using ret_type = typename cast_retty<To, const swift::SILNode*>::ret_type;
   static ret_type doit(const swift::SILNode *node) {
-    return swift::cast_sil_node<To>::doit(const_cast<swift::SILNode*>(node));
+    return swift::cast_from_SILNode<To>::doit(const_cast<swift::SILNode*>(node));
+  }
+};
+template <class To>
+struct cast_convert_val<To, swift::SILInstruction*, swift::SILInstruction*> {
+  using ret_type = typename cast_retty<To, swift::SILInstruction*>::ret_type;
+  static ret_type doit(swift::SILInstruction *inst) {
+    return swift::cast_from_SILInstruction<To>::doit(inst);
+  }
+};
+template <class To>
+struct cast_convert_val<To, const swift::SILInstruction *,
+                            const swift::SILInstruction *> {
+  using ret_type = typename cast_retty<To, const swift::SILInstruction*>::ret_type;
+  static ret_type doit(const swift::SILInstruction *inst) {
+    return swift::cast_from_SILInstruction<To>::
+             doit(const_cast<swift::SILInstruction*>(inst));
   }
 };
 
