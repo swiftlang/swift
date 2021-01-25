@@ -473,19 +473,12 @@ struct BorrowedValue {
 
   BorrowedValue() = default;
 
-  /// If \p value is a borrow introducer construct a valid BorrowedValue.
-  BorrowedValue(SILValue value) {
+  /// If value is a borrow introducer, create a valid BorrowedValue.
+  explicit BorrowedValue(SILValue value) {
     kind = BorrowedValueKind::get(value);
-    if (!kind)
-      return;
-    this->value = value;
+    if (kind)
+      this->value = value;
   }
-
-  /// If value is a borrow introducer return it after doing some checks.
-  ///
-  /// This is the only way to construct a BorrowScopeIntroducingValue. We make
-  /// the primary constructor private for this reason.
-  static BorrowedValue get(SILValue value) { return BorrowedValue(value); }
 
   operator bool() const { return kind != BorrowedValueKind::Invalid && value; }
 
@@ -567,12 +560,6 @@ struct BorrowedValue {
   SILValue operator->() const { return value; }
   SILValue operator*() { return value; }
   SILValue operator*() const { return value; }
-
-private:
-  /// Internal constructor for failable static constructor. Please do not expand
-  /// its usage since it assumes the code passed in is well formed.
-  BorrowedValue(SILValue value, BorrowedValueKind kind)
-      : value(value), kind(kind) {}
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

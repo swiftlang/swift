@@ -734,7 +734,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
   //    this formulation is that it ensures that we are always working with a
   //    non-dominating copy value, allowing us to force our borrowing value to
   //    need a base phi argument (the one of our choosing).
-  if (auto oldValueBorrowedVal = BorrowedValue::get(oldValue)) {
+  if (auto oldValueBorrowedVal = BorrowedValue(oldValue)) {
     SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> foundReborrows;
     if (oldValueBorrowedVal.gatherReborrows(foundReborrows)) {
       rewriteReborrows(newBorrowedValue, foundReborrows, ctx.callbacks);

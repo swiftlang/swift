@@ -67,7 +67,7 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
       v = def;
       continue;
     }
-    if (auto borrowedVal = BorrowedValue::get(def)) {
+    if (auto borrowedVal = BorrowedValue(def)) {
       // Any def's that aren't filtered out here must be handled by
       // computeBorrowLiveness.
       switch (borrowedVal.kind) {
@@ -121,7 +121,7 @@ llvm::cl::opt<bool>
                          llvm::cl::desc("Enable rewriting borrow scopes"));
 
 bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
-  auto borrowedVal = BorrowedValue::get(currentDef);
+  auto borrowedVal = BorrowedValue(currentDef);
   if (!borrowedVal) {
     return false;
   }
@@ -261,8 +261,7 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
 
   auto *beginBorrow = cast<BeginBorrowInst>(currentDef);
   SmallVector<SILInstruction *, 1> scopeEndingInst;
-  BorrowedValue::get(beginBorrow)
-      .getLocalScopeEndingInstructions(scopeEndingInst);
+  BorrowedValue(beginBorrow).getLocalScopeEndingInstructions(scopeEndingInst);
   assert(scopeEndingInst.size() == 1 && "expected single-block borrow");
   // Remove outer uses that occur before the end of the borrow scope by
   // forward iterating from begin_borrow to end_borrow.

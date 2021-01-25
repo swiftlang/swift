@@ -83,7 +83,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
 
       // Find the scope ending uses of the guaranteed phi arg and add it to the
       // worklist.
-      auto scopedValue = BorrowedValue::get(phiArg);
+      auto scopedValue = BorrowedValue(phiArg);
       assert(scopedValue);
       scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
         addVisitedOp(op, newBaseVal);

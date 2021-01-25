@@ -414,13 +414,13 @@ bool BorrowingOperand::visitBorrowIntroducingUserResults(
   case BorrowingOperandKind::Yield:
     llvm_unreachable("Never has borrow introducer results!");
   case BorrowingOperandKind::BeginBorrow: {
-    auto value = BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
+    auto value = BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
     assert(value);
     return visitor(value);
   }
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
-    auto value = BorrowedValue::get(
+    auto value = BorrowedValue(
         bi->getDestBB()->getArgument(op->getOperandNumber()));
     assert(value && "guaranteed-to-unowned conversion not allowed on branches");
     return visitor(value);
@@ -820,7 +820,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     SILValue value = worklist.pop_back_val();
 
     // First check if v is an introducer. If so, stash it and continue.
-    if (auto scopeIntroducer = BorrowedValue::get(value)) {
+    if (auto scopeIntroducer = BorrowedValue(value)) {
       out.push_back(scopeIntroducer);
       continue;
     }
@@ -868,7 +868,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
   while (true) {
     // First check if our initial value is an introducer. If we have one, just
     // return it.
-    if (auto scopeIntroducer = BorrowedValue::get(currentValue)) {
+    if (auto scopeIntroducer = BorrowedValue(currentValue)) {
       return scopeIntroducer;
     }
 
