@@ -103,6 +103,11 @@ module ClassTemplateInNamespaceForSwiftModule {
   requires cplusplus
 }
 
+module ClassTemplateNestedTypeForSwiftModule {
+  header "class-template-nested-type-for-swift-module.h"
+  requires cplusplus
+}
+
 module MemberTemplates {
   header "member-templates.h"
   requires cplusplus
