@@ -3392,16 +3392,20 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl final : public NominalTypeDecl {
   SourceLoc StructLoc;
-  Type TemplateInstantiationType;
+  // We import C++ class template instantiations as non-generic structs
+  // with a name prefixed with `__CxxTemplateInst`. However for proper
+  // serialization we need to have an access to the bound generic type
+  // that would have produced this instantiation. This field contains
+  // such type.
+  //
+  // The field is set during the typechecking at the time when we
+  // instantiate the C++ class template.
+  Type TemplateInstantiationType = Type();
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
              ArrayRef<TypeLoc> Inherited,
              GenericParamList *GenericParams, DeclContext *DC);
-
-  StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-             ArrayRef<TypeLoc> Inherited,
-             GenericParamList *GenericParams, DeclContext *DC, Type templateInstantiationType);
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceRange getSourceRange() const {

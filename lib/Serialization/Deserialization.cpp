@@ -1391,39 +1391,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   case XREF_INITIALIZER_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
 
-  case XREF_CLANG_TEMPLATE_INSTANTIATION: {
-    auto &astContext = getContext();
-    auto clangModuleLoader = astContext.getClangModuleLoader();
-    auto clangImporter = static_cast<ClangImporter *>(clangModuleLoader);
-    auto &clangASTContext = clangModuleLoader->getClangASTContext();
-
-    ClangTypeID clangTypeId;
-    XRefClangTemplateInstantiationLayout::readRecord(scratch, clangTypeId);
-
-    const clang::Type *clangInstantiationType = nullptr;
-    auto loadedClangType = getClangType(clangTypeId);
-    if (!loadedClangType) {
-      return loadedClangType.takeError();
-      clangInstantiationType = loadedClangType.get();
-    }
-
-    auto decl = clangInstantiationType->getAsCXXRecordDecl();
-    decl->dump();
-
-    llvm_unreachable("only in a nominal or function");
-    return nullptr;
-
-    // clangInstantiationType
-    // clangModuleLoader->lookup(clangInstantiationType);
-
-    // auto *classTemplateDecl = const_cast<clang::ClassTemplateDecl *>(
-    //     dyn_cast<clang::ClassTemplateDecl>(templateDecl->getClangDecl()));
-    // assert(classTemplateDecl);
-
-    // auto *instantiation = clangModuleLoader->instantiateCXXClassTemplate(
-    //     classTemplateDecl, templateArguments);
-    // return instantiation;
-  }
   default:
     // Unknown xref kind.
     pathTrace.addUnknown(recordID);

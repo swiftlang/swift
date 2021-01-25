@@ -4172,8 +4172,3 @@ ClangImporter::instantiateCXXClassTemplate(
   return dyn_cast_or_null<StructDecl>(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
-
-Identifier
-ClangImporter::lookupIdentifier(const clang::IdentifierInfo* declName) {
-  return Impl.importIdentifier(declName);
-}

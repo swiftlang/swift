@@ -176,14 +176,16 @@ public:
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
-  /// Instantiate and import class template.
+
+  /// Instantiate and import class template using given arguments.
+  ///
+  /// This method will find the clang::ClassTemplateSpecialization decl if
+  /// it already exists, or it will create one. Then it will import this
+  /// decl the same way as we import typedeffed class templates - using
+  /// the hidden struct prefixed with `__CxxTemplateInst`.
   virtual StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
-
-  /// Lookup identifier for an already imported decl.
-  virtual Identifier
-  lookupIdentifier(const clang::IdentifierInfo* declName) = 0;
 
   /// Try to parse the string as a Clang function type.
   ///

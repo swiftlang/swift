@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "Serialization.h"
-#include "ModuleFormat.h"
 #include "SILFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -75,20 +74,6 @@ using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
 
-
-static Type getResultInterfaceTypeForSerialization(Type t) {
-  if (!t)
-    return t;
-  if (auto nominalDecl = t->getAnyNominal()) {
-    if (auto structDecl = dyn_cast<StructDecl>(nominalDecl)) {
-      if (auto templateInstantiationType =
-              structDecl->getTemplateInstantiationType()) {
-        return templateInstantiationType;
-      }
-    }
-  }
-  return t;
-}
 
 ASTContext &SerializerBase::getASTContext() {
   return M->getASTContext();
@@ -643,14 +628,25 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
-  auto tyToSerialize = getResultInterfaceTypeForSerialization(ty);
+  Type typeToSerialize = ty;
+  if (ty) {
+    if (auto nominalDecl = ty->getAnyNominal()) {
+      if (auto structDecl = dyn_cast<StructDecl>(nominalDecl)) {
+        if (auto templateInstantiationType =
+                structDecl->getTemplateInstantiationType()) {
+          typeToSerialize = templateInstantiationType;
+        }
+      }
+    }
+  }
+
 #ifndef NDEBUG
-  PrettyStackTraceType trace(M->getASTContext(), "serializing", tyToSerialize);
+  PrettyStackTraceType trace(M->getASTContext(), "serializing", typeToSerialize);
   assert(M->getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
-         !tyToSerialize || !ty->hasError() && "serializing type with an error");
+         !typeToSerialize || !typeToSerialize->hasError() && "serializing type with an error");
 #endif
 
-  return TypesToSerialize.addRef(tyToSerialize);
+  return TypesToSerialize.addRef(typeToSerialize);
 }
 
 serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
