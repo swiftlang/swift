@@ -1184,7 +1184,8 @@ irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   descriptor.typeEncoding =
-      getObjCEncodingForMethod(IGM, methodType, /*extended*/ false, method);
+      getObjCEncodingForMethod(IGM, methodType, /*extended*/ method->hasAsync(),
+                               method);
   
   /// The third element is the method implementation pointer.
   if (!concrete) {
