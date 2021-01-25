@@ -37,6 +37,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -402,7 +403,7 @@ bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
   BeginAccessInst *access, BlockSetVector &blocksAccessedAcross) {
 
   assert(Worklist.empty());
-  SmallPtrSet<SILBasicBlock*, 8> visited;
+  BasicBlockSet visited(access->getFunction());
 
   // Don't follow any paths that lead to an end_access.
   for (auto endAccess : access->getEndAccesses())
@@ -412,14 +413,14 @@ bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
   for (SILBasicBlock *bb : blocksAccessedAcross) {
     for (SILBasicBlock *succBB : bb->getSuccessorBlocks()) {
       if (blocksAccessedAcross.count(succBB)) continue;
-      if (visited.insert(succBB).second)
+      if (visited.insert(succBB))
         Worklist.push_back(succBB);
     }
   }
 
   while (!Worklist.empty()) {
     SILBasicBlock *bb = Worklist.pop_back_val();
-    assert(visited.count(bb));
+    assert(visited.contains(bb));
 
     // If we're tracking information for this block, there's an escape.
     if (StateMap.count(bb))
@@ -427,7 +428,7 @@ bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
 
     // Add all reachable successors.
     for (SILBasicBlock *succ : bb->getSuccessors()) {
-      if (visited.insert(succ).second)
+      if (visited.insert(succ))
         Worklist.push_back(succ);
     }
   }
