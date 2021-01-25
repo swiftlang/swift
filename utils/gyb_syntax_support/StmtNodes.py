@@ -74,7 +74,8 @@ STMT_NODES = [
              Child('GuardResult', kind='Expr'),
          ]),
 
-    # for-in-stmt -> label? ':'? 'for' 'try'? 'await'? 'case'? pattern 'in' expr 'where'?
+    # for-in-stmt -> label? ':'? 
+    #   'for' 'try'? 'await'? 'case'? pattern 'in' expr 'where'?
     #   expr code-block ';'?
     Node('ForInStmt', kind='Stmt',
          traits=['WithCodeBlock', 'Labeled'],
