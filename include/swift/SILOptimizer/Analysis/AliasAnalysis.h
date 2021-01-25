@@ -153,7 +153,7 @@ public:
   /// It's needed if e.g. \p inst is an address projection and its operand gets
   /// replaced with a different underlying object.
   void invalidateInstruction(SILInstruction *inst) {
-    handleDeleteNotification(inst);
+    handleDeleteNotification(inst->asSILNode());
   }
 
   /// Perform an alias query to see if V1, V2 refer to the same values.

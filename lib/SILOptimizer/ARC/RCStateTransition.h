@@ -87,9 +87,9 @@ public:
   RCStateTransition(ImmutablePointerSet<SILInstruction> *I) {
     assert(I->size() == 1);
     SILInstruction *Inst = *I->begin();
-    Kind = getRCStateTransitionKind(Inst);
+    Kind = getRCStateTransitionKind(Inst->asSILNode());
     if (isRCStateTransitionEndPoint(Kind)) {
-      EndPoint = Inst;
+      EndPoint = Inst->asSILNode();
       return;
     }
 
