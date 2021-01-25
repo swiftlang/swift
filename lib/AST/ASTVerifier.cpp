@@ -2620,6 +2620,41 @@ public:
         abort();
       }
 
+      // Tracking for those Objective-C requirements that have witnesses.
+      llvm::SmallDenseSet<std::pair<ObjCSelector, char>> hasObjCWitnessMap;
+      bool populatedObjCWitnesses = false;
+      auto populateObjCWitnesses = [&] {
+        if (populatedObjCWitnesses)
+          return;
+
+        populatedObjCWitnesses = true;
+        for (auto req : proto->getMembers()) {
+          if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req)) {
+            if (normal->hasWitness(reqFunc)) {
+              hasObjCWitnessMap.insert(
+                  {reqFunc->getObjCSelector(), reqFunc->isInstanceMember()});
+            }
+          }
+        }
+      };
+
+      // Check whether there is a witness with the same selector and kind as
+      // this requirement.
+      auto hasObjCWitness = [&](ValueDecl *req) {
+        if (!proto->isObjC())
+          return false;
+
+        auto func = dyn_cast<AbstractFunctionDecl>(req);
+        if (!func)
+          return false;
+
+        populateObjCWitnesses();
+
+        std::pair<ObjCSelector, char> key(
+            func->getObjCSelector(), func->isInstanceMember());
+        return hasObjCWitnessMap.count(key) > 0;
+      };
+
       // Check that a normal protocol conformance is complete.
       for (auto member : proto->getMembers()) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2649,7 +2684,6 @@ public:
         if (isa<AccessorDecl>(member))
           continue;
 
-
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
             if ((req->getAttrs().isUnavailable(Ctx) ||
@@ -2657,6 +2691,10 @@ public:
                 proto->isObjC()) {
               continue;
             }
+
+            // Check if *any* witness matches the Objective-C selector.
+            if (hasObjCWitness(req))
+              continue;
 
             dumpRef(decl);
             Out << " is missing witness for "
