@@ -367,6 +367,20 @@ namespace swift {
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;
 
+    /// A helper enum to represent whether or not we customized the default
+    /// ASTVerifier behavior via a frontend flag. By default, we do not
+    /// customize.
+    ///
+    /// NOTE: The default behavior is to run the ASTVerifier only when asserts
+    /// are enabled. This just allows for one to customize that behavior.
+    enum class ASTVerifierOverrideKind {
+      NoOverride = 0,
+      EnableVerifier = 1,
+      DisableVerifier = 2,
+    };
+    ASTVerifierOverrideKind ASTVerifierOverride =
+        ASTVerifierOverrideKind::NoOverride;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

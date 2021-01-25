@@ -83,9 +83,6 @@ if "@SWIFT_STDLIB_ASSERTIONS@" == "TRUE":
 else:
     config.available_features.add('swift_stdlib_no_asserts')
 
-if "@SWIFT_AST_VERIFIER@" == "TRUE":
-    config.available_features.add('swift_ast_verifier')
-
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
