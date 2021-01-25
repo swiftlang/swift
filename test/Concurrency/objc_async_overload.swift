@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-concurrency -typecheck -verify -import-objc-header %S/Inputs/Delegate.h %s
-
+// REQUIRES: concurrency
 // REQUIRES: objc_interop
 
 
