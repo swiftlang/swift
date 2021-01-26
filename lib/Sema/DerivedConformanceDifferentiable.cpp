@@ -157,24 +157,6 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
   return true;
 }
 
-// Synthesizable `Differentiable` protocol requirements.
-enum class DifferentiableRequirement {
-  // associatedtype TangentVector
-  TangentVector,
-  // mutating func move(along direction: TangentVector)
-  MoveAlong,
-};
-
-static DifferentiableRequirement
-getDifferentiableRequirementKind(ValueDecl *requirement) {
-  auto &C = requirement->getASTContext();
-  if (requirement->getBaseName() == C.Id_TangentVector)
-    return DifferentiableRequirement::TangentVector;
-  if (requirement->getBaseName() == C.Id_move)
-    return DifferentiableRequirement::MoveAlong;
-  llvm_unreachable("Invalid `Differentiable` protocol requirement");
-}
-
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
                                                  DeclContext *DC,
                                                  ValueDecl *requirement) {
@@ -182,8 +164,6 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   if (auto *SF = DC->getParentSourceFile())
     if (!isDifferentiableProgrammingEnabled(*SF))
       return false;
-
-  auto reqKind = getDifferentiableRequirementKind(requirement);
 
   auto &C = nominal->getASTContext();
   // If there are any `TangentVector` type witness candidates, check whether
