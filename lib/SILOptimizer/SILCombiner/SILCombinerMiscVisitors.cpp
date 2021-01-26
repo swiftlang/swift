@@ -1887,9 +1887,6 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
 }
 
 SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
-  if (SEI->getFunction()->hasOwnership())
-    return nullptr;
-
   // Canonicalize a select_enum: if the default refers to exactly one case, then
   // replace the default with that case.
   if (SEI->hasDefault()) {

@@ -106,9 +106,9 @@ enum E {
 }
 
 // CHECK-LABEL: sil [ossa] @canonicalize_select_enum
-// XHECK: select_enum {{.*}} case #E.E2!enumelt:
-// XHECK: return
-
+// CHECK: select_enum {{.*}} case #E.E2!enumelt:
+// CHECK: return
+// CHECK: } // end sil function 'canonicalize_select_enum'
 sil [ossa] @canonicalize_select_enum : $@convention(thin) (E) -> Int32 {
 bb0(%0 : $E):
   %1 = integer_literal $Builtin.Int32, 0
