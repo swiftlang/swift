@@ -468,6 +468,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
       VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
               SourceLoc(), name, parentDC);
   propDecl->setImplicit();
+  propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 

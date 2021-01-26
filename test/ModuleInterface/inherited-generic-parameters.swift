@@ -26,10 +26,10 @@ public class Base<In, Out> {
 
 // CHECK: public class Derived<T> : {{(main.)?}}Base<T, T> {
 public class Derived<T> : Base<T, T> {
-// CHECK-NEXT: {{(@objc )?}}deinit
 // CHECK-NEXT: override public init(x: @escaping (T) -> T)
 // CHECK-NEXT: override public init<A>(_ argument: A, _ argument: A)
 // CHECK-NEXT: override public init<C>(_ argument: C) where C : main.Base<T, T>
+// CHECK-NEXT: {{(@objc )?}}deinit
 // CHECK-NEXT: }
 }
 

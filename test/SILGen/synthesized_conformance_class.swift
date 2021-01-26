@@ -8,17 +8,17 @@ final class Final<T> {
 // CHECK-LABEL: final class Final<T> {
 // CHECK:   @_hasStorage final var x: T { get set }
 // CHECK:   init(x: T)
-// CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
 // CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Final<T>.CodingKeys, _ b: Final<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
 // CHECK:     func hash(into hasher: inout Hasher)
-// CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
-// CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
+// CHECK:     var hashValue: Int { get }
+// CHECK:     var intValue: Int? { get }
+// CHECK:     var stringValue: String { get }
 // CHECK:   }
+// CHECK:   deinit
 // CHECK: }
 
 class Nonfinal<T> {
@@ -28,17 +28,17 @@ class Nonfinal<T> {
 // CHECK-LABEL: class Nonfinal<T> {
 // CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   init(x: T)
-// CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
 // CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Nonfinal<T>.CodingKeys, _ b: Nonfinal<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
 // CHECK:     func hash(into hasher: inout Hasher)
-// CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
-// CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
+// CHECK:     var hashValue: Int { get }
+// CHECK:     var intValue: Int? { get }
+// CHECK:     var stringValue: String { get }
 // CHECK:   }
+// CHECK:   deinit
 // CHECK: }
 
 // CHECK-LABEL: extension Final : Encodable where T : Encodable {

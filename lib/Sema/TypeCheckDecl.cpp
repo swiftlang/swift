@@ -2511,18 +2511,18 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
 namespace {
 
 // Utility class for deterministically ordering vtable entries for
-// synthesized methods.
-struct SortedFuncList {
+// synthesized declarations.
+struct SortedDeclList {
   using Key = std::tuple<DeclName, std::string>;
-  using Entry = std::pair<Key, AbstractFunctionDecl *>;
+  using Entry = std::pair<Key, ValueDecl *>;
   SmallVector<Entry, 2> elts;
   bool sorted = false;
 
-  void add(AbstractFunctionDecl *afd) {
-    assert(!isa<AccessorDecl>(afd));
+  void add(ValueDecl *vd) {
+    assert(!isa<AccessorDecl>(vd));
 
-    Key key{afd->getName(), afd->getInterfaceType().getString()};
-    elts.emplace_back(key, afd);
+    Key key{vd->getName(), vd->getInterfaceType()->getCanonicalType().getString()};
+    elts.emplace_back(key, vd);
   }
 
   bool empty() { return elts.empty(); }
@@ -2550,17 +2550,28 @@ struct SortedFuncList {
 
 } // end namespace
 
-ArrayRef<Decl *>
-SemanticMembersRequest::evaluate(Evaluator &evaluator,
-                                IterableDeclContext *idc) const {
+namespace {
+  enum class MembersRequestKind {
+    ABI,
+    All,
+  };
+
+}
+
+/// Evaluate a request for a particular set of members of an iterable
+/// declaration context.
+static ArrayRef<Decl *> evaluateMembersRequest(
+  IterableDeclContext *idc, MembersRequestKind kind) {
   auto dc = cast<DeclContext>(idc->getDecl());
-  auto &Context = dc->getASTContext();
+  auto &ctx = dc->getASTContext();
   SmallVector<Decl *, 8> result;
 
+  // If there's no parent source file, everything is already in order.
   if (!dc->getParentSourceFile()) {
-    auto members = idc->getMembers();
-    result.append(members.begin(), members.end());
-    return Context.AllocateCopy(result);
+    for (auto *member : idc->getMembers())
+      result.push_back(member);
+
+    return ctx.AllocateCopy(result);
   }
 
   auto nominal = dyn_cast<NominalTypeDecl>(idc);
@@ -2571,47 +2582,71 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
     TypeChecker::addImplicitConstructors(nominal);
   }
 
-  // Force any derivable conformances in this context. This ensures that any
-  // synthesized members will approach in the member list.
+  // Force any conformances that may introduce more members.
   for (auto conformance : idc->getLocalConformances()) {
-    if (conformance->getState() == ProtocolConformanceState::Incomplete &&
-        conformance->getProtocol()->getKnownDerivableProtocolKind())
-      TypeChecker::checkConformance(conformance->getRootNormalConformance());
+    auto proto = conformance->getProtocol();
+    bool isDerivable =
+      conformance->getState() == ProtocolConformanceState::Incomplete &&
+      proto->getKnownDerivableProtocolKind();
+
+    switch (kind) {
+    case MembersRequestKind::ABI:
+      // Force any derivable conformances in this context.
+      if (isDerivable)
+        break;
+
+      continue;
+
+    case MembersRequestKind::All:
+      // Force any derivable conformances.
+      if (isDerivable)
+        break;
+
+      // If there are any associated types in the protocol, they might add
+      // type aliases here.
+      if (!proto->getAssociatedTypeMembers().empty())
+        break;
+
+      continue;
+    }
+
+    TypeChecker::checkConformance(conformance->getRootNormalConformance());
   }
 
   // If the type conforms to Encodable or Decodable, even via an extension,
   // the CodingKeys enum is synthesized as a member of the type itself.
   // Force it into existence.
   if (nominal) {
-    (void) evaluateOrDefault(Context.evaluator,
-                             ResolveImplicitMemberRequest{nominal,
-                                        ImplicitMemberAction::ResolveCodingKeys},
-                             {});
+    (void) evaluateOrDefault(
+      ctx.evaluator,
+      ResolveImplicitMemberRequest{nominal,
+                 ImplicitMemberAction::ResolveCodingKeys},
+      {});
   }
 
   // If the decl has a @main attribute, we need to force synthesis of the
   // $main function.
   (void) evaluateOrDefault(
-      Context.evaluator,
+      ctx.evaluator,
       SynthesizeMainFunctionRequest{const_cast<Decl *>(idc->getDecl())},
       nullptr);
 
   for (auto *member : idc->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
-      // The projected storage wrapper ($foo) might have dynamically-dispatched
-      // accessors, so force them to be synthesized.
+      // The projected storage wrapper ($foo) might have
+      // dynamically-dispatched accessors, so force them to be synthesized.
       if (var->hasAttachedPropertyWrapper())
         (void) var->getPropertyWrapperBackingProperty();
     }
   }
 
-  SortedFuncList synthesizedMembers;
+  SortedDeclList synthesizedMembers;
 
   for (auto *member : idc->getMembers()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+    if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // If this is a witness to Actor.enqueue(partialTask:), put it at the
       // beginning of the vtable.
-      if (auto func = dyn_cast<FuncDecl>(afd)) {
+      if (auto func = dyn_cast<FuncDecl>(vd)) {
         if (func->isActorEnqueuePartialTaskWitness()) {
           result.insert(result.begin(), func);
           continue;
@@ -2620,8 +2655,8 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
-      if (afd->isSynthesized()) {
-        synthesizedMembers.add(afd);
+      if (vd->isSynthesized()) {
+        synthesizedMembers.add(vd);
         continue;
       }
     }
@@ -2631,12 +2666,23 @@ SemanticMembersRequest::evaluate(Evaluator &evaluator,
 
   if (!synthesizedMembers.empty()) {
     synthesizedMembers.sort();
-
     for (const auto &pair : synthesizedMembers)
       result.push_back(pair.second);
   }
 
-  return Context.AllocateCopy(result);
+  return ctx.AllocateCopy(result);
+}
+
+ArrayRef<Decl *>
+ABIMembersRequest::evaluate(
+    Evaluator &evaluator, IterableDeclContext *idc) const {
+  return evaluateMembersRequest(idc, MembersRequestKind::ABI);
+}
+
+ArrayRef<Decl *>
+AllMembersRequest::evaluate(
+    Evaluator &evaluator, IterableDeclContext *idc) const {
+  return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
