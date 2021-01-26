@@ -474,10 +474,11 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 }
 
 // CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer
-// XHECK: bb0
-// XHECK-NEXT: unchecked_addr_cast
-// XHECK-NEXT: load
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: unchecked_addr_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer'
 sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
@@ -1450,10 +1451,11 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
-// XHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// XHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
-// XHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [trivial] [[ADDR_CAST]] : $*Builtin.Word
-// XHECK-NEXT: return [[RETURN_VALUE]]
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
+// CHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [trivial] [[ADDR_CAST]] : $*Builtin.Word
+// CHECK-NEXT: return [[RETURN_VALUE]]
+// CHECK: } // end sil function 'unchecked_addr_cast_formation'
 sil [ossa] @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer

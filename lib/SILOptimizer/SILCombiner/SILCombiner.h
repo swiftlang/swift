@@ -433,6 +433,10 @@ private:
   /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
                                       TryApplyInst *TAI);
+
+  bool hasOwnership() const {
+    return Builder.hasOwnership();
+  }
 };
 
 } // end namespace swift

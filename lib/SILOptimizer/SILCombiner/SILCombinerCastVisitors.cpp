@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+
 #include "SILCombiner.h"
+
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
@@ -23,6 +25,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -232,10 +235,18 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   if (PTAI->isStrict()) {
     // We can not perform this optimization with ownership until we are able to
     // handle issues around interior pointers and expanding borrow scopes.
-    if (!F->hasOwnership()) {
-      if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
+    if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
+      if (!hasOwnership()) {
         return Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
                                                PTAI->getType());
+      }
+
+      OwnershipRAUWHelper helper(ownershipFixupContext, PTAI, ATPI->getOperand());
+      if (helper) {
+        auto *newInst = Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
+                                                        PTAI->getType());
+        helper.perform(newInst);
+        return nullptr;
       }
     }
   }
