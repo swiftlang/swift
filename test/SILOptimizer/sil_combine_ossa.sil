@@ -519,9 +519,10 @@ bb0(%0 : @guaranteed $C):
   return %2 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil [ossa] @downcast_upcast_roundtrip
-// XHECK: bb0
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @downcast_upcast_roundtrip :
+// CHECK-NOT: upcast
+// CHECK-NOT: unconditional_checked_cast
+// CHECK: } // end sil function 'downcast_upcast_roundtrip'
 sil [ossa] @downcast_upcast_roundtrip : $@convention(thin) <T_0_0, T_0_1> (@owned HeapBufferStorage<T_0_0, T_0_1>) -> @owned HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
   %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
@@ -1417,9 +1418,10 @@ bb0(%0 : $*E):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
-// XHECK: bb0
-// XHECK-NEXT: integer_literal
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unchecked_enum_data_of_enum'
 sil [ossa] @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
@@ -1815,9 +1817,10 @@ bb0(%0 : $Builtin.Int16):
 sil [ossa] @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @eliminate_dead_thin_to_thick_function : $@convention(thin) () -> () {
-// XHECK: bb0
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'eliminate_dead_thin_to_thick_function'
 sil [ossa] @eliminate_dead_thin_to_thick_function : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
@@ -1828,10 +1831,11 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @eliminate_thin_to_thick_apply : $@convention(thin) () -> () {
-// XHECK: bb0
-// XHECK: function_ref @eliminate_dead_thin_to_thick_function_fun
-// XHECK-NEXT: apply
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK: function_ref @eliminate_dead_thin_to_thick_function_fun
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'eliminate_thin_to_thick_apply'
 sil [ossa] @eliminate_thin_to_thick_apply : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
@@ -2163,11 +2167,12 @@ class ZZZ {
 struct SSS {
 }
 
-//CHECK-LABEL: sil [ossa] @test_delete_readonly_owned :
-//XHECK: bb0(%0 : @owned $ZZZ):
-//XHECK-NEXT: destroy_value %0
-//XHECK-NEXT: tuple
-//XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @test_delete_readonly_owned :
+// CHECK: bb0(%0 : @owned $ZZZ):
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_delete_readonly_owned'
 sil [ossa] @test_delete_readonly_owned : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : @owned $ZZZ):
   %2 = function_ref @read_only_owned : $@convention(thin) (@owned ZZZ) -> () // user: %4
@@ -2178,10 +2183,11 @@ bb0(%0 : @owned $ZZZ):
 
 sil [readonly] @read_only_owned : $@convention(thin) (@owned ZZZ) -> ()
 
-//CHECK-LABEL: sil [ossa] @test_delete_readonly_guaranteed :
-//XHECK: bb0(%0 : @guaranteed $ZZZ):
-//XHECK-NEXT: tuple
-//XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @test_delete_readonly_guaranteed :
+// CHECK: bb0(%0 : @guaranteed $ZZZ):
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_delete_readonly_guaranteed'
 sil [ossa] @test_delete_readonly_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> () {
 bb0(%0 : @guaranteed $ZZZ):
   %2 = function_ref @read_only_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> () // user: %4
@@ -2192,11 +2198,12 @@ bb0(%0 : @guaranteed $ZZZ):
 
 sil [readonly] @read_only_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> ()
 
-//CHECK-LABEL: sil [ossa] @test_delete_readonly_in
-//XHECK: bb0(%0 : $*SSS):
-//XHECK-NEXT: destroy_addr %0
-//XHECK-NEXT: tuple
-//XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @test_delete_readonly_in :
+// CHECK: bb0(%0 : $*SSS):
+// CHECK-NEXT: destroy_addr %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_delete_readonly_in'
 sil [ossa] @test_delete_readonly_in : $@convention(thin) (@in SSS) -> () {
 bb0(%0 : $*SSS):
   %2 = function_ref @read_only_in : $@convention(thin) (@in SSS) -> () // user: %4
@@ -2216,11 +2223,12 @@ sil [readonly] @readonly_owned : $@convention(thin) (@owned B) -> @owned B
 sil [ossa] @returns_param : $@convention(thin) (@owned B) -> @owned B
 
 
-// CHECK-LABEL: sil [ossa] @delete_readonly_insert_release_after_arc_uses_simple
-// XHECK: copy_value
-// XHECK-NEXT: apply
-// XHECK-NEXT: destroy_value
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @delete_readonly_insert_release_after_arc_uses_simple :
+// CHECK: copy_value
+// CHECK-NEXT: apply
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'delete_readonly_insert_release_after_arc_uses_simple'
 sil [ossa] @delete_readonly_insert_release_after_arc_uses_simple : $@convention(thin) (@owned B) -> @owned B {
 bb0(%0 : @owned $B):
   %fu = function_ref @returns_param : $@convention(thin) (@owned B) -> @owned B
@@ -2237,23 +2245,21 @@ bb0(%0 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @delete_readonly_insert_release_after_arc_uses_multibb
-// XHECK:        apply
-// XHECK-NEXT:   cond_br
+// CHECK:        apply
+// CHECK-NEXT:   cond_br
 //
-// XHECK:      bb1:
-// XHECK-NEXT:   copy_value
-// XHECK-NEXT:   destroy_value
-// XHECK-NEXT:   br bb3(
+// CHECK:      bb1:
+// CHECK-NEXT:   copy_value
+// CHECK-NEXT:   br bb3(
 //
-// XHECK:      bb2:
-// XHECK-NEXT:   copy_value
-// XHECK-NEXT:   destroy_value
-// XHECK-NEXT:   br bb3(
+// CHECK:      bb2:
+// CHECK-NEXT:   copy_value
+// CHECK-NEXT:   br bb3(
 //
-// XHECK:      bb3(
-// XHECK-NEXT:   destroy_value
-// XHECK-NEXT:   return
-// XHECK: } // end sil function 'delete_readonly_insert_release_after_arc_uses_multibb'
+// CHECK:      bb3(
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'delete_readonly_insert_release_after_arc_uses_multibb'
 sil [ossa] @delete_readonly_insert_release_after_arc_uses_multibb : $@convention(thin) (@owned B) -> @owned B {
 bb0(%0 : @owned $B):
   %fu = function_ref @returns_param : $@convention(thin) (@owned B) -> @owned B
@@ -2278,10 +2284,11 @@ bb3(%ruOut : @owned $B):
   return %ruOut : $B
 }
 
-// CHECK-LABEL: sil [ossa] @dont_delete_readonly_function_dealloc_ref_simple
-// XHECK:      apply
-// XHECK-NEXT: dealloc_ref
-// XHECK:      return
+// CHECK-LABEL: sil [ossa] @dont_delete_readonly_function_dealloc_ref_simple :
+// CHECK:      apply
+// CHECK-NEXT: dealloc_ref
+// CHECK:      return
+// CHECK: } // end sil function 'dont_delete_readonly_function_dealloc_ref_simple'
 sil [ossa] @dont_delete_readonly_function_dealloc_ref_simple : $@convention(thin) () -> () {
 bb0:
   %3 = alloc_ref [stack] $B
@@ -2294,13 +2301,14 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_delete_readonly_function_dealloc_ref_multibb
-// XHECK:      apply
-// XHECK:      dealloc_ref
-// XHECK-NEXT: destroy_value
-// XHECK:      dealloc_ref
-// XHECK-NEXT: destroy_value
-// XHECK:      return
+// CHECK-LABEL: sil [ossa] @dont_delete_readonly_function_dealloc_ref_multibb :
+// CHECK:      apply
+// CHECK:      dealloc_ref
+// CHECK-NEXT: destroy_value
+// CHECK:      dealloc_ref
+// CHECK-NEXT: destroy_value
+// CHECK:      return
+// CHECK: } // end sil function 'dont_delete_readonly_function_dealloc_ref_multibb'
 sil [ossa] @dont_delete_readonly_function_dealloc_ref_multibb : $@convention(thin) () -> () {
 bb0:
   %3 = alloc_ref [stack] $B
@@ -2324,9 +2332,9 @@ bb3:
   return %10 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @delete_readonly_function_dealloc_ref_simple
-// XHECK-NOT:  apply
-// XHECK:      return
+// CHECK-LABEL: sil [ossa] @delete_readonly_function_dealloc_ref_simple :
+// CHECK-NOT:  apply
+// CHECK: } // end sil function 'delete_readonly_function_dealloc_ref_simple'
 sil [ossa] @delete_readonly_function_dealloc_ref_simple : $@convention(thin) () -> () {
 bb0:
   %3 = alloc_ref [stack] $B
@@ -2339,9 +2347,9 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @delete_readonly_function_dealloc_ref_multibb
-// XHECK-NOT:  apply
-// XHECK:      return
+// CHECK-LABEL: sil [ossa] @delete_readonly_function_dealloc_ref_multibb :
+// CHECK-NOT:  apply
+// CHECK:      } // end sil function 'delete_readonly_function_dealloc_ref_multibb'
 sil [ossa] @delete_readonly_function_dealloc_ref_multibb : $@convention(thin) () -> () {
 bb0:
   %3 = alloc_ref [stack] $B
@@ -2562,13 +2570,11 @@ class XXImpl : XX {
   init()
 }
 
-// We do not support this today due to unowned ownership. We can support it if
-// we need to though just may take a little work to handle forwarding
-// instructions.
-//
 // CHECK-LABEL: sil [ossa] @unowned_round_trips : $@convention(thin) (@guaranteed B, @guaranteed @sil_unowned B, @guaranteed AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
-// XHECK: bb0(
-// XHECK: } // end sil function 'unowned_round_trips'
+// CHECK: bb0(
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unowned_round_trips'
 sil [ossa] @unowned_round_trips : $@convention(thin) (@guaranteed B, @guaranteed @sil_unowned B, @guaranteed AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
 bb0(%0 : @guaranteed $B, %1 : @guaranteed $@sil_unowned B, %2 : @guaranteed $AnyObject, %3 : $@sil_unmanaged AnyObject):
   %4 = ref_to_unowned %0 : $B to $@sil_unowned B
@@ -2702,12 +2708,12 @@ bb0(%0 : @guaranteed $MyClass):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @load_fixlifetime_address
-// XHECK:          [[Stck:%.*]] = alloc_stack
-// XHECK-NOT:                     fix_lifetime [[Stck]]#1
-// XHECK:       [[StckVal:%.*]] = load_borrow [[Stck]]
-// XHECK:                         fix_lifetime [[StckVal]]
-
+// CHECK-LABEL: sil [ossa] @load_fixlifetime_address :
+// CHECK:          [[Stck:%.*]] = alloc_stack
+// CHECK-NOT:                     fix_lifetime [[Stck]]#1
+// CHECK:       [[StckVal:%.*]] = load_borrow [[Stck]]
+// CHECK:                         fix_lifetime [[StckVal]]
+// CHECK: } // end sil function 'load_fixlifetime_address'
 sil [ossa] @load_fixlifetime_address : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
@@ -2719,12 +2725,13 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %6 : $()
 }
 
-// CHECK-LABEL:     sil [ossa] @collapse_to_unchecked_trivial_bit_cast
-// XHECK:           bb0([[Ref:%.*]] : @guaranteed $Optional<MyClass>):
-// XHECK:             unchecked_trivial_bit_cast [[Ref]]
-// XHECK-NOT:         unchecked_ref_cast
-// XHECK-NOT:         ref_to_raw_pointer
-// XHECK:             return
+// CHECK-LABEL:     sil [ossa] @collapse_to_unchecked_trivial_bit_cast :
+// CHECK:           bb0([[Ref:%.*]] : @guaranteed $Optional<MyClass>):
+// CHECK:             unchecked_trivial_bit_cast [[Ref]]
+// CHECK-NOT:         unchecked_ref_cast
+// CHECK-NOT:         ref_to_raw_pointer
+// CHECK:             return
+// CHECK: } // end sil function 'collapse_to_unchecked_trivial_bit_cast'
 // (ref_to_raw_pointer (unchecked_ref_cast x)) -> (unchecked_trivial_bit_cast x)
 sil [ossa] @collapse_to_unchecked_trivial_bit_cast : $@convention(thin) (@guaranteed Optional<MyClass>) -> Builtin.RawPointer {
 bb0(%0 : @guaranteed $Optional<MyClass>):
@@ -2971,10 +2978,11 @@ bb0(%0 : $*B):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @delete_dead_alloc_ref
-// XHECK: bb0
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @delete_dead_alloc_ref :
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'delete_dead_alloc_ref'
 sil [ossa] @delete_dead_alloc_ref : $() -> () {
 bb0:
   %1 = alloc_ref $B
@@ -3002,11 +3010,12 @@ bb0(%0 : $*B):
 
 sil [ossa] @use_b : $@convention(thin) (@inout B) -> ()
 
-// CHECK-LABEL: sil [ossa] @dont_delete_dead_alloc_stack
-// XHECK: bb0
-// XHECK-NEXT: alloc_stack
-// XHECK-NEXT: copy_addr
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @dont_delete_dead_alloc_stack :
+// CHECK: bb0
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: copy_addr
+// CHECK: return
+// CHECK: } // end sil function 'dont_delete_dead_alloc_stack'
 sil [ossa] @dont_delete_dead_alloc_stack : $(@inout B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
@@ -3127,13 +3136,14 @@ final class NClass {
 	var s: NStruct
 }
 
-// CHECK-LABEL: sil [ossa] @narrow_load_with_debug_value
-// XHECK: bb0(%0 : @guaranteed $NClass):
-// XHECK: debug_value %0
-// XHECK: [[C:%[0-9]+]] = ref_element_addr %0
-// XHECK: [[S:%[0-9]+]] = struct_element_addr [[C]]
-// XHECK: [[R:%[0-9]+]] = load [trivial] [[S]]
-// XHECK: return [[R]]
+// CHECK-LABEL: sil [ossa] @narrow_load_with_debug_value :
+// CHECK: bb0(%0 : @guaranteed $NClass):
+// CHECK: debug_value %0
+// CHECK: [[C:%[0-9]+]] = ref_element_addr %0
+// CHECK: [[S:%[0-9]+]] = struct_element_addr [[C]]
+// CHECK: [[R:%[0-9]+]] = load [trivial] [[S]]
+// CHECK: return [[R]]
+// CHECK: } // end sil function 'narrow_load_with_debug_value'
 sil [ossa] @narrow_load_with_debug_value : $@convention(thin) (@guaranteed NClass) -> Int {
 bb0(%0 : @guaranteed $NClass):
   debug_value %0 : $NClass, let, name "c" // id: %1
@@ -3664,7 +3674,7 @@ bb0(%0 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @enum_promotion_case3a : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
-// XHECK: } // end sil function 'enum_promotion_case3a'
+// CHECK: } // end sil function 'enum_promotion_case3a'
 sil [ossa] @enum_promotion_case3a : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : @owned $B):
   %2 = alloc_stack $FakeOptional<B>
@@ -3818,9 +3828,9 @@ bb0:
 
 
 // CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref
-// XHECK-NEXT: bb0
-// XHECK-NEXT: %0 = tuple ()
-// XHECK-NEXT: return %0 : $()
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %0 = tuple ()
+// CHECK-NEXT: return %0 : $()
 sil [ossa] @remove_unused_alloc_ref : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_ref $B
@@ -3830,9 +3840,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_stack
-// XHECK-NEXT: bb0
-// XHECK-NEXT: %0 = tuple ()
-// XHECK-NEXT: return %0 : $()
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %0 = tuple ()
+// CHECK-NEXT: return %0 : $()
 sil [ossa] @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_ref [stack] $B
@@ -4152,9 +4162,10 @@ bb0(%0 : @owned $_ContiguousArrayStorage<B>):
 
 sil [ossa] @returnInt : $@convention(thin) () -> Builtin.Int32
 
-// CHECK-LABEL: sil [ossa] @optimize_convert_escape_to_noescape
-// XHECK: [[FN:%.*]] = function_ref @returnInt
-// XHECK: apply [[FN]]()
+// CHECK-LABEL: sil [ossa] @optimize_convert_escape_to_noescape :
+// CHECK: [[FN:%.*]] = function_ref @returnInt
+// CHECK: apply [[FN]]()
+// CHECK: } // end sil function 'optimize_convert_escape_to_noescape'
 sil [ossa] @optimize_convert_escape_to_noescape : $@convention(thin) () -> Builtin.Int32 {
 bb0:
   %0 = function_ref @returnInt : $@convention(thin) () -> Builtin.Int32
@@ -4423,7 +4434,11 @@ bb0:
 // Check for disabled optimization of unchecked_bitwise_cast to unchecked_ref_cast in ossa
 // This test can be optimized when ossa is supported in the SILCombine for unchecked_bitwise_cast
 // CHECK-LABEL: sil [ossa] @refcast :
-// XHECK: unchecked_bitwise_cast
+// CHECK: bb0
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: return
 // CHECK-LABEL: } // end sil function 'refcast'
 sil [ossa] @refcast : $@convention(thin) (@owned Klass) -> @owned Optional<Klass> {
 bb0(%0 : @owned $Klass):
