@@ -2385,7 +2385,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
 llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
   auto name = "__swift_async_resume_project_context";
-  return cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+  auto Fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
       [&](IRGenFunction &IGF) {
         auto it = IGF.CurFn->arg_begin();
@@ -2398,9 +2398,29 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
               PointerAuthInfo::emit(IGF, schema, addr, PointerAuthEntity());
           callerContext = emitPointerAuthAuth(IGF, callerContext, authInfo);
         }
+        // TODO: remove this once all platforms support lowering the intrinsic.
+        // At the time of this writing only arm64 supports it.
+        if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
+          auto contextLocationInExtendedFrame =
+              Address(Builder.CreateIntrinsicCall(
+                          llvm::Intrinsic::swift_async_context_addr, {}),
+                      IGM.getPointerAlignment());
+          // On arm64e we need to sign this pointer address discriminated
+          // with 0xc31a and process dependent key.
+          if (auto schema = IGF.IGM.getOptions()
+                                .PointerAuth.AsyncContextExtendedFrameEntry) {
+            auto authInfo = PointerAuthInfo::emit(
+                IGF, schema, contextLocationInExtendedFrame.getAddress(),
+                PointerAuthEntity());
+            callerContext = emitPointerAuthSign(IGF, callerContext, authInfo);
+          }
+          Builder.CreateStore(callerContext, contextLocationInExtendedFrame);
+        }
         Builder.CreateRet(callerContext);
       },
       false /*isNoInline*/));
+  Fn->addFnAttr(llvm::Attribute::AlwaysInline);
+  return Fn;
 }
 llvm::Function *
 IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
