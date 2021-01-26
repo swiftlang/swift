@@ -4267,14 +4267,14 @@ bb0(%0 : $Builtin.Int64):
   convenience init(type: String) throws
 }
 // CHECK-LABEL: sil hidden [thunk] [ossa] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> @owned Optional<TestObjCInit> {
-// XHECK: bb0(%0 : @owned $TestObjCInit):
-// XHECK:   [[VMT2:%.*]] = value_metatype $@objc_metatype TestObjCInit.Type, %0 : $TestObjCInit
-// XHECK:   [[VMT:%.*]] = value_metatype $@thick TestObjCInit.Type, %0 : $TestObjCInit
-// XHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
-// XHECK-NOT: value_metatype
-// XHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
-// XHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
-// XHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK: bb0(%0 : @owned $TestObjCInit):
+// CHECK:   [[VMT2:%.*]] = value_metatype $@objc_metatype TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   [[VMT:%.*]] = value_metatype $@thick TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
+// CHECK-NOT: value_metatype
+// CHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
 // CHECK-LABEL: } // end sil function 'objc_init_partial_dealloc'
 sil hidden [thunk] [ossa] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> @owned Optional<TestObjCInit> {
 bb0(%2 : @owned $TestObjCInit):
