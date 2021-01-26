@@ -2735,7 +2735,8 @@ ParserStatus Parser::parseDeclAttribute(
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
-      Tok.isNot(tok::kw_inout)) {
+      Tok.isNot(tok::kw_inout) &&
+      Tok.isNot(tok::kw_rethrows)) {
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
@@ -2756,7 +2757,7 @@ ParserStatus Parser::parseDeclAttribute(
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
-  
+  if (DK == DAK_Rethrows) { DK = DAK_AtRethrows; }
   auto checkInvalidAttrName = [&](StringRef invalidName,
                                   StringRef correctName,
                                   DeclAttrKind kind,
@@ -3681,7 +3682,8 @@ static void skipAttribute(Parser &P) {
   // Parse the attribute name, which can be qualified, have
   // generic arguments, and so on.
   do {
-    if (!P.consumeIf(tok::identifier) && !P.consumeIf(tok::code_complete))
+    if (!(P.consumeIf(tok::identifier) || P.consumeIf(tok::kw_rethrows)) && 
+        !P.consumeIf(tok::code_complete))
       return;
 
     if (P.startsWithLess(P.Tok)) {
@@ -3700,8 +3702,16 @@ static void skipAttribute(Parser &P) {
 }
 
 bool Parser::isStartOfSwiftDecl() {
-  // If this is obviously not the start of a decl, then we're done.
-  if (!isKeywordPossibleDeclStart(Tok)) return false;
+  if (Tok.is(tok::at_sign) && peekToken().is(tok::kw_rethrows)) {
+    // @rethrows does not follow the general rule of @<identifier> so
+    // it is needed to short circuit this else there will be an infinite
+    // loop on invalid attributes of just rethrows
+  } else if (!isKeywordPossibleDeclStart(Tok)) {
+    // If this is obviously not the start of a decl, then we're done.
+    return false;
+  }
+  
+  
 
   // When 'init' appears inside another 'init', it's likely the user wants to
   // invoke an initializer but forgets to prefix it with 'self.' or 'super.'
@@ -7415,6 +7425,12 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
+
+  // Protocol requirement arguments may not have default values.
+  if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
+    diagnose(SubscriptLoc, diag::protocol_subscript_argument_init);
+    return nullptr;
+  }
 
   // Build an AST for the subscript declaration.
   DeclName name = DeclName(Context, DeclBaseName::createSubscript(),

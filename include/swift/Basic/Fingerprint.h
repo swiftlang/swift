@@ -123,9 +123,9 @@ template <> struct StableHasher::Combiner<Fingerprint> {
     // raw bytes from the core by hand.
     uint8_t buffer[8];
     memcpy(buffer, &Val.core.first, sizeof(buffer));
-    hasher.combine(buffer);
+    hasher.combine<sizeof(buffer)>(buffer);
     memcpy(buffer, &Val.core.second, sizeof(buffer));
-    hasher.combine(buffer);
+    hasher.combine<sizeof(buffer)>(buffer);
   }
 };
 

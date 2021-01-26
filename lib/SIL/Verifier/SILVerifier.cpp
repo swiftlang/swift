@@ -5560,11 +5560,21 @@ public:
 //===----------------------------------------------------------------------===//
 
 static bool verificationEnabled(const SILModule &M) {
-#ifdef NDEBUG
-  if (!M.getOptions().VerifyAll)
+  // If we are asked to never verify, return false early.
+  if (M.getOptions().VerifyNone)
     return false;
+
+  // Otherwise, if verify all is set, we always verify.
+  if (M.getOptions().VerifyAll)
+    return true;
+
+#ifndef NDEBUG
+  // Otherwise if we do have asserts enabled, always verify...
+  return true;
+#else
+  // And if we don't never verify.
+  return false;
 #endif
-  return !M.getOptions().VerifyNone;
 }
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows

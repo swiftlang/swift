@@ -170,7 +170,12 @@ public:
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
+
+  bool classifyAsThrows() const;
 };
+
+void simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef);
+SourceLoc extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef);
 
 } // end namespace swift
 

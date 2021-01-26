@@ -26,7 +26,7 @@
 #include <dispatch/dispatch.h>
 #endif
 
-#if !defined(_WIN32) && !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if !defined(_WIN32) && !defined(__wasi__)
 #include <dlfcn.h>
 #endif
 
@@ -174,7 +174,7 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
 /// to handle the final return.
 SWIFT_CC(swift)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
-                         AsyncContext *context) {
+                         SWIFT_ASYNC_CONTEXT AsyncContext *context) {
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
@@ -307,7 +307,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
 
 void swift::swift_task_future_wait(
     AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncContext *rawContext) {
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
   // Suspend the waiting task.
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
@@ -404,7 +404,7 @@ using RunAndBlockCalleeContext =
 /// Second half of the runAndBlock async function.
 SWIFT_CC(swiftasync)
 static void runAndBlock_finish(AsyncTask *task, ExecutorRef executor,
-                               AsyncContext *_context) {
+                               SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   auto calleeContext = static_cast<RunAndBlockCalleeContext*>(_context);
   auto context = popAsyncContext(task, calleeContext);
 
@@ -416,7 +416,7 @@ static void runAndBlock_finish(AsyncTask *task, ExecutorRef executor,
 /// First half of the runAndBlock async function.
 SWIFT_CC(swiftasync)
 static void runAndBlock_start(AsyncTask *task, ExecutorRef executor,
-                              AsyncContext *_context) {
+                              SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   auto callerContext = static_cast<RunAndBlockContext*>(_context);
 
   size_t calleeContextSize;
@@ -538,17 +538,36 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 }
 
 void swift::swift_task_asyncMainDrainQueue() {
-#if !defined(_WIN32) && !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  bool Finished = false;
+  donateThreadToGlobalExecutorUntil([](void *context) {
+    return *reinterpret_cast<bool*>(context);
+  }, &Finished);
+#else
+#if defined(_WIN32)
+  static void(FAR *pfndispatch_main)(void) = NULL;
+
+  if (pfndispatch_main)
+    return pfndispatch_main();
+
+  HMODULE hModule = LoadLibraryW(L"dispatch.dll");
+  if (hModule == NULL)
+    abort();
+
+  pfndispatch_main =
+      reinterpret_cast<void (FAR *)(void)>(GetProcAddress(hModule,
+                                                          "dispatch_main"));
+  if (pfndispatch_main == NULL)
+    abort();
+
+  pfndispatch_main();
+#else
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
   if (runLoop)
     runLoop();
   else
     dispatch_main();
-#else
-  // TODO: I don't have a windows box to get this working right now.
-  //       We need to either pull in the CFRunLoop if it's available, or do
-  //       something that will drain the main queue. Exploding for now.
-  abort();
+#endif
 #endif
 }

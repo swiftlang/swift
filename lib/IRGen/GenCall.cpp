@@ -817,6 +817,8 @@ void SignatureExpansion::addAsyncParameters() {
   //   void (AsyncTask *, ExecutorRef, AsyncContext *);
   ParamIRTypes.push_back(IGM.SwiftTaskPtrTy);
   ParamIRTypes.push_back(IGM.SwiftExecutorPtrTy);
+  Attrs = Attrs.addParamAttribute(IGM.getLLVMContext(), getCurParamIndex(),
+                                  llvm::Attribute::SwiftAsync);
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
 }
 

@@ -146,6 +146,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// The resume function stored in AsyncTask.
   PointerAuthSchema TaskResumeFunction;
+
+  /// The swift async context entry in the extended frame info.
+  PointerAuthSchema AsyncContextExtendedFrameEntry;
 };
 
 enum class JITDebugArtifact : unsigned {
