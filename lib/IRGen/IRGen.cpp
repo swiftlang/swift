@@ -702,6 +702,10 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.TaskResumeFunction =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
                         SpecialPointerAuthDiscriminators::TaskResumeFunction);
+
+  opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
+      dataKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);
 }
 
 std::unique_ptr<llvm::TargetMachine>

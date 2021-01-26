@@ -60,6 +60,8 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   // arm64 tops out at 56 effective bits of address space and reserves the high
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
+
+  target.UsableSwiftAsyncContextAddrIntrinsic = true;
 }
 
 /// Configures target-specific information for x86-64 platforms.

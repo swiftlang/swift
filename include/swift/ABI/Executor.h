@@ -118,7 +118,7 @@ using JobInvokeFunction =
 
 using TaskContinuationFunction =
   SWIFT_CC(swiftasync)
-  void (AsyncTask *, ExecutorRef, AsyncContext *);
+  void (AsyncTask *, ExecutorRef, SWIFT_ASYNC_CONTEXT AsyncContext *);
 
 template <class AsyncSignature>
 class AsyncFunctionPointer;
