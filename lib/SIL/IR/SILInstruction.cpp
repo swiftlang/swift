@@ -99,10 +99,13 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 
 // Assert that all subclasses of ValueBase implement classof.
 #define NODE(CLASS, PARENT) \
-  ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
+  ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(const SILNode*));
 #include "swift/SIL/SILNodes.def"
 
-SILFunction *SILInstruction::getFunction() const {
+SILFunction *SILInstruction::getFunction() {
+  return getParent()->getParent();
+}
+const SILFunction *SILInstruction::getFunction() const {
   return getParent()->getParent();
 }
 
@@ -1537,7 +1540,7 @@ MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
 MultipleValueInstructionResult::MultipleValueInstructionResult(
     ValueKind valueKind, unsigned index, SILType type,
     ValueOwnershipKind ownershipKind)
-    : ValueBase(valueKind, type) {
+    : ValueBase(valueKind, type, IsRepresentative::No) {
   setOwnershipKind(ownershipKind);
   setIndex(index);
 }

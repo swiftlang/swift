@@ -1292,7 +1292,7 @@ void DifferentiationTransformer::foldDifferentiableFunctionExtraction(
 bool DifferentiationTransformer::processDifferentiableFunctionInst(
     DifferentiableFunctionInst *dfi) {
   PrettyStackTraceSILNode dfiTrace("canonicalizing `differentiable_function`",
-                                   dfi);
+                                   cast<SILInstruction>(dfi));
   PrettyStackTraceSILFunction fnTrace("...in", dfi->getFunction());
   LLVM_DEBUG({
     auto &s = getADDebugStream() << "Processing DifferentiableFunctionInst:\n";
@@ -1332,7 +1332,8 @@ bool DifferentiationTransformer::processDifferentiableFunctionInst(
 
 bool DifferentiationTransformer::processLinearFunctionInst(
     LinearFunctionInst *lfi) {
-  PrettyStackTraceSILNode dfiTrace("canonicalizing `linear_function`", lfi);
+  PrettyStackTraceSILNode dfiTrace("canonicalizing `linear_function`",
+                                   cast<SILInstruction>(lfi));
   PrettyStackTraceSILFunction fnTrace("...in", lfi->getFunction());
   LLVM_DEBUG({
     auto &s = getADDebugStream() << "Processing LinearFunctionInst:\n";

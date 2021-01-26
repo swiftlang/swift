@@ -16,7 +16,7 @@
 using namespace swift;
 
 SILUndef::SILUndef(SILType type)
-    : ValueBase(ValueKind::SILUndef, type) {}
+    : ValueBase(ValueKind::SILUndef, type, IsRepresentative::Yes) {}
 
 SILUndef *SILUndef::get(SILType ty, SILModule &m) {
   SILUndef *&entry = m.UndefValues[ty];
