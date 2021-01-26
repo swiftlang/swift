@@ -662,7 +662,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     }
 
     // Remove dead address instructions that may be uses of the allocation.
-    SILNode *Node = Inst->asSILNode();
+    SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
            isa<TupleElementAddrInst>(Node) ||
            isa<UncheckedAddrCastInst>(Node)) {

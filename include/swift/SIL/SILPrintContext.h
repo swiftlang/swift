@@ -108,7 +108,7 @@ public:
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 
-  SILPrintContext::ID getID(SILNodePointer node);
+  SILPrintContext::ID getID(const SILNode *node);
 
   /// Returns true if the \p Scope has and ID assigned.
   bool hasScopeID(const SILDebugScope *Scope) const {

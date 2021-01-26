@@ -97,3 +97,39 @@ bb0(%0 : @guaranteed $ObjectWrapper):
   end_borrow %2 : $AnyObject
   return %3 : $ObjectWrapper
 }
+
+final class B { }
+
+final class K {
+  @_hasStorage public var x: B { get }
+  init()
+}
+
+sil [ossa] @test_dealloc_ref : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  end_borrow %1 : $K
+  dealloc_ref %0 : $K
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_dealloc_partial_ref : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %1 = begin_borrow %0 : $K
+  %2 = ref_element_addr %1 : $K, #K.x
+  %3 = begin_access [read] [dynamic] %2 : $*B
+  %4 = load_borrow %3 : $*B
+  end_borrow %4 : $B
+  end_access %3 : $*B
+  end_borrow %1 : $K
+  %8 = metatype $@thick K.Type
+  dealloc_partial_ref %0 : $K, %8 : $@thick K.Type
+  %r = tuple ()
+  return %r : $()
+}

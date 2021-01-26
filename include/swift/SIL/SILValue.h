@@ -346,8 +346,10 @@ class ValueBase : public SILNode, public SILAllocated<ValueBase> {
   ValueBase &operator=(const ValueBase &) = delete;
 
 protected:
-  ValueBase(ValueKind kind, SILType type)
-      : SILNode(SILNodeKind(kind)), Type(type) {}
+  ValueBase(ValueKind kind, SILType type, IsRepresentative isRepresentative)
+      : SILNode(SILNodeKind(kind), SILNodeStorageLocation::Value,
+                isRepresentative),
+        Type(type) {}
 
 public:
   ~ValueBase() {
@@ -515,9 +517,9 @@ public:
   /// result index, or None if it is not defined by an instruction.
   Optional<DefiningInstructionResult> getDefiningInstructionResult();
 
-  static bool classof(SILNodePointer node) {
-    return node->getKind() >= SILNodeKind::First_ValueBase &&
-           node->getKind() <= SILNodeKind::Last_ValueBase;
+  static bool classof(const SILNode *N) {
+    return N->getKind() >= SILNodeKind::First_ValueBase &&
+           N->getKind() <= SILNodeKind::Last_ValueBase;
   }
   static bool classof(const ValueBase *V) { return true; }
 
@@ -615,8 +617,6 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 };
-
-inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
 
 inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
   return isCompatibleWith(other.getOwnershipKind());

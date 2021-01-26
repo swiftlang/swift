@@ -43,7 +43,7 @@ public:
 
   static bool classof(const SILArgument *) = delete;
   static bool classof(const SILInstruction *) = delete;
-  static bool classof(SILNodePointer node) {
+  static bool classof(const SILNode *node) {
     return node->getKind() == SILNodeKind::SILUndef;
   }
 };
