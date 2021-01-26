@@ -260,6 +260,8 @@ getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
 SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
                                               SILInstruction *ignoreUser);
 
+FullApplySite findApplyFromDevirtualizedResult(SILValue value);
+
 /// Cast a value into the expected, ABI compatible type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.

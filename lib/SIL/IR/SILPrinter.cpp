@@ -761,18 +761,17 @@ public:
 
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
-  bool printUsersOfValue(SILValue value, bool printedSlashes) {
-    return printUserList({value}, value, printedSlashes);
-  }
-
-  bool printUsersOfInstruction(const SILInstruction *inst, bool printedSlashes) {
+  bool printUsersOfSILNode(const SILNode *node, bool printedSlashes) {
     llvm::SmallVector<SILValue, 8> values;
-    llvm::copy(inst->getResults(), std::back_inserter(values));
-    return printUserList(values, inst, printedSlashes);
-  }
+    if (auto *value = dyn_cast<ValueBase>(node)) {
+      values.push_back(value);
+    } else if (auto *inst = dyn_cast<SILInstruction>(node)) {
+      assert(!isa<SingleValueInstruction>(inst) && "SingleValueInstruction was "
+                                                   "handled by the previous "
+                                                   "value base check.");
+      llvm::copy(inst->getResults(), std::back_inserter(values));
+    }
 
-  bool printUserList(ArrayRef<SILValue> values, SILNodePointer node,
-                     bool printedSlashes) {
     // If the set of values is empty, we need to print the ID of
     // the instruction.  Otherwise, if none of the values has a use,
     // we don't need to do anything.
@@ -1012,7 +1011,7 @@ public:
     printedSlashes = printTypeDependentOperands(I);
 
     // Print users, or id for valueless instructions.
-    printedSlashes = printUsersOfInstruction(I, printedSlashes);
+    printedSlashes = printUsersOfSILNode(I, printedSlashes);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
@@ -1057,7 +1056,7 @@ public:
           << Ctx.getID(arg->getParent()) << " : " << arg->getType();
 
     // Print users.
-    (void) printUsersOfValue(arg, false);
+    (void) printUsersOfSILNode(arg, false);
 
     *this << '\n';
   }
@@ -1094,13 +1093,13 @@ public:
     visit(static_cast<SILInstruction *>(nonConstParent));
 
     // Print users.
-    (void)printUsersOfValue(result, false);
+    (void)printUsersOfSILNode(result, false);
 
     *this << '\n';
   }
 
   void printInContext(const SILNode *node) {
-    auto sortByID = [&](SILNodePointer a, SILNodePointer b) {
+    auto sortByID = [&](const SILNode *a, const SILNode *b) {
       return Ctx.getID(a).Number < Ctx.getID(b).Number;
     };
 
@@ -3129,7 +3128,7 @@ void SILInstruction::dumpInContext() const {
 }
 void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
-  SILPrinter(Ctx).printInContext(asSILNode());
+  SILPrinter(Ctx).printInContext(this);
 }
 
 void SILVTableEntry::print(llvm::raw_ostream &OS) const {
@@ -3593,11 +3592,11 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
   return R;
 }
 
-ID SILPrintContext::getID(SILNodePointer node) {
+ID SILPrintContext::getID(const SILNode *node) {
   if (node == nullptr)
     return {ID::Null, ~0U};
 
-  if (isa<SILUndef>(node.get()))
+  if (isa<SILUndef>(node))
     return {ID::SILUndef, 0};
   
   SILBasicBlock *BB = node->getParentBlock();
@@ -3626,7 +3625,7 @@ ID SILPrintContext::getID(SILNodePointer node) {
   unsigned idx = 0;
   for (auto &I : *BB) {
     // Give the instruction itself the next ID.
-    ValueToIDMap[I.asSILNode()] = idx;
+    ValueToIDMap[&I] = idx;
 
     // If there are no results, make sure we don't reuse that ID.
     auto results = I.getResults();
