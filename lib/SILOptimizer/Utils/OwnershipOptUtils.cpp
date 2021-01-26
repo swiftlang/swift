@@ -1014,15 +1014,19 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   }
 }
 
-SILBasicBlock::iterator OwnershipRAUWHelper::perform() {
+SILBasicBlock::iterator
+OwnershipRAUWHelper::perform(SingleValueInstruction *maybeTransformedNewValue) {
   assert(isValid() && "OwnershipRAUWHelper invalid?!");
 
   // Make sure to always clear our context after we transform.
   SWIFT_DEFER { ctx->clear(); };
+  SILValue actualNewValue = newValue;
+  if (maybeTransformedNewValue)
+    actualNewValue = maybeTransformedNewValue;
 
   if (oldValue->getType().isAddress())
-    return replaceAddressUses(oldValue, newValue);
+    return replaceAddressUses(oldValue, actualNewValue);
 
-  OwnershipRAUWUtility utility{oldValue, newValue, *ctx};
+  OwnershipRAUWUtility utility{oldValue, actualNewValue, *ctx};
   return utility.perform();
 }
