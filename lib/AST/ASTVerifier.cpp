@@ -1803,11 +1803,25 @@ public:
         Out << "\n";
         abort();
       } else if (E->throws() && !FT->isThrowing()) {
-        Out << "apply expression is marked as throwing, but function operand"
-               "does not have a throwing function type\n";
-        E->dump(Out);
-        Out << "\n";
-        abort();
+        FunctionRethrowingKind rethrowingKind = FunctionRethrowingKind::Invalid;
+        if (auto DRE = dyn_cast<DeclRefExpr>(E->getFn())) {
+          if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(DRE->getDecl())) {
+            rethrowingKind = fnDecl->getRethrowingKind();
+          }
+        } else if (auto OCDRE = dyn_cast<OtherConstructorDeclRefExpr>(E->getFn())) {
+          if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(OCDRE->getDecl())) {
+            rethrowingKind = fnDecl->getRethrowingKind();
+          }
+        }
+
+        if (rethrowingKind != FunctionRethrowingKind::ByConformance &&
+            rethrowingKind != FunctionRethrowingKind::Throws) {
+          Out << "apply expression is marked as throwing, but function operand"
+                 "does not have a throwing function type\n";
+          E->dump(Out);
+          Out << "\n";
+          abort();
+        }
       }
 
       if (E->isSuper() != E->getArg()->isSuperExpr()) {

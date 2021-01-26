@@ -3650,6 +3650,7 @@ generateForEachStmtConstraints(
     ConstraintSystem &cs, SolutionApplicationTarget target, Expr *sequence) {
   auto forEachStmtInfo = target.getForEachStmtInfo();
   ForEachStmt *stmt = forEachStmtInfo.stmt;
+  bool isAsync = stmt->getAwaitLoc().isValid();
 
   auto locator = cs.getConstraintLocator(sequence);
   auto contextualLocator =
@@ -3657,7 +3658,9 @@ generateForEachStmtConstraints(
 
   // The expression type must conform to the Sequence protocol.
   auto sequenceProto = TypeChecker::getProtocol(
-      cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+      cs.getASTContext(), stmt->getForLoc(), 
+      isAsync ? 
+      KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto) {
     return None;
   }
@@ -3703,18 +3706,22 @@ generateForEachStmtConstraints(
 
   // Determine the iterator type.
   auto iteratorAssocType =
-      sequenceProto->getAssociatedType(cs.getASTContext().Id_Iterator);
+      sequenceProto->getAssociatedType(isAsync ? 
+        cs.getASTContext().Id_AsyncIterator : cs.getASTContext().Id_Iterator);
   Type iteratorType = DependentMemberType::get(sequenceType, iteratorAssocType);
 
   // The iterator type must conform to IteratorProtocol.
   ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(),
-      KnownProtocolKind::IteratorProtocol);
+      isAsync ? 
+        KnownProtocolKind::AsyncIteratorProtocol : KnownProtocolKind::IteratorProtocol);
   if (!iteratorProto)
     return None;
 
   // Reference the makeIterator witness.
-  FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
+  FuncDecl *makeIterator = isAsync ? 
+    ctx.getAsyncSequenceMakeAsyncIterator() : ctx.getSequenceMakeIterator();
+  
   Type makeIteratorType =
       cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
   cs.addValueWitnessConstraint(

@@ -536,6 +536,12 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 }
 
 void swift::swift_task_asyncMainDrainQueue() {
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  bool Finished = false;
+  donateThreadToGlobalExecutorUntil([](void *context) {
+    return *reinterpret_cast<bool*>(context);
+  }, &Finished);
+#else
 #if defined(_WIN32)
   static void(FAR *pfndispatch_main)(void) = NULL;
 
@@ -560,5 +566,6 @@ void swift::swift_task_asyncMainDrainQueue() {
     runLoop();
   else
     dispatch_main();
+#endif
 #endif
 }
