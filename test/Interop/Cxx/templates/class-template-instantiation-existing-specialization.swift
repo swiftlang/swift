@@ -10,7 +10,7 @@ var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
 // This test covers the case where Clang has to create specialization eagerly
 // because the code in the header forces it to. Swift has to reuse this
-// specialization, it must not create it's own.
+// specialization, it must not create its own.
 TemplatesTestSuite.test("existing-specialization") {
   let myInt = IntWrapper(value: 18)
   var magicInt = MagicWrapper<IntWrapper>(t: myInt)
