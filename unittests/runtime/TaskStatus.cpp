@@ -40,7 +40,7 @@ using undeduced =
 template <class T>
 SWIFT_CC(swift)
 static void simpleTaskInvokeFunction(AsyncTask *task, ExecutorRef executor,
-                                     AsyncContext *context) {
+                                     SWIFT_ASYNC_CONTEXT AsyncContext *context) {
   auto valueContext = static_cast<ValueContext<T>*>(context);
   valueContext->StoredInvokeFn(task, executor, valueContext);
 

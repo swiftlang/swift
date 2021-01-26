@@ -20,7 +20,7 @@ import _Concurrency
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 
 // CHECK-LL: @genericToVoidTu =
-// CHECK-LL: define hidden swiftcc void @genericToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swiftcc void @genericToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @genericToVoid : $@async @convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%instance : $*T):
   %print_generic = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()

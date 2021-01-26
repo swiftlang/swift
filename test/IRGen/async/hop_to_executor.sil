@@ -14,7 +14,7 @@ import _Concurrency
 final actor class MyActor {
 }
 
-// CHECK-LABEL: define{{.*}} void @test_simple(%swift.task* %0, %swift.executor* %1, %swift.context* %2)
+// CHECK-LABEL: define{{.*}} void @test_simple(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
 // CHECK: [[TASK_LOC:%[0-9]+]] = alloca %swift.task*
 // CHECK: [[CTX:%[0-9]+]] = bitcast %swift.context* %2
 // CHECK: [[ACTOR_ADDR:%[0-9]+]] = getelementptr {{.*}} [[CTX]], i32 0, i32 6

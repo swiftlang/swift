@@ -157,7 +157,7 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
 void swift::swift_task_group_wait_next(
     AsyncTask *waitingTask,
     ExecutorRef executor,
-    AsyncContext *rawContext) {
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
