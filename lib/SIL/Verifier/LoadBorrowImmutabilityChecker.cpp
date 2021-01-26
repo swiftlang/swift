@@ -97,6 +97,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::ExistentialMetatypeInst:
+  case SILInstructionKind::IsUniqueInst:
     return true;
 
   // Known writes...
