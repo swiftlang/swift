@@ -5356,23 +5356,25 @@ public:
 
     if (auto clangDecl = nominal->getClangDecl()) {
       if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
-        auto clangImporter = static_cast<ClangImporter *>(nominal->getASTContext().getClangModuleLoader());
+        auto clangImporter = static_cast<ClangImporter *>(
+            nominal->getASTContext().getClangModuleLoader());
 
         SmallVector<Type, 2> typesOfGenericArgs;
         for (auto arg : genericArgs) {
-          typesOfgenericArgs.push_back(arg);
+          typesOfGenericArgs.push_back(arg);
         }
 
         SmallVector<clang::TemplateArgument, 2> templateArguments;
         std::unique_ptr<TemplateInstantiationError> error =
-            ctx.getClangTemplateArguments(
-                ctd->getTemplateParameters(), typesOfgenericArgs,
-                templateArguments);
+            ctx.getClangTemplateArguments(ctd->getTemplateParameters(),
+                                          typesOfGenericArgs,
+                                          templateArguments);
 
         auto instantiation = clangImporter->instantiateCXXClassTemplate(
-          const_cast<clang::ClassTemplateDecl *>(ctd), templateArguments);
+            const_cast<clang::ClassTemplateDecl *>(ctd), templateArguments);
 
-        instantiation->setTemplateInstantiationType(BoundGenericType::get(nominal, parentTy, genericArgs));
+        instantiation->setTemplateInstantiationType(
+            BoundGenericType::get(nominal, parentTy, genericArgs));
         return instantiation->getDeclaredInterfaceType();
       }
     }

@@ -841,15 +841,15 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   if (auto clangDecl = decl->getClangDecl()) {
     if (auto classTemplateDecl =
             dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
-      SmallVector<Type, 2> typesOfgenericArgs;
+      SmallVector<Type, 2> typesOfGenericArgs;
       for (auto typeRepr : generic->getGenericArgs()) {
-        typesOfgenericArgs.push_back(resolution.resolveType(typeRepr));
+        typesOfGenericArgs.push_back(resolution.resolveType(typeRepr));
       }
 
       SmallVector<clang::TemplateArgument, 2> templateArguments;
       std::unique_ptr<TemplateInstantiationError> error =
           ctx.getClangTemplateArguments(
-              classTemplateDecl->getTemplateParameters(), typesOfgenericArgs,
+              classTemplateDecl->getTemplateParameters(), typesOfGenericArgs,
               templateArguments);
 
       if (error) {

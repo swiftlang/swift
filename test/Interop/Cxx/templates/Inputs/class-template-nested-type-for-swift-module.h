@@ -2,10 +2,9 @@
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NESTED_TYPE_FOR_SWIFT_MODULE_H
 
 template <class T> struct Ship {
-    struct Engine {
-        T power;
-    };
+  struct Engine {
+    T power;
+  };
 };
-
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_NESTED_TYPE_FOR_SWIFT_MODULE_H
