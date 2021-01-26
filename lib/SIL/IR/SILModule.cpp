@@ -167,6 +167,8 @@ void SILModule::checkForLeaks() const {
 }
 
 void SILModule::checkForLeaksAfterDestruction() {
+// Disabled in release (non-assert) builds because this check fails in rare
+// cases in lldb, causing crashes. rdar://70826934
 #ifndef NDEBUG
   int numAllocated = SILInstruction::getNumCreatedInstructions() -
                      SILInstruction::getNumDeletedInstructions();
