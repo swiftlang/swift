@@ -958,12 +958,15 @@ namespace {
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
                           bool isPartialApply) {
+      
       // check that the call is actually async
       if (!isAsyncCall(call))
         return false;
 
       Expr *subArg = arg->getSubExpr();
       ValueDecl *valueDecl = nullptr;
+      if (auto binding = dyn_cast<BindOptionalExpr>(subArg))
+        subArg = binding->getSubExpr();
       if (LookupExpr *baseArg = dyn_cast<LookupExpr>(subArg)) {
         while (LookupExpr *nextLayer = dyn_cast<LookupExpr>(baseArg->getBase()))
           baseArg = nextLayer;

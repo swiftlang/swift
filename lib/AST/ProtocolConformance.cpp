@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -183,6 +184,79 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   }
 
   return getConcrete()->getWitnessDeclRef(requirement);
+}
+
+
+static bool classifyRequirement(ModuleDecl *module, 
+                                ProtocolConformance *reqConformance, 
+                                ValueDecl *requiredFn) {
+  auto declRef = reqConformance->getWitnessDeclRef(requiredFn);
+  auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
+  switch (witnessDecl->getRethrowingKind()) {
+    case FunctionRethrowingKind::ByConformance: {
+      auto substitutions = reqConformance->getSubstitutions(module);
+      for (auto conformanceRef : substitutions.getConformances()) {
+        if (conformanceRef.classifyAsThrows()) {
+          return true;
+        }
+      }
+      break;
+    }
+    case FunctionRethrowingKind::None:
+      break;
+    case FunctionRethrowingKind::Throws:
+      return true;
+    default:
+      return true;
+  }
+  return false;
+}
+
+// classify the type requirements of a given prottocol type with a function
+// requirement as throws or not. This will detect if the signature of the 
+// function is throwing or not depending on associated types.
+static bool classifyTypeRequirement(ModuleDecl *module, Type protoType, 
+                                    ValueDecl *requiredFn, 
+                                    ProtocolConformance *conformance,
+                                    ProtocolDecl *requiredProtocol) {
+  auto reqProtocol = cast<ProtocolDecl>(requiredFn->getDeclContext());
+  ProtocolConformance *reqConformance;
+
+  if(protoType->isEqual(reqProtocol->getSelfInterfaceType()) && 
+     requiredProtocol == reqProtocol) {
+    reqConformance = conformance;
+  } else {
+    auto reqConformanceRef = 
+      conformance->getAssociatedConformance(protoType, reqProtocol);
+    if (!reqConformanceRef.isConcrete()) {
+      return true;
+    }
+    reqConformance = reqConformanceRef.getConcrete();
+  }
+
+  return classifyRequirement(module, reqConformance, requiredFn);
+}
+
+bool
+ProtocolConformanceRefClassifyAsThrowsRequest::evaluate(
+  Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const {
+  auto conformance = conformanceRef.getConcrete();
+  auto requiredProtocol = conformanceRef.getRequirement();
+  auto module = requiredProtocol->getModuleContext();
+  for (auto req : requiredProtocol->getRethrowingRequirements()) {
+    if (classifyTypeRequirement(module, req.first, req.second, 
+                                conformance, requiredProtocol)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ProtocolConformanceRef::classifyAsThrows() const {
+  if (!isConcrete()) { return true; }
+  return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
+     ProtocolConformanceRefClassifyAsThrowsRequest{ *this }, 
+     true);
 }
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
@@ -1528,4 +1602,21 @@ FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>() {
 void swift::simple_display(llvm::raw_ostream &out,
                            const ProtocolConformance *conf) {
   conf->printName(out);
+}
+
+void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
+  if (conformanceRef.isAbstract()) {
+    simple_display(out, conformanceRef.getAbstract());
+  } else if (conformanceRef.isConcrete()) {
+    simple_display(out, conformanceRef.getConcrete());
+  }
+}
+
+SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef) {
+  if (conformanceRef.isAbstract()) {
+    return extractNearestSourceLoc(conformanceRef.getAbstract());
+  } else if (conformanceRef.isConcrete()) {
+    return extractNearestSourceLoc(conformanceRef.getConcrete()->getProtocol());
+  }
+  return SourceLoc();
 }
