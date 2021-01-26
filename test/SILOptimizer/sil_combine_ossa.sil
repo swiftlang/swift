@@ -2024,6 +2024,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 // CHECK-NEXT: unchecked_trivial_bit_cast
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NOT: unchecked_bitwise_cast
+// CHECK-NOT: unchecked_ownership_conversion
 // CHECK: } // end sil function 'bitwise_combines_owned'
 sil [ossa] @bitwise_combines_owned : $@convention(thin) (@owned Builtin.NativeObject, Builtin.RawPointer) -> @owned (Optional<Builtin.NativeObject>, Builtin.RawPointer, Optional<Builtin.NativeObject>) {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
@@ -2050,6 +2051,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 // CHECK-NEXT: unchecked_trivial_bit_cast
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NOT: unchecked_bitwise_cast
+// CHECK-NOT: unchecked_ownership_conversion
 // CHECK: } // end sil function 'bitwise_combines_guaranteed'
 sil [ossa] @bitwise_combines_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject, Builtin.RawPointer) -> @owned (Optional<Builtin.NativeObject>, Builtin.RawPointer, Optional<Builtin.NativeObject>) {
 bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : $Builtin.RawPointer):

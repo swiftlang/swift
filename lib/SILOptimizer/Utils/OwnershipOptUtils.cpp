@@ -608,14 +608,19 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     // value, we need to ensure that the guaranteed value is live at all use
     // points of the unowned value. If so, just replace and continue.
     //
-    // TODO: Implement this.
+    // TODO: Implement this for more interesting cases.
+    if (isa<SILFunctionArgument>(newValue))
+      return replaceAllUsesAndErase(oldValue, newValue, callbacks);
 
     // Otherwise, we need to lifetime extend the borrow over all of the use
-    // points. To do so, we copy the value, borrow it, insert an unchecked
-    // ownership conversion to unowned at oldValue and then RAUW.
+    // points. To do so, we copy the value, borrow it, and insert an unchecked
+    // ownership conversion to unowned at all uses that are terminator uses.
     //
-    // We need to insert the conversion to ensure that we do not violate
-    // ownership propagation rules of forwarding insts.
+    // We need to insert the conversion since if we have a non-argument
+    // guaranteed value since its scope will end before the terminator so we
+    // need to convert the value to unowned early.
+    //
+    // TODO: Do we need a separate array here?
     SmallVector<Operand *, 8> oldValueUses(oldValue->getUses());
     for (auto *use : oldValueUses) {
       if (auto *ti = dyn_cast<TermInst>(use->getUser())) {
@@ -628,14 +633,12 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
         }
       }
     }
+
     auto extender = getLifetimeExtender();
     SILValue borrow =
         extender.createPlusZeroBorrow(newValue, oldValue->getUses());
     SILBuilderWithScope builder(oldValue);
-    auto *newInst = builder.createUncheckedOwnershipConversion(
-        oldValue->getLoc(), borrow, OwnershipKind::Unowned);
-    callbacks.createdNewInst(newInst);
-    return replaceAllUsesAndErase(oldValue, newInst, callbacks);
+    return replaceAllUsesAndErase(oldValue, borrow, callbacks);
   }
   case OwnershipKind::Owned: {
     // If we have an unowned value that we want to replace with an owned value,
@@ -646,13 +649,15 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
 
     // Otherwise, insert a copy of the owned value and lifetime extend that over
     // all uses of the value and then RAUW.
+    //
+    // NOTE: For terminator uses, we funnel the use through an
+    // unchecked_ownership_conversion to ensure that we can end the lifetime of
+    // our owned/guaranteed value before the terminator.
     SmallVector<Operand *, 8> oldValueUses(oldValue->getUses());
     for (auto *use : oldValueUses) {
       if (auto *ti = dyn_cast<TermInst>(use->getUser())) {
         if (ti->isFunctionExiting()) {
           SILBuilderWithScope builder(ti);
-          // We insert this to ensure that we can extend our owned value's
-          // lifetime to before the function end point.
           auto *newInst = builder.createUncheckedOwnershipConversion(
               ti->getLoc(), use->get(), OwnershipKind::Unowned);
           callbacks.createdNewInst(newInst);
@@ -663,10 +668,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     auto extender = getLifetimeExtender();
     SILValue copy = extender.createPlusZeroCopy(newValue, oldValue->getUses());
     SILBuilderWithScope builder(oldValue);
-    auto *newInst = builder.createUncheckedOwnershipConversion(
-        oldValue->getLoc(), copy, OwnershipKind::Unowned);
-    callbacks.createdNewInst(newInst);
-    auto result = replaceAllUsesAndErase(oldValue, newInst, callbacks);
+    auto result = replaceAllUsesAndErase(oldValue, copy, callbacks);
     return result;
   }
   }
