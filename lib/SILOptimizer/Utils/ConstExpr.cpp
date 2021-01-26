@@ -793,7 +793,7 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
                                                 SILFunction *callee) {
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Opaque Callee: " << *callee << "\n");
   return evaluator.getUnknown(
-      apply,
+      (SILInstruction *)apply,
       UnknownReason::createCalleeImplementationUnknown(callee));
 }
 
@@ -882,7 +882,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       }
     }
     return evaluator.getUnknown(
-        apply,
+        (SILInstruction *)apply,
         UnknownReason::createTrap(message, evaluator.getAllocator()));
   }
   case WellKnownFunction::ArrayInitEmpty: { // Array.init()
@@ -893,7 +893,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto typeValue = getConstantValue(apply->getOperand(1));
     if (typeValue.getKind() != SymbolicValue::Metatype) {
       return typeValue.isConstant()
-                 ? getUnknown(evaluator, apply,
+                 ? getUnknown(evaluator, (SILInstruction *)apply,
                               UnknownReason::InvalidOperandValue)
                  : typeValue;
     }
@@ -928,7 +928,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     // Allocating uninitialized arrays is supported only in flow-sensitive mode.
     // TODO: the top-level mode in the interpreter should be phased out.
     if (recursivelyComputeValueIfNotInState)
-      return getUnknown(evaluator, apply, UnknownReason::Default);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::Default);
 
     SmallVector<SymbolicValue, 8> elementConstants;
     // Set array elements to uninitialized state. Subsequent stores through
@@ -1002,7 +1003,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     if (!arrayValue.isConstant())
       return arrayValue;
     if (arrayValue.getKind() != SymbolicValue::Array) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
 
     // Create a new array storage by appending the \c element to the existing
@@ -1040,14 +1042,16 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumParameters() == 4 && "unexpected signature");
     auto literal = getConstantValue(apply->getOperand(1));
     if (literal.getKind() != SymbolicValue::String) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
     auto literalVal = literal.getStringValue();
 
     auto byteCount = getConstantValue(apply->getOperand(2));
     if (byteCount.getKind() != SymbolicValue::Integer ||
         byteCount.getIntegerValue().getLimitedValue() != literalVal.size()) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
     setValue(apply, literal);
     return None;
@@ -1064,7 +1068,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       return otherString;
     }
     if (otherString.getKind() != SymbolicValue::String) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
 
     auto inoutOperand = apply->getOperand(2);
@@ -1073,7 +1078,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       return firstString;
     }
     if (firstString.getKind() != SymbolicValue::String) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
 
     auto result = SmallString<8>(firstString.getStringValue());
@@ -1091,12 +1097,14 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
 
     auto firstString = getConstantValue(apply->getOperand(1));
     if (firstString.getKind() != SymbolicValue::String) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
 
     auto otherString = getConstantValue(apply->getOperand(2));
     if (otherString.getKind() != SymbolicValue::String) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
 
     // The result is a Swift.Bool which is a struct that wraps an Int1.
@@ -1122,7 +1130,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     }
 
     if (stringArgument.getKind() != SymbolicValue::String) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
 
     // Replace all precent symbol (%) in the string with double percents (%%)
@@ -1154,7 +1163,8 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     Optional<bool> isSignedIntegerType =
         getSignIfStdlibIntegerType(argumentType);
     if (!isSignedIntegerType.hasValue()) {
-      return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
     }
     // Load the stdlib integer's value and convert it to a string.
     SymbolicValue stdlibIntegerValue =
@@ -1203,7 +1213,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   // Determine the callee.
   auto calleeFn = getConstantValue(apply->getOperand(0));
   if (calleeFn.getKind() != SymbolicValue::Function)
-    return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
+    return getUnknown(evaluator, (SILInstruction *)apply,
+                      UnknownReason::InvalidOperandValue);
 
   SILFunction *callee = calleeFn.getFunctionValue();
   evaluator.recordCalledFunctionIfEnabled(callee);
@@ -1220,7 +1231,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     auto op = apply->getOperand(i + 1);
     SymbolicValue argValue = getConstantValue(op);
     if (!argValue.isConstant()) {
-      return evaluator.getUnknown(apply,
+      return evaluator.getUnknown((SILInstruction *)apply,
                                   UnknownReason::createCallArgumentUnknown(i));
     }
     paramConstants.push_back(argValue);
@@ -1269,7 +1280,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       auto conf = protoSelfToConcreteType.lookupConformance(
           protocol->getSelfInterfaceType()->getCanonicalType(), protocol);
       if (conf.isInvalid())
-        return getUnknown(evaluator, apply,
+        return getUnknown(evaluator, (SILInstruction *)apply,
                           UnknownReason::UnknownWitnessMethodConformance);
 
       callSubMap = getWitnessMethodSubstitutions(
@@ -1698,7 +1709,7 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
   if (!calleeValue.isConstant())
     return calleeValue;
   if (calleeValue.getKind() != SymbolicValue::Function) {
-    return getUnknown(evaluator, closureInst,
+    return getUnknown(evaluator, (SILInstruction *)closureInst,
                       UnknownReason::InvalidOperandValue);
   }
 
@@ -1785,7 +1796,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
         return None;
       // Conditional fail actually failed.
       return evaluator.getUnknown(
-          inst->asSILNode(),
+          (SILInstruction *)inst,
           UnknownReason::createTrap(
               (Twine("trap: ") + condFail->getMessage()).str(),
               evaluator.getAllocator()));
@@ -1855,8 +1866,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown FS: " << *inst << "\n");
   // If this is an unknown instruction with no results then bail out.
-  return getUnknown(evaluator, inst->asSILNode(),
-                    UnknownReason::UnsupportedInstruction);
+  return getUnknown(evaluator, inst, UnknownReason::UnsupportedInstruction);
 }
 
 std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
@@ -1975,8 +1985,8 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     DynamicCastFeasibility castResult = classifyDynamicCast(
         inst->getModule().getSwiftModule(), sourceType, targetType);
     if (castResult == DynamicCastFeasibility::MaySucceed) {
-      return {None, getUnknown(evaluator, inst->asSILNode(),
-                               UnknownReason::UnknownCastResult)};
+      return {None,
+              getUnknown(evaluator, inst, UnknownReason::UnknownCastResult)};
     }
     // Determine the basic block to jump to.
     SILBasicBlock *resultBB =
@@ -1997,8 +2007,8 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr: Unknown Branch Instruction: " << *inst
                           << "\n");
 
-  return {None, getUnknown(evaluator, inst->asSILNode(),
-                           UnknownReason::UnsupportedInstruction)};
+  return {None,
+          getUnknown(evaluator, inst, UnknownReason::UnsupportedInstruction)};
 }
 
 /// Evaluate a call to the specified function as if it were a constant
@@ -2044,8 +2054,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 
     // Make sure we haven't exceeded our interpreter iteration cap.
     if (++numInstEvaluated > ConstExprLimit) {
-      return getUnknown(evaluator, inst->asSILNode(),
-                        UnknownReason::TooManyInstructions);
+      return getUnknown(evaluator, inst, UnknownReason::TooManyInstructions);
     }
 
     if (isa<ReturnInst>(inst)) {
@@ -2196,7 +2205,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
     SmallVector<unsigned, 4> accessPath;
     auto *memoryObject = constVal.getAddressValue(accessPath);
     auto unknownValue = SymbolicValue::getUnknown(
-        inst->asSILNode(),
+        inst,
         UnknownReason::create(UnknownReason::MutatedByUnevaluatedInstruction),
         {}, evaluator.getAllocator());
 
@@ -2213,7 +2222,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
   for (auto result : inst->getResults()) {
     internalState->setValue(
         result, SymbolicValue::getUnknown(
-                    inst->asSILNode(),
+                    inst,
                     UnknownReason::create(
                         UnknownReason::ReturnedByUnevaluatedInstruction),
                     {}, evaluator.getAllocator()));
