@@ -596,3 +596,37 @@ bb8:
   return %res : $()
 }
 
+struct RecurStruct {
+  var val:NonTrivialStruct
+}
+
+// Test to make sure we do not crash on a use after free when the branch instructions in bb1 and bb2 are deleted
+// CHECK-LABEL: sil [ossa] @test_useafterfreeinrauw :
+// CHECK: bb0
+// CHECK: struct_extract
+// CHECK-NOT: struct_extract
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_useafterfreeinrauw'
+sil [ossa] @test_useafterfreeinrauw : $@convention(thin) (@guaranteed RecurStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $RecurStruct):
+  %1 = struct_extract %0 : $RecurStruct, #RecurStruct.val
+  debug_value %1 : $NonTrivialStruct
+  %2 = struct_extract %0 : $RecurStruct, #RecurStruct.val
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
+  %borrow3 = begin_borrow %3 : $Klass
+  br bb3(%borrow3 : $Klass)
+
+bb2:
+  %4 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
+  %borrow4 = begin_borrow %4 : $Klass
+  br bb3(%borrow4 : $Klass)
+
+bb3(%borrow : @guaranteed $Klass):
+  end_borrow %borrow : $Klass
+  %copy = copy_value %1 : $NonTrivialStruct
+  return %copy : $NonTrivialStruct 
+}
+

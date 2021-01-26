@@ -100,8 +100,8 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
 }
 
 static bool findTransitiveBorrowedUses(
-  SILValue value, SmallVectorImpl<Operand *> &usePoints,
-  SmallVectorImpl<BorrowingOperand> &reborrowPoints) {
+    SILValue value, SmallVectorImpl<Operand *> &usePoints,
+    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>> &reborrowPoints) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
 
   unsigned firstOffset = usePoints.size();
@@ -165,7 +165,9 @@ static bool findTransitiveBorrowedUses(
         [&](Operand *scopeEndingUse) {
           if (auto scopeEndingBorrowingOp = BorrowingOperand(scopeEndingUse)) {
             if (scopeEndingBorrowingOp.isReborrow()) {
-              reborrowPoints.push_back(scopeEndingUse);
+              auto *branch = scopeEndingUse->getUser();
+              reborrowPoints.push_back(
+                  {branch->getParent(), scopeEndingUse->getOperandNumber()});
               return true;
             }
           }
@@ -430,18 +432,20 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
 //===----------------------------------------------------------------------===//
 
 static void eliminateReborrowsOfRecursiveBorrows(
-    ArrayRef<BorrowingOperand> transitiveReborrows,
+    ArrayRef<std::pair<SILBasicBlock *, unsigned>> transitiveReborrows,
     SmallVectorImpl<Operand *> &usePoints, InstModCallbacks &callbacks) {
   SmallVector<std::pair<SILPhiArgument *, SILPhiArgument *>, 8>
       baseBorrowedValuePair;
   // Ok, we have transitive reborrows.
-  for (auto borrowingOperand : transitiveReborrows) {
+  for (auto it : transitiveReborrows) {
     // We eliminate the reborrow by creating a new copy+borrow at the reborrow
     // edge from the base value and using that for the reborrow instead of the
     // actual value. We of course insert an end_borrow for our original incoming
     // value.
+    auto *bi = cast<BranchInst>(it.first->getTerminator());
+    auto &op = bi->getOperandRef(it.second);
+    BorrowingOperand borrowingOperand(&op);
     SILValue value = borrowingOperand->get();
-    auto *bi = cast<BranchInst>(borrowingOperand->getUser());
     SILBuilderWithScope reborrowBuilder(bi);
     // Use an auto-generated location here, because the branch may have an
     // incompatible LocationKind
@@ -501,15 +505,19 @@ static void eliminateReborrowsOfRecursiveBorrows(
   }
 }
 
-static void rewriteReborrows(SILValue newBorrowedValue,
-                             ArrayRef<BorrowingOperand> foundReborrows,
-                             InstModCallbacks &callbacks) {
+static void
+rewriteReborrows(SILValue newBorrowedValue,
+                 ArrayRef<std::pair<SILBasicBlock *, unsigned>> foundReborrows,
+                 InstModCallbacks &callbacks) {
   // Each initial reborrow that we have is a use of oldValue, so we know
   // that copy should be valid at the reborrow.
   SmallVector<std::pair<SILPhiArgument *, SILPhiArgument *>, 8>
       baseBorrowedValuePair;
-  for (auto reborrow : foundReborrows) {
-    auto *bi = cast<BranchInst>(reborrow.op->getUser());
+  for (auto it : foundReborrows) {
+    auto *bi = cast<BranchInst>(it.first->getTerminator());
+    auto &op = bi->getOperandRef(it.second);
+    BorrowingOperand reborrow(&op);
+
     SILBuilderWithScope reborrowBuilder(bi);
     // Use an auto-generated location here, because the branch may have an
     // incompatible LocationKind
@@ -713,7 +721,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
   //    non-dominating copy value, allowing us to force our borrowing value to
   //    need a base phi argument (the one of our choosing).
   if (auto oldValueBorrowedVal = BorrowedValue::get(oldValue)) {
-    SmallVector<BorrowingOperand, 8> foundReborrows;
+    SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> foundReborrows;
     if (oldValueBorrowedVal.gatherReborrows(foundReborrows)) {
       rewriteReborrows(newBorrowedValue, foundReborrows, ctx.callbacks);
     }
