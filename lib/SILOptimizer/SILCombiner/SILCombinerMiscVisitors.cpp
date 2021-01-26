@@ -1644,40 +1644,49 @@ visitUnreachableInst(UnreachableInst *UI) {
 ///
 /// Also remove dead unchecked_take_enum_data_addr:
 ///   (destroy_addr (unchecked_take_enum_data_addr x)) -> (destroy_addr x)
-SILInstruction *
-SILCombiner::
-visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
-  if (TEDAI->getFunction()->hasOwnership())
-    return nullptr;
-
+SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
+    UncheckedTakeEnumDataAddrInst *tedai) {
   // If our TEDAI has no users, there is nothing to do.
-  if (TEDAI->use_empty())
+  if (tedai->use_empty())
     return nullptr;
 
   bool onlyLoads = true;
   bool onlyDestroys = true;
-  for (auto U : getNonDebugUses(TEDAI)) {
+  for (auto U : getNonDebugUses(tedai)) {
     // Check if it is load. If it is not a load, bail...
-    if (!isa<LoadInst>(U->getUser()))
+    if (!isa<LoadInst>(U->getUser()) && !isa<LoadBorrowInst>(U->getUser()))
       onlyLoads = false;
+
+    // If we have a load_borrow, perform an additional check that we do not have
+    // any reborrow uses. We do not handle reborrows in this optimization.
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(U->getUser())) {
+      // false if any consuming use is not an end_borrow.
+      for (auto *use : lbi->getConsumingUses()) {
+        if (!isa<EndBorrowInst>(use->getUser())) {
+          onlyLoads = false;
+          break;
+        }
+      }
+    }
+
     if (!isa<DestroyAddrInst>(U->getUser()))
       onlyDestroys = false;
   }
-  
+
   if (onlyDestroys) {
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
     // destroys with a destroy of its operand.
-    while (!TEDAI->use_empty()) {
-      Operand *use = *TEDAI->use_begin();
+    while (!tedai->use_empty()) {
+      Operand *use = *tedai->use_begin();
       SILInstruction *user = use->getUser();
       if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
-        dai->setOperand(TEDAI->getOperand());
+        dai->setOperand(tedai->getOperand());
       } else {
         assert(user->isDebugInstruction());
         eraseInstFromFunction(*user);
       }
     }
-    return eraseInstFromFunction(*TEDAI);
+    return eraseInstFromFunction(*tedai);
   }
 
   if (!onlyLoads)
@@ -1687,38 +1696,56 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
-  if (TEDAI->getOperand()->getType().isAddressOnly(*TEDAI->getFunction()))
+  if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
     return nullptr;
 
   // Grab the EnumAddr.
-  SILLocation Loc = TEDAI->getLoc();
-  Builder.setCurrentDebugScope(TEDAI->getDebugScope());
-  SILValue EnumAddr = TEDAI->getOperand();
-  EnumElementDecl *EnumElt = TEDAI->getElement();
-  SILType PayloadType = TEDAI->getType().getObjectType();
+  SILLocation loc = tedai->getLoc();
+  Builder.setCurrentDebugScope(tedai->getDebugScope());
+  SILValue enumAddr = tedai->getOperand();
+  EnumElementDecl *enumElt = tedai->getElement();
+  SILType payloadType = tedai->getType().getObjectType();
 
   // Go back through a second time now that we know all of our users are
   // loads. Perform the transformation on each load.
-  SmallVector<LoadInst*, 4> ToRemove;
-  for (auto U : getNonDebugUses(TEDAI)) {
-    // Grab the load.
-    LoadInst *L = cast<LoadInst>(U->getUser());
+  while (!tedai->use_empty()) {
+    auto *use = *tedai->use_begin();
+    auto *user = use->getUser();
+
+    // Delete debug insts.
+    if (user->isDebugInstruction()) {
+      eraseInstFromFunction(*user);
+      continue;
+    }
 
     // Insert a new Load of the enum and extract the data from that.
-    auto *Ld =
-        Builder.createLoad(Loc, EnumAddr, LoadOwnershipQualifier::Unqualified);
-    auto *D = Builder.createUncheckedEnumData(Loc, Ld, EnumElt, PayloadType);
+    auto *svi = cast<SingleValueInstruction>(user);
+    SILValue newValue;
+    if (auto *oldLoad = dyn_cast<LoadInst>(svi)) {
+      auto newLoad = Builder.emitLoadValueOperation(
+          loc, enumAddr, oldLoad->getOwnershipQualifier());
+      newValue =
+          Builder.createUncheckedEnumData(loc, newLoad, enumElt, payloadType);
+    } else if (auto *lbi = cast<LoadBorrowInst>(svi)) {
+      auto newLoad = Builder.emitLoadBorrowOperation(loc, enumAddr);
+      for (auto ui = lbi->consuming_use_begin(), ue = lbi->consuming_use_end();
+           ui != ue; ui = lbi->consuming_use_begin()) {
+        // We already checked that all of our uses here are end_borrow above.
+        assert(isa<EndBorrowInst>(ui->getUser()) &&
+               "Expected only end_borrow consuming uses");
+        ui->set(newLoad);
+      }
+      newValue =
+          Builder.createUncheckedEnumData(loc, newLoad, enumElt, payloadType);
+    }
+    assert(newValue);
 
     // Replace all uses of the old load with the data and erase the old load.
-    replaceInstUsesWith(*L, D);
-    ToRemove.push_back(L);
+    replaceInstUsesWith(*svi, newValue);
+    eraseInstFromFunction(*svi);
   }
 
-  for (auto *LD : ToRemove) {
-    eraseInstFromFunction(*LD);
-  }
-
-  return eraseInstFromFunction(*TEDAI);
+  return eraseInstFromFunction(*tedai);
 }
 
 SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {

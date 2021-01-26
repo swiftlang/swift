@@ -1592,9 +1592,9 @@ bb0(%0 : @owned $E):
 // CHECK-NEXT: switch_enum [[BORROW]]
 // CHECK: bb1([[GUARANTEED:%.*]] : @guaranteed
 // CHECK-NEXT: end_borrow [[BORROW]]
-// XHECK-NEXT: load
-// XHECK-NEXT: unchecked_enum_data
-// XHECK-NEXT: return
+// CHECK-NEXT: load [copy]
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: return
 // CHECK: } /
 sil [ossa] @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> @owned B {
 bb0(%0 : $*FakeOptional<B>):
@@ -1917,11 +1917,12 @@ bb1:
   return %1a : $FakeOptional<Builtin.NativeObject>
 }
 
-// CHECK-LABEL: sil [ossa] @dead_unchecked_take_enum_data_addr
-// XHECK:      bb0(%0 : $*AddressOnlyEnum):
-// XHECK-NEXT:   destroy_addr %0
-// XHECK-NEXT:   tuple
-// XHECK-NEXT:   return
+// CHECK-LABEL: sil [ossa] @dead_unchecked_take_enum_data_addr :
+// CHECK:      bb0(%0 : $*AddressOnlyEnum):
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'dead_unchecked_take_enum_data_addr'
 sil [ossa] @dead_unchecked_take_enum_data_addr : $@convention(thin) (@in AddressOnlyEnum) -> () {
 bb0(%0 : $*AddressOnlyEnum):
   %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt
@@ -4633,5 +4634,37 @@ bb0(%0 : @owned $E):
   destroy_value %2 : $Builtin.NativeObject
   %res = tuple ()
   return %res : $()
+}
+
+// Make sure we optimize this and do not put the end_borrow on the
+// unchecked_enum_data and thus have the verifier hit us.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_load_borrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: unchecked_enum_data
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_load_borrow'
+sil [ossa] @unchecked_take_enum_data_addr_load_borrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
+bb0(%0 : $*Optional<Builtin.NativeObject>):
+  %1 = unchecked_take_enum_data_addr %0 : $*Optional<Builtin.NativeObject>, #Optional.some!enumelt
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  %3 = copy_value %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_load_borrow_no_reborrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
+// CHECK: unchecked_take_enum_data_addr
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_load_borrow_no_reborrow'
+sil [ossa] @unchecked_take_enum_data_addr_load_borrow_no_reborrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
+bb0(%0 : $*Optional<Builtin.NativeObject>):
+  %1 = unchecked_take_enum_data_addr %0 : $*Optional<Builtin.NativeObject>, #Optional.some!enumelt
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  br bb1(%2 : $Builtin.NativeObject)
+
+bb1(%2a : @guaranteed $Builtin.NativeObject):
+  %3 = copy_value %2a : $Builtin.NativeObject
+  end_borrow %2a : $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
 }
 
