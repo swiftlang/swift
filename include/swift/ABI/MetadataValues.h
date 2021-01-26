@@ -1172,6 +1172,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
   const uint16_t EscalationNotificationFunction = 0x5be4; // = 23524
+
+  /// Swift async context parameter stored in the extended frame info.
+  const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a;
 }
 
 /// The number of arguments that will be passed directly to a generic

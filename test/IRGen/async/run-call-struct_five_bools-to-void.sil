@@ -43,7 +43,7 @@ entry(%pack : $Pack):
 // Defined in _Concurrency
 sil public_external @swift_task_runAndBlockThread : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> ()) -> ()
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_case(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_case(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
 sil @test_case : $@async @convention(thin) () -> () {
   
   %a_literal = integer_literal $Builtin.Int1, -1

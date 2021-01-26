@@ -51,6 +51,10 @@ public:
     return ObjCHasOpaqueISAs;
   }
 
+  bool canUseSwiftAsyncContextAddrIntrinsic() const {
+    return UsableSwiftAsyncContextAddrIntrinsic;
+  }
+
   /// The target's object format type.
   llvm::Triple::ObjectFormatType OutputObjectFormat;
   
@@ -104,6 +108,8 @@ public:
   /// True if `swift_retain` and `swift_release` are no-ops when passed
   /// "negative" pointer values.
   bool SwiftRetainIgnoresNegativeValues = false;
+
+  bool UsableSwiftAsyncContextAddrIntrinsic = false;
 };
 
 }

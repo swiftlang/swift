@@ -176,6 +176,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_INDIRECT_RESULT
 #endif
 
+#if __has_attribute(swift_async_context)
+#define SWIFT_ASYNC_CONTEXT __attribute__((swift_async_context))
+#else
+#define SWIFT_ASYNC_CONTEXT
+#endif
+
 // SWIFT_CC(swiftasync) is the Swift async calling convention.
 // We assume that it supports mandatory tail call elimination.
 #if __has_attribute(swiftasynccall)

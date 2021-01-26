@@ -311,6 +311,44 @@ public:
   void cacheResult(bool value) const;
 };
 
+class ProtocolRethrowsRequirementsRequest :
+    public SimpleRequest<ProtocolRethrowsRequirementsRequest,
+                         ProtocolRethrowsRequirementList(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ProtocolRethrowsRequirementList 
+  evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class ProtocolConformanceRefClassifyAsThrowsRequest : 
+    public SimpleRequest<ProtocolConformanceRefClassifyAsThrowsRequest,
+                         bool(ProtocolConformanceRef),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool 
+  evaluate(Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
@@ -733,6 +771,26 @@ public:
 void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
 
 void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
+
+class FunctionRethrowingKindRequest :
+    public SimpleRequest<FunctionRethrowingKindRequest,
+                         FunctionRethrowingKind(AbstractFunctionDecl*),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FunctionRethrowingKind evaluate(Evaluator &evaluator, AbstractFunctionDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, FunctionRethrowingKind value);
 
 /// Request the custom attribute which attaches a result builder to the
 /// given declaration.

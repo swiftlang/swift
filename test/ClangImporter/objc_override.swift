@@ -114,6 +114,10 @@ class MyHashableNSObject: NSObject {
     // expected-error@-1 {{'NSObject.hashValue' is not overridable; did you mean to override 'NSObject.hash'?}}
     return 0
   }
+
+  override func hash(into hasher: inout Hasher) {
+    // expected-error@-1 {{`NSObject.hash(into:)` is not overridable; subclasses can customize hashing by overriding the `hash` property}}
+  }
 }
 
 // rdar://problem/47557376

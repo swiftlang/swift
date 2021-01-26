@@ -188,7 +188,8 @@ class DCE : public SILFunctionTransform {
   void computeMinPredecessorLevels(PostDomTreeNode *root);
   void insertControllingInfo(SILBasicBlock *Block, unsigned Level);
 
-  void markValueLive(SILNode *V);
+  void markValueLive(SILValue V);
+  void markInstructionLive(SILInstruction *Inst);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
@@ -208,30 +209,28 @@ class DCE : public SILFunctionTransform {
 
 // Keep track of the fact that V is live and add it to our worklist
 // so that we can process the values it depends on.
-void DCE::markValueLive(SILNode *V) {
-  V = V->getRepresentativeSILNodeInObject();
-  if (LiveValues.count(V) || isa<SILUndef>(V))
+void DCE::markValueLive(SILValue V) {
+  if (SILInstruction *inst = V->getDefiningInstruction())
+    return markInstructionLive(inst);
+
+  if (!LiveValues.insert(V).second || isa<SILUndef>(V))
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "Marking as live:\n");
-  LLVM_DEBUG(V->dump());
-
-  LiveValues.insert(V);
-
-  if (auto *Def = dyn_cast<SILInstruction>(V)) {
-    markControllingTerminatorsLive(Def->getParent());
-    Worklist.push_back(Def);
-    return;
-  }
-
-  // TODO: MultiValueInstruction
-
-  assert(isa<SILArgument>(V) &&
-         "Only expected instructions and arguments!");
+  LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *V);
 
   auto *Arg = cast<SILArgument>(V);
   markControllingTerminatorsLive(Arg->getParent());
   propagateLiveBlockArgument(Arg);
+}
+
+void DCE::markInstructionLive(SILInstruction *Inst) {
+  if (!LiveValues.insert(Inst->asSILNode()).second)
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
+
+  markControllingTerminatorsLive(Inst->getParent());
+  Worklist.push_back(Inst);
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
@@ -263,7 +262,7 @@ void DCE::markLive(SILFunction &F) {
         if (auto *Prod = getProducer(cast<CondFailInst>(&I))) {
           addReverseDependency(Prod, &I);
         } else {
-          markValueLive(&I);
+          markInstructionLive(&I);
         }
         break;
       }
@@ -272,7 +271,7 @@ void DCE::markLive(SILFunction &F) {
         if (!Op->getType().isAddress()) {
           addReverseDependency(Op, &I);
         } else {
-          markValueLive(&I);
+          markInstructionLive(&I);
         }
         break;
       }
@@ -290,7 +289,7 @@ void DCE::markLive(SILFunction &F) {
       }
       default:
         if (seemsUseful(&I))
-          markValueLive(&I);
+          markInstructionLive(&I);
       }
     }
   }
@@ -319,7 +318,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
   // If the arguments are live, we need to keep the terminator that
   // delivers those arguments.
-  markValueLive(Term);
+  markInstructionLive(Term);
 
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
@@ -380,11 +379,11 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   // is in reverse direction: Only if its definition (the Arg) is alive, also
   // the debug_value instruction is alive.
   for (Operand *DU : getDebugUses(Arg))
-    markValueLive(DU->getUser());
+    markInstructionLive(DU->getUser());
 
   // Mark all reverse dependencies on the Arg live
   for (auto *depInst : ReverseDependencies.lookup(Arg)) {
-    markValueLive(depInst);
+    markInstructionLive(depInst);
   }
 
   auto *Block = Arg->getParent();
@@ -406,14 +405,14 @@ void DCE::propagateLiveness(SILInstruction *I) {
     // debug_value instruction is alive.
     for (auto result : I->getResults())
       for (Operand *DU : getDebugUses(result))
-        markValueLive(DU->getUser());
+        markInstructionLive(DU->getUser());
 
     // Handle all other reverse-dependency instructions, like cond_fail,
     // fix_lifetime, destroy_value, etc. Only if the definition is alive, the
     // user itself is alive.
     for (auto res : I->getResults()) {
       for (auto *depInst : ReverseDependencies.lookup(res)) {
-        markValueLive(depInst);
+        markInstructionLive(depInst);
       }
     }
     return;
@@ -493,7 +492,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
 }
 
 void DCE::endLifetimeOfLiveValue(SILValue value, SILInstruction *insertPt) {
-  if (!LiveValues.count(value->getRepresentativeSILNodeInObject())) {
+  if (!LiveValues.count(value)) {
     return;
   }
   SILBuilderWithScope builder(insertPt);
@@ -540,7 +539,7 @@ bool DCE::removeDead(SILFunction &F) {
           auto insertPt = getInsertAfterPoint(arg).getValue();
           SILBuilderWithScope builder(insertPt);
           auto *destroy = builder.createDestroyValue(insertPt->getLoc(), arg);
-          LiveValues.insert(destroy->getRepresentativeSILNodeInObject());
+          LiveValues.insert(destroy->asSILNode());
         }
         i++;
         Changed = true;
@@ -552,13 +551,12 @@ bool DCE::removeDead(SILFunction &F) {
       // This is not necessary in non-OSSA, and will infact be incorrect.
       // Because, passing a value as a phi argument does not imply end of
       // lifetime in non-OSSA.
-      BB.eraseArgument(i);
       for (auto *pred : BB.getPredecessorBlocks()) {
         auto *predTerm = pred->getTerminator();
         auto predArg = predTerm->getAllOperands()[i].get();
         endLifetimeOfLiveValue(predArg, predTerm);
-        deleteEdgeValue(pred->getTerminator(), &BB, i);
       }
+      erasePhiArgument(&BB, i);
       Changed = true;
       BranchesChanged = true;
     }
@@ -566,7 +564,7 @@ bool DCE::removeDead(SILFunction &F) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto *Inst = &*I;
       ++I;
-      if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
+      if (LiveValues.count(Inst->asSILNode()) || isa<BranchInst>(Inst))
         continue;
 
       // We want to replace dead terminators with unconditional branches to
@@ -802,7 +800,7 @@ void DCE::markControllingTerminatorsLive(SILBasicBlock *Block) {
   collectControllingBlocks(Block, ControllingBlocks);
 
   for (auto BB : ControllingBlocks)
-    markValueLive(BB->getTerminator());
+    markInstructionLive(BB->getTerminator());
 }
 
 } // end anonymous namespace

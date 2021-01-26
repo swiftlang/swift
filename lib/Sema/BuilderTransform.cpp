@@ -774,7 +774,8 @@ protected:
     // take care of this.
     auto sequenceProto = TypeChecker::getProtocol(
         dc->getASTContext(), forEachStmt->getForLoc(),
-        KnownProtocolKind::Sequence);
+        forEachStmt->getAwaitLoc().isValid() ? 
+          KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
     if (!sequenceProto) {
       if (!unhandledNode)
         unhandledNode = forEachStmt;

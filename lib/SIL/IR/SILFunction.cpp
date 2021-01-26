@@ -246,10 +246,10 @@ void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
     for (auto &I : BB) {
       auto results = I.getResults();
       if (results.empty()) {
-        ValueToNumberMap[&I] = idx++;
+        ValueToNumberMap[I.asSILNode()] = idx++;
       } else {
         // Assign the instruction node the first result ID.
-        ValueToNumberMap[&I] = idx;
+        ValueToNumberMap[I.asSILNode()] = idx;
         for (auto result : results) {
           ValueToNumberMap[result] = idx++;
         }

@@ -12,7 +12,6 @@ class Foo: NSObject {
   }
 
   override func hash(into hasher: inout Hasher) {
-    // expected-error@-1 {{overriding non-open instance method outside of its defining module}}
-    // expected-error@-2 {{overriding declarations in extensions is not supported}}
+    // expected-error@-1 {{`NSObject.hash(into:)` is not overridable; subclasses can customize hashing by overriding the `hash` property}}
   }
 }

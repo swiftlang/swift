@@ -8,7 +8,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: define hidden swiftcc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* %2)
+// CHECK-LABEL: define hidden swiftcc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
 sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
 bb0:
   // CHECK: [[TASKLOC:%.*]] = alloca %swift.task*
