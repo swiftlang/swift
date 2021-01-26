@@ -19,7 +19,7 @@ public func use_global() -> Int {
 // i386-LABEL: {{_?}}$s4main10use_globalSiyF:
 // i386:       [[PIC_BLOCK:^L.*\$pb]]:{{$}}
 // i386:         popl [[PIC_REG:%[a-z]+]]
-// i386:         movl {{_?}}$s4main6globalSivp-[[PIC_BLOCK]]([[PIC_REG]]), {{%[a-z]+}}
+// i386:         leal {{_?}}$s4main6globalSivp-[[PIC_BLOCK]]([[PIC_REG]]), {{%[a-z]+}}
 
 // armv7-LABEL: {{_?}}$s4main10use_globalSiyF:
 // Check for the runtime memory enforcement call. The global address may be
