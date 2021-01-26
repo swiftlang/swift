@@ -790,6 +790,8 @@ ERROR(protocol_method_argument_init,none,
       "default argument not permitted in a protocol method", ())
 ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
+ERROR(protocol_subscript_argument_init,none,
+      "default argument not permitted in a protocol subscript", ())
 ERROR(tuple_type_multiple_labels,none,
       "tuple element cannot have two labels", ())
 

@@ -7366,6 +7366,12 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
+  // Protocol requirement arguments may not have default values.
+  if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
+    diagnose(SubscriptLoc, diag::protocol_subscript_argument_init);
+    return nullptr;
+  }
+
   // Build an AST for the subscript declaration.
   DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
                            argumentNames);
