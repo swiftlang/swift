@@ -241,8 +241,11 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   if (oldValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
     // Check that the old lifetime can be extended and record the necessary
     // book-keeping in the OwnershipFixupContext.
-    return findTransitiveBorrowedUses(oldValue, context.transitiveBorrowedUses,
-                                      context.recursiveReborrows);
+    if (!findTransitiveBorrowedUses(oldValue, context.transitiveBorrowedUses,
+                                    context.recursiveReborrows)) {
+      context.clear();
+      return false;
+    }
   }
   return true;
 }
