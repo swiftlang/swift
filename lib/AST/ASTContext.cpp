@@ -206,9 +206,6 @@ struct ASTContext::Implementation {
   /// The declaration of 'Sequence.makeIterator()'.
   FuncDecl *MakeIterator = nullptr;
 
-  /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
-  FuncDecl *MakeAsyncIterator = nullptr;
-
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -775,31 +772,6 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getAsyncSequenceMakeAsyncIterator() const {
-  if (getImpl().MakeAsyncIterator) {
-    return getImpl().MakeAsyncIterator;
-  }
-
-  auto proto = getProtocol(KnownProtocolKind::AsyncSequence);
-  if (!proto)
-    return nullptr;
-
-  for (auto result : proto->lookupDirect(Id_makeAsyncIterator)) {
-    if (result->getDeclContext() != proto)
-      continue;
-
-    if (auto func = dyn_cast<FuncDecl>(result)) {
-      if (func->getParameters()->size() != 0)
-        continue;
-
-      getImpl().MakeAsyncIterator = func;
-      return func;
-    }
-  }
-
-  return nullptr;
-}
-
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \
     if (getImpl().NAME##Decl) \
@@ -971,8 +943,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Differentiation);
     break;
   case KnownProtocolKind::Actor:
-  case KnownProtocolKind::AsyncSequence:
-  case KnownProtocolKind::AsyncIteratorProtocol:
     M = getLoadedModule(Id_Concurrency);
     break;
   default:

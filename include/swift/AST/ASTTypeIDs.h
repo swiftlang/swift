@@ -64,8 +64,6 @@ class ProtocolDecl;
 class Requirement;
 enum class ResilienceExpansion : unsigned;
 struct FragileFunctionKind;
-enum class FunctionRethrowingKind : uint8_t;
-class ProtocolRethrowsRequirementList;
 class SourceFile;
 class SymbolSourceMap;
 struct TangentPropertyInfo;

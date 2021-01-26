@@ -522,9 +522,6 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
-  /// Get AsyncSequence.makeAsyncIterator().
-  FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
-
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///

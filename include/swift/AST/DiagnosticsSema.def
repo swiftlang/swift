@@ -2983,8 +2983,6 @@ ERROR(override_rethrows_with_non_rethrows,none,
       "be 'rethrows'", (bool))
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
-ERROR(rethrows_attr_on_non_protocol,none,
-      "@rethrows may only be used on 'protocol' declarations", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
@@ -4061,8 +4059,6 @@ NOTE(because_rethrows_argument_throws,none,
 NOTE(because_rethrows_default_argument_throws,none,
      "call is to 'rethrows' function, but a defaulted argument function"
      " can throw", ())
-NOTE(because_rethrows_default_conformance_throws,none,
-     "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "call can throw, but it is executed in a non-throwing "

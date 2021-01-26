@@ -22,7 +22,6 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 
@@ -45,44 +44,33 @@ private:
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
   unsigned ParamCount : 2;
-  FunctionRethrowingKind rethrowingKind;
-  ConcreteDeclRef declRef;
 
 public:
-  explicit AbstractFunction(Kind kind, Expr *fn, ConcreteDeclRef declRef)
+  explicit AbstractFunction(Kind kind, Expr *fn)
     : TheKind(kind),
       IsRethrows(false),
-      ParamCount(1),
-      rethrowingKind(FunctionRethrowingKind::Invalid),
-      declRef(declRef) {
+      ParamCount(1) {
     TheExpr = fn;
   }
 
-  explicit AbstractFunction(AbstractFunctionDecl *fn, ConcreteDeclRef declRef)
+  explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->getNumCurryLevels()),
-      rethrowingKind(fn->getRethrowingKind()),
-      declRef(declRef) {
+      ParamCount(fn->getNumCurryLevels()) {
     TheFunction = fn;
   }
 
-  explicit AbstractFunction(AbstractClosureExpr *closure, 
-                            ConcreteDeclRef declRef)
+  explicit AbstractFunction(AbstractClosureExpr *closure)
     : TheKind(Kind::Closure),
       IsRethrows(false),
-      ParamCount(1),
-      rethrowingKind(FunctionRethrowingKind::Invalid),
-      declRef(declRef) {
+      ParamCount(1) {
     TheClosure = closure;
   }
 
-  explicit AbstractFunction(ParamDecl *parameter, ConcreteDeclRef declRef)
+  explicit AbstractFunction(ParamDecl *parameter)
     : TheKind(Kind::Parameter),
       IsRethrows(false),
-      ParamCount(1),
-      rethrowingKind(FunctionRethrowingKind::Invalid),
-      declRef(declRef) {
+      ParamCount(1) {
     TheParameter = parameter;
   }
 
@@ -90,8 +78,6 @@ public:
 
   /// Whether the function is marked 'rethrows'.
   bool isBodyRethrows() const { return IsRethrows; }
-
-  FunctionRethrowingKind getRethrowingKind() const { return rethrowingKind; }
 
   unsigned getNumArgumentsForFullApply() const {
     return ParamCount;
@@ -130,29 +116,18 @@ public:
     return TheExpr;
   }
 
-  ConcreteDeclRef getDeclRef() {
-    return declRef;
-  }
-
   static AbstractFunction decomposeApply(ApplyExpr *apply,
                                          SmallVectorImpl<Expr*> &args) {
     Expr *fn;
-    ConcreteDeclRef declRef;
     do {
       args.push_back(apply->getArg());
-      auto applyFn = apply->getFn();
-      if (!declRef) {
-        if (auto DRE = dyn_cast<DeclRefExpr>(applyFn)) {
-          declRef = DRE->getDeclRef();
-        }
-      }
-      fn = applyFn->getValueProvidingExpr();
+      fn = apply->getFn()->getValueProvidingExpr();
     } while ((apply = dyn_cast<ApplyExpr>(fn)));
 
-    return decomposeFunction(fn, declRef);
+    return decomposeFunction(fn);
   }
 
-  static AbstractFunction decomposeFunction(Expr *fn, ConcreteDeclRef declRef = ConcreteDeclRef()) {
+  static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
     while (true) {
@@ -183,25 +158,25 @@ public:
     
     // Constructor delegation.
     if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      return AbstractFunction(otherCtorDeclRef->getDecl(), declRef);
+      return AbstractFunction(otherCtorDeclRef->getDecl());
     }
 
     // Normal function references.
-    if (auto DRE = dyn_cast<DeclRefExpr>(fn)) {
-      ValueDecl *decl = DRE->getDecl();
+    if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
+      ValueDecl *decl = declRef->getDecl();
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-        return AbstractFunction(fn, declRef);
+        return AbstractFunction(fn);
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
-        return AbstractFunction(param, declRef);
+        return AbstractFunction(param);
       }
 
     // Closures.
     } else if (auto closure = dyn_cast<AbstractClosureExpr>(fn)) {
-      return AbstractFunction(closure, declRef);
+      return AbstractFunction(closure);
     }
 
     // Everything else is opaque.
-    return AbstractFunction(Kind::Opaque, fn, declRef);
+    return AbstractFunction(Kind::Opaque, fn);
   }
 };
 
@@ -269,8 +244,6 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
-    } else if (auto forEach = dyn_cast<ForEachStmt>(S)) {
-      recurse = asImpl().checkForEach(forEach);
     }
     return {bool(recurse), S};
   }
@@ -283,10 +256,6 @@ public:
       asImpl().checkCatch(clause, bodyResult);
     }
     return ShouldNotRecurse;
-  }
-
-  ShouldRecurse_t checkForEach(ForEachStmt *S) {
-    return ShouldRecurse;
   }
 };
 
@@ -310,10 +279,6 @@ public:
     /// The function is 'rethrows', and it was passed a default
     /// argument that was not rethrowing-only in this context.
     CallRethrowsWithDefaultThrowingArgument,
-
-    /// The the function is 'rethrows', and it is a member that
-    /// is a conformance to a rethrowing protocol.
-    CallRethrowsWithConformance,
   };
 
   static StringRef kindToString(Kind k) {
@@ -325,8 +290,6 @@ public:
         return "CallRethrowsWithExplicitThrowingArgument";
       case Kind::CallRethrowsWithDefaultThrowingArgument: 
         return "CallRethrowsWithDefaultThrowingArgument";
-      case Kind::CallRethrowsWithConformance:
-        return "CallRethrowsWithConformance";
     }
   }
 
@@ -344,11 +307,6 @@ public:
   static PotentialThrowReason forDefaultArgument() {
     return PotentialThrowReason(Kind::CallRethrowsWithDefaultThrowingArgument);
   }
-  static PotentialThrowReason forRethrowsConformance(Expr *E) {
-    PotentialThrowReason result(Kind::CallRethrowsWithConformance);
-    result.TheExpression = E;
-    return result;
-  }
   static PotentialThrowReason forThrowingApply() {
     return PotentialThrowReason(Kind::CallThrows);
   }
@@ -365,8 +323,7 @@ public:
   bool isThrow() const { return getKind() == Kind::Throw; }
   bool isRethrowsCall() const {
     return (getKind() == Kind::CallRethrowsWithExplicitThrowingArgument ||
-            getKind() == Kind::CallRethrowsWithDefaultThrowingArgument ||
-            getKind() == Kind::CallRethrowsWithConformance);
+            getKind() == Kind::CallRethrowsWithDefaultThrowingArgument);
   }
 
   /// If this was built with forRethrowsArgument, return the expression.
@@ -507,6 +464,11 @@ public:
     if (!fnType) return Classification::forInvalidCode();
 
     bool isAsync = fnType->isAsync() || E->implicitlyAsync();
+    
+    // If the function doesn't throw at all, we're done here.
+    if (!fnType->isThrowing())
+      return isAsync ? Classification::forAsync() : Classification();
+
     // Decompose the application.
     SmallVector<Expr*, 4> args;
     auto fnRef = AbstractFunction::decomposeApply(E, args);
@@ -515,34 +477,6 @@ public:
     for (auto arg : args) {
       if (!arg->getType() || arg->getType()->hasError())
         return Classification::forInvalidCode();
-    }
-
-    if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
-      auto substitutions = fnRef.getDeclRef().getSubstitutions();
-      bool classifiedAsThrows = false;
-      for (auto conformanceRef : substitutions.getConformances()) {
-        if (conformanceRef.classifyAsThrows()) {
-          classifiedAsThrows = true;
-          break;
-        }
-      }
-
-      if (classifiedAsThrows) {
-        return Classification::forRethrowingOnly(
-          PotentialThrowReason::forRethrowsConformance(E), isAsync);
-      }
-    } else if (fnRef.isBodyRethrows() && 
-               fnRef.getRethrowingKind() == FunctionRethrowingKind::Throws) {
-      return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
-                                      isAsync);
-    } else if (fnRef.isBodyRethrows() &&
-               fnRef.getRethrowingKind() == FunctionRethrowingKind::None) {
-      return isAsync ? Classification::forAsync() : Classification();
-    }
-
-    // If the function doesn't throw at all, we're done here.
-    if (!fnType->isThrowing()) {
-      return isAsync ? Classification::forAsync() : Classification();
     }
 
     // If we're applying more arguments than the natural argument
@@ -1032,7 +966,7 @@ public:
     if (!fn)
       return false;
 
-    return fn->getRethrowingKind() == FunctionRethrowingKind::ByClosure;
+    return fn->getAttrs().hasAttribute<RethrowsAttr>();
   }
 
   /// Whether this is an autoclosure.
@@ -1207,9 +1141,6 @@ public:
       return;
     case PotentialThrowReason::Kind::CallRethrowsWithDefaultThrowingArgument:
       Diags.diagnose(loc, diag::because_rethrows_default_argument_throws);
-      return;
-    case PotentialThrowReason::Kind::CallRethrowsWithConformance:
-      Diags.diagnose(loc, diag::because_rethrows_default_conformance_throws);
       return;
     }
     llvm_unreachable("bad reason kind");
@@ -2087,16 +2018,6 @@ private:
 
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
-  }
-
-  ShouldRecurse_t checkForEach(ForEachStmt *S) {
-    if (S->getTryLoc().isValid() && 
-        !Flags.has(ContextFlags::IsTryCovered)) {
-      checkThrowAsyncSite(S, /*requiresTry*/ false,
-                        Classification::forThrow(PotentialThrowReason::forThrow(),
-                                                 /*async*/false));
-    }
-    return ShouldRecurse;
   }
 };
 

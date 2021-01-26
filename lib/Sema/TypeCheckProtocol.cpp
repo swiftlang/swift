@@ -558,25 +558,12 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::MutatingConflict);
 
     // If the requirement is rethrows, the witness must either be
-    // rethrows or be non-throwing if the requirement is not by conformance
-    // else the witness can be by conformance, throwing or non throwing
+    // rethrows or be non-throwing.
     if (reqAttrs.hasAttribute<RethrowsAttr>() &&
-        !witnessAttrs.hasAttribute<RethrowsAttr>()) {
-      auto reqRethrowingKind = funcReq->getRethrowingKind();
-      auto witnessRethrowingKind = funcWitness->getRethrowingKind();
-      if (reqRethrowingKind == FunctionRethrowingKind::ByConformance) {
-        switch (witnessRethrowingKind) {
-        case FunctionRethrowingKind::ByConformance:
-        case FunctionRethrowingKind::Throws:
-        case FunctionRethrowingKind::None:
-          break;
-        default:
-          return RequirementMatch(witness, MatchKind::RethrowsConflict);
-        }
-      } else if (cast<AbstractFunctionDecl>(witness)->hasThrows()) {
-        return RequirementMatch(witness, MatchKind::RethrowsConflict);
-      }
-    }
+        !witnessAttrs.hasAttribute<RethrowsAttr>() &&
+        cast<AbstractFunctionDecl>(witness)->hasThrows())
+      return RequirementMatch(witness, MatchKind::RethrowsConflict);
+
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {

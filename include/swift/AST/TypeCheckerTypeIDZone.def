@@ -211,8 +211,6 @@ SWIFT_REQUEST(TypeChecker, RequiresOpaqueModifyCoroutineRequest,
               bool(AbstractStorageDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, FragileFunctionKindRequest,
               FragileFunctionKind(DeclContext *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, FunctionRethrowingKindRequest,
-              FunctionRethrowingKind(AbstractFunctionDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SelfAccessKindRequest, SelfAccessKind(FuncDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest,
@@ -267,12 +265,6 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
               Type(ProtocolDecl *, TypeEraserAttr *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ProtocolRethrowsRequirementsRequest,
-              ProtocolRethrowsRequirementList(ProtocolDecl *), 
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ProtocolConformanceRefClassifyAsThrowsRequest,
-              bool(ProtocolConformanceRef), 
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
               Type (const TypeResolution *, TypeRepr *, GenericParamList *),
               Uncached, NoLocationInfo)
