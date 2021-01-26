@@ -21,6 +21,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -436,6 +437,17 @@ private:
 
   bool hasOwnership() const {
     return Builder.hasOwnership();
+  }
+
+  /// Gets access to the joint post dominance computer and clears it after \p
+  /// callback.
+  template <typename ResultTy>
+  ResultTy withJointPostDomComputer(
+      function_ref<ResultTy(JointPostDominanceSetComputer &)> callback) {
+    // Make sure we clear the joint post dom computer after callback.
+    SWIFT_DEFER { jPostDomComputer.clear(); };
+    // Then return callback passing in the computer.
+    return callback(jPostDomComputer);
   }
 };
 
