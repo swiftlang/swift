@@ -8953,7 +8953,12 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  
+  // If we're in concurrency mode, mark the constant as @actorIndependent
+  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
+    auto actorIndependentAttr = new (C) ActorIndependentAttr(SourceLoc(),
+        SourceRange(), ActorIndependentKind::Safe);
+    var->getAttrs().add(actorIndependentAttr);
+  }
   // Set the function up as the getter.
   makeComputed(var, func, nullptr);
 

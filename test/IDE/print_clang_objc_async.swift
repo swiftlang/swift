@@ -42,3 +42,5 @@ import _Concurrency
 // CHECK-NEXT: @MainActor func mainActorMethod()
 // CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
+
+// CHECK: @actorIndependent var MAGIC_NUMBER: Int32 { get }
