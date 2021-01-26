@@ -82,6 +82,9 @@ namespace swift {
     /// The target variant SDK version, if known.
     Optional<llvm::VersionTuple> VariantSDKVersion;
 
+    /// The alternate name to use for the entry point instead of main.
+    std::string entryPointFunctionName = "main";
+
     ///
     /// Language features
     ///

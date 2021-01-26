@@ -1151,6 +1151,10 @@ public:
   /// standard library's String implementation.
   bool isASCIIString(StringRef s) const;
 
+  /// Retrieve the name of to be used for the entry point, either main or an
+  /// alternative specified via the -entry-point-function-name frontend flag.
+  std::string getEntryPointFunctionName() const;
+
 private:
   friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);

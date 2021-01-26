@@ -733,6 +733,9 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
 
+def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">, 
+    HelpText<"Name of the entry point function">;
+
 def target_sdk_version : Separate<["-"], "target-sdk-version">,
   HelpText<"The version of target SDK used for compilation">;
 

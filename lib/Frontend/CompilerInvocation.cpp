@@ -661,6 +661,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
+    Opts.entryPointFunctionName = A->getValue();
+  }
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
