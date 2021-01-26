@@ -1614,9 +1614,6 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 SILInstruction *
 SILCombiner::
 visitUnreachableInst(UnreachableInst *UI) {
-  if (UI->getFunction()->hasOwnership())
-    return nullptr;
-
   // Make sure that this unreachable instruction
   // is the last instruction in the basic block.
   if (UI->getParent()->getTerminator() == UI)
