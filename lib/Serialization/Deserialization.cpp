@@ -5358,7 +5358,7 @@ public:
       if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
         auto clangImporter = static_cast<ClangImporter *>(nominal->getASTContext().getClangModuleLoader());
 
-        SmallVector<Type, 2> typesOfgenericArgs;
+        SmallVector<Type, 2> typesOfGenericArgs;
         for (auto arg : genericArgs) {
           typesOfgenericArgs.push_back(arg);
         }
