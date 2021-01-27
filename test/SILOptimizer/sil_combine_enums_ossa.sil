@@ -20,10 +20,10 @@ enum Numerals {
 
 sil [ossa] @external_func: $@convention(thin) () -> ()
 
-// CHECK-LABEL: eliminate_sw_enum_addr
-// XHECK-NOT: switch_enum_addr
-// XHECK: switch_enum
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
+// CHECK-NOT: switch_enum_addr
+// CHECK: switch_enum {{%.*}} :
+// CHECK: } // end sil function 'eliminate_sw_enum_addr'
 sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>, var, name "x" // users: %2, %4, %5, %17, %19
@@ -106,9 +106,9 @@ enum E {
 }
 
 // CHECK-LABEL: sil [ossa] @canonicalize_select_enum
-// XHECK: select_enum {{.*}} case #E.E2!enumelt:
-// XHECK: return
-
+// CHECK: select_enum {{.*}} case #E.E2!enumelt:
+// CHECK: return
+// CHECK: } // end sil function 'canonicalize_select_enum'
 sil [ossa] @canonicalize_select_enum : $@convention(thin) (E) -> Int32 {
 bb0(%0 : $E):
   %1 = integer_literal $Builtin.Int32, 0

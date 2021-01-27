@@ -21,10 +21,10 @@ class XImpl : X {
 // (thick_to_objc_metatype (metatype @thick)) -> (metatype @objc_metatype)
 //
 // CHECK-LABEL: sil [ossa] @_TF31peephole_thick_to_objc_metatype36test_thick_to_objc_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @owned AnyObject
-// XHECK-NOT: metatype $@thick
-// XHECK-NOT: {{thick_to_objc_metatype }}
-// XHECK: metatype $@objc_metatype
-// XHECK: return
+// CHECK-NOT: metatype $@thick
+// CHECK-NOT: {{thick_to_objc_metatype }}
+// CHECK: metatype $@objc_metatype
+// CHECK: return
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_metatype () -> Swift.AnyObject
 sil [ossa] @_TF31peephole_thick_to_objc_metatype36test_thick_to_objc_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @owned AnyObject {
 bb0:
@@ -37,10 +37,10 @@ bb0:
 // (thick_to_objc_metatype (existential_metatype @thick)) -> (existential_metatype @objc_metatype)
 //
 // CHECK-LABEL: sil [ossa] @_TF31peephole_thick_to_objc_metatype48test_thick_to_objc_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @owned AnyObject
-// XHECK-NOT: existential_metatype $@thick
-// XHECK-NOT: {{thick_to_objc_metatype }}
-// XHECK: existential_metatype $@objc_metatype
-// XHECK: return
+// CHECK-NOT: existential_metatype $@thick
+// CHECK-NOT: {{thick_to_objc_metatype }}
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: return
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_existential_metatype (peephole_thick_to_objc_metatype.X) -> Swift.AnyObject
 sil [ossa] @_TF31peephole_thick_to_objc_metatype48test_thick_to_objc_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @owned AnyObject {
 bb0(%0 : @owned $X):
@@ -56,10 +56,10 @@ bb0(%0 : @owned $X):
 // (thick_to_objc_metatype (value_metatype @thick)) -> (value_metatype @objc_metatype)
 //
 // CHECK-LABEL: sil [ossa] @_TF31peephole_thick_to_objc_metatype42test_thick_to_objc_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned An
-// XHECK-NOT: value_metatype $@thick
-// XHECK-NOT: {{thick_to_objc_metatype }}
-// XHECK: value_metatype $@objc_metatype
-// XHECK: return
+// CHECK-NOT: value_metatype $@thick
+// CHECK-NOT: {{thick_to_objc_metatype }}
+// CHECK: value_metatype $@objc_metatype
+// CHECK: return
 // peephole_thick_to_objc_metatype.test_thick_to_objc_metatype_value_metatype <A : Swift.AnyObject>(A) -> Swift.AnyObject
 sil [ossa] @_TF31peephole_thick_to_objc_metatype42test_thick_to_objc_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned AnyObject {
 bb0(%0 : @owned $T):
@@ -75,10 +75,10 @@ bb0(%0 : @owned $T):
 // (objc_to_thick_metatype (metatype @objc_metatype)) -> (metatype @thick)
 //
 // CHECK-LABEL: sil [ossa] @_TF31peephole_thick_to_objc_metatype36test_objc_to_thick_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @thick XImpl.Type
-// XHECK-NOT: metatype $@objc_metatype
-// XHECK-NOT: {{objc_to_thick_metatype }}
-// XHECK: metatype $@thick
-// XHECK: return
+// CHECK-NOT: metatype $@objc_metatype
+// CHECK-NOT: {{objc_to_thick_metatype }}
+// CHECK: metatype $@thick
+// CHECK: return
 sil [ossa] @_TF31peephole_thick_to_objc_metatype36test_objc_to_thick_metatype_metatypeFT_Ps9AnyObject_ : $@convention(thin) () -> @thick XImpl.Type {
 bb0:
   %0 = metatype $@objc_metatype XImpl.Type                // users: %1, %2
@@ -89,10 +89,10 @@ bb0:
 // (objc_to_objc_metatype (existential_metatype @objc_metatype)) -> (existential_metatype @thick)
 //
 // CHECK-LABEL: sil [ossa] @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @thick X.Type
-// XHECK-NOT: existential_metatype $@objc_metatype
-// XHECK-NOT: {{objc_to_thick_metatype }}
-// XHECK: existential_metatype $@thick
-// XHECK: return
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK-NOT: {{objc_to_thick_metatype }}
+// CHECK: existential_metatype $@thick
+// CHECK: return
 sil [ossa] @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @thick X.Type {
 bb0(%0 : @owned $X):
   debug_value %0 : $X, let, name "o" // id: %1
@@ -105,10 +105,10 @@ bb0(%0 : @owned $X):
 // (objc_to_thick_metatype (value_metatype @objc_metatype)) -> (value_metatype @thick)
 //
 // CHECK-LABEL: sil [ossa] @_TF31peephole_thick_to_objc_metatype42test_objc_to_thick_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @thick T.Type
-// XHECK-NOT: value_metatype $@objc_metatype
-// XHECK-NOT: {{objc_to_thick_metatype }}
-// XHECK: value_metatype $@thick
-// XHECK: return
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK-NOT: {{objc_to_thick_metatype }}
+// CHECK: value_metatype $@thick
+// CHECK: return
 sil [ossa] @_TF31peephole_thick_to_objc_metatype42test_objc_to_thick_metatype_value_metatypeUs9AnyObject__FQ_PS0__ : $@convention(thin) <T where T : AnyObject> (@owned T) -> @thick T.Type {
 bb0(%0 : @owned $T):
   debug_value %0 : $T, let, name "o" // id: %1
@@ -119,11 +119,11 @@ bb0(%0 : @owned $T):
 }
 
 // CHECK-LABEL: sil [ossa] @$test_peephole_objc_to_thick_to_objc :
-// XHECK: [[T:%.*]] = apply
-// XHECK-NOT: objc_to_thick_metatype
-// XHECK-NOT: thick_to_objc_metatype
-// XHECK: enum $Optional<@objc_metatype AnyObject.Type>, #Optional.some!enumelt, [[T]] : $@objc_metatype AnyObject.Type
-// XHECK: } // end sil function '$test_peephole_objc_to_thick_to_objc'
+// CHECK: [[T:%.*]] = apply
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK-NOT: thick_to_objc_metatype
+// CHECK: enum $Optional<@objc_metatype AnyObject.Type>, #Optional.some!enumelt, [[T]] : $@objc_metatype AnyObject.Type
+// CHECK: } // end sil function '$test_peephole_objc_to_thick_to_objc'
 
 sil [ossa] @$test_peephole_objc_to_thick_to_objc : $@convention(thin) (@guaranteed NSObject) -> Optional<UnsafeMutablePointer<OpaquePointer>> {
 // %0 "obj"                                       // users: %3, %2, %1
@@ -144,12 +144,11 @@ bb0(%0 : @guaranteed $NSObject):
 }
 
 // CHECK-LABEL: sil [ossa] @$test_peephole_thick_to_objc_to_thick :
-// XHECK: [[T:%.*]] = apply
-// XHECK-NOT: thick_to_objc_metatype
-// XHECK-NOT: objc_to_thick_metatype
-// XHECK: return [[T]]
-// XHECK: } // end sil function '$test_peephole_thick_to_objc_to_thick'
-
+// CHECK: [[T:%.*]] = apply
+// CHECK-NOT: thick_to_objc_metatype
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK: return [[T]]
+// CHECK: } // end sil function '$test_peephole_thick_to_objc_to_thick'
 sil [ossa] @$test_peephole_thick_to_objc_to_thick : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type {
 bb0(%0 : @guaranteed $AnyObject):
   %func = function_ref @foo : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type
