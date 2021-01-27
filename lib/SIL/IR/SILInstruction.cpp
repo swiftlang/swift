@@ -1126,6 +1126,8 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::StrongReleaseInst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Name##ReleaseValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
