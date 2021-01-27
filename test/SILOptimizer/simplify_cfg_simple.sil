@@ -7,6 +7,11 @@ sil_stage canonical
 import Builtin
 import Swift
 
+internal enum Enum {
+  case one
+  case two
+}
+
 // CHECK-LABEL: sil @simple_test : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK-NEXT: tuple
@@ -26,4 +31,65 @@ bb2:
 bb3:
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// Test that SimplifyCFG::simplifyBlocks, tryJumpThreading does not
+// perform unbounded loop peeling.
+//
+// rdar://73357726 ([SR-14068]: Compiling with optimisation runs indefinitely for grpc-swift)
+// CHECK-LABEL: sil @testInfinitePeeling : $@convention(method) (Builtin.Int64, Enum) -> () {
+//
+// There is only one switch_enum blocks, and it is no longer in a loop.
+// CHECK: bb0(%0 : $Builtin.Int64, %1 : $Enum):
+// CHECK:   switch_enum %1 : $Enum, case #Enum.one!enumelt: bb3, case #Enum.two!enumelt: bb4
+// CHECK: bb1:
+// CHECK:   br bb8
+// CHECK: bb2:
+// CHECK:   br bb5(%{{.*}} : $Enum)
+//
+// This is the original cond_br block
+// CHECK: bb3:
+// CHECK:   cond_br %{{.*}}, bb2, bb1
+// CHECK: bb4:
+// CHECK:   br bb5(%1 : $Enum)
+//
+// This is the cond_br block after jump-threading.
+// CHECK: bb5(%{{.*}} : $Enum):
+// CHECK:   cond_br %{{.*}}, bb6, bb7
+// CHECK: bb6:
+// CHECK:   br bb5(%{{.*}} : $Enum)
+// CHECK: bb7:
+// CHECK:   br bb8
+// CHECK: bb8:
+// CHECK:   return %19 : $()
+// CHECK-LABEL: } // end sil function 'testInfinitePeeling'
+sil @testInfinitePeeling : $@convention(method) (Builtin.Int64, Enum) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Enum):
+  %2 = integer_literal $Builtin.Int64, 99999999
+  br bb1(%0 : $Builtin.Int64, %1 : $Enum)
+
+bb1(%4 : $Builtin.Int64, %5 : $Enum):
+  switch_enum %5 : $Enum, case #Enum.one!enumelt: bb4, default bb5
+
+bb2(%7 : $Builtin.Int64, %8 : $Enum):
+  %9 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %9, bb3, bb6
+
+bb3:
+  br bb1(%7 : $Builtin.Int64, %8 : $Enum)
+
+bb4:
+  %12 = integer_literal $Builtin.Int64, 1
+  %13 = integer_literal $Builtin.Int1, -1
+  %14 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %12 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0
+  %16 = enum $Enum, #Enum.two!enumelt
+  br bb2(%15 : $Builtin.Int64, %16 : $Enum)
+
+bb5:
+  br bb2(%2 : $Builtin.Int64, %5 : $Enum)
+
+bb6:
+  %19 = tuple ()
+  return %19 : $()
 }
