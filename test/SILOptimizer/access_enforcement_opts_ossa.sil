@@ -1760,3 +1760,32 @@ bb0(%0 : @guaranteed ${ var Int64 }):
   end_access %access : $*Int64
   return %val : $Int64
 }
+
+
+// Test that SILInstruction::mayRelease recognizes
+// unmanaged_release_value without asserting.
+// CHECK-LABEL: sil [transparent] [serialized] [ossa] @testUnmanagedRelease : $@convention(method) <T where T : AnyObject> (@inout T) -> () {
+// CHECK: begin_access
+// CHECK: unmanaged_release_value
+// CHECK-LABEL: } // end sil function 'testUnmanagedRelease'
+sil [transparent] [serialized] [ossa] @testUnmanagedRelease : $@convention(method) <T where T : AnyObject> (@inout T) -> () {
+bb0(%0 : $*T):
+  %access = begin_access [modify] [dynamic] %0 : $*T
+  %load = load [copy] %access : $*T
+  end_access %access : $*T
+  %unmanaged1 = ref_to_unmanaged %load : $T to $@sil_unmanaged T
+  %copy1 = strong_copy_unmanaged_value %unmanaged1 : $@sil_unmanaged T
+  unmanaged_retain_value %copy1 : $T
+  %cast1 = unchecked_bitwise_cast %copy1 : $T to $UnsafeRawPointer
+  destroy_value %copy1 : $T
+  %cast2 = unchecked_bitwise_cast %cast1 : $UnsafeRawPointer to $T
+  %copy2 = copy_value %cast2 : $T
+  %unmanaged2 = ref_to_unmanaged %copy2 : $T to $@sil_unmanaged T
+  destroy_value %copy2 : $T
+  %copy3 = strong_copy_unmanaged_value %unmanaged2 : $@sil_unmanaged T
+  unmanaged_release_value %copy3 : $T
+  destroy_value %copy3 : $T
+  destroy_value %load : $T
+  %108 = tuple ()
+  return %108 : $()
+}
