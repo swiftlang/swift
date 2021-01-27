@@ -44,6 +44,9 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclBase.h"
+#include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -833,6 +836,46 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     else
       diags.diagnose(loc, diag::use_of_void_pointer, "").
         fixItReplace(generic->getSourceRange(), "UnsafeRawPointer");
+  }
+
+  if (auto clangDecl = decl->getClangDecl()) {
+    if (auto classTemplateDecl =
+            dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
+      SmallVector<Type, 2> typesOfGenericArgs;
+      for (auto typeRepr : generic->getGenericArgs()) {
+        typesOfGenericArgs.push_back(resolution.resolveType(typeRepr));
+      }
+
+      SmallVector<clang::TemplateArgument, 2> templateArguments;
+      std::unique_ptr<TemplateInstantiationError> error =
+          ctx.getClangTemplateArguments(
+              classTemplateDecl->getTemplateParameters(), typesOfGenericArgs,
+              templateArguments);
+
+      if (error) {
+        std::string failedTypesStr;
+        llvm::raw_string_ostream failedTypesStrStream(failedTypesStr);
+        llvm::interleaveComma(error->failedTypes, failedTypesStrStream);
+        // TODO: This error message should not reference implementation details.
+        // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
+        ctx.Diags.diagnose(
+            loc, diag::unable_to_convert_generic_swift_types.ID,
+            {classTemplateDecl->getName(), StringRef(failedTypesStr)});
+        return ErrorType::get(ctx);
+      }
+
+      auto *clangModuleLoader = decl->getASTContext().getClangModuleLoader();
+      auto instantiatedDecl = clangModuleLoader->instantiateCXXClassTemplate(
+          const_cast<clang::ClassTemplateDecl *>(classTemplateDecl),
+          templateArguments);
+      if (instantiatedDecl) {
+        instantiatedDecl->setTemplateInstantiationType(result);
+        return instantiatedDecl->getDeclaredInterfaceType();
+      } else {
+        diags.diagnose(loc, diag::cxx_class_instantiation_failed);
+        return ErrorType::get(ctx);
+      }
+    }
   }
   return result;
 }

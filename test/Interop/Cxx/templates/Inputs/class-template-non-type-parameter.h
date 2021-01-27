@@ -5,10 +5,7 @@
 using size_t = __SIZE_TYPE__;
 #endif
 
-template<class T, size_t Size>
-struct MagicArray {
-    T t[Size];
-};
+template <class T, size_t Size> struct MagicArray { T t[Size]; };
 
 typedef MagicArray<int, 2> MagicIntPair;
 

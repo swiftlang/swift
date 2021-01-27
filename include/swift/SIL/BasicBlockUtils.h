@@ -14,6 +14,7 @@
 #define SWIFT_SIL_BASICBLOCKUTILS_H
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILBitfield.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -98,13 +99,6 @@ struct JointPostDominanceSetComputer {
   /// The worklist that drives the algorithm.
   SmallVector<SILBasicBlock *, 32> worklist;
 
-  /// A set that guards our worklist. Any block before it is added to worklist
-  /// should be checked against visitedBlocks.
-  SmallPtrSet<SILBasicBlock *, 32> visitedBlocks;
-
-  /// The set of blocks where we begin our walk.
-  SmallPtrSet<SILBasicBlock *, 8> initialBlocks;
-
   /// A subset of our initial blocks that we found as a predecessor of another
   /// block along our walk.
   SmallVector<SILBasicBlock *, 8> reachableInputBlocks;
@@ -113,7 +107,7 @@ struct JointPostDominanceSetComputer {
   /// visited yet are placed in here. At the end of our worklist, any blocks
   /// that remain here are "leaking blocks" that together with our initial set
   /// would provide a jointly-postdominating set of our dominating value.
-  SmallSetVector<SILBasicBlock *, 8> blocksThatLeakIfNeverVisited;
+  SmallVector<SILBasicBlock *, 32> blocksThatLeakIfNeverVisited;
 
   DeadEndBlocks &deadEndBlocks;
 
@@ -122,8 +116,6 @@ struct JointPostDominanceSetComputer {
 
   void clear() {
     worklist.clear();
-    visitedBlocks.clear();
-    initialBlocks.clear();
     reachableInputBlocks.clear();
     blocksThatLeakIfNeverVisited.clear();
   }

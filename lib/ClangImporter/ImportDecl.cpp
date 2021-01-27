@@ -3575,13 +3575,6 @@ namespace {
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
 
-      // If this type is fully specialized (i.e. "Foo<>" or "Foo<int, int>"),
-      // bail to prevent a crash.
-      // TODO: we should be able to support fully specialized class templates.
-      // See SR-13775 for more info.
-      if (def->getTypeAsWritten())
-        return nullptr;
-
       // FIXME: This will instantiate all members of the specialization (and detect
       // instantiation failures in them), which can be more than is necessary
       // and is more than what Clang does. As a result we reject some C++
@@ -3590,19 +3583,6 @@ namespace {
           def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
 
       return VisitCXXRecordDecl(def);
-    }
-
-    Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
-      // When loading a namespace's sub-decls, we won't add template
-      // specilizations, so make sure to do that here.
-      for (auto spec : decl->specializations()) {
-        if (auto importedSpec = Impl.importDecl(spec, getVersion())) {
-          if (auto namespaceDecl =
-                  dyn_cast<EnumDecl>(importedSpec->getDeclContext()))
-            namespaceDecl->addMember(importedSpec);
-        }
-      }
-      return nullptr;
     }
 
     Decl *VisitClassTemplatePartialSpecializationDecl(
@@ -4254,6 +4234,43 @@ namespace {
         return nullptr;
       return importFunctionDecl(decl->getAsFunction(), importedName,
                                 correctSwiftName, None, decl);
+    }
+
+    Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
+      // When loading a namespace's sub-decls, we won't add template
+      // specilizations, so make sure to do that here.
+      for (auto spec : decl->specializations()) {
+        if (auto importedSpec = Impl.importDecl(spec, getVersion())) {
+          if (auto namespaceDecl =
+                  dyn_cast<EnumDecl>(importedSpec->getDeclContext()))
+            namespaceDecl->addMember(importedSpec);
+        }
+      }
+
+      Optional<ImportedName> correctSwiftName;
+      auto importedName = importFullName(decl, correctSwiftName);
+      auto name = importedName.getDeclName().getBaseIdentifier();
+      if (name.empty())
+        return nullptr;
+      auto loc = Impl.importSourceLoc(decl->getLocation());
+      auto dc = Impl.importDeclContextOf(
+          decl, importedName.getEffectiveContext());
+
+      SmallVector<GenericTypeParamDecl *, 4> genericParams;
+      for (auto &param : *decl->getTemplateParameters()) {
+        auto genericParamDecl = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
+            param, AccessLevel::Public, dc,
+            Impl.SwiftContext.getIdentifier(param->getName()),
+            Impl.importSourceLoc(param->getLocation()),
+            /*depth*/ 0, /*index*/ genericParams.size());
+        genericParams.push_back(genericParamDecl);
+      }
+      auto genericParamList = GenericParamList::create(
+          Impl.SwiftContext, loc, genericParams, loc);
+
+      auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+        decl, AccessLevel::Public, loc, name, loc, None, genericParamList, dc);
+      return structDecl;
     }
 
     Decl *VisitUsingDecl(const clang::UsingDecl *decl) {
