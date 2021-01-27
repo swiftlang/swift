@@ -2930,12 +2930,13 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
   return %24 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_with_metatype
-// XHECK: bb0
-// XHECK-NOT: alloc_ref_dynamic
-// XHECK-NEXT: alloc_ref $B
-// XHECK-NEXT: destroy_value
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_with_metatype :
+// CHECK: bb0
+// CHECK-NOT: alloc_ref_dynamic
+// CHECK-NEXT: alloc_ref $B
+// CHECK-NEXT: destroy_value
+// CHECK: return
+// CHECK: } // end sil function 'alloc_ref_dynamic_with_metatype'
 sil [ossa] @alloc_ref_dynamic_with_metatype : $() -> () {
   %1 = metatype $@thick B.Type
   %2 = alloc_ref_dynamic %1 : $@thick B.Type, $B
@@ -2944,11 +2945,12 @@ sil [ossa] @alloc_ref_dynamic_with_metatype : $() -> () {
   return %4 : $()
 }
 
-// XHECK: sil [ossa] @alloc_ref_dynamic_with_metatype_genneric
-// XHECK: metatype
-// XHECK: upcast
-// XHECK: alloc_ref_dynamic
-// XHECK: return
+// CHECK: sil [ossa] @alloc_ref_dynamic_with_metatype_genneric :
+// CHECK: metatype
+// CHECK: upcast
+// CHECK: alloc_ref_dynamic
+// CHECK: return
+// CHECK: } // end sil function 'alloc_ref_dynamic_with_metatype_genneric'
 sil [ossa] @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
   %1 = metatype $@thick T.Type
   %2 = upcast %1 : $@thick T.Type to $@thick B.Type
@@ -2958,12 +2960,13 @@ sil [ossa] @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () 
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_with_upcast_metatype
-// XHECK: bb0
-// XHECK-NOT: alloc_ref_dynamic
-// XHECK-NEXT: [[R:%[0-9]+]] = alloc_ref $E
-// XHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// XHECK-NEXT: return [[C]]
+// CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_with_upcast_metatype :
+// CHECK: bb0
+// CHECK-NOT: alloc_ref_dynamic
+// CHECK-NEXT: [[R:%[0-9]+]] = alloc_ref $E
+// CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
+// CHECK-NEXT: return [[C]]
+// CHECK: } // end sil function 'alloc_ref_dynamic_with_upcast_metatype'
 sil [ossa] @alloc_ref_dynamic_with_upcast_metatype : $@convention(thin) () -> @owned B {
   %1 = metatype $@thick E.Type
   %2 = upcast %1 : $@thick E.Type to $@thick B.Type
@@ -2972,10 +2975,11 @@ sil [ossa] @alloc_ref_dynamic_with_upcast_metatype : $@convention(thin) () -> @o
 }
 
 // CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br :
-// XHECK: checked_cast_br
-// XHECK: bb1
-// XHECK-NOT: alloc_ref_dynamic
-// XHECK: alloc_ref $B
+// CHECK: checked_cast_br
+// CHECK: bb1
+// CHECK-NOT: alloc_ref_dynamic
+// CHECK: alloc_ref $B
+// CHECK: } // end sil function 'alloc_ref_dynamic_after_successful_checked_cast_br'
 sil [ossa] @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
   checked_cast_br [exact] %1 : $@thick B.Type to B.Type, bb1, bb2
@@ -2995,11 +2999,12 @@ bb3 (%10: $Builtin.Int32):
 }
 
 // CHECK-LABEL: @alloc_ref_dynamic_upcast_after_successful_checked_cast_br
-// XHECK: checked_cast_br
-// XHECK: bb1
-// XHECK-NOT: alloc_ref_dynamic
-// XHECK:      [[R:%[0-9]+]] = alloc_ref $E
-// XHECK-NEXT: destroy_value [[R]]
+// CHECK: checked_cast_br
+// CHECK: bb1
+// CHECK-NOT: alloc_ref_dynamic
+// CHECK:      [[R:%[0-9]+]] = alloc_ref $E
+// CHECK-NEXT: destroy_value [[R]]
+// CHECK: } // end sil function 'alloc_ref_dynamic_upcast_after_successful_checked_cast_br'
 sil [ossa] @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
   checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2
@@ -3261,9 +3266,10 @@ enum ErrorEnum: Error {
 // the behavior specified.
 //
 // CHECK-LABEL: sil [ossa] @insert_compensating_release_at_release_of_box :
-// XHECK: bb0(
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0(
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'insert_compensating_release_at_release_of_box'
 sil [ossa] @insert_compensating_release_at_release_of_box : $@convention(method) (@in_guaranteed Array<Error>) -> () {
 bb0(%0 : $*Array<Error>):
   %20 = load [copy] %0 : $*Array<Error>
@@ -3278,9 +3284,10 @@ bb0(%0 : $*Array<Error>):
 }
 
 // CHECK-LABEL: sil [ossa] @insert_compensating_release_at_release_of_box_2 :
-// XHECK: bb0(
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0(
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'insert_compensating_release_at_release_of_box_2'
 sil [ossa] @insert_compensating_release_at_release_of_box_2 : $@convention(method) (@in_guaranteed Array<Error>) -> () {
 bb0(%0 : $*Array<Error>):
   %20 = load_borrow %0 : $*Array<Error>

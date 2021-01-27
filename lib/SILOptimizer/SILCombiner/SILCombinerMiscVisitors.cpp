@@ -2055,9 +2055,6 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
 SILInstruction *
 SILCombiner::
 visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
-  if (ARDI->getFunction()->hasOwnership())
-    return nullptr;
-
   SmallVector<SILValue, 4> Counts;
   auto getCounts = [&] (AllocRefDynamicInst *AI) -> ArrayRef<SILValue> {
     for (Operand &Op : AI->getTailAllocatedCounts()) {
@@ -2073,8 +2070,8 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   Builder.setCurrentDebugScope(ARDI->getDebugScope());
 
   SILValue MDVal = ARDI->getMetatypeOperand();
-  if (auto *UC = dyn_cast<UpcastInst>(MDVal))
-    MDVal = UC->getOperand();
+  while (auto *UCI = dyn_cast<UpcastInst>(MDVal))
+    MDVal = UCI->getOperand();
 
   SingleValueInstruction *NewInst = nullptr;
   if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
