@@ -1894,6 +1894,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+    // A @concurrent function can be a subtype of a non-@concurrent function.
+    if (func1->isConcurrent() != func2->isConcurrent()) {
+      // Cannot add '@concurrent'.
+      if (func2->isConcurrent() || kind < ConstraintKind::Subtype) {
+        if (!shouldAttemptFixes())
+          return getTypeMatchFailure(locator);
+
+        auto *fix = AddConcurrentAttribute::create(
+            *this, func1, func2, getConstraintLocator(locator));
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+      }
+    }
+
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
   if (func1->isNoEscape() != func2->isNoEscape() &&

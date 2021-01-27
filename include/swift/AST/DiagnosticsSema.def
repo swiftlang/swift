@@ -3724,26 +3724,30 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 NOTE(noescape_parameter,none,
-    "parameter %0 is implicitly non-escaping",
-     (Identifier))
+    "parameter %1 is implicitly %select{non-escaping|non-concurrent}0",
+     (unsigned, Identifier))
 NOTE(generic_parameters_always_escaping,none,
      "generic parameters are always considered '@escaping'", ())
 
-ERROR(passing_noescape_to_escaping,none,
-      "passing non-escaping parameter %0 to function expecting an @escaping closure",
-      (Identifier))
+ERROR(passing_noattrfunc_to_attrfunc,none,
+      "passing %select{non-escaping|non-concurrent}0 parameter %1 to function "
+      "expecting %select{an @escaping|a @concurrent}0 closure",
+      (unsigned, Identifier))
 ERROR(converting_noespace_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
-ERROR(assigning_noescape_to_escaping,none,
-      "assigning non-escaping parameter %0 to an @escaping closure",
-      (Identifier))
-ERROR(general_noescape_to_escaping,none,
-      "using non-escaping parameter %0 in a context expecting an @escaping closure",
-      (Identifier))
-ERROR(converting_noescape_to_type,none,
-      "converting non-escaping value to %0 may allow it to escape",
-      (Type))
+ERROR(assigning_noattrfunc_to_attrfunc,none,
+      "assigning %select{non-escaping|non-concurrent}0 parameter %1 to "
+      "%select{an @escaping|a @concurrent}0 closure",
+      (unsigned, Identifier))
+ERROR(general_noattrfunc_to_attr,none,
+      "using %select{non-escaping|non-concurrent}0 parameter %1 in a context "
+      "expecting %select{an @escaping|a @concurrent}0 closure",
+      (unsigned, Identifier))
+ERROR(converting_noattrfunc_to_type,none,
+      "converting %select{non-escaping|non-concurrent function}0 value to %1 "
+      "may %select{allow it to escape|introduce data races}0",
+      (unsigned, Type))
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",

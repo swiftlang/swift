@@ -289,20 +289,21 @@ class ASTExtInfoBuilder {
   friend AnyFunctionType;
   friend ASTExtInfo;
 
-  // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
+  // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|async|throws|differentiability|
-  //   |    0 .. 3    |    4   |  5  |   6  |      7 .. 8     |
+  //   |representation|noEscape|concurrent|async|throws|differentiability|
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  |      8 .. 9     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
     NoEscapeMask = 1 << 4,
-    AsyncMask = 1 << 5,
-    ThrowsMask = 1 << 6,
-    DifferentiabilityMaskOffset = 7,
+    ConcurrentMask = 1 << 5,
+    AsyncMask = 1 << 6,
+    ThrowsMask = 1 << 7,
+    DifferentiabilityMaskOffset = 8,
     DifferentiabilityMask = 0x3 << DifferentiabilityMaskOffset,
-    NumMaskBits = 9
+    NumMaskBits = 10
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -349,6 +350,8 @@ public:
   }
 
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
+
+  constexpr bool isConcurrent() const { return bits & ConcurrentMask; }
 
   constexpr bool isAsync() const { return bits & AsyncMask; }
 
@@ -404,6 +407,12 @@ public:
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
+                             clangTypeInfo);
+  }
+  LLVM_NODISCARD
+  ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
+    return ASTExtInfoBuilder(concurrent ? (bits | ConcurrentMask)
+                                        : (bits & ~ConcurrentMask),
                              clangTypeInfo);
   }
   LLVM_NODISCARD
@@ -497,6 +506,8 @@ public:
 
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
 
+  constexpr bool isConcurrent() const { return builder.isConcurrent(); }
+
   constexpr bool isAsync() const { return builder.isAsync(); }
 
   constexpr bool isThrowing() const { return builder.isThrowing(); }
@@ -527,6 +538,14 @@ public:
   LLVM_NODISCARD
   ASTExtInfo withNoEscape(bool noEscape = true) const {
     return builder.withNoEscape(noEscape).build();
+  }
+
+  /// Helper method for changing only the concurrent field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withConcurrent for chaining.
+  LLVM_NODISCARD
+  ASTExtInfo withConcurrent(bool concurrent = true) const {
+    return builder.withConcurrent(concurrent).build();
   }
 
   /// Helper method for changing only the throws field.

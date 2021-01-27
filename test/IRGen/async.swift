@@ -8,6 +8,8 @@ public func f() async { }
 // CHECK: "$s5async1gyyYKF"
 public func g() async throws { }
 
+// CHECK: "$s5async1hyyS2iJXEF"
+public func h(_: @concurrent (Int) -> Int) { }
 
 public class SomeClass {}
 

@@ -873,22 +873,23 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
   return true;
 }
 
-bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
+bool AttributedFuncToTypeConversionFailure::diagnoseAsError() {
   if (diagnoseParameterUse())
     return true;
 
   if (auto *typeVar = getRawFromType()->getAs<TypeVariableType>()) {
     if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-      emitDiagnostic(diag::converting_noescape_to_type, GP);
+      emitDiagnostic(diag::converting_noattrfunc_to_type, attributeKind, GP);
       return true;
     }
   }
 
-  emitDiagnostic(diag::converting_noescape_to_type, getToType());
+  emitDiagnostic(
+      diag::converting_noattrfunc_to_type, attributeKind, getToType());
   return true;
 }
 
-bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
+bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
   auto convertTo = getToType();
   // If the other side is not a function, we have common case diagnostics
   // which handle function-to-type conversion diagnostics.
@@ -896,7 +897,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     return false;
 
   auto anchor = getAnchor();
-  auto diagnostic = diag::general_noescape_to_escaping;
+  auto diagnostic = diag::general_noattrfunc_to_attr;
 
   ParamDecl *PD = nullptr;
   if (auto *DRE = getAsExpr<DeclRefExpr>(anchor)) {
@@ -912,7 +913,8 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     // function at that position.
     if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
       auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
-      if (paramInterfaceTy->isTypeParameter()) {
+      if (paramInterfaceTy->isTypeParameter() &&
+          attributeKind == AttributeKind::Escaping) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
           emitDiagnostic(diag::converting_noespace_param_to_generic_type,
                          PD->getName(), paramInterfaceTy);
@@ -938,23 +940,25 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
       }
 
       // If there are no generic parameters involved, this could
-      // only mean that parameter is expecting @escaping function type.
-      diagnostic = diag::passing_noescape_to_escaping;
+      // only mean that parameter is expecting @escaping/@concurrent function
+      // type.
+      diagnostic = diag::passing_noattrfunc_to_attrfunc;
     }
   } else if (auto *AE = getAsExpr<AssignExpr>(getRawAnchor())) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getSrc())) {
       PD = dyn_cast<ParamDecl>(DRE->getDecl());
-      diagnostic = diag::assigning_noescape_to_escaping;
+      diagnostic = diag::assigning_noattrfunc_to_attrfunc;
     }
   }
 
   if (!PD)
     return false;
 
-  emitDiagnostic(diagnostic, PD->getName());
+  emitDiagnostic(diagnostic, attributeKind, PD->getName());
 
   // Give a note and fix-it
-  auto note = emitDiagnosticAt(PD, diag::noescape_parameter, PD->getName());
+  auto note = emitDiagnosticAt(
+      PD, diag::noescape_parameter, attributeKind, PD->getName());
 
   SourceLoc reprLoc;
   SourceLoc autoclosureEndLoc;
@@ -966,7 +970,10 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
           attrRepr->getAttrs().getLoc(TAK_autoclosure));
     }
   }
-  if (!PD->isAutoClosure()) {
+  if (attributeKind == AttributeKind::Concurrent) {
+    note.fixItInsert(reprLoc, "@concurrent ");
+  }
+  else if (!PD->isAutoClosure()) {
     note.fixItInsert(reprLoc, "@escaping ");
   } else {
     note.fixItInsertAfter(autoclosureEndLoc, " @escaping");

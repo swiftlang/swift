@@ -633,6 +633,10 @@ void Remangler::mangleValueWitnessTable(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleConcurrentFunctionType(Node *node) {
+  Buffer << "y";
+}
+
 void Remangler::mangleAsyncAnnotation(Node *node) {
   Buffer << "Z";
 }
