@@ -596,3 +596,68 @@ bb8:
   return %res : $()
 }
 
+struct RecurStruct {
+  var val:NonTrivialStruct
+}
+
+// Test to make sure we do not crash on a use after free when the branch instructions in bb1 and bb2 are deleted
+// CHECK-LABEL: sil [ossa] @test_useafterfreeinrauw :
+// CHECK: bb0
+// CHECK: struct_extract
+// CHECK-NOT: struct_extract
+// CHECK: cond_br
+// CHECK-LABEL: } // end sil function 'test_useafterfreeinrauw'
+sil [ossa] @test_useafterfreeinrauw : $@convention(thin) (@guaranteed RecurStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $RecurStruct):
+  %1 = struct_extract %0 : $RecurStruct, #RecurStruct.val
+  debug_value %1 : $NonTrivialStruct
+  %2 = struct_extract %0 : $RecurStruct, #RecurStruct.val
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
+  %borrow3 = begin_borrow %3 : $Klass
+  br bb3(%borrow3 : $Klass)
+
+bb2:
+  %4 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
+  %borrow4 = begin_borrow %4 : $Klass
+  br bb3(%borrow4 : $Klass)
+
+bb3(%borrow : @guaranteed $Klass):
+  end_borrow %borrow : $Klass
+  %copy = copy_value %1 : $NonTrivialStruct
+  return %copy : $NonTrivialStruct 
+}
+
+// Test to make sure we clear the context if we fail while checking if ownership rauw is possible
+// CHECK-LABEL: sil [ossa] @test_rauwfailsandthensucceeds :
+// CHECK: bb0
+// CHECK: struct_extract
+// CHECK: struct_extract
+// CHECK: struct $_SliceBuffer
+// CHECK-NOT: struct $_SliceBuffer
+// CHECK-LABEL: } // end sil function 'test_rauwfailsandthensucceeds'
+sil [ossa] @test_rauwfailsandthensucceeds : $@convention(method) <Element> (UnsafeMutablePointer<Element>, @guaranteed _ContiguousArrayBuffer<Element>, Int, UInt) -> @owned _SliceBuffer<Element> {
+bb0(%0 : $UnsafeMutablePointer<Element>, %1 : @guaranteed $_ContiguousArrayBuffer<Element>, %2 : $Int, %3 : $UInt):
+  %4 = struct_extract %1 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %5 = copy_value %4 : $__ContiguousArrayStorageBase
+  %6 = init_existential_ref %5 : $__ContiguousArrayStorageBase : $__ContiguousArrayStorageBase, $AnyObject
+  %7 = struct_extract %1 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %8 = ref_tail_addr %7 : $__ContiguousArrayStorageBase, $Element
+  %9 = address_to_pointer %8 : $*Element to $Builtin.RawPointer
+  %10 = struct $UnsafeMutablePointer<Element> (%9 : $Builtin.RawPointer)
+  %11 = begin_borrow %6 : $AnyObject
+  %12 = struct $_SliceBuffer<Element> (%11 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
+  %13 = copy_value %12 : $_SliceBuffer<Element>
+  end_borrow %11 : $AnyObject
+  destroy_value %13 : $_SliceBuffer<Element>
+  %14 = begin_borrow %6 : $AnyObject
+  %15 = struct $_SliceBuffer<Element> (%14 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
+  %16 = copy_value %15 : $_SliceBuffer<Element>
+  end_borrow %14 : $AnyObject
+  %17 = struct $_SliceBuffer<Element> (%6 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
+  destroy_value %17 : $_SliceBuffer<Element>
+  return %16 : $_SliceBuffer<Element>
+}
+
