@@ -139,7 +139,7 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                           getTrailingObjects<RC<RawSyntax>>());
 }
 
-RawSyntax::RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
+RawSyntax::RawSyntax(tok TokKind, StringRef Text, size_t TextLength,
                      StringRef LeadingTrivia, StringRef TrailingTrivia,
                      SourcePresence Presence, const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId)
@@ -147,6 +147,7 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
       RefCount(0) {
   assert(Arena && "RawSyntax nodes must always be allocated in an arena");
   copyToArenaIfNecessary(LeadingTrivia, Arena);
+  copyToArenaIfNecessary(Text, Arena);
   copyToArenaIfNecessary(TrailingTrivia, Arena);
 
   if (NodeId.hasValue()) {
@@ -156,19 +157,13 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
     this->NodeId = NextFreeNodeId++;
   }
   Bits.Token.TokenKind = unsigned(TokKind);
-  // FIXME: Copy the backing storage of the string into the arena
   Bits.Token.LeadingTrivia = LeadingTrivia;
+  Bits.Token.TokenText = Text;
   Bits.Token.TrailingTrivia = TrailingTrivia;
-
-  // Initialize token text.
-  ::new (static_cast<void *>(getTrailingObjects<OwnedString>()))
-      OwnedString(Text);
 }
 
 RawSyntax::~RawSyntax() {
-  if (isToken()) {
-    getTrailingObjects<OwnedString>()->~OwnedString();
-  } else {
+  if (!isToken()) {
     for (auto &child : getLayout())
       child.~RC<RawSyntax>();
   }
@@ -179,19 +174,19 @@ RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                               const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-  auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString>(Layout.size(), 0);
+  auto size = totalSizeToAlloc<RC<RawSyntax>>(Layout.size());
   void *data = Arena->Allocate(size, alignof(RawSyntax));
   return RC<RawSyntax>(
       new (data) RawSyntax(Kind, Layout, TextLength, Presence, Arena, NodeId));
 }
 
-RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text, size_t TextLength,
+RC<RawSyntax> RawSyntax::make(tok TokKind, StringRef Text, size_t TextLength,
                               StringRef LeadingTrivia, StringRef TrailingTrivia,
                               SourcePresence Presence,
                               const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-  auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString>(0, 1);
+  auto size = totalSizeToAlloc<RC<RawSyntax>>(0);
   void *data = Arena->Allocate(size, alignof(RawSyntax));
   return RC<RawSyntax>(new (data)
                            RawSyntax(TokKind, Text, TextLength, LeadingTrivia,
@@ -306,9 +301,8 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
-                        OwnedString Text, StringRef LeadingTrivia,
-                        StringRef TrailingTrivia) {
+void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind, StringRef Text,
+                        StringRef LeadingTrivia, StringRef TrailingTrivia) {
   ID.AddInteger(unsigned(TokKind));
   ID.AddInteger(LeadingTrivia.size());
   ID.AddInteger(TrailingTrivia.size());
@@ -320,7 +314,7 @@ void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
 #include "swift/Syntax/TokenKinds.def"
     break;
   default:
-    ID.AddString(Text.str());
+    ID.AddString(Text);
     break;
   }
   ID.AddString(LeadingTrivia);
