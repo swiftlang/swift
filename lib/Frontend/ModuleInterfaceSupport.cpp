@@ -452,6 +452,9 @@ public:
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
           return TypeWalker::Action::Continue; 
 
+        if (inherited->isSPI() && !printOptions.PrintSPIs)
+          return TypeWalker::Action::Continue;
+
         if (isPublicOrUsableFromInline(inherited) &&
             conformanceDeclaredInModule(M, nominal, inherited)) {
           protocolsToPrint.push_back({inherited, protoAndAvailability.second});
@@ -466,17 +469,20 @@ public:
 
     for (const auto &protoAndAvailability : protocolsToPrint) {
       StreamPrinter printer(out);
+      ProtocolDecl *proto = protoAndAvailability.first;
+
       // FIXME: Shouldn't this be an implicit conversion?
       TinyPtrVector<const DeclAttribute *> attrs;
       attrs.insert(attrs.end(), protoAndAvailability.second.begin(),
                    protoAndAvailability.second.end());
+      auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
+      attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
       DeclAttributes::print(printer, printOptions, attrs);
 
       printer << "extension ";
       nominal->getDeclaredType().print(printer, printOptions);
       printer << " : ";
 
-      ProtocolDecl *proto = protoAndAvailability.first;
       proto->getDeclaredInterfaceType()->print(printer, printOptions);
 
       printer << " {}\n";
