@@ -338,6 +338,25 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
+  DeclNameRef LookupName = Name;
+  if (Name.isCompoundName()) {
+    auto &context = DC->getASTContext();
+
+    // Remove any $ prefixes for lookup
+    SmallVector<Identifier, 4> lookupLabels;
+    for (auto label : Name.getArgumentNames()) {
+      if (label.hasDollarPrefix()) {
+        auto unprefixed = label.str().drop_front();
+        lookupLabels.push_back(context.getIdentifier(unprefixed));
+      } else {
+        lookupLabels.push_back(label);
+      }
+    }
+
+    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
+    LookupName = DeclNameRef(lookupName);
+  }
+
   auto errorResult = [&]() -> Expr * {
     if (replaceInvalidRefsWithErrors)
       return new (DC->getASTContext()) ErrorExpr(UDRE->getSourceRange());
@@ -362,7 +381,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   if (Loc.isValid() && !Name.isOperator()) {
     SmallVector<ValueDecl *, 2> localDecls;
     ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               Name.getFullName(), Loc,
+                               LookupName.getFullName(), Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -376,7 +395,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (Loc.isInvalid())
       DC = DC->getModuleScopeContext();
 
-    Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
+    Lookup = TypeChecker::lookupUnqualified(DC, LookupName, Loc, lookupOptions);
 
     ValueDecl *localDeclAfterUse = nullptr;
     auto isValid = [&](ValueDecl *D) {
@@ -435,7 +454,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-        TypeChecker::lookupUnqualified(DC, Name, Loc, relookupOptions);
+        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
