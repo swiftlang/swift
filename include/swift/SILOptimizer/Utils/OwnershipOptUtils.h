@@ -19,6 +19,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_OWNERSHIPOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_OWNERSHIPOPTUTILS_H
 
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILModule.h"
@@ -76,6 +77,17 @@ struct OwnershipFixupContext {
     extraAddressFixupInfo.intPtrOp = InteriorPointerOperand();
   }
 
+  /// Gets access to the joint post dominance computer and clears it after \p
+  /// callback.
+  template <typename ResultTy>
+  ResultTy withJointPostDomComputer(
+      function_ref<ResultTy(JointPostDominanceSetComputer &)> callback) {
+    // Make sure we clear the joint post dom computer after callback.
+    SWIFT_DEFER { jointPostDomSetComputer.clear(); };
+    // Then return callback passing in the computer.
+    return callback(jointPostDomSetComputer);
+  }
+
 private:
   /// Helper method called to determine if we discovered we needed interior
   /// pointer fixups while simplifying.
@@ -127,6 +139,37 @@ public:
 private:
   SILBasicBlock::iterator replaceAddressUses(SingleValueInstruction *oldValue,
                                              SILValue newValue);
+};
+
+/// A utility composed ontop of OwnershipFixupContext that knows how to replace
+/// a single use of a value with another value with a different ownership. We
+/// allow for the values to have different types.
+///
+/// NOTE: When not in OSSA, this just performs a normal set use, so this code is
+/// safe to use with all code.
+class OwnershipReplaceSingleUseHelper {
+  OwnershipFixupContext *ctx;
+  Operand *use;
+  SILValue newValue;
+
+public:
+  OwnershipReplaceSingleUseHelper()
+      : ctx(nullptr), use(nullptr), newValue(nullptr) {}
+
+  /// Return an instance of this class if we support replacing \p use->get()
+  /// with \p newValue.
+  ///
+  /// NOTE: For now we only support objects, not addresses so addresses will
+  /// always yield an invalid helper.
+  OwnershipReplaceSingleUseHelper(OwnershipFixupContext &ctx, Operand *use,
+                                  SILValue newValue);
+
+  /// Returns true if this helper was initialized into a valid state.
+  operator bool() const { return isValid(); }
+  bool isValid() const { return bool(ctx) && bool(use) && bool(newValue); }
+
+  /// Perform the actual RAUW.
+  SILBasicBlock::iterator perform();
 };
 
 } // namespace swift

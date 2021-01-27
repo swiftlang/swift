@@ -1613,14 +1613,14 @@ bb2:
 sil [ossa] @weird_function : $@convention(thin) (@inout E, @guaranteed E, Builtin.Int1) -> ()
 
 // CHECK-LABEL: sil [ossa] @convert_function_simplification : $@convention(thin) (@inout B, @guaranteed B, Builtin.Int1) -> () {
-// XHECK: bb0([[ADDR:%[0-9]+]] : $*B, [[REF:%[0-9]+]] : @guaranteed $B, [[NA:%[0-9]+]] : $Builtin.Int1):
-// XHECK-NEXT: function_ref weird_function
-// XHECK-NEXT: [[FUN:%[0-9]+]] = function_ref @weird_function : $@convention(thin) (@inout E, @guaranteed E, Builtin.Int1) -> ()
-// XHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast %0 : $*B to $*E
-// XHECK-NEXT: [[REF_CAST:%[0-9]+]] = unchecked_ref_cast %1 : $B to $E
-// XHECK-NEXT: apply [[FUN]]([[ADDR_CAST]], [[REF_CAST]], [[NA]])
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0([[ADDR:%[0-9]+]] : $*B, [[REF:%[0-9]+]] : @guaranteed $B, [[NA:%[0-9]+]] : $Builtin.Int1):
+// CHECK-NEXT: function_ref weird_function
+// CHECK-NEXT: [[FUN:%[0-9]+]] = function_ref @weird_function : $@convention(thin) (@inout E, @guaranteed E, Builtin.Int1) -> ()
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast %0 : $*B to $*E
+// CHECK-NEXT: [[REF_CAST:%[0-9]+]] = unchecked_ref_cast %1 : $B to $E
+// CHECK-NEXT: apply [[FUN]]([[ADDR_CAST]], [[REF_CAST]], [[NA]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @convert_function_simplification : $@convention(thin) (@inout B, @guaranteed B, Builtin.Int1) -> () {
 bb0(%0 : $*B, %1 : @guaranteed $B, %2 : $Builtin.Int1):
   %3 = function_ref @weird_function : $@convention(thin) (@inout E, @guaranteed E, Builtin.Int1) -> ()
@@ -4371,8 +4371,9 @@ bb0(%0 : $@thin T.Type):
 }
 
 // CHECK-LABEL: sil [ossa] @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
-// XHECK:       bb0(%0 : @guaranteed $@callee_guaranteed () -> @out ()):
-// XHECK:         apply %0
+// CHECK:       bb0(%0 : @guaranteed $@callee_guaranteed () -> @out ()):
+// CHECK-NOT:      convert_function
+// CHECK: } // end sil function 'convert_function_substitution'
 sil [ossa] @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () {
 bb0(%0 : @guaranteed $@callee_guaranteed () -> @out ()):
   %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed @substituted <A> () -> @out A for <()>
@@ -4383,6 +4384,8 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> @out ()):
 }
 
 // CHECK-LABEL: sil [ossa] @convert_function_substitution_pa :
+// CHECK-NOT: convert_function
+// CHECK: } // end sil function 'convert_function_substitution_pa'
 sil [ossa] @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
 bb0(%0 : @guaranteed $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
   %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
