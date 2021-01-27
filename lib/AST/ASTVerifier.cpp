@@ -3686,15 +3686,36 @@ public:
   };
 } // end anonymous namespace
 
+static bool shouldVerifyGivenContext(const ASTContext &ctx) {
+  using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
+  switch (ctx.LangOpts.ASTVerifierOverride) {
+  case ASTVerifierOverrideKind::EnableVerifier:
+    return true;
+  case ASTVerifierOverrideKind::DisableVerifier:
+    return false;
+  case ASTVerifierOverrideKind::NoOverride:
+#ifndef NDEBUG
+    // asserts. Default behavior is to run.
+    return true;
+#else
+    // no-asserts. Default behavior is not to run the verifier.
+    return false;
+#endif
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
 void swift::verify(SourceFile &SF) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  if (!shouldVerifyGivenContext(SF.getASTContext()))
+    return;
   Verifier verifier(SF, &SF);
   SF.walk(verifier);
-#endif
 }
 
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  if (!shouldVerifyGivenContext(Context))
+    return false;
+
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldVerify(ED->getExtendedNominal(), Context);
   }
@@ -3706,15 +3727,13 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
   }
 
   return true;
-#else
-  return false;
-#endif
 }
 
 void swift::verify(Decl *D) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+  if (!shouldVerifyGivenContext(D->getASTContext()))
+    return;
+
   Verifier V = Verifier::forDecl(D);
   D->walk(V);
-#endif
 }
 
