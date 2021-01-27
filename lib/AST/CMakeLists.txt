@@ -144,14 +144,3 @@ endif()
 # headers.
 # For more information see the comment at the top of lib/CMakeLists.txt.
 add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
-
-set(swift_ast_verifier_flag)
-if(SWIFT_AST_VERIFIER)
-  set(swift_ast_verifier_flag " -USWIFT_DISABLE_AST_VERIFIER")
-else()
-  set(swift_ast_verifier_flag " -DSWIFT_DISABLE_AST_VERIFIER=1")
-endif()
-
-set_property(SOURCE ASTVerifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
-  "${swift_ast_verifier_flag}")
-

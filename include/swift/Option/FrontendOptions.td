@@ -769,4 +769,20 @@ def bad_file_descriptor_retry_count:
   Separate<["-"], "bad-file-descriptor-retry-count">,
   HelpText<"Number of retrying opening a file if previous open returns a bad "
            "file descriptor error.">;
+
+def enable_ast_verifier : Flag<["-"], "enable-ast-verifier">,
+  HelpText<"Run the AST verifier during compilation. NOTE: This lets the user "
+           "override the default behavior on whether or not the ASTVerifier "
+           "is run. The default behavior is to run the verifier when asserts "
+           "are enabled and not run it when asserts are disabled. NOTE: "
+           "Can not be used if disable-ast-verifier is used as well">;
+
+def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
+  HelpText<"Do not run the AST verifier during compilation. NOTE: This lets "
+           "the user override the default behavior on whether or not the "
+           "ASTVerifier is run. The default behavior is to run the verifier "
+           "when asserts are enabled and not run it when asserts are "
+           "disabled. NOTE: Can not be used if enable-ast-verifier is used "
+           "as well">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
