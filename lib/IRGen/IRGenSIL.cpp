@@ -6133,14 +6133,22 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   CanType baseTy = i->getLookupType();
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
+  auto fnType = IGM.getSILTypes().getConstantFunctionType(
+      IGM.getMaximalTypeExpansionContext(), member);
 
   assert(member.requiresNewWitnessTableEntry());
 
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {
-    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
-    auto fnType = IGM.getSILTypes().getConstantFunctionType(
-        IGM.getMaximalTypeExpansionContext(), member);
+    llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
+
+    if (fnType->isAsync()) {
+      auto *fnPtrType = fnPtr->getType();
+      fnPtr = IGM.getAddrOfAsyncFunctionPointer(
+          LinkEntity::forDispatchThunk(member));
+      fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
+    }
+
     auto sig = IGM.getSignature(fnType);
     auto fn = FunctionPointer::forDirect(fnType, fnPtr, sig);
 
@@ -6340,7 +6348,15 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   if (IGM.hasResilientMetadata(classDecl,
                                ResilienceExpansion::Maximal)) {
-    auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
+    llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
+
+    if (methodType->isAsync()) {
+      auto *fnPtrType = fnPtr->getType();
+      fnPtr = IGM.getAddrOfAsyncFunctionPointer(
+          LinkEntity::forDispatchThunk(method));
+      fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
+    }
+
     auto sig = IGM.getSignature(methodType);
     FunctionPointer fn(methodType, fnPtr, sig);
 
