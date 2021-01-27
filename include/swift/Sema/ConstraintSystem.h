@@ -1375,6 +1375,17 @@ enum class ConstraintSystemFlags {
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
   ForCodeCompletion = 0x40,
+
+  /// Include Clang function types when checking equality for function types.
+  ///
+  /// When LangOptions.UseClangFunctionTypes is set, we can synthesize
+  /// different @convention(c) function types with the same parameter and result
+  /// types (similarly for blocks). This difference is reflected in the `cType:`
+  /// field (@convention(c, cType: ...)). When the cType is different, the types
+  /// should be treated as semantically different, as they may have different
+  /// calling conventions, say due to Clang attributes such as
+  /// `__attribute__((ns_consumed))`.
+  UseClangFunctionTypes = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.

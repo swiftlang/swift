@@ -760,8 +760,9 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   bool InSynthesizedExtension = false;
   if (BaseType) {
     if (auto Target = BaseType->getAnyNominal()) {
-      SynthesizedExtensionAnalyzer Analyzer(Target,
-                                          PrintOptions::printModuleInterface());
+      SynthesizedExtensionAnalyzer Analyzer(
+          Target, PrintOptions::printModuleInterface(
+                      Invoc.getFrontendOptions().PrintFullConvention));
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
     }
   }

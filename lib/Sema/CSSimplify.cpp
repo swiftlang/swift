@@ -1557,19 +1557,38 @@ isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
        || isThickRepresentation(potentialSuperRepr);
 }
 
-/// Returns true if `constraint rep1 rep2` is satisfied.
-static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
-                                         FunctionTypeRepresentation rep2,
-                                         ConstraintKind kind) {
+/// Returns true if `constraint extInfo1 extInfo2` is satisfied.
+static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
+                                         FunctionType::ExtInfo einfo2,
+                                         ConstraintKind kind,
+                                         ConstraintSystemOptions options) {
+  auto rep1 = einfo1.getRepresentation();
+  auto rep2 = einfo2.getRepresentation();
+  bool clangTypeMismatch =
+      (options.contains(ConstraintSystemFlags::UseClangFunctionTypes) &&
+       (einfo1.getClangTypeInfo() != einfo2.getClangTypeInfo()));
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
-    return rep1 == rep2;
-      
+    return (rep1 == rep2) && !clangTypeMismatch;
+
   case ConstraintKind::Subtype: {
-    return isSubtypeOf(rep1, rep2);
+    // Breakdown of cases:
+    // 1. isSubtypeOf(rep1, rep2) == false (hence rep1 != rep2):
+    //    In this case, this function will return false, indicating that we
+    //    can't convert. E.g. you can't convert from @convention(swift) to
+    //    @convention(c).
+    // 2. isSubtypeOf(rep1, rep2) == true and rep1 != rep2:
+    //    In this case, this function will return true, indicating that we
+    //    can convert, because the Clang type doesn't matter when converting
+    //    between different representations. E.g. it is okay to convert from
+    //    @convention(c) (regardless of cType) to @convention(swift).
+    // 3. isSubtypeOf(rep1, rep2) == true and rep1 == rep2:
+    //    In this case, the function returns !clangTypeMismatch, as we forbid
+    //    conversions between @convention(c) functions with different cTypes.
+    return isSubtypeOf(rep1, rep2) && ((rep1 != rep2) || !clangTypeMismatch);
   }
 
   // [NOTE: diagnose-swift-to-c-convention-change]: @convention(swift) ->
@@ -1588,6 +1607,19 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+    // For now, forbid conversion if representations match but cTypes differ.
+    //
+    // let f : @convention(c, cType: "id (*)(void) __attribute__((ns_returns_retained))")
+    //           () -> AnyObject = ...
+    // let _ : @convention(c, cType: "id (*)(void)")
+    //           () -> AnyObject = f // error
+    // let g : @convention(c, cType: "void (*)(void *)")
+    //           (OpaquePointer?) -> () = ...
+    // let _ : @convention(c, cType: "void (*)(MyCtx *)")
+    //           (OpaquePointer?) -> () = g // error
+    if ((rep1 == rep2) && clangTypeMismatch) {
+      return false;
+    }
     return true;
 
   case ConstraintKind::OpaqueUnderlyingType:
@@ -1908,9 +1940,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
-  if (!matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
-                                    func2->getExtInfo().getRepresentation(),
-                                    kind)) {
+  if (!matchFunctionRepresentations(func1->getExtInfo(), func2->getExtInfo(),
+                                    kind, Options)) {
     return getTypeMatchFailure(locator);
   }
 

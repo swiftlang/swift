@@ -286,7 +286,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     return true;
   }
 
-  PrintOptions Options = PrintOptions::printModuleInterface();
+  PrintOptions Options = PrintOptions::printModuleInterface(
+      Ctx.TypeCheckerOpts.PrintFullConvention);
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
@@ -313,7 +314,8 @@ static bool getHeaderInterfaceInfo(ASTContext &Ctx,
     return true;
   }
 
-  PrintOptions Options = PrintOptions::printModuleInterface();
+  PrintOptions Options = PrintOptions::printModuleInterface(
+      Ctx.TypeCheckerOpts.PrintFullConvention);
 
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
@@ -336,7 +338,8 @@ SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
   IFaceGenCtx->Impl.ModuleOrHeaderName = SourceFileName.str();
   IFaceGenCtx->Impl.AstUnit = AstUnit;
 
-  PrintOptions Options = PrintOptions::printSwiftFileInterface();
+  PrintOptions Options = PrintOptions::printSwiftFileInterface(
+      Invocation.getFrontendOptions().PrintFullConvention);
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(IFaceGenCtx->Impl.Info, OS);
