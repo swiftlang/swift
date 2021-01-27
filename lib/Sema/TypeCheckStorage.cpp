@@ -2439,8 +2439,12 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 
   // Compute the name of the storage type.
   SmallString<64> nameBuf;
-  nameBuf = "$";
-  nameBuf += var->getName().str();
+  if (var->getName().hasDollarPrefix()) {
+    nameBuf = var->getName().str();
+  } else {
+    nameBuf = "$";
+    nameBuf += var->getName().str();
+  }
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the property.
@@ -2695,7 +2699,10 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = var->getASTContext();
   SmallString<64> nameBuf;
   nameBuf = "_";
-  nameBuf += var->getName().str();
+  if (var->getName().hasDollarPrefix())
+    nameBuf += var->getName().str().drop_front();
+  else
+    nameBuf += var->getName().str();
   Identifier name = ctx.getIdentifier(nameBuf);
 
   auto dc = var->getDeclContext();
