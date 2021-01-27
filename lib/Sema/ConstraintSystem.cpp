@@ -88,6 +88,9 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
   }
   if (Context.LangOpts.UseClangFunctionTypes)
     Options |= ConstraintSystemFlags::UseClangFunctionTypes;
+
+  if (Context.TypeCheckerOpts.DisableImplicitDoubleCGFloatConversion)
+    Options |= ConstraintSystemFlags::DisableImplicitDoubleCGFloatConversion;
 }
 
 ConstraintSystem::~ConstraintSystem() {

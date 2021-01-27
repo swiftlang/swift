@@ -244,6 +244,9 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
+def disable_implicit_double_cgfloat_conversion : Flag<["-"], "disable-implicit-double-cgfloat-conversion">,
+  HelpText<"Disable implicit conversion between Double and CGFloat types">;
+
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
 

@@ -579,6 +579,9 @@ namespace swift {
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
+
+    /// Disallow Double and CGFloat types to be used interchangeably.
+    bool DisableImplicitDoubleCGFloatConversion = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
