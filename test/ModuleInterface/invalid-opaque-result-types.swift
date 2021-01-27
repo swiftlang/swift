@@ -19,5 +19,5 @@
 
 // CHECK: cannot find type 'InvalidParameter' in scope
 // CHECK: unable to resolve type for _opaqueReturnTypeOf attribute
-// CHECK: failed to build module 'InvalidOpaqueResultType' from its module interface
+// CHECK: failed to build module 'InvalidOpaqueResultType' for importation
 import InvalidOpaqueResultType
