@@ -339,9 +339,10 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
     return;
   }
 
-  SynthesizedExtensionAnalyzer
-  ExtensionAnalyzer(const_cast<NominalTypeDecl*>(OwningNominal),
-      PrintOptions::printModuleInterface());
+  SynthesizedExtensionAnalyzer ExtensionAnalyzer(
+      const_cast<NominalTypeDecl *>(OwningNominal),
+      PrintOptions::printModuleInterface(
+          OwningNominal->getASTContext().TypeCheckerOpts.PrintFullConvention));
   auto MergeGroupKind = SynthesizedExtensionAnalyzer::MergeGroupKind::All;
   ExtensionAnalyzer.forEachExtensionMergeGroup(MergeGroupKind,
       [&](ArrayRef<ExtensionInfo> ExtensionInfos){

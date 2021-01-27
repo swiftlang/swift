@@ -902,7 +902,8 @@ static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
     SmallString<512> TempBuf;
     llvm::raw_svector_ostream TempOS(TempBuf);
 
-    PrintOptions PO = PrintOptions::printInterface();
+    PrintOptions PO = PrintOptions::printInterface(
+        Invocation.getFrontendOptions().PrintFullConvention);
     PO.PrintOriginalSourceText = true;
     PO.Indent = 2;
     PO.PrintAccess = false;

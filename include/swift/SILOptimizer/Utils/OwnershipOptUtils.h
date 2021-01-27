@@ -121,7 +121,8 @@ public:
   /// "forwarding" transformation must be performed upon \p newValue at \p
   /// oldValue's insertion point so that we can then here RAUW the transformed
   /// \p newValue.
-  SILBasicBlock::iterator perform();
+  SILBasicBlock::iterator
+  perform(SingleValueInstruction *maybeTransformedNewValue = nullptr);
 
 private:
   SILBasicBlock::iterator replaceAddressUses(SingleValueInstruction *oldValue,

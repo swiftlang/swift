@@ -1393,7 +1393,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     // Eliminating the trampoline can expose opportunities to improve the
     // new block we branch to.
     if (LoopHeaders.count(DestBB))
-      LoopHeaders.insert(BB);
+      LoopHeaders.insert(trampolineDest.destBB);
 
     addToWorklist(trampolineDest.destBB);
     BI->eraseFromParent();

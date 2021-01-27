@@ -269,7 +269,7 @@ public:
     }
     auto Res = Path.getValue().createExtract(Val, &*InsertPt, true);
     if (Val != Base) {
-      Res = makeCopiedValueAvailable(Res, Inst->getParent(),
+      Res = makeCopiedValueAvailable(Res, Inst->getParentBlock(),
                                      jointPostDomComputer);
       Builder.emitEndBorrowOperation(InsertPt->getLoc(), Val);
       // Insert a destroy on the Base

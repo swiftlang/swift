@@ -14,6 +14,7 @@
 struct Point {
   var x: Int
   var y: Int
+  var z: Int? = nil
 
   mutating func setComponents(x: inout Int, y: inout Int) async {
     defer { (x, y) = (self.x, self.y) }
@@ -22,10 +23,12 @@ struct Point {
 }
 
 actor class TestActor {
+  // expected-note@+1{{mutable state is only available within the actor instance}}
   var position = Point(x: 0, y: 0)
   var nextPosition = Point(x: 0, y: 1)
   var value1: Int = 0
   var value2: Int = 1
+  var points: [Point] = []
 }
 
 func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
@@ -56,6 +59,15 @@ extension TestActor {
     // expected-error@+1{{actor-isolated property 'position' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&position.x)
   }
+
+  func nestedExprs() async {
+    // expected-error@+1{{actor-isolated property 'position' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&position.z!)
+
+    // expected-error@+1{{actor-isolated property 'points' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&points[0].z!)
+  }
+
 }
 
 // internal method call
@@ -132,6 +144,40 @@ extension TestActor {
   }
 }
 
+actor class MyActor {
+  var points: [Point] = []
+  var int: Int = 0
+  var maybeInt: Int?
+  var maybePoint: Point?
+  var myActor: TestActor = TestActor()
+
+  // Checking that various ways of unwrapping emit the right error messages at
+  // the right times and that illegal operations are caught
+  func modifyStuff() async {
+    // expected-error@+1{{actor-isolated property 'points' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&points[0].x)
+    // expected-error@+1{{actor-isolated property 'points' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&points[0].z!)
+    // expected-error@+1{{actor-isolated property 'int' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&int)
+    // expected-error@+1{{actor-isolated property 'maybeInt' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&maybeInt!)
+    // expected-error@+1{{actor-isolated property 'maybePoint' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&maybePoint!.z!)
+    // expected-error@+1{{actor-isolated property 'int' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&(int))
+
+    // This warning is emitted because this fails to typecheck before the
+    // async-ness is attached.
+    // expected-warning@+2{{no calls to 'async' functions occur within 'await' expression}}
+    // expected-error@+1{{cannot pass immutable value of type 'Int' as inout argument}}
+    await modifyAsynchronously(&(maybePoint?.z)!)
+    // expected-error@+2{{actor-isolated property 'position' can only be referenced inside the actor}}
+    // expected-error@+1{{actor-isolated property 'myActor' cannot be passed 'inout' to 'async' function call}}
+    await modifyAsynchronously(&myActor.position.x)
+  }
+}
+
 // Verify global actor protection
 
 @globalActor
@@ -159,3 +205,17 @@ func globalSyncFunction(_ foo: inout Int) { }
 @MyGlobalActor func globalActorAsyncOkay() async { globalActorSyncFunction(&number) }
 @MyGlobalActor func globalActorAsyncOkay2() async { globalSyncFunction(&number) }
 @MyGlobalActor func globalActorSyncOkay() { globalSyncFunction(&number) }
+
+// Gently unwrap things that are fine
+struct Cat {
+  mutating func meow() async { }
+}
+
+struct Dog {
+  var cat: Cat?
+
+  mutating func woof() async {
+    // This used to cause the compiler to crash, but should be fine
+    await cat?.meow()
+  }
+}

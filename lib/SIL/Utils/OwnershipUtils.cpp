@@ -26,29 +26,31 @@ bool swift::isValueAddressOrTrivial(SILValue v) {
 }
 
 // These operations forward both owned and guaranteed ownership.
-static bool isOwnershipForwardingInstructionKind(SILInstructionKind kind) {
+//
+// FIXME: Should be implemented as a SILInstruction type check-cast.
+static bool isOwnershipForwardingValueKind(SILNodeKind kind) {
   switch (kind) {
-  case SILInstructionKind::TupleInst:
-  case SILInstructionKind::StructInst:
-  case SILInstructionKind::EnumInst:
-  case SILInstructionKind::DifferentiableFunctionInst:
-  case SILInstructionKind::LinearFunctionInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::UpcastInst:
-  case SILInstructionKind::UncheckedValueCastInst:
-  case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::ConvertFunctionInst:
-  case SILInstructionKind::RefToBridgeObjectInst:
-  case SILInstructionKind::BridgeObjectToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::SwitchEnumInst:
-  case SILInstructionKind::CheckedCastBranchInst:
-  case SILInstructionKind::DestructureStructInst:
-  case SILInstructionKind::DestructureTupleInst:
-  case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::InitExistentialRefInst:
+  case SILNodeKind::TupleInst:
+  case SILNodeKind::StructInst:
+  case SILNodeKind::EnumInst:
+  case SILNodeKind::DifferentiableFunctionInst:
+  case SILNodeKind::LinearFunctionInst:
+  case SILNodeKind::OpenExistentialRefInst:
+  case SILNodeKind::UpcastInst:
+  case SILNodeKind::UncheckedValueCastInst:
+  case SILNodeKind::UncheckedRefCastInst:
+  case SILNodeKind::ConvertFunctionInst:
+  case SILNodeKind::RefToBridgeObjectInst:
+  case SILNodeKind::BridgeObjectToRefInst:
+  case SILNodeKind::UnconditionalCheckedCastInst:
+  case SILNodeKind::UncheckedEnumDataInst:
+  case SILNodeKind::SelectEnumInst:
+  case SILNodeKind::SwitchEnumInst:
+  case SILNodeKind::CheckedCastBranchInst:
+  case SILNodeKind::DestructureStructInst:
+  case SILNodeKind::DestructureTupleInst:
+  case SILNodeKind::MarkDependenceInst:
+  case SILNodeKind::InitExistentialRefInst:
     return true;
   default:
     return false;
@@ -57,17 +59,17 @@ static bool isOwnershipForwardingInstructionKind(SILInstructionKind kind) {
 
 // These operations forward guaranteed ownership, but don't necessarily forward
 // owned values.
-static bool isGuaranteedForwardingInstructionKind(SILInstructionKind kind) {
+static bool isGuaranteedForwardingValueKind(SILNodeKind kind) {
   switch (kind) {
-  case SILInstructionKind::TupleExtractInst:
-  case SILInstructionKind::StructExtractInst:
-  case SILInstructionKind::DifferentiableFunctionExtractInst:
-  case SILInstructionKind::LinearFunctionExtractInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILNodeKind::TupleExtractInst:
+  case SILNodeKind::StructExtractInst:
+  case SILNodeKind::DifferentiableFunctionExtractInst:
+  case SILNodeKind::LinearFunctionExtractInst:
+  case SILNodeKind::OpenExistentialValueInst:
+  case SILNodeKind::OpenExistentialBoxValueInst:
     return true;
   default:
-    return isOwnershipForwardingInstructionKind(kind);
+    return isOwnershipForwardingValueKind(kind);
   }
 }
 
@@ -81,21 +83,19 @@ bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
         return true;
       }
 
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return false;
-
-  bool result = isGuaranteedForwardingInstructionKind(inst->getKind());
+  auto *node = value->getRepresentativeSILNodeInObject();
+  bool result = isGuaranteedForwardingValueKind(node->getKind());
   if (result) {
-    assert(!isa<OwnedFirstArgForwardingSingleValueInst>(inst));
-    assert(OwnershipForwardingMixin::isa(inst));
+    assert(!isa<OwnedFirstArgForwardingSingleValueInst>(node));
+    assert(OwnershipForwardingMixin::isa(node));
   }
   return result;
 }
 
 bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
   auto *user = use->getUser();
-  bool result = isOwnershipForwardingInstructionKind(user->getKind());
+  auto kind = user->getKind();
+  bool result = isOwnershipForwardingValueKind(SILNodeKind(kind));
   if (result) {
     assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(user));
     assert(OwnershipForwardingMixin::isa(user));
@@ -103,12 +103,12 @@ bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
   return result;
 }
 
-static bool isOwnedForwardingValueKind(SILInstructionKind kind) {
+static bool isOwnedForwardingValueKind(SILNodeKind kind) {
   switch (kind) {
-  case SILInstructionKind::MarkUninitializedInst:
+  case SILNodeKind::MarkUninitializedInst:
     return true;
   default:
-    return isOwnershipForwardingInstructionKind(kind);
+    return isOwnershipForwardingValueKind(kind);
   }
 }
 
@@ -121,21 +121,19 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
         assert(OwnershipForwardingMixin::isa(predTerm));
         return true;
       }
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return false;
-
-  bool result = isOwnedForwardingValueKind(inst->getKind());
+  auto *node = value->getRepresentativeSILNodeInObject();
+  bool result = isOwnedForwardingValueKind(node->getKind());
   if (result) {
-    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(inst));
-    assert(OwnershipForwardingMixin::isa(inst));
+    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(node));
+    assert(OwnershipForwardingMixin::isa(node));
   }
   return result;
 }
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
-  bool result = isOwnershipForwardingInstructionKind(user->getKind());
+  auto kind = SILNodeKind(user->getKind());
+  bool result = isOwnershipForwardingValueKind(kind);
   if (result) {
     assert(OwnershipForwardingMixin::isa(user));
   }

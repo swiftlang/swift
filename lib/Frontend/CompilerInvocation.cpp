@@ -770,6 +770,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.EnableOneWayClosureParameters |=
       Args.hasArg(OPT_experimental_one_way_closure_params);
 
+  Opts.PrintFullConvention |=
+      Args.hasArg(OPT_experimental_print_full_convention);
+
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 

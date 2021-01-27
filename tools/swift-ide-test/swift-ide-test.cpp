@@ -2733,7 +2733,8 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
   else
     Printer.reset(new StreamPrinter(llvm::outs()));
 
-  PrintOptions Options = PrintOptions::printSwiftFileInterface();
+  PrintOptions Options = PrintOptions::printSwiftFileInterface(
+      InitInvok.getFrontendOptions().PrintFullConvention);
   if (options::PrintOriginalSourceText)
     Options.PrintOriginalSourceText = true;
   printSwiftSourceInterface(*CI.getPrimarySourceFile(), *Printer, Options);
@@ -3946,7 +3947,8 @@ int main(int argc, char *argv[]) {
 
   PrintOptions PrintOpts;
   if (options::PrintInterface) {
-    PrintOpts = PrintOptions::printModuleInterface();
+    PrintOpts = PrintOptions::printModuleInterface(
+        InitInvok.getFrontendOptions().PrintFullConvention);
   } else if (options::PrintInterfaceForDoc) {
     PrintOpts = PrintOptions::printDocInterface();
   } else {
