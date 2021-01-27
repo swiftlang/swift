@@ -184,6 +184,7 @@ module WinSDK [system] {
     // separate module is meant to augment the uncovered portions only.
     module _DXGI {
       header "../shared/dxgi1_6.h"
+      header "dxgidebug.h"
       export *
 
       link "dxgi.lib"
