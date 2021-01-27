@@ -546,7 +546,7 @@ static void eliminateReborrowsOfRecursiveBorrows(
     // Then check if in our destination block, we have further reborrows. If we
     // do, we need to recursively process them.
     auto *borrowedArg =
-        const_cast<SILPhiArgument *>(bi->getArgForOperand(borrowingOperand));
+        const_cast<SILPhiArgument *>(bi->getArgForOperand(*borrowingOperand));
     auto *baseArg =
         insertOwnedBaseValueAlongBranchEdge(bi, innerCopy, callbacks);
     baseBorrowedValuePair.emplace_back(baseArg, borrowedArg);
@@ -574,7 +574,7 @@ static void eliminateReborrowsOfRecursiveBorrows(
       // edge and undef along all other edges.
       auto borrowingOp = BorrowingOperand::get(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
-      auto *newBorrowedPhi = brInst->getArgForOperand(borrowingOp);
+      auto *newBorrowedPhi = brInst->getArgForOperand(*borrowingOp);
       auto *newBasePhi =
           insertOwnedBaseValueAlongBranchEdge(brInst, baseArg, callbacks);
       baseBorrowedValuePair.emplace_back(newBasePhi, newBorrowedPhi);
@@ -639,7 +639,7 @@ rewriteReborrows(SILValue newBorrowedValue,
       // edge and undef along all other edges.
       auto borrowingOp = BorrowingOperand::get(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
-      auto *newBorrowedPhi = brInst->getArgForOperand(borrowingOp);
+      auto *newBorrowedPhi = brInst->getArgForOperand(*borrowingOp);
       auto *newBasePhi =
           insertOwnedBaseValueAlongBranchEdge(brInst, baseArg, callbacks);
       baseBorrowedValuePair.emplace_back(newBasePhi, newBorrowedPhi);
