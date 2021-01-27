@@ -3098,8 +3098,8 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
       }
     }
 
-    PrintOptions Options =
-        PrintOptions::printForDiagnostics(AccessLevel::Private);
+    PrintOptions Options = PrintOptions::printForDiagnostics(
+        AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
     Options.PrintDocumentationComments = false;
     Options.PrintAccess = false;
     Options.SkipAttributes = true;

@@ -359,7 +359,8 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
   }
 
   {
-    PrintOptions PO = PrintOptions::printInterface();
+    PrintOptions PO = PrintOptions::printInterface(
+        D->getASTContext().TypeCheckerOpts.PrintFullConvention);
     PO.PrintAccess = false;
     PO.AccessFilter = AccessLevel::Private;
     PO.PrintDocumentationComments = false;

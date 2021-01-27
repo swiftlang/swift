@@ -442,12 +442,13 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
 /// with the same string representation, it should be qualified during
 /// formatting.
 static bool typeSpellingIsAmbiguous(Type type,
-                                    ArrayRef<DiagnosticArgument> Args) {
+                                    ArrayRef<DiagnosticArgument> Args,
+                                    PrintOptions &PO) {
   for (auto arg : Args) {
     if (arg.getKind() == DiagnosticArgumentKind::Type) {
       auto argType = arg.getAsType();
       if (argType && !argType->isEqual(type) &&
-          argType->getWithoutParens().getString() == type.getString()) {
+          argType->getWithoutParens().getString(PO) == type.getString(PO)) {
         return true;
       }
     }
@@ -543,12 +544,22 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Type type;
     bool needsQualification = false;
 
+    // TODO: We should use PrintOptions::printForDiagnostic here, or we should
+    // rename that method.
+    PrintOptions printOptions{};
+
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
       type = Arg.getAsType()->getWithoutParens();
-      needsQualification = typeSpellingIsAmbiguous(type, Args);
+      if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
+        printOptions.PrintFunctionRepresentationAttrs =
+            PrintOptions::FunctionRepresentationMode::Full;
+      needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     } else {
       assert(Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType);
       type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
+      if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
+        printOptions.PrintFunctionRepresentationAttrs =
+            PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = true;
     }
 
@@ -574,12 +585,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
       auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
 
       Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
-                          type->getString().c_str(),
+                          type->getString(printOptions).c_str(),
                           Decl::getDescriptiveKindName(descriptiveKind).data(),
                           NamingDeclText.c_str());
 
     } else {
-      auto printOptions = PrintOptions();
       printOptions.FullyQualifiedTypes = needsQualification;
       std::string typeName = type->getString(printOptions);
 
@@ -1016,8 +1026,11 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
           TrackingPrinter printer(entries, out, bufferAccessLevel);
-          ppDecl->print(printer,
-                        PrintOptions::printForDiagnostics(bufferAccessLevel));
+          ppDecl->print(
+              printer,
+              PrintOptions::printForDiagnostics(
+                  bufferAccessLevel,
+                  decl->getASTContext().TypeCheckerOpts.PrintFullConvention));
         }
 
         // Build a buffer with the pretty-printed declaration.
