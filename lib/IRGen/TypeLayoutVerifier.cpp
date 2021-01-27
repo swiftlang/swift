@@ -291,8 +291,8 @@ void IRGenModule::emitTypeVerifier() {
     return;
 
   // Find the entry point.
-  SILFunction *EntryPoint =
-    getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+  SILFunction *EntryPoint = getSILModule().lookUpFunction(
+      getSILModule().getASTContext().getEntryPointFunctionName());
 
   if (!EntryPoint)
     return;

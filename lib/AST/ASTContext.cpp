@@ -4841,6 +4841,10 @@ ASTContext::SILTransformCtors ASTContext::getIRGenSILTransforms() const {
   return passes;
 }
 
+std::string ASTContext::getEntryPointFunctionName() const {
+  return LangOpts.entryPointFunctionName;
+}
+
 SILLayout *SILLayout::get(ASTContext &C,
                           CanGenericSignature Generics,
                           ArrayRef<SILField> Fields) {

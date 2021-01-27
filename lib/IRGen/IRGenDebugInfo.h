@@ -89,10 +89,10 @@ public:
   /// artificial inline location pointing to the user's instruction.
   void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope);
 
-  /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
+  /// Set the location for entry point function (main by default).
   void setEntryPointLoc(IRBuilder &Builder);
 
-  /// Return the scope for SWIFT_ENTRY_POINT_FUNCTION.
+  /// Return the scope for the entry point function (main by default).
   llvm::DIScope *getEntryPointFn();
 
   /// Translate a SILDebugScope into an llvm::DIDescriptor.
