@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
+sil_stage canonical
+
 import Builtin
 import Swift
 
@@ -12,9 +14,9 @@ bb0(%x : $Builtin.Int64):
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_add_with_overflow_zeros
-// XHECK-NOT: integer_literal $Builtin.Int64, 0
-// XHECK-NOT: builtin "int_sadd_with_overflow_Int64"
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin "int_sadd_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
@@ -26,9 +28,9 @@ bb0(%x : $Builtin.Int64):
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_add_with_overflow_zeros2
-// XHECK-NOT: integer_literal $Builtin.Int64, 0
-// XHECK-NOT: builtin "int_sadd_with_overflow_Int64"
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin "int_sadd_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
@@ -40,9 +42,9 @@ bb0(%x : $Builtin.Int64):
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_sub_with_overflow_zeros
-// XHECK-NOT: integer_literal $Builtin.Int64, 0
-// XHECK-NOT: builtin "int_ssub_with_overflow_Int64"
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin "int_ssub_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
@@ -54,9 +56,9 @@ bb0(%x : $Builtin.Int64):
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_mul_with_overflow_zeros
-// XHECK-NOT: builtin "int_smul_with_overflow_Int64"
-// XHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 0
-// XHECK-NEXT: return [[RES]] : $Builtin.Int64
+// CHECK-NOT: builtin "int_smul_with_overflow_Int64"
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
 
 // Simplify arithmetic where one operand is a one and the other is not a constant
@@ -68,8 +70,8 @@ bb0(%x : $Builtin.Int64):
  return %19 : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_mul_with_overflow_ones
-// XHECK-NOT: builtin "int_smul_with_overflow_Int64"
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: builtin "int_smul_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify trunc(zext(x)) -> x
@@ -80,8 +82,8 @@ bb0(%x : $Builtin.Word):
   return %80 : $Builtin.Word
 
 // CHECK-LABEL: sil [ossa] @fold_trunc_zext
-// XHECK-NOT: builtin
-// XHECK: return %0 : $Builtin.Word
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Word
 }
 
 // Simplify trunc(sext(x)) -> x
@@ -92,8 +94,8 @@ bb0(%x : $Builtin.Word):
   return %80 : $Builtin.Word
 
 // CHECK-LABEL: sil [ossa] @fold_trunc_sext
-// XHECK-NOT: builtin
-// XHECK: return %0 : $Builtin.Word
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Word
 }
 
 // Simplify trunc((x)) -> x with same type
@@ -103,8 +105,8 @@ bb0(%x : $Builtin.Int64):
   return %trunc : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_trunc_n_to_n
-// XHECK-NOT: builtin
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify sext((x)) -> x with same type
@@ -114,8 +116,8 @@ bb0(%x : $Builtin.Int64):
   return %trunc : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_sext_n_to_n
-// XHECK-NOT: builtin
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
 }
 
 // Simplify zext((x)) -> x with same type
@@ -125,8 +127,8 @@ bb0(%x : $Builtin.Int64):
   return %trunc : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @fold_zext_n_to_n
-// XHECK-NOT: builtin
-// XHECK: return %0 : $Builtin.Int64
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
 }
 
 class IntClass {
@@ -139,16 +141,14 @@ enum SortaOptional1 {
   case Nope, Yup(IntClass)
 }
 
-// In OSSA, we can not simplify this for owned values. We can do so for guaranteed, see rewrap_optional_1a.
-//
 // CHECK-LABEL: sil [ossa] @rewrap_optional_1 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional1 {
+// CHECK-NOT: enum $SortaOptional1
+// CHECK: } // end sil function 'rewrap_optional_1'
 sil [ossa] @rewrap_optional_1 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional1 {
 bb0(%0 : @owned $SortaOptional1):
   switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1(%2 : @owned $IntClass):
-  // XHECK: [[ENUM:%.*]] = enum $SortaOptional1
-  // XHECK: return [[ENUM]]
   %3 = enum $SortaOptional1, #SortaOptional1.Yup!enumelt, %2 : $IntClass
   return %3 : $SortaOptional1
 
@@ -161,9 +161,9 @@ bb2:
 // We can perform this simplification though when we have a guaranteed value.
 //
 // CHECK-LABEL: sil [ossa] @rewrap_optional_1a : $@convention(thin) (@guaranteed SortaOptional1) -> @owned SortaOptional1 {
-// XHECK: bb1(
-// XHECK-NEXT: [[COPY:%.*]] = copy_value %0
-// XHECK-NEXT: return [[COPY]]
+// CHECK: bb1(
+// CHECK-NOT: enum
+// CHECK: } // end sil function 'rewrap_optional_1a'
 sil [ossa] @rewrap_optional_1a : $@convention(thin) (@guaranteed SortaOptional1) -> @owned SortaOptional1 {
 bb0(%0 : @guaranteed $SortaOptional1):
   switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
@@ -189,9 +189,9 @@ bb0(%0 : @owned $SortaOptional1):
   switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1(%2 : @owned $IntClass):
-  // XHECK: bb1([[DATA:%.*]] : @owned $IntClass):
-  // XHECK-NEXT: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, [[DATA]] : $IntClass
-  // XHECK-NEXT: return [[RESULT]]
+  // CHECK: bb1([[DATA:%.*]] : @owned $IntClass):
+  // CHECK-NEXT: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, [[DATA]] : $IntClass
+  // CHECK-NEXT: return [[RESULT]]
   %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, %2 : $IntClass // user: %4
   return %3 : $SortaOptional2                      // id: %4
 
@@ -212,10 +212,10 @@ bb0(%0 : @guaranteed $SortaOptional1):
   switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1(%2 : @guaranteed $IntClass):
-  // XHECK: bb1([[DATA:%.*]] : @guaranteed $IntClass):
-  // XHECK-NEXT: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, [[DATA]] : $IntClass
-  // XHECK-NEXT: [[RESULT_COPY:%.*]] = copy_value [[RESULT]]
-  // XHECK-NEXT: return [[RESULT_COPY]]
+  // CHECK: bb1([[DATA:%.*]] : @guaranteed $IntClass):
+  // CHECK-NEXT: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, [[DATA]] : $IntClass
+  // CHECK-NEXT: [[RESULT_COPY:%.*]] = copy_value [[RESULT]]
+  // CHECK-NEXT: return [[RESULT_COPY]]
   %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, %2 : $IntClass // user: %4
   %3a = copy_value %3 : $SortaOptional2
   return %3a : $SortaOptional2                      // id: %4
@@ -227,10 +227,10 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @combine_enum_data_and_enum
-// XHECK: [[RESULT:%[0-9]+]] = load [trivial] %0
-// XHECK-NOT: unchecked_enum_data
-// XHECK-NOT: enum $GenericEnum
-// XHECK: return [[RESULT]]
+// CHECK: [[RESULT:%[0-9]+]] = load [trivial] %0
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: enum $GenericEnum
+// CHECK: return [[RESULT]]
 sil [ossa] @combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Int> {
 bb0(%0 : $*GenericEnum<Int>):
   %5 = load [trivial] %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
@@ -240,10 +240,10 @@ bb0(%0 : $*GenericEnum<Int>):
 }
 
 // CHECK-LABEL: sil [ossa] @dont_combine_enum_data_and_enum
-// XHECK: load
-// XHECK-NEXT: unchecked_enum_data
-// XHECK-NEXT: enum $GenericEnum
-// XHECK-NEXT: return
+// CHECK: load
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: enum $GenericEnum
+// CHECK-NEXT: return
 sil [ossa] @dont_combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Double> {
 bb0(%0 : $*GenericEnum<Int>):
   %5 = load [trivial] %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
@@ -263,21 +263,21 @@ case Third
 // CHECK-LABEL: sil [ossa] @do_not_use_switch_enum_operand
 sil [ossa] @do_not_use_switch_enum_operand : $@convention(method) (Builtin.Word, Ternary) -> Ternary {
 bb0(%0 : $Builtin.Word, %1 : $Ternary):
-// XHECK: bb0
-// XHECK-NEXT: switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: [[FIRST:bb[0-9a-zA-Z]+]], default [[SECOND:bb[0-9a-zA-Z]+]]
+// CHECK: bb0
+// CHECK-NEXT: switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: [[FIRST:bb[0-9a-zA-Z]+]], default [[SECOND:bb[0-9a-zA-Z]+]]
   switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: bb1, default bb2
 
 bb1:
-// XHECK: [[FIRST]]
-// XHECK: enum $Ternary, #Ternary.Third!enumelt
+// CHECK: [[FIRST]]
+// CHECK: enum $Ternary, #Ternary.Third!enumelt
   %5 = enum $Ternary, #Ternary.Third!enumelt
   br bb3(%5 : $Ternary)
 
 bb2(%default: $Ternary):
-// XHECK: [[SECOND]]
-// XHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $Ternary, #Ternary.First!enumelt
+// CHECK: [[SECOND]]
+// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $Ternary, #Ternary.First!enumelt
   %9 = enum $Ternary, #Ternary.First!enumelt
-// XHECK: br bb3([[RESULT]] : $Ternary)
+// CHECK: br bb3([[RESULT]] : $Ternary)
   br bb3(%9 : $Ternary)
 
 bb3(%11 : $Ternary):
@@ -286,8 +286,8 @@ bb3(%11 : $Ternary):
 
 // xor(xor (a, b), b) -> a
 // CHECK-LABEL: sil [ossa] @simplify_xor1
-// XHECK: bb0
-// XHECK-NEXT: return %0 : $Builtin.Int32
+// CHECK: bb0
+// CHECK-NEXT: return %0 : $Builtin.Int32
 sil [ossa] @simplify_xor1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -297,8 +297,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 
 // xor(xor (a, b), a) -> b
 // CHECK-LABEL: sil [ossa] @simplify_xor2
-// XHECK: bb0
-// XHECK-NEXT: return %1 : $Builtin.Int32
+// CHECK: bb0
+// CHECK-NEXT: return %1 : $Builtin.Int32
 sil [ossa] @simplify_xor2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -308,9 +308,9 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 
 
 // CHECK-LABEL: sil [ossa] @simplify_xor3
-// XHECK: bb0
+// CHECK: bb0
 // xor(b, xor (a, b)) -> a
-// XHECK-NEXT: return %0 : $Builtin.Int32
+// CHECK-NEXT: return %0 : $Builtin.Int32
 sil [ossa] @simplify_xor3 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -328,9 +328,9 @@ struct BitwiseStruct2 {
 }
 
 // CHECK-LABEL: sil [ossa] @simplify_unchecked_bitwise_cast
-// XHECK: bb0
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @simplify_unchecked_bitwise_cast : $@convention(thin) (BitwiseStruct1) -> (BitwiseStruct1, BitwiseStruct1) {
 bb0(%0 : $BitwiseStruct1):
   %1 = unchecked_bitwise_cast %0 : $BitwiseStruct1 to $BitwiseStruct1
@@ -351,9 +351,9 @@ bb0(%0 : $Builtin.Int64):
   return %5 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 
 // CHECK-LABEL: sil [ossa] @simplify_shifts_by_zero
-// XHECK: bb0
-// XHECK-NEXT: %1 = tuple (%0 : $Builtin.Int64, %0 : $Builtin.Int64, %0 : $Builtin.Int64)
-// XHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+// CHECK: bb0
+// CHECK-NEXT: %1 = tuple (%0 : $Builtin.Int64, %0 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 }
 
 public class A {
@@ -371,11 +371,11 @@ public class B {
 // simplify access markers
 
 // CHECK-LABEL: sil [ossa] @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
-// XHECK: bb0(%0 : @guaranteed $A):
-// XHECK-NEXT: [[ADR:%.*]] = ref_element_addr %0 : $A, #A.b
-// XHECK-NEXT: fix_lifetime [[ADR]] : $*B
-// XHECK-NEXT: %{{.*}} = tuple ()
-// XHECK-NEXT: return %{{.*}} : $()
+// CHECK: bb0(%0 : @guaranteed $A):
+// CHECK-NEXT: [[ADR:%.*]] = ref_element_addr %0 : $A, #A.b
+// CHECK-NEXT: fix_lifetime [[ADR]] : $*B
+// CHECK-NEXT: %{{.*}} = tuple ()
+// CHECK-NEXT: return %{{.*}} : $()
 // CHECK: } // end sil function 'simplify_accesssil'
 sil [ossa] @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
 bb0(%0 : @guaranteed $A):
@@ -405,8 +405,8 @@ protocol SomeP {}
 public enum SpecialEnum : SomeP {}
 
 // CHECK-LABEL: sil [ossa] @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
-// XHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
-// XHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
 // CHECK: }  // end sil function 'testSimplifyMetatype'
 sil [ossa] @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
 bb0(%0 : $@thick SpecialEnum.Type):
@@ -419,8 +419,8 @@ bb0(%0 : $@thick SpecialEnum.Type):
 }
 
 // CHECK-LABEL: sil [ossa] @dontSimplifyIndirectMetatype : $@convention(thin) () -> @out @thick Int.Type {
-// XHECK:   [[MT:%[0-9]+]] = metatype $@thick Int.Type
-// XHECK:   store [[MT]] to [trivial] %0
+// CHECK:   [[MT:%[0-9]+]] = metatype $@thick Int.Type
+// CHECK:   store [[MT]] to [trivial] %0
 // CHECK: }  // end sil function 'dontSimplifyIndirectMetatype'
 sil [ossa] @dontSimplifyIndirectMetatype : $@convention(thin) () -> @out @thick Int.Type {
 bb0(%0 : $*@thick Int.Type):

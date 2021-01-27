@@ -8,9 +8,9 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil [ossa] @tst_ssub
-// XHECK: %1 = integer_literal $Builtin.Int32, 0
-// XHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_ssub : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -24,9 +24,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_usub
-// XHECK: %1 = integer_literal $Builtin.Int32, 0
-// XHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_usub : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32._value
@@ -40,9 +40,9 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_sdiv
-// XHECK: %1 = integer_literal $Builtin.Int32, 1
-// XHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 1
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_sdiv : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
@@ -53,9 +53,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_udiv
-// XHECK: %1 = integer_literal $Builtin.Int32, 1
-// XHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 1
+// CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_udiv : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   %1 = integer_literal $Builtin.Int32, 0
@@ -66,9 +66,9 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_srem
-// XHECK: %1 = integer_literal $Builtin.Int32, 0
-// XHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_srem : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
@@ -79,9 +79,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_urem
-// XHECK: %1 = integer_literal $Builtin.Int32, 0
-// XHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_urem : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   %1 = integer_literal $Builtin.Int32, 0
@@ -92,7 +92,7 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_and
-// XHECK: return %0
+// CHECK: return %0
 sil [ossa] @tst_and : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -102,7 +102,7 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_or
-// XHECK: return %0
+// CHECK: return %0
 sil [ossa] @tst_or : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -112,9 +112,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_xor
-// XHECK: %1 = integer_literal $Builtin.Int32, 0
-// XHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int32, 0
+// CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK: return %2
 sil [ossa] @tst_xor : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -124,9 +124,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_eq
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_eq : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -136,9 +136,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_ne
-// XHECK: %1 = integer_literal $Builtin.Int1, 0
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_ne : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -148,9 +148,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_sle
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_sle : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -160,9 +160,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_sge
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_sge : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -172,9 +172,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_slt
-// XHECK: %1 = integer_literal $Builtin.Int1, 0
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_slt : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -184,9 +184,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_sgt
-// XHECK: %1 = integer_literal $Builtin.Int1, 0
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_sgt : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32._value
@@ -196,9 +196,9 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_ule
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_ule : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32._value
@@ -208,9 +208,9 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_uge
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_uge : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32._value
@@ -220,9 +220,9 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_ult
-// XHECK: %1 = integer_literal $Builtin.Int1, 0
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_ult : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32._value
@@ -232,9 +232,9 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_icmp_ugt
-// XHECK: %1 = integer_literal $Builtin.Int1, 0
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_icmp_ugt : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32._value
@@ -244,9 +244,9 @@ bb0(%0 : $UInt32):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_fcmp_ueq
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_fcmp_ueq : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float._value
@@ -256,9 +256,9 @@ bb0(%0 : $Float):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_fcmp_one
-// XHECK: %1 = integer_literal $Builtin.Int1, 0
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, 0
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_fcmp_one : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float._value
@@ -268,9 +268,9 @@ bb0(%0 : $Float):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_fcmp_ule
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_fcmp_ule : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float._value
@@ -280,9 +280,9 @@ bb0(%0 : $Float):
 }
 
 // CHECK-LABEL: sil [ossa] @tst_fcmp_uge
-// XHECK: %1 = integer_literal $Builtin.Int1, -1
-// XHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
-// XHECK: return %2
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
+// CHECK: return %2
 sil [ossa] @tst_fcmp_uge : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float._value
