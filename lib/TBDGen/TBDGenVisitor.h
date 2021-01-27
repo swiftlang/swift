@@ -165,7 +165,8 @@ public:
     // TBD for, and not for any statically linked libraries.
     // FIXME: We should have a SymbolSource for main.
     if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
-      addSymbol("main", SymbolSource::forUnknown());
+      addSymbol(SwiftModule->getASTContext().getEntryPointFunctionName(),
+                SymbolSource::forUnknown());
   }
 
   /// Adds the global symbols associated with the first file.

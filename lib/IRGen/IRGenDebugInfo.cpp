@@ -132,7 +132,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DIFile *MainFile = nullptr;
   /// The current module.
   llvm::DIModule *MainModule = nullptr;
-  /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  /// Scope of entry point function (main by default).
   llvm::DIScope *EntryPointFn = nullptr;
   /// The artificial type decls for named archetypes.
   llvm::StringMap<TypeAliasDecl *> MetadataTypeDeclCache;
@@ -2087,7 +2087,8 @@ llvm::DIScope *IRGenDebugInfoImpl::getEntryPointFn() {
   // Lazily create EntryPointFn.
   if (!EntryPointFn) {
     EntryPointFn = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+        llvm::dwarf::DW_TAG_subroutine_type,
+        IGM.getSILModule().getASTContext().getEntryPointFunctionName(),
         MainFile, MainFile, 0);
   }
   return EntryPointFn;
@@ -2222,7 +2223,8 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
     Scope = getOrCreateContext(SILFn->getDeclContext()->getParent());
 
   // We know that main always comes from MainFile.
-  if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
+  if (LinkageName ==
+      IGM.getSILModule().getASTContext().getEntryPointFunctionName()) {
     File = MainFile;
     Line = 1;
     Name = LinkageName;
@@ -2245,7 +2247,9 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // have a Swift name, does appear prominently in the source code.
   // ObjC thunks should also not show up in the linetable, because we
   // never want to set a breakpoint there.
-  if ((Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION &&
+  if ((Name.empty() &&
+       LinkageName !=
+           IGM.getSILModule().getASTContext().getEntryPointFunctionName() &&
        !isExplicitClosure(SILFn)) ||
       (Rep == SILFunctionTypeRepresentation::ObjCMethod) ||
       isAllocatingConstructor(Rep, DeclCtx)) {
@@ -2282,7 +2286,8 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
     Fn->setSubprogram(SP);
 
   // RAUW the entry point function forward declaration with the real thing.
-  if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
+  if (LinkageName ==
+      IGM.getSILModule().getASTContext().getEntryPointFunctionName()) {
     if (EntryPointFn) {
       assert(EntryPointFn->isTemporary() &&
              "more than one entry point function");
