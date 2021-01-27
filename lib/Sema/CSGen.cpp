@@ -2471,7 +2471,7 @@ namespace {
       // the type variable for the pattern `i`.
       struct CollectVarRefs : public ASTWalker {
         ConstraintSystem &cs;
-        llvm::SmallVector<TypeVariableType *, 4> varRefs;
+        llvm::SmallPtrSet<TypeVariableType *, 4> varRefs;
         bool hasErrorExprs = false;
 
         CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
@@ -2532,10 +2532,12 @@ namespace {
       if (!inferredType || inferredType->hasError())
         return Type();
 
-      CS.addUnsolvedConstraint(
-          Constraint::create(CS, ConstraintKind::DefaultClosureType,
-                             closureType, inferredType, locator,
-                             collectVarRefs.varRefs));
+      SmallVector<TypeVariableType *, 4> referencedVars{
+          collectVarRefs.varRefs.begin(), collectVarRefs.varRefs.end()};
+
+      CS.addUnsolvedConstraint(Constraint::create(
+          CS, ConstraintKind::DefaultClosureType, closureType, inferredType,
+          locator, referencedVars));
 
       CS.setClosureType(closure, inferredType);
       return closureType;

@@ -10549,13 +10549,16 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
       // Extract any type variables present in the parameter's result builder.
-      SmallVector<TypeVariableType *, 4> typeVars;
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
       if (auto builderTy = getOpenedResultBuilderTypeFor(*this, locator))
         builderTy->getTypeVariables(typeVars);
 
+      SmallVector<TypeVariableType *, 4> referencedVars{typeVars.begin(),
+                                                        typeVars.end()};
+
       auto *loc = getConstraintLocator(locator);
       addUnsolvedConstraint(
-          Constraint::create(*this, kind, first, second, loc, typeVars));
+          Constraint::create(*this, kind, first, second, loc, referencedVars));
       return SolutionKind::Solved;
     }
   }

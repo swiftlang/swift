@@ -140,23 +140,16 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
 bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
                                            Type type,
                                            bool *involvesOtherTypeVariables) {
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   type->getTypeVariables(typeVars);
-  bool result = false;
-  for (auto referencedTypeVar : typeVars) {
-    if (referencedTypeVar == typeVar) {
-      result = true;
-      if (!involvesOtherTypeVariables || *involvesOtherTypeVariables)
-        break;
 
-      continue;
-    }
-
-    if (involvesOtherTypeVariables)
-      *involvesOtherTypeVariables = true;
+  bool occurs = typeVars.count(typeVar);
+  if (involvesOtherTypeVariables) {
+    *involvesOtherTypeVariables =
+        occurs ? typeVars.size() > 1 : !typeVars.empty();
   }
 
-  return result;
+  return occurs;
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
