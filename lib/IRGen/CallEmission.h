@@ -103,6 +103,13 @@ public:
                     bool isOutlined);
   void emitToExplosion(Explosion &out, bool isOutlined);
 
+  llvm::CallInst *emitCoroutineAsOrdinaryFunction() {
+    assert(IsCoroutine);
+    IsCoroutine = false;
+
+    return emitCallSite();
+  }
+
   TemporarySet claimTemporaries() {
     // Move the actual temporary set out.
     auto result = std::move(Temporaries);
