@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_MEMBER_TEMPLATES_H
+#define TEST_INTEROP_CXX_TEMPLATES_INPUTS_MEMBER_TEMPLATES_H
+
 struct HasMemberTemplates {
   template <class T> T addSameTypeParams(T a, T b) { return a + b; }
 
@@ -29,3 +32,5 @@ template <class T> struct TemplateClassWithMemberTemplates {
 };
 
 using IntWrapper = TemplateClassWithMemberTemplates<int>;
+
+#endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_MEMBER_TEMPLATES_H

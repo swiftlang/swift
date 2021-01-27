@@ -20,6 +20,8 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/SILBitfield.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
@@ -28,7 +30,6 @@ class SILBasicBlock;
 class SILInstruction;
 class SILModule;
 class SILValue;
-class DeadEndBlocks;
 class SILOwnershipVerifier;
 class SILValueOwnershipChecker;
 
@@ -56,13 +57,11 @@ private:
   friend class SILOwnershipVerifier;
   friend class SILValueOwnershipChecker;
 
-  SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
   DeadEndBlocks &deadEndBlocks;
 
 public:
-  LinearLifetimeChecker(SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                        DeadEndBlocks &deadEndBlocks)
-      : visitedBlocks(visitedBlocks), deadEndBlocks(deadEndBlocks) {}
+  LinearLifetimeChecker(DeadEndBlocks &deadEndBlocks)
+      : deadEndBlocks(deadEndBlocks) {}
 
   /// Returns true that \p value forms a linear lifetime with consuming uses \p
   /// consumingUses, non consuming uses \p nonConsumingUses. Returns false

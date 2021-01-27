@@ -416,6 +416,17 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
   // always clean up any resources that we use!
   SWIFT_DEFER { clear(); };
 
+  /// A set that guards our worklist. Any block before it is added to worklist
+  /// should be checked against visitedBlocks.
+  SILFunction *function = dominatingBlock->getParent();
+  BasicBlockSet visitedBlocks(function);
+
+  /// The set of blocks where we begin our walk.
+  BasicBlockSet initialBlocks(function);
+
+  /// True for blocks which are in blocksThatLeakIfNeverVisited.
+  BasicBlockFlag isLeakingBlock(function);
+
   // Otherwise, we need to compute our joint post dominating set. We do this by
   // performing a backwards walk up the CFG tracking back liveness until we find
   // our dominating block. As we walk up, we keep track of any successor blocks
@@ -429,7 +440,7 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
 
     // We require dominatedBlockSet to be a set and thus assert if we hit it to
     // flag user error to our caller.
-    bool succeededInserting = visitedBlocks.insert(block).second;
+    bool succeededInserting = visitedBlocks.insert(block);
     (void)succeededInserting;
     assert(succeededInserting &&
            "Repeat Elt: dominatedBlockSet should be a set?!");
@@ -441,19 +452,16 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
   while (!worklist.empty()) {
     auto *block = worklist.pop_back_val();
 
-    // First remove block from blocksThatLeakIfNeverVisited if it is there since
-    // we know that it isn't leaking since we are visiting it now.
-    blocksThatLeakIfNeverVisited.remove(block);
-
     // Then if our block is not one of our initial blocks, add the block's
     // successors to blocksThatLeakIfNeverVisited.
-    if (!initialBlocks.count(block)) {
+    if (!initialBlocks.contains(block)) {
       for (auto *succBlock : block->getSuccessorBlocks()) {
-        if (visitedBlocks.count(succBlock))
+        if (visitedBlocks.contains(succBlock))
           continue;
         if (deadEndBlocks.isDeadEnd(succBlock))
           continue;
-        blocksThatLeakIfNeverVisited.insert(succBlock);
+        blocksThatLeakIfNeverVisited.push_back(succBlock);
+        isLeakingBlock.set(succBlock);
       }
     }
 
@@ -465,25 +473,28 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
     // our initial blocks (signaling a loop) and then add it to the worklist if
     // we haven't visited it already.
     for (auto *predBlock : block->getPredecessorBlocks()) {
-      if (initialBlocks.count(predBlock)) {
+      if (initialBlocks.contains(predBlock)) {
         reachableInputBlocks.push_back(predBlock);
         for (auto *succBlock : predBlock->getSuccessorBlocks()) {
-          if (visitedBlocks.count(succBlock))
+          if (visitedBlocks.contains(succBlock))
             continue;
           if (deadEndBlocks.isDeadEnd(succBlock))
             continue;
-          blocksThatLeakIfNeverVisited.insert(succBlock);
+          if (!isLeakingBlock.testAndSet(succBlock))
+            blocksThatLeakIfNeverVisited.push_back(succBlock);
         }
       }
-      if (visitedBlocks.insert(predBlock).second)
+      if (visitedBlocks.insert(predBlock))
         worklist.push_back(predBlock);
     }
   }
 
-  // After our worklist has emptied, any blocks left in
+  // After our worklist has emptied, any not visited blocks in
   // blocksThatLeakIfNeverVisited are "leaking blocks".
-  for (auto *leakingBlock : blocksThatLeakIfNeverVisited)
-    foundJointPostDomSetCompletionBlocks(leakingBlock);
+  for (auto *leakingBlock : blocksThatLeakIfNeverVisited) {
+    if (!visitedBlocks.contains(leakingBlock))
+      foundJointPostDomSetCompletionBlocks(leakingBlock);
+  }
 
   // Then unique our list of reachable input blocks and pass them to our
   // callback.

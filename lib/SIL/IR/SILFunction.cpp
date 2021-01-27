@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-function"
+
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
@@ -24,12 +26,15 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
 #include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
+
+STATISTIC(MaxBitfieldID, "Max value of SILFunction::currentBitfieldID");
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
@@ -212,6 +217,8 @@ SILFunction::~SILFunction() {
          "Function cannot be deleted while function_ref's still exist");
   assert(!newestAliveBitfield &&
          "Not all BasicBlockBitfields deleted at function destruction");
+  if (currentBitfieldID > MaxBitfieldID)
+    MaxBitfieldID = currentBitfieldID;
 }
 
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,

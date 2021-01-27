@@ -3402,6 +3402,42 @@ public:
 class StructDecl final : public NominalTypeDecl {
   SourceLoc StructLoc;
 
+  // We import C++ class templates as generic structs. Then when in Swift code
+  // we want to substitude generic parameters with actual arguments, we
+  // convert the arguments to C++ equivalents and ask Clang to instantiate the
+  // C++ template. Then we import the C++ class template instantiation
+  // as a non-generic structs with a name prefixed with `__CxxTemplateInst`.
+  //
+  // To reiterate:
+  // 1) We need to have a C++ class template declaration in the Clang AST. This
+  //    declaration is simply imported from a Clang module.
+  // 2) We need a Swift generic struct in the Swift AST. This will provide
+  //    template arguments to Clang.
+  // 3) We produce a C++ class template instantiation in the Clang AST
+  //    using 1) and 2). This declaration does not exist in the Clang module
+  //    AST initially in the general case, it's added there on instantiation.
+  // 4) We import the instantiation as a Swift struct, with the name prefixed
+  //    with `__CxxTemplateInst`.
+  //
+  // This causes a problem for serialization/deserialization of the Swift
+  // module. Imagine the Swift struct from 4) is used in the function return
+  // type. We cannot just serialize the non generic Swift struct, because on
+  // deserialization we would need to find its backing Clang declaration
+  // (the C++ class template instantiation), and it won't be found in the
+  // general case. Only the C++ class template from step 1) is in the Clang
+  // AST.
+  //
+  // What we need is to serialize enough information to be
+  // able to instantiate C++ class template on deserialization. It turns out
+  // that all that information is conveniently covered by the BoundGenericType,
+  // which we store in this field. The field is set during the typechecking at
+  // the time when we instantiate the C++ class template.
+  //
+  // Alternative, and likely better solution long term, is to serialize the
+  // C++ class template instantiation into a synthetic Clang module, and load
+  // this Clang module on deserialization.
+  Type TemplateInstantiationType = Type();
+
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
              ArrayRef<TypeLoc> Inherited,
@@ -3445,6 +3481,9 @@ public:
   bool isCxxNonTrivial() const { return Bits.StructDecl.IsCxxNonTrivial; }
 
   void setIsCxxNonTrivial(bool v) { Bits.StructDecl.IsCxxNonTrivial = v; }
+
+  Type getTemplateInstantiationType() const { return TemplateInstantiationType; }
+  void setTemplateInstantiationType(Type t) { TemplateInstantiationType = t; }
 };
 
 /// This is the base type for AncestryOptions. Each flag describes possible

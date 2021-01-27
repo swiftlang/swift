@@ -186,10 +186,9 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     if (!foundNonDeadEnd && haveAnyLocalScopes)
       return false;
     SmallVector<Operand *, 8> scratchSpace;
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
           return !borrowScope.areUsesWithinScope(lr.getAllConsumingUses(),
-                                                 scratchSpace, visitedBlocks,
+                                                 scratchSpace,
                                                  getDeadEndBlocks());
         })) {
       return false;
@@ -206,12 +205,10 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       OwnershipLiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
     auto opPhi = *OwnershipPhiOperand::get(lr.getSingleUnknownConsumingUse());
     SmallVector<Operand *, 8> scratchSpace;
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
 
     bool canOptimizePhi = opPhi.visitResults([&](SILValue value) {
       SWIFT_DEFER {
         scratchSpace.clear();
-        visitedBlocks.clear();
       };
 
       OwnershipLiveRange phiArgLR(value);
@@ -221,7 +218,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
             return !borrowScope.areUsesWithinScope(
-                phiArgLR.getAllConsumingUses(), scratchSpace, visitedBlocks,
+                phiArgLR.getAllConsumingUses(), scratchSpace,
                 getDeadEndBlocks());
           })) {
         return false;
@@ -769,8 +766,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // Ok, we have an owned value. If we do not have any non-destroying consuming
   // uses, see if all of our uses (ignoring destroying uses) are within our
   // parent owned value's lifetime.
-  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
-  LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+  LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

@@ -4,6 +4,8 @@
 template<typename T>
 struct MagicWrapper {};
 
+struct IntWrapper {};
+
 typedef MagicWrapper<int> WrappedMagicInt;
 typedef MagicWrapper<bool> WrappedMagicBool;
 

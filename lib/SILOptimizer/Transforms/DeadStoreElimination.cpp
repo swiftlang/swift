@@ -69,6 +69,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SIL/BasicBlockData.h"
+#include "swift/SIL/SILBitfield.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -359,7 +360,7 @@ private:
   /// data flow iteration. For function that requires more than 1 iteration of
   /// the data flow this is populated when the first time the functions is
   /// walked, i.e. when the we generate the genset and killset.
-  llvm::DenseSet<SILBasicBlock *> BBWithStores;
+  BasicBlockSet BBWithStores;
 
   /// Contains a map between location to their index in the LocationVault.
   /// used to facilitate fast location to index lookup.
@@ -446,7 +447,8 @@ public:
              AliasAnalysis *AA, TypeExpansionAnalysis *TE,
              EpilogueARCFunctionInfo *EAFI,
              llvm::SpecificBumpPtrAllocator<BlockState> &BPA) 
-    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BBToLocState(F) {}
+    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BBToLocState(F),
+      BBWithStores(F) {}
 
   void dump();
 
@@ -568,11 +570,11 @@ DSEContext::ProcessKind DSEContext::getProcessFunctionKind(unsigned StoreCount) 
   // Then this function can be processed in one iteration, i.e. no
   // need to generate the genset and killset.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  BasicBlockSet HandledBBs(F);
   for (SILBasicBlock *B : PO->getPostOrder()) {
     ++BBCount;
-    for (auto &X : B->getSuccessors()) {
-      if (HandledBBs.find(X) == HandledBBs.end()) {
+    for (SILBasicBlock *succ : B->getSuccessors()) {
+      if (!HandledBBs.contains(succ)) {
         RunOneIteration = false;
         break;
       }
@@ -624,7 +626,7 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     // Only process store insts.
     if (isa<StoreInst>(*I)) {
-      if (BBWithStores.find(BB) == BBWithStores.end())
+      if (!BBWithStores.contains(BB))
         BBWithStores.insert(BB);
       processStoreInst(&(*I), DSEKind::ComputeMaxStoreSet);
     }
@@ -660,7 +662,7 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB, bool Optimistic) {
   // and this basic block does not even have StoreInsts, there is no point
   // in processing every instruction in the basic block again as no store
   // will be eliminated. 
-  if (Optimistic && BBWithStores.find(BB) == BBWithStores.end())
+  if (Optimistic && !BBWithStores.contains(BB))
     return;
 
   // Intersect in the successor WriteSetIns. A store is dead if it is not read
@@ -1164,7 +1166,7 @@ void DSEContext::runIterativeDSE() {
   // BBWriteSetIn of a basic block changes, the optimization is rerun on its
   // predecessors.
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  BasicBlockSet HandledBBs(F);
   // Push into reverse post order so that we can pop from the back and get
   // post order.
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
@@ -1175,12 +1177,12 @@ void DSEContext::runIterativeDSE() {
     SILBasicBlock *BB = WorkList.pop_back_val();
     HandledBBs.erase(BB);
     if (processBasicBlockWithGenKillSet(BB)) {
-      for (auto X : BB->getPredecessorBlocks()) {
+      for (SILBasicBlock *pred : BB->getPredecessorBlocks()) {
         // We do not push basic block into the worklist if its already 
         // in the worklist.
-        if (HandledBBs.find(X) != HandledBBs.end())
+        if (HandledBBs.contains(pred))
           continue;
-        WorkList.push_back(X);
+        WorkList.push_back(pred);
       }
     }
   }
