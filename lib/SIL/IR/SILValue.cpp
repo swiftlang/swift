@@ -99,50 +99,26 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 SILBasicBlock *SILNode::getParentBlock() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
+  if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
+  if (auto *Arg = dyn_cast<SILArgument>(this))
     return Arg->getParent();
+  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
+    return MVR->getParent()->getParent();
+  }
   return nullptr;
 }
 
 SILFunction *SILNode::getFunction() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
-    return Inst->getFunction();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
-    return Arg->getFunction();
+  if (auto *parentBlock = getParentBlock())
+    return parentBlock->getParent();
   return nullptr;
 }
 
 SILModule *SILNode::getModule() const {
-  auto *CanonicalNode =
-      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
-  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
-    return &Inst->getModule();
-  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
-    return &Arg->getModule();
+  if (SILFunction *func = getFunction())
+    return &func->getModule();
   return nullptr;
-}
-
-const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
-  assert(getStorageLoc() != SILNodeStorageLocation::Instruction);
-
-  if (isa<SingleValueInstruction>(this)) {
-    assert(hasMultipleSILNodeBases(getKind()));
-    return &static_cast<const SILInstruction &>(
-        static_cast<const SingleValueInstruction &>(
-            static_cast<const ValueBase &>(*this)));
-  }
-
-  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
-    return MVR->getParent();
-  }
-
-  llvm_unreachable("Invalid value for slow path");
 }
 
 /// Get a location for this value.

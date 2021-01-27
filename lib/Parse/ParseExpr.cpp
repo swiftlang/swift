@@ -399,8 +399,17 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (Tok.isContextualKeyword("await")) {
-    if (shouldParseExperimentalConcurrency()) {
+  if (shouldParseExperimentalConcurrency()) {
+    // A function called "async" is possible, so we don't want to replace it
+    // with await.
+    bool isReplaceableAsync = Tok.isContextualKeyword("async") &&
+                              !peekToken().is(tok::l_paren);
+    if (Tok.isContextualKeyword("await") || isReplaceableAsync) {
+      // Error on a replaceable async
+      if (isReplaceableAsync) {
+        diagnose(Tok.getLoc(), diag::expected_await_not_async)
+          .fixItReplace(Tok.getLoc(), "await");
+      }
       SourceLoc awaitLoc = consumeToken();
       ParserResult<Expr> sub =
         parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
@@ -416,12 +425,12 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
         sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
       }
 
-      return sub;
-    } else {
-      // warn that future versions of Swift will parse this token differently.
-      diagnose(Tok.getLoc(), diag::warn_await_keyword)
-        .fixItReplace(Tok.getLoc(), "`await`");
+     return sub;
     }
+  } else if (Tok.isContextualKeyword("await")) {
+    // warn that future versions of Swift will parse this token differently.
+    diagnose(Tok.getLoc(), diag::warn_await_keyword)
+      .fixItReplace(Tok.getLoc(), "`await`");
   }
 
   SourceLoc tryLoc;

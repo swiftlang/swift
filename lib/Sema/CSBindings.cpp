@@ -830,9 +830,9 @@ PotentialBindings ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
 /// \returns the type to bind to, if the binding is okay.
 static Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
   // If the type references the type variable, don't permit the binding.
-  SmallVector<TypeVariableType *, 4> referencedTypeVars;
+  SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
   type->getTypeVariables(referencedTypeVars);
-  if (count(referencedTypeVars, typeVar))
+  if (referencedTypeVars.count(typeVar))
     return None;
 
   // If type variable is not allowed to bind to `lvalue`,
@@ -940,21 +940,9 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   if (type->getWithoutSpecifierType()
           ->lookThroughAllOptionalTypes()
           ->is<DependentMemberType>()) {
-    SmallVector<TypeVariableType *, 4> referencedVars;
-    type->getTypeVariables(referencedVars);
+    type->getTypeVariables(AdjacentVars);
 
-    bool containsSelf = false;
-    for (auto *var : referencedVars) {
-      // Add all type variables encountered in the type except
-      // to the current type variable.
-      if (var != TypeVar) {
-        AdjacentVars.insert(var);
-        continue;
-      }
-
-      containsSelf = true;
-    }
-
+    bool containsSelf = AdjacentVars.erase(TypeVar);
     // If inferred type doesn't contain the current type variable,
     // let's mark bindings as delayed until dependent member type
     // is resolved.
@@ -979,11 +967,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // Check whether we can perform this binding.
   if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
     type = *boundType;
-    if (type->hasTypeVariable()) {
-      SmallVector<TypeVariableType *, 4> referencedVars;
-      type->getTypeVariables(referencedVars);
-      AdjacentVars.insert(referencedVars.begin(), referencedVars.end());
-    }
+    if (type->hasTypeVariable())
+      type->getTypeVariables(AdjacentVars);
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 

@@ -381,43 +381,45 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   void *operator new(size_t) = delete;
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
-             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
              ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second, Type third,
              ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
              DeclContext *useDC, FunctionRefKind functionRefKind,
              ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new value witness constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
              ValueDecl *requirement, DeclContext *useDC,
              FunctionRefKind functionRefKind, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
   Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
              ConstraintFix *fix, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
              Type first, Type second, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
-  
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
   /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
-             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {

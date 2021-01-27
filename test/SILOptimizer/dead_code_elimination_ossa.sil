@@ -275,3 +275,17 @@ bb0(%0 : $*Container):
   return %999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @nested_destructure_tuple :
+// CHECK:      bb0(%0 : @owned $(String, (Int, Int, String))):
+// CHECK-NEXT:   (%1, %2) = destructure_tuple %0 : $(String, (Int, Int, String))
+// CHECK-NEXT:   destroy_value %2
+// CHECK-NEXT:   return %1
+// CHECK:      } // end sil function 'nested_destructure_tuple'
+sil [ossa] @nested_destructure_tuple : $@convention(thin) (@owned (String, (Int, Int, String))) -> @owned String {
+bb0(%0 : @owned $(String, (Int, Int, String))):
+  (%1, %2) = destructure_tuple %0 : $(String, (Int, Int, String))
+  (%3, %4, %5) = destructure_tuple %2 : $(Int, Int, String)
+  destroy_value %5 : $String
+  return %1 : $String
+}
+

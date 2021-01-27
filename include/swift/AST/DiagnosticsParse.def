@@ -960,7 +960,6 @@ ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
       (StringRef, StringRef))
 
-
 // Assignment statement
 ERROR(expected_expr_assignment,none,
       "expected expression in assignment", ())
@@ -987,6 +986,10 @@ NOTE(indent_expression_to_silence,none,
 // Throw Statement
 ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
+
+// Await/Async
+ERROR(expected_await_not_async,none,
+      "found 'async' in expression; did you mean 'await'?", ())
 
 // Yield Statment
 ERROR(expected_expr_yield,PointsToFirstBadToken,

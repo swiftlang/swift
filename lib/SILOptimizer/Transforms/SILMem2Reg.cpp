@@ -663,15 +663,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     }
 
     // Remove dead address instructions that may be uses of the allocation.
-    SILNode *Node = Inst;
-    while (isa<StructElementAddrInst>(Node) ||
-           isa<TupleElementAddrInst>(Node) ||
-           isa<UncheckedAddrCastInst>(Node)) {
-      auto *I = cast<SingleValueInstruction>(Node);
-      if (!I->use_empty()) break;
-      Node = I->getOperand(0);
-      I->eraseFromParent();
+    auto *addrInst = dyn_cast<SingleValueInstruction>(Inst);
+    while (addrInst && addrInst->use_empty() &&
+           (isa<StructElementAddrInst>(addrInst) ||
+            isa<TupleElementAddrInst>(addrInst) ||
+            isa<UncheckedAddrCastInst>(addrInst))) {
+      SILValue op = addrInst->getOperand(0);
+      addrInst->eraseFromParent();
       ++NumInstRemoved;
+      addrInst = dyn_cast<SingleValueInstruction>(op);
     }
   }
 }
