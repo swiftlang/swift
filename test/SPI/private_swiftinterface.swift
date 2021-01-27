@@ -200,3 +200,11 @@ extension IOIPublicStruct : LocalPublicProto {}
 extension PublicType: SPIProto where T: PrivateConstraint {}
 // CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+
+// Preserve SPI information when printing indirect conformances via
+// an internal protocol. rdar://73082943
+@_spi(S) public protocol SPIProtocol {}
+internal protocol InternalProtocol: SPIProtocol {}
+public struct PublicStruct2: InternalProtocol {}
+// CHECK-PRIVATE: @_spi(S) extension {{.*}}.PublicStruct2 : {{.*}}.SPIProtocol
+// CHECK-PUBLIC-NOT: SPIProtocol
