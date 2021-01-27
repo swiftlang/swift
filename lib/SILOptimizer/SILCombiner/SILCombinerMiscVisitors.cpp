@@ -44,35 +44,46 @@ static llvm::cl::opt<bool>
 
 SILInstruction*
 SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
-  if (AEBI->getFunction()->hasOwnership())
-    return nullptr;
-
   // Optimize away the pattern below that happens when exceptions are created
   // and in some cases, due to inlining, are not needed.
   //
   //   %6 = alloc_existential_box $Error, $ColorError
+  //   %6a = project_existential_box %6
   //   %7 = enum $VendingMachineError, #ColorError.Red
-  //   store %7 to %6#1 : $*ColorError
-  //   debug_value %6#0 : $Error
-  //   strong_release %6#0 : $Error
-
+  //   store %7 to %6a : $*ColorError
+  //   debug_value %6 : $Error
+  //   strong_release %6 : $Error
+  //
+  //   %6 = alloc_existential_box $Error, $ColorError
+  //   %6a = project_existential_box %6
+  //   %7 = enum $VendingMachineError, #ColorError.Red
+  //   store %7 to [init] %6a : $*ColorError
+  //   debug_value %6 : $Error
+  //   destroy_value %6 : $Error
   SILValue boxedValue =
     getConcreteValueOfExistentialBox(AEBI, /*ignoreUser*/ nullptr);
   if (!boxedValue)
     return nullptr;
 
-  // Check if the box is released at a single place. That's the end of its
+  // Check if the box is destroyed at a single place. That's the end of its
   // lifetime.
-  StrongReleaseInst *singleRelease = nullptr;
-  for (Operand *use : AEBI->getUses()) {
-    if (auto *RI = dyn_cast<StrongReleaseInst>(use->getUser())) {
-      // If this is not the only release of the box then bail out.
-      if (singleRelease)
-        return nullptr;
-      singleRelease = RI;
+  SILInstruction *singleDestroy = nullptr;
+  if (hasOwnership()) {
+    if (auto *use = AEBI->getSingleConsumingUse()) {
+      singleDestroy = dyn_cast<DestroyValueInst>(use->getUser());
+    }
+  } else {
+    for (Operand *use : AEBI->getUses()) {
+      auto *user = use->getUser();
+      if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user)) {
+        if (singleDestroy)
+          return nullptr;
+        singleDestroy = user;
+      }
     }
   }
-  if (!singleRelease)
+
+  if (!singleDestroy)
     return nullptr;
 
   // Release the value that was stored into the existential box. The box
@@ -85,7 +96,7 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   //      store %value to %addr
   //      retain_value %value    // must insert the release after this retain
   //      strong_release %box
-  Builder.setInsertionPoint(singleRelease);
+  Builder.setInsertionPoint(singleDestroy);
   Builder.emitDestroyValueOperation(AEBI->getLoc(), boxedValue);
 
   eraseInstIncludingUsers(AEBI);
