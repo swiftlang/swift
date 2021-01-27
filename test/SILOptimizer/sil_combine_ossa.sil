@@ -48,6 +48,10 @@ struct MyInt {
   var value: Builtin.Int32
 }
 
+struct NativeObjectStruct {
+  var ele : Builtin.NativeObject
+}
+
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil [ossa] @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
@@ -1373,16 +1377,31 @@ bb0(%0 : @owned $B):
 }
 
 // (upcast X2->X (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x))) -> x
-// CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_round_trip : $@convention(thin) (@owned E) -> @owned E {
+// CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_round_trip1 : $@convention(thin) (@owned E) -> @owned E {
 // CHECK-NOT: upcast
 // CHECK-NOT: unchecked_ref_cast
-// CHECK: } // end sil function 'upcast_unchecked_ref_cast_round_trip'
-sil [ossa] @upcast_unchecked_ref_cast_round_trip : $@convention(thin) (@owned E) -> @owned E {
+// CHECK: } // end sil function 'upcast_unchecked_ref_cast_round_trip1'
+sil [ossa] @upcast_unchecked_ref_cast_round_trip1 : $@convention(thin) (@owned E) -> @owned E {
 bb0(%0 : @owned $E):
   %1 = upcast %0 : $E to $B
   %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $E
   return %3 : $E
+}
+
+// CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_round_trip2 :
+// CHECK-NOT: upcast
+// CHECK-NOT: unchecked_ref_cast
+// CHECK-LABEL: } // end sil function 'upcast_unchecked_ref_cast_round_trip2'
+sil [ossa] @upcast_unchecked_ref_cast_round_trip2 : $@convention(method) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = upcast %0 : $E to $B
+  debug_value %1 : $B
+  %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject
+  %3 = struct $NativeObjectStruct (%2 : $Builtin.NativeObject)
+  destroy_value %3 : $NativeObjectStruct
+  %res = tuple ()
+  return %res : $()
 }
 
 // (load (upcast-addr %x)) -> (upcast-ref (load %x))
