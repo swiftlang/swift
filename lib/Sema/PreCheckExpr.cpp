@@ -519,15 +519,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         diag.highlight(UDRE->getSourceRange());
         typo->addFixits(diag);
       } else {
-        if (Name.isSimpleName("async")) {
-          auto diag = Context.Diags.diagnose(Loc,
-              diag::cannot_find_in_scope_corrected, Name,
-              /*isOperator=*/false, "await");
-          diag.highlight(UDRE->getSourceRange());
-          diag.fixItReplace(Loc, "await");
-        } else {
-          emitBasicError();
-        }
+        emitBasicError();
       }
 
       corrections.noteAllCandidates();
