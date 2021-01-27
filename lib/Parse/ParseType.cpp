@@ -1020,11 +1020,13 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
         && (peekToken().is(tok::colon)
             || peekToken().canBeArgumentLabel())) {
       // Consume a name.
-      element.NameLoc = consumeArgumentLabel(element.Name);
+      element.NameLoc = consumeArgumentLabel(element.Name,
+                                             /*diagnoseDollarPrefix=*/true);
 
       // If there is a second name, consume it as well.
       if (Tok.canBeArgumentLabel())
-        element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
+        element.SecondNameLoc = consumeArgumentLabel(element.SecondName,
+                                                     /*diagnoseDollarPrefix=*/true);
 
       // Consume the ':'.
       if (consumeIf(tok::colon, element.ColonLoc)) {
