@@ -14,6 +14,10 @@ func async() throws { }
     // expected-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{9-14=await}}
     try async asyncFunc()
 
+    // expected-error@+2 {{found 'async' in expression; did you mean 'await'?}}{{5-10=await}}
+    // expected-warning@+1 {{'try' must precede 'await'}}{{5-11=}}{{15-15=await }}
+    async try asyncFunc()
+
     // expected-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{13-18=await}}
     let _ = async anotherAsyncFunc()
 
