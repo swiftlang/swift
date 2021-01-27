@@ -449,6 +449,9 @@ void TBDGenVisitor::addSymbol(LinkEntity entity) {
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
   auto entity = LinkEntity::forDispatchThunk(declRef);
   addSymbol(entity);
+
+  if (declRef.getAbstractFunctionDecl()->hasAsync())
+    addSymbol(LinkEntity::forAsyncFunctionPointer(entity));
 }
 
 void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
