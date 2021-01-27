@@ -19,12 +19,12 @@
 #define SWIFT_SIL_PRETTYSTACKTRACE_H
 
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILNode.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
 class ASTContext;
 class SILFunction;
-class SILNode;
 
 void printSILLocationDescription(llvm::raw_ostream &out, SILLocation loc,
                                  ASTContext &ctx);
@@ -74,7 +74,7 @@ class PrettyStackTraceSILNode : public llvm::PrettyStackTraceEntry {
   const char *Action;
 
 public:
-  PrettyStackTraceSILNode(const char *action, const SILNode *node)
+  PrettyStackTraceSILNode(const char *action, SILNodePointer node)
     : Node(node), Action(action) {}
 
   virtual void print(llvm::raw_ostream &OS) const override;
