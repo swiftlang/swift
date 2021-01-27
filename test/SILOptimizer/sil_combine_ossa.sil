@@ -4561,3 +4561,19 @@ bb1(%2 : @owned $FakeOptional<Builtin.NativeObject>):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_useafterfree_debuginstdelete :
+// CHECK-NOT: upcast
+// CHECK-NOT: unchecked_ref_cast
+// CHECK-LABEL: } // end sil function 'test_useafterfree_debuginstdelete'
+sil [ossa] @test_useafterfree_debuginstdelete : $@convention(method) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = upcast %0 : $E to $B
+  debug_value %1 : $B
+  %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject
+  debug_value %2 : $Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %res = tuple ()
+  return %res : $()
+}
+
