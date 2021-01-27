@@ -632,7 +632,7 @@ public:
   ///
   /// \param typeVariables This vector is populated with the set of
   /// type variables referenced by this type.
-  void getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables);
+  void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
