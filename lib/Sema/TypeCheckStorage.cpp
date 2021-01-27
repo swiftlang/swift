@@ -2860,6 +2860,11 @@ PropertyWrapperWrappedValueVarRequest::evaluate(Evaluator &evaluator,
   localVar->overwriteAccess(var->getFormalAccess());
 
   auto mutability = *var->getPropertyWrapperMutability();
+  if (mutability.Getter == PropertyWrapperMutability::Mutating) {
+    ctx.Diags.diagnose(var->getLoc(), diag::property_wrapper_param_mutating);
+    return nullptr;
+  }
+
   if (mutability.Setter == PropertyWrapperMutability::Nonmutating) {
     localVar->setImplInfo(StorageImplInfo::getMutableComputed());
   } else {
