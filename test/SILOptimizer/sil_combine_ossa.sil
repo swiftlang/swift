@@ -970,11 +970,12 @@ bb0(%0 : @guaranteed $C1):
   return %0a : $C1
 }
 
-// CHECK-LABEL: sil [ossa] @dead_end_cow_mutation
-// XHECK: bb0
-// XHECK-NEXT: destroy_value %0
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK-LABEL: sil [ossa] @dead_end_cow_mutation :
+// CHECK: bb0(
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'dead_end_cow_mutation'
 sil [ossa] @dead_end_cow_mutation : $@convention(thin) (@owned C1) -> () {
 bb0(%0 : @owned $C1):
   %1 = end_cow_mutation %0 : $C1
@@ -1898,25 +1899,6 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@convention(thin) (@owned Builtin.NativeObject) -> @owned FakeOptional<Builtin.NativeObject> {
-// XHECK: bb0
-// XHECK-NEXT: enum
-// XHECK-NEXT: copy_value
-// XHECK-NEXT: br bb1
-// XHECK: bb1
-// XHECK-NEXT: destroy_value
-// XHECK-NEXT: return
-sil [ossa] @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@convention(thin) (@owned Builtin.NativeObject) -> @owned FakeOptional<Builtin.NativeObject> {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
-  %1a = copy_value %1 : $FakeOptional<Builtin.NativeObject>
-  br bb1
-
-bb1:
-  destroy_value %1 : $FakeOptional<Builtin.NativeObject>
-  return %1a : $FakeOptional<Builtin.NativeObject>
-}
-
 // CHECK-LABEL: sil [ossa] @dead_unchecked_take_enum_data_addr :
 // CHECK:      bb0(%0 : $*AddressOnlyEnum):
 // CHECK-NEXT:   destroy_addr %0
@@ -2587,11 +2569,12 @@ bb3:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @resilient_enum_case_propagation
-// XHECK: bb0:
-// XHECK:   br bb2
-// XHECK: bb1:
-// XHECK:   return
+// We do not perform this optimization in SILCombine in OSSA since we would be
+// deleting an edge from the CFG.
+//
+// CHECK-LABEL: sil [ossa] @resilient_enum_case_propagation :
+// CHECK: switch_enum_addr
+// CHECK: } // end sil function 'resilient_enum_case_propagation'
 sil [ossa] @resilient_enum_case_propagation : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $FloatingPointRoundingRule
