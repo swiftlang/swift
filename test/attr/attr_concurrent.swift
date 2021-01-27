@@ -24,3 +24,17 @@ func passingConcurrentOrNot(
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 }
+
+func closures() {
+  // Okay, inferring @concurrent
+  acceptsConcurrent { $0 }
+  acceptsConcurrent({ $0 })
+  acceptsConcurrent({ i in i })
+  acceptsConcurrent({ (i: Int) -> Int in
+      print(i)
+      return i
+    })
+
+  let closure1 = { $0 + 1 } // inferred to be non-concurrent
+  acceptsConcurrent(closure1) // expected-error{{converting non-concurrent function value to '@concurrent (Int) -> Int' may introduce data races}}
+}
