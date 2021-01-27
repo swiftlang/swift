@@ -19,6 +19,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -1195,7 +1196,7 @@ static bool
 storesCommonlyDominateLoopExits(AccessPath accessPath,
                                 SILLoop *loop,
                                 ArrayRef<SILBasicBlock *> exitingBlocks) {
-  SmallPtrSet<SILBasicBlock *, 16> stores;
+  BasicBlockSet stores(loop->getHeader()->getParent());
   SmallVector<Operand *, 8> uses;
   // Collect as many recognizable stores as possible. It's ok if not all stores
   // are collected.
@@ -1208,7 +1209,7 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   SILBasicBlock *header = loop->getHeader();
   // If a store is in the loop header, we already know that it's dominating all
   // loop exits.
-  if (stores.count(header) != 0)
+  if (stores.contains(header))
     return true;
 
   // Also a store in the pre-header dominates all exists. Although the situation
@@ -1243,21 +1244,21 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   //   exit:
   //     store %phi to %addr
   //
-  if (stores.count(loop->getLoopPreheader()) != 0)
+  if (stores.contains(loop->getLoopPreheader()))
     return true;
 
   // Propagate the store-is-not-alive flag through the control flow in the loop,
   // starting at the header.
-  SmallPtrSet<SILBasicBlock *, 16> storesNotAlive;
+  BasicBlockSet storesNotAlive(loop->getHeader()->getParent());
   storesNotAlive.insert(header);
   bool changed = false;
   do {
     changed = false;
     for (SILBasicBlock *block : loop->blocks()) {
-      bool storeAlive = (storesNotAlive.count(block) == 0);
-      if (storeAlive && stores.count(block) == 0 &&
+      bool storeAlive = !storesNotAlive.contains(block);
+      if (storeAlive && !stores.contains(block) &&
           std::any_of(block->pred_begin(), block->pred_end(),
-            [&](SILBasicBlock *b) { return storesNotAlive.count(b) != 0; })) {
+            [&](SILBasicBlock *b) { return storesNotAlive.contains(b); })) {
         storesNotAlive.insert(block);
         changed = true;
       }
@@ -1272,7 +1273,7 @@ storesCommonlyDominateLoopExits(AccessPath accessPath,
   for (SILBasicBlock *eb : exitingBlocks) {
     // Ignore loop exits to blocks which end in an unreachable.
     if (!std::any_of(eb->succ_begin(), eb->succ_end(), isUnreachableBlock) &&
-        storesNotAlive.count(eb) != 0) {
+        storesNotAlive.contains(eb)) {
       return false;
     }
   }

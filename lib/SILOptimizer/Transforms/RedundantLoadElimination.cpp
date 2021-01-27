@@ -76,6 +76,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -479,7 +480,7 @@ private:
   /// data flow iteration. For function that requires more than 1 iteration of
   /// the data flow this is populated when the first time the functions is
   /// walked, i.e. when the we generate the genset and killset.
-  llvm::DenseSet<SILBasicBlock *> BBWithLoads;
+  BasicBlockSet BBWithLoads;
 
   /// If set, RLE ignores loads from that array type.
   NominalTypeDecl *ArrayType;
@@ -1143,11 +1144,11 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
   // Then this function can be processed in one iteration, i.e. no
   // need to generate the genset and killset.
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(Fn);
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  BasicBlockSet HandledBBs(Fn);
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
     ++BBCount;
-    for (auto X : B->getPredecessorBlocks()) {
-      if (HandledBBs.find(X) == HandledBBs.end()) {
+    for (SILBasicBlock *pred : B->getPredecessorBlocks()) {
+      if (!HandledBBs.contains(pred)) {
         RunOneIteration = false;
         break;
       }
@@ -1213,6 +1214,7 @@ RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads,
                        JointPostDominanceSetComputer &computer)
     : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI), BBToLocState(F),
+      BBWithLoads(F),
       ArrayType(disableArrayLoads
                     ? F->getModule().getASTContext().getArrayDecl()
                     : nullptr),
@@ -1289,7 +1291,7 @@ BlockState::ValueState BlockState::getValueStateAtEndOfBlock(RLEContext &Ctx,
 SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
                                                      LSLocation &L) {
   llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> Values;
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  BasicBlockSet HandledBBs(Fn);
   llvm::SmallVector<SILBasicBlock *, 8> WorkList;
 
   // Push in all the predecessors to get started.
@@ -1325,7 +1327,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // locations, collect in this block's predecessors.
     if (Forwarder.isCoverValues(*this, L)) {
       for (auto Pred : CurBB->getPredecessorBlocks()) {
-        if (HandledBBs.find(Pred) != HandledBBs.end())
+        if (HandledBBs.contains(Pred))
           continue;
         WorkList.push_back(Pred);
       }
@@ -1427,7 +1429,7 @@ void RLEContext::processBasicBlocksForGenKillSet() {
     // point in the basic block.
     for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
       if (auto *LI = dyn_cast<LoadInst>(&*I)) {
-        if (BBWithLoads.find(BB) == BBWithLoads.end())
+        if (!BBWithLoads.contains(BB))
           BBWithLoads.insert(BB);
         S.processLoadInst(*this, LI, RLEKind::ComputeAvailSetMax);
       }
@@ -1446,7 +1448,7 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
   // ForwardSetOut of a basic block changes, the optimization is rerun on its
   // successors.
   llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  llvm::DenseSet<SILBasicBlock *> HandledBBs;
+  BasicBlockSet HandledBBs(Fn);
 
   // Push into the worklist in post order so that we can pop from the back and
   // get reverse post order.
@@ -1466,12 +1468,12 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
     Forwarder.mergePredecessorAvailSet(*this);
 
     if (Forwarder.processBasicBlockWithGenKillSet()) {
-      for (auto &X : BB->getSuccessors()) {
+      for (SILBasicBlock *succ : BB->getSuccessors()) {
         // We do not push basic block into the worklist if its already
         // in the worklist.
-        if (HandledBBs.find(X) != HandledBBs.end())
+        if (HandledBBs.contains(succ))
           continue;
-        WorkList.push_back(X);
+        WorkList.push_back(succ);
       }
     }
     LLVM_DEBUG(Forwarder.dump(*this));
@@ -1514,7 +1516,7 @@ void RLEContext::processBasicBlocksForRLE(bool Optimistic) {
     // and this basic block does not even have LoadInsts, there is no point
     // in processing every instruction in the basic block again as no store
     // will be eliminated. 
-    if (Optimistic && BBWithLoads.find(BB) == BBWithLoads.end())
+    if (Optimistic && !BBWithLoads.contains(BB))
       continue;
 
     BlockState &Forwarder = getBlockState(BB);
@@ -1588,7 +1590,7 @@ bool RLEContext::run() {
 
   // These are a list of basic blocks that we actually processed.
   // We do not process unreachable block, instead we set their liveouts to nil.
-  llvm::DenseSet<SILBasicBlock *> BBToProcess;
+  BasicBlockSet BBToProcess(Fn);
   for (auto X : PO->getPostOrder()) 
     BBToProcess.insert(X);
 
@@ -1596,8 +1598,8 @@ bool RLEContext::run() {
   // know all the locations accessed in this function, we can resize the bit
   // vector to the appropriate size.
   for (auto bs : BBToLocState) {
-    bs.data.init(&bs.block, LocationVault.size(), Optimistic &&
-                 BBToProcess.find(&bs.block) != BBToProcess.end());
+    bs.data.init(&bs.block, LocationVault.size(),
+                 Optimistic && BBToProcess.contains(&bs.block));
   }
 
   LLVM_DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {

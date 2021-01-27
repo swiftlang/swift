@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILBITFIELD_H
 
 #include "swift/SIL/SILFunction.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -25,17 +26,21 @@ namespace swift {
 ///
 /// This can be used by transforms to store temporary flags or tiny values per
 /// basic block.
-/// It is very efficient: no memory allocation is needed, no hash set or map is
-/// needed for lookup and there is no initialization cost (in contrast to
-/// BasicBlockData which needs to iterate over all blocks at initialization).
+/// The memory managed is a 32 bit field within each basic block (\see
+/// BasicBlock::customBits) and thus is very efficient: no memory allocation is
+/// needed, no hash set or map is needed for lookup and there is no
+/// initialization cost (in contrast to BasicBlockData which needs to iterate
+/// over all blocks at initialization).
 ///
-/// Restrictions:
+/// Invariants:
 /// * BasicBlockBitfield instances must be allocated and deallocated
-///   following a strict stack discipline. This means, it's fine to use them as
-///   (or in) local variables in transformations. But it's e.g. not possible to
-///   store a BasicBlockBitfield in an Analysis.
+///   following a strict stack discipline, because bit-positions in
+///   BasicBlock::customBits are "allocated" and "freed" with a stack-allocation
+///   algorithm. This means, it's fine to use a BasicBlockBitfield as (or in)
+///   local variables, e.g. in transformations. But it's not possible to store
+///   a BasicBlockBitfield in an Analysis.
 /// * The total number of bits which are alive at the same time must not exceed
-///   32.
+///   32 (the size of BasicBlock::customBits).
 class BasicBlockBitfield {
   /// The bitfield is "added" to the blocks of this function.
   SILFunction *function;
@@ -89,6 +94,7 @@ public:
   SILFunction *getFunction() const { return function; }
 
   unsigned get(SILBasicBlock *block) const {
+    assert(block->getParent() == function);
     if (bitfieldID > block->lastInitializedBitfieldID) {
       // The bitfield is not initialized yet in this block.
       return 0;
@@ -97,6 +103,7 @@ public:
   }
 
   void set(SILBasicBlock *block, unsigned value) {
+    assert(block->getParent() == function);
     assert(((value << startBit) & ~mask) == 0 &&
            "value too large for BasicBlockBitfield");
     unsigned clearMask = mask;
@@ -136,7 +143,9 @@ public:
   
   bool get(SILBasicBlock *block) const { return (bool)bit.get(block); }
 
-  void set(SILBasicBlock *block) { bit.set(block, 1); }
+  void set(SILBasicBlock *block, bool value = true) {
+    bit.set(block, (unsigned)value);
+  }
   void reset(SILBasicBlock *block) { bit.set(block, 0); }
 
   /// Sets the flag and returns the old value.
@@ -161,7 +170,45 @@ public:
   /// Returns true if \p block was not contained in the set before inserting.
   bool insert(SILBasicBlock *block) { return !flag.testAndSet(block); }
 
-  void remove(SILBasicBlock *block) { flag.reset(block); }
+  void erase(SILBasicBlock *block) { flag.reset(block); }
+};
+
+/// An implementation of `llvm::SetVector<SILBasicBlock *,
+///                                       SmallVector<SILBasicBlock *, N>,
+///                                       BasicBlockSet>`.
+///
+/// Unfortunately it's not possible to use `llvm::SetVector` directly because
+/// the BasicBlockSet constructor needs a `SILFunction` argument.
+///
+/// Note: This class does not provide a `remove` method intentinally, because
+/// it would have a O(n) complexity.
+template <unsigned N> class BasicBlockSetVector {
+  using Vector = llvm::SmallVector<SILBasicBlock *, N>;
+
+  Vector vector;
+  BasicBlockSet set;
+  
+public:
+  using iterator = typename Vector::const_iterator;
+
+  BasicBlockSetVector(SILFunction *function) : set(function) {}
+
+  iterator begin() const { return vector.begin(); }
+  iterator end() const { return vector.end(); }
+
+  unsigned size() const { return vector.size(); }
+  bool empty() const { return vector.empty(); }
+
+  bool contains(SILBasicBlock *block) const { return set.contains(block); }
+
+  /// Returns true if \p block was not contained in the set before inserting.
+  bool insert(SILBasicBlock *block) {
+    if (set.insert(block)) {
+      vector.push_back(block);
+      return true;
+    }
+    return false;
+  }
 };
 
 } // namespace swift

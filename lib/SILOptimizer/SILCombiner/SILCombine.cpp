@@ -24,6 +24,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -62,14 +63,14 @@ static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   llvm::SmallVector<SILBasicBlock *, 256> Worklist;
   llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
-  llvm::SmallPtrSet<SILBasicBlock *, 32> Visited;
+  BasicBlockSet Visited(BB->getParent());
 
   Worklist.push_back(BB);
   do {
     BB = Worklist.pop_back_val();
 
     // We have now visited this block!  If we've already been here, ignore it.
-    if (!Visited.insert(BB).second) continue;
+    if (!Visited.insert(BB)) continue;
 
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
       SILInstruction *Inst = &*BBI;

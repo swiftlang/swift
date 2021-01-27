@@ -137,7 +137,6 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
   using SILClonerWithScopes<ImplClass>::recordFoldedValue;
-  using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
   using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
   TypeSubstCloner(SILFunction &To,
