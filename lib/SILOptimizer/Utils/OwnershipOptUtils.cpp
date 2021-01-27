@@ -929,6 +929,11 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   if (!isValid())
     return;
 
+  // If we are not in ownership, we can always RAUW successfully so just bail
+  // and leave the object valid.
+  if (!oldValue->getFunction()->hasOwnership())
+    return;
+
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
   if (!canFixUpOwnershipForRAUW(oldValue, newValue, inputCtx)) {
@@ -1030,11 +1035,15 @@ SILBasicBlock::iterator
 OwnershipRAUWHelper::perform(SingleValueInstruction *maybeTransformedNewValue) {
   assert(isValid() && "OwnershipRAUWHelper invalid?!");
 
-  // Make sure to always clear our context after we transform.
-  SWIFT_DEFER { ctx->clear(); };
   SILValue actualNewValue = newValue;
   if (maybeTransformedNewValue)
     actualNewValue = maybeTransformedNewValue;
+
+  if (!oldValue->getFunction()->hasOwnership())
+    return replaceAllUsesAndErase(oldValue, actualNewValue, ctx->callbacks);
+
+  // Make sure to always clear our context after we transform.
+  SWIFT_DEFER { ctx->clear(); };
 
   if (oldValue->getType().isAddress())
     return replaceAddressUses(oldValue, actualNewValue);
