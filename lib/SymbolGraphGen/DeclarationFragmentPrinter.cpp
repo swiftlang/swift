@@ -146,6 +146,10 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
         ShouldLink = false;
       }
     }
+
+    if (T->isTypeParameter()) {
+      ShouldLink = false;
+    }
   }
 
   if (ShouldLink) {

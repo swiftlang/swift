@@ -70,8 +70,7 @@ public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) where S: Seque
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "kind": "typeIdentifier",
-// CHECK-NEXT:     "spelling": "S",
-// CHECK-NEXT:     "preciseIdentifier": "s:8Function3foo1f3ext1syyyc_SixtSTRzlF1SL_xmfp"
+// CHECK-NEXT:     "spelling": "S"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "kind": "text",

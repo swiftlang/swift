@@ -539,7 +539,6 @@ enum MyEnum {
 // CHECKBAR_ALL:         },
 // CHECKBAR_ALL:         {
 // CHECKBAR_ALL:           "kind": "typeIdentifier",
-// CHECKBAR_GEN:           "preciseIdentifier": "s:19cursor_symbol_graph3FooV1Txmfp",
 // CHECKBAR_GEN:           "spelling": "T"
 // CHECKBAR_INT:           "preciseIdentifier": "s:Si",
 // CHECKBAR_INT:           "spelling": "Int"
@@ -564,7 +563,6 @@ enum MyEnum {
 // CHECKBAR_GEN:         },
 // CHECKBAR_GEN:         {
 // CHECKBAR_GEN:           "kind": "typeIdentifier",
-// CHECKBAR_GEN:           "preciseIdentifier": "s:19cursor_symbol_graph3FooV1Txmfp",
 // CHECKBAR_GEN:           "spelling": "T"
 // CHECKBAR_GEN:         },
 // CHECKBAR_GEN:         {
@@ -608,7 +606,6 @@ enum MyEnum {
 // CHECKBAR_ALL:               },
 // CHECKBAR_ALL:               {
 // CHECKBAR_ALL:                 "kind": "typeIdentifier",
-// CHECKBAR_GEN:                 "preciseIdentifier": "s:19cursor_symbol_graph3FooV1Txmfp",
 // CHECKBAR_GEN:                 "spelling": "T"
 // CHECKBAR_INT:                 "preciseIdentifier": "s:Si",
 // CHECKBAR_INT:                 "spelling": "Int"
@@ -669,7 +666,6 @@ enum MyEnum {
 // CHECKBAR_ALL:           },
 // CHECKBAR_ALL:           {
 // CHECKBAR_ALL:             "kind": "typeIdentifier",
-// CHECKBAR_GEN:             "preciseIdentifier": "s:19cursor_symbol_graph3FooV1Txmfp",
 // CHECKBAR_GEN:             "spelling": "T"
 // CHECKBAR_INT:             "preciseIdentifier": "s:Si",
 // CHECKBAR_INT:             "spelling": "Int"
@@ -708,7 +704,6 @@ enum MyEnum {
 // CHECKBAR_ALL:           },
 // CHECKBAR_ALL:           {
 // CHECKBAR_ALL:             "kind": "typeIdentifier",
-// CHECKBAR_GEN:             "preciseIdentifier": "s:19cursor_symbol_graph3FooV1Txmfp",
 // CHECKBAR_GEN:             "spelling": "T"
 // CHECKBAR_INT:             "preciseIdentifier": "s:Si",
 // CHECKBAR_INT:             "spelling": "Int"
