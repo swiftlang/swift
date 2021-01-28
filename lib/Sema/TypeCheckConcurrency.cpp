@@ -653,6 +653,16 @@ static bool isEscapingClosure(const AbstractClosureExpr *closure) {
   return true;
 }
 
+/// Determine whether this closure is escaping.
+static bool isConcurrentClosure(const AbstractClosureExpr *closure) {
+  if (auto type = closure->getType()) {
+    if (auto fnType = type->getAs<AnyFunctionType>())
+      return fnType->isConcurrent();
+  }
+
+  return false;
+}
+
 namespace {
   /// Check whether a particular context may execute concurrently within
   /// another context.
@@ -1370,8 +1380,8 @@ namespace {
     /// isolation checked.
     ClosureActorIsolation determineClosureIsolation(
         AbstractClosureExpr *closure) {
-      // An escaping closure is always actor-independent.
-      if (isEscapingClosure(closure))
+      // Escaping and concurrent closures are always actor-independent.
+      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
@@ -1565,9 +1575,11 @@ bool ConcurrentExecutionChecker::mayExecuteConcurrentlyWith(
     const DeclContext *useContext, const DeclContext *defContext) {
   // Walk the context chain from the use to the definition.
   while (useContext != defContext) {
-    // If we find an escaping closure, it can be run concurrently.
+    // If we find a concurrent closure... it can be run concurrently.
+    // NOTE: We also classify escaping closures this way, which detects more
+    // problematic cases.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isEscapingClosure(closure))
+      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
         return true;
     }
 

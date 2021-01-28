@@ -6,6 +6,7 @@ var mutableGlobal: String = "can't touch this" // expected-note 3{{var declared 
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
+func acceptConcurrentClosure<T>(_: @concurrent () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 func acceptEscapingClosure<T>(_: (String) -> ()) async -> T? { nil }
 
@@ -29,12 +30,12 @@ actor class MySuperActor {
 
 actor class MyActor: MySuperActor {
   let immutable: Int = 17
-  var text: [String] = [] // expected-note 9{{mutable state is only available within the actor instance}}
+  var text: [String] = [] // expected-note 10{{mutable state is only available within the actor instance}}
 
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 21{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -127,13 +128,21 @@ extension MyActor {
 
     // Closures.
     let localConstant = 17
-    var localVar = 17 // expected-note 3{{var declared here}}
+    var localVar = 17 // expected-note 4{{var declared here}}
 
     // Non-escaping closures are okay.
     acceptClosure {
       _ = text[0]
       _ = self.synchronous()
       _ = localVar
+      _ = localConstant
+    }
+
+    // Concurrent closures might run... concurrently.
+    acceptConcurrentClosure {
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+      _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
 
