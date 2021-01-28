@@ -3,6 +3,8 @@
 // RUN: %target-build-swift %s %t/forward.o -Xfrontend -entry-point-function-name -Xfrontend foobar -o %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
+// REQUIRES: executable_test
+
 // CHECK: howdy from foobar
 print("howdy from foobar")
 
