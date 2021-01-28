@@ -2,9 +2,6 @@
 // RUN:    -module-name M -enable-experimental-concurrency | %FileCheck %s
 // REQUIRES: concurrency
 
-// rdar//72473691
-// XFAIL: *
-
 func use<T>(_ t: T) {}
 func forceSplit() async {
 }
@@ -13,24 +10,24 @@ func withGenericArg<T>(_ msg: T) async {
   // this up after coroutine splitting.
   // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYlF"(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
   // CHECK: call void @llvm.dbg.declare(metadata %swift.context** %[[ALLOCA:[^,]*]],
-  // CHECK-SAME:   metadata ![[MSG:[0-9]+]], metadata !DIExpression(
-  // CHECK-SAME:     DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.context** %[[ALLOCA]],
   // CHECK-SAME:   metadata ![[TAU:[0-9]+]], metadata !DIExpression(
   // CHECK-SAME:     DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}))
+  // CHECK: call void @llvm.dbg.declare(metadata %swift.context** %[[ALLOCA]],
+  // CHECK-SAME:   metadata ![[MSG:[0-9]+]], metadata !DIExpression(
+  // CHECK-SAME:     DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
   // CHECK: store %swift.context* %2, %swift.context** %[[ALLOCA]], align
 
   await forceSplit()
   // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYlF.resume.0"(i8* %0, i8* %1, i8* swiftasync %2)
-  // CHECK: store i8* %2, i8** %[[ALLOCA:.*]], align
+  // CHECK: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]*]],
+  // CHECK-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
+  // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
   // CHECK: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA]],
   // CHECK-SAME:   metadata ![[TAU_R:[0-9]+]], metadata !DIExpression(
-  // CHECK-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
-  // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
-  // CHECK: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA]],
-  // CHECK-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
   // CHECK-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]],
-  // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
+  // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
+  // CHECK: store i8* %2, i8** %[[ALLOCA]], align
 
   use(msg)
 }
@@ -38,8 +35,8 @@ func withGenericArg<T>(_ msg: T) async {
 runAsyncAndBlock {
   await withGenericArg("hello (asynchronously)")
 }
-// CHECK: ![[MSG]] = !DILocalVariable(name: "msg", arg: 1,
 // CHECK: ![[TAU]] = !DILocalVariable(name: "$\CF\84_0_0",
-// CHECK: ![[TAU_R]] = !DILocalVariable(name: "$\CF\84_0_0",
+// CHECK: ![[MSG]] = !DILocalVariable(name: "msg", arg: 1,
 // CHECK: ![[MSG_R]] = !DILocalVariable(name: "msg", arg: 1,
+// CHECK: ![[TAU_R]] = !DILocalVariable(name: "$\CF\84_0_0",
 
