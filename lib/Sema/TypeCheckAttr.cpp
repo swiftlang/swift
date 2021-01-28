@@ -51,7 +51,12 @@ namespace {
     assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
-      assert(loc.isValid() && "Diagnosing attribute with invalid location");
+      if (!loc.isValid()) {
+        llvm::errs() << "Attribute '";
+        attr->print(llvm::errs());
+        llvm::errs() << "' has invalid location, failed to diagnose!\n";
+        assert(false && "Diagnosing attribute with invalid location");
+      }
       if (loc.isInvalid()) {
         loc = D->getLoc();
       }
