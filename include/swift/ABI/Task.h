@@ -343,16 +343,16 @@ public:
     };
 
     struct GroupStatus {
-        static const unsigned long long maskReady      = 0x00FFFFF0000000000ll;
-        static const unsigned long long oneReadyTask   = 0x00000010000000000ll;
+        static const uint64_t maskReady      = 0x00FFFFF0000000000ll;
+        static const uint64_t oneReadyTask   = 0x00000010000000000ll;
 
-        static const unsigned long long maskPending    = 0x0000000FFFFF00000ll;
-        static const unsigned long long onePendingTask = 0x00000000000100000ll;
+        static const uint64_t maskPending    = 0x0000000FFFFF00000ll;
+        static const uint64_t onePendingTask = 0x00000000000100000ll;
 
-        static const unsigned long long maskWaiting    = 0x000000000000FFFFFll;
-        static const unsigned long long oneWaitingTask = 0x00000000000000001ll;
+        static const uint64_t maskWaiting    = 0x000000000000FFFFFll;
+        static const uint64_t oneWaitingTask = 0x00000000000000001ll;
 
-        unsigned long long status;
+        uint64_t status;
 
         unsigned int readyTasks() {
           return (status & maskReady) >> 40;
@@ -436,7 +436,7 @@ public:
     mutable std::mutex mutex;
 
     /// Used for queue management, counting number of waiting and ready tasks
-    std::atomic<unsigned long long> status;
+    std::atomic<uint64_t> status;
 
     /// Queue containing completed tasks offered into this channel.
     ///
