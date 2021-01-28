@@ -174,8 +174,8 @@ namespace irgen {
 
     // Temporary only!
     explicit FunctionPointer(KindTy kind, llvm::Value *value,
-                             const Signature &signature, bool
-                             isWithoutCtxt = false)
+                             const Signature &signature,
+                             bool isWithoutCtxt = false)
         : FunctionPointer(kind, value, PointerAuthInfo(), signature, isWithoutCtxt) {}
 
     static FunctionPointer forDirect(IRGenModule &IGM,

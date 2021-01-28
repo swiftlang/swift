@@ -302,6 +302,8 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
     return false;
 
   Cloner.cloneBranchTarget(SrcTerm);
+  JumpThreadingCost[Cloner.getNewBB()] = JumpThreadingCost[SrcTerm->getDestBB()];
+
 
   // We have copied the threaded block into the edge.
   auto *clonedSrc = Cloner.getNewBB();
@@ -1111,6 +1113,10 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // to use the branch arguments as we go.
   Cloner.cloneBranchTarget(BI);
   Cloner.updateSSAAfterCloning();
+
+  // Also account the costs to the cloned DestBB, so the jump threading cannot
+  // loop by cloning the cloned block again.
+  JumpThreadingCost[Cloner.getNewBB()] += copyCosts;
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
   // the threaded and edge block to the worklist now that they (likely) can be
@@ -2851,6 +2857,8 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
 
     Cloner.cloneBranchTarget(Branch);
     Cloner.updateSSAAfterCloning();
+
+    JumpThreadingCost[Cloner.getNewBB()] = JumpThreadingCost[DestBB];
 
     Changed = true;
     // Simplify the cloned block and continue tail duplicating through its new

@@ -141,7 +141,7 @@ public:
     if (!hasOneNonDebugUse(next))
       return false;
 
-    assert(getSingleNonDebugUser(rest.back()) == next);
+    assert(rest.empty() || getSingleNonDebugUser(rest.back()) == next);
     rest.push_back(next);
     return true;
   }

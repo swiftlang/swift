@@ -415,7 +415,9 @@ namespace irgen {
   Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
   void emitDeallocAsyncContext(IRGenFunction &IGF, Address context);
 
-  void emitAsyncFunctionEntry(IRGenFunction &IGF, SILFunction *asyncFunc);
+  void emitAsyncFunctionEntry(IRGenFunction &IGF,
+                              const AsyncContextLayout &layout,
+                              LinkEntity asyncFunction);
 
   /// Yield the given values from the current continuation.
   ///
