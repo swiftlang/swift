@@ -600,6 +600,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   APIBreakingToAdd | APIBreakingToRemove,
   106)
 
+SIMPLE_DECL_ATTR(concurrent, Concurrent,
+  OnFunc | OnConstructor | OnAccessor | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  107)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

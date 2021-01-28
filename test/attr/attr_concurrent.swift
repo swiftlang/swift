@@ -18,6 +18,8 @@ func onEscapingAutoclosure2(_ fn: @escaping @autoclosure @concurrent () -> Int) 
 func acceptsConcurrent(_ fn: @concurrent (Int) -> Int) { }
 func acceptsNonConcurrent(_ fn: (Int) -> Int) { }
 
+@concurrent func negate(_ x: Int) -> Int { -x }
+
 func passingConcurrentOrNot(
   _ cfn: @concurrent (Int) -> Int,
   ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-concurrent}}{{9-9=@concurrent }}
@@ -30,6 +32,11 @@ func passingConcurrentOrNot(
   acceptsConcurrent(ncfn) // expected-error{{passing non-concurrent parameter 'ncfn' to function expecting a @concurrent closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
+
+  acceptsConcurrent(negate)
+  acceptsNonConcurrent(negate)
+
+  let _: Int = negate // expected-error{{cannot convert value of type '@concurrent (Int) -> Int' to specified type 'Int'}}
 }
 
 func closures() {
@@ -45,3 +52,4 @@ func closures() {
   let closure1 = { $0 + 1 } // inferred to be non-concurrent
   acceptsConcurrent(closure1) // expected-error{{converting non-concurrent function value to '@concurrent (Int) -> Int' may introduce data races}}
 }
+
