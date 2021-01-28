@@ -360,6 +360,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   assert(!fixed->is<TypeVariableType>() &&
          "Cannot bind to type variable; merge equivalence classes instead");
 
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
+
   // If there are no type variables in the fixed type, there's nothing to do.
   if (!fixed->hasTypeVariable())
     return;
@@ -373,12 +377,6 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     (*this)[otherTypeVar].addReferencedBy(typeVar);
     node.addReferencedVar(otherTypeVar);
   }
-
-  // Record the change, if there are active scopes.
-  // Note: If we ever use this to undo the actual variable binding,
-  // we'll need to store the change along the early-exit path as well.
-  if (ActiveScope)
-    Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
 }
 
 void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
