@@ -430,6 +430,8 @@ struct BorrowedValue {
   /// instructions and pass them individually to visitor. Asserts if this is
   /// called with a scope that is not local.
   ///
+  /// Returns false and early exist if \p visitor returns false.
+  ///
   /// The intention is that this method can be used instead of
   /// BorrowScopeIntroducingValue::getLocalScopeEndingUses() to avoid
   /// introducing an intermediate array when one needs to transform the
@@ -437,7 +439,7 @@ struct BorrowedValue {
   ///
   /// NOTE: To determine if a scope is a local scope, call
   /// BorrowScopeIntoducingValue::isLocalScope().
-  void visitLocalScopeEndingUses(function_ref<void(Operand *)> visitor) const;
+  bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
@@ -632,14 +634,15 @@ struct InteriorPointerOperand {
   /// Return the end scope of all borrow introducers of the parent value of this
   /// projection. Returns true if we were able to find all borrow introducing
   /// values.
-  bool visitBaseValueScopeEndingUses(function_ref<void(Operand *)> func) const {
+  bool visitBaseValueScopeEndingUses(function_ref<bool(Operand *)> func) const {
     SmallVector<BorrowedValue, 4> introducers;
     if (!getAllBorrowIntroducingValues(operand->get(), introducers))
       return false;
     for (const auto &introducer : introducers) {
       if (!introducer.isLocalScope())
         continue;
-      introducer.visitLocalScopeEndingUses(func);
+      if (!introducer.visitLocalScopeEndingUses(func))
+        return false;
     }
     return true;
   }

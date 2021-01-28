@@ -275,13 +275,14 @@ void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
       if (auto subBorrowScopeOp = BorrowingOperand::get(valueUser)) {
         if (subBorrowScopeOp.isReborrow()) {
           subBorrowScopeOp.visitUserResultConsumingUses(func);
-          return;
+          return true;
         }
       }
 
       // Otherwise, if we don't have a borrow scope operand that consumes
       // guaranteed values, just visit value user.
       func(valueUser);
+      return true;
     });
   });
 }
@@ -371,8 +372,8 @@ void BorrowedValue::getLocalScopeEndingInstructions(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowedValue::visitLocalScopeEndingUses(
-    function_ref<void(Operand *)> visitor) const {
+bool BorrowedValue::visitLocalScopeEndingUses(
+    function_ref<bool(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
   case BorrowedValueKind::Invalid:
@@ -384,10 +385,11 @@ void BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isLifetimeEnding()) {
-        visitor(use);
+        if (!visitor(use))
+          return false;
       }
     }
-    return;
+    return true;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }

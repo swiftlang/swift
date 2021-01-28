@@ -81,6 +81,7 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
         borrowedVal.visitLocalScopeEndingUses([&](Operand *endBorrow) {
           if (endBorrow->getUser()->getParent() != def->getParentBlock())
             localScope = false;
+          return true;
         });
         if (localScope) {
           return def;
@@ -145,6 +146,7 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
   }
   borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ true);
+    return true;
   });
 
   // TODO: Fix getCanonicalCopiedDef to allow multi-block borrows and remove

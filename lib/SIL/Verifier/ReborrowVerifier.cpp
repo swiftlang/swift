@@ -88,6 +88,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
       scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
         addVisitedOp(op, newBaseVal);
         worklist.emplace_back(op, newBaseVal);
+        return true;
       });
     }
   }
