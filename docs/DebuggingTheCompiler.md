@@ -553,6 +553,97 @@ the pipeline. Here is a quick summary of the various options:
   When printing IR for functions for print-[before|after]-all options, Only
   print the IR for functions whose name is in this comma separated list.
 
+## Debugging assembly and object code
+
+Understanding layout of compiler-generated metadata
+can sometimes involve looking at assembly and object code.
+
+### Working with a single file
+
+Here's how to generate assembly or object code:
+
+```
+# Emit assembly in Intel syntax (AT&T syntax is the default)
+swiftc tmp.swift -emit-assembly -Xllvm -x86-asm-syntax=intel -o tmp.S
+
+# Emit object code
+swiftc tmp.swift -emit-object -o tmp.o
+```
+
+Understanding mangled names can be hard though: `swift demangle` to the rescue!
+
+```
+swiftc tmp.swift -emit-assembly -Xllvm -x86-asm-syntax=intel -o - \
+  | swift demangle > tmp-demangled.S
+
+swiftc tmp.swift -emit-object -o tmp.o
+
+# Look at where different symbols are located, sorting by address (-n)
+# and displaying section names (-m)
+nm -n -m tmp.o | swift demangle > tmp.txt
+
+# Inspect disassembly of an existing dylib (AT&T syntax is the default)
+objdump -d -macho --x86-asm-syntax=intel /path/to/libcake.dylib \
+  | swift demangle > libcake.S
+```
+
+### Working with multiple files
+
+Some bugs only manifest in WMO, and may involve complicated Xcode projects.
+Moreover, Xcode may be passing arguments via `-filelist`
+and expecting outputs via `-output-filelist`, and those file lists
+may be in temporary directories.
+
+If you want to inspect assembly or object code for individual files when
+compiling under WMO, you can mimic this by doing the following:
+
+```
+# Assuming all .swift files from the MyProject/Sources directory
+# need to be included
+find MyProject/Sources -name '*.swift' -type f > input-files.txt
+
+# In some cases, projects may use multiple files with the same
+# name but in different directories (for different schemes),
+# which can be a problem. Having a file list makes working around
+# this convenient as you can manually manually edit out the files
+# that are not of interest at this stage.
+
+mkdir Output
+
+# 1. -output-filelist doesn't recreate a subdirectory structure,
+#    so first strip out directories
+# 2. map .swift files to assembly files
+sed -e 's|.*/|Output/|;s|\.swift|.S|' input-files.txt > output-files.txt
+
+# Save command-line arguments from Xcode's 'CompileSwiftSources' phase in
+# the build log to a file for convenience, say args.txt.
+#
+# -sdk /path/to/sdk <... other args ...>
+
+xcrun swift-frontend @args.txt \
+  -filelist input-files.txt \
+  -output-filelist output-files.txt \
+  -O -whole-module-optimization \
+  -emit-assembly
+```
+
+If you are manually calling `swift-frontend` without an Xcode invocation to
+use as a template, you will need to at least add
+`-sdk "$(xcrun --show-sdk-path macosx)"` (if compiling for macOS),
+and `-I /path/to/includedir` to include necessary swift modules and interfaces.
+
+### Working with multi-architecture binaries
+
+In certain cases, one might be looking at multi-architecture binaries,
+such as [universal binaries](https://en.wikipedia.org/wiki/Universal_binary).
+By default `nm` will show symbols from all architectures, so a universal
+binary might look funny due to two copies of everything. Use `nm -arch`
+to look at a specific architecture:
+
+```
+nm -n -m -arch x86_64 path/to/libcake.dylib | swift demangle
+```
+
 ## Bisecting Compiler Errors
 
 ### Bisecting on SIL optimizer pass counts to identify optimizer bugs
