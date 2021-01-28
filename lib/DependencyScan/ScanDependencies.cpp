@@ -916,6 +916,18 @@ using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
                               std::unique_ptr<ModuleDependenciesCache>>>;
 
+static void
+updateCachedInstanceSearchPaths(CompilerInstance &cachedInstance,
+                                const CompilerInstance &invocationInstance) {
+  cachedInstance.getASTContext().SearchPathOpts =
+      invocationInstance.getASTContext().SearchPathOpts;
+  // The Clang Importer arguments must also match those of the current
+  // invocation instead of the cached one because they include search
+  // path directives for Clang.
+  cachedInstance.getASTContext().ClangImporterOpts =
+      invocationInstance.getASTContext().ClangImporterOpts;
+}
+
 static bool
 forEachBatchEntry(CompilerInstance &invocationInstance,
                   ModuleDependenciesCache &invocationCache,
@@ -950,13 +962,9 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // before.
       pInstance = (*subInstanceMap)[entry.arguments].first.get();
       pCache = (*subInstanceMap)[entry.arguments].second.get();
-      // We must update the search paths of this instance to instead reflect those of the current
-      // invocation's.
-      for (auto &path : invocationInstance.getASTContext().SearchPathOpts.ImportSearchPaths)
-        pInstance->getASTContext().addSearchPath(path, false, false);
-      for (auto &path : invocationInstance.getASTContext().SearchPathOpts.FrameworkSearchPaths)
-        pInstance->getASTContext().addSearchPath(path.Path, true, path.IsSystem);
-
+      // We must update the search paths of this instance to instead reflect
+      // those of the current scanner invocation.
+      updateCachedInstanceSearchPaths(*pInstance, invocationInstance);
     } else {
       // Create a new instance by the arguments and save it in the map.
       subInstanceMap->insert(
