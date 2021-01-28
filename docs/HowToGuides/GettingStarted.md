@@ -68,7 +68,8 @@ toolchain as a one-off, there are a couple of differences:
      If you plan on contributing regularly, cloning over SSH provides a better
      experience. After you've [uploaded your SSH keys to GitHub][]:
      ```sh
-     git clone git@github.com:apple/swift.git .
+     git clone git@github.com:apple/swift.git swift
+     cd swift
      utils/update-checkout --clone-with-ssh
      ```
    - Via HTTPS:
@@ -76,7 +77,8 @@ toolchain as a one-off, there are a couple of differences:
      or are not familiar with setting up SSH,
      you can use HTTPS instead:
      ```sh
-     git clone https://github.com/apple/swift.git .
+     git clone https://github.com/apple/swift.git swift
+     cd swift
      utils/update-checkout --clone
      ```
    **Note:** If you've already forked the project on GitHub at this stage,
