@@ -21,7 +21,7 @@ func testAsyncLetInt() async -> Int {
   // CHECK: [[REABSTRACT_THUNK:%.*]] = function_ref @$sSiIegHd_Sis5Error_pIegHrzo_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[REABSTRACT_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[THICK_CLOSURE]]) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[CLOSURE_ARG:%.*]] = convert_function [[REABSTRACT_CLOSURE]] : $@async @callee_guaranteed () -> (@out Int, @error Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
-  // CHECK: [[RUN_CHILD_TASK:%.*]] = function_ref @$s12_Concurrency13_runChildTask9operationBoxyYKc_tYlF : $@convention(thin) @async <τ_0_0> (@guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK: [[RUN_CHILD_TASK:%.*]] = function_ref @$s12_Concurrency13_runChildTask9operationBoxyYJKc_tYlF : $@convention(thin) @async <τ_0_0> (@guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK: [[CHILD_TASK:%.*]] = apply [[RUN_CHILD_TASK]]<Int>([[CLOSURE_ARG]]) : $@convention(thin) @async <τ_0_0> (@guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> @owned Builtin.NativeObject
   async let i = await getInt()
 
