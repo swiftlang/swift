@@ -191,7 +191,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-bool BorrowingOperand::visitLocalEndScopeUses(
+bool BorrowingOperand::visitLocalScopeEndingUses(
     function_ref<bool(Operand *)> func) const {
   switch (kind) {
   case BorrowingOperandKind::Invalid:
@@ -313,7 +313,7 @@ void BorrowingOperand::visitUserResultConsumingUses(
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitLocalEndScopeUses([&](Operand *op) {
+  visitLocalScopeEndingUses([&](Operand *op) {
     foundUses.push_back(op);
     return true;
   });

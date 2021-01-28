@@ -225,7 +225,7 @@ struct BorrowingOperand {
   ///
   /// NOTE: Return false from func to stop iterating. Returns false if the
   /// closure requested to stop early.
-  bool visitLocalEndScopeUses(function_ref<bool(Operand *)> func) const;
+  bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.

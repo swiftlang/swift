@@ -161,7 +161,7 @@ static bool findTransitiveBorrowedUses(
       // Try to grab additional end scope instructions to find more liveness
       // info. Stash any reborrow uses so that we can eliminate the reborrow
       // before we are done processing.
-      BorrowingOperand(use).visitLocalEndScopeUses(
+      BorrowingOperand(use).visitLocalScopeEndingUses(
         [&](Operand *scopeEndingUse) {
           if (auto scopeEndingBorrowingOp = BorrowingOperand(scopeEndingUse)) {
             if (scopeEndingBorrowingOp.isReborrow()) {
