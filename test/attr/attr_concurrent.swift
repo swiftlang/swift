@@ -7,6 +7,13 @@ func f(_ fn: @concurrent (Int) -> Int) { }
 // Okay to overload @concurrent vs. not concurrent
 func f(_ fn: (Int) -> Int) { }
 
+// Concurrent attribute with other function attributes.
+func onEscaping(_ fn: @escaping @concurrent (Int) -> Int) { }
+func onEscaping2(_ fn: @concurrent @escaping (Int) -> Int) { }
+func onAutoclosure(_ fn: @autoclosure @concurrent () -> Int) { }
+func onAutoclosure2(_ fn: @concurrent @autoclosure () -> Int) { }
+func onEscapingAutoclosure(_ fn: @concurrent @autoclosure @escaping () -> Int) { }
+func onEscapingAutoclosure2(_ fn: @escaping @autoclosure @concurrent () -> Int) { }
 
 func acceptsConcurrent(_ fn: @concurrent (Int) -> Int) { }
 func acceptsNonConcurrent(_ fn: (Int) -> Int) { }
