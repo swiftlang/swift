@@ -4644,7 +4644,7 @@ public:
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
-  void applyPropertyWrapperParameter(
+  TypeMatchResult applyPropertyWrapperParameter(
       Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
       ConstraintKind matchKind, ConstraintLocatorBuilder locator);
 

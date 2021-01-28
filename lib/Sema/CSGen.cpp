@@ -4059,7 +4059,8 @@ bool ConstraintSystem::generateConstraints(
   return false;
 }
 
-void ConstraintSystem::applyPropertyWrapperParameter(
+ConstraintSystem::TypeMatchResult
+ConstraintSystem::applyPropertyWrapperParameter(
     Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
     ConstraintKind matchKind, ConstraintLocatorBuilder locator) {
   Expr *anchor = getAsExpr(locator.getAnchor());
@@ -4070,6 +4071,19 @@ void ConstraintSystem::applyPropertyWrapperParameter(
   PropertyWrapperInitKind initKind;
   if (argLabel.hasDollarPrefix()) {
     auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+    if (!typeInfo.projectedValueVar) {
+      if (shouldAttemptFixes()) {
+        if (paramType->hasTypeVariable())
+          recordPotentialHole(paramType);
+
+        auto *fix = AddProjectedValue::create(*this, wrapperType, getConstraintLocator(locator));
+        if (!recordFix(fix))
+          return getTypeMatchSuccess();
+      }
+
+      return getTypeMatchFailure(locator);
+    }
+
     auto projectionType = wrapperType->getTypeOfMember(param->getModuleContext(),
                                                        typeInfo.projectedValueVar);
     addConstraint(matchKind, paramType, projectionType, locator);
@@ -4089,6 +4103,7 @@ void ConstraintSystem::applyPropertyWrapperParameter(
   generateConstraints(init, DC);
 
   appliedPropertyWrappers[anchor].push_back({ init });
+  return getTypeMatchSuccess();
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {

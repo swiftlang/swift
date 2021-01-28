@@ -1422,8 +1422,10 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
       if (auto *param = paramInfo.getPropertyWrapperParam(argIdx)) {
         auto argLabel = argInfo->Labels[argIdx];
-        cs.applyPropertyWrapperParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
-                                         argLabel, subKind, locator);
+        if (cs.applyPropertyWrapperParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
+                                             argLabel, subKind, locator).isFailure()) {
+          return cs.getTypeMatchFailure(loc);
+        }
         continue;
       }
 
@@ -10662,6 +10664,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInResultBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
+  case FixKind::AddProjectedValue:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
   case FixKind::ExplicitlyConstructRawRepresentable:

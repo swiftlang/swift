@@ -3297,6 +3297,11 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
   return true;
 }
 
+bool MissingProjectedValueFailure::diagnoseAsError() {
+  emitDiagnostic(diag::property_wrapper_param_no_projection, wrapperType);
+  return true;
+}
+
 bool SubscriptMisuseFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto &sourceMgr = getASTContext().SourceMgr;

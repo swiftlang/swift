@@ -119,6 +119,10 @@ enum class FixKind : uint8_t {
   /// the storage or property wrapper.
   UseWrappedValue,
 
+  /// Add 'var projectedValue' to the property wrapper type to allow passing
+  /// a projection argument.
+  AddProjectedValue,
+
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
 
@@ -955,6 +959,24 @@ public:
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
                                  ConstraintLocator *locator);
+};
+
+class AddProjectedValue final : public ConstraintFix {
+  Type wrapperType;
+
+  AddProjectedValue(ConstraintSystem &cs, Type wrapper,
+                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseWrappedValue, locator), wrapperType(wrapper) {}
+
+public:
+  static AddProjectedValue *create(ConstraintSystem &cs, Type wrapper,
+                                   ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "add 'var projectedValue' to pass a projection argument";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 };
 
 class UseSubscriptOperator final : public ConstraintFix {

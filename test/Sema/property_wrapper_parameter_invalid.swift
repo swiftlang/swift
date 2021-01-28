@@ -27,3 +27,17 @@ func testComposedMutating(@MutatingWrapper @NonMutatingWrapper value: Int) {}
 
 // okay
 func testComposedNonMutating(@NonMutatingWrapper @MutatingWrapper value: Int) {}
+
+@propertyWrapper
+struct NoProjection<T> {
+  var wrappedValue: T
+}
+
+func takesNoProjectionWrapper(@NoProjection value: String) {}
+
+func testNoProjection(message: String) {
+  takesNoProjectionWrapper(value: message) // okay
+
+  // expected-error@+1 {{cannot use property wrapper projection parameter; wrapper 'NoProjection<String>' does not have a 'projectedValue'}}
+  takesNoProjectionWrapper($value: message)
+}
