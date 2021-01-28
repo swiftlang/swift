@@ -552,6 +552,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--verbose-build'),
     EnableOption('--watchos'),
     EnableOption('--xctest', dest='build_xctest'),
+    EnableOption('--swift-disable-dead-stripping'),
 
     DisableOption('--skip-build-cmark', dest='build_cmark'),
     DisableOption('--skip-build-llvm', dest='build_llvm'),

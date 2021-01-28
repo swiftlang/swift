@@ -600,7 +600,7 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
-        
+
         if args.swift_disable_dead_stripping:
             args.extra_cmake_options.append('-DSWIFT_DISABLE_DEAD_STRIPPING:BOOL=TRUE')
 
