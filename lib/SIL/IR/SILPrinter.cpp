@@ -831,12 +831,12 @@ public:
 
   void printDebugLocRef(SILLocation Loc, const SourceManager &SM,
                         bool PrintComma = true) {
-    auto DL = Loc.decodeDebugLoc(SM);
-    if (!DL.Filename.empty()) {
+    auto DL = Loc.decodeForDebugging(SM);
+    if (!DL.filename.empty()) {
       if (PrintComma)
         *this << ", ";
-      *this << "loc " << QuotedString(DL.Filename) << ':' << DL.Line << ':'
-            << DL.Column;
+      *this << "loc " << QuotedString(DL.filename) << ':' << DL.line << ':'
+            << (unsigned)DL.column;
     }
   }
 

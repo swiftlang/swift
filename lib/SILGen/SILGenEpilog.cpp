@@ -79,8 +79,7 @@ static Optional<SILLocation>
 prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
                               SILBasicBlock *epilogBB,
                               SmallVectorImpl<SILValue> &directResults) {
-  SILLocation implicitReturnFromTopLevel =
-      ImplicitReturnLocation::getImplicitReturnLoc(topLevel);
+  ImplicitReturnLocation implicitReturnFromTopLevel(topLevel);
 
   // If the current BB we are inserting into isn't terminated, and we require a
   // return, then we

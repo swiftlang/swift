@@ -260,7 +260,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       }
     }
 
-    SGF.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
+    SGF.B.createReturn(ImplicitReturnLocation(Loc),
                        SGF.emitEmptyTuple(Loc), std::move(functionLevelScope));
     return;
   }
@@ -309,7 +309,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   }
 
   SILValue selfValue = SGF.B.createStruct(Loc, selfTy, eltValues);
-  SGF.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
+  SGF.B.createReturn(ImplicitReturnLocation(Loc),
                      selfValue, std::move(functionLevelScope));
   return;
 }
@@ -542,7 +542,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                    element, C);
 
   // Return the enum.
-  auto ReturnLoc = ImplicitReturnLocation::getImplicitReturnLoc(Loc);
+  auto ReturnLoc = ImplicitReturnLocation(Loc);
 
   if (dest) {
     if (!mv.isInContext()) {
@@ -646,8 +646,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   emitProfilerIncrement(ctor->getTypecheckedBody());
 
   // Return the initialized 'self'.
-  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
-                 initedSelfValue);
+  B.createReturn(ImplicitReturnLocation(Loc), initedSelfValue);
 }
 
 static void emitDefaultActorInitialization(SILGenFunction &SGF,

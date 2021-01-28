@@ -1895,8 +1895,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
   // Collect the cases and specialized rows.
   CaseBlocks blocks{SGF, rows, sourceType, SGF.B.getInsertionBB()};
 
-  SILLocation loc = PatternMatchStmt;
-  loc.setDebugLoc(rows[0].Pattern);
+  RegularLocation loc(PatternMatchStmt, rows[0].Pattern, SGF.SGM.M);
   bool isPlusZero =
       src.getFinalConsumption() == CastConsumptionKind::BorrowAlways;
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
@@ -2030,8 +2029,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
     ProfileCounter defaultCaseCount) {
   // Why do we need to do this here (I just cargo culted this).
-  SILLocation loc = PatternMatchStmt;
-  loc.setDebugLoc(rows[0].Pattern);
+  RegularLocation loc(PatternMatchStmt, rows[0].Pattern, SGF.SGM.M);
 
   // If our source is an address that is loadable, perform a load_borrow.
   if (src.getType().isAddress() && src.getType().isLoadable(SGF.F)) {
@@ -2337,8 +2335,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     defaultBB = SGF.createBasicBlockAfter(curBB);
 
   // Emit the switch_value
-  SILLocation loc = PatternMatchStmt;
-  loc.setDebugLoc(rows[0].Pattern);
+  RegularLocation loc(PatternMatchStmt, rows[0].Pattern, SGF.SGM.M);
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
 
   // Extract the i1 from the Bool struct.

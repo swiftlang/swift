@@ -20,6 +20,8 @@
 
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILNode.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {

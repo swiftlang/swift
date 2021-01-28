@@ -2184,7 +2184,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       result = resultMV.forward(*this);
     }
   }
-  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), result);
+  B.createReturn(ImplicitReturnLocation(fd), result);
   // Emit the throw destination.
   emitRethrowEpilog(fd);
 }

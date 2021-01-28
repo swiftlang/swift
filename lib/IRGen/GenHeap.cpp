@@ -1369,16 +1369,16 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
 llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
     llvm::Value *value, SourceLoc sourceLoc, unsigned verificationType) {
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
-  auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
-  auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
+  auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.line);
+  auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.column);
 
   // Only output the filepath in debug mode. It is going to leak into the
   // executable. This is the same behavior as asserts.
   auto filename = IGM.IRGen.Opts.shouldOptimize()
                       ? IGM.getAddrOfGlobalString("")
-                      : IGM.getAddrOfGlobalString(loc.Filename);
+                      : IGM.getAddrOfGlobalString(loc.filename);
   auto filenameLength =
-      llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
+      llvm::ConstantInt::get(IGM.Int32Ty, loc.filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call =
       Builder.CreateCall(IGM.getIsEscapingClosureAtFileLocationFn(),
