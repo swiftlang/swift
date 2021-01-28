@@ -54,7 +54,7 @@ public:
     Block = nullptr;
     Depth = CleanupsDepth::invalid();
     // Null location.
-    CleanupLoc = CleanupLocation::get(ArtificialUnreachableLocation());
+    CleanupLoc = CleanupLocation(ArtificialUnreachableLocation());
     return NewValue;
   }
 

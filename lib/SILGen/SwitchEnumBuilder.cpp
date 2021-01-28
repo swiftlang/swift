@@ -120,7 +120,7 @@ void SwitchEnumBuilder::emit() && {
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
+                                    CleanupLocation(loc), branchDest);
     builder.emitBlock(defaultBlock);
     ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
@@ -138,7 +138,7 @@ void SwitchEnumBuilder::emit() && {
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
+                                    CleanupLocation(loc), branchDest);
 
     builder.emitBlock(caseBlock);
 
@@ -166,7 +166,7 @@ void SwitchEnumBuilder::emit() && {
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc), branchDest);
+                                    CleanupLocation(loc), branchDest);
     builder.emitBlock(defaultBlock);
     ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {

@@ -1912,7 +1912,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     SGF.B.setInsertionPoint(caseBB);
 
     // We're in conditionally-executed code; enter a scope.
-    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
+    Scope scope(SGF.Cleanups, CleanupLocation(loc));
 
     // Create a BB argument or 'unchecked_take_enum_data_addr'
     // instruction to receive the enum case data if it has any.
@@ -2101,7 +2101,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     forwardIntoIrrefutableSubtree(SGF, srcScope, src);
 
     // We're in conditionally-executed code; enter a scope.
-    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
+    Scope scope(SGF.Cleanups, CleanupLocation(loc));
 
     // Create a BB argument or 'unchecked_take_enum_data_addr'
     // instruction to receive the enum case data if it has any.
@@ -2351,7 +2351,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     SGF.B.setInsertionPoint(caseBB);
 
     // We're in conditionally-executed code; enter a scope.
-    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
+    Scope scope(SGF.Cleanups, CleanupLocation(loc));
 
     SILValue result
       = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);

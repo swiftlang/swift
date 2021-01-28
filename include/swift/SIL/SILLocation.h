@@ -570,10 +570,6 @@ public:
   /// Returns a null location.
   static CleanupLocation invalid() { return CleanupLocation(); }
 
-  static CleanupLocation get(SILLocation L) {
-    return CleanupLocation(L);
-  }
-
   /// Returns a location representing a cleanup on the module level.
   /// This is just a null location.
   static CleanupLocation getModuleCleanupLocation() {

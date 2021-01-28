@@ -48,7 +48,7 @@ void FormalAccess::verify(SILGenFunction &SGF) const {
 //===----------------------------------------------------------------------===//
 
 void SharedBorrowFormalAccess::finishImpl(SILGenFunction &SGF) {
-  SGF.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue);
+  SGF.B.createEndBorrow(CleanupLocation(loc), borrowedValue);
 }
 
 //===----------------------------------------------------------------------===//
@@ -56,7 +56,7 @@ void SharedBorrowFormalAccess::finishImpl(SILGenFunction &SGF) {
 //===----------------------------------------------------------------------===//
 
 void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
-  auto cleanupLoc = CleanupLocation::get(loc);
+  auto cleanupLoc = CleanupLocation(loc);
   if (value->getType().isAddress())
     SGF.B.createDestroyAddr(cleanupLoc, value);
   else
