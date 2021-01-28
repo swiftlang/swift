@@ -18,6 +18,7 @@
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"     // DeclContext::isModuleScopeContext()
 #include "swift/Parse/Parser.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -61,39 +62,87 @@ parseObjCSelector(swift::ASTContext &ctx, llvm::StringRef string) {
 
 namespace swift {
 
-NullablePtr<const AccessNote> AccessNotes::lookup(ValueDecl *VD) const {
-  assert(VD != nullptr);
+AccessNoteDeclName::AccessNoteDeclName() : parentNames(), name() { }
 
+AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
+  auto parsedName = parseDeclName(str);
+
+  StringRef first, rest = parsedName.ContextName;
+  while (!rest.empty()) {
+    std::tie(first, rest) = rest.split('.');
+    parentNames.push_back(ctx.getIdentifier(first));
+  }
+
+  name = parsedName.formDeclName(ctx);
+
+  // FIXME: parseDeclName() doesn't handle the special `subscript` name.
+  // Fixing this without affecting existing uses in import-as-member will need
+  // a bit of work. Hack around the problem for this specific caller instead.
+  if (name.getBaseName() == ctx.getIdentifier("subscript"))
+    name = DeclName(ctx, DeclBaseName::createSubscript(),
+                    name.getArgumentNames());
+}
+
+bool AccessNoteDeclName::matches(ValueDecl *VD) const {
   auto lookupVD = VD;
   if (auto accessor = dyn_cast<AccessorDecl>(VD))
     VD = accessor->getStorage();
 
-  auto lookupName = lookupVD->getName();
+  if (!lookupVD->getName().matchesRef(name))
+    return false;
 
-  // FIXME: parseDeclName() doesn't handle the special `subscript` name.
-  // Fixing this without affecting existing uses in import-as-member will need
-  // a bit of work. Hack around this by changing to a normal identifier.
-  if (isa<SubscriptDecl>(lookupVD) &&
-      lookupName.getBaseName() == DeclBaseName::createSubscript()) {
-    ASTContext &ctx = lookupVD->getASTContext();
-    lookupName = DeclName(ctx, ctx.getIdentifier("subscript"),
-                          lookupName.getArgumentNames());
+  // The rest of this checks `parentNames` against the parents of `lookupVD`.
+
+  ArrayRef<Identifier> remainingContextNames = parentNames;
+  DeclContext *nextContext = lookupVD->getDeclContext();
+
+  while (!nextContext->isModuleScopeContext()) {
+    // If we've run out of names without reaching module scope, we've failed.
+    if (remainingContextNames.empty())
+      return false;
+
+    Identifier contextName = remainingContextNames.back();
+
+    // If the context is not a type (or extension), we can't name VD in an
+    // access note and the match fails; if the name doesn't match, the match
+    // fails too.
+    auto contextType = nextContext->getSelfNominalTypeDecl();
+    if (!contextType || contextType->getName() != contextName)
+      return false;
+
+    // Still checking. Move to the parent.
+    remainingContextNames = remainingContextNames.drop_back();
+    nextContext = contextType->getParent();
   }
 
-  const std::vector<AccessNote> *notesToSearch = &notes;
+  // If the context is module-scoped, we've succeeded if we're out of names, or
+  // failed if we still have some names to go.
+  return remainingContextNames.empty();
+}
 
-  // If nested, look at the parent context's notes.
-  if (auto parent = lookupVD->getDeclContext()->getSelfNominalTypeDecl()) {
-    if (auto parentNote = lookup(parent))
-      notesToSearch = &(parentNote.get()->members);
-    else
-      return nullptr;
-  }
+bool AccessNoteDeclName::empty() const {
+  return !name;
+}
 
-  auto iter = llvm::find_if(*notesToSearch, [&](const AccessNote &note) -> bool {
-    return lookupName.matchesRef(note.name);
+void AccessNoteDeclName::print(llvm::raw_ostream &os) const {
+  for (auto parentName : parentNames)
+    os << parentName << '.';
+  name.print(os, /*skipEmptyArgumentNames=*/false);
+}
+
+void AccessNoteDeclName::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+NullablePtr<const AccessNote> AccessNotes::lookup(ValueDecl *VD) const {
+  assert(VD != nullptr);
+
+  auto iter = llvm::find_if(notes, [&](const AccessNote &note) -> bool {
+    return note.name.matches(VD);
   });
-  return NullablePtr<const AccessNote>(iter == notesToSearch->end() ? nullptr : &*iter);
+
+  return NullablePtr<const AccessNote>(iter == notes.end() ? nullptr : &*iter);
 }
 
 void AccessNotes::dump() const {
@@ -114,8 +163,11 @@ void AccessNotes::dump(llvm::raw_ostream &os) const {
 }
 
 void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
-  os.indent(indent) << "(note name='" << name << "'";
-  if (name.getBaseName().isSpecial())
+  os.indent(indent) << "(note name='";
+  name.print(os);
+  os << "'";
+
+  if (name.name.getBaseName().isSpecial())
     os << " is_special_name";
 
   if (ObjC)
@@ -125,22 +177,12 @@ void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
   if (Dynamic)
     os << " dynamic=" << *Dynamic;
 
-  if (!members.empty()) {
-    os << "\n";
-    os.indent(indent + 2) << "(members";
-    for (const auto &member : members) {
-      os << "\n";
-      member.dump(os, indent + 4);
-    }
-    os << ")";
-  }
-
   os << ")";
 }
 
 }
 
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::DeclName, QuotingType::Single)
+LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::AccessNoteDeclName, QuotingType::Single);
 LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::ObjCSelector, QuotingType::Single);
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::AccessNote)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotes)
@@ -173,19 +215,19 @@ namespace yaml {
 using AccessNote = swift::AccessNote;
 using AccessNotes = swift::AccessNotes;
 using ASTContext = swift::ASTContext;
-using DeclName = swift::DeclName;
+using AccessNoteDeclName = swift::AccessNoteDeclName;
 using ObjCSelector = swift::ObjCSelector;
 
-void ScalarTraits<DeclName>::output(const DeclName &name, void *ctxPtr,
-                                    raw_ostream &os) {
-  name.print(os, /*skipEmptyArgumentNames=*/false);
+void ScalarTraits<AccessNoteDeclName>::
+output(const AccessNoteDeclName &name, void *ctxPtr, raw_ostream &os) {
+  name.print(os);
 }
 
-StringRef ScalarTraits<DeclName>::input(StringRef str, void *ctxPtr,
-                                        DeclName &name) {
+StringRef ScalarTraits<AccessNoteDeclName>::
+input(StringRef str, void *ctxPtr, AccessNoteDeclName &name) {
   ASTContext &ctx = *static_cast<ASTContext *>(ctxPtr);
-  name = parseDeclName(ctx, str);
-  return name ? "" : "invalid declaration name";
+  name = AccessNoteDeclName(ctx, str);
+  return name.empty() ? "invalid declaration name" : "";
 }
 
 void ScalarTraits<ObjCSelector>::output(const ObjCSelector &selector,
@@ -207,12 +249,9 @@ StringRef ScalarTraits<ObjCSelector>::input(StringRef str, void *ctxPtr,
 
 void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
   io.mapRequired("Name", note.name);
-
   io.mapOptional("ObjC", note.ObjC);
   io.mapOptional("Dynamic", note.Dynamic);
   io.mapOptional("ObjCName", note.ObjCName);
-
-  io.mapOptional("Members", note.members);
 }
 
 StringRef MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {

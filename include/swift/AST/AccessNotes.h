@@ -29,10 +29,24 @@ namespace swift {
 class ASTContext;
 class ValueDecl;
 
+class AccessNoteDeclName {
+public:
+  std::vector<Identifier> parentNames;
+  DeclName name;
+
+  AccessNoteDeclName(ASTContext &ctx, StringRef str);
+  AccessNoteDeclName();
+
+  bool matches(ValueDecl *VD) const;
+  bool empty() const;
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
+};
+
 class AccessNote {
 public:
-  DeclName name;
-  std::vector<AccessNote> members;    // can't be SmallVector due to recursion
+  AccessNoteDeclName name;
 
   Optional<bool> ObjC;
   Optional<bool> Dynamic;

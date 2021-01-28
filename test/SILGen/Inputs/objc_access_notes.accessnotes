@@ -1,47 +1,52 @@
 ---
 Reason: fancy test suite
 Notes:
-  - Name: Hoozit
-    Members:
-    - Name: 'typical(_:y:)'
-      ObjC: true
-    - Name: 'copyFoo()'
-      ObjC: true
-    - Name: 'mutableCopyFoo()'
-      ObjC: true
-    - Name: 'copy8()'
-      ObjC: true
-    - Name: 'makeDuplicate()'
-      ObjC: true
-      ObjCName: 'copyDuplicate'
-    - Name: 'mutableCopyFoo()'
-      ObjC: true
-    - Name: 'initFoo()'
-      ObjC: true
-    - Name: 'typicalProperty'
-      ObjC: true
-    - Name: 'copyProperty'
-      ObjC: true
-    - Name: 'propComputed'
-      ObjC: true
-      # FIXME: Add a way to specify getter and setter names in an access note
-    - Name: 'roProperty'
-      ObjC: true
-    - Name: 'rwProperty'
-      ObjC: true
-    - Name: 'copyRWProperty'
-      ObjC: true
-    - Name: 'initProperty'
-      ObjC: true
-    - Name: 'subscript(_:)'
-      ObjC: true
-    - Name: 'init(int:)'
-      ObjC: true
-      Dynamic: true
-    - Name: 'foof()'
-      ObjC: true
-  - Name: Wotsit
-    Members:
-    - Name: 'plain()'
-      ObjC: true
 
+# These two should not match anything, but could accidentally match Hoozit.typical(_:y:)
+- Name: 'typical(_:y:)'
+  ObjC: true
+  ObjCName: 'pickedNoteWithNameThatWasTooShallow_typical:y:'
+- Name: 'Hoozit.Hoozit.typical(_:y:)'
+  ObjC: true
+  ObjCName: 'pickedNoteWithNameThatWasTooDeep_typical:y:'
+
+# These entries should actually match things.
+- Name: 'Hoozit.typical(_:y:)'
+  ObjC: true
+- Name: 'Hoozit.copyFoo()'
+  ObjC: true
+- Name: 'Hoozit.mutableCopyFoo()'
+  ObjC: true
+- Name: 'Hoozit.copy8()'
+  ObjC: true
+- Name: 'Hoozit.makeDuplicate()'
+  ObjC: true
+  ObjCName: 'copyDuplicate'
+- Name: 'Hoozit.mutableCopyFoo()'
+  ObjC: true
+- Name: 'Hoozit.initFoo()'
+  ObjC: true
+- Name: 'Hoozit.typicalProperty'
+  ObjC: true
+- Name: 'Hoozit.copyProperty'
+  ObjC: true
+- Name: 'Hoozit.propComputed'
+  ObjC: true
+  # FIXME: Add a way to specify getter and setter names in an access note
+- Name: 'Hoozit.roProperty'
+  ObjC: true
+- Name: 'Hoozit.rwProperty'
+  ObjC: true
+- Name: 'Hoozit.copyRWProperty'
+  ObjC: true
+- Name: 'Hoozit.initProperty'
+  ObjC: true
+- Name: 'Hoozit.subscript(_:)'
+  ObjC: true
+- Name: 'Hoozit.init(int:)'
+  ObjC: true
+  Dynamic: true
+- Name: 'Hoozit.foof()'
+  ObjC: true
+- Name: 'Wotsit.plain()'
+  ObjC: true
