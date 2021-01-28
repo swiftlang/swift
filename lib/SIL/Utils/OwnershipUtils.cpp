@@ -231,6 +231,26 @@ bool BorrowingOperand::visitLocalScopeEndingUses(
   llvm_unreachable("Covered switch isn't covered");
 }
 
+bool BorrowingOperand::visitTransitiveScopeEndingUses(
+    function_ref<bool(Operand *)> func) const {
+  SmallSetVector<Operand *, 4> reborrows;
+  reborrows.insert(this->op);
+  auto visitEnd = [&](Operand *scopeEndingUse) {
+    if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+      reborrows.insert(scopeEndingUse);
+      return true;
+    }
+    return func(scopeEndingUse);
+  };
+  for (unsigned idx = 0; idx < reborrows.size(); ++idx) {
+    if (!BorrowingOperand(reborrows[idx])
+        .visitLocalScopeEndingUses(visitEnd)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void BorrowingOperand::visitBorrowIntroducingUserResults(
     function_ref<void(BorrowedValue)> visitor) const {
   switch (kind) {

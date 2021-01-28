@@ -227,6 +227,14 @@ struct BorrowingOperand {
   /// closure requested to stop early.
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> func) const;
 
+  /// Visit the scope ending operands after transitively searching through
+  /// reborrows. These uses might not be dominated by this BorrowingOperand.
+  ///
+  /// Returns false and early exits if the visitor \p func returns false.
+  ///
+  /// Note: this currently does not visit the intermediate reborrows.
+  bool visitTransitiveScopeEndingUses(function_ref<bool(Operand *)> func) const;
+
   /// Returns true if this borrow scope operand consumes guaranteed
   /// values and produces a new scope afterwards.
   ///
