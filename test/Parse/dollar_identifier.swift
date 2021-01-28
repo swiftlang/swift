@@ -77,8 +77,11 @@ func $declareWithDollar() { // expected-error{{cannot declare entity named '$dec
     $b c: Int) { } // expected-error{{cannot declare entity named '$b'}}
   let _: (Int) -> Int = {
     [$capture = 0] // expected-error{{cannot declare entity named '$capture'}}
-    $a in // expected-error{{cannot declare entity named '$a'}}
+    $a in // diagnosed after type checking the closure
     $capture
+  }
+  let _: (Int) -> Void = {
+    $a in // expected-error{{cannot declare entity named '$a'}}
   }
   let ($a: _, _) = (0, 0) // expected-error{{cannot declare entity named '$a'}}
   $label: if true { // expected-error{{cannot declare entity named '$label'}}

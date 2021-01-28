@@ -40,6 +40,7 @@
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/DenseMap.h"
@@ -2079,6 +2080,13 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   TypeChecker::checkClosureAttributes(closure);
   TypeChecker::checkParameterList(closure->getParameters(), closure);
+
+  for (auto *param : *closure->getParameters()) {
+    if (!param->isImplicit() && param->getName().hasDollarPrefix() &&
+        !param->hasAttachedPropertyWrapper()) {
+      param->diagnose(diag::dollar_identifier_decl, param->getName());
+    }
+  }
 
   BraceStmt *body = closure->getBody();
 

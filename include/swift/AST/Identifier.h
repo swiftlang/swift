@@ -166,7 +166,7 @@ public:
   }
 
   bool hasDollarPrefix() const {
-    return str().startswith("$");
+    return str().startswith("$") && !(getLength() == 1);
   }
   
   const void *getAsOpaquePointer() const {
