@@ -1583,14 +1583,30 @@ bool ConcurrentExecutionChecker::mayExecuteConcurrentlyWith(
         return true;
     }
 
-    // If we find a local function that was referenced in code that can be
-    // executed concurrently with where the local function was declared, the
-    // local function can be run concurrently.
     if (auto func = dyn_cast<FuncDecl>(useContext)) {
       if (func->isLocalCapture()) {
-        SourceLoc concurrentLoc = getConcurrentReferenceLoc(func);
-        if (concurrentLoc.isValid())
+        // If the function is @concurrent... it can be run concurrently.
+        if (func->isConcurrent())
           return true;
+
+        // If we find a local function that was referenced in code that can be
+        // executed concurrently with where the local function was declared, the
+        // local function can be run concurrently.
+        SourceLoc concurrentLoc = getConcurrentReferenceLoc(func);
+        if (concurrentLoc.isValid()) {
+          ASTContext &ctx = func->getASTContext();
+          func->diagnose(
+              diag::local_function_executed_concurrently,
+              func->getDescriptiveKind(), func->getName())
+            .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
+          ctx.Diags.diagnose(concurrentLoc, diag::concurrent_access_here);
+
+          // Add the @concurrent attribute implicitly, so we don't diagnose
+          // again.
+          const_cast<FuncDecl *>(func)->getAttrs().add(
+              new (ctx) ConcurrentAttr(true));
+          return true;
+        }
       }
     }
 

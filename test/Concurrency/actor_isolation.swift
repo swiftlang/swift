@@ -8,7 +8,7 @@ func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
 func acceptConcurrentClosure<T>(_: @concurrent () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
-func acceptEscapingClosure<T>(_: (String) -> ()) async -> T? { nil }
+func acceptEscapingClosure<T>(_: @escaping (String) -> ()) async -> T? { nil }
 
 func acceptAsyncClosure<T>(_: () async -> T) { }
 func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
@@ -155,14 +155,14 @@ extension MyActor {
     }
 
     // Local functions might run concurrently.
-    func localFn1() {
+    @concurrent func localFn1() {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
 
-    func localFn2() {
+    @concurrent func localFn2() {
       acceptClosure {
         _ = text[0]  // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
         _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
@@ -341,8 +341,9 @@ func checkLocalFunctions() async {
     i = 17
   }
 
-  func local2() {
+  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@concurrent'}}{{3-3=@concurrent }}
     j = 42 // expected-warning{{local var 'j' is unsafe to reference in code that may execute concurrently}}
+    // FIXME: the above should be an error as well
   }
 
   // Okay to call locally.
@@ -357,7 +358,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptEscapingClosure {
-    local2()
+    local2() // expected-note{{access in concurrently-executed code here}}
   }
 
   print(i)
@@ -366,11 +367,11 @@ func checkLocalFunctions() async {
   var k = 17 // expected-note{{var declared here}}
   func local4() {
     acceptEscapingClosure {
-      local3()
+      local3() // expected-note{{access in concurrently-executed code here}}
     }
   }
 
-  func local3() {
+  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@concurrent'}}
     k = 25 // expected-warning{{local var 'k' is unsafe to reference in code that may execute concurrently}}
   }
 

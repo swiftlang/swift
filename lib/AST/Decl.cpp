@@ -6768,6 +6768,10 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
+bool AbstractFunctionDecl::isConcurrent() const {
+  return getAttrs().hasAttribute<ConcurrentAttr>();
+}
+
 bool AbstractFunctionDecl::isAsyncHandler() const {
   auto func = dyn_cast<FuncDecl>(this);
   if (!func)

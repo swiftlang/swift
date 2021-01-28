@@ -4261,6 +4261,11 @@ ERROR(actor_isolated_concurrent_access,none,
         "actor-isolated %0 %1 is unsafe to reference in code "
         "that may execute concurrently",
         (DescriptiveDeclKind, DeclName))
+ERROR(local_function_executed_concurrently,none,
+      "concurrently-executed %0 %1 must be marked as '@concurrent'",
+      (DescriptiveDeclKind, DeclName))
+NOTE(concurrent_access_here,none,
+     "access in concurrently-executed code here", ())
 NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
