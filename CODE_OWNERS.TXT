@@ -47,6 +47,11 @@ E: rjmccall@apple.com
 G: rjmccall
 D: Demangler, IRGen, Runtime
 
+N: Victoria Mitchell
+E: victoria_m@apple.com
+G: QuietMisdreavus
+D: SymbolGraphGen
+
 N: Max Moiseev
 E: moiseev@apple.com
 G: moiseev
