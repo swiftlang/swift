@@ -8023,6 +8023,25 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       return getActorIsolation(var);
   }
 
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+    switch (auto isolation = closure->getActorIsolation()) {
+    case ClosureActorIsolation::Independent:
+      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
+
+    case ClosureActorIsolation::GlobalActor: {
+      return ActorIsolation::forGlobalActor(isolation.getGlobalActor());
+    }
+
+    case ClosureActorIsolation::ActorInstance: {
+      auto selfDecl = isolation.getActorInstance();
+      auto actorClass = selfDecl->getType()->getRValueType()
+          ->getClassOrBoundGenericClass();
+      assert(actorClass && "Bad closure actor isolation?");
+      return ActorIsolation::forActorInstance(actorClass);
+    }
+    }
+  }
+
   return ActorIsolation::forUnspecified();
 }
 

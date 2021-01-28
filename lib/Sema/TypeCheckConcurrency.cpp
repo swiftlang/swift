@@ -1385,55 +1385,10 @@ namespace {
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
-      Optional<ActorIsolation> parentIsolation;
-      auto parentDC = closure->getParent();
-      switch (parentDC->getContextKind()) {
-      case DeclContextKind::AbstractClosureExpr: {
-        auto parentClosureIsolation = cast<AbstractClosureExpr>(parentDC)
-          ->getActorIsolation();
-        switch (parentClosureIsolation) {
-        case ClosureActorIsolation::Independent:
-          parentIsolation = ActorIsolation::forIndependent(
-              ActorIndependentKind::Safe);
-          break;
-
-        case ClosureActorIsolation::ActorInstance: {
-          auto selfDecl = parentClosureIsolation.getActorInstance();
-          auto actorClass = selfDecl->getType()->getRValueType()
-              ->getClassOrBoundGenericClass();
-          assert(actorClass && "Bad closure actor isolation?");
-          parentIsolation = ActorIsolation::forActorInstance(actorClass);
-          break;
-        }
-
-        case ClosureActorIsolation::GlobalActor:
-          parentIsolation = ActorIsolation::forGlobalActor(
-              parentClosureIsolation.getGlobalActor());
-          break;
-        }
-        break;
-      }
-
-      case DeclContextKind::AbstractFunctionDecl:
-      case DeclContextKind::SubscriptDecl:
-        parentIsolation = getActorIsolation(
-            cast<ValueDecl>(parentDC->getAsDecl()));
-        break;
-
-      case DeclContextKind::EnumElementDecl:
-      case DeclContextKind::ExtensionDecl:
-      case DeclContextKind::FileUnit:
-      case DeclContextKind::GenericTypeDecl:
-      case DeclContextKind::Initializer:
-      case DeclContextKind::Module:
-      case DeclContextKind::SerializedLocal:
-      case DeclContextKind::TopLevelCodeDecl:
-        return ClosureActorIsolation::forIndependent();
-      }
+      auto parentIsolation = getActorIsolationOfContext(closure->getParent());
 
       // We must have parent isolation determined to get here.
-      assert(parentIsolation && "Missing parent isolation?");
-      switch (*parentIsolation) {
+      switch (parentIsolation) {
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
       case ActorIsolation::Unspecified:
@@ -1441,7 +1396,7 @@ namespace {
 
       case ActorIsolation::GlobalActor: {
         Type globalActorType = closure->mapTypeIntoContext(
-            parentIsolation->getGlobalActor()->mapTypeOutOfContext());
+            parentIsolation.getGlobalActor()->mapTypeOutOfContext());
         return ClosureActorIsolation::forGlobalActor(globalActorType);
       }
 
