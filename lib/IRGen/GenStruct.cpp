@@ -16,20 +16,25 @@
 
 #include "GenStruct.h"
 
-#include "swift/AST/Types.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/GlobalDecl.h"
+#include "clang/AST/Mangle.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
+#include "clang/Sema/Sema.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 
 #include "GenMeta.h"
 #include "GenRecord.h"
@@ -60,6 +65,24 @@ enum class StructTypeInfoKind {
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
   return (StructTypeInfoKind) type.getSubclassKind();
+}
+
+/// If this type has a CXXDestructorDecl, find it and return it. Otherwise,
+/// return nullptr.
+static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
+  auto *structDecl = type.getStructOrBoundGenericStruct();
+  if (!structDecl || !structDecl->getClangDecl())
+    return nullptr;
+  const clang::CXXRecordDecl *cxxRecordDecl =
+      dyn_cast<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  if (!cxxRecordDecl)
+    return nullptr;
+  for (auto member : cxxRecordDecl->methods()) {
+    if (auto dest = dyn_cast<clang::CXXDestructorDecl>(member)) {
+      return dest;
+    }
+  }
+  return nullptr;
 }
 
 namespace {
@@ -362,9 +385,58 @@ namespace {
                              // with user-defined special member functions.
                              SpareBitVector(llvm::Optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsPOD, IsNotBitwiseTakable, IsFixedSize),
+                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
+    }
+
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
+      auto *destructor = getCXXDestructor(T);
+      // If the destructor is trivial, clang will assert when we call
+      // `emitCXXDestructorCall` so, just let Swift handle this destructor.
+      if (!destructor || destructor->isTrivial()) {
+        // If we didn't find a destructor to call, bail out to the parent
+        // implementation.
+        StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                           ClangFieldInfo>::destroy(IGF, address, T,
+                                                    isOutlined);
+        return;
+      }
+
+      if (!destructor->isUserProvided() &&
+          !destructor->doesThisDeclarationHaveABody()) {
+        assert(!destructor->isDeleted() &&
+               "Swift cannot handle a type with no known destructor.");
+        // Make sure we define the destructor so we have something to call.
+        auto &sema = IGF.IGM.Context.getClangModuleLoader()->getClangSema();
+        sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
+      }
+
+      clang::GlobalDecl destructorGlobalDecl(destructor, clang::Dtor_Complete);
+      auto *destructorFnAddr =
+          cast<llvm::Function>(IGF.IGM.getAddrOfClangGlobalDecl(
+              destructorGlobalDecl, NotForDefinition));
+
+      SmallVector<llvm::Value *, 2> args;
+      auto *thisArg = IGF.coerceValue(address.getAddress(),
+                                      destructorFnAddr->getArg(0)->getType(),
+                                      IGF.IGM.DataLayout);
+      args.push_back(thisArg);
+      llvm::Value *implicitParam =
+          clang::CodeGen::getCXXDestructorImplicitParam(
+              IGF.IGM.getClangCGM(), IGF.Builder.GetInsertBlock(),
+              IGF.Builder.GetInsertPoint(), destructor, clang::Dtor_Complete,
+              false, false);
+      if (implicitParam) {
+        implicitParam = IGF.coerceValue(implicitParam,
+                                        destructorFnAddr->getArg(1)->getType(),
+                                        IGF.IGM.DataLayout);
+        args.push_back(implicitParam);
+      }
+
+      IGF.Builder.CreateCall(destructorFnAddr->getFunctionType(),
+                             destructorFnAddr, args);
     }
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
