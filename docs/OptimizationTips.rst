@@ -245,7 +245,7 @@ this allows the compiler to elide unnecessary copies by retaining the container
 instead of performing a deep copy. This is done by only copying the underlying
 container if the reference count of the container is greater than 1 and the
 container is mutated. For instance in the following, no copying will occur when
-``d`` is assigned to ``c``, but when ``d`` undergoes structural mutation by
+``c`` is assigned to ``d``, but when ``d`` undergoes structural mutation by
 appending ``2``, ``d`` will be copied and then ``2`` will be appended to ``d``:
 
 ::
