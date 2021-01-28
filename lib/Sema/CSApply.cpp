@@ -7835,6 +7835,7 @@ static Expr *wrapAsyncLetInitializer(
   bool throws = TypeChecker::canThrow(initializer);
   auto extInfo = ASTExtInfoBuilder()
     .withAsync()
+    .withConcurrent()
     .withThrows(throws)
     .build();
 

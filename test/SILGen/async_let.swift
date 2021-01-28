@@ -16,7 +16,7 @@ enum SomeError: Error {
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A11AsyncLetIntSiyYF : $@convention(thin) @async () -> Int
 func testAsyncLetInt() async -> Int {
   // CHECK: [[I:%.*]] = mark_uninitialized [var] %0
-  // CHECK: [[CLOSURE:%.*]] = function_ref @$s4test0A11AsyncLetIntSiyYFSiyYcfu_ : $@convention(thin) @async () -> Int
+  // CHECK: [[CLOSURE:%.*]] = function_ref @$s4test0A11AsyncLetIntSiyYFSiyYJcfu_ : $@convention(thin) @async () -> Int
   // CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) @async () -> Int to $@async @callee_guaranteed () -> Int
   // CHECK: [[REABSTRACT_THUNK:%.*]] = function_ref @$sSiIegHd_Sis5Error_pIegHrzo_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[REABSTRACT_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[THICK_CLOSURE]]) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
