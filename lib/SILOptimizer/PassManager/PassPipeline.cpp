@@ -700,7 +700,8 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Only has an effect if opt-remark is enabled.
   P.addOptRemarkGenerator();
 
-  P.addPruneVTables();
+  // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
+  // P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
