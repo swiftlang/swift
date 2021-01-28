@@ -42,7 +42,7 @@ distributed actor class DistributedActor_1 {
   distributed func distInt(int: Int) async throws -> Int { int } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
-    // expected-error@-1 {{distributed function parameter 'notCodable' type 'NotCodableValue' does not conform to 'Codable'}}
+    // expected-error@-1 {{distributed function parameter 'notCodable' of type 'NotCodableValue' does not conform to 'Codable'}}
   }
   distributed func distBadReturn(int: Int) async throws -> NotCodableValue {
     // expected-error@-1 {{distributed function result type 'NotCodableValue' does not conform to 'Codable'}}
@@ -58,6 +58,18 @@ distributed actor class DistributedActor_1 {
   }
   distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
     // expected-error@-1 {{distributed function result type 'T' does not conform to 'Codable'}}
+    fatalError()
+  }
+
+  distributed func distGenericParam<T: Codable>(value: T) async throws { // ok
+    fatalError()
+  }
+  distributed func distGenericParamWhere<T>(value: T) async throws -> T
+    where T: Codable { // ok
+    fatalError()
+  }
+  distributed func distBadGenericParam<T>(int: T) async throws {
+    // expected-error@-1 {{distributed function parameter 'int' of type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 

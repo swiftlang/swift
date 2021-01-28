@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/ExistentialLayout.h"
 
 using namespace swift;
 
@@ -150,8 +151,8 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
   }
 
   /// TODO: the latest actors proposal states that functions dont need to be async
-  /// but they will be transparently called as async from outside; so we can remove
-  /// this requirement here.
+  ///       but they will be transparently called as async from outside; so we can remove
+  ///       this requirement here.
   if (!func->hasAsync()) {
     if (diagnose) {
 //      func->diagnose(diag::asynchandler_async)
@@ -164,15 +165,44 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
 
   // All parameters and the result type must be Codable
 
-//  if (auto attr = func->getAttrs().getAttribute<DistributedActorAttr>()) { // TODO: can we remove this here since it's checked earlier already?
-//  if (checkDistributedFuncParamAndResultTypes(func, diagnose)) return true;
-//  }
-  auto encodableType = func->getASTContext().getProtocol(KnownProtocolKind::Encodable);
-  auto decodableType = func->getASTContext().getProtocol(KnownProtocolKind::Decodable);
+  auto &C = func->getASTContext();
+  auto encodableType = C.getProtocol(KnownProtocolKind::Encodable);
+  auto decodableType = C.getProtocol(KnownProtocolKind::Decodable);
 
-  /// Check parameters for 'Codable' conformance
+  // Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
     auto paramType = param->getInterfaceType();
+
+    if (paramType->isExistentialType()) {
+      func->dump();
+      assert(false && "OH NO");
+
+      bool encodableConformance = false;
+      bool decodableConformance = false;
+      auto layout = paramType->getExistentialLayout();
+      for (Type protoTy : layout.getProtocols()) {
+        if (TypeChecker::conformsToProtocol(protoTy, encodableType, func)) {
+          encodableConformance = true;
+        }
+        if (TypeChecker::conformsToProtocol(protoTy, decodableType, func)) {
+          decodableConformance = true;
+        }
+
+        if (decodableConformance && encodableConformance) {
+          return false; // ok!
+        }
+      }
+
+      if (diagnose) {
+        func->diagnose(
+            diag::distributed_actor_func_param_not_codable,
+            param->getArgumentName().str(),
+            paramType
+        );
+        return true;
+      }
+    }
+
     if (!TypeChecker::conformsToProtocol(paramType, encodableType, func)) {
       if (diagnose)
         func->diagnose(
@@ -199,16 +229,9 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
   // Result type must be either void or a codable type
   // TODO: In the future we can also support AsyncSequence of Codable values
   auto resultType = func->getResultInterfaceType();
-  llvm::errs() << "   RESULT TYPE:";
-  llvm::errs() << resultType;
-  llvm::errs() << "\n";
-
   if (!resultType->isVoid()) {
     if (!TypeChecker::conformsToProtocol(resultType, decodableType, func) ||
         !TypeChecker::conformsToProtocol(resultType, encodableType, func)) {
-      llvm::errs() << "   CODABLE:";
-      llvm::errs() << resultType;
-      llvm::errs() << "\n";
 
       if (diagnose)
         func->diagnose(
@@ -218,6 +241,8 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
       // TODO: suggest a fixit to add Codable to the type?
       return true;
     }
+  } else if (resultType) {
+
   }
 
   return false;

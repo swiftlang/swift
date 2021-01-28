@@ -4101,18 +4101,16 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
       } else if (baseName == DeclBaseName::createConstructor() &&
                  argumentNames[0] == Context.Id_transport) {
+        action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+      }
+    } else if (!member.isCompoundName() || argumentNames.size() == 2) {
+      if (baseName == DeclBaseName::createConstructor() &&
+          argumentNames[0] == Context.Id_resolve &&
+          argumentNames[1] == Context.Id_using) {
         fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "emplace ResolveDistributedActor");
         action.emplace(ImplicitMemberAction::ResolveDistributedActor);
       }
     }
-//    else if (!member.isCompoundName() || argumentNames.size() == 2) {
-//      if (baseName == DeclBaseName::createConstructor() &&
-//          argumentNames[0] == Context.Id_resolve &&
-//          argumentNames[1] == Context.Id_using) {
-//        fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "emplace ResolveDistributedActor");
-//        action.emplace(ImplicitMemberAction::ResolveDistributedActor);
-//      }
-//    }
   }
 
   if (auto actionToTake = action) {

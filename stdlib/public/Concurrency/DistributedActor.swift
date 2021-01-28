@@ -20,7 +20,7 @@ import Swift
 /// which involves enqueuing new partial tasks to be executed at some
 /// point. Actor classes implicitly conform to this protocol as part of their
 /// primary class definition.
-public protocol DistributedActor: Actor {
+public protocol DistributedActor: Actor, Codable {
 
   /// Creates new (local) distributed actor instance, bound to the passed transport.
   ///
@@ -39,33 +39,27 @@ public protocol DistributedActor: Actor {
   /// the transport, allowing it to take over the remote messaging with the
   /// remote actor instance.
   ///
-  /// - Parameter address:
-  /// - Parameter transport:
+  /// - Parameter address: the address to resolve, and produce an instance or proxy for.
+  /// - Parameter transport: transport which should be used to resolve the `address`.
   init(resolve address: ActorAddress, using transport: ActorTransport)
 
-//  /// Decode an actor (remote or local) reference using the transport stored
-//  /// within the passed decoder. The transport's `resolve` function is called to
-//  /// perform all the heavy lifting of this function.
-//  ///
-//  /// Requires `ActorTransport` to be present as userInfo under the ... key.
-//  override init(from decoder: Decoder) throws
-//
-//  @actorIndependent
-//  override func encode(to encoder: Encoder) throws
-//  // /Users/ktoso/code/swift-project-distributed/swift/stdlib/public/Concurrency/DistributedActor.swift:39:17: error: actor-independent instance method 'encode(to:)' has different actor isolation from non-actor-isolated overridden declaration
-//  //  override func encode(to encoder: Encoder) throws
-//  //                ^
-//  // Swift.Encodable:2:10: note: overridden declaration is here
-//  //    func encode(to encoder: Encoder) throws
-//  //         ^
-
-  // @actorIndependent
+  /// The `ActorTransport` associated with this actor.
+  /// It is immutable and equal to the transport passed in the local/resolve
+  /// initializer.
+  ///
+  /// Conformance to this requirement is synthesized automatically for any
+  /// `distributed actor` declaration.
+  // FIXME: don't express it as a protocol requirement, since there never
+  //        is a reason to reach into it externally?
   var actorTransport: ActorTransport { get }
 
   /// Logical address which this distributed actor represents.
   ///
   /// An address is always uniquely pointing at a specific actor instance.
-  // @actorIndependent
+  ///
+  /// Conformance to this requirement is synthesized automatically for any
+  /// `distributed actor` declaration.
+  // @actorIndependent // FIXME
   var actorAddress: ActorAddress { get }
 }
 

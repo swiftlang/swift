@@ -102,8 +102,8 @@ deriveBodyDistributedActor_init_resolve(AbstractFunctionDecl *initDecl, void *) 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
       /*implicit=*/true);
 
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT transport BODY:");
-  initDecl->dump();
+//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT transport BODY:");
+//  initDecl->dump();
 
   return { body, /*isTypeChecked=*/false };}
 
@@ -147,7 +147,6 @@ static ValueDecl *deriveDistributedActor_init_resolve(DerivedConformance &derive
   );
 
   // Func name: init(resolve:using:)
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FLE__, __LINE__, __FUNCTION__, "init func");
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl =
@@ -158,19 +157,10 @@ static ValueDecl *deriveDistributedActor_init_resolve(DerivedConformance &derive
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&deriveBodyDistributedActor_init_resolve);
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "init func prepared");
-
-//  // This constructor is 'required', all distributed actors MUST invoke it.
-//  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-//  initDecl->getAttrs().add(reqAttr);
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
   derived.addMembersToConformanceContext({initDecl});
-
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT DECL:");
-//  initDecl->dump();
-
   return initDecl;
 }
 
@@ -271,11 +261,6 @@ deriveBodyDistributedActor_init_transport(AbstractFunctionDecl *initDecl, void *
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
       /*implicit=*/true);
 
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT transport BODY: init decl");
-//  initDecl->dump();
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT transport BODY: assign body");
-//  body->dump();
-
   return { body, /*isTypeChecked=*/false };
 }
 
@@ -323,36 +308,12 @@ static ValueDecl *deriveDistributedActor_init_transport(DerivedConformance &deri
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
+
   derived.addMembersToConformanceContext({initDecl});
-
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT DECL:");
-//  initDecl->dump();
-
   return initDecl;
 }
 
 // ==== Properties -------------------------------------------------------------
-
-// FIXME: this is copied from DerivedConformanceAdditiveArithmetic
-// Synthesize body for a property computed property getter.
-static std::pair<BraceStmt *, bool>
-deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
-                         ValueDecl *reqDecl) {
-  assert(false);
-}
-
-// Synthesize body for the `actorTransport` computed property getter.
-static std::pair<BraceStmt *, bool>
-deriveBodyDistributedActor_actorTransport(AbstractFunctionDecl *funcDecl, void *) {
-  auto &C = funcDecl->getASTContext();
-//  auto distributedActorProto = C.getDistributedActorDecl();
-  auto distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
-  auto *transportReq = getProtocolRequirement(distributedActorProto, C.Id_actorTransport);
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "TRANSPORT REQUIREMENT:");
-  transportReq->dump();
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "...");
-  return deriveBodyPropertyGetter(funcDecl, distributedActorProto, transportReq);
-}
 
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributedActor_property_getter_actorTransport(AbstractFunctionDecl *funcDecl, void *) {
@@ -369,31 +330,6 @@ deriveBodyDistributedActor_property_getter_actorTransport(AbstractFunctionDecl *
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };
-
-//  // The enclosing type decl.
-//  auto conformanceDC = varDecl->getDeclContext();
-//  auto *targetDecl = conformanceDC->getSelfNominalTypeDecl();
-//
-//  auto *funcDC = cast<DeclContext>(varDecl);
-//  auto &C = funcDC->getASTContext();
-//
-//  // self.actorTransport
-//  auto *selfRef = DerivedConformance::createSelfDeclRef(varDecl);
-//  auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
-//                                        ConcreteDeclRef(varDecl),
-//                                        DeclNameLoc(), /*Implicit=*/true);
-//
-//  SmallVector<ASTNode, 1> statements;
-//
-//  // TODO: return the property from this getter
-//  statements.push_back(varExpr);
-//
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "actorTransport getter BODY:");
-//  varDecl->dump();
-//
-//  auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-//      /*implicit=*/true);
-//  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the declaration of Actor's actorTransport.
@@ -412,19 +348,11 @@ static ValueDecl *deriveDistributedActor_actorTransport(DerivedConformance &deri
       C.Id_actorTransport, transportType, transportType,
       /*isStatic*/ false, /*isFinal*/ true);
 
-  // Define the getter.
-//  auto *getterDecl =
-//      derived.addGetterToReadOnlyDerivedProperty(propDecl, transportType);
-//  getterDecl->setBodySynthesizer(deriveBodyDistributedActor_property_getter_actorTransport, nullptr);
-//  getterDecl->setBodySynthesizer(deriveBodyDistributedActor_actorTransport, nullptr);
-
   derived.addMembersToConformanceContext({propDecl, pbDecl});
-
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "VAR DECL (actorTransport):");
-  propDecl->dump();
-  pbDecl->dump();
+//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "VAR DECL (actorTransport):");
+//  propDecl->dump();
+//  pbDecl->dump();
 //  getterDecl->dump();
-
   return propDecl;
 }
 
@@ -443,31 +371,6 @@ deriveBodyDistributedActor_property_getter_actorAddress(AbstractFunctionDecl *fu
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };
-
-//  // The enclosing type decl.
-//  auto conformanceDC = varDecl->getDeclContext();
-//  auto *targetDecl = conformanceDC->getSelfNominalTypeDecl();
-//
-//  auto *funcDC = cast<DeclContext>(varDecl);
-//  auto &C = funcDC->getASTContext();
-//
-//  // self.actorTransport
-//  auto *selfRef = DerivedConformance::createSelfDeclRef(varDecl);
-//  auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
-//                                        ConcreteDeclRef(varDecl),
-//                                        DeclNameLoc(), /*Implicit=*/true);
-//
-//  SmallVector<ASTNode, 1> statements;
-//
-//  // TODO: return the property from this getter
-//  statements.push_back(varExpr);
-//
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "actorTransport getter BODY:");
-//  varDecl->dump();
-//
-//  auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-//      /*implicit=*/true);
-//  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the declaration of Actor's actorAddress.
@@ -492,66 +395,7 @@ static ValueDecl *deriveDistributedActor_actorAddress(DerivedConformance &derive
 //  getterDecl->setBodySynthesizer(deriveBodyDistributedActor_property_getter_actorAddress, nullptr);
 
   derived.addMembersToConformanceContext({propDecl, pbDecl});
-
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "VAR DECL (actorAddress):");
-  propDecl->dump();
-  pbDecl->dump();
-//  getterDecl->dump();
-
   return propDecl;
-
-
-//  ASTContext &C = derived.Context;
-//
-//  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-//  auto conformanceDC = derived.getConformanceContext();
-//
-//  auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
-//  VarDecl *varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-//                                                 SourceLoc(), C.Id_actorAddress, conformanceDC);
-//  varDecl->setInterfaceType(addressType);
-//  varDecl->setImplicit();
-//  varDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
-//
-//  derived.addMembersToConformanceContext({varDecl});
-//
-////  (pattern_binding_decl range=[/Users/ktoso/code/swift-project-distributed/swift/test/Concurrency/Runtime/distributed_actor_run.swift:39:3 - line:39:14]
-////  (pattern_typed type='ActorTransport'
-////      (pattern_named type='ActorTransport' 'XXXXX')
-////  (type_ident
-////      (component id='ActorTransport' bind=_Concurrency.(file).ActorTransport))))
-//
-//
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "VAR DECL (actorAddress):");
-//  varDecl->dump();
-//
-//  return varDecl;
-
-  // TODO: the below was another implementation but that made the property immutable since was a get only computed one
-  // so we could not even set it in the constructor.
-//
-//  VarDecl *propDecl;
-//  PatternBindingDecl *pbDecl;
-//  std::tie(propDecl, pbDecl) =
-//      derived.declareDerivedProperty(C.Id_actorAddress, addressType, addressType,
-//                                     /*isStatic=*/false, /*isFinal=*/false);
-//  // Define the getter.
-//  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(propDecl, addressType);
-//
-//  // TODO: doing this causes a crash, do we need this though?
-//  // propDecl->setImplInfo(StorageImplInfo::getSimpleStored(StorageIsNotMutable));
-//
-//  // Synthesize the body.
-//  getterDecl->setBodySynthesizer(&deriveBodyDistributedActor_property_getter_actorAddress);
-//
-//  derived.addMembersToConformanceContext({propDecl, pbDecl});
-//
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "PROP DECL (actorAddress):");
-//  propDecl->dump();
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "PB DECL (actorAddress):");
-//  pbDecl->dump();
-//
-//  return propDecl;
 }
 
 // ==== ------------------------------------------------------------------------
@@ -562,7 +406,7 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   const auto name = requirement->getName();
   fprintf(stderr, "[%s:%d] >> (%s) TRY %s \n", __FILE__, __LINE__, __FUNCTION__, name);
 
-  // Synthesize initializers
+  // Synthesize initializers // TODO: this is actually now done earlier, no need to do here?
 //  if (dyn_cast<ConstructorDecl>(requirement)) {
 //    const auto name = requirement->getName();
 //    auto argumentNames = name.getArgumentNames();
