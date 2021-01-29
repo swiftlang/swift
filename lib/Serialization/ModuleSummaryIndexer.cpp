@@ -314,7 +314,7 @@ bool shouldPreserveFunction(const SILFunction &F) {
        F.getName().equals("$ss23_getErrorDomainNSStringyyXlSPyxGs0B0RzlF"))) {
     return false;
   }
-  if (F.getName().equals(SWIFT_ENTRY_POINT_FUNCTION)) {
+  if (F.getName().equals(F.getASTContext().getEntryPointFunctionName())) {
     return true;
   }
 
