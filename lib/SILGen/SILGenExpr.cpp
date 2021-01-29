@@ -1077,7 +1077,7 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
   SGF.ThrowDest = JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
-                           CleanupLocation::get(loc));
+                           CleanupLocation(loc));
 }
 
 void SILGenFunction::ForceTryEmission::finish() {
@@ -4861,7 +4861,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
     optAddr = optInit->getAddressForInPlaceInitialization(*this, loc);
 
   // Enter a cleanups scope.
-  FullExpr scope(Cleanups, CleanupLocation::get(loc));
+  FullExpr scope(Cleanups, CleanupLocation(loc));
 
   // Inside of the cleanups scope, create a new initialization to
   // emit into optAddr.
@@ -4875,7 +4875,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   SILBasicBlock *failureBB = createBasicBlock();
   RestoreOptionalFailureDest
     restoreFailureDest(*this, JumpDest(failureBB, Cleanups.getCleanupsDepth(),
-                                       CleanupLocation::get(loc)));
+                                       CleanupLocation(loc)));
 
   generateNormalResults(results, SGFContext(normalInit.get()));
   assert(results.size() >= 1 && "didn't include a normal result");
@@ -5055,7 +5055,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
   // If the subexpression is a monadic optional operation, peephole
   // the emission of the operation.
   if (auto eval = dyn_cast<OptionalEvaluationExpr>(E)) {
-    CleanupLocation cleanupLoc = CleanupLocation::get(loc);
+    CleanupLocation cleanupLoc = CleanupLocation(loc);
     SILBasicBlock *failureBB;
     JumpDest failureDest(cleanupLoc);
 
@@ -5283,7 +5283,7 @@ public:
   
   RValue get(SILGenFunction &SGF, SILLocation loc,
              ManagedValue base, SGFContext c) && override {
-    FullExpr TightBorrowScope(SGF.Cleanups, CleanupLocation::get(loc));
+    FullExpr TightBorrowScope(SGF.Cleanups, CleanupLocation(loc));
 
     // Load the value at +0.
     ManagedValue loadedBase = SGF.B.createLoadBorrow(loc, base);

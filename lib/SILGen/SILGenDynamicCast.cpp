@@ -173,7 +173,7 @@ namespace {
       // Emit the success block.
       SGF.B.setInsertionPoint(trueBB);
       {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
+        FullExpr scope(SGF.Cleanups, CleanupLocation(Loc));
 
         ManagedValue result;
         if (Strategy == CastStrategy::Address &&
@@ -202,7 +202,7 @@ namespace {
       // Emit the failure block.
       SGF.B.setInsertionPoint(falseBB);
       {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
+        FullExpr scope(SGF.Cleanups, CleanupLocation(Loc));
 
         // If we have an address only type, do not handle the consumption
         // rules. These are handled for us by the user.
@@ -224,7 +224,7 @@ namespace {
         // the false case, our user must treat the taken value as a new value.
         if (shouldDestroyOnFailure(consumption)) {
           {
-            FullExpr argScope(SGF.Cleanups, CleanupLocation::get(Loc));
+            FullExpr argScope(SGF.Cleanups, CleanupLocation(Loc));
             SGF.B.createOwnedPhiArgument(operandValue.getType());
           }
           handleFalse(None);
@@ -485,7 +485,7 @@ RValue Lowering::emitConditionalCheckedCast(
   }
 
   // Prepare a jump destination here.
-  ExitableFullExpr scope(SGF, CleanupLocation::get(loc));
+  ExitableFullExpr scope(SGF, CleanupLocation(loc));
 
   auto operandCMV = ConsumableManagedValue::forOwned(operand);
   assert(operandCMV.getFinalConsumption() == CastConsumptionKind::TakeAlways);
@@ -575,7 +575,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
   }
 
   // Prepare a jump destination here.
-  ExitableFullExpr scope(SGF, CleanupLocation::get(loc));
+  ExitableFullExpr scope(SGF, CleanupLocation(loc));
 
   auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
 

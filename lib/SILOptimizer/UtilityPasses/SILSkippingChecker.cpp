@@ -119,7 +119,7 @@ class SILSkippingChecker : public SILModuleTransform {
           continue;
 
         llvm::dbgs() << "Function serialized that should have been skipped!\n";
-        F.getLocation().dump(F.getModule().getSourceManager());
+        F.getLocation().print(llvm::dbgs(), F.getModule().getSourceManager());
         llvm::dbgs() << "\n";
         F.dump();
         abort();

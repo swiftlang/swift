@@ -906,7 +906,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
              dc, interfaceType, /*throws=*/false, SourceLoc());
   if (EmitProfilerIncrement)
     emitProfilerIncrement(value);
-  prepareEpilog(true, false, CleanupLocation::get(Loc));
+  prepareEpilog(true, false, CleanupLocation(Loc));
 
   {
     llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
@@ -958,7 +958,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
   emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
              /*throws=*/false, SourceLoc());
-  prepareEpilog(true, false, CleanupLocation::get(loc));
+  prepareEpilog(true, false, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);

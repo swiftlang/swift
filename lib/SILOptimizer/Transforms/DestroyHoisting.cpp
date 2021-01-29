@@ -503,7 +503,7 @@ void DestroyHoisting::insertDestroys(Bits &toInsert, Bits &activeDestroys,
   SILInstruction *insertionPoint =
     (afterInst ? &*std::next(afterInst->getIterator()) : &*inBlock->begin());
   SILBuilder builder(insertionPoint);
-  SILLocation loc = RegularLocation(insertionPoint->getLoc().getSourceLoc());
+  SILLocation loc = RegularLocation(insertionPoint->getLoc());
 
   // Insert destroy_addr instructions for all bits in toInsert.
   for (int locIdx = toInsert.find_first(); locIdx >= 0;
@@ -664,7 +664,7 @@ bool DestroyHoisting::tailMergingInBlock(SILBasicBlock *block,
 
   // Create the common destroy_addr at the block entry.
   SILBuilder builder(&*block->begin());
-  SILLocation loc = RegularLocation(block->begin()->getLoc().getSourceLoc());
+  SILLocation loc = RegularLocation(block->begin()->getLoc());
   for (int locIdx = canHoist.find_first(); locIdx >= 0;
        locIdx = canHoist.find_next(locIdx)) {
     SILValue addr = createAddress(locIdx, builder);

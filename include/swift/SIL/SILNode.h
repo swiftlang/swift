@@ -124,6 +124,8 @@ public:
   enum { NumSILAccessEnforcementBits = 2 };
 
 protected:
+  friend class SILInstruction;
+
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8),
@@ -145,7 +147,9 @@ protected:
       Index : 32
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
+  SWIFT_INLINE_BITFIELD(SILInstruction, SILNode, 8,
+    LocationKindAndFlags : 8
+  );
 
   // Special handling for UnaryInstructionWithTypeDependentOperandsBase
   SWIFT_INLINE_BITFIELD(IBWTO, SILNode, 64-NumSILNodeBits,
@@ -227,7 +231,7 @@ protected:
     OnStack : 1,
     NumTailTypes : 32-1-1-NumAllocationInstBits
   );
-  static_assert(32-1-1-NumAllocationInstBits >= 16, "Reconsider bitfield use?");
+  static_assert(32-1-1-NumAllocationInstBits >= 14, "Reconsider bitfield use?");
 
   UIWTDOB_BITFIELD_EMPTY(AllocValueBufferInst, AllocationInst);
 

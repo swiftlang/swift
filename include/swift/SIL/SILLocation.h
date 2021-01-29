@@ -15,7 +15,7 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/SourceManager.h"
+#include "swift/SIL/SILAllocated.h"
 #include "swift/AST/TypeAlignments.h"
 
 #include <cstddef>
@@ -23,21 +23,59 @@
 
 namespace swift {
 
-class SourceLoc;
 class ReturnStmt;
 class BraceStmt;
 class AbstractClosureExpr;
 class AbstractFunctionDecl;
+class SILModule;
+class SourceManager;
 
-/// This is a pointer to the AST node that a SIL instruction was
-/// derived from. This may be null if AST information is unavailable or
-/// stripped.
+/// Represents a source location.
 ///
-/// FIXME: This should eventually include inlining history, generics
-/// instantiation info, etc (when we get to it).
-///
+/// In most cases this is a pointer to an AST node from which the source
+/// location can be retrieved from. In case the location refers to a parsed
+/// or deserialized SIL file, the source location is represented differently.
+/// For details see SILLocation::Storage.
 class SILLocation {
-private:
+public:
+  enum LocationKind : uint8_t {
+    RegularKind = 1,
+    ReturnKind = 2,
+    ImplicitReturnKind = 3,
+    InlinedKind = 4,
+    MandatoryInlinedKind = 5,
+    CleanupKind = 6,
+    ArtificialUnreachableKind = 7
+  };
+
+  /// Describes a position in a source file by explicitly storing the file name,
+  /// line and column.
+  ///
+  /// This is used for parsed locations from a SIL file, for "-gsil" (see
+  /// SILDebugInfoGenerator) and for the "compiler-generated" singleton location.
+  /// In future we might also use it for de-serialized locations from a
+  /// swiftmodule file.
+  struct FilenameAndLocation : public SILAllocated<FilenameAndLocation> {
+    unsigned line;
+    uint16_t column;
+    StringRef filename;
+
+    FilenameAndLocation(unsigned line = 0, uint16_t column = 0,
+                      StringRef filename = StringRef())
+        : line(line), column(column), filename(filename) {}
+
+    static FilenameAndLocation *alloc(unsigned line, unsigned column,
+                               StringRef filename, SILModule &module);
+
+    inline bool operator==(const FilenameAndLocation &rhs) const {
+      return line == rhs.line && column == rhs.column &&
+             filename.equals(rhs.filename);
+    }
+    void dump() const;
+    void print(raw_ostream &OS) const;
+  };
+
+protected:
   template <class T, class Enable = void>
   struct base_type;
 
@@ -67,108 +105,115 @@ private:
 
   using ASTNodeTy = llvm::PointerUnion<Stmt *, Expr *, Decl *, Pattern *>;
 
-public:
-  enum LocationKind : unsigned {
-    RegularKind = 1,
-    ReturnKind = 2,
-    ImplicitReturnKind = 3,
-    InlinedKind = 4,
-    MandatoryInlinedKind = 5,
-    CleanupKind = 6,
-    ArtificialUnreachableKind = 7
+  /// Used in case the location for diagnostics does not match the location for
+  /// debugging.
+  struct ExtendedASTNodeLoc : public SILAllocated<ExtendedASTNodeLoc> {
+    /// Primary AST location, always used for diagnostics.
+    ASTNodeTy primary;
+    /// Sometimes the location for diagnostics needs to be different than the
+    /// one used to emit the line table for debugging.
+    ASTNodeTy forDebugging;
+    
+    ExtendedASTNodeLoc(ASTNodeTy primary, ASTNodeTy forDebugging) :
+      primary(primary), forDebugging(forDebugging) {}
   };
 
-  enum StorageKind : unsigned {
-    UnknownKind = 0,
-    ASTNodeKind = 1 << 3,
-    SILFileKind = 1 << 4,
-    DebugInfoKind = 1 << 3 | 1 << 4
+private:
+  friend class SILInstruction;
+
+  /// Each kind corresponds to a union member in `Storage`.
+  enum StorageKind : uint8_t {
+    /// For usages see the struct `FilenameAndLocation`.
+    FilenameAndLocationKind,
+    
+    /// The most common location kind: a pointer to the AST from which the
+    /// source location can be retrieved.
+    /// This is the "normal" case when compiling a swift file.
+    ASTNodeKind,
+    
+    /// Use for a few locations in pattern-code. See ExtendedASTNodeLoc.
+    ExtendedASTNodeKind,
+    
+    /// This is used when parsing a SIL file.
+    /// Note: this is only used for functions/instruction for which there is no
+    /// location specified in the SIL file.
+    /// In case a SIL instruction is annotated with a parsable location in
+    /// the SIL file, the instruction gets a FilenameAndLocation.
+    SourceLocKind
   };
 
-  struct DebugLoc {
-    unsigned Line;
-    unsigned Column;
-    StringRef Filename;
+  /// The storage which actually points to the source location. Each union
+  /// member corresponds to a StorageKind and is basically a pointer.
+  /// Note that a referenced FilenameAndLocation or ExtendedASTNodeLoc is not
+  /// owned by SILLocation, thus not freed on destruction. Those data structures
+  /// are allocated with the SILModule's bump pointer allocator.
+  union Storage {
+    Storage() : filePositionLoc(nullptr) {}
+    Storage(FilenameAndLocation *F) : filePositionLoc(F) {}
+    Storage(ASTNodeTy N) : ASTNodeLoc(N) {}
+    Storage(ExtendedASTNodeLoc *E) : extendedASTNodeLoc(E) {}
+    Storage(SourceLoc L) : sourceLoc(L) {}
 
-    DebugLoc(unsigned Line = 0, unsigned Column = 0,
-             StringRef Filename = StringRef())
-        : Line(Line), Column(Column), Filename(Filename) {}
+    const FilenameAndLocation *filePositionLoc;
+    ASTNodeTy ASTNodeLoc;
+    const ExtendedASTNodeLoc *extendedASTNodeLoc;
+    SourceLoc sourceLoc;
+  };
 
-    inline bool operator==(const DebugLoc &R) const {
-      return Line == R.Line && Column == R.Column &&
-             Filename.equals(R.Filename);
+  static_assert(sizeof(SILLocation::Storage) == sizeof(void *),
+                "SILLocation::Storage must stay small");
+
+  /// Contains the LocationKind, StorageKind and some extra flags.
+  /// This fits nicely in a single byte. If for some reason we need more flags
+  /// it's possible to extend this to e.g. a uint16_t.
+  /// But SILNode::Bits.LocationKindAndFlags must be updated accordingly.
+  union KindAndFlags {
+    KindAndFlags() : packedKindAndFlags(0) {}
+    KindAndFlags(LocationKind kind, StorageKind storageKind)
+        : fields({kind, storageKind, 0, 0, 0 }) {
+      assert(fields.kind == kind && "LocationKind overflow");
+      assert(fields.storageKind == storageKind && "StorageKind overflow");
     }
+    KindAndFlags(uint8_t packed) : packedKindAndFlags(packed) {}
+  
+    uint8_t packedKindAndFlags;
+    struct Fields {
+      uint8_t kind: 3;
+      uint8_t storageKind: 2;
+      uint8_t autoGenerated: 1;
+      uint8_t pointsToEnd: 1;
+      uint8_t inPrologue: 1;
+    } fields;
   };
 
-protected:
-  union UnderlyingLocation {
-    UnderlyingLocation() : DebugInfoLoc({}) {}
-    UnderlyingLocation(ASTNodeTy N) : ASTNode(N) {}
-    UnderlyingLocation(SourceLoc L) : SILFileLoc(L) {}
-    UnderlyingLocation(DebugLoc D)
-        : DebugInfoLoc({D.Filename.data(), D.Line, D.Column}) {}
-    struct ASTNodeLoc {
-      ASTNodeLoc(ASTNodeTy N) : Primary(N) {}
-      /// Primary AST location, always used for diagnostics.
-      ASTNodeTy Primary;
-      /// Sometimes the location for diagnostics needs to be
-      /// different than the one used to emit the line table. If
-      /// HasDebugLoc is set, this is used for the debug info.
-      ASTNodeTy ForDebugger;
-    } ASTNode;
+  static_assert(sizeof(SILLocation::KindAndFlags) == sizeof(uint8_t),
+                "SILLocation::KindAndFlags should be 1 byte");
 
-    /// A location inside a textual .sil file.
-    SourceLoc SILFileLoc;
+  // Data fields:
+  Storage storage;
+  KindAndFlags kindAndFlags;
 
-    /// A deserialized source location.
-    ///
-    /// This represents \e most of the information in a SILLocation::DebugLoc,
-    /// but for bit-packing purposes the length of the filename is stored in
-    /// the SILLocation's ExtraStorageData instead of here.
-    ///
-    /// \sa SILLocation::getDebugInfoLoc
-    struct CompactDebugLoc {
-      const char *FilenameData;
-      unsigned Line;
-      unsigned Column;
-    } DebugInfoLoc;
-  } Loc;
+  StorageKind getStorageKind() const {
+    return (StorageKind)kindAndFlags.fields.storageKind;
+  }
 
-  /// The kind of this SIL location.
-  unsigned KindData;
+  ASTNodeTy getPrimaryASTNode() const {
+    switch (getStorageKind()) {
+    case ASTNodeKind:
+      return storage.ASTNodeLoc;
+    case ExtendedASTNodeKind:
+      return storage.extendedASTNodeLoc->primary;
+    case SourceLocKind:
+    case FilenameAndLocationKind:
+      assert(false);
+    }
+  }
 
-  /// Extra data that's not in UnderlyingLocation to keep the size of
-  /// SILLocation down.
-  unsigned ExtraStorageData = 0;
-
-  enum {
-    LocationKindBits = 3,
-    LocationKindMask = 7,
-
-    StorageKindBits = 2,
-    StorageKindMask = (1 << 3) | (1 << 4),
-    SpecialFlagsMask = ~ (LocationKindMask | StorageKindMask),
-
-    /// Used to mark this instruction as part of auto-generated
-    /// code block.
-    AutoGeneratedBit = 5,
-
-    /// Used to redefine the default source location used to
-    /// represent this SILLocation. For example, when the host instruction
-    /// is known to correspond to the beginning or the end of the source
-    /// range of the ASTNode.
-    PointsToStartBit = 6,
-    PointsToEndBit = 7,
-
-    /// Used to notify that this instruction belongs to the top-
-    /// level (module) scope.
-    ///
-    /// FIXME: If Module becomes a Decl, this could be removed.
-    IsInTopLevel = 8,
-
-    /// Marks this instruction as belonging to the function prologue.
-    IsInPrologue = 9
-  };
+  /// Returns true if the location has a separate AST node for debugging.
+  /// See ExtendedASTNodeLoc.
+  bool hasASTNodeForDebugging() const {
+    return getStorageKind() == ExtendedASTNodeKind;
+  }
 
   template <typename T>
   T *getNodeAs(ASTNodeTy Node) const {
@@ -179,7 +224,8 @@ protected:
   template <typename T>
   bool isNode(ASTNodeTy Node) const {
     assert(isASTNode());
-    if (Loc.ASTNode.Primary.is<typename base_type<T>::type*>())
+    ASTNodeTy primaryNd = getPrimaryASTNode();
+    if (primaryNd.is<typename base_type<T>::type*>())
       return isa<T>(Node.get<typename base_type<T>::type*>());
     return false;
   }
@@ -189,117 +235,99 @@ protected:
     return cast<T>(Node.get<typename base_type<T>::type*>());
   }
 
-  /// \defgroup SILLocation constructors.
-  /// @{
-
-  /// This constructor is used to support getAs operation.
-  SILLocation() { assert(Loc.DebugInfoLoc.Line == 0); }
-  SILLocation(LocationKind K, unsigned Flags = 0) : KindData(K | Flags) {
-    assert(Loc.DebugInfoLoc.Line == 0);
-  }
-
-  SILLocation(Stmt *S, LocationKind K, unsigned Flags = 0)
-      : Loc(S), KindData(K | Flags) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-
-  SILLocation(Expr *E, LocationKind K, unsigned Flags = 0)
-      : Loc(E), KindData(K | Flags) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-
-  SILLocation(Decl *D, LocationKind K, unsigned Flags = 0)
-      : Loc(D), KindData(K | Flags) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-
-  SILLocation(Pattern *P, LocationKind K, unsigned Flags = 0)
-      : Loc(P), KindData(K | Flags) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-
-  SILLocation(SourceLoc L, LocationKind K, unsigned Flags = 0)
-      : Loc(L), KindData(K | Flags) {
-    setStorageKind(SILFileKind);
-    assert(isSILFile());
-  }
-
-  SILLocation(DebugLoc L, LocationKind K, unsigned Flags = 0)
-      : KindData(K | Flags) {
-    setDebugInfoLoc(L);
-  }
-  /// @}
-
-private:
-  friend class ImplicitReturnLocation;
-  friend class MandatoryInlinedLocation;
-  friend class InlinedLocation;
-  friend class CleanupLocation;
-
-  void setLocationKind(LocationKind K) { KindData |= (K & LocationKindMask); }
-  void setStorageKind(StorageKind K) { KindData |= (K & StorageKindMask); }
-  unsigned getSpecialFlags() const { return KindData & SpecialFlagsMask; }
-  void setSpecialFlags(unsigned Flags) {
-    KindData |= (Flags & SpecialFlagsMask);
-  }
-
   SourceLoc getSourceLoc(ASTNodeTy N) const;
-  SourceLoc getStartSourceLoc(ASTNodeTy N) const;
-  SourceLoc getEndSourceLoc(ASTNodeTy N) const;
+  static SourceLoc getStartSourceLoc(ASTNodeTy N);
+  static SourceLoc getEndSourceLoc(ASTNodeTy N);
+
+protected:
+  SILLocation(LocationKind K) : kindAndFlags(K, FilenameAndLocationKind) {}
+
+  /// Constructs a null location.
+  SILLocation() : SILLocation(RegularKind) { assert(isNull()); }
+
+  /// Constructs a location like \p l, but with a different kind.
+  SILLocation(SILLocation l, LocationKind K)
+      : storage(l.storage), kindAndFlags(l.kindAndFlags.packedKindAndFlags) {
+    kindAndFlags.fields.kind = K;
+  }
+
+  SILLocation(FilenameAndLocation *filePos, LocationKind K)
+      : storage(filePos), kindAndFlags(K, FilenameAndLocationKind) {
+    assert(filePos && !filePos->filename.empty());
+  }
+
+  // It is okay to pass a nullptr, but preferably, a null-location should be
+  // created with `invalid()`.
+  SILLocation(ASTNodeTy Node, LocationKind K)
+      : storage(Node), kindAndFlags(K, ASTNodeKind) {}
+
+  SILLocation(ExtendedASTNodeLoc *ext, LocationKind K)
+      : storage(ext), kindAndFlags(K, ExtendedASTNodeKind) {
+    assert(ext && !ext->primary.isNull() && !ext->forDebugging.isNull());
+  }
+
+  SILLocation(SourceLoc L, LocationKind K)
+      : storage(L), kindAndFlags(K, SourceLocKind) {}
+
+  // Used by SILInstruction.
+  SILLocation(Storage storage, uint8_t packedKindAndFlags) :
+    storage(storage), kindAndFlags(packedKindAndFlags) {}
 
 public:
+  // When an ASTNode gets implicitly converted into a SILLocation we
+  // construct a RegularLocation. Since RegularLocations represent the majority
+  // of locations, this greatly simplifies the user code.
+  //
+  // It is okay to pass a nullptr to these constructors, but preferably, a
+  // null-location should be created with `invalid()`.
+  SILLocation(Stmt *S) : SILLocation(ASTNodeTy(S), RegularKind) {}
+  SILLocation(Expr *E) : SILLocation(ASTNodeTy(E), RegularKind) {}
+  SILLocation(Decl *D) : SILLocation(ASTNodeTy(D), RegularKind) {}
+  SILLocation(Pattern *P) : SILLocation(ASTNodeTy(P), RegularKind) {}
 
-  /// When an ASTNode gets implicitly converted into a SILLocation we
-  /// construct a RegularLocation. Since RegularLocations represent the majority
-  /// of locations, this greatly simplifies the user code.
-  SILLocation(Stmt *S) : Loc(S), KindData(RegularKind) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-  SILLocation(Expr *E) : Loc(E), KindData(RegularKind) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-  SILLocation(Decl *D) : Loc(D), KindData(RegularKind) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-  SILLocation(Pattern *P) : Loc(P), KindData(RegularKind) {
-    setStorageKind(ASTNodeKind);
-    assert(isASTNode());
-  }
-
+  /// Returns a null location.
   static SILLocation invalid() { return SILLocation(); }
 
-  /// Check if the location wraps an AST node or a valid SIL file
-  /// location.
-  ///
+  LocationKind getKind() const {
+    return (LocationKind)kindAndFlags.fields.kind;
+  }
+
   /// Artificial locations and the top-level module locations will be null.
   bool isNull() const {
     switch (getStorageKind()) {
-    case ASTNodeKind:   return Loc.ASTNode.Primary.isNull();
-    case DebugInfoKind: return ExtraStorageData == 0;
-    case SILFileKind:   return Loc.SILFileLoc.isInvalid();
-    default:            return true;
+    case ASTNodeKind:             return storage.ASTNodeLoc.isNull();
+    case ExtendedASTNodeKind:     return false;
+    case FilenameAndLocationKind: return storage.filePositionLoc == nullptr;;
+    case SourceLocKind:           return storage.sourceLoc.isInvalid();
     }
   }
   explicit operator bool() const { return !isNull(); }
 
-  /// Return whether this location is backed by an AST node.
-  bool isASTNode() const { return getStorageKind() == ASTNodeKind; }
+  /// Return true if this location is backed by an AST node.
+  bool isASTNode() const {
+    switch (getStorageKind()) {
+    case ASTNodeKind:
+    case ExtendedASTNodeKind:
+      return true;
+    case SourceLocKind:
+    case FilenameAndLocationKind:
+      return false;
+    }
+  }
 
-  /// Return whether this location came from a SIL file.
-  bool isSILFile() const { return getStorageKind() == SILFileKind; }
+  /// Returns true if this location came from a SIL file.
+  bool isSILFile() const { return getStorageKind() == SourceLocKind; }
 
-  /// Return whether this location came from a textual SIL file.
-  bool isDebugInfoLoc() const { return getStorageKind() == DebugInfoKind; }
+  bool isFilenameAndLocation() const {
+    return getStorageKind() == FilenameAndLocationKind && !isNull();
+  }
+  const FilenameAndLocation *getFilenameAndLocation() const {
+    assert(isFilenameAndLocation());
+    return storage.filePositionLoc;
+  }
 
   /// Marks the location as coming from auto-generated body.
-  void markAutoGenerated() { KindData |= (1 << AutoGeneratedBit); }
+  void markAutoGenerated() { kindAndFlags.fields.autoGenerated = true; }
 
   /// Returns true if the location represents an artificially generated
   /// body, such as thunks or default destructors.
@@ -307,190 +335,88 @@ public:
   /// These locations should not be included in the debug line table.
   /// These might also need special handling by the debugger since they might
   /// contain calls, which the debugger could be able to step into.
-  bool isAutoGenerated() const { return KindData & (1 << AutoGeneratedBit); }
+  bool isAutoGenerated() const { return kindAndFlags.fields.autoGenerated; }
 
   /// Returns true if the line number of this location is zero.
   bool isLineZero(const SourceManager &SM) const {
-    return decodeDebugLoc(SM).Line == 0;
+    return decodeForDebugging(SM).line == 0;
   }
-
-  /// Changes the default source location position to point to start of
-  /// the AST node.
-  void pointToStart() { KindData |= (1 << PointsToStartBit); }
 
   /// Changes the default source location position to point to the end of
   /// the AST node.
-  void pointToEnd() { KindData |= (1 << PointsToEndBit); }
-
-  /// Mark this location as the location corresponding to the top-level
-  /// (module-level) code.
-  void markAsInTopLevel() { KindData |= (1 << IsInTopLevel); }
-
-  /// Check is this location is associated with the top level/module.
-  bool isInTopLevel() const { return KindData & (1 << IsInTopLevel); }
+  void pointToEnd() { kindAndFlags.fields.pointsToEnd = true; }
 
   /// Mark this location as being part of the function
   /// prologue, which means that it deals with setting up the stack
   /// frame. The first breakpoint location in a function is at the end
   /// of the prologue.
-  void markAsPrologue() { KindData |= (1 << IsInPrologue); }
+  void markAsPrologue() { kindAndFlags.fields.inPrologue = true; }
 
   /// Check is this location is part of a function's implicit prologue.
-  bool isInPrologue() const { return KindData & (1 << IsInPrologue); }
-
-  /// Add an ASTNode to use as the location for debugging
-  /// purposes if this location is different from the location used
-  /// for diagnostics.
-  template <typename T>
-  void setDebugLoc(T *ASTNodeForDebugging) {
-    assert(!hasDebugLoc() && "DebugLoc already present");
-    assert(isASTNode() && "not an AST location");
-    Loc.ASTNode.ForDebugger = ASTNodeForDebugging;
-  }
-  bool hasDebugLoc() const {
-    return isASTNode() && !Loc.ASTNode.ForDebugger.isNull();
-  }
-
-  /// Populate this empty SILLocation with a DebugLoc.
-  void setDebugInfoLoc(DebugLoc L) {
-    ExtraStorageData = L.Filename.size();
-    assert(ExtraStorageData == L.Filename.size() &&
-           "file name is longer than 32 bits");
-    Loc = L;
-    setStorageKind(DebugInfoKind);
-  }
-
-  /// Check if the corresponding source code location definitely points
-  ///  to the start of the AST node.
-  bool alwaysPointsToStart() const { return KindData & (1 << PointsToStartBit);}
+  bool isInPrologue() const { return kindAndFlags.fields.inPrologue; }
 
   /// Check if the corresponding source code location definitely points
   ///  to the end of the AST node.
-  bool alwaysPointsToEnd() const { return KindData & (1 << PointsToEndBit); }
+  bool alwaysPointsToEnd() const { return kindAndFlags.fields.pointsToEnd; }
 
-  LocationKind getKind() const {
-    return LocationKind(KindData & LocationKindMask);
-  }
-  StorageKind getStorageKind() const {
-    return StorageKind(KindData & StorageKindMask);
-  }
-
-  template <typename T>
-  bool is() const {
-    return T::isKind(*this);
-  }
-
-  template <typename T>
-  T castTo() const {
-    assert(T::isKind(*this));
-    T t;
-    SILLocation& tr = t;
-    tr = *this;
-    return t;
-  }
-
-  template <typename T>
-  Optional<T> getAs() const {
-    if (!T::isKind(*this))
-      return Optional<T>();
-    T t;
-    SILLocation& tr = t;
-    tr = *this;
-    return t;
-  }
+  template <typename T> bool is() const { return T::isKind(*this); }
 
   /// If the current value is of the specified AST unit type T,
   /// return it, otherwise return null.
   template <typename T> T *getAsASTNode() const {
-    return isASTNode() ? getNodeAs<T>(Loc.ASTNode.Primary) : nullptr;
+    return isASTNode() ? getNodeAs<T>(getPrimaryASTNode()) : nullptr;
   }
 
   /// Returns true if the Location currently points to the AST node
   /// matching type T.
   template <typename T> bool isASTNode() const {
-    return isASTNode() && isNode<T>(Loc.ASTNode.Primary);
+    return isASTNode() && isNode<T>(getPrimaryASTNode());
   }
 
   /// Returns the primary value as the specified AST node type. If the
   /// specified type is incorrect, asserts.
   template <typename T> T *castToASTNode() const {
-    assert(isASTNode());
-    return castNodeTo<T>(Loc.ASTNode.Primary);
-  }
-
-  /// If the DebugLoc is of the specified AST unit type T,
-  /// return it, otherwise return null.
-  template <typename T> T *getDebugLocAsASTNode() const {
-    assert(hasDebugLoc() && "no debug location");
-    return getNodeAs<T>(Loc.ASTNode.ForDebugger);
+    return castNodeTo<T>(getPrimaryASTNode());
   }
 
   /// Return the location as a DeclContext or null.
   DeclContext *getAsDeclContext() const;
 
-  /// Convert a specialized location kind into a regular location.
-  SILLocation getAsRegularLocation() {
-    SILLocation RegularLoc = *this;
-    RegularLoc.setLocationKind(RegularKind);
-    return RegularLoc;
-  }
-
-  SourceLoc getDebugSourceLoc() const;
+  /// Returns the source location for diagnoses.
   SourceLoc getSourceLoc() const;
+
+  /// Returns the source location for debugging.
+  /// See ExtendedASTNodeLoc.
+  SourceLoc getSourceLocForDebugging() const;
+  
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
   SourceRange getSourceRange() const {
     return {getStartSourceLoc(), getEndSourceLoc()};
   }
-  DebugLoc getDebugInfoLoc() const {
-    assert(isDebugInfoLoc());
-    return DebugLoc(Loc.DebugInfoLoc.Line, Loc.DebugInfoLoc.Column,
-                    StringRef(Loc.DebugInfoLoc.FilenameData, ExtraStorageData));
-  }
 
-  /// Fingerprint a DebugLoc for use in a DenseMap.
-  using DebugLocKey = std::pair<std::pair<unsigned, unsigned>, StringRef>;
-  struct DebugLocHash : public DebugLocKey {
-    DebugLocHash(DebugLoc L) : DebugLocKey({{L.Line, L.Column}, L.Filename}) {}
-  };
+  /// Extract the line, column, and filename from \p Loc.
+  static FilenameAndLocation decode(SourceLoc Loc, const SourceManager &SM);
 
-  /// Extract the line, column, and filename.
-  static DebugLoc decode(SourceLoc Loc, const SourceManager &SM);
-
-  /// Return the decoded debug location.
-  LLVM_NODISCARD DebugLoc decodeDebugLoc(const SourceManager &SM) const {
-    return isDebugInfoLoc() ? getDebugInfoLoc()
-                            : decode(getDebugSourceLoc(), SM);
+  /// Return the decoded FilenameAndLocation.
+  /// In case the location has a separate AST node for debugging, this node is
+  /// used. See ExtendedASTNodeLoc.
+  FilenameAndLocation decodeForDebugging(const SourceManager &SM) const {
+    return isFilenameAndLocation() ? *getFilenameAndLocation()
+                            : decode(getSourceLocForDebugging(), SM);
   }
 
   /// Compiler-generated locations may be applied to instructions without any
   /// clear correspondence to an AST node in an otherwise normal function.
-  static DebugLoc getCompilerGeneratedDebugLoc() {
-    return {0, 0, "<compiler-generated>"};
-  }
+  static FilenameAndLocation *getCompilerGeneratedLoc();
   
   /// Pretty-print the value.
-  void dump(const SourceManager &SM) const;
+  void dump() const;
   void print(raw_ostream &OS, const SourceManager &SM) const;
 
-  /// Returns an opaque pointer value for the debug location that may
-  /// be used to unique debug locations.
-  const void *getOpaquePointerValue() const {
-    if (isSILFile())
-      return Loc.SILFileLoc.getOpaquePointerValue();
-    if (isASTNode())
-      return Loc.ASTNode.Primary.getOpaqueValue();
-    else
-      return 0;
-  }
-  unsigned getOpaqueKind() const { return KindData; }
-
   inline bool operator==(const SILLocation& R) const {
-    return KindData == R.KindData &&
-           Loc.ASTNode.Primary.getOpaqueValue() ==
-               R.Loc.ASTNode.Primary.getOpaqueValue() &&
-           Loc.ASTNode.ForDebugger.getOpaqueValue() ==
-               R.Loc.ASTNode.ForDebugger.getOpaqueValue();
+    return kindAndFlags.packedKindAndFlags == R.kindAndFlags.packedKindAndFlags
+           && storage.filePositionLoc == R.storage.filePositionLoc;
   }
 
   inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
@@ -499,37 +425,27 @@ public:
 /// Allowed on any instruction.
 class RegularLocation : public SILLocation {
 public:
-  RegularLocation(Stmt *S) : SILLocation(S, RegularKind) {}
-  RegularLocation(Expr *E) : SILLocation(E, RegularKind) {}
-  RegularLocation(Decl *D) : SILLocation(D, RegularKind) {}
-  RegularLocation(Pattern *P) : SILLocation(P, RegularKind) {}
+  RegularLocation(Stmt *S) : SILLocation(ASTNodeTy(S), RegularKind) {}
+  RegularLocation(Expr *E) : SILLocation(ASTNodeTy(E), RegularKind) {}
+  RegularLocation(Decl *D) : SILLocation(ASTNodeTy(D), RegularKind) {}
+  RegularLocation(Pattern *P) : SILLocation(ASTNodeTy(P), RegularKind) {}
+  RegularLocation(Stmt *S, Pattern *P, SILModule &Module);
   RegularLocation(SourceLoc L) : SILLocation(L, RegularKind) {}
-  RegularLocation(DebugLoc L) : SILLocation(L, RegularKind) {}
+  RegularLocation(FilenameAndLocation *filePos)
+    : SILLocation(filePos, RegularKind) {}
+
+  /// Convert \p loc to a RegularLocation.
+  explicit RegularLocation(SILLocation loc) : SILLocation(loc, RegularKind) {}
 
   /// Returns a location representing the module.
-  static RegularLocation getModuleLocation() {
-    RegularLocation Loc;
-    Loc.markAsInTopLevel();
-    return Loc;
-  }
-
-  /// If the current value is of the specified AST unit type T,
-  /// return it, otherwise return null.
-  template <typename T> T *getAs() const { return getNodeAs<T>(Loc.ASTNode); }
-
-  /// Returns true if the Location currently points to the AST node
-  /// matching type T.
-  template <typename T> bool is() const { return isNode<T>(Loc.ASTNode); }
-
-  /// Returns the primary value as the specified AST node type. If the
-  /// specified type is incorrect, asserts.
-  template <typename T> T *castTo() const { return castNodeTo<T>(Loc.ASTNode); }
+  /// This is just a null location.
+  static RegularLocation getModuleLocation() { return RegularLocation(); }
 
   /// Compiler-generated locations may be applied to instructions without any
   /// clear correspondence to an AST node in an otherwise normal function.
   /// The auto-generated bit also turns off certain diagnostics passes such.
   static RegularLocation getAutoGeneratedLocation() {
-    RegularLocation AL(getCompilerGeneratedDebugLoc());
+    RegularLocation AL(getCompilerGeneratedLoc());
     AL.markAutoGenerated();
     return AL;
   }
@@ -545,13 +461,12 @@ public:
     return AL;
   }
 
-private:
-  RegularLocation() : SILLocation(RegularKind) {}
-
-  friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == RegularKind;
   }
+
+private:
+  RegularLocation() : SILLocation(RegularKind) {}
 };
 
 /// Used to represent a return instruction in user code.
@@ -564,10 +479,9 @@ public:
   /// Construct the return location for a constructor or a destructor.
   ReturnLocation(BraceStmt *BS);
 
-  ReturnStmt *get();
+  ReturnLocation(FilenameAndLocation *filePos)
+    : SILLocation(filePos, ReturnKind) {}
 
-private:
-  friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == ReturnKind;
   }
@@ -586,20 +500,15 @@ public:
 
   ImplicitReturnLocation(AbstractFunctionDecl *AFD);
 
-  /// Construct from a RegularLocation; preserve all special bits.
-  ///
-  /// Note, this can construct an implicit return for an arbitrary expression
-  /// (specifically, in case of auto-generated bodies).
-  static SILLocation getImplicitReturnLoc(SILLocation L);
+  ImplicitReturnLocation(FilenameAndLocation *filePos)
+    : SILLocation(filePos, ImplicitReturnKind) {}
 
-  AbstractClosureExpr *get();
+  /// Convert \p loc to an ImplicitReturnLocation.
+  explicit ImplicitReturnLocation(SILLocation Loc);
 
-private:
-  friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == ImplicitReturnKind;
   }
-  ImplicitReturnLocation() : SILLocation(ImplicitReturnKind) {}
 };
 
 /// Marks instructions that correspond to inlined function body and
@@ -611,39 +520,12 @@ private:
 /// Allowed on any instruction except for ReturnInst.
 class InlinedLocation : public SILLocation {
 public:
-  InlinedLocation(Expr *CallSite) : SILLocation(CallSite, InlinedKind) {}
-  InlinedLocation(Stmt *S) : SILLocation(S, InlinedKind) {}
-  InlinedLocation(Pattern *P) : SILLocation(P, InlinedKind) {}
-  InlinedLocation(Decl *D) : SILLocation(D, InlinedKind) {}
+  /// Convert \p loc to an InlinedLocation.
+  InlinedLocation(SILLocation L) : SILLocation(L, InlinedKind) {}
 
-  /// Constructs an inlined location when the call site is represented by a
-  /// SILFile location.
-  InlinedLocation(SourceLoc L) : SILLocation(InlinedKind) {
-    setStorageKind(SILFileKind);
-    Loc.SILFileLoc = L;
-  }
-
-  static InlinedLocation getInlinedLocation(SILLocation L);
-
-private:
-  friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == InlinedKind;
   }
-  InlinedLocation() : SILLocation(InlinedKind) {}
-
-  InlinedLocation(Expr *E, unsigned F) : SILLocation(E, InlinedKind, F) {}
-  InlinedLocation(Stmt *S, unsigned F) : SILLocation(S, InlinedKind, F) {}
-  InlinedLocation(Pattern *P, unsigned F) : SILLocation(P, InlinedKind, F) {}
-  InlinedLocation(Decl *D, unsigned F) : SILLocation(D, InlinedKind, F) {}
-  InlinedLocation(SourceLoc L, unsigned F) : SILLocation(L, InlinedKind, F) {}
-
-  static InlinedLocation getModuleLocation(unsigned Flags) {
-    auto L = InlinedLocation();
-    L.setSpecialFlags(Flags);
-    return L;
-  }
-
 };
 
 /// Marks instructions that correspond to inlined function body and
@@ -655,44 +537,20 @@ private:
 /// Allowed on any instruction except for ReturnInst.
 class MandatoryInlinedLocation : public SILLocation {
 public:
-  MandatoryInlinedLocation(Expr *CallSite) :
-    SILLocation(CallSite, MandatoryInlinedKind) {}
-  MandatoryInlinedLocation(Stmt *S) : SILLocation(S, MandatoryInlinedKind) {}
-  MandatoryInlinedLocation(Pattern *P) : SILLocation(P, MandatoryInlinedKind) {}
-  MandatoryInlinedLocation(Decl *D) : SILLocation(D, MandatoryInlinedKind) {}
+  MandatoryInlinedLocation() : SILLocation(MandatoryInlinedKind) {}
 
-  /// Constructs an inlined location when the call site is represented by a
-  /// SILFile location.
-  MandatoryInlinedLocation(SourceLoc L)
-      : SILLocation(L, MandatoryInlinedKind) {}
+  /// Convert \p loc to a MandatoryInlinedLocation.
+  explicit MandatoryInlinedLocation(SILLocation L)
+    : SILLocation(L, MandatoryInlinedKind) {}
 
-  static MandatoryInlinedLocation getMandatoryInlinedLocation(SILLocation L);
-  static MandatoryInlinedLocation getAutoGeneratedLocation();
-
-  static MandatoryInlinedLocation getModuleLocation(unsigned Flags) {
-    auto L = MandatoryInlinedLocation();
-    L.setSpecialFlags(Flags);
-    return L;
+  static MandatoryInlinedLocation getAutoGeneratedLocation() {
+    return MandatoryInlinedLocation(
+      RegularLocation::getAutoGeneratedLocation());
   }
-  
-private:
-  friend class SILLocation;
+
   static bool isKind(const SILLocation& L) {
     return L.getKind() == MandatoryInlinedKind;
   }
-  MandatoryInlinedLocation() : SILLocation(MandatoryInlinedKind) {}
-  MandatoryInlinedLocation(Expr *E, unsigned F)
-      : SILLocation(E, MandatoryInlinedKind, F) {}
-  MandatoryInlinedLocation(Stmt *S, unsigned F)
-      : SILLocation(S, MandatoryInlinedKind, F) {}
-  MandatoryInlinedLocation(Pattern *P, unsigned F)
-      : SILLocation(P, MandatoryInlinedKind, F) {}
-  MandatoryInlinedLocation(Decl *D, unsigned F)
-      : SILLocation(D, MandatoryInlinedKind, F) {}
-  MandatoryInlinedLocation(SourceLoc L, unsigned F)
-      : SILLocation(L, MandatoryInlinedKind, F) {}
-  MandatoryInlinedLocation(DebugLoc L, unsigned F)
-      : SILLocation(L, MandatoryInlinedKind, F) {}
 };
 
 /// Used on the instruction performing auto-generated cleanup such as
@@ -708,31 +566,29 @@ private:
 /// Locations of an inlined destructor should also be represented by this.
 class CleanupLocation : public SILLocation {
 public:
-  CleanupLocation(Expr *E) : SILLocation(E, CleanupKind) {}
-  CleanupLocation(Stmt *S) : SILLocation(S, CleanupKind) {}
-  CleanupLocation(Pattern *P) : SILLocation(P, CleanupKind) {}
-  CleanupLocation(Decl *D) : SILLocation(D, CleanupKind) {}
+  CleanupLocation(Expr *E) : SILLocation(ASTNodeTy(E), CleanupKind) {}
+  CleanupLocation(Stmt *S) : SILLocation(ASTNodeTy(S), CleanupKind) {}
+  CleanupLocation(Pattern *P) : SILLocation(ASTNodeTy(P), CleanupKind) {}
+  CleanupLocation(Decl *D) : SILLocation(ASTNodeTy(D), CleanupKind) {}
+  
+  /// Convert \p loc to a CleanupLocation.
+  explicit CleanupLocation(SILLocation L) : SILLocation(L, CleanupKind) {}
 
-  static CleanupLocation get(SILLocation L);
+  /// Returns a null location.
+  static CleanupLocation invalid() { return CleanupLocation(); }
 
   /// Returns a location representing a cleanup on the module level.
+  /// This is just a null location.
   static CleanupLocation getModuleCleanupLocation() {
-    CleanupLocation Loc;
-    Loc.markAsInTopLevel();
-    return Loc;
+    return CleanupLocation();
   }
 
-private:
-  friend class SILLocation;
   static bool isKind(const SILLocation& L) {
     return L.getKind() == CleanupKind;
   }
-  CleanupLocation() : SILLocation(CleanupKind) {}
 
-  CleanupLocation(Expr *E, unsigned F) : SILLocation(E, CleanupKind, F) {}
-  CleanupLocation(Stmt *S, unsigned F) : SILLocation(S, CleanupKind, F) {}
-  CleanupLocation(Pattern *P, unsigned F) : SILLocation(P, CleanupKind, F) {}
-  CleanupLocation(Decl *D, unsigned F) : SILLocation(D, CleanupKind, F) {}
+private:
+  CleanupLocation() : SILLocation(CleanupKind) {}
 };
 
 /// Used to represent an unreachable location that was
@@ -745,8 +601,7 @@ private:
 class ArtificialUnreachableLocation : public SILLocation {
 public:
   ArtificialUnreachableLocation() : SILLocation(ArtificialUnreachableKind) {}
-private:
-  friend class SILLocation;
+
   static bool isKind(const SILLocation& L) {
     return (L.getKind() == ArtificialUnreachableKind);
   }
@@ -771,6 +626,5 @@ public:
 };
 
 } // end swift namespace
-
 
 #endif

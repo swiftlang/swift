@@ -33,7 +33,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(false, false, CleanupLocation::get(Loc));
+  prepareEpilog(false, false, CleanupLocation(Loc));
 
   emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
@@ -46,7 +46,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   if (!maybeReturnValue)
     return;
 
-  auto cleanupLoc = CleanupLocation::get(Loc);
+  auto cleanupLoc = CleanupLocation(Loc);
 
   // If we have a superclass, invoke its destructor.
   SILValue resultSelfValue;
@@ -126,7 +126,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   // Call the destroying destructor.
   SILValue selfForDealloc;
   {
-    FullExpr CleanupScope(Cleanups, CleanupLocation::get(loc));
+    FullExpr CleanupScope(Cleanups, CleanupLocation(loc));
     ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, initialSelfValue);
     selfForDealloc = B.createApply(loc, dtorValue.forward(*this), subMap,
                                    borrowedSelf.getUnmanagedValue());
@@ -165,7 +165,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
   ManagedValue selfValue = ManagedValue::forUnmanaged(
       emitSelfDecl(cd->getDestructor()->getImplicitSelfDecl()));
 
-  auto cleanupLoc = CleanupLocation::get(loc);
+  auto cleanupLoc = CleanupLocation(loc);
   prepareEpilog(false, false, cleanupLoc);
   {
     Scope S(*this, cleanupLoc);
@@ -230,7 +230,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(false, false, CleanupLocation::get(loc));
+  prepareEpilog(false, false, CleanupLocation(loc));
 
   emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
@@ -243,7 +243,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   if (!maybeReturnValue)
     return;
 
-  auto cleanupLoc = CleanupLocation::get(loc);
+  auto cleanupLoc = CleanupLocation(loc);
 
   // Note: the ivar destroyer is responsible for destroying the
   // instance variables before the object is actually deallocated.
