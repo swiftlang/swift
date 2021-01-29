@@ -86,17 +86,6 @@ extension DistributedActor {
   }
 }
 
-// TODO: implement in C, by inspecting the status flag of the instance
-public func __isRemoteActor<Act>(_ actor: Act) -> Bool
-  where Act: DistributedActor {
-  return false // TODO: implement
-}
-
-public func __isLocalActor<Act>(_ actor: Act) -> Bool
-  where Act: DistributedActor {
-  return !__isRemoteActor(actor)
-}
-
 public protocol ActorTransport {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
@@ -151,7 +140,6 @@ public struct ActorAddress: Equatable, Codable {
   }
 }
 
-@frozen
 public enum ActorResolved<Act: DistributedActor> {
   case resolved(Act)
   case makeProxy
@@ -167,4 +155,16 @@ public struct DistributedActorDecodingError: ActorTransportError {
     where Act: DistributedActor {
     .init(message: "Missing ActorTransport userInfo while decoding")
   }
+}
+
+/// Called to initialize the distributed *remote* actor instance in an actor.
+/// The implementation will call this within the actor's initializer.
+@_silgen_name("swift_distributedActor_initialize_remote")
+public func _distributedActorInitializeRemote(_ actor: AnyObject)
+
+@_silgen_name("swift_distributed_actor_is_remote")
+public func __isRemoteActor(_ actor: AnyObject) -> Bool
+
+public func __isLocalActor(_ actor: AnyObject) -> Bool {
+  return !__isRemoteActor(actor)
 }

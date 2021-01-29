@@ -2728,8 +2728,30 @@ bool ConformanceChecker::checkActorIsolation(
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
-  case ActorIsolationRestriction::ActorSelf:
   case ActorIsolationRestriction::DistributedActor: {
+    if (witness->isSynthesized()) {
+      // Some of our synthesized properties get special treatment,
+      // they are always available, regardless if the actor is remote even.
+      auto &C = requirement->getASTContext();
+
+      // actorAddress is special, it is *always* available.
+      // even if the actor is 'remote' it is always available and immutable.
+      if (witness->getName() == C.Id_actorAddress &&
+          witness->getInterfaceType()->isEqual(
+              C.getActorAddressDecl()->getDeclaredInterfaceType()))
+        return false;
+
+      // TODO: we don't *really* need to expose the transport like that... reconsider?
+      if (witness->getName() == C.Id_actorTransport &&
+          witness->getInterfaceType()->isEqual(
+              C.getActorTransportDecl()->getDeclaredInterfaceType()))
+        return false;
+    }
+
+    // continue checking ActorSelf rules
+    LLVM_FALLTHROUGH;
+  }
+  case ActorIsolationRestriction::ActorSelf: {
     // Actor-isolated witnesses cannot conform to protocol requirements.
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),

@@ -1580,6 +1580,14 @@ FUNCTION(DefaultActorDestroy,
 //         ARGS(RefCountedPtrTy, RefCountedPtrTy),
 //         ATTRS(NoUnwind))
 
+// void swift_distributedActor_initialize_remote(DefaultActor *actor);
+FUNCTION(DistributedActorInitializeRemote,
+         swift_distributedActor_initialize_remote, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,
          swift_autoDiffCreateLinearMapContext, SwiftCC,

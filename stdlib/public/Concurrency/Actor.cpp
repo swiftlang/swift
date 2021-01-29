@@ -374,6 +374,7 @@ class DefaultActorImpl : public HeapObject {
       Status_width = 2,
 
       HasActiveInlineJob = 2,
+      IsDistributedRemote = 3,
 
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
@@ -390,6 +391,12 @@ class DefaultActorImpl : public HeapObject {
     /// in the actor?
     FLAGSET_DEFINE_FLAG_ACCESSORS(HasActiveInlineJob,
                                   hasActiveInlineJob, setHasActiveInlineJob)
+
+    /// Is the actor a distributed 'remote' actor?
+    /// I.e. it does not have storage for user-defined properties and all
+    /// function call must be transformed into $distributed_ function calls.
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedRemote,
+                                  isDistributedRemote, setIsDistributedRemote)
 
     /// What is the maximum priority of jobs that are currently running
     /// or enqueued on this actor?
@@ -418,10 +425,12 @@ class DefaultActorImpl : public HeapObject {
   };
 
 public:
-
   /// Properly construct an actor, except for the heap header.
-  void initialize() {
-    new (&CurrentState) std::atomic<State>(State{JobRef(), Flags()});
+  /// \param isDistributedRemote When true sets the IsDistributedRemote flag
+  void initialize(bool isDistributedRemote = false) {
+    auto flags = Flags();
+    flags.setIsDistributedRemote(isDistributedRemote);
+    new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -441,6 +450,12 @@ public:
 
   /// Claim the next job off the actor or give it up.
   Job *claimNextJobOrGiveUp(bool actorIsOwned, RunningJobInfo runner);
+
+  /// Check if the actor is actually a distributed *remote* actor.
+  ///
+  /// Note that a distributed *local* actor instance is the same as any other
+  /// ordinary default (local) actor, and no special handling is needed for them.
+  bool isDistributedRemote();
 
 private:
   /// Schedule an inline processing job.  This can generally only be
@@ -1282,8 +1297,18 @@ void swift::swift_defaultActor_destroy(DefaultActor *_actor) {
   asImpl(_actor)->destroy();
 }
 
+// TODO: most likely where we'd need to create the "proxy instance" instead?
+void swift::swift_distributedActor_initialize_remote(DefaultActor *_actor) {
+  auto actor = asImpl(_actor);
+  actor->initialize(/*remote=*/true);
+}
+
 void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
   asImpl(_actor)->enqueue(job);
+}
+
+bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
+  return asImpl(_actor)->isDistributedRemote();
 }
 
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
@@ -1438,4 +1463,13 @@ void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
   // FIXME: call the general method.
   return asImpl(reinterpret_cast<DefaultActor*>(executor.getRawValue()))
     ->enqueue(job);
+}
+
+/*****************************************************************************/
+/***************************** DISTRIBUTED ACTOR *****************************/
+/*****************************************************************************/
+
+bool DefaultActorImpl::isDistributedRemote() {
+  auto state = CurrentState.load(std::memory_order_relaxed);
+  return state.Flags.isDistributedRemote() == 1;
 }

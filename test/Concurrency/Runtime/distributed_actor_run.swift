@@ -6,30 +6,6 @@
 import Dispatch
 import _Concurrency
 
-protocol DA {
-  @actorIndependent
-  var actorTransport: ActorTransport { get }
-}
-
-actor class XXX: DA {
-  let actorTransport: ActorTransport
-//  @actorIndependent(unsafe) var actorTransport: ActorTransport {
-//    self._actorTransport
-//  }
-  init(transport: ActorTransport) {
-    self.actorTransport = transport
-  }
-}
-
-protocol P {
-  var field: String { get }
-}
-
-actor class P1: P {
-  let field: String = "hello"
-}
-
-
 distributed actor class SomeSpecificDistributedActor {
 //  // @derived let actorTransport: ActorTransport
 //  // @derived let actorAddress: ActorAddress
