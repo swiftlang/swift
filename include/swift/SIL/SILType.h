@@ -565,6 +565,13 @@ public:
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
 
+  /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
+  /// SILType().
+  ///
+  /// \p field Return the type of the ith field of the box. Default set to 0
+  /// since we only support one field today. This is just future proofing.
+  SILType getSILBoxFieldType(const SILFunction *f, unsigned field = 0);
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);

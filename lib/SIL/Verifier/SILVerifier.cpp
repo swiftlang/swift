@@ -1671,13 +1671,24 @@ public:
     SILFunctionConventions substConv(substTy, F.getModule());
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
-    for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
+    bool isConcurrentAndStageIsCanonical =
+        PAI->getFunctionType()->isConcurrent() &&
+        F.getModule().getStage() >= SILStage::Canonical;
+    for (auto p : llvm::enumerate(PAI->getArguments())) {
       requireSameType(
-          PAI->getArguments()[i]->getType(),
-          substConv.getSILArgumentType(appliedArgStartIdx + i,
+          p.value()->getType(),
+          substConv.getSILArgumentType(appliedArgStartIdx + p.index(),
                                        F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+
+      // TODO: Expand this to also be true for address only types.
+      if (isConcurrentAndStageIsCanonical)
+        require(
+            !p.value()->getType().getASTType()->is<SILBoxType>() ||
+                p.value()->getType().getSILBoxFieldType(&F).isAddressOnly(F),
+            "Concurrent partial apply in canonical SIL with a loadable box "
+            "type argument?!");
     }
 
     // The arguments to the result function type must match the prefix of the

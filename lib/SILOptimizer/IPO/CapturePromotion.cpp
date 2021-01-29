@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,8 +17,8 @@
 ///
 /// Swift's closure model is that all local variables are capture by reference.
 /// This produces a very simple programming model which is great to use, but
-/// relies on the optimizer to promote by-ref captures to by-value (i.e. by-copy)
-/// captures for decent performance. Consider this simple example:
+/// relies on the optimizer to promote by-ref captures to by-value (i.e.
+/// by-copy) captures for decent performance. Consider this simple example:
 ///
 ///   func foo(a : () -> ()) {} // assume this has an unknown body
 ///
@@ -30,21 +30,23 @@
 ///
 /// Since x is captured by-ref by the closure, x must live on the heap. By
 /// looking at bar without any knowledge of foo, we can know that it is safe to
-/// promote this to a by-value capture, allowing x to live on the stack under the
-/// following conditions:
+/// promote this to a by-value capture, allowing x to live on the stack under
+/// the following conditions:
 ///
 /// 1. If x is not modified in the closure body and is only loaded.
 /// 2. If we can prove that all mutations to x occur before the closure is
 ///    formed.
 ///
-/// Under these conditions if x is loadable then we can even load the given value
-/// and pass it as a scalar instead of an address.
+/// Under these conditions if x is loadable then we can even load the given
+/// value and pass it as a scalar instead of an address.
 ///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
 
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -56,6 +58,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <tuple>
 
 using namespace swift;
@@ -769,6 +772,15 @@ struct EscapeMutationScanningState {
   /// The list of escapes that we found while checking for escapes.
   SmallVector<Operand *, 8> accumulatedEscapes;
 
+  /// A multimap that maps partial applies to the set of operands in the partial
+  /// applies referenced function that the pass has identified as being the use
+  /// that caused the partial apply to capture our box.
+  ///
+  /// We use a frozen multi-map since our algorithm first accumulates this info
+  /// and then wants to use it, perfect for the 2-stage frozen multi map.
+  SmallFrozenMultiMap<PartialApplyInst *, Operand *, 16>
+      accumulatedCaptureCausingUses;
+
   /// A flag that we use to ensure that we only ever see 1 project_box on an
   /// alloc_box.
   bool sawProjectBoxInst;
@@ -801,9 +813,10 @@ static bool isNonMutatingLoad(SILInstruction *inst) {
 /// address of the box's contents), return true if this box has mutating
 /// captures. Return false otherwise. All of the mutating captures that we find
 /// are placed into \p accumulatedMutatingUses.
-static bool getPartialApplyArgMutationsAndEscapes(
-    SILArgument *boxArg, SmallVectorImpl<Operand *> &accumulatedMutatingUses,
-    SmallVectorImpl<Operand *> &accumulatedEscapes) {
+static bool
+getPartialApplyArgMutationsAndEscapes(PartialApplyInst *pai,
+                                      SILArgument *boxArg,
+                                      EscapeMutationScanningState &state) {
   SmallVector<ProjectBoxInst *, 2> projectBoxInsts;
 
   // Conservatively do not allow any use of the box argument other than a
@@ -811,6 +824,7 @@ static bool getPartialApplyArgMutationsAndEscapes(
   // SILGen.
   SmallVector<Operand *, 32> incrementalMutatingUses;
   SmallVector<Operand *, 32> incrementalEscapes;
+  SmallVector<Operand *, 32> incrementalCaptureCausingUses;
   for (auto *use : boxArg->getUses()) {
     if (isa<StrongReleaseInst>(use->getUser()) ||
         isa<DestroyValueInst>(use->getUser()))
@@ -832,18 +846,25 @@ static bool getPartialApplyArgMutationsAndEscapes(
   // function that mirrors isNonEscapingUse.
   auto checkIfAddrUseMutating = [&](Operand *addrUse) -> bool {
     unsigned initSize = incrementalMutatingUses.size();
-    auto *addrInst = addrUse->getUser();
-    if (auto *seai = dyn_cast<StructElementAddrInst>(addrInst)) {
+    auto *addrUser = addrUse->getUser();
+    if (auto *seai = dyn_cast<StructElementAddrInst>(addrUser)) {
       for (auto *seaiUse : seai->getUses()) {
-        if (!isNonMutatingLoad(seaiUse->getUser())) {
+        if (isNonMutatingLoad(seaiUse->getUser())) {
+          incrementalCaptureCausingUses.push_back(seaiUse);
+        } else {
           incrementalMutatingUses.push_back(seaiUse);
         }
       }
       return incrementalMutatingUses.size() != initSize;
     }
 
-    if (isNonMutatingLoad(addrInst) || isa<DebugValueAddrInst>(addrInst) ||
-        isa<MarkFunctionEscapeInst>(addrInst) || isa<EndAccessInst>(addrInst)) {
+    if (isNonMutatingLoad(addrUser)) {
+      incrementalCaptureCausingUses.push_back(addrUse);
+      return false;
+    }
+
+    if (isa<DebugValueAddrInst>(addrUser) ||
+        isa<MarkFunctionEscapeInst>(addrUser) || isa<EndAccessInst>(addrUser)) {
       return false;
     }
 
@@ -864,12 +885,19 @@ static bool getPartialApplyArgMutationsAndEscapes(
     }
   }
 
+  auto &accCaptureCausingUses = state.accumulatedCaptureCausingUses;
+  while (!incrementalCaptureCausingUses.empty())
+    accCaptureCausingUses.insert(pai,
+                                 incrementalCaptureCausingUses.pop_back_val());
+
   if (incrementalMutatingUses.empty() && incrementalEscapes.empty())
     return false;
+  auto &accMutations = state.accumulatedMutations;
   while (!incrementalMutatingUses.empty())
-    accumulatedMutatingUses.push_back(incrementalMutatingUses.pop_back_val());
+    accMutations.push_back(incrementalMutatingUses.pop_back_val());
+  auto &accEscapes = state.accumulatedEscapes;
   while (!incrementalEscapes.empty())
-    accumulatedEscapes.push_back(incrementalEscapes.pop_back_val());
+    accEscapes.push_back(incrementalEscapes.pop_back_val());
   return true;
 }
 
@@ -932,8 +960,7 @@ bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
   // Verify that this closure is known not to mutate the captured value; if
   // it does, then conservatively refuse to promote any captures of this
   // value.
-  if (getPartialApplyArgMutationsAndEscapes(boxArg, state.accumulatedMutations,
-                                            state.accumulatedEscapes)) {
+  if (getPartialApplyArgMutationsAndEscapes(pai, boxArg, state)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutation or escape of a "
                                "partial apply arg?!\n");
     return false;
@@ -1202,6 +1229,57 @@ static bool findEscapeOrMutationUses(Operand *op,
   return isNonEscapingUse(op, state);
 }
 
+/// We found a capture of \p abi in concurrent closure \p pai that we can not
+/// promote to a by value capture. Emit a nice warning (FIXME: error) to warn
+/// the user and provide the following information in the compiler feedback:
+///
+/// 1. The source loc where the variable's box is written to.
+///
+/// 2. The source loc of the captured variable's declaration.
+///
+/// 3. The source loc of the start of the concurrent closure that caused the
+///    variable to be captured.
+///
+/// 4. All places in the concurrent closure that triggered the box's
+///    capture. NOTE: For objects these are load points. For address only things
+///    it is still open for debate at this point.
+static void diagnoseInvalidCaptureByConcurrentClosure(
+    AllocBoxInst *abi, PartialApplyInst *pai,
+    const EscapeMutationScanningState &state, SILInstruction *mutatingUser) {
+  auto captureCausingUses = state.accumulatedCaptureCausingUses.find(pai);
+  if (!captureCausingUses) {
+    llvm::errs() << "Didn't find capture causing use of partial apply: "
+                 << *pai;
+    llvm::errs() << "Original Func: " << pai->getFunction()->getName() << '\n';
+    llvm::errs() << "Partial Applied Func: "
+                 << pai->getReferencedFunctionOrNull()->getName() << '\n';
+    llvm::report_fatal_error("standard compiler error");
+  }
+
+  auto &astCtx = pai->getFunction()->getASTContext();
+  auto &de = astCtx.Diags;
+  auto varInfo = abi->getVarInfo();
+  StringRef name = "<unknown>";
+  if (varInfo) {
+    name = varInfo->Name;
+  }
+
+  de.diagnoseWithNotes(
+      de.diagnose(mutatingUser->getLoc().getSourceLoc(),
+                  diag::capturepromotion_concurrentcapture_mutation, name),
+      [&]() {
+        de.diagnose(abi->getLoc().getSourceLoc(),
+                    diag::capturepromotion_variable_defined_here);
+        de.diagnose(pai->getLoc().getSourceLoc(),
+                    diag::capturepromotion_concurrentcapture_closure_here);
+        for (auto *use : *captureCausingUses) {
+          de.diagnose(
+              use->getUser()->getLoc().getSourceLoc(),
+              diag::capturepromotion_concurrentcapture_capturinguse_here);
+        }
+      });
+}
+
 /// Examine an alloc_box instruction, returning true if at least one
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
@@ -1210,7 +1288,7 @@ static bool
 examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
                     llvm::DenseMap<PartialApplyInst *, unsigned> &im) {
   LLVM_DEBUG(llvm::dbgs() << "Visiting alloc box: " << *abi);
-  EscapeMutationScanningState state{{}, {}, false, im};
+  EscapeMutationScanningState state{{}, {}, {}, false, im};
 
   // Scan the box for escaping or mutating uses.
   for (auto *use : abi->getUses()) {
@@ -1227,6 +1305,7 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
     return false;
   }
 
+  state.accumulatedCaptureCausingUses.setFrozen();
   LLVM_DEBUG(llvm::dbgs() << "We can optimize this alloc box!\n");
 
   // Helper lambda function to determine if instruction b is strictly after
@@ -1256,6 +1335,13 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
       // block is after the partial_apply.
       if (ri.isReachable(pai->getParent(), user->getParent()) ||
           (pai->getParent() == user->getParent() && isAfter(pai, user))) {
+        // If our partial apply is concurrent and we can not promote this, emit
+        // a warning that shows the variable, where the variable is captured,
+        // and the mutation that we found.
+        if (pai->getFunctionType()->isConcurrent()) {
+          diagnoseInvalidCaptureByConcurrentClosure(abi, pai, state, user);
+        }
+
         LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *pai);
         LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *user);
         auto prev = iter++;
@@ -1264,6 +1350,7 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
       }
       ++iter;
     }
+
     // If there are no valid captures left, then stop.
     if (im.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
