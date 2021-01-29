@@ -3,15 +3,19 @@
 
 actor class LocalActor_1 {
   let name: String = "alice"
-  var mutable: String = ""
+  var mutable: String = "" // expected-note{{mutable state is only available within the actor instance}}
 }
 
 struct NotCodableValue { }
 
+distributed struct StructNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
+distributed class ClassNope {} // expected-error{{'distributed' can only be applied to 'actor class' definitions, and distributed actor-isolated async functions}}
+distributed enum EnumNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
+
 distributed actor class DistributedActor_1 {
 
   let name: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
-  var mutable: String = "alice" // expected -note{{mutable-state is only available within the actor instance}}
+  var mutable: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
   var computedMutable: String {
     get {
       "hey"
@@ -21,24 +25,24 @@ distributed actor class DistributedActor_1 {
     }
   }
 
-  func sync() -> Int { // expected -note{{only asynchronous methods can be used outside the actor instance; do you want to add 'async'}}
-    42
+  distributed let letProperty: String = "" // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+  distributed var varProperty: String = "" // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+  distributed var computedProperty: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+    ""
   }
 
-  func async() async -> Int {
-    42
-  }
+  distributed static func distributedStatic() {} // expected-error{{'distributed' functions cannot be 'static'}}
 
-  func hello() async {
-    print("Hello, by: \(self.actorAddress)")
-  }
+  func hello() {} // ok
+  func helloAsync() async {} // ok
+  func helloAsyncThrows() async throws {} // ok
 
-  distributed func distVoid1() async throws { } // ok
-  distributed func distVoid2() async throws -> () { } // ok
-  distributed func distVoid3() async throws -> Void { } // ok
+  distributed func distHello() { } // ok
+  distributed func distHelloAsync() async { } // ok
+  distributed func distHelloThrows() throws { } // ok
+  distributed func distHelloAsyncThrows() async throws { } // ok
 
   distributed func distInt() async throws -> Int { 42 } // ok
-
   distributed func distInt(int: Int) async throws -> Int { int } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
@@ -74,12 +78,18 @@ distributed actor class DistributedActor_1 {
   func test() async throws {
     _ = self.name
     _ = self.computedMutable
-    _ = self.sync()
-    _ = await self.async()
-    try await self.distVoid1()
-    try await self.distVoid2()
-    try await self.distVoid3()
+
     _ = try await self.distInt()
+    _ = try await self.distInt(int: 42)
+
+    self.hello()
+    _ = await self.helloAsync()
+    _ = try await self.helloAsyncThrows()
+
+    self.distHello()
+    await self.distHelloAsync()
+    try self.distHelloThrows()
+    try await self.distHelloAsyncThrows()
   }
 }
 
@@ -89,12 +99,13 @@ func test(
 ) async throws {
   _ = local.name // ok, special case that let constants are okey
   _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
-  //    _ = local.mutable // expected- error{{actor-isolated property 'mutable' can only be referenced inside the actor}}
-  //    _ = distributed.mutable // expected- error{{actor-isolated property 'mutable' can only be referenced inside the actor}}
-  //    _ = distributed.sync() // expected- error{{actor-isolated instance method 'sync()' can only be referenced inside the actor}}
-  //
-  //    _ = await distributed.async() // expected -error{{actor-isolated instance method 'dist()' can only be referenced inside the distributed actor}}
-  try await distributed.distVoid1() // ok
+  _ = local.mutable // expected-error{{actor-isolated property 'mutable' can only be referenced inside the actor}}
+  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
+
+//  try await distributed.distHello()
+//  try await distributed.distHelloAsync()
+//  try await distributed.distHelloThrows()
+//  try await distributed.distHelloAsyncThrows()
   
   // special: the actorAddress may always be referred to
   _ = distributed.actorAddress

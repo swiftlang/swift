@@ -139,30 +139,6 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
 static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
-  // 1. Distributed functions must be throwing
-  if (!func->hasThrows()) {
-    if (diagnose) {
-//      func->diagnose(diag::asynchandler_throws)
-//          .fixItRemove(func->getThrowsLoc());
-      printf("TODO: diagnose that distributed function must be 'async throws'"); // FIXME
-    }
-
-    return true;
-  }
-
-  /// TODO: the latest actors proposal states that functions dont need to be async
-  ///       but they will be transparently called as async from outside; so we can remove
-  ///       this requirement here.
-  if (!func->hasAsync()) {
-    if (diagnose) {
-//      func->diagnose(diag::asynchandler_async)
-//          .fixItRemove(func->getAsyncLoc());
-      printf("TODO: diagnose that distributed function must be 'async'"); // FIXME
-    }
-
-    return true;
-  }
-
   // All parameters and the result type must be Codable
 
   auto &C = func->getASTContext();

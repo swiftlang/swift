@@ -340,7 +340,7 @@ public:
     // distributed can be applied to actor class definitions and async functions
     if (auto var = dyn_cast<VarDecl>(D)) {
       // distributed can not be applied to stored properties
-      diagnoseAndRemoveAttr(attr, diag::distributedactor_let);
+      diagnoseAndRemoveAttr(attr, diag::distributedactor_property);
       return;
     }
 
@@ -358,20 +358,14 @@ public:
       return;
     }
 
-    if (auto funcDecl = dyn_cast<FuncDecl>(D)) {
-      // distributed func must be `async throws`
-      if (!funcDecl->hasAsync() || !funcDecl->hasThrows()) {
-        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_async_throws);
-        return;
-      }
-
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
       // distributed functions must not be static
       if (funcDecl->isStatic()) {
         diagnoseAndRemoveAttr(attr, diag::distributedactor_func_static);
         return;
       }
 
-      // distributed func must be declared inside an distibuted actor
+      // distributed func must be declared inside an distributed actor
       if (dc->getSelfClassDecl() &&
           !dc->getSelfClassDecl()->isDistributedActor()) {
         diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);

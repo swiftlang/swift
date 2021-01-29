@@ -4428,7 +4428,7 @@ ERROR(actor_instance_property_wrapper,none,
 ERROR(distributedactor_local_var,none,
       "'distributed' can not be applied to local variables",
       ())
-ERROR(distributedactor_let,none,
+ERROR(distributedactor_property,none,
       "'distributed' can not be applied to local properties",
       ())
 ERROR(distributedactor_storage,none,
@@ -4437,16 +4437,13 @@ ERROR(distributedactor_storage,none,
       ())
 ERROR(distributedactor_not_actor,none,
       "'distributed' can only be applied to 'actor class' definitions, "
-      "and distributed actor isolated async functions",
+      "and distributed actor-isolated async functions",
       ())
 ERROR(distributedactor_not_actor_func,none,
       "'distributed' can only be applied to distributed actor async functions",
       ())
-ERROR(distributedactor_func_not_async_throws,none,
-      "'distributed' actor-isolated function must be 'async throws'",
-      ())
 ERROR(distributedactor_func_static,none,
-      "'distributed' actor-isolated functions cannot be 'static'",
+      "'distributed' functions cannot be 'static'",
       ())
 ERROR(distributedactor_func_not_in_distributed_actor,none,
       "'distributed' function can only be declared within 'distributed actor class'",
