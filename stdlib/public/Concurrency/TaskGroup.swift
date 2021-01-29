@@ -63,7 +63,7 @@ extension Task {
   public static func withGroup<TaskResult, BodyResult>(
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
-    body: @escaping ((inout Task.Group<TaskResult>) async throws -> BodyResult)
+    body: @concurrent @escaping (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async throws -> BodyResult {
     let parent = Builtin.getCurrentAsyncTask()
 
@@ -134,7 +134,7 @@ extension Task {
     @discardableResult
     public mutating func add(
       overridingPriority priorityOverride: Priority? = nil,
-      operation: @escaping () async throws -> TaskResult
+      operation: @concurrent @escaping () async throws -> TaskResult
     ) async -> Task.Handle<TaskResult> {
       // Increment the number of pending tasks immediately;
       // We don't need to know which specific task is pending, just that pending

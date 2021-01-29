@@ -556,13 +556,14 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? throws? // results and parameters
+  function-signature ::= params-type params-type async? concurrent? throws? // results and parameters
 
   params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
   params-type ::= empty-list                  // shortcut for no parameters
 
+  concurrent ::= 'J'                         // @concurrent on function types
   async ::= 'Y'                              // 'async' annotation on function types
   throws ::= 'K'                             // 'throws' annotation on function types
 

@@ -2377,6 +2377,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
     appendOperator("Y");
+  if (fn->isConcurrent())
+    appendOperator("J");
   if (fn->isThrowing())
     appendOperator("K");
 }

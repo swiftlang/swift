@@ -2524,6 +2524,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       AFD->getParameters()->getParams(argTy);
 
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
+      infoBuilder = infoBuilder.withConcurrent(AFD->isConcurrent());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows());
       // Defer bodies must not escape.

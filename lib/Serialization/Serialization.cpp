@@ -4299,6 +4299,7 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
+        fnTy->isConcurrent(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
@@ -4314,7 +4315,7 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->isAsync(), fnTy->isThrowing(),
+        fnTy->isConcurrent(), fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addGenericSignatureRef(genericSig));
 

@@ -4160,6 +4160,11 @@ public:
       }
     }
 
+    if (!Options.excludeAttrKind(TAK_concurrent) &&
+        info.isConcurrent()) {
+      Printer << "@concurrent ";
+    }
+
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:

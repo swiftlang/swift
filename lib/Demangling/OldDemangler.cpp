@@ -1765,9 +1765,10 @@ private:
   }
   
   NodePointer demangleFunctionType(Node::Kind kind) {
-    bool throws = false, async = false;
+    bool throws = false, concurrent = false, async = false;
     if (Mangled) {
       throws = Mangled.nextIf('z');
+      concurrent = Mangled.nextIf('y');
       async = Mangled.nextIf('Z');
     }
     NodePointer in_args = demangleType();
