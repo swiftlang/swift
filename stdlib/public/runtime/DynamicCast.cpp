@@ -712,6 +712,14 @@ struct ObjCBridgeMemo {
 };
 #endif
 
+static bool avoidOptionalsInAnyHashable() {
+  // Unexpected nulls are fatal in Swift 5.4 and not before
+  // AnyHashable avoids optionals before Swift 5.4
+  // TODO: This is admittedly awkward, but I need to get this changed quickly
+  // I'll come back and clean this up later.
+  return !unexpectedNullIsFatal();
+}
+
 static DynamicCastResult
 tryCastToAnyHashable(
   OpaqueValue *destLocation, const Metadata *destType,
@@ -731,26 +739,47 @@ tryCastToAnyHashable(
     // TODO: Implement a fast path for NSString->AnyHashable casts.
     // These are incredibly common because an NSDictionary with
     // NSString keys is bridged by default to [AnyHashable:Any].
-    // Until this is implemented, fall through to the default case
-    SWIFT_FALLTHROUGH;
+    // Until this is implemented, fall through to the general case
+    break;
 #else
-    // If no Obj-C interop, just fall through to the default case.
-    SWIFT_FALLTHROUGH;
+    // If no Obj-C interop, just fall through to the general case.
+    break;
 #endif
   }
-  default: {
-    auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
-    if (hashableConformance) {
-      _swift_convertToAnyHashableIndirect(srcValue, destLocation,
-                                          srcType, hashableConformance);
-      return DynamicCastResult::SuccessViaCopy;
-    } else {
-      return DynamicCastResult::Failure;
+  case MetadataKind::Optional: {
+    if (avoidOptionalsInAnyHashable()) {
+      // Mimic the Swift 5.3 behavior when running in older contexts
+      // This behavior is consistent with Swift 5.3 runtime, but inconsistent
+      // with how other casting paths handle this case (which is why it's being
+      // changed in Swift 5.4).
+      // Old behavior:  "Foo" as! String? as! AnyHashable => AnyHashable("Foo")
+      // New behavior:  "Foo" as! String? as! AnyHashable => AnyHashable(Optional("Foo"))
+      auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+      unsigned sourceEnumCase = srcInnerType->vw_getEnumTagSinglePayload(
+        srcValue, /*emptyCases=*/1);
+      auto nonNil = (sourceEnumCase == 0);
+      if (nonNil) {
+        return DynamicCast::Failure;  // Our caller will unwrap the optional and try again
+      }
+      // If it is nil, fall through to the general case to just wrap the nil
     }
+    break;
   }
+  default:
+    break;
   }
-  return DynamicCastResult::Failure;
+
+
+  // General case: If it conforms to Hashable, we cast it
+  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+    swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+  if (hashableConformance) {
+    _swift_convertToAnyHashableIndirect(srcValue, destLocation,
+                                        srcType, hashableConformance);
+    return DynamicCastResult::SuccessViaCopy;
+  } else {
+    return DynamicCastResult::Failure;
+  }
 }
 
 static DynamicCastResult
