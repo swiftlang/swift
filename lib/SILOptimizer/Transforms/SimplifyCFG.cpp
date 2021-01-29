@@ -83,13 +83,8 @@ class SimplifyCFG {
   // this set may or may not still be LoopHeaders.
   // (ultimately this can be used to eliminate findLoopHeaders)
   SmallPtrSet<SILBasicBlock *, 4> ClonedLoopHeaders;
-  // The accumulated cost of jump threading per basic block. Initially
-  // zero. Each clone increases the cost by ~ the number of copied instructions.
-  // Effectively multiplying a block's cost is by the number of times it has
-  // been cloned prevents any one block from being cloned indefinitely. Cloned
-  // blocks inherit their original block's current cost to avoid indefinitely
-  // optimizing the newly cloned blocks (primarily relevant for loops where the
-  // number of predecessors can remain the same).
+  // The cost (~ number of copied instructions) of jump threading per basic
+  // block. Used to prevent infinite jump threading loops.
   llvm::SmallDenseMap<SILBasicBlock *, int, 8> JumpThreadingCost;
 
   // Dominance and post-dominance info for the current function
@@ -323,8 +318,8 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
     return false;
 
   Cloner.cloneBranchTarget(SrcTerm);
-  JumpThreadingCost[Cloner.getNewBB()] =
-    JumpThreadingCost[SrcTerm->getDestBB()];
+  JumpThreadingCost[Cloner.getNewBB()] = JumpThreadingCost[SrcTerm->getDestBB()];
+
 
   // We have copied the threaded block into the edge.
   auto *clonedSrc = Cloner.getNewBB();
@@ -1095,7 +1090,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
       }
     }
   }
-  // Deduct the prior cost of cloning these blocks (initially zero).
+
   ThreadingBudget -= JumpThreadingCost[SrcBB];
   ThreadingBudget -= JumpThreadingCost[DestBB];
 
@@ -1131,7 +1126,6 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   LLVM_DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID()
                           << " to bb" << DestBB->getDebugID() << '\n');
 
-  // Accumulate the cost of cloning the block to avoid indefinite cloning.
   JumpThreadingCost[DestBB] += copyCosts;
 
   // Duplicate the destination block into this one, rewriting uses of the BBArgs
@@ -1140,8 +1134,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   Cloner.updateSSAAfterCloning();
 
   // Also account the costs to the cloned DestBB, so the jump threading cannot
-  // loop by cloning the cloned block again. This is primarily relevant for
-  // loops where the number of predecessors might not decrease with each clone.
+  // loop by cloning the cloned block again.
   JumpThreadingCost[Cloner.getNewBB()] += copyCosts;
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
