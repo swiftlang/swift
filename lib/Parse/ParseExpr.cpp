@@ -1730,7 +1730,6 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                     unsigned &InterpolationCount) {
   SourceLoc Loc = EntireTok.getLoc();
   ParserStatus Status;
-  ParsedTrivia EmptyTrivia;
   bool First = true;
 
   DeclNameRef appendLiteral(
@@ -1785,7 +1784,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       // such token to the context.
       Token content(tok::string_segment,
                     CharSourceRange(Segment.Loc, Segment.Length).str());
-      SyntaxContext->addToken(content, EmptyTrivia, EmptyTrivia);
+      SyntaxContext->addToken(content, StringRef(), StringRef());
       break;
     }
         
@@ -1799,14 +1798,14 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       // Backslash is part of an expression segment.
       SourceLoc BackSlashLoc = Segment.Loc.getAdvancedLoc(-1 - DelimiterLen);
       Token BackSlash(tok::backslash, CharSourceRange(BackSlashLoc, 1).str());
-      ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
+      ExprContext.addToken(BackSlash, StringRef(), StringRef());
 
       // Custom delimiter may be a part of an expression segment.
       if (HasCustomDelimiter) {
         SourceLoc DelimiterLoc = Segment.Loc.getAdvancedLoc(-DelimiterLen);
         Token Delimiter(tok::raw_string_delimiter,
                         CharSourceRange(DelimiterLoc, DelimiterLen).str());
-        ExprContext.addToken(Delimiter, EmptyTrivia, EmptyTrivia);
+        ExprContext.addToken(Delimiter, StringRef(), StringRef());
       }
 
       // Create a temporary lexer that lexes from the body of the string.
@@ -1909,20 +1908,17 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // Make unknown tokens to represent the open and close quote.
   Token OpenQuote(QuoteKind, OpenQuoteStr);
   Token CloseQuote(QuoteKind, CloseQuoteStr);
-  ParsedTrivia EmptyTrivia;
   StringRef EntireTrailingTrivia = TrailingTrivia;
 
   if (HasCustomDelimiter) {
-    auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
     Token OpenDelimiter(tok::raw_string_delimiter, OpenDelimiterStr);
     // When a custom delimiter is present, it owns the leading trivia.
-    SyntaxContext->addToken(OpenDelimiter, LeadingTriviaPieces, EmptyTrivia);
+    SyntaxContext->addToken(OpenDelimiter, LeadingTrivia, StringRef());
 
-    SyntaxContext->addToken(OpenQuote, EmptyTrivia, EmptyTrivia);
+    SyntaxContext->addToken(OpenQuote, StringRef(), StringRef());
   } else {
-    auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
     // Without custom delimiter the quote owns trailing trivia.
-    SyntaxContext->addToken(OpenQuote, LeadingTriviaPieces, EmptyTrivia);
+    SyntaxContext->addToken(OpenQuote, LeadingTrivia, StringRef());
   }
 
   // The simple case: just a single literal segment.
@@ -1943,24 +1939,19 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       auto Segment = Segments.front();
       Token content(tok::string_segment,
                     CharSourceRange(Segment.Loc, Segment.Length).str());
-      SyntaxContext->addToken(content, EmptyTrivia, EmptyTrivia);
+      SyntaxContext->addToken(content, StringRef(), StringRef());
     }
 
     if (HasCustomDelimiter) {
-      SyntaxContext->addToken(CloseQuote, EmptyTrivia, EmptyTrivia);
+      SyntaxContext->addToken(CloseQuote, StringRef(), StringRef());
 
       Token CloseDelimiter(tok::raw_string_delimiter, CloseDelimiterStr);
       // When a custom delimiter is present it owns the trailing trivia.
-      auto EntireTrailingTriviaPieces =
-          TriviaLexer::lexTrivia(EntireTrailingTrivia);
-      SyntaxContext->addToken(CloseDelimiter, EmptyTrivia,
-                              EntireTrailingTriviaPieces);
+      SyntaxContext->addToken(CloseDelimiter, StringRef(),
+                              EntireTrailingTrivia);
     } else {
       // Without custom delimiter the quote owns trailing trivia.
-      auto EntireTrailingTriviaPieces =
-          TriviaLexer::lexTrivia(EntireTrailingTrivia);
-      SyntaxContext->addToken(CloseQuote, EmptyTrivia,
-                              EntireTrailingTriviaPieces);
+      SyntaxContext->addToken(CloseQuote, StringRef(), EntireTrailingTrivia);
     }
 
     return makeParserResult(
@@ -2019,20 +2010,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   }
 
   if (HasCustomDelimiter) {
-    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EmptyTrivia);
+    SyntaxContext->addToken(CloseQuote, StringRef(), StringRef());
 
     Token CloseDelimiter(tok::raw_string_delimiter, CloseDelimiterStr);
     // When a custom delimiter is present it owns the trailing trivia.
-    auto EntireTrailingTriviaPieces =
-        TriviaLexer::lexTrivia(EntireTrailingTrivia);
-    SyntaxContext->addToken(CloseDelimiter, EmptyTrivia,
-                            EntireTrailingTriviaPieces);
+    SyntaxContext->addToken(CloseDelimiter, StringRef(), EntireTrailingTrivia);
   } else {
     // Without custom delimiter the quote owns trailing trivia.
     auto EntireTrailingTriviaPieces =
         TriviaLexer::lexTrivia(EntireTrailingTrivia);
-    SyntaxContext->addToken(CloseQuote, EmptyTrivia,
-                            EntireTrailingTriviaPieces);
+    SyntaxContext->addToken(CloseQuote, StringRef(), EntireTrailingTrivia);
   }
 
   if (AppendingExpr->getBody()->getNumElements() == 1) {

@@ -18,8 +18,9 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Parse/ParsedSyntax.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Parse/ParsedSyntax.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingCache.h"
@@ -203,18 +204,22 @@ ParsedTokenSyntax SyntaxParsingContext::popToken() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(Token &Tok,
-                                    const ParsedTrivia &LeadingTrivia,
-                                    const ParsedTrivia &TrailingTrivia) {
+void SyntaxParsingContext::addToken(Token &Tok, StringRef LeadingTrivia,
+                                    StringRef TrailingTrivia) {
   if (!Enabled)
     return;
 
+  auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+  auto TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
+
   ParsedRawSyntaxNode raw;
-  if (shouldDefer())
-    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
-                                            *this);
-  else
-    raw = getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
+  if (shouldDefer()) {
+    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTriviaPieces,
+                                            TrailingTriviaPieces, *this);
+  } else {
+    raw = getRecorder().recordToken(Tok, LeadingTriviaPieces,
+                                    TrailingTriviaPieces);
+  }
   addRawSyntax(std::move(raw));
 }
 
