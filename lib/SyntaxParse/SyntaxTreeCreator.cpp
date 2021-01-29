@@ -14,6 +14,7 @@
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Syntax/Trivia.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
@@ -109,18 +110,16 @@ SyntaxTreeCreator::realizeSyntaxRoot(OpaqueSyntaxNode rootN,
   return rootNode;
 }
 
-OpaqueSyntaxNode
-SyntaxTreeCreator::recordToken(tok tokenKind,
-                               ArrayRef<ParsedTriviaPiece> leadingTriviaPieces,
-                               ArrayRef<ParsedTriviaPiece> trailingTriviaPieces,
-                               CharSourceRange range) {
-  size_t leadingTriviaLen =
-    ParsedTriviaPiece::getTotalLength(leadingTriviaPieces);
-  size_t trailingTriviaLen =
-    ParsedTriviaPiece::getTotalLength(trailingTriviaPieces);
-  SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTriviaLen);
-  unsigned tokLength = range.getByteLength() -
-      leadingTriviaLen - trailingTriviaLen;
+OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
+                                                StringRef leadingTrivia,
+                                                StringRef trailingTrivia,
+                                                CharSourceRange range) {
+  auto leadingTriviaPieces = TriviaLexer::lexTrivia(leadingTrivia).Pieces;
+  auto trailingTriviaPieces = TriviaLexer::lexTrivia(trailingTrivia).Pieces;
+
+  SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTrivia.size());
+  unsigned tokLength =
+      range.getByteLength() - leadingTrivia.size() - trailingTrivia.size();
   CharSourceRange tokRange = CharSourceRange{tokLoc, tokLength};
   SourceLoc leadingTriviaLoc = range.getStart();
   SourceLoc trailingTriviaLoc = tokLoc.getAdvancedLoc(tokLength);

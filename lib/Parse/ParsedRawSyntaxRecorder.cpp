@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParseActions.h"
@@ -42,10 +41,8 @@ ParsedRawSyntaxRecorder::recordToken(tok tokKind, CharSourceRange tokRange,
   unsigned length =
       leadingTrivia.size() + tokRange.getByteLength() + trailingTrivia.size();
   CharSourceRange range(offset, length);
-  auto leadingTriviaPieces = TriviaLexer::lexTrivia(leadingTrivia).Pieces;
-  auto trailingTriviaPieces = TriviaLexer::lexTrivia(trailingTrivia).Pieces;
-  OpaqueSyntaxNode n = SPActions->recordToken(tokKind, leadingTriviaPieces,
-                                              trailingTriviaPieces, range);
+  OpaqueSyntaxNode n =
+      SPActions->recordToken(tokKind, leadingTrivia, trailingTrivia, range);
   return ParsedRawSyntaxNode(SyntaxKind::Token, tokKind, range, n);
 }
 

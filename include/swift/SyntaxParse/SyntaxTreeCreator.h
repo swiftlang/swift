@@ -56,9 +56,8 @@ public:
   realizeSyntaxRoot(OpaqueSyntaxNode root, const SourceFile &SF) override;
 
 private:
-  OpaqueSyntaxNode recordToken(tok tokenKind,
-                               ArrayRef<ParsedTriviaPiece> leadingTrivia,
-                               ArrayRef<ParsedTriviaPiece> trailingTrivia,
+  OpaqueSyntaxNode recordToken(tok tokenKind, StringRef leadingTrivia,
+                               StringRef trailingTrivia,
                                CharSourceRange range) override;
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;
