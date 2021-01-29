@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
-// RUN:    -module-name M -enable-experimental-concurrency | %FileCheck %s
+// RUN:    -module-name M -enable-experimental-concurrency \
+// RUN:    -parse-as-library | %FileCheck %s
 // REQUIRES: concurrency
 
 func use<T>(_ t: T) {}
@@ -32,8 +33,10 @@ func withGenericArg<T>(_ msg: T) async {
   use(msg)
 }
 // CHECK-LABEL: {{^define }}
-runAsyncAndBlock {
-  await withGenericArg("hello (asynchronously)")
+@main struct Main {
+  static func main() async {
+    await withGenericArg("hello (asynchronously)")
+  }
 }
 // CHECK: ![[MSG]] = !DILocalVariable(name: "msg", arg: 1,
 // CHECK: ![[TAU]] = !DILocalVariable(name: "$\CF\84_0_0",

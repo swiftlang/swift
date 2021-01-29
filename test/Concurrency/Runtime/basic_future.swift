@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -22,7 +22,7 @@ func formGreeting(name: String) async -> String {
 
 func testSimple(
   name: String, dogName: String, shouldThrow: Bool, doSuspend: Bool
-) {
+) async {
   print("Testing name: \(name), dog: \(dogName), shouldThrow: \(shouldThrow) doSuspend: \(doSuspend)")
 
   var completed = false
@@ -46,36 +46,39 @@ func testSimple(
     return greeting + "!"
   }
 
-  runAsyncAndBlock {
-    // If the intent is not to test suspending, wait a bit so the first task
-    // can complete.
-    if !doSuspend {
-      print("+ Reader sleeping")
-      sleep(1)
-    }
+  // If the intent is not to test suspending, wait a bit so the first task
+  // can complete.
+  if !doSuspend {
+    print("+ Reader sleeping")
+    sleep(1)
+  }
 
-    do {
-      print("+ Reader waiting for the result")
-      let result = try await taskHandle.get()
-      completed = true
-      print("+ Normal return: \(result)")
-      assert(result == "Hello \(name) from async world!")
-    } catch HomeworkError.dogAteIt(let badDog) {
-      completed = true
-      print("+ Error return: HomeworkError.dogAteIt(\(badDog))")
-      assert(badDog == dogName + " the dog")
-    } catch {
-      fatalError("Caught a different exception?")
-    }
+  do {
+    print("+ Reader waiting for the result")
+    let result = try await taskHandle.get()
+    completed = true
+    print("+ Normal return: \(result)")
+    assert(result == "Hello \(name) from async world!")
+  } catch HomeworkError.dogAteIt(let badDog) {
+    completed = true
+    print("+ Error return: HomeworkError.dogAteIt(\(badDog))")
+    assert(badDog == dogName + " the dog")
+  } catch {
+    fatalError("Caught a different exception?")
   }
 
   assert(completed)
   print("Finished test")
 }
 
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: false)
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: true)
-testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: true)
 
-print("Done")
+@main struct Main {
+  static func main() async {
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: false)
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: true)
+    await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: true, doSuspend: true)
+
+    print("Done")
+  }
+}

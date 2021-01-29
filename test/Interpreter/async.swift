@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -23,20 +23,22 @@ func sayWithClosure(_ action: () async -> ()) async {
   print("hallo welt")
 }
 
-runAsyncAndBlock {
-  // CHECK: hello
-  await sayHello()
-
-  // CHECK: hello
-  // CHECK: world
-  await sayGeneric("world")
-
-
-  // CHECK: hello
-  // CHECK: and now in german
-  // CHECK: hallo welt
-  await sayWithClosure {
+@main struct Main {
+  static func main() async {
+    // CHECK: hello
     await sayHello()
-    print("and now in german")
+
+    // CHECK: hello
+    // CHECK: world
+    await sayGeneric("world")
+
+
+    // CHECK: hello
+    // CHECK: and now in german
+    // CHECK: hallo welt
+    await sayWithClosure {
+      await sayHello()
+      print("and now in german")
+    }
   }
 }
