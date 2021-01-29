@@ -189,12 +189,12 @@ struct BorrowingOperand {
 
   // A set of operators so that a BorrowingOperand can be used like a normal
   // operand in a light weight way.
-  operator const Operand *() const { return op; }
-  operator Operand *() { return op; }
   const Operand *operator*() const { return op; }
   Operand *operator*() { return op; }
   const Operand *operator->() const { return op; }
   Operand *operator->() { return op; }
+
+  operator bool() const { return kind != BorrowingOperandKind::Invalid && op; }
 
   /// If \p op is a borrow introducing operand return it after doing some
   /// checks.

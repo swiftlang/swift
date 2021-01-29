@@ -195,6 +195,12 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
   return getEnumElementType(elt, M.Types, context);
 }
 
+SILType SILType::getEnumElementType(EnumElementDecl *elt,
+                                    SILFunction *fn) const {
+  return getEnumElementType(elt, fn->getModule(),
+                            fn->getTypeExpansionContext());
+}
+
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
   SILModule &M = F.getModule();
   return isLoadable(F) || !SILModuleConventions(M).useLoweredAddresses();

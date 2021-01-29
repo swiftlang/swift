@@ -705,6 +705,11 @@ SILValue
 makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock,
                       JointPostDominanceSetComputer *jointPostDomComputer);
 
+/// Given a forwarding instruction, eliminate it if all of its users are debug
+/// instructions and ownership uses.
+bool tryEliminateOnlyOwnershipUsedForwardingInst(
+    SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks);
+
 } // end namespace swift
 
 #endif
