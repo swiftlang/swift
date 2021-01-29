@@ -87,6 +87,23 @@ Trivia lexTrivia(StringRef TriviaStr) {
   return SyntaxTrivia;
 }
 
+/// If the \p Str is not allocated in \p Arena, copy it to \p Arena and adjust
+/// \p Str to point to the string's copy in \p Arena.
+void copyToArenaIfNecessary(StringRef &Str, const RC<SyntaxArena> Arena) {
+  if (Str.empty()) {
+    // Empty strings can live wherever they want. Nothing to do.
+    return;
+  }
+  if (Arena->containsPointer(Str.data())) {
+    // String already in arena. Nothing to do.
+    return;
+  }
+  // Copy string to arena
+  char *Data = (char *)Arena->Allocate(Str.size(), alignof(char *));
+  std::uninitialized_copy(Str.begin(), Str.end(), Data);
+  Str = StringRef(Data, Str.size());
+}
+
 // FIXME: If we want thread-safety for tree creation, this needs to be atomic.
 unsigned RawSyntax::NextFreeNodeId = 1;
 
@@ -129,6 +146,8 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
     : Arena(Arena), Bits({{unsigned(TextLength), unsigned(Presence), true}}),
       RefCount(0) {
   assert(Arena && "RawSyntax nodes must always be allocated in an arena");
+  copyToArenaIfNecessary(LeadingTrivia, Arena);
+  copyToArenaIfNecessary(TrailingTrivia, Arena);
 
   if (NodeId.hasValue()) {
     this->NodeId = NodeId.getValue();

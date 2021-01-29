@@ -15,6 +15,7 @@
 
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Syntax/References.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
   class RawSyntaxTokenCache;
@@ -37,6 +38,12 @@ class SyntaxTreeCreator: public SyntaxParseActions {
   SourceManager &SM;
   unsigned BufferID;
   RC<syntax::SyntaxArena> Arena;
+
+  /// A string allocated in \c Arena that contains an exact copy of the source
+  /// file for which this \c SyntaxTreeCreator creates a syntax tree. \c
+  /// RawSyntax nodes can safely reference text inside this buffer since they
+  /// retain the \c SyntaxArena which holds the buffer.
+  StringRef ArenaSourceBuffer;
 
   /// A cache of nodes that can be reused when creating the current syntax
   /// tree.

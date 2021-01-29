@@ -40,6 +40,10 @@ public:
   void *Allocate(size_t size, size_t alignment) {
     return Allocator.Allocate(size, alignment);
   }
+
+  bool containsPointer(const void *Ptr) {
+    return getAllocator().identifyObject(Ptr) != llvm::None;
+  }
 };
 
 } // namespace syntax

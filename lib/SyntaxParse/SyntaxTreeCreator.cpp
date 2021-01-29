@@ -42,6 +42,11 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
       Arena(std::move(arena)),
       SyntaxCache(syntaxCache),
       TokenCache(new RawSyntaxTokenCache()) {
+  StringRef BufferContent = SM.getEntireTextForBuffer(BufferID);
+  char *Data = (char *)Arena->Allocate(BufferContent.size(), alignof(char *));
+  std::uninitialized_copy(BufferContent.begin(), BufferContent.end(), Data);
+  ArenaSourceBuffer = StringRef(Data, BufferContent.size());
+  assert(ArenaSourceBuffer == BufferContent);
 }
 
 SyntaxTreeCreator::~SyntaxTreeCreator() = default;
@@ -113,14 +118,25 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
                                                 StringRef leadingTrivia,
                                                 StringRef trailingTrivia,
                                                 CharSourceRange range) {
-  SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTrivia.size());
   unsigned tokLength =
       range.getByteLength() - leadingTrivia.size() - trailingTrivia.size();
-  CharSourceRange tokRange = CharSourceRange{tokLoc, tokLength};
-  StringRef tokenText = SM.extractText(tokRange, BufferID);
+  auto leadingTriviaStartOffset =
+      SM.getLocOffsetInBuffer(range.getStart(), BufferID);
+  auto tokStartOffset = leadingTriviaStartOffset + leadingTrivia.size();
+  auto trailingTriviaStartOffset = tokStartOffset + tokLength;
+
+  // Get StringRefs of the token's texts that point into the syntax arena's
+  // buffer.
+  StringRef leadingTriviaText =
+      ArenaSourceBuffer.substr(leadingTriviaStartOffset, leadingTrivia.size());
+  StringRef tokenText = ArenaSourceBuffer.substr(tokStartOffset, tokLength);
+  StringRef trailingTriviaText = ArenaSourceBuffer.substr(
+      trailingTriviaStartOffset, trailingTrivia.size());
+
   auto ownedText = OwnedString::makeRefCounted(tokenText);
-  auto raw = TokenCache->getToken(Arena, tokenKind, range.getByteLength(),
-                                  ownedText, leadingTrivia, trailingTrivia);
+  auto raw =
+      TokenCache->getToken(Arena, tokenKind, range.getByteLength(), ownedText,
+                           leadingTriviaText, trailingTriviaText);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;
