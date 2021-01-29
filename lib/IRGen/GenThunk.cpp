@@ -285,8 +285,6 @@ void IRGenThunk::emit() {
   GenericContextScope scope(IGF.IGM, origTy->getInvocationGenericSignature());
 
   if (isAsync) {
-    IGF.setupAsync();
-
     auto entity = LinkEntity::forDispatchThunk(declRef);
     emitAsyncFunctionEntry(IGF, *asyncLayout, entity);
     emitAsyncFunctionPointer(IGF.IGM, IGF.CurFn, entity,

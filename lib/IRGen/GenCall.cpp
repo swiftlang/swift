@@ -335,14 +335,17 @@ static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
 void IRGenFunction::setupAsync() {
   llvm::Value *t = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
   asyncTaskLocation = createAlloca(t->getType(), IGM.getPointerAlignment());
-  Builder.CreateStore(t, asyncTaskLocation);
 
   llvm::Value *e = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
   asyncExecutorLocation = createAlloca(e->getType(), IGM.getPointerAlignment());
-  Builder.CreateStore(e, asyncExecutorLocation);
-
   llvm::Value *c = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
   asyncContextLocation = createAlloca(c->getType(), IGM.getPointerAlignment());
+
+  // Insert the stores after the coro.begin.
+  Builder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
+                         getEarliestInsertionPoint()->getIterator());
+  Builder.CreateStore(t, asyncTaskLocation);
+  Builder.CreateStore(e, asyncExecutorLocation);
   Builder.CreateStore(c, asyncContextLocation);
 }
 
@@ -3638,6 +3641,10 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
   // Set the coroutine handle; this also flags that is a coroutine so that
   // e.g. dynamic allocas use the right code generation.
   IGF.setCoroutineHandle(hdl);
+  auto *pt = IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int1Ty,
+                                                     /*array size*/ nullptr,
+                                                     "earliest insert point");
+  IGF.setEarliestInsertionPoint(pt);
 }
 
 void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
@@ -3661,6 +3668,12 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
   // Set the coroutine handle; this also flags that is a coroutine so that
   // e.g. dynamic allocas use the right code generation.
   IGF.setCoroutineHandle(hdl);
+
+  auto *pt = IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int1Ty,
+                                                     /*array size*/ nullptr,
+                                                     "earliest insert point");
+  IGF.setEarliestInsertionPoint(pt);
+  IGF.setupAsync();
 }
 
 void irgen::emitYieldOnceCoroutineEntry(
@@ -3945,6 +3958,9 @@ Address IRGenFunction::getCalleeErrorResultSlot(SILType errorType) {
                              errorTI.getFixedAlignment(),
                              "swifterror");
 
+    builder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
+                           getEarliestInsertionPoint()->getIterator());
+
     // Only add the swifterror attribute on ABIs that pass it in a register.
     // We create a shadow stack location of the swifterror parameter for the
     // debugger on platforms that pass swifterror by reference and so we can't
@@ -4001,6 +4017,7 @@ void IRGenFunction::emitPrologue() {
   AllocaIP = Builder.IRBuilderBase::CreateAlloca(IGM.Int1Ty,
                                                  /*array size*/ nullptr,
                                                  "alloca point");
+  EarliestIP = AllocaIP;
 }
 
 /// Emit a branch to the return block and set the insert point there.
@@ -4040,6 +4057,8 @@ bool IRGenFunction::emitBranchToReturnBB() {
 
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
+  if (EarliestIP != AllocaIP)
+    EarliestIP->eraseFromParent();
   // Destroy the alloca insertion point.
   AllocaIP->eraseFromParent();
 }
