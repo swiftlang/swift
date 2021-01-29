@@ -901,7 +901,7 @@ CastsTests.test("Optional cast to AnyHashable") {
   expectNil(d6)
 
   // In both Swift 5.3 and 5.4, the nil key should be preserved and still function
-  let d7 = d2[nil]
+  let d7 = d2[String?.none as AnyHashable]
   expectNotNil(d7)
 
   // Direct casts via the runtime unwrap the optional in 5.3 but not 5.4.
