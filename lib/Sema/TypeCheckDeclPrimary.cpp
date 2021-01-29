@@ -1500,7 +1500,7 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   ASTContext &ctx = VD->getASTContext();
 
   addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]() {
-    return ObjCAttr::create(ctx, note.ObjCName, true);
+    return ObjCAttr::create(ctx, note.ObjCName, false);
   });
 
   addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{
@@ -1509,11 +1509,9 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 
   if (note.ObjCName) {
     auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
+    assert(attr && "ObjCName set, but ObjCAttr not true or did not apply???");
 
-    if (!attr) {
-      // TODO: diagnose use of ObjCName without ObjC: true
-    }
-    else if (!attr->hasName()) {
+    if (!attr->hasName()) {
       attr->setName(*note.ObjCName, true);
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::attr_objc_name_changed_by_access_note,

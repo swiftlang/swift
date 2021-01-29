@@ -107,7 +107,7 @@ class Hoozit : Gizmo {
 
   // NS_RETURNS_RETAINED by family (-copy)
   // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
-  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
+  // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc(copyDuplicate) }}
   func makeDuplicate() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC13makeDuplicateSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):

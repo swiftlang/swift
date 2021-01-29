@@ -255,8 +255,12 @@ void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
 }
 
 StringRef MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
-  if (!note.ObjC.getValueOr(true) && note.ObjCName.hasValue())
+  if (note.ObjCName.hasValue()) {
+    if (!note.ObjC)
+      note.ObjC = true;
+    else if (!*note.ObjC)
     return "cannot have an 'ObjCName' if 'ObjC' is false";
+  }
 
   return "";
 }
