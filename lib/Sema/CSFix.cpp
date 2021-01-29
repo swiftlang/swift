@@ -182,8 +182,9 @@ TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
 
 bool MarkExplicitlyEscaping::diagnose(const Solution &solution,
                                       bool asNote) const {
-  NoEscapeFuncToTypeConversionFailure failure(solution, getFromType(),
-                                              getToType(), getLocator());
+  AttributedFuncToTypeConversionFailure failure(
+      solution, getFromType(), getToType(), getLocator(),
+      AttributedFuncToTypeConversionFailure::Escaping);
   return failure.diagnose(asNote);
 }
 
@@ -197,6 +198,26 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
+bool AddConcurrentAttribute::diagnose(const Solution &solution,
+                                      bool asNote) const {
+  AttributedFuncToTypeConversionFailure failure(
+      solution, getFromType(), getToType(), getLocator(),
+      AttributedFuncToTypeConversionFailure::Concurrent);
+  return failure.diagnose(asNote);
+}
+
+AddConcurrentAttribute *
+AddConcurrentAttribute::create(ConstraintSystem &cs,
+                               FunctionType *fromType,
+                               FunctionType *toType,
+                               ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+    locator = cs.getConstraintLocator(
+        locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
+
+  return new (cs.getAllocator()) AddConcurrentAttribute(
+      cs, fromType, toType, locator);
+}
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   LabelingFailure failure(solution, getLocator(), getLabels());
   return failure.diagnose(asNote);

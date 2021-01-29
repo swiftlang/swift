@@ -315,7 +315,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 9 };
+  enum { NumAFTExtInfoBits = 10 };
   enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
@@ -3143,6 +3143,10 @@ public:
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
+  }
+
+  bool isConcurrent() const {
+    return getExtInfo().isConcurrent();
   }
 
   bool isAsync() const { return getExtInfo().isAsync(); }

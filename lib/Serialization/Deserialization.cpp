@@ -5036,19 +5036,19 @@ public:
                                             bool isGeneric) {
     TypeID resultID;
     uint8_t rawRepresentation, rawDiffKind;
-    bool noescape = false, async, throws;
+    bool noescape = false, concurrent, async, throws;
     GenericSignature genericSig;
     TypeID clangTypeID;
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, clangTypeID,
-          noescape, async, throws, rawDiffKind);
+          noescape, concurrent, async, throws, rawDiffKind);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(
-          scratch, resultID, rawRepresentation, async, throws, rawDiffKind,
-          rawGenericSig);
+          scratch, resultID, rawRepresentation, concurrent, async, throws,
+          rawDiffKind, rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
       clangTypeID = 0;
     }
@@ -5071,6 +5071,7 @@ public:
 
     auto info = FunctionType::ExtInfoBuilder(*representation, noescape, throws,
                                              *diffKind, clangFunctionType)
+                    .withConcurrent(concurrent)
                     .withAsync(async)
                     .build();
 
