@@ -111,8 +111,8 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                      size_t TextLength, SourcePresence Presence,
                      const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId)
-    : Arena(Arena), Bits({{unsigned(TextLength), unsigned(Presence), false}}),
-      RefCount(0) {
+    : RefCount(0), Arena(Arena),
+      Bits({{unsigned(TextLength), unsigned(Presence), false}}) {
   assert(Arena && "RawSyntax nodes must always be allocated in an arena");
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
@@ -143,12 +143,19 @@ RawSyntax::RawSyntax(tok TokKind, StringRef Text, size_t TextLength,
                      StringRef LeadingTrivia, StringRef TrailingTrivia,
                      SourcePresence Presence, const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId)
-    : Arena(Arena), Bits({{unsigned(TextLength), unsigned(Presence), true}}),
-      RefCount(0) {
+    : RefCount(0), Arena(Arena),
+      Bits({{unsigned(TextLength), unsigned(Presence), true}}) {
   assert(Arena && "RawSyntax nodes must always be allocated in an arena");
   copyToArenaIfNecessary(LeadingTrivia, Arena);
   copyToArenaIfNecessary(Text, Arena);
   copyToArenaIfNecessary(TrailingTrivia, Arena);
+
+  if (Presence == SourcePresence::Missing) {
+    assert(TextLength == 0);
+  } else {
+    assert(TextLength ==
+           LeadingTrivia.size() + Text.size() + TrailingTrivia.size());
+  }
 
   if (NodeId.hasValue()) {
     this->NodeId = NodeId.getValue();
@@ -156,10 +163,13 @@ RawSyntax::RawSyntax(tok TokKind, StringRef Text, size_t TextLength,
   } else {
     this->NodeId = NextFreeNodeId++;
   }
+  Bits.Token.LeadingTrivia = LeadingTrivia.data();
+  Bits.Token.TokenText = Text.data();
+  Bits.Token.TrailingTrivia = TrailingTrivia.data();
+  Bits.Token.LeadingTriviaLength = LeadingTrivia.size();
+  Bits.Token.TokenLength = Text.size();
+  Bits.Token.TrailingTriviaLength = TrailingTrivia.size();
   Bits.Token.TokenKind = unsigned(TokKind);
-  Bits.Token.LeadingTrivia = LeadingTrivia;
-  Bits.Token.TokenText = Text;
-  Bits.Token.TrailingTrivia = TrailingTrivia;
 }
 
 RawSyntax::~RawSyntax() {

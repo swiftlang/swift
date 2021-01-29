@@ -160,6 +160,8 @@ class RawSyntax final
   /// An ID of this node that is stable across incremental parses
   SyntaxNodeId NodeId;
 
+  mutable std::atomic<int> RefCount;
+
   /// If this node was allocated using a \c SyntaxArena's bump allocator, a
   /// reference to the arena to keep the underlying memory buffer of this node
   /// alive. If this is a \c nullptr, the node owns its own memory buffer.
@@ -167,8 +169,8 @@ class RawSyntax final
 
   union {
     struct {
-      // FIXME: Reduce TextLength to 30 bits so that common fits in 4 bytes?
-      /// Number of bytes this node takes up spelled out in the source code
+      /// Number of bytes this node takes up spelled out in the source code.
+      /// Always 0 if the node is missing.
       unsigned TextLength : 32;
       /// Whether this piece of syntax was actually present in the source.
       unsigned Presence : 1;
@@ -196,10 +198,13 @@ class RawSyntax final
                     "Only 64 bits reserved for standard syntax bits");
       uint64_t : bitmax(NumRawSyntaxBits, 64); // align to 16 bits
       /// The kind of token this "token" node represents.
+      const char *LeadingTrivia;
+      const char *TokenText;
+      const char *TrailingTrivia;
+      unsigned LeadingTriviaLength : 32;
+      unsigned TokenLength : 32;
+      unsigned TrailingTriviaLength : 32;
       unsigned TokenKind : 16;
-      StringRef LeadingTrivia;
-      StringRef TokenText;
-      StringRef TrailingTrivia;
     } Token;
   } Bits;
 
@@ -237,8 +242,6 @@ class RawSyntax final
     }
     return TextLength;
   }
-
-  mutable std::atomic<int> RefCount;
 
 public:
   ~RawSyntax();
@@ -392,19 +395,20 @@ public:
   /// disappear when the syntax node gets freed.
   StringRef getTokenText() const {
     assert(isToken());
-    return Bits.Token.TokenText;
+    return StringRef(Bits.Token.TokenText, Bits.Token.TokenLength);
   }
 
   /// Return the unparsed leading trivia of the token.
   StringRef getLeadingTrivia() const {
     assert(isToken());
-    return Bits.Token.LeadingTrivia;
+    return StringRef(Bits.Token.LeadingTrivia, Bits.Token.LeadingTriviaLength);
   }
 
   /// Return the unparsed trailing trivia of the token.
   StringRef getTrailingTrivia() const {
     assert(isToken());
-    return Bits.Token.TrailingTrivia;
+    return StringRef(Bits.Token.TrailingTrivia,
+                     Bits.Token.TrailingTriviaLength);
   }
 
   /// Return pieces that make up the leading trivia of the token.
