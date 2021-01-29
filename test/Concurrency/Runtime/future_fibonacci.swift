@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -47,15 +47,16 @@ func asyncFib(_ n: Int) async -> Int {
   return result
 }
 
-func runFibonacci(_ n: Int) {
-  var result = 0
-  runAsyncAndBlock {
-    result = await asyncFib(n)
-  }
+func runFibonacci(_ n: Int) async {
+  var result = await asyncFib(n)
 
   print()
   print("Async fib = \(result), sequential fib = \(fib(n))")
   assert(result == fib(n))
 }
 
-runFibonacci(15)
+@main struct Main {
+  static func main() async {
+    await runFibonacci(15)
+  }
+}

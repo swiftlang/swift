@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -81,6 +81,8 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   print("DONE!")
 }
 
-runAsyncAndBlock {
-  await runTest(numCounters: 10, numWorkers: 100, numIterations: 1000)
+@main struct Main {
+  static func main() async {
+    await runTest(numCounters: 10, numWorkers: 100, numIterations: 1000)
+  }
 }
