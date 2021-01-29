@@ -551,6 +551,7 @@ private:
   void lexHexNumber();
   void lexNumber();
   void lexTrivia(ParsedTrivia &T, bool IsForTrailingTrivia);
+  StringRef lexTrivia(bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,
@@ -572,7 +573,14 @@ private:
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
 };
-  
+
+/// A lexer that can lex trivia into its pieces
+class TriviaLexer {
+public:
+  /// Decompose the triva in \p TriviaStr into their pieces.
+  static ParsedTrivia lexTrivia(StringRef TriviaStr);
+};
+
 /// Given an ordered token \param Array , get the iterator pointing to the first
 /// token that is not before \param Loc .
 template<typename ArrayTy, typename Iterator = typename ArrayTy::iterator>

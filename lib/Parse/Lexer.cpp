@@ -2531,6 +2531,15 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
 }
 
 void Lexer::lexTrivia(ParsedTrivia &Pieces, bool IsForTrailingTrivia) {
+  auto TriviaString = lexTrivia(IsForTrailingTrivia);
+  auto ParsedPieces = TriviaLexer::lexTrivia(TriviaString);
+  Pieces.Pieces.insert(Pieces.Pieces.end(), ParsedPieces.Pieces.begin(),
+                       ParsedPieces.Pieces.end());
+}
+
+StringRef Lexer::lexTrivia(bool IsForTrailingTrivia) {
+  const char *AllTriviaStart = CurPtr;
+
 Restart:
   const char *TriviaStart = CurPtr;
 
@@ -2539,30 +2548,19 @@ Restart:
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
-    Pieces.appendOrSquash(TriviaKind::Newline, 1);
     goto Restart;
   case '\r':
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
     if (CurPtr[0] == '\n') {
-      Pieces.appendOrSquash(TriviaKind::CarriageReturnLineFeed, 2);
       ++CurPtr;
-    } else {
-      Pieces.appendOrSquash(TriviaKind::CarriageReturn, 1);
     }
     goto Restart;
   case ' ':
-    Pieces.appendOrSquash(TriviaKind::Space, 1);
-    goto Restart;
   case '\t':
-    Pieces.appendOrSquash(TriviaKind::Tab, 1);
-    goto Restart;
   case '\v':
-    Pieces.appendOrSquash(TriviaKind::VerticalTab, 1);
-    goto Restart;
   case '\f':
-    Pieces.appendOrSquash(TriviaKind::Formfeed, 1);
     goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
@@ -2571,19 +2569,11 @@ Restart:
       break;
     } else if (*CurPtr == '/') {
       // '// ...' comment.
-      bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(isDocComment ? TriviaKind::DocLineComment
-                                    : TriviaKind::LineComment, Length);
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
-      bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(isDocComment ? TriviaKind::DocBlockComment
-                                    : TriviaKind::BlockComment, Length);
       goto Restart;
     }
     break;
@@ -2594,8 +2584,6 @@ Restart:
       if (!IsHashbangAllowed)
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
       skipHashbang(/*EatNewline=*/false);
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaKind::GarbageText, Length);
       goto Restart;
     }
     break;
@@ -2603,8 +2591,6 @@ Restart:
   case '>':
     if (tryLexConflictMarker(/*EatNewline=*/false)) {
       // Conflict marker.
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaKind::GarbageText, Length);
       goto Restart;
     }
     break;
@@ -2612,8 +2598,6 @@ Restart:
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::Embedded: {
       diagnoseEmbeddedNul(Diags, CurPtr - 1);
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaKind::GarbageText, Length);
       goto Restart;
     }
     case NulCharacterKind::CodeCompletion:
@@ -2655,15 +2639,15 @@ Restart:
     bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
     if (ShouldTokenize) {
       CurPtr = Tmp;
-      return;
+      size_t Length = CurPtr - AllTriviaStart;
+      return StringRef(AllTriviaStart, Length);
     }
-
-    size_t Length = CurPtr - TriviaStart;
-    Pieces.push_back(TriviaKind::GarbageText, Length);
     goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
+  size_t Length = CurPtr - AllTriviaStart;
+  return StringRef(AllTriviaStart, Length);
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
@@ -2844,6 +2828,158 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc,
     ++EndOfIndentation;
 
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
+}
+
+bool tryAdvanceToEndOfConflictMarker(const char *&CurPtr,
+                                     const char *BufferEnd) {
+  const char *Ptr = CurPtr - 1;
+
+  // Check to see if we have <<<<<<< or >>>>.
+  StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
+  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+    return false;
+
+  ConflictMarkerKind Kind =
+      *Ptr == '<' ? ConflictMarkerKind::Normal : ConflictMarkerKind::Perforce;
+  if (const char *End = findConflictEnd(Ptr, BufferEnd, Kind)) {
+    CurPtr = End;
+
+    // Skip ahead to the end of the marker.
+    if (CurPtr != BufferEnd) {
+      advanceToEndOfLine(CurPtr, End);
+    }
+
+    return true;
+  }
+
+  // No end of conflict marker found.
+  return false;
+}
+
+ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
+  const char *CurPtr = TriviaStr.begin();
+  const char *BufferEnd = TriviaStr.end();
+
+  ParsedTrivia Pieces;
+
+  while (CurPtr < BufferEnd) {
+    // Iterate through the trivia and lex them into pieces. In the switch
+    // statement in this loop we can
+    //  - 'continue' if we have successfully lexed a trivia piece to continue
+    //    with the next piece. In this case CurPtr points to the next character
+    //    to be lexed (which is not part of the lexed trivia).
+    //  - 'break' to perform the default handling defined towards the bottom of
+    //    the loop.
+
+    const char *TriviaStart = CurPtr;
+
+    signed char CurChar = (signed char)*CurPtr;
+    CurPtr++;
+
+    switch (CurChar) {
+    case '\n':
+      Pieces.appendOrSquash(TriviaKind::Newline, 1);
+      continue;
+    case '\r':
+      if (CurPtr[0] == '\n') {
+        Pieces.appendOrSquash(TriviaKind::CarriageReturnLineFeed, 2);
+        ++CurPtr;
+        continue;
+      } else {
+        Pieces.appendOrSquash(TriviaKind::CarriageReturn, 1);
+        continue;
+      }
+    case ' ':
+      Pieces.appendOrSquash(TriviaKind::Space, 1);
+      continue;
+    case '\t':
+      Pieces.appendOrSquash(TriviaKind::Tab, 1);
+      continue;
+    case '\v':
+      Pieces.appendOrSquash(TriviaKind::VerticalTab, 1);
+      continue;
+    case '\f':
+      Pieces.appendOrSquash(TriviaKind::Formfeed, 1);
+      continue;
+    case '/':
+      if (*CurPtr == '/') {
+        // '// ...' comment.
+        bool isDocComment = CurPtr[1] == '/';
+        advanceToEndOfLine(CurPtr, BufferEnd);
+        size_t Length = CurPtr - TriviaStart;
+        Pieces.push_back(isDocComment ? TriviaKind::DocLineComment
+                                      : TriviaKind::LineComment,
+                         Length);
+        continue;
+      } else if (*CurPtr == '*') {
+        // '/* ... */' comment.
+        bool isDocComment = CurPtr[1] == '*';
+        skipToEndOfSlashStarComment(CurPtr, BufferEnd);
+        size_t Length = CurPtr - TriviaStart;
+        Pieces.push_back(isDocComment ? TriviaKind::DocBlockComment
+                                      : TriviaKind::BlockComment,
+                         Length);
+        continue;
+      }
+      break;
+    case '#':
+      if (*CurPtr == '!') {
+        // Hashbang '#!/path/to/swift'.
+        advanceToEndOfLine(CurPtr, BufferEnd);
+        size_t Length = CurPtr - TriviaStart;
+        Pieces.push_back(TriviaKind::GarbageText, Length);
+        continue;
+      }
+      break;
+    case '<':
+    case '>':
+      if (tryAdvanceToEndOfConflictMarker(CurPtr, BufferEnd)) {
+        // Conflict marker.
+        size_t Length = CurPtr - TriviaStart;
+        Pieces.push_back(TriviaKind::GarbageText, Length);
+        continue;
+      }
+      break;
+    case 0: {
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaKind::GarbageText, Length);
+      continue;
+    }
+    default:
+      break;
+    }
+
+    // Default handling for anything that didn't 'continue' in the above switch
+    // statement.
+
+    for (; CurPtr < BufferEnd; ++CurPtr) {
+      bool HasFoundNextTriviaStart = false;
+      switch (*CurPtr) {
+      case '\n':
+      case '\r':
+      case ' ':
+      case '\t':
+      case '\v':
+      case '\f':
+      case '/':
+      case 0:
+        HasFoundNextTriviaStart = true;
+        break;
+      }
+      if (HasFoundNextTriviaStart) {
+        break;
+      }
+    }
+
+    size_t Length = CurPtr - TriviaStart;
+    Pieces.push_back(TriviaKind::GarbageText, Length);
+    continue;
+  }
+
+  assert(Pieces.getLength() == TriviaStr.size() &&
+         "Not all characters in the source string have been used in trivia "
+         "pieces");
+  return Pieces;
 }
 
 ArrayRef<Token> swift::
