@@ -91,7 +91,6 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -1403,23 +1402,19 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   // formatting and privacy options are literals, all candidate instructions
   // must be in the same basic block. But, this code doesn't rely on that
   // assumption.
-  BasicBlockSet candidateBBs(oslogInit->getFunction());
-  SILBasicBlock *candidateBB = nullptr;
-  unsigned numCandidateBBsFound = 0;
+  SmallPtrSet<SILBasicBlock *, 4> candidateBBs;
   for (auto *candidate: candidateStartInstructions) {
-    candidateBB = candidate->getParent();
-    if (candidateBBs.insert(candidateBB))
-      ++numCandidateBBsFound;
+    SILBasicBlock *candidateBB = candidate->getParent();
+    candidateBBs.insert(candidateBB);
   }
 
   SILBasicBlock *firstBB = nullptr;
-  if (numCandidateBBsFound == 1) {
-    assert(candidateBB);
-    firstBB = candidateBB;
+  if (candidateBBs.size() == 1) {
+    firstBB = *candidateBBs.begin();
   } else {
     SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
     for (SILBasicBlock *bb : llvm::breadth_first<SILBasicBlock *>(entryBB)) {
-      if (candidateBBs.contains(bb)) {
+      if (candidateBBs.count(bb)) {
         firstBB = bb;
         break;
       }

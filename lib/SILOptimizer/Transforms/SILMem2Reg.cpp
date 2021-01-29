@@ -28,7 +28,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -55,7 +54,7 @@ typedef llvm::DenseMap<DomTreeNode *, unsigned> DomTreeLevelMap;
 
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  typedef BasicBlockSetVector<16> BlockSet;
+  typedef llvm::SmallSetVector<SILBasicBlock *, 16> BlockSet;
   typedef llvm::DenseMap<SILBasicBlock *, SILInstruction *> BlockToInstMap;
 
   // Use a priority queue keyed on dominator tree level so that inserted nodes
@@ -700,7 +699,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
       }
 
     // If there is a Phi definition in this block:
-    if (PhiBlocks.contains(BB)) {
+    if (PhiBlocks.count(BB)) {
       // Return the dummy instruction that represents the new value that we will
       // add to the basic block.
       SILValue Phi = BB->getArgument(BB->getNumArguments() - 1);
@@ -722,7 +721,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   // our loads happen before stores, so we need to first check for Phi nodes
   // in the first block, but stores first in all other stores in the idom
   // chain.
-  if (PhiBlocks.contains(BB)) {
+  if (PhiBlocks.count(BB)) {
     LLVM_DEBUG(llvm::dbgs() << "*** Found a local Phi definition.\n");
     return BB->getArgument(BB->getNumArguments() - 1);
   }
@@ -845,7 +844,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
 void StackAllocationPromoter::pruneAllocStackUsage() {
   LLVM_DEBUG(llvm::dbgs() << "*** Pruning : " << *ASI);
-  BlockSet Blocks(ASI->getFunction());
+  BlockSet Blocks;
 
   // Insert all of the blocks that ASI is live in.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
@@ -884,7 +883,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   LLVM_DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *ASI);
 
   // A list of blocks that will require new Phi values.
-  BlockSet PhiBlocks(ASI->getFunction());
+  BlockSet PhiBlocks;
 
   // The "piggy-bank" data-structure that we use for processing the dom-tree
   // bottom-up.

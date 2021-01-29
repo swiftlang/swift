@@ -20,7 +20,6 @@
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -1338,7 +1337,7 @@ class AvailableValueDataflowContext {
   ///
   /// We use this to determine if we should visit a block or look at a block's
   /// predecessors during dataflow for an available value.
-  BasicBlockFlag HasLocalDefinition;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> HasLocalDefinition;
 
   /// The set of blocks that have definitions which specifically "kill" the
   /// given value. If a block is in this set, there must be an instruction in
@@ -1346,7 +1345,7 @@ class AvailableValueDataflowContext {
   /// computation.
   ///
   /// NOTE: These are not considered escapes.
-  BasicBlockFlag HasLocalKill;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> HasLocalKill;
 
   /// This is a set of load takes that we are tracking. HasLocalKill is the set
   /// of parent blocks of these instructions.
@@ -1405,8 +1404,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
     AllocationInst *InputTheMemory, unsigned NumMemorySubElements,
     SmallVectorImpl<PMOMemoryUse> &InputUses)
     : TheMemory(InputTheMemory), NumMemorySubElements(NumMemorySubElements),
-      Uses(InputUses), HasLocalDefinition(InputTheMemory->getFunction()),
-      HasLocalKill(InputTheMemory->getFunction()) {
+      Uses(InputUses) {
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
   for (unsigned ui : indices(Uses)) {
@@ -1423,7 +1421,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
       if (auto *LI = dyn_cast<LoadInst>(Use.Inst)) {
         if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
           LoadTakeUses.insert(LI);
-          HasLocalKill.set(LI->getParent());
+          HasLocalKill.insert(LI->getParent());
         }
         continue;
       }
@@ -1434,7 +1432,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
       if (auto *CAI = dyn_cast<CopyAddrInst>(Use.Inst)) {
         if (CAI->isTakeOfSrc() == IsTake) {
           LoadTakeUses.insert(CAI);
-          HasLocalKill.set(CAI->getParent());
+          HasLocalKill.insert(CAI->getParent());
         }
         continue;
       }
@@ -1444,7 +1442,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
 
     // Keep track of all the uses that aren't loads.
     NonLoadUses[Use.Inst] = ui;
-    HasLocalDefinition.set(Use.Inst->getParent());
+    HasLocalDefinition.insert(Use.Inst->getParent());
 
     if (Use.Kind == PMOUseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
@@ -1456,7 +1454,7 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
   // as a use so we see it in our dataflow walks.
   NonLoadUses[TheMemory] = ~0U;
-  HasLocalDefinition.set(TheMemory->getParent());
+  HasLocalDefinition.insert(TheMemory->getParent());
 }
 
 // This function takes in the current (potentially uninitialized) available
@@ -1702,7 +1700,7 @@ void AvailableValueDataflowContext::computeAvailableValuesFrom(
   // to see if the store, escape, or load [take] is before or after the load. If
   // it is before, check to see if it produces the value we are looking for.
   bool shouldCheckBlock =
-      HasLocalDefinition.get(BB) || HasLocalKill.get(BB);
+      HasLocalDefinition.count(BB) || HasLocalKill.count(BB);
   if (shouldCheckBlock) {
     for (SILBasicBlock::iterator BBI = StartingFrom; BBI != BB->begin();) {
       SILInstruction *TheInst = &*std::prev(BBI);
@@ -1858,7 +1856,7 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
         if (auto *LI = dyn_cast<LoadInst>(NewInst)) {
           if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
             LoadTakeUses.insert(LI);
-            HasLocalKill.set(LI->getParent());
+            HasLocalKill.insert(LI->getParent());
           }
         }
         LoadUse.Inst = NewInst;

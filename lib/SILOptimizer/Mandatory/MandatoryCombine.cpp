@@ -31,7 +31,6 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
@@ -207,7 +206,7 @@ static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
 
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
   SmallVector<SILBasicBlock *, 32> blockWorklist;
-  BasicBlockSet blockAlreadyAddedToWorklist(&function);
+  SmallPtrSet<SILBasicBlock *, 32> blockAlreadyAddedToWorklist;
   SmallVector<SILInstruction *, 128> initialInstructionWorklist;
 
   {
@@ -239,7 +238,7 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
     llvm::copy_if(block->getSuccessorBlocks(),
                   std::back_inserter(blockWorklist),
                   [&](SILBasicBlock *block) -> bool {
-                    return blockAlreadyAddedToWorklist.insert(block);
+                    return blockAlreadyAddedToWorklist.insert(block).second;
                   });
   }
 

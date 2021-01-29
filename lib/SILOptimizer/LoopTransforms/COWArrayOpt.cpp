@@ -25,7 +25,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -117,9 +116,7 @@ class COWArrayOpt {
   std::pair<bool, bool> CachedSafeLoop;
 
   // Set of all blocks that may reach the loop, not including loop blocks.
-  BasicBlockSet ReachingBlocks;
-
-  bool reachingBlocksComputed = false;
+  llvm::SmallPtrSet<SILBasicBlock*,32> ReachingBlocks;
 
   /// Transient per-Array user set.
   ///
@@ -155,13 +152,13 @@ public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
       : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
-        ColdBlocks(DA), CachedSafeLoop(false, false), ReachingBlocks(Function) {}
+        ColdBlocks(DA), CachedSafeLoop(false, false) {}
 
   bool run();
 
 private:
   bool checkUniqueArrayContainer(SILValue ArrayContainer);
-  BasicBlockSet &getReachingBlocks();
+  SmallPtrSetImpl<SILBasicBlock*> &getReachingBlocks();
   bool isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
                                     bool IsUniquelyIdentifiedArray = true);
   bool checkSafeArrayAddressUses(UserList &AddressUsers);
@@ -271,19 +268,18 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
 }
 
 /// Lazily compute blocks that may reach the loop.
-BasicBlockSet &COWArrayOpt::getReachingBlocks() {
-  if (!reachingBlocksComputed) {
+SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
+  if (ReachingBlocks.empty()) {
     SmallVector<SILBasicBlock*, 8> Worklist;
     ReachingBlocks.insert(Preheader);
     Worklist.push_back(Preheader);
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
       for (auto PI = BB->pred_begin(), PE = BB->pred_end(); PI != PE; ++PI) {
-        if (ReachingBlocks.insert(*PI))
+        if (ReachingBlocks.insert(*PI).second)
           Worklist.push_back(*PI);
       }
     }
-    reachingBlocksComputed = true;
   }
   return ReachingBlocks;
 }
@@ -408,7 +404,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
       // Check of this escape can reach the current loop.
       if (!Loop->contains(UseInst->getParent()) &&
-          !getReachingBlocks().contains(UseInst->getParent())) {
+          !getReachingBlocks().count(UseInst->getParent())) {
         continue;
       }
 

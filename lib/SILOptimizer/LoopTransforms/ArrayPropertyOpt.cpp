@@ -62,7 +62,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
@@ -87,20 +86,18 @@ class ArrayPropertiesAnalysis {
   llvm::DenseMap<SILFunction *, uint32_t> InstCountCache;
   llvm::SmallSet<SILValue, 16> HoistableArray;
 
-  BasicBlockSet ReachingBlocks;
-  SmallVector<SILBasicBlock *, 16> CachedExitingBlocks;
+  SmallPtrSet<SILBasicBlock *, 16> ReachingBlocks;
+  SmallPtrSet<SILBasicBlock *, 16> CachedExitingBlocks;
 
   // This controls the max instructions the analysis can scan before giving up
   const uint32_t AnalysisThreshold = 5000;
   // This controls the max threshold for instruction count in the loop
   const uint32_t LoopInstCountThreshold = 500;
 
-  bool reachingBlocksComputed = false;
-
 public:
   ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
       : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
-        DomTree(DA->get(Fun)), ReachingBlocks(Fun) {}
+        DomTree(DA->get(Fun)) {}
 
   /// Check if it is profitable to specialize a loop when you see an apply
   /// instruction. We consider it is not profitable to specialize the loop when:
@@ -242,19 +239,18 @@ private:
     return V;
   }
 
-  BasicBlockSet &getReachingBlocks() {
-    if (!reachingBlocksComputed) {
+  SmallPtrSetImpl<SILBasicBlock *> &getReachingBlocks() {
+    if (ReachingBlocks.empty()) {
       SmallVector<SILBasicBlock *, 8> Worklist;
       ReachingBlocks.insert(Preheader);
       Worklist.push_back(Preheader);
       while (!Worklist.empty()) {
         SILBasicBlock *BB = Worklist.pop_back_val();
         for (auto PI = BB->pred_begin(), PE = BB->pred_end(); PI != PE; ++PI) {
-          if (ReachingBlocks.insert(*PI))
+          if (ReachingBlocks.insert(*PI).second)
             Worklist.push_back(*PI);
         }
       }
-      reachingBlocksComputed = true;
     }
     return ReachingBlocks;
   }
@@ -283,7 +279,7 @@ private:
 
         // Check if this escape can reach the current loop.
         if (!Loop->contains(UseInst->getParent()) &&
-            !getReachingBlocks().contains(UseInst->getParent())) {
+            !getReachingBlocks().count(UseInst->getParent())) {
           continue;
         }
         LLVM_DEBUG(llvm::dbgs()
@@ -360,10 +356,12 @@ private:
     return false;
   }
 
-  SmallVectorImpl<SILBasicBlock *> &getLoopExitingBlocks() {
+  SmallPtrSetImpl<SILBasicBlock *> &getLoopExitingBlocks() {
     if (!CachedExitingBlocks.empty())
       return CachedExitingBlocks;
-    Loop->getExitingBlocks(CachedExitingBlocks);
+    SmallVector<SILBasicBlock *, 16> ExitingBlocks;
+    Loop->getExitingBlocks(ExitingBlocks);
+    CachedExitingBlocks.insert(ExitingBlocks.begin(), ExitingBlocks.end());
     return CachedExitingBlocks;
   }
 

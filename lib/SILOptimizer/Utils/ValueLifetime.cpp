@@ -99,11 +99,11 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
 
   // Exit-blocks from the lifetime region. The value is live at the end of
   // a predecessor block but not in the frontier block itself.
-  BasicBlockSetVector<16> frontierBlocks(getFunction());
+  llvm::SmallSetVector<SILBasicBlock *, 16> frontierBlocks;
 
   // Blocks where the value is live at the end of the block and which have
   // a frontier block as successor.
-  BasicBlockSetVector<16> liveOutBlocks(getFunction());
+  llvm::SmallSetVector<SILBasicBlock *, 16> liveOutBlocks;
 
   /// The lifetime ends if we have a live block and a not-live successor.
   for (SILBasicBlock *bb : liveBlocks) {
@@ -194,7 +194,7 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
     // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
     for (SILBasicBlock *Pred : frontierBB->getPredecessorBlocks()) {
-      if (!liveOutBlocks.contains(Pred)) {
+      if (!liveOutBlocks.count(Pred)) {
         needSplit = true;
         break;
       }

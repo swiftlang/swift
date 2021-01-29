@@ -18,7 +18,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -87,9 +86,9 @@ static bool useCaptured(Operand *UI) {
 
 // Is any successor of BB in the LiveIn set?
 static bool successorHasLiveIn(SILBasicBlock *BB,
-                               BasicBlockSetVector<16> &LiveIn) {
+                               SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
   for (auto &Succ : BB->getSuccessors())
-    if (LiveIn.contains(Succ))
+    if (LiveIn.count(Succ))
       return true;
 
   return false;
@@ -97,7 +96,7 @@ static bool successorHasLiveIn(SILBasicBlock *BB,
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
-static void propagateLiveness(BasicBlockSetVector<16> &LiveIn,
+static void propagateLiveness(SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
                               SILBasicBlock *DefBB) {
 
   // First populate a worklist of predecessors.
@@ -112,7 +111,7 @@ static void propagateLiveness(BasicBlockSetVector<16> &LiveIn,
 
     // If it's already in the set, then we've already queued and/or
     // processed the predecessors.
-    if (BB == DefBB || !LiveIn.insert(BB))
+    if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
     for (auto Pred : BB->getPredecessorBlocks())
@@ -143,9 +142,8 @@ static bool addLastRelease(SILValue V, SILBasicBlock *BB,
 // loop.
 static bool getFinalReleases(SILValue Box,
                              SmallVectorImpl<SILInstruction *> &Releases) {
-  SILFunction *function = Box->getFunction();
-  BasicBlockSetVector<16> LiveIn(function);
-  BasicBlockSetVector<16> UseBlocks(function);
+  SmallPtrSet<SILBasicBlock *, 16> LiveIn;
+  SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
 
   auto *DefBB = Box->getParentBlock();
 

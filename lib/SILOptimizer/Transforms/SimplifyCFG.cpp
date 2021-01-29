@@ -21,7 +21,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
@@ -454,7 +453,7 @@ static bool tryDominatorBasedSimplifications(
     llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>>
         &ThreadedEdgeSet,
     bool TryJumpThreading,
-    BasicBlockFlag &isThreadable, BasicBlockFlag &threadableComputed) {
+    llvm::DenseMap<SILBasicBlock *, bool> &CachedThreadable) {
   auto *DominatingTerminator = DominatingBB->getTerminator();
 
   // We handle value propagation from cond_br and switch_enum terminators.
@@ -543,12 +542,15 @@ static bool tryDominatorBasedSimplifications(
         continue;
 
       // Check whether we have seen this destination block already.
-      if (!threadableComputed.testAndSet(DestBB))
-        isThreadable.set(DestBB, isThreadableBlock(DestBB, LoopHeaders));
+      auto CacheEntryIt = CachedThreadable.find(DestBB);
+      bool IsThreadable = CacheEntryIt != CachedThreadable.end()
+                              ? CacheEntryIt->second
+                              : (CachedThreadable[DestBB] =
+                                     isThreadableBlock(DestBB, LoopHeaders));
 
       // If the use is a conditional branch/switch then look for an incoming
       // edge that is dominated by DominatingSuccBB.
-      if (isThreadable.get(DestBB)) {
+      if (IsThreadable) {
         auto Preds = DestBB->getPredecessorBlocks();
 
         for (SILBasicBlock *PredBB : Preds) {
@@ -594,14 +596,13 @@ bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
   // Collect jump threadable edges and propagate outgoing edge values of
   // conditional branches/switches.
   SmallVector<ThreadInfo, 8> JumpThreadableEdges;
-  BasicBlockFlag isThreadable(&Fn);
-  BasicBlockFlag threadableComputed(&Fn);
+  llvm::DenseMap<SILBasicBlock *, bool> CachedThreadable;
   llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>> ThreadedEdgeSet;
   for (auto &BB : Fn)
     if (DT->getNode(&BB)) // Only handle reachable blocks.
       Changed |= tryDominatorBasedSimplifications(
           &BB, DT, LoopHeaders, JumpThreadableEdges, ThreadedEdgeSet,
-          EnableJumpThread, isThreadable, threadableComputed);
+          EnableJumpThread, CachedThreadable);
 
   // Nothing to jump thread?
   if (JumpThreadableEdges.empty())
@@ -930,8 +931,8 @@ void SimplifyCFG::findLoopHeaders() {
   /// block is the target of such a back edge we will identify it as a header.
   LoopHeaders.clear();
 
-  BasicBlockSet Visited(&Fn);
-  BasicBlockSet InDFSStack(&Fn);
+  SmallPtrSet<SILBasicBlock *, 16> Visited;
+  SmallPtrSet<SILBasicBlock *, 16> InDFSStack;
   SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::succ_iterator>, 16>
       DFSStack;
 
@@ -951,10 +952,10 @@ void SimplifyCFG::findLoopHeaders() {
       // Visit the next successor.
       SILBasicBlock *NextSucc = *(D.second);
       ++D.second;
-      if (Visited.insert(NextSucc)) {
+      if (Visited.insert(NextSucc).second) {
         InDFSStack.insert(NextSucc);
         DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
-      } else if (InDFSStack.contains(NextSucc)) {
+      } else if (InDFSStack.count(NextSucc)) {
         // We have already visited this node and it is in our dfs search. This
         // is a back-edge.
         LoopHeaders.insert(NextSucc);
@@ -1237,12 +1238,12 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
     return;
 
   // Disallow infinite loops through targetBB.
-  BasicBlockSet VisitedBBs(sourceBB->getParent());
+  llvm::SmallPtrSet<SILBasicBlock *, 8> VisitedBBs;
   BranchInst *nextBI = targetBranch;
   do {
     SILBasicBlock *nextBB = nextBI->getDestBB();
     // We don't care about infinite loops after SBB.
-    if (!VisitedBBs.insert(nextBB))
+    if (!VisitedBBs.insert(nextBB).second)
       break;
     // Only if the infinite loop goes through SBB directly we bail.
     if (nextBB == targetBB)
@@ -1275,7 +1276,7 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
 #ifndef NDEBUG
 /// Is the block reachable from the entry.
 static bool isReachable(SILBasicBlock *Block) {
-  BasicBlockSet Visited(Block->getParent());
+  SmallPtrSet<SILBasicBlock *, 16> Visited;
   llvm::SmallVector<SILBasicBlock *, 16> Worklist;
   SILBasicBlock *EntryBB = &*Block->getParent()->begin();
   Worklist.push_back(EntryBB);
@@ -1290,7 +1291,7 @@ static bool isReachable(SILBasicBlock *Block) {
 
     for (auto &Succ : CurBB->getSuccessors())
       // Second is true if the insertion took place.
-      if (Visited.insert(Succ))
+      if (Visited.insert(Succ).second)
         Worklist.push_back(Succ);
   }
 
@@ -2011,7 +2012,7 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
   // allow for side-entrances to the region from blocks not reachable from
   // noneSuccessorBB. See function level comment above.
   SILBasicBlock *iter = noneSuccessorBB;
-  BasicBlockSet visitedBlocks(someBB->getParent());
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   visitedBlocks.insert(iter);
 
   do {
@@ -2039,7 +2040,7 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
     // we can never have visited someSuccessorBB on any previous iteration
     // meaning that the only time we can have succBlock equal to someSuccessorBB
     // is on the last iteration before we exit the loop.
-    if (!visitedBlocks.insert(succBlock))
+    if (!visitedBlocks.insert(succBlock).second)
       return false;
 
     // Otherwise, set iter to succBlock.
@@ -3656,7 +3657,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
     return false;
   
   // Collect all case infos from the merge block's predecessors.
-  BasicBlockSet FoundCmpBlocks(MergeBlock->getParent());
+  SmallPtrSet<SILBasicBlock *, 8> FoundCmpBlocks;
   SmallVector<CaseInfo, 8> CaseInfos;
   SILValue Input;
   for (auto *Pred : MergeBlock->getPredecessorBlocks()) {
@@ -3680,7 +3681,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
   for (auto &CaseInfo : CaseInfos) {
     if (CaseInfo.Literal) {
       auto *BrInst = cast<CondBranchInst>(CaseInfo.CmpOrDefault->getTerminator());
-      if (!FoundCmpBlocks.contains(BrInst->getFalseBB()))
+      if (FoundCmpBlocks.count(BrInst->getFalseBB()) != 1)
         return false;
       // Ignore duplicate cases
       if (CaseLiteralsToResultMap.find(CaseInfo.Literal) ==
@@ -3700,7 +3701,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
         }
       }
       SILBasicBlock *Pred = CaseInfo.CmpOrDefault->getSinglePredecessorBlock();
-      if (!Pred || !FoundCmpBlocks.contains(Pred)) {
+      if (!Pred || FoundCmpBlocks.count(Pred) == 0) {
         // There may be only a single block whose predecessor we didn't see. And
         // this is the entry block to the CFG pattern.
         if (dominatingBlock)

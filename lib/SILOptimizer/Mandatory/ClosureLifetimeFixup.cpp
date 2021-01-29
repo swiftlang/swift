@@ -18,7 +18,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -104,7 +103,7 @@ static SILInstruction *getDeinitSafeClosureDestructionPoint(SILBasicBlock *bb) {
 static void findReachableExitBlocks(SILInstruction *i,
                                     SmallVectorImpl<SILBasicBlock *> &result) {
   SmallVector<SILBasicBlock *, 32> worklist;
-  BasicBlockSet visitedBlocks(i->getFunction());
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
 
   visitedBlocks.insert(i->getParent());
   worklist.push_back(i->getParent());
@@ -117,7 +116,7 @@ static void findReachableExitBlocks(SILInstruction *i,
     }
     llvm::copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
                   [&](SILBasicBlock *bb) {
-      return visitedBlocks.insert(bb);
+      return visitedBlocks.insert(bb).second;
     });
   }
 }

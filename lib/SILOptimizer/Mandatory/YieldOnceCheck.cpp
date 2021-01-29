@@ -26,8 +26,6 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/TerminatorUtils.h"
-#include "swift/SIL/SILBitfield.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -51,31 +49,25 @@ class YieldOnceCheck : public SILFunctionTransform {
     /// (BeforeYield) or after seeing a yield (AfterYield), or in both states
     /// (Conflict). This enum is a semi-lattice where Conflict is the top and
     /// the merge of BeforeYield and AfterYield states is Conflict.
-    enum YieldState { BeforeYield, AfterYield, Conflict } yieldState = Conflict;
+    enum YieldState { BeforeYield, AfterYield, Conflict } yieldState;
 
   private:
-    friend class BasicBlockData<BBState>;
-  
     // The following states are maintained for emitting diagnostics.
 
     /// For AfterYield and Conflict states, this field records the yield
     /// instruction that was seen while propagating the state.
-    SILInstruction *yieldInst = nullptr;
+    SILInstruction *yieldInst;
 
     /// For Conflict state, these fields record the basic blocks that
     /// propagated the 'AfterYield' and 'BeforeYield' states which resulted
     /// in the Conflict.
-    SILBasicBlock *yieldingPred = nullptr;
-    SILBasicBlock *nonYieldingPred = nullptr;
-    
-    bool visited = false;
-
-    BBState() {}
+    SILBasicBlock *yieldingPred;
+    SILBasicBlock *nonYieldingPred;
 
     BBState(YieldState yState, SILInstruction *yieldI, SILBasicBlock *yieldPred,
             SILBasicBlock *noYieldPred)
         : yieldState(yState), yieldInst(yieldI), yieldingPred(yieldPred),
-          nonYieldingPred(noYieldPred), visited(true) {}
+          nonYieldingPred(noYieldPred) {}
 
   public:
     static BBState getInitialState() {
@@ -108,8 +100,6 @@ class YieldOnceCheck : public SILFunctionTransform {
       assert(yieldState == Conflict);
       return nonYieldingPred;
     }
-    
-    bool isVisited() const { return visited; }
   };
 
   /// A structure that records an error found during the analysis along with
@@ -202,7 +192,7 @@ class YieldOnceCheck : public SILFunctionTransform {
   /// \return the new state obtained by merging the oldState with the newState
   static BBState merge(SILBasicBlock *mergeBlock, BBState oldState,
                        BBState newState, SILBasicBlock *newStatePred,
-                       BasicBlockData<BBState> &bbToStateMap) {
+                       llvm::DenseMap<SILBasicBlock *, BBState> &bbToStateMap) {
     auto oldYieldState = oldState.yieldState;
     auto newYieldState = newState.yieldState;
 
@@ -230,7 +220,7 @@ class YieldOnceCheck : public SILFunctionTransform {
     // propagated the 'oldState'.
     SILBasicBlock *oldStatePred = nullptr;
     for (auto predBB : mergeBlock->getPredecessorBlocks()) {
-      if (predBB != newStatePred && bbToStateMap[predBB].isVisited()) {
+      if (predBB != newStatePred && bbToStateMap.count(predBB)) {
         oldStatePred = predBB;
         break;
       }
@@ -253,12 +243,12 @@ class YieldOnceCheck : public SILFunctionTransform {
   /// Diagnostics are not reported for nodes unreachable from the entry of
   /// the control-flow graph.
   void diagnoseYieldOnceUsage(SILFunction &fun) {
-    BasicBlockData<BBState> bbToStateMap(&fun);
+    llvm::DenseMap<SILBasicBlock *, BBState> bbToStateMap;
 
     SmallVector<SILBasicBlock *, 16> worklist;
 
     auto *entryBB = fun.getEntryBlock();
-    bbToStateMap[entryBB] = BBState::getInitialState();
+    bbToStateMap.try_emplace(entryBB, BBState::getInitialState());
     worklist.push_back(entryBB);
 
     // ReturnBeforeYield errors, which denote that no paths yield before
@@ -277,8 +267,7 @@ class YieldOnceCheck : public SILFunctionTransform {
     // errors along shorter paths to return.
     while (!worklist.empty()) {
       SILBasicBlock *bb = worklist.pop_back_val();
-      const BBState &state = bbToStateMap[bb];
-      assert(state.isVisited());
+      const BBState &state = bbToStateMap.find(bb)->getSecond();
 
       Optional<YieldError> errorResult = None;
       auto resultState = transferStateThroughBasicBlock(bb, state, errorResult);
@@ -302,11 +291,12 @@ class YieldOnceCheck : public SILFunctionTransform {
       auto nextState = resultState.getValue();
 
       for (auto *succBB : bb->getSuccessorBlocks()) {
-        BBState &succState = bbToStateMap[succBB];
-        if (!succState.isVisited()) {
-          // We are seeing the successor for the first time.
-          // Add the successor to the worklist.
-          succState = nextState;
+        // Optimistically try to set the state of the successor as next state.
+        auto insertResult = bbToStateMap.try_emplace(succBB, nextState);
+
+        // If the insertion was successful, it means we are seeing the successor
+        // for the first time. Add the successor to the worklist.
+        if (insertResult.second) {
           worklist.insert(worklist.begin(), succBB);
           continue;
         }
@@ -314,9 +304,10 @@ class YieldOnceCheck : public SILFunctionTransform {
         // Here the successor already has a state. Merge the current and
         // previous states and propagate it if it is different from the
         // old state.
-        auto mergedState = merge(succBB, succState, nextState, bb, bbToStateMap);
+        const auto &oldState = insertResult.first->second;
+        auto mergedState = merge(succBB, oldState, nextState, bb, bbToStateMap);
 
-        if (mergedState.yieldState == succState.yieldState)
+        if (mergedState.yieldState == oldState.yieldState)
           continue;
 
         // Even though at this point there has to be an error since there is an
@@ -324,7 +315,7 @@ class YieldOnceCheck : public SILFunctionTransform {
         // continue propagation of this conflict state to determine
         // whether this results in multiple-yields error or return-on-conflict
         // error.
-        succState = mergedState;
+        insertResult.first->second = mergedState;
         worklist.insert(worklist.begin(), succBB);
       }
     }
@@ -335,7 +326,7 @@ class YieldOnceCheck : public SILFunctionTransform {
   }
 
   void emitDiagnostics(YieldError &error, SILFunction &fun,
-                       BasicBlockData<BBState> &visitedBBs) {
+                       llvm::DenseMap<SILBasicBlock *, BBState> &visitedBBs) {
     ASTContext &astCtx = fun.getModule().getASTContext();
 
     switch (error.errorKind) {
@@ -401,10 +392,10 @@ class YieldOnceCheck : public SILFunctionTransform {
 
       // Find all transitive predecessors of 'yieldPred' that were visited
       // during the analysis
-      BasicBlockSet predecessorsOfYieldPred(&fun);
+      SmallPtrSet<SILBasicBlock *, 8> predecessorsOfYieldPred;
       for (auto *predBB :
            llvm::breadth_first<llvm::Inverse<SILBasicBlock *>>(yieldPred)) {
-        if (visitedBBs[predBB].isVisited()) {
+        if (visitedBBs.count(predBB)) {
           predecessorsOfYieldPred.insert(predBB);
         }
       }
@@ -412,13 +403,13 @@ class YieldOnceCheck : public SILFunctionTransform {
       // Find the first predecessor of 'noYieldPred' that is also a predecessor
       // of 'yieldPred', in the breadth-first search order of the reversed CFG.
       SILBasicBlock *lowestCommonAncestorBB = nullptr;
-      BasicBlockSet predecessorsOfNoYieldPred(&fun);
+      SmallPtrSet<SILBasicBlock *, 8> predecessorsOfNoYieldPred;
       for (auto *pred :
            llvm::breadth_first<llvm::Inverse<SILBasicBlock *>>(noYieldPred)) {
-        if (!visitedBBs[pred].isVisited()) {
+        if (!visitedBBs.count(pred)) {
           continue;
         }
-        if (predecessorsOfYieldPred.contains(pred)) {
+        if (predecessorsOfYieldPred.count(pred)) {
           lowestCommonAncestorBB = pred;
           break;
         }
@@ -432,7 +423,7 @@ class YieldOnceCheck : public SILFunctionTransform {
       // doesn't yield.
       SILBasicBlock *noYieldTarget = nullptr;
       for (auto *succ : lowestCommonAncestorBB->getSuccessorBlocks()) {
-        if (predecessorsOfNoYieldPred.contains(succ)) {
+        if (predecessorsOfNoYieldPred.count(succ)) {
           noYieldTarget = succ;
           break;
         }

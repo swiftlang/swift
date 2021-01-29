@@ -20,7 +20,6 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
@@ -434,7 +433,7 @@ public:
 /// destroy or deallocation of \p alloc.
 static bool somethingIsRetained(SILInstruction *from, AllocStackInst *alloc) {
   llvm::SmallVector<SILInstruction *, 8> workList;
-  BasicBlockSet handled(from->getFunction());
+  llvm::SmallPtrSet<SILBasicBlock *, 8> handled;
   workList.push_back(from);
   while (!workList.empty()) {
     SILInstruction *start = workList.pop_back_val();
@@ -451,7 +450,7 @@ static bool somethingIsRetained(SILInstruction *from, AllocStackInst *alloc) {
       }
       if (isa<TermInst>(inst)) {
         for (SILBasicBlock *succ : start->getParent()->getSuccessors()) {
-          if (handled.insert(succ))
+          if (handled.insert(succ).second)
             workList.push_back(&*succ->begin());
         }
       }
@@ -1494,7 +1493,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     assert(InitEnumBB && "DataAddrInst is not in a valid Basic Block");
     llvm::SmallVector<SILInstruction *, 64> Worklist;
     Worklist.push_back(IEAI);
-    BasicBlockSet Preds(InitEnumBB->getParent());
+    llvm::SmallPtrSet<SILBasicBlock *, 16> Preds;
     Preds.insert(IEAI->getParent());
     while (!Worklist.empty()) {
       SILInstruction *CurrIns = Worklist.pop_back_val();
@@ -1525,7 +1524,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       for (SILBasicBlock *Pred : CurrBB->getPredecessorBlocks()) {
         // If it's already in the set, then we've already queued and/or
         // processed the predecessors.
-        if (Preds.insert(Pred)) {
+        if (Preds.insert(Pred).second) {
           Worklist.push_back(&*Pred->rbegin());
         }
       }

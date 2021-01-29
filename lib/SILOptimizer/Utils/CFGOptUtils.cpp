@@ -18,7 +18,6 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -143,7 +142,7 @@ void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
   //
   // NOTE: This needs to be a SmallSetVector since we need both uniqueness /and/
   // insertion order. Otherwise non-determinism can result.
-  BasicBlockSetVector<8> predBlocks(block->getParent());
+  SmallSetVector<SILBasicBlock *, 8> predBlocks;
 
   for (auto *pred : block->getPredecessorBlocks())
     predBlocks.insert(pred);

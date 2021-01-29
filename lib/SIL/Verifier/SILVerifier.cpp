@@ -33,7 +33,6 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -5111,7 +5110,7 @@ public:
   }
 
   bool isUnreachableAlongAllPathsStartingAt(
-      SILBasicBlock *StartBlock, BasicBlockSet &Visited) {
+      SILBasicBlock *StartBlock, SmallPtrSetImpl<SILBasicBlock *> &Visited) {
     if (isa<UnreachableInst>(StartBlock->getTerminator()))
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))
@@ -5121,7 +5120,7 @@ public:
 
     // Recursively check all successors.
     for (auto *SuccBB : StartBlock->getSuccessorBlocks())
-      if (!Visited.insert(SuccBB))
+      if (!Visited.insert(SuccBB).second)
         if (!isUnreachableAlongAllPathsStartingAt(SuccBB, Visited))
           return false;
 
@@ -5305,7 +5304,7 @@ public:
             // this successor bb.  (FIXME: Why? Infinite loops should still
             // preserve consistency...)
             auto isUnreachable = [&] {
-              BasicBlockSet visited(F);
+              SmallPtrSet<SILBasicBlock *, 16> visited;
               return isUnreachableAlongAllPathsStartingAt(succBB, visited);
             };
             
@@ -5472,7 +5471,7 @@ public:
     // This ensures that any open_existential instructions, which
     // open archetypes, are seen before the uses of these archetypes.
     llvm::ReversePostOrderTraversal<SILFunction *> RPOT(F);
-    BasicBlockSet VisitedBBs(F);
+    llvm::DenseSet<SILBasicBlock *> VisitedBBs;
     for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
       auto *BB = *Iter;
       VisitedBBs.insert(BB);
@@ -5482,7 +5481,7 @@ public:
     // Visit all basic blocks that were not visited during the RPOT traversal,
     // e.g. unreachable basic blocks.
     for (auto &BB : *F) {
-      if (VisitedBBs.contains(&BB))
+      if (VisitedBBs.count(&BB))
         continue;
       visitSILBasicBlock(&BB);
     }

@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-simplify-cfg"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -97,9 +96,9 @@ class CheckedCastBrJumpThreading {
   llvm::SpecificBumpPtrAllocator<Edit> EditAllocator;
 
   // Keeps track of what blocks we change the terminator instruction.
-  BasicBlockSet BlocksToEdit;
+  llvm::SmallPtrSet<SILBasicBlock *, 16> BlocksToEdit;
   // Keeps track of what blocks we clone.
-  BasicBlockSet BlocksToClone;
+  llvm::SmallPtrSet<SILBasicBlock *, 16> BlocksToClone;
 
   bool areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI);
   bool areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
@@ -121,8 +120,7 @@ class CheckedCastBrJumpThreading {
 public:
   CheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
                              SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist)
-      : Fn(Fn), DT(DT), BlocksForWorklist(BlocksForWorklist),
-        BlocksToEdit(Fn), BlocksToClone(Fn) { }
+      : Fn(Fn), DT(DT), BlocksForWorklist(BlocksForWorklist) { }
 
   void optimizeFunction();
 };
@@ -316,7 +314,7 @@ bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
   bool SuccessDominates = DomCCBI->getSuccessBB() == BB;
   bool FailureDominates = DomCCBI->getFailureBB() == BB;
 
-  if (BlocksToEdit.contains(ArgBB))
+  if (BlocksToEdit.count(ArgBB) != 0)
     return false;
 
   classifyPredecessor(ArgBB, SuccessDominates, FailureDominates);
@@ -390,7 +388,7 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
     for (auto *PredBB : ArgBB->getPredecessorBlocks()) {
 
       // We must avoid that we are going to change a block twice.
-      if (BlocksToEdit.contains(PredBB))
+      if (BlocksToEdit.count(PredBB) != 0)
         return false;
 
       auto IncomingValue = IncomingValues[idx];
@@ -458,7 +456,7 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
         return false;
 
       // We must avoid that we are going to change a block twice.
-      if (BlocksToEdit.contains(PredBB))
+      if (BlocksToEdit.count(PredBB) != 0)
         return false;
 
       // Don't allow critical edges from PredBB to BB. This ensures that
@@ -489,7 +487,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
   // Init information about the checked_cast_br we try to
   // jump-thread.
   BB = CCBI->getParent();
-  if (BlocksToEdit.contains(BB))
+  if (BlocksToEdit.count(BB) != 0)
     return false;
 
   Condition = stripClassCasts(CCBI->getOperand());
@@ -546,7 +544,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
     // We need the block argument of the DomSuccessBB. If we are going to
     // clone it for a previous checked_cast_br the argument will not dominate
     // the blocks which it's used to dominate anymore.
-    if (BlocksToClone.contains(DomCCBI->getSuccessBB()))
+    if (BlocksToClone.count(DomCCBI->getSuccessBB()) != 0)
       continue;
 
     // Init state variables for paths analysis
