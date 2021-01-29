@@ -206,6 +206,11 @@ struct LiteralRequirement {
                                     bool canBeNil,
                                     DeclContext *useDC) const;
 
+  void resetCoverage() {
+    assert(isCovered() && "literal requirement is uncovered");
+    CoveredBy = nullptr;
+  }
+
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }

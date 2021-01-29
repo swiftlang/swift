@@ -1298,6 +1298,11 @@ void PotentialBindings::retract(Constraint *constraint) {
       AdjacentVars.erase(std::make_pair(adjacentVar, constraint));
   }
 
+  for (auto &literal : Literals) {
+    if (literal.second.CoveredBy == constraint)
+      literal.second.resetCoverage();
+  }
+
   DelayedBy.erase(llvm::remove_if(DelayedBy, isMatchingConstraint),
                   DelayedBy.end());
 
