@@ -32,7 +32,10 @@ Notes:
   ObjC: true
 - Name: 'Hoozit.propComputed'
   ObjC: true
-  # FIXME: Add a way to specify getter and setter names in an access note
+- Name: 'getter:Hoozit.propComputed()'
+  ObjCName: 'initPropComputedGetter'
+- Name: 'setter:Hoozit.propComputed(_:)'
+  ObjCName: 'initPropComputedSetter:'
 - Name: 'Hoozit.roProperty'
   ObjC: true
 - Name: 'Hoozit.rwProperty'

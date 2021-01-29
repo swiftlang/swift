@@ -352,9 +352,12 @@ class Hoozit : Gizmo {
   // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this property}}
   // expected-note@+1 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
   var propComputed: Gizmo {
-    // FIXME: Add a way to specify these names in an access note.
-    @objc(initPropComputedGetter) get { return self }
-    @objc(initPropComputedSetter:) set {}
+    // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this getter}}
+    // expected-note@+1 {{add attribute explicitly to silence this warning}} {{5-5=@objc(initPropComputedGetter) }}
+    get { return self }
+    // expected-warning@+2 {{access note for fancy test suite adds attribute 'objc' to this setter}}
+    // expected-note@+1 {{add attribute explicitly to silence this warning}} {{5-5=@objc(initPropComputedSetter:) }}
+    set {}
   }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6HoozitC12propComputedSo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {

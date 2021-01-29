@@ -62,7 +62,8 @@ parseObjCSelector(swift::ASTContext &ctx, llvm::StringRef string) {
 
 namespace swift {
 
-AccessNoteDeclName::AccessNoteDeclName() : parentNames(), name() { }
+AccessNoteDeclName::AccessNoteDeclName()
+  : parentNames(), name(), accessorKind(None) { }
 
 AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   auto parsedName = parseDeclName(str);
@@ -72,6 +73,13 @@ AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
     std::tie(first, rest) = rest.split('.');
     parentNames.push_back(ctx.getIdentifier(first));
   }
+
+  if (parsedName.IsGetter)
+    accessorKind = AccessorKind::Get;
+  else if (parsedName.IsSetter)
+    accessorKind = AccessorKind::Set;
+  else
+    accessorKind = None;
 
   name = parsedName.formDeclName(ctx);
 
@@ -84,10 +92,20 @@ AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
 }
 
 bool AccessNoteDeclName::matches(ValueDecl *VD) const {
+  // These are normally just `VD` and `name`, but not for accessors.
   auto lookupVD = VD;
-  if (auto accessor = dyn_cast<AccessorDecl>(VD))
-    VD = accessor->getStorage();
 
+  // First, we check if the accessor-ness of `VD` matches the accessor-ness of
+  // the name, and update `lookupVD` if necessary.
+  if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+    if (!accessorKind || *accessorKind != accessor->getAccessorKind())
+      return false;
+    lookupVD = accessor->getStorage();
+  }
+  else if (accessorKind.hasValue())
+    return false;
+
+  // Check that `name` matches `lookupVD`.
   if (!lookupVD->getName().matchesRef(name))
     return false;
 
@@ -125,6 +143,9 @@ bool AccessNoteDeclName::empty() const {
 }
 
 void AccessNoteDeclName::print(llvm::raw_ostream &os) const {
+  if (accessorKind)
+    os << getAccessorLabel(*accessorKind) << "ter:";
+
   for (auto parentName : parentNames)
     os << parentName << '.';
   name.print(os, /*skipEmptyArgumentNames=*/false);
@@ -259,7 +280,7 @@ StringRef MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
     if (!note.ObjC)
       note.ObjC = true;
     else if (!*note.ObjC)
-    return "cannot have an 'ObjCName' if 'ObjC' is false";
+      return "cannot have an 'ObjCName' if 'ObjC' is false";
   }
 
   return "";

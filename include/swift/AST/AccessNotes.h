@@ -19,6 +19,7 @@
 #define ACCESSNOTES_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -33,6 +34,7 @@ class AccessNoteDeclName {
 public:
   std::vector<Identifier> parentNames;
   DeclName name;
+  Optional<AccessorKind> accessorKind;
 
   AccessNoteDeclName(ASTContext &ctx, StringRef str);
   AccessNoteDeclName();
