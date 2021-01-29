@@ -11,6 +11,8 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// REQUIRES: OS=macosx
+
 import StdlibUnittest
 import resilient_protocol
 
