@@ -1446,6 +1446,16 @@ void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   diagnoseDuplicateDecls(captureListVars);
 }
 
+template<typename ...DiagIDAndArgs> InFlightDiagnostic
+diagnoseForAccessNote(DeclAttribute *attr, ValueDecl *VD,
+                      DiagIDAndArgs... idAndArgs) {
+  ASTContext &ctx = VD->getASTContext();
+  if (attr->getLocation().isValid())
+    return ctx.Diags.diagnose(attr->getLocation(), idAndArgs...);
+  else
+    return ctx.Diags.diagnose(VD, idAndArgs...);
+}
+
 template <typename Attr>
 static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
                             Optional<bool> expected,
@@ -1459,20 +1469,10 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
       [&](Diag<StringRef, bool, StringRef, DescriptiveDeclKind> diagID,
           Diag<bool> fixitID) -> InFlightDiagnostic {
     bool isModifier = attr->isDeclModifier();
-    Diagnostic warning(diagID, notes.reason, isModifier, attr->getAttrName(),
-                       VD->getDescriptiveKind());
-    Diagnostic note(fixitID, isModifier);
 
-    ASTContext &ctx = VD->getASTContext();
-
-    if (attr->getLocation().isValid()) {
-      ctx.Diags.diagnose(attr->getLocation(), warning);
-      return ctx.Diags.diagnose(attr->getLocation(), note);
-    }
-    else {
-      ctx.Diags.diagnose(VD, warning);
-      return ctx.Diags.diagnose(VD->getAttributeInsertionLoc(isModifier), note);
-    }
+    diagnoseForAccessNote(attr, VD, diagID, notes.reason, isModifier,
+                          attr->getAttrName(), VD->getDescriptiveKind());
+    return diagnoseForAccessNote(attr, VD, fixitID, isModifier);
   };
 
   if (*expected) {
@@ -1513,10 +1513,10 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 
     if (!attr->hasName()) {
       attr->setName(*note.ObjCName, true);
-      ctx.Diags.diagnose(attr->getLocation(),
-                         diag::attr_objc_name_changed_by_access_note,
-                         notes.reason, VD->getDescriptiveKind(),
-                         *note.ObjCName);
+      diagnoseForAccessNote(attr, VD,
+                            diag::attr_objc_name_changed_by_access_note,
+                            notes.reason, VD->getDescriptiveKind(),
+                            *note.ObjCName);
 
       SmallString<64> newNameString;
       llvm::raw_svector_ostream os(newNameString);
@@ -1524,9 +1524,8 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
       os << *note.ObjCName;
       os << ")";
 
-      auto note =
-          ctx.Diags.diagnose(attr->getLocation(),
-                             diag::fixit_attr_objc_name_changed_by_access_note);
+      auto note = diagnoseForAccessNote(attr, VD,
+                            diag::fixit_attr_objc_name_changed_by_access_note);
 
       if (attr->getLParenLoc().isValid())
         note.fixItReplace({ attr->getLParenLoc(), attr->getRParenLoc() },
@@ -1537,6 +1536,7 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
     else if (attr->getName() != *note.ObjCName) {
       // TODO: diagnose conflict between explicit name in code and explicit
       // name in access note
+      llvm::report_fatal_error("conflict between name in code and name in access note");
     }
   }
 }
