@@ -1,6 +1,6 @@
 option(SWIFT_ENABLE_IOS32
        "Build 32-bit variants of iOS"
-       FALSE)
+       TRUE)
 
 if(SWIFT_ENABLE_IOS32)
 set(SUPPORTED_IOS_ARCHS "armv7;armv7s;arm64;arm64e")
