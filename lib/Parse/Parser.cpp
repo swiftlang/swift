@@ -74,7 +74,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   }
 
   Token Tok;
-  ParsedTrivia LeadingTrivia, TrailingTrivia;
+  StringRef LeadingTrivia, TrailingTrivia;
   do {
     L.lex(Tok, LeadingTrivia, TrailingTrivia);
 
@@ -99,7 +99,9 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
         DestFunc(StrTok, ParsedTrivia(), ParsedTrivia());
       }
     } else {
-      DestFunc(Tok, LeadingTrivia, TrailingTrivia);
+      auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+      auto TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
+      DestFunc(Tok, LeadingTriviaPieces, TrailingTriviaPieces);
     }
 
   } while (Tok.getKind() != tok::eof);
@@ -604,7 +606,9 @@ void Parser::consumeExtraToken(Token Extra) {
 
 SourceLoc Parser::consumeToken() {
   TokReceiver->receive(Tok);
-  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+  auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+  auto TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
+  SyntaxContext->addToken(Tok, LeadingTriviaPieces, TrailingTriviaPieces);
   return consumeTokenWithoutFeedingReceiver();
 }
 
@@ -640,7 +644,8 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
   ParsedTrivia EmptyTrivia;
-  SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
+  auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+  SyntaxContext->addToken(SplitTokens.back(), LeadingTriviaPieces, EmptyTrivia);
   TokReceiver->receive(SplitTokens.back());
 }
 
@@ -839,7 +844,7 @@ bool Parser::loadCurrentSyntaxNodeFromCache() {
   }
   unsigned LexerOffset =
       SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
-  unsigned LeadingTriviaLen = LeadingTrivia.getLength();
+  unsigned LeadingTriviaLen = LeadingTrivia.size();
   unsigned LeadingTriviaOffset = LexerOffset - LeadingTriviaLen;
   SourceLoc LeadingTriviaLoc = Tok.getLoc().getAdvancedLoc(-LeadingTriviaLen);
   if (auto TextLength = SyntaxContext->lookupNode(LeadingTriviaOffset,

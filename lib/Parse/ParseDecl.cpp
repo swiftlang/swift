@@ -210,7 +210,9 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
   }
 
   // Finalize the syntax context.
-  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+  auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
+  auto TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
+  SyntaxContext->addToken(Tok, LeadingTriviaPieces, TrailingTriviaPieces);
 }
 
 bool Parser::parseTopLevelSIL() {

@@ -1865,7 +1865,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         Tok.setKind(tok::string_interpolation_anchor);
         // We don't allow trailing trivia for this anchor, because the
         // trivia is a part of the next string segment.
-        TrailingTrivia.clear();
+        TrailingTrivia = StringRef();
         consumeToken();
       }
       break;
@@ -1910,17 +1910,19 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   Token OpenQuote(QuoteKind, OpenQuoteStr);
   Token CloseQuote(QuoteKind, CloseQuoteStr);
   ParsedTrivia EmptyTrivia;
-  ParsedTrivia EntireTrailingTrivia = TrailingTrivia;
+  StringRef EntireTrailingTrivia = TrailingTrivia;
 
   if (HasCustomDelimiter) {
+    auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
     Token OpenDelimiter(tok::raw_string_delimiter, OpenDelimiterStr);
     // When a custom delimiter is present, it owns the leading trivia.
-    SyntaxContext->addToken(OpenDelimiter, LeadingTrivia, EmptyTrivia);
+    SyntaxContext->addToken(OpenDelimiter, LeadingTriviaPieces, EmptyTrivia);
 
     SyntaxContext->addToken(OpenQuote, EmptyTrivia, EmptyTrivia);
   } else {
+    auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
     // Without custom delimiter the quote owns trailing trivia.
-    SyntaxContext->addToken(OpenQuote, LeadingTrivia, EmptyTrivia);
+    SyntaxContext->addToken(OpenQuote, LeadingTriviaPieces, EmptyTrivia);
   }
 
   // The simple case: just a single literal segment.
@@ -1949,10 +1951,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
       Token CloseDelimiter(tok::raw_string_delimiter, CloseDelimiterStr);
       // When a custom delimiter is present it owns the trailing trivia.
-      SyntaxContext->addToken(CloseDelimiter, EmptyTrivia, EntireTrailingTrivia);
+      auto EntireTrailingTriviaPieces =
+          TriviaLexer::lexTrivia(EntireTrailingTrivia);
+      SyntaxContext->addToken(CloseDelimiter, EmptyTrivia,
+                              EntireTrailingTriviaPieces);
     } else {
       // Without custom delimiter the quote owns trailing trivia.
-      SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+      auto EntireTrailingTriviaPieces =
+          TriviaLexer::lexTrivia(EntireTrailingTrivia);
+      SyntaxContext->addToken(CloseQuote, EmptyTrivia,
+                              EntireTrailingTriviaPieces);
     }
 
     return makeParserResult(
@@ -1965,8 +1973,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // We are going to mess with Tok to do reparsing for interpolated literals,
   // don't lose our 'next' token.
   llvm::SaveAndRestore<Token> SavedTok(Tok);
-  llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
-  llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
+  llvm::SaveAndRestore<StringRef> SavedLeadingTrivia(LeadingTrivia);
+  llvm::SaveAndRestore<StringRef> SavedTrailingTrivia(TrailingTrivia);
   // For errors, we need the real PreviousLoc, i.e. the start of the
   // whole InterpolatedStringLiteral.
   llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
@@ -2015,10 +2023,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     Token CloseDelimiter(tok::raw_string_delimiter, CloseDelimiterStr);
     // When a custom delimiter is present it owns the trailing trivia.
-    SyntaxContext->addToken(CloseDelimiter, EmptyTrivia, EntireTrailingTrivia);
+    auto EntireTrailingTriviaPieces =
+        TriviaLexer::lexTrivia(EntireTrailingTrivia);
+    SyntaxContext->addToken(CloseDelimiter, EmptyTrivia,
+                            EntireTrailingTriviaPieces);
   } else {
     // Without custom delimiter the quote owns trailing trivia.
-    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+    auto EntireTrailingTriviaPieces =
+        TriviaLexer::lexTrivia(EntireTrailingTrivia);
+    SyntaxContext->addToken(CloseQuote, EmptyTrivia,
+                            EntireTrailingTriviaPieces);
   }
 
   if (AppendingExpr->getBody()->getNumElements() == 1) {

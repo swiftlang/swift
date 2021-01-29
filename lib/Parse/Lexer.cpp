@@ -283,12 +283,13 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   }
   unsigned CommentLength = 0;
   if (RetainComments == CommentRetentionMode::AttachToNextToken) {
+    auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
     // 'CommentLength' here is the length from the *first* comment to the
     // token text (or its backtick if exist).
-    auto Iter = llvm::find_if(LeadingTrivia, [](const ParsedTriviaPiece &Piece) {
+    auto Iter = llvm::find_if(LeadingTriviaPieces, [](const ParsedTriviaPiece &Piece) {
       return isCommentTriviaKind(Piece.getKind());
     });
-    for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
+    for (auto End = LeadingTriviaPieces.end(); Iter != End; Iter++) {
       CommentLength += Iter->getLength();
     }
   }
@@ -296,8 +297,9 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
   if (TriviaRetention == TriviaRetentionMode::WithTrivia && Kind != tok::eof) {
-    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-    lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
+    TrailingTrivia = lexTrivia(/*IsForTrailingTrivia=*/true);
+  } else {
+    TrailingTrivia = StringRef();
   }
 
   NextToken.setToken(Kind, TokenText, CommentLength);
@@ -2336,15 +2338,11 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
-  LeadingTrivia.clear();
-  TrailingTrivia.clear();
-
+  const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
-      // Add UTF-8 BOM to LeadingTrivia.
-      LeadingTrivia.push_back(TriviaKind::GarbageText, BOMLen);
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
@@ -2352,8 +2350,11 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  lexTrivia(LeadingTrivia, /* IsForTrailingTrivia */ false);
-
+  // Advance CurPtr to the end of the first trivia in the source file and form
+  // the leading trivia including the BOM
+  lexTrivia(/*IsForTrailingTrivia=*/false);
+  LeadingTrivia = StringRef(LeadingTriviaStart, CurPtr - LeadingTriviaStart);
+  
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
@@ -2528,13 +2529,6 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
           HashbangMode::Allowed, CRM);
   L.restoreState(State(Loc));
   return L.peekNextToken();
-}
-
-void Lexer::lexTrivia(ParsedTrivia &Pieces, bool IsForTrailingTrivia) {
-  auto TriviaString = lexTrivia(IsForTrailingTrivia);
-  auto ParsedPieces = TriviaLexer::lexTrivia(TriviaString);
-  Pieces.Pieces.insert(Pieces.Pieces.end(), ParsedPieces.Pieces.begin(),
-                       ParsedPieces.Pieces.end());
 }
 
 StringRef Lexer::lexTrivia(bool IsForTrailingTrivia) {
