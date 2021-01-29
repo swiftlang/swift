@@ -119,6 +119,8 @@ protected:
   };
 
 private:
+  friend class SILInstruction;
+
   /// Each kind corresponds to a union member in `Storage`.
   enum StorageKind : uint8_t {
     /// For usages see the struct `FilenameAndLocation`.
@@ -164,6 +166,7 @@ private:
   /// Contains the LocationKind, StorageKind and some extra flags.
   /// This fits nicely in a single byte. If for some reason we need more flags
   /// it's possible to extend this to e.g. a uint16_t.
+  /// But SILNode::Bits.LocationKindAndFlags must be updated accordingly.
   union KindAndFlags {
     KindAndFlags() : packedKindAndFlags(0) {}
     KindAndFlags(LocationKind kind, StorageKind storageKind)
@@ -265,6 +268,10 @@ protected:
 
   SILLocation(SourceLoc L, LocationKind K)
       : storage(L), kindAndFlags(K, SourceLocKind) {}
+
+  // Used by SILInstruction.
+  SILLocation(Storage storage, uint8_t packedKindAndFlags) :
+    storage(storage), kindAndFlags(packedKindAndFlags) {}
 
 public:
   // When an ASTNode gets implicitly converted into a SILLocation we
