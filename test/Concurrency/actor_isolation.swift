@@ -140,16 +140,16 @@ extension MyActor {
 
     // Concurrent closures might run... concurrently.
     acceptConcurrentClosure {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent closure}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
 
     // Escaping closures might run concurrently.
     acceptEscapingClosure {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from an '@escaping' closure}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from an '@escaping' closure}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }
@@ -164,8 +164,8 @@ extension MyActor {
 
     @concurrent func localFn2() {
       acceptClosure {
-        _ = text[0]  // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+        _ = text[0]  // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
+        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
         _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
         _ = localConstant
       }
@@ -180,7 +180,7 @@ extension MyActor {
 
     // Partial application
     _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' is unsafe to reference in code that may execute concurrently}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from an '@actorIndependent' context}}
     acceptClosure(synchronous)
     acceptClosure(self.synchronous)
     acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
@@ -384,7 +384,7 @@ func checkLocalFunctions() async {
 
 actor class LazyActor {
     var v: Int = 0
-    // expected-note@-1 5 {{mutable state is only available within the actor instance}}
+    // expected-note@-1 6 {{mutable state is only available within the actor instance}}
 
     let l: Int = 0
 
@@ -392,7 +392,7 @@ actor class LazyActor {
     lazy var l12: Int = v
     lazy var l13: Int = { self.v }()
     lazy var l14: Int = self.v
-    lazy var l15: Int = { [unowned self] in self.v }()
+    lazy var l15: Int = { [unowned self] in self.v }() // expected-error{{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
 
     lazy var l21: Int = { l }()
     lazy var l22: Int = l

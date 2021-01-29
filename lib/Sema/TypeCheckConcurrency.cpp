@@ -869,9 +869,8 @@ namespace {
     }
 
   private:
-    /// If the expression is a reference to `self`, return the context of
-    /// the 'self' parameter.
-    static DeclContext *getSelfReferenceContext(Expr *expr) {
+    /// If the expression is a reference to `self`, the `self` declaration.
+    static VarDecl *getReferencedSelf(Expr *expr) {
       // Look through identity expressions and implicit conversions.
       Expr *prior;
       do {
@@ -885,24 +884,13 @@ namespace {
 
       // 'super' references always act on self.
       if (auto super = dyn_cast<SuperRefExpr>(expr))
-        return super->getSelf()->getDeclContext();
+        return super->getSelf();
 
       // Declaration references to 'self'.
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
         if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-          if (var->isSelfParameter())
-            return var->getDeclContext();
-
-          // If this is a 'self' capture in a capture list, recurse through
-          // the capture list entry's initializer to find the original 'self'.
-          if (var->isSelfParamCapture()) {
-            for (auto capture : var->getParentCaptureList()->getCaptureList()) {
-              if (capture.Var == var) {
-                expr = capture.Init->getInit(0);
-                return getSelfReferenceContext(expr);
-              }
-            }
-          }
+          if (var->isSelfParameter() || var->isSelfParamCapture())
+            return var;
         }
       }
 
@@ -1268,6 +1256,44 @@ namespace {
       llvm_unreachable("unhandled actor isolation kind!");
     }
 
+    /// Determine the reason for the given declaration context to be
+    /// actor-independent.
+    static Diag<DescriptiveDeclKind, DeclName>
+    findActorIndependentReason(DeclContext *dc) {
+      if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
+        switch (autoclosure->getThunkKind()) {
+        case AutoClosureExpr::Kind::AsyncLet:
+          return diag::actor_isolated_from_async_let;
+
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+          return findActorIndependentReason(dc->getParent());
+
+        case AutoClosureExpr::Kind::None:
+          break;
+        }
+      }
+
+      if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+        if (isConcurrentClosure(closure)) {
+          return diag::actor_isolated_from_concurrent_closure;
+        }
+
+        if (isEscapingClosure(closure)) {
+          return diag::actor_isolated_from_escaping_closure;
+        }
+
+        return findActorIndependentReason(dc->getParent());
+      }
+
+      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+        if (func->isConcurrent())
+          return diag::actor_isolated_from_concurrent_function;
+      }
+
+      return diag::actor_isolated_self_independent_context;
+    }
+
     /// Check a reference with the given base expression to the given member.
     /// Returns true iff the member reference refers to actor-isolated state
     /// in an invalid or unsafe way such that a diagnostic was emitted.
@@ -1286,8 +1312,8 @@ namespace {
 
       case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
-        auto *selfDC = getSelfReferenceContext(base);
-        if (!selfDC) {
+        auto *selfVar = getReferencedSelf(base);
+        if (!selfVar) {
           // actor-isolated non-self calls are implicitly async and thus OK.
           if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
             markNearestCallAsImplicitlyAsync();
@@ -1303,8 +1329,9 @@ namespace {
           return true;
         }
 
-        // Check whether the context of 'self' is actor-isolated.
-        switch (auto contextIsolation = getActorIsolationOfContext(selfDC)) {
+        // Check whether the current context is differently-isolated.
+        auto curDC = const_cast<DeclContext *>(getDeclContext());
+        switch (auto contextIsolation = getActorIsolationOfContext(curDC)) {
           case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
@@ -1323,15 +1350,15 @@ namespace {
             // Okay
             break;
 
-          case ActorIsolation::Independent:
+          case ActorIsolation::Independent: {
             // The 'self' is for an actor-independent member, which means
             // we cannot refer to actor-isolated state.
-            ctx.Diags.diagnose(
-                memberLoc, diag::actor_isolated_self_independent_context,
-                member->getDescriptiveKind(),
-                member->getName());
+            auto diag = findActorIndependentReason(curDC);
+            ctx.Diags.diagnose(memberLoc, diag, member->getDescriptiveKind(),
+                               member->getName());
             noteIsolatedActorMember(member);
             return true;
+          }
 
           case ActorIsolation::GlobalActor:
             // The 'self' is for a member that's part of a global actor, which
@@ -1347,7 +1374,8 @@ namespace {
 
         // Check whether we are in a context that will not execute concurrently
         // with the context of 'self'.
-        if (mayExecuteConcurrentlyWith(getDeclContext(), selfDC)) {
+        if (mayExecuteConcurrentlyWith(
+                getDeclContext(), selfVar->getDeclContext())) {
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_concurrent_access,
               member->getDescriptiveKind(), member->getName());

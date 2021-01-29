@@ -4261,6 +4261,18 @@ ERROR(actor_isolated_concurrent_access,none,
         "actor-isolated %0 %1 is unsafe to reference in code "
         "that may execute concurrently",
         (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_from_concurrent_closure,none,
+        "actor-isolated %0 %1 cannot be referenced from a concurrent closure",
+        (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_from_concurrent_function,none,
+        "actor-isolated %0 %1 cannot be referenced from a concurrent function",
+        (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_from_async_let,none,
+        "actor-isolated %0 %1 cannot be referenced from 'async let' initializer",
+        (DescriptiveDeclKind, DeclName))
+ERROR(actor_isolated_from_escaping_closure,none,
+        "actor-isolated %0 %1 cannot be referenced from an '@escaping' closure",
+        (DescriptiveDeclKind, DeclName))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@concurrent'",
       (DescriptiveDeclKind, DeclName))
