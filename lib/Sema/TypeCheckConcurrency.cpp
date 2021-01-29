@@ -675,6 +675,14 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     // (outside or inside the actor). This suggests that the implicitly-async
     // concept could be merged into the CrossActorSelf concept.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (func->isDistributed()) { // TODO: this causes all check, should instead just be a quick is/is-not?
+        if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+          return forDistributedActorSelf(classDecl);
+        } else {
+          assert(false && "distributed functions must be declared within an distributed actor, yet no enclosing actor context was available?");
+        }
+      }
+
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
     }
@@ -1464,13 +1472,18 @@ namespace {
 
     /// Note that the given actor member is isolated.
     /// @param context is allowed to be null if no context is appropriate.
-    void noteIsolatedActorMember(ValueDecl *decl, Expr *context) {
+    void noteIsolatedActorMember(ValueDecl *decl, Expr *context,
+                                 bool distributedActor = false) {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         func->diagnose(diag::actor_isolated_sync_func,
           decl->getDescriptiveKind(),
           decl->getName());
+      } else if (isa<VarDecl>(decl)) {
+        // TODO: can we check this against the context rather than the boolean?
+        if (distributedActor)
+          decl->diagnose(diag::distributedactor_isolated_property);
 
         // was it an attempt to mutate an actor instance's isolated state?
       } else if (auto environment = kindOfUsage(decl, context)) {
@@ -2099,7 +2112,6 @@ namespace {
       case ActorIsolationRestriction::DistributedActor: {
         // distributed actor isolation is more strict;
         // we do not allow any property access, or synchronous access at all.
-        // TODO: special case some "unsafe version"?
 
         // Must reference distributed actor-isolated state on 'self'.
         auto *selfDC = getSelfReferenceContext(base);
@@ -2116,13 +2128,13 @@ namespace {
             }
           }
 
-          // no property except actorAddress may be accessed directly on distributed actor
-          if (auto decl = dyn_cast<VarDecl>(member))
-            if (decl->isLet() &&
-                member->getName() == member->getASTContext().Id_actorAddress)
-              // the actorAddress field is special, and guaranteed to be present
-              // always, regardless is local or remote actor.
+          // @_distributedActorIndependent decls are accessible always,
+          // regardless of distributed actor-isolation; e.g. actorAddress
+          if (auto attr = member->getAttrs().getAttribute<DistributedActorIndependentAttr>())
+            switch (attr->getKind()) {
+            case DistributedActorIndependentKind::Default:
               return false;
+            }
 
           ctx.Diags.diagnose(
               memberLoc, diag::distributed_actor_isolated_non_self_reference,

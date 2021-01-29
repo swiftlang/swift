@@ -75,7 +75,7 @@ distributed actor class DistributedActor_1 {
     fatalError()
   }
 
-  func test() async throws {
+  func test_inside() async throws {
     _ = self.name
     _ = self.computedMutable
 
@@ -93,22 +93,31 @@ distributed actor class DistributedActor_1 {
   }
 }
 
-func test(
+func test_outside(
   local: LocalActor_1,
   distributed: DistributedActor_1
 ) async throws {
+  // ==== properties
+  _ = distributed.actorAddress // ok
+  distributed.actorAddress = ActorAddress(parse: "mock://1.1.1.1:8080/#123121") // expected-error{{cannot assign to property: 'actorAddress' is immutable}}
+
+  // just to make sure synthesized fields like transport didn't get special treated:
+  _ = distributed.actorTransport // expected-error{{distributed actor-isolated property 'actorTransport' can only be referenced inside the distributed actor}}
+
+  // FIXME: dont set the (never) on the transport
+
   _ = local.name // ok, special case that let constants are okey
   _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
   _ = local.mutable // expected-error{{actor-isolated property 'mutable' can only be referenced inside the actor}}
   _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
 
+  // ==== functions // TODO: once we automatically infer async and throws unlock this
 //  try await distributed.distHello()
 //  try await distributed.distHelloAsync()
 //  try await distributed.distHelloThrows()
 //  try await distributed.distHelloAsyncThrows()
-  
+
   // special: the actorAddress may always be referred to
-  _ = distributed.actorAddress
 }
 
 // ==== Codable parameters and return types ------------------------------------

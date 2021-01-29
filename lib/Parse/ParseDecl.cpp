@@ -1806,6 +1806,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     // We do not (yet) support any additional options for distributed.
     return false;
   }
+  case DAK_DistributedActorIndependent: {
+    // TODO: this is declared as UserInaccessible attr, so why are we forced to parse anyway?
+    llvm_unreachable("DAK_DistributedActorIndependent should never be declared in source.");
+  }
 
   case DAK_Optimize: {
     if (!consumeIf(tok::l_paren)) {

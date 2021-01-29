@@ -11,9 +11,19 @@ distributed actor class SomeDistributedActor_0 { }
 distributed class SomeDistributedActor_1 { } // expected-error{{'distributed' can only be applied to 'actor class' definitions, and distributed actor-isolated async functions}}
 distributed struct SomeDistributedActor_2 { } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
 distributed enum SomeDistributedActor_3 { } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
+
 // ==== ------------------------------------------------------------------------
 // MARK: Declaring distributed functions
 // NOTE: not distributed actor, so cannot have any distributed functions
+
+struct SomeNotActorStruct_2 {
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor class'}}
+}
+
+class SomeNotActorClass_3 {
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor class'}}
+}
+
 actor class SomeNotDistributedActor_4 {
   distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor class'}}
 }
@@ -35,3 +45,4 @@ distributed actor class BadValuesDistributedActor_7 {
   distributed static var staticVarNope: Int { 13 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
   distributed static func staticNope() async throws -> Int { 13 } // expected-error{{'distributed' functions cannot be 'static'}}
 }
+

@@ -375,16 +375,19 @@ public:
         return;
       }
     }
-
-    //    auto VD = cast<ValueDecl>(D);
-//    if (!VD->isInstanceMember()) {
-//      diagnoseAndRemoveAttr(attr, diag::distributedactor_not_actor_func);
-//      return;
-//    }
-//
-//    (void)getActorIsolation(VD);
   }
 
+  void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr) {
+    auto dc = D->getDeclContext();
+
+    /// user-inaccessible _distributedActorIndependent can only be applied to let properties
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      if (!var->isLet()) {
+        diagnoseAndRemoveAttr(attr, diag::distributedactor_independent_property_must_be_let);
+        return;
+      }
+    }
+  }
 
   void visitGlobalActorAttr(GlobalActorAttr *attr) {
     auto nominal = dyn_cast<NominalTypeDecl>(D);

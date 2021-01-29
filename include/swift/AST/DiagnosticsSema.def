@@ -4433,7 +4433,7 @@ ERROR(distributedactor_property,none,
       ())
 ERROR(distributedactor_storage,none,
       "'distributed' can not be applied to actor properties; "
-      "Only async functions can be 'distributed'",
+      "Only functions can be 'distributed'",
       ())
 ERROR(distributedactor_not_actor,none,
       "'distributed' can only be applied to 'actor class' definitions, "
@@ -4447,6 +4447,12 @@ ERROR(distributedactor_func_static,none,
       ())
 ERROR(distributedactor_func_not_in_distributed_actor,none,
       "'distributed' function can only be declared within 'distributed actor class'",
+      ())
+ERROR(distributedactor_independent_property_must_be_let,none,
+      "_distributedActorIndependent can be applied to properties, however they must be 'let'",
+      ())
+ERROR(distributedactor_isolated_property,none,
+      "distributed actor state is only available within the actor instance",
       ())
 
 ERROR(concurrency_lib_missing,none,

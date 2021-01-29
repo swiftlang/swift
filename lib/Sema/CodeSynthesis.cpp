@@ -35,7 +35,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "DerivedConformanceDistributedActor.cpp"
+#include "CodeSynthesisDistributedActor.cpp"
 using namespace swift;
 
 const bool IsImplicit = true;
@@ -789,149 +789,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   return ctor;
 }
 
-
-static ConstructorDecl *
-createDistributedActorResolveInit(ClassDecl *classDecl,
-                                  ASTContext &ctx) {
-  // FIXME: DUPLICATED FROM deriveDistributedActor_init_resolve !!!!!!!!!!!!!!!!
-
-  auto &C = ctx;
-
-  // auto conformanceDC = derived.getConformanceContext();
-  auto conformanceDC = classDecl;
-
-  // Expected type: (Self) -> (ActorAddress, ActorTransport) -> (Self)
-  //
-  // Param: (resolve address: ActorAddress)
-  auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
-  auto *addressParamDecl = new (C) ParamDecl(
-      SourceLoc(), SourceLoc(), C.Id_resolve,
-      SourceLoc(), C.Id_address, conformanceDC);
-  addressParamDecl->setImplicit();
-  addressParamDecl->setSpecifier(ParamSpecifier::Default);
-  addressParamDecl->setInterfaceType(addressType);
-
-  // Param: (using transport: ActorTransport)
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-  auto *transportParamDecl = new (C) ParamDecl(
-      SourceLoc(), SourceLoc(), C.Id_using,
-      SourceLoc(), C.Id_transport, conformanceDC);
-  transportParamDecl->setImplicit();
-  transportParamDecl->setSpecifier(ParamSpecifier::Default);
-  transportParamDecl->setInterfaceType(transportType);
-
-  auto *paramList = ParameterList::create(
-      C,
-      /*LParenLoc=*/SourceLoc(),
-      /*params=*/{addressParamDecl, transportParamDecl},
-      /*RParenLoc=*/SourceLoc()
-  );
-
-  // Func name: init(resolve:using:)
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FLE__, __LINE__, __FUNCTION__, "init func");
-  DeclName name(C, DeclBaseName::createConstructor(), paramList);
-
-  auto *initDecl =
-      new (C) ConstructorDecl(name, SourceLoc(),
-          /*Failable=*/false, SourceLoc(),
-          /*Throws=*/false, SourceLoc(), paramList, // TODO: make throws.
-          /*GenericParams=*/nullptr, conformanceDC);
-  initDecl->setImplicit();
-  initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(&deriveBodyDistributedActor_init_resolve);
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "init func prepared");
-
-  // This constructor is 'required', all distributed actors MUST invoke it.
-  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-  initDecl->getAttrs().add(reqAttr);
-
-  initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
-//  initDecl->copyFormalAccessFrom(derived.Nominal,
-//      /*sourceIsParentContext=*/true);
-  // derived.addMembersToConformanceContext({initDecl});
-
-  return initDecl;
-}
-
-static ConstructorDecl *
-createDistributedActorLocalInit(ClassDecl *classDecl,
-                                ASTContext &ctx) {
-  // FIXME: DUPLICATED FROM deriveDistributedActor_init_transport !!!!!!!!!!!!!!!!
-
-  auto &C = ctx;
-
-//  auto conformanceDC = derived.getConformanceContext();
-  auto conformanceDC = classDecl;
-
-  // Expected type: (Self) -> (ActorTransport) -> (Self)
-  //
-  // Params: (transport transport: ActorTransport)
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-  auto *transportParamDecl = new (C) ParamDecl(
-      SourceLoc(), SourceLoc(), C.Id_transport,
-      SourceLoc(), C.Id_transport, conformanceDC);
-  transportParamDecl->setImplicit();
-  transportParamDecl->setSpecifier(ParamSpecifier::Default);
-  transportParamDecl->setInterfaceType(transportType);
-
-  auto *paramList = ParameterList::createWithoutLoc(transportParamDecl);
-
-  // Func name: init(transport:)
-  DeclName name(C, DeclBaseName::createConstructor(), paramList);
-
-  auto *initDecl =
-      new (C) ConstructorDecl(name, SourceLoc(),
-          /*Failable=*/false, SourceLoc(),
-          /*Throws=*/false, SourceLoc(), paramList, // TODO: make it throws?
-          /*GenericParams=*/nullptr, conformanceDC);
-  initDecl->setImplicit();
-  initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(&deriveBodyDistributedActor_init_transport);
-
-  // This constructor is 'required', all distributed actors MUST invoke it.
-  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-  initDecl->getAttrs().add(reqAttr);
-
-//  // This constructor is 'required', all distributed actors MUST invoke it.
-//  // TODO: this makes sense I guess, and we should ban defining such constructor at all.
-//  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-//  initDecl->getAttrs().add(reqAttr);
-
-  initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
-//  initDecl->copyFormalAccessFrom(derived.Nominal,
-//      /*sourceIsParentContext=*/true);
-  // derived.addMembersToConformanceContext({initDecl});
-
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT DECL:");
-//  initDecl->dump();
-
-  return initDecl;
-}
-
-static ConstructorDecl *
-createDistributedActorInit(ClassDecl *classDecl,
-                           ConstructorDecl *requirement,
-                           ASTContext &ctx) {
-  auto &C = ctx;
-  const auto name = requirement->getName();
-  auto argumentNames = name.getArgumentNames();
-
-  if (argumentNames.size() == 1 &&
-      argumentNames[0] == C.Id_transport) {
-    fprintf(stderr, "[%s:%d] >> (%s) init 1 param \n", __FILE__, __LINE__, __FUNCTION__);
-    return createDistributedActorLocalInit(classDecl, ctx);
-  } else if (argumentNames.size() == 2 &&
-             argumentNames[0] == C.Id_resolve &&
-             argumentNames[1] == C.Id_using) {
-    fprintf(stderr, "[%s:%d] >> (%s) init 2 params \n", __FILE__, __LINE__, __FUNCTION__);
-    return createDistributedActorResolveInit(classDecl, ctx);
-  } else {
-    requirement->dump();
-    fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__, "unrecognized constructor requirement for DistributedActor");
-    return nullptr;
-  }
-}
-
 /// Diagnose a missing required initializer.
 static void diagnoseMissingRequiredInitializer(
               ClassDecl *classDecl,
@@ -1146,48 +1003,6 @@ static void collectNonOveriddenSuperclassInits(
   }
 }
 
-static void collectNonOveriddenDistributedActorInits(
-    ASTContext& Context,
-    ClassDecl *actorDecl,
-    SmallVectorImpl<ConstructorDecl *> &results) {
-  assert(actorDecl->isDistributedActor());
-  auto protoDecl = Context.getProtocol(KnownProtocolKind::DistributedActor);
-
-//  // Record all of the initializers the actorDecl has implemented.
-//  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
-//  for (auto member : actorDecl->getMembers())
-//    if (auto ctor = dyn_cast<ConstructorDecl>(member))
-//      if (!ctor->hasStubImplementation())
-//         // if (auto overridden = ctor->getOverriddenDecl())
-//          overriddenInits.insert(ctor);
-//
-//  actorDecl->synthesizeSemanticMembersIfNeeded(
-//    DeclBaseName::createConstructor());
-
-  NLOptions subOptions = (NL_QualifiedDefault | NL_IgnoreAccessControl);
-  SmallVector<ValueDecl *, 4> lookupResults;
-  actorDecl->lookupQualified(
-      protoDecl, DeclNameRef::createConstructor(),
-      subOptions, lookupResults);
-
-  for (auto decl : lookupResults) {
-    // Distributed Actor Constructor
-    auto daCtor = cast<ConstructorDecl>(decl);
-
-//    // Skip invalid superclass initializers.
-//    if (daCtor->isInvalid())
-//      continue;
-//
-//    // Skip unavailable superclass initializers.
-//    if (AvailableAttr::isUnavailable(daCtor))
-//      continue;
-//
-// TODO: Don't require it if overriden
-//    if (!overriddenInits.count(daCtor))
-      results.push_back(daCtor);
-  }
-}
-
 /// For a class with a superclass, automatically define overrides
 /// for all of the superclass's designated initializers.
 static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
@@ -1285,53 +1100,6 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   }
 }
 
-/// For a distributed actor class, automatically define initializers
-/// that match the DistributedActor requirements.
-// TODO: inheritance is tricky here?
-static void addImplicitDistributedActorConstructorsToClass(ClassDecl *decl) {
-  // Bail out if not a distributed actor definition.
-  if (!decl->isDistributedActor())
-    return;
-
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "GENERATE DA INITS");
-
-  // Bail out if we're validating one of our constructors already;
-  // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (ctor->isRecursiveValidation())
-        return;
-    }
-  }
-
-  decl->setAddedImplicitInitializers();
-
-  // Check whether the user has defined a designated initializer for this class,
-  // and whether all of its stored properties have initial values.
-  auto &ctx = decl->getASTContext();
-  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
-  bool defaultInitable =
-      areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
-
-  // We can't define these overrides if we have any uninitialized
-  // stored properties.
-  if (!defaultInitable && !foundDesignatedInit)
-    return;
-
-  SmallVector<ConstructorDecl *, 4> nonOverridenCtors;
-  collectNonOveriddenDistributedActorInits(
-      ctx, decl, nonOverridenCtors);
-
-  for (auto *daCtor : nonOverridenCtors) {
-    fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "NON OVERIDEN CONSTRUCTOR");
-    daCtor->dump();
-
-    if (auto ctor = createDistributedActorInit(decl, daCtor, ctx)) {
-      decl->addMember(ctor);
-    }
-  }
-}
-
 bool
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
@@ -1386,7 +1154,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
-  
+
   if (!shouldAttemptInitializerSynthesis(decl)) {
     decl->setAddedImplicitInitializers();
     return;
@@ -1394,7 +1162,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);
-    addImplicitDistributedActorConstructorsToClass(classDecl);
+    addImplicitDistributedActorMembersToClass(classDecl);
   }
 
   // Force the memberwise and default initializers if the type has them.
@@ -1477,7 +1245,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     (void)evaluateTargetConformanceTo(decodableProto);
   }
     break;
-  case ImplicitMemberAction::ResolveDistributedActor: {
+  case ImplicitMemberAction::ResolveDistributedActor:
+  case ImplicitMemberAction::ResolveDistributedActorAddress: {
     // init(transport:) and init(resolve:using:) may be synthesized as part of
     // derived conformance to the DistributedActor protocol.
     // If the target should conform to the DistributedActor protocol, check the

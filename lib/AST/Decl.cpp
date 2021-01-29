@@ -4091,17 +4091,16 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   } else {
     auto argumentNames = member.getArgumentNames();
     if (!member.isCompoundName() || argumentNames.size() == 1) {
-      if (baseName == DeclBaseName::createConstructor() &&
-          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
-        action.emplace(ImplicitMemberAction::ResolveDecodable);
+      if (baseName == DeclBaseName::createConstructor()) {
+        if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+          action.emplace(ImplicitMemberAction::ResolveDecodable);
+        } else if (argumentNames[0] == Context.Id_transport) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+        }
       } else if (!baseName.isSpecial() &&
-                 baseName.getIdentifier() == Context.Id_encode &&
-                 (member.isSimpleName() ||
-                  argumentNames.front() == Context.Id_to)) {
+           baseName.getIdentifier() == Context.Id_encode &&
+           (member.isSimpleName() || argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
-      } else if (baseName == DeclBaseName::createConstructor() &&
-                 argumentNames[0] == Context.Id_transport) {
-        action.emplace(ImplicitMemberAction::ResolveDistributedActor);
       }
     } else if (!member.isCompoundName() || argumentNames.size() == 2) {
       if (baseName == DeclBaseName::createConstructor() &&
@@ -4109,6 +4108,10 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
           argumentNames[1] == Context.Id_using) {
         action.emplace(ImplicitMemberAction::ResolveDistributedActor);
       }
+    } else if (member.isSimpleName() &&
+               baseName.getKind() == DeclBaseName::Kind::Normal &&
+               baseName == "actorAddress") {
+      assert(false && "address!!!!!!!!!!!!!!!!!!!!!!!!");
     }
   }
 

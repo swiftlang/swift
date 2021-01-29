@@ -636,6 +636,12 @@ CONTEXTUAL_DECL_ATTR(distributed, DistributedActor,
   APIBreakingToAdd | APIBreakingToRemove,
   112)
 
+DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
+  OnFunc | OnVar | ConcurrencyOnly | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  113)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

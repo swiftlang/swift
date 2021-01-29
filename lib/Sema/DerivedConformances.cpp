@@ -311,17 +311,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
-    // DistributedActor.actorAddress
-    if (name.isSimpleName(ctx.Id_actorAddress)) {
-      fprintf(stderr, "[%s:%d] >> derived conformances: Id_actorAddress \n", __FILE__, __LINE__);
-      return getRequirement(KnownProtocolKind::DistributedActor);
-    }
-
-    // DistributedActor.actorTransport
-    if (name.isSimpleName(ctx.Id_actorTransport)) {
-      fprintf(stderr, "[%s:%d] >> derived conformances: Id_actorTransport \n", __FILE__, __LINE__);
-      return getRequirement(KnownProtocolKind::DistributedActor);
-    }
+//    // DistributedActor.actorAddress
+//    if (name.isSimpleName(ctx.Id_actorAddress)) {
+//      fprintf(stderr, "[%s:%d] >> derived conformances: Id_actorAddress \n", __FILE__, __LINE__);
+//      return getRequirement(KnownProtocolKind::DistributedActor);
+//    }
+//
+//    // DistributedActor.actorTransport
+//    if (name.isSimpleName(ctx.Id_actorTransport)) {
+//      fprintf(stderr, "[%s:%d] >> derived conformances: Id_actorTransport \n", __FILE__, __LINE__);
+//      return getRequirement(KnownProtocolKind::DistributedActor);
+//    }
 
     return nullptr;
   }
@@ -383,19 +383,20 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       if (argumentNames[0] == ctx.Id_from)
         return getRequirement(KnownProtocolKind::Decodable);
 
-      // DistributedActor.init(transport: ActorTransport)
-      if (argumentNames[0] == ctx.Id_transport) {
-        fprintf(stderr, "[%s:%d] >> derived conformances: distributed actor initializer \n", __FILE__, __LINE__);
-        return getRequirement(KnownProtocolKind::DistributedActor);
-      }
-    } else if (argumentNames.size() == 2) {
-      // DistributedActor.init(transport: ActorTransport)
-      if (argumentNames[0] == ctx.Id_resolve &&
-          argumentNames[1] == ctx.Id_transport) {
-        fprintf(stderr, "[%s:%d] >> derived conformances: distributed actor resolve initializer \n", __FILE__, __LINE__);
-        return getRequirement(KnownProtocolKind::DistributedActor);
-      }
+//      // DistributedActor.init(transport: ActorTransport)
+//      if (argumentNames[0] == ctx.Id_transport) {
+//        fprintf(stderr, "[%s:%d] >> derived conformances: distributed actor initializer \n", __FILE__, __LINE__);
+//        return getRequirement(KnownProtocolKind::DistributedActor);
+//      }
     }
+//    else if (argumentNames.size() == 2) {
+//      // DistributedActor.init(transport: ActorTransport)
+//      if (argumentNames[0] == ctx.Id_resolve &&
+//          argumentNames[1] == ctx.Id_transport) {
+//        fprintf(stderr, "[%s:%d] >> derived conformances: distributed actor resolve initializer \n", __FILE__, __LINE__);
+//        return getRequirement(KnownProtocolKind::DistributedActor);
+//      }
+//    }
 
     return nullptr;
   }
@@ -462,34 +463,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
 
 
   return getterDecl;
-}
-
-// TODO: intense duplication with declareDerivedProperty
-std::pair<VarDecl *, PatternBindingDecl *>
-DerivedConformance::declareDerivedConstantProperty(Identifier name,
-                                           Type propertyInterfaceType,
-                                           Type propertyContextType,
-                                           bool isStatic, bool isFinal) {
-  auto parentDC = getConformanceContext();
-
-  VarDecl *propDecl = new (Context)
-      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Let,
-                           SourceLoc(), name, parentDC);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyInterfaceType);
-
-  Pattern *propPat = NamedPattern::createImplicit(Context, propDecl);
-  propPat->setType(propertyContextType);
-
-  propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
-  propPat->setType(propertyContextType);
-
-  auto *pbDecl = PatternBindingDecl::createImplicit(
-      Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      parentDC);
-  return {propDecl, pbDecl};
 }
 
 std::pair<VarDecl *, PatternBindingDecl *>

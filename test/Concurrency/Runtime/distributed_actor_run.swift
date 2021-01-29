@@ -71,10 +71,10 @@ func test_address() {
   _ = actor.actorAddress
 }
 
-func test_run() {
-  print("before")
-//  try! await actor.hello() // CHECK: hell
-  print("after")
+func test_run() async {
+  print("before") // CHECK: before
+//  try! await actor.hello()
+  print("after") // CHECK: after
 }
 
-//runAsyncAndBlock(run)
+runAsyncAndBlock(test_run)
