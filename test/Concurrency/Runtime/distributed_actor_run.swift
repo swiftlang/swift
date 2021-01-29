@@ -6,6 +6,21 @@
 import Dispatch
 import _Concurrency
 
+//protocol DA {
+//  var address: ActorAddress { get }
+//
+//}
+//
+//class MANUAL: DA {
+//  // @derived
+//  let address: ActorAddress
+//
+//  init( actorAddress: ActorAddress) {
+//    self.address = actorAddress
+//  }
+//}
+
+
 distributed actor class SomeSpecificDistributedActor {
 //  // @derived let actorTransport: ActorTransport
 //  // @derived let actorAddress: ActorAddress
@@ -21,11 +36,9 @@ distributed actor class SomeSpecificDistributedActor {
 //    self.actorTransport = transport
 //  }
 
-  distributed func hello() async throws {
-    _ = self.actorTransport
-    _ = self.actorAddress
-    print("hello from \(self.actorAddress)")
-  }
+//  distributed func hello() async throws {
+//    // print("hello from \(self.actorAddress)")
+//  }
 }
 
 // ==== Fake Transport ---------------------------------------------------------
@@ -40,12 +53,6 @@ struct FakeTransport: ActorTransport {
 //    ,
 //    onActorCreated: (Act) -> ()
   ) -> ActorAddress where Act : DistributedActor {
-    fatalError()
-  }
-  func send<Message>(_ message: Message, to recipient: ActorAddress) async throws where Message : Decodable, Message : Encodable {
-    fatalError()
-  }
-  func request<Request, Reply>(replyType: Reply.Type, _ request: Request, from recipient: ActorAddress) async throws where Request : Decodable, Request : Encodable, Reply : Decodable, Reply : Encodable {
     fatalError()
   }
 }

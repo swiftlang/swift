@@ -37,7 +37,9 @@ func test_remote() async {
   assert(__isRemoteActor(local) == false, "should be local")
 
   // assume it always makes a remote one
-  _ = SomeSpecificDistributedActor(resolve: address, using: transport)
+  let remote = SomeSpecificDistributedActor(resolve: address, using: transport)
+  assert(__isLocalActor(local) == false, "should be remote")
+  assert(__isRemoteActor(local) == true, "should be remote")
 }
 
 runAsyncAndBlock(test_remote)

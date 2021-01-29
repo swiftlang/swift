@@ -227,6 +227,16 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                                                   ASTContext &ctx) {
   assert(!decl->hasClangNode());
 
+  // Don't synthesize for distributed actors, they're a bit special.
+  //
+  // They have their special inits, and should not get the usual
+  // default/implicit constructor (i.e. `init()` is illegal for them, as they
+  // always must have an associated transport - via `init(transport:)` or
+  // `init(resolve:using:)`).
+  if (auto clazz = dyn_cast<ClassDecl>(decl))
+    if (clazz->isDistributedActor())
+      return nullptr;
+
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
 
@@ -1316,41 +1326,6 @@ static void addImplicitDistributedActorConstructorsToClass(ClassDecl *decl) {
     fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "NON OVERIDEN CONSTRUCTOR");
     daCtor->dump();
 
-//    // Diagnose a missing override of a required initializer.
-//    if (daCtor->isRequired() && !inheritDesignatedInits) {
-//      diagnoseMissingRequiredInitializer(decl, daCtor, ctx);
-//      continue;
-//    }
-
-    // A designated or required initializer has not been overridden.
-
-//    bool alreadyDeclared = false;
-//    for (auto *member : decl->getMembers()) {
-//      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-//        // Skip any invalid constructors.
-//        if (ctor->isInvalid())
-//          continue;
-//
-//        auto type = swift::getMemberTypeForComparison(ctor, nullptr);
-//        auto parentType = swift::getMemberTypeForComparison(daCtor, ctor);
-//
-//        if (isOverrideBasedOnType(ctor, type, daCtor, parentType)) {
-//          alreadyDeclared = true;
-//          break;
-//        }
-//      }
-//    }
-//
-//    // If we have already introduced an initializer with this parameter type,
-//    // don't add one now.
-//    if (alreadyDeclared)
-//      continue;
-
-//    // If we're inheriting initializers, create an override delegating
-//    // to 'super.init'. Otherwise, create a stub which traps at runtime.
-//    auto kind = inheritDesignatedInits ? DesignatedInitKind::Chaining
-//                                       : DesignatedInitKind::Stub;
-
     if (auto ctor = createDistributedActorInit(decl, daCtor, ctx)) {
       decl->addMember(ctor);
     }
@@ -1691,16 +1666,20 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                   decl);
 
   // Create the default constructor.
-  auto ctor = createImplicitConstructor(decl,
+  if (auto ctor = createImplicitConstructor(decl,
                                         ImplicitConstructorKind::Default,
-                                        ctx);
+                                        ctx)) {
 
-  // Add the constructor.
-  decl->addMember(ctor);
+    // Add the constructor.
+    decl->addMember(ctor);
 
-  // Lazily synthesize an empty body for the default constructor.
-  ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
-  return ctor;
+    // Lazily synthesize an empty body for the default constructor.
+    ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
+    return ctor;
+  }
+
+  // no default init was synthesized
+  return nullptr;
 }
 
 ValueDecl *swift::getProtocolRequirement(ProtocolDecl *protocol,

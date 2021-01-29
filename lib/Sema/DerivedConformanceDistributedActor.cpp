@@ -29,17 +29,6 @@ bool DerivedConformance::canDeriveDistributedActor(
   return classDecl && classDecl->isDistributedActor() && dc == nominal;
 }
 
-/// Returns whether the given type is valid for synthesizing the transport
-/// initializer.
-///
-/// Checks to see whether the given type has has already defined such initializer,
-/// and if not attempts to synthesize it.
-///
-/// \param requirement The requirement we want to synthesize.
-static bool canSynthesizeInitializer(DerivedConformance &derived, ValueDecl *requirement) {
-  return true; // TODO: replace with real impl
-}
-
 // ==== Initializers -----------------------------------------------------------
 
 /// Synthesizes the body for
@@ -313,7 +302,11 @@ static ValueDecl *deriveDistributedActor_init_transport(DerivedConformance &deri
   return initDecl;
 }
 
-// ==== Properties -------------------------------------------------------------
+/******************************************************************************/
+/***************************** PROPERTIES *************************************/
+/******************************************************************************/
+
+// ==== Property: actorTransport -----------------------------------------------
 
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributedActor_property_getter_actorTransport(AbstractFunctionDecl *funcDecl, void *) {
@@ -325,8 +318,11 @@ deriveBodyDistributedActor_property_getter_actorTransport(AbstractFunctionDecl *
   auto *selfRef = DerivedConformance::createSelfDeclRef(funcDecl);
   auto *memberRef =
       UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_actorTransport);
+//  auto *targetExpr = new (C) DotSelfExpr(memberRef, SourceLoc(),
+//                                         SourceLoc());
 
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
+//  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), targetExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -335,9 +331,6 @@ deriveBodyDistributedActor_property_getter_actorTransport(AbstractFunctionDecl *
 /// Derive the declaration of Actor's actorTransport.
 static ValueDecl *deriveDistributedActor_actorTransport(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
-
-  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-  auto conformanceDC = derived.getConformanceContext();
 
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
@@ -348,13 +341,45 @@ static ValueDecl *deriveDistributedActor_actorTransport(DerivedConformance &deri
       C.Id_actorTransport, transportType, transportType,
       /*isStatic*/ false, /*isFinal*/ true);
 
+//  propDecl->setImplInfo(StorageImplInfo::getSimpleStored(StorageIsNotMutable));
+
+//  // Define the getter.
+//  auto *getterDecl =
+//      derived.addGetterToReadOnlyDerivedProperty(propDecl, transportType);
+//  getterDecl->setBodySynthesizer(deriveBodyDistributedActor_property_getter_actorTransport, nullptr);
+//  // ^^^^^^
+//  // if we do this (it's kind of wrong, we end up crashing in SIL:
+////  The field decl for a struct_extract, struct_element_addr, or ref_element_addr must be an accessible stored property of the operand type
+////  UNREACHABLE executed at /Users/ktoso/code/swift-project-distributed/swift/lib/SIL/IR/SILInstructions.cpp:1336!
+////      Please submit a bug report (https://swift.org/contributing/#reporting-bugs) and include the project and the crash backtrace.
+////  Stack dump:
+////  0.	Program arguments: /Users/ktoso/code/swift-project-distributed/build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/bin/swift-frontend -frontend -c -primary-file /Users/ktoso/code/swift-project-distributed/swift/test/Concurrency/Runtime/distributed_actor_run.swift -target x86_64-apple-macosx10.9 -enable-objc-interop -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -F /Users/ktoso/code/swift-project-distributed/build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/lib -module-cache-path /Users/ktoso/code/swift-project-distributed/build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/swift-test-results/x86_64-apple-macosx10.9/clang-module-cache -swift-version 4 -ignore-module-source-info -enable-experimental-concurrency -target-sdk-version 11.0 -module-name main -o /var/folders/w1/hmg_v8p532d800g08jtqtddc0000gn/T/distributed_actor_run-07e09c.o
+////  1.	Swift version 5.4-dev (LLVM 67722b8904ff3f1, Swift 582e334794ce6b6)
+////  2.	While evaluating request ASTLoweringRequest(Lowering AST to SIL for file "/Users/ktoso/code/swift-project-distributed/swift/test/Concurrency/Runtime/distributed_actor_run.swift")
+////  3.	While silgen emitFunction SIL function "@$s4main28SomeSpecificDistributedActorC14actorTransport12_Concurrency0eG0_pvg".
+////  for getter for actorTransport (in module 'main')
+////  4.	While verifying SIL function "@$s4main28SomeSpecificDistributedActorC14actorTransport12_Concurrency0eG0_pvg".
+////  for getter for actorTransport (in module 'main')
+////  0  swift-frontend           0x0000000108fca1a5 llvm::sys::PrintStackTrace(llvm::raw_ostream&) + 37
+////  1  swift-frontend           0x0000000108fc9475 llvm::sys::RunSignalHandlers() + 85
+////  2  swift-frontend           0x0000000108fca776 SignalHandler(int) + 262
+////  3  libsystem_platform.dylib 0x00007fff2038fd7d _sigtramp + 29
+////  4  libsystem_platform.dylib 0x000000011f1ef223 _sigtramp + 18446603344792646851
+////  5  libsystem_c.dylib        0x00007fff2029e720 abort + 120
+////  6  swift-frontend           0x0000000108f38372 llvm::llvm_unreachable_internal(char const*, char const*, unsigned int) + 482
+////  7  swift-frontend           0x00000001053db599 swift::getFieldIndex(swift::NominalTypeDecl*, swift::VarDecl*) + 153
+////  8  swift-frontend           0x00000001054b643c swift::FieldIndexCacheBase<swift::SingleValueInstruction>::cacheFieldIndex() + 124
+////  9  swift-frontend           0x00000001054a9b00 swift::SILInstructionVisitor<(anonymous namespace)::SILVerifier, void>::visit(swift::SILInstruction*) + 74032
+////  10 swift-frontend           0x0000000105496cd4 (anonymous namespace)::SILVerifier::visitSILBasicBlock(swift::SILBasicBlock*) + 1364
+////  11 swift-frontend           0x00000001054953ec (anonymous namespace)::SILVerifier::visitSILFunction(swift::SILFunction*) + 9052
+////  12 swift-frontend           0x000000010548e875 swift::SILFunction::verify(bool) const + 69
+
+
   derived.addMembersToConformanceContext({propDecl, pbDecl});
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "VAR DECL (actorTransport):");
-//  propDecl->dump();
-//  pbDecl->dump();
-//  getterDecl->dump();
   return propDecl;
 }
+
+// ==== Property: actorAddress -------------------------------------------------
 
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributedActor_property_getter_actorAddress(AbstractFunctionDecl *funcDecl, void *) {
@@ -377,9 +402,6 @@ deriveBodyDistributedActor_property_getter_actorAddress(AbstractFunctionDecl *fu
 static ValueDecl *deriveDistributedActor_actorAddress(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
-  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-  auto conformanceDC = derived.getConformanceContext();
-
   auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
 
   // Defined the property.
@@ -389,7 +411,7 @@ static ValueDecl *deriveDistributedActor_actorAddress(DerivedConformance &derive
       C.Id_actorAddress, addressType, addressType,
       /*isStatic*/ false, /*isFinal*/ true);
 
-  // Define the getter.
+//  // Define the getter.
 //  auto *getterDecl =
 //      derived.addGetterToReadOnlyDerivedProperty(propDecl, addressType);
 //  getterDecl->setBodySynthesizer(deriveBodyDistributedActor_property_getter_actorAddress, nullptr);
