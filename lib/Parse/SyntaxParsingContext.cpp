@@ -18,7 +18,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
 #include "swift/Parse/ParsedSyntax.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -209,16 +208,12 @@ void SyntaxParsingContext::addToken(Token &Tok, StringRef LeadingTrivia,
   if (!Enabled)
     return;
 
-  auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
-  auto TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
-
   ParsedRawSyntaxNode raw;
   if (shouldDefer()) {
-    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTriviaPieces,
-                                            TrailingTriviaPieces, *this);
+    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
+                                            *this);
   } else {
-    raw = getRecorder().recordToken(Tok, LeadingTriviaPieces,
-                                    TrailingTriviaPieces);
+    raw = getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
   }
   addRawSyntax(std::move(raw));
 }
