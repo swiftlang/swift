@@ -262,7 +262,7 @@ extension Task {
   ///     throw the error the operation has thrown when awaited on.
   public static func runDetached<T>(
     priority: Priority = .default,
-    operation: @escaping () async throws -> T
+    operation: @concurrent @escaping () async throws -> T
   ) -> Handle<T> {
     // Set up the job flags for a new task.
     var flags = JobFlags()
@@ -281,7 +281,7 @@ extension Task {
 
 }
 
-public func _runAsyncHandler(operation: @escaping () async -> ()) {
+public func _runAsyncHandler(operation: @concurrent @escaping () async -> ()) {
   _ = Task.runDetached(operation: operation)
 }
 
@@ -368,7 +368,7 @@ public func _taskFutureGetThrowing<T>(
 }
 
 public func _runChildTask<T>(
-  operation: @escaping () async throws -> T
+  operation: @concurrent @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
   let currentTask = Builtin.getCurrentAsyncTask()
 
@@ -391,7 +391,7 @@ public func _runChildTask<T>(
 
 public func _runGroupChildTask<T>(
   overridingPriority priorityOverride: Task.Priority? = nil,
-  operation: @escaping () async throws -> T
+  operation: @concurrent @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
   let currentTask = Builtin.getCurrentAsyncTask()
 

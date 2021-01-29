@@ -2542,6 +2542,7 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
+      .withConcurrent(info.isConcurrent())
       .withAsync(info.isAsync())
       .withThrows(info.isThrowing())
       .withClangFunctionType(info.getClangTypeInfo().getType())
@@ -6767,6 +6768,10 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
+bool AbstractFunctionDecl::isConcurrent() const {
+  return getAttrs().hasAttribute<ConcurrentAttr>();
+}
+
 bool AbstractFunctionDecl::isAsyncHandler() const {
   auto func = dyn_cast<FuncDecl>(this);
   if (!func)
@@ -8016,6 +8021,25 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
     if (auto *var = init->getBinding()->getSingleVar())
       return getActorIsolation(var);
+  }
+
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+    switch (auto isolation = closure->getActorIsolation()) {
+    case ClosureActorIsolation::Independent:
+      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
+
+    case ClosureActorIsolation::GlobalActor: {
+      return ActorIsolation::forGlobalActor(isolation.getGlobalActor());
+    }
+
+    case ClosureActorIsolation::ActorInstance: {
+      auto selfDecl = isolation.getActorInstance();
+      auto actorClass = selfDecl->getType()->getRValueType()
+          ->getClassOrBoundGenericClass();
+      assert(actorClass && "Bad closure actor isolation?");
+      return ActorIsolation::forActorInstance(actorClass);
+    }
+    }
   }
 
   return ActorIsolation::forUnspecified();

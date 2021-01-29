@@ -653,6 +653,16 @@ static bool isEscapingClosure(const AbstractClosureExpr *closure) {
   return true;
 }
 
+/// Determine whether this closure is escaping.
+static bool isConcurrentClosure(const AbstractClosureExpr *closure) {
+  if (auto type = closure->getType()) {
+    if (auto fnType = type->getAs<AnyFunctionType>())
+      return fnType->isConcurrent();
+  }
+
+  return false;
+}
+
 namespace {
   /// Check whether a particular context may execute concurrently within
   /// another context.
@@ -859,9 +869,8 @@ namespace {
     }
 
   private:
-    /// If the expression is a reference to `self`, return the context of
-    /// the 'self' parameter.
-    static DeclContext *getSelfReferenceContext(Expr *expr) {
+    /// If the expression is a reference to `self`, the `self` declaration.
+    static VarDecl *getReferencedSelf(Expr *expr) {
       // Look through identity expressions and implicit conversions.
       Expr *prior;
       do {
@@ -875,24 +884,13 @@ namespace {
 
       // 'super' references always act on self.
       if (auto super = dyn_cast<SuperRefExpr>(expr))
-        return super->getSelf()->getDeclContext();
+        return super->getSelf();
 
       // Declaration references to 'self'.
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
         if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-          if (var->isSelfParameter())
-            return var->getDeclContext();
-
-          // If this is a 'self' capture in a capture list, recurse through
-          // the capture list entry's initializer to find the original 'self'.
-          if (var->isSelfParamCapture()) {
-            for (auto capture : var->getParentCaptureList()->getCaptureList()) {
-              if (capture.Var == var) {
-                expr = capture.Init->getInit(0);
-                return getSelfReferenceContext(expr);
-              }
-            }
-          }
+          if (var->isSelfParameter() || var->isSelfParamCapture())
+            return var;
         }
       }
 
@@ -1259,6 +1257,44 @@ namespace {
       llvm_unreachable("unhandled actor isolation kind!");
     }
 
+    /// Determine the reason for the given declaration context to be
+    /// actor-independent.
+    static Diag<DescriptiveDeclKind, DeclName>
+    findActorIndependentReason(DeclContext *dc) {
+      if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
+        switch (autoclosure->getThunkKind()) {
+        case AutoClosureExpr::Kind::AsyncLet:
+          return diag::actor_isolated_from_async_let;
+
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+          return findActorIndependentReason(dc->getParent());
+
+        case AutoClosureExpr::Kind::None:
+          break;
+        }
+      }
+
+      if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+        if (isConcurrentClosure(closure)) {
+          return diag::actor_isolated_from_concurrent_closure;
+        }
+
+        if (isEscapingClosure(closure)) {
+          return diag::actor_isolated_from_escaping_closure;
+        }
+
+        return findActorIndependentReason(dc->getParent());
+      }
+
+      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+        if (func->isConcurrent())
+          return diag::actor_isolated_from_concurrent_function;
+      }
+
+      return diag::actor_isolated_self_independent_context;
+    }
+
     /// Check a reference with the given base expression to the given member.
     /// Returns true iff the member reference refers to actor-isolated state
     /// in an invalid or unsafe way such that a diagnostic was emitted.
@@ -1277,8 +1313,8 @@ namespace {
 
       case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
-        auto *selfDC = getSelfReferenceContext(base);
-        if (!selfDC) {
+        auto *selfVar = getReferencedSelf(base);
+        if (!selfVar) {
           // actor-isolated non-self calls are implicitly async and thus OK.
           if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
             markNearestCallAsImplicitlyAsync();
@@ -1294,8 +1330,9 @@ namespace {
           return true;
         }
 
-        // Check whether the context of 'self' is actor-isolated.
-        switch (auto contextIsolation = getActorIsolationOfContext(selfDC)) {
+        // Check whether the current context is differently-isolated.
+        auto curDC = const_cast<DeclContext *>(getDeclContext());
+        switch (auto contextIsolation = getActorIsolationOfContext(curDC)) {
           case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
@@ -1314,15 +1351,15 @@ namespace {
             // Okay
             break;
 
-          case ActorIsolation::Independent:
+          case ActorIsolation::Independent: {
             // The 'self' is for an actor-independent member, which means
             // we cannot refer to actor-isolated state.
-            ctx.Diags.diagnose(
-                memberLoc, diag::actor_isolated_self_independent_context,
-                member->getDescriptiveKind(),
-                member->getName());
+            auto diag = findActorIndependentReason(curDC);
+            ctx.Diags.diagnose(memberLoc, diag, member->getDescriptiveKind(),
+                               member->getName());
             noteIsolatedActorMember(member);
             return true;
+          }
 
           case ActorIsolation::GlobalActor:
             // The 'self' is for a member that's part of a global actor, which
@@ -1334,16 +1371,6 @@ namespace {
                 contextIsolation.getGlobalActor());
             noteIsolatedActorMember(member);
             return true;
-        }
-
-        // Check whether we are in a context that will not execute concurrently
-        // with the context of 'self'.
-        if (mayExecuteConcurrentlyWith(getDeclContext(), selfDC)) {
-          ctx.Diags.diagnose(
-              memberLoc, diag::actor_isolated_concurrent_access,
-              member->getDescriptiveKind(), member->getName());
-          noteIsolatedActorMember(member);
-          return true;
         }
 
         // It's fine.
@@ -1371,60 +1398,15 @@ namespace {
     /// isolation checked.
     ClosureActorIsolation determineClosureIsolation(
         AbstractClosureExpr *closure) {
-      // An escaping closure is always actor-independent.
-      if (isEscapingClosure(closure))
+      // Escaping and concurrent closures are always actor-independent.
+      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
-      Optional<ActorIsolation> parentIsolation;
-      auto parentDC = closure->getParent();
-      switch (parentDC->getContextKind()) {
-      case DeclContextKind::AbstractClosureExpr: {
-        auto parentClosureIsolation = cast<AbstractClosureExpr>(parentDC)
-          ->getActorIsolation();
-        switch (parentClosureIsolation) {
-        case ClosureActorIsolation::Independent:
-          parentIsolation = ActorIsolation::forIndependent(
-              ActorIndependentKind::Safe);
-          break;
-
-        case ClosureActorIsolation::ActorInstance: {
-          auto selfDecl = parentClosureIsolation.getActorInstance();
-          auto actorClass = selfDecl->getType()->getRValueType()
-              ->getClassOrBoundGenericClass();
-          assert(actorClass && "Bad closure actor isolation?");
-          parentIsolation = ActorIsolation::forActorInstance(actorClass);
-          break;
-        }
-
-        case ClosureActorIsolation::GlobalActor:
-          parentIsolation = ActorIsolation::forGlobalActor(
-              parentClosureIsolation.getGlobalActor());
-          break;
-        }
-        break;
-      }
-
-      case DeclContextKind::AbstractFunctionDecl:
-      case DeclContextKind::SubscriptDecl:
-        parentIsolation = getActorIsolation(
-            cast<ValueDecl>(parentDC->getAsDecl()));
-        break;
-
-      case DeclContextKind::EnumElementDecl:
-      case DeclContextKind::ExtensionDecl:
-      case DeclContextKind::FileUnit:
-      case DeclContextKind::GenericTypeDecl:
-      case DeclContextKind::Initializer:
-      case DeclContextKind::Module:
-      case DeclContextKind::SerializedLocal:
-      case DeclContextKind::TopLevelCodeDecl:
-        return ClosureActorIsolation::forIndependent();
-      }
+      auto parentIsolation = getActorIsolationOfContext(closure->getParent());
 
       // We must have parent isolation determined to get here.
-      assert(parentIsolation && "Missing parent isolation?");
-      switch (*parentIsolation) {
+      switch (parentIsolation) {
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
       case ActorIsolation::Unspecified:
@@ -1432,7 +1414,7 @@ namespace {
 
       case ActorIsolation::GlobalActor: {
         Type globalActorType = closure->mapTypeIntoContext(
-            parentIsolation->getGlobalActor()->mapTypeOutOfContext());
+            parentIsolation.getGlobalActor()->mapTypeOutOfContext());
         return ClosureActorIsolation::forGlobalActor(globalActorType);
       }
 
@@ -1566,20 +1548,38 @@ bool ConcurrentExecutionChecker::mayExecuteConcurrentlyWith(
     const DeclContext *useContext, const DeclContext *defContext) {
   // Walk the context chain from the use to the definition.
   while (useContext != defContext) {
-    // If we find an escaping closure, it can be run concurrently.
+    // If we find a concurrent closure... it can be run concurrently.
+    // NOTE: We also classify escaping closures this way, which detects more
+    // problematic cases.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isEscapingClosure(closure))
+      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
         return true;
     }
 
-    // If we find a local function that was referenced in code that can be
-    // executed concurrently with where the local function was declared, the
-    // local function can be run concurrently.
     if (auto func = dyn_cast<FuncDecl>(useContext)) {
       if (func->isLocalCapture()) {
-        SourceLoc concurrentLoc = getConcurrentReferenceLoc(func);
-        if (concurrentLoc.isValid())
+        // If the function is @concurrent... it can be run concurrently.
+        if (func->isConcurrent())
           return true;
+
+        // If we find a local function that was referenced in code that can be
+        // executed concurrently with where the local function was declared, the
+        // local function can be run concurrently.
+        SourceLoc concurrentLoc = getConcurrentReferenceLoc(func);
+        if (concurrentLoc.isValid()) {
+          ASTContext &ctx = func->getASTContext();
+          func->diagnose(
+              diag::local_function_executed_concurrently,
+              func->getDescriptiveKind(), func->getName())
+            .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
+          ctx.Diags.diagnose(concurrentLoc, diag::concurrent_access_here);
+
+          // Add the @concurrent attribute implicitly, so we don't diagnose
+          // again.
+          const_cast<FuncDecl *>(func)->getAttrs().add(
+              new (ctx) ConcurrentAttr(true));
+          return true;
+        }
       }
     }
 
@@ -1798,6 +1798,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // Determine the default isolation for this declaration, which may still be
   // overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
+
+  // A @concurrent function is assumed to be actor-independent.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (func->isConcurrent()) {
+      defaultIsolation = ActorIsolation::forIndependent(
+          ActorIndependentKind::Safe);
+    }
+  }
 
   // Check for instance members of actor classes, which are part of
   // actor-isolated state.

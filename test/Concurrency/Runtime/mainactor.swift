@@ -74,7 +74,7 @@ actor class A {
   exitTest(success: ok)
 }
 
-func someFunc() async {
+@concurrent func someFunc() async {
   guard checkIfMainQueue(expectedAnswer: false) else {
     print("ERROR: did not expect detatched task to run on main queue!")
     exit(EXIT_FAILURE)

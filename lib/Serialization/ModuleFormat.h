@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 590; // differentiable_function_extract explicit extractee type
+const uint16_t SWIFTMODULE_VERSION_MINOR = 591; // @concurrent function type
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -983,6 +983,7 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     ClangTypeIDField, // type
     BCFixed<1>,  // noescape?
+    BCFixed<1>,   // concurrent?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
@@ -1059,6 +1060,7 @@ namespace decls_block {
     GENERIC_FUNCTION_TYPE,
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
+    BCFixed<1>,          // concurrent?
     BCFixed<1>,          // async?
     BCFixed<1>,          // throws?
     DifferentiabilityKindField, // differentiability kind

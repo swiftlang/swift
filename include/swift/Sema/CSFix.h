@@ -615,6 +615,26 @@ public:
                                ConstraintLocator *locator);
 };
 
+/// This is a contextual mismatch between @concurrent and non-@concurrent
+/// function types, repair it by adding @concurrent attribute.
+class AddConcurrentAttribute final : public ContextualMismatch {
+  AddConcurrentAttribute(ConstraintSystem &cs, FunctionType *fromType,
+                     FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, fromType, toType, locator) {
+    assert(fromType->isConcurrent() != toType->isConcurrent());
+  }
+
+public:
+  std::string getName() const override { return "add '@concurrent' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AddConcurrentAttribute *create(ConstraintSystem &cs,
+                                    FunctionType *fromType,
+                                    FunctionType *toType,
+                                    ConstraintLocator *locator);
+};
+
 /// This is a contextual mismatch between throwing and non-throwing
 /// function types, repair it by dropping `throws` attribute.
 class DropThrowsAttribute final : public ContextualMismatch {

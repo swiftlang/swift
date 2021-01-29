@@ -6661,9 +6661,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+    // If we have a ClosureExpr, then we can safely propagate the 'concurrent'
     // bit to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
+    if (toEI.isConcurrent() && !fromEI.isConcurrent()) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating the 'concurrent' bit might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+    // bit to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
     if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
       if (!isInDefaultArgumentContext &&
@@ -7820,6 +7835,7 @@ static Expr *wrapAsyncLetInitializer(
   bool throws = TypeChecker::canThrow(initializer);
   auto extInfo = ASTExtInfoBuilder()
     .withAsync()
+    .withConcurrent()
     .withThrows(throws)
     .build();
 

@@ -645,6 +645,13 @@ public:
         ++firstChildIdx;
       }
 
+      bool isConcurrent = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::ConcurrentFunctionType) {
+        isConcurrent = true;
+        ++firstChildIdx;
+      }
+
       bool isAsync = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::AsyncAnnotation) {
@@ -652,7 +659,8 @@ public:
         ++firstChildIdx;
       }
 
-      flags = flags.withAsync(isAsync).withThrows(isThrow);
+      flags = flags.withConcurrent(isConcurrent)
+          .withAsync(isAsync).withThrows(isThrow);
 
       if (Node->getNumChildren() < firstChildIdx + 2)
         return MAKE_NODE_TYPE_ERROR(Node,

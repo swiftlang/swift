@@ -2414,6 +2414,10 @@ void Remangler::mangleFullObjCResilientClassStub(Node *node) {
   Buffer << "Mt";
 }
 
+void Remangler::mangleConcurrentFunctionType(Node *node) {
+  Buffer << 'J';
+}
+
 void Remangler::mangleAsyncAnnotation(Node *node) {
   Buffer << 'Y';
 }

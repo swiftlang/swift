@@ -2531,6 +2531,8 @@ public:
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         if (!fType->getExtInfo().isNoEscape())
           PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+        if (fType->getExtInfo().isConcurrent())
+          PrintWithColorRAII(OS, ClosureModifierColor) << " concurrent";
       }
     }
 
@@ -3810,6 +3812,7 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
+      printFlag(T->isConcurrent(), "concurrent");
       printFlag(T->isAsync(), "async");
       printFlag(T->isThrowing(), "throws");
 

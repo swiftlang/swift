@@ -779,6 +779,7 @@ class TargetFunctionTypeFlags {
     DifferentiableMask = 0x08000000U,
     LinearMask        = 0x10000000U,
     AsyncMask         = 0x20000000U,
+    ConcurrentMask    = 0x40000000U,
   };
   int_type Data;
   
@@ -831,6 +832,13 @@ public:
                                              (isEscaping ? EscapingMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type>
+  withConcurrent(bool isConcurrent) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~ConcurrentMask) |
+        (isConcurrent ? ConcurrentMask : 0));
+  }
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -843,6 +851,10 @@ public:
 
   bool isEscaping() const {
     return bool (Data & EscapingMask);
+  }
+
+  bool isConcurrent() const {
+    return bool (Data & ConcurrentMask);
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }

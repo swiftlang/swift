@@ -703,19 +703,29 @@ public:
 };
 
 /// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' to some other type.
-class NoEscapeFuncToTypeConversionFailure final : public ContextualFailure {
+/// isn't explicitly '@escaping' or '@concurrent' to some other type.
+class AttributedFuncToTypeConversionFailure final : public ContextualFailure {
 public:
-  NoEscapeFuncToTypeConversionFailure(const Solution &solution, Type fromType,
-                                      Type toType, ConstraintLocator *locator)
-      : ContextualFailure(solution, fromType, toType, locator) {}
+  enum AttributeKind {
+    Escaping,
+    Concurrent,
+  };
+
+  const AttributeKind attributeKind;
+
+  AttributedFuncToTypeConversionFailure(const Solution &solution, Type fromType,
+                                        Type toType, ConstraintLocator *locator,
+                                        AttributeKind attributeKind)
+      : ContextualFailure(solution, fromType, toType, locator),
+        attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
 
 private:
-  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
-  /// passing such parameter as an @escaping argument, or trying to
-  /// assign it to a variable which expects @escaping function.
+  /// Emit tailored diagnostics for no-escape/non-concurrent parameter
+  /// conversions e.g. passing such parameter as an @escaping or @concurrent
+  /// argument, or trying to assign it to a variable which expects @escaping
+  /// or @concurrent function.
   bool diagnoseParameterUse() const;
 };
 
