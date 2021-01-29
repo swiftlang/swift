@@ -256,9 +256,6 @@ class HostSpecificConfiguration(object):
 
     def __platforms_archs_to_skip_test(self, args, host_target):
         platforms_archs_to_skip_test = set()
-        if not args.test_ios_32bit_simulator:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
         if host_target == StdlibDeploymentTarget.OSX.x86_64.name:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.arm64)
