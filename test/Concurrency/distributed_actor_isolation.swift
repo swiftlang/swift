@@ -52,8 +52,7 @@ distributed actor class DistributedActor_1 {
   distributed func distReturnGeneric<T: Codable>(int: Int) async throws -> T { // ok
     fatalError()
   }
-  distributed func distReturnGenericWhere<T>(int: Int) async throws -> T
-    where T: Codable { // ok
+  distributed func distReturnGenericWhere<T>(int: Int) async throws -> T where T: Codable { // ok
     fatalError()
   }
   distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
@@ -64,8 +63,7 @@ distributed actor class DistributedActor_1 {
   distributed func distGenericParam<T: Codable>(value: T) async throws { // ok
     fatalError()
   }
-  distributed func distGenericParamWhere<T>(value: T) async throws -> T
-    where T: Codable { // ok
+  distributed func distGenericParamWhere<T>(value: T) async throws -> T where T: Codable { // ok
     fatalError()
   }
   distributed func distBadGenericParam<T>(int: T) async throws {

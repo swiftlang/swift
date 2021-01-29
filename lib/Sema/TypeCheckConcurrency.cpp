@@ -171,55 +171,14 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
 
   // Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
-    auto paramType = param->getInterfaceType();
-
-    if (paramType->isExistentialType()) {
-      func->dump();
-      assert(false && "OH NO");
-
-      bool encodableConformance = false;
-      bool decodableConformance = false;
-      auto layout = paramType->getExistentialLayout();
-      for (Type protoTy : layout.getProtocols()) {
-        if (TypeChecker::conformsToProtocol(protoTy, encodableType, func)) {
-          encodableConformance = true;
-        }
-        if (TypeChecker::conformsToProtocol(protoTy, decodableType, func)) {
-          decodableConformance = true;
-        }
-
-        if (decodableConformance && encodableConformance) {
-          return false; // ok!
-        }
-      }
-
-      if (diagnose) {
-        func->diagnose(
-            diag::distributed_actor_func_param_not_codable,
-            param->getArgumentName().str(),
-            paramType
-        );
-        return true;
-      }
-    }
-
-    if (!TypeChecker::conformsToProtocol(paramType, encodableType, func)) {
+    auto paramType = func->mapTypeIntoContext(param->getInterfaceType()); // TODO: getDeclaredInterfaceType instead?
+    if (TypeChecker::conformsToProtocol(paramType, encodableType, func).isInvalid() ||
+        TypeChecker::conformsToProtocol(paramType, decodableType, func).isInvalid()) {
       if (diagnose)
         func->diagnose(
             diag::distributed_actor_func_param_not_codable,
             param->getArgumentName().str(),
-            paramType
-        );
-      // TODO: suggest a fixit to add Codable to the type?
-      return true;
-    }
-
-    if (!TypeChecker::conformsToProtocol(paramType, decodableType, func)) {
-      if (diagnose)
-        func->diagnose(
-            diag::distributed_actor_func_param_not_codable,
-            param->getArgumentName().str(),
-            paramType
+            param->getInterfaceType()
         );
       // TODO: suggest a fixit to add Codable to the type?
       return true;
@@ -228,21 +187,18 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
 
   // Result type must be either void or a codable type
   // TODO: In the future we can also support AsyncSequence of Codable values
-  auto resultType = func->getResultInterfaceType();
+  auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType()); // TODO: getDeclaredInterfaceType instead?
   if (!resultType->isVoid()) {
-    if (!TypeChecker::conformsToProtocol(resultType, decodableType, func) ||
-        !TypeChecker::conformsToProtocol(resultType, encodableType, func)) {
-
+    if (TypeChecker::conformsToProtocol(resultType, decodableType, func).isInvalid() ||
+        TypeChecker::conformsToProtocol(resultType, encodableType, func).isInvalid()) {
       if (diagnose)
         func->diagnose(
             diag::distributed_actor_func_result_not_codable,
-            resultType
+            func->getResultInterfaceType()
         );
       // TODO: suggest a fixit to add Codable to the type?
       return true;
     }
-  } else if (resultType) {
-
   }
 
   return false;
