@@ -1289,7 +1289,7 @@ function common_cross_c_flags() {
 
     case $host in
         macosx-*)
-            echo -n " -arch ${arch} -target ${arch}-apple-macosx${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
+            echo -n " -arch ${arch} -target ${arch}-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
             ;;
         iphonesimulator-*)
             echo -n " -arch ${arch} -target ${arch}-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
