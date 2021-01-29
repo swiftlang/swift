@@ -116,6 +116,9 @@ public:
 
   ApplySiteKind getKind() const { return ApplySiteKind(Inst->getKind()); }
 
+  SILInstruction *operator*() const { return Inst; }
+  SILInstruction *operator->() const { return Inst; }
+
   explicit operator bool() const { return Inst != nullptr; }
 
   SILInstruction *getInstruction() const { return Inst; }

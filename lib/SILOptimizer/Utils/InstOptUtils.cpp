@@ -2024,3 +2024,40 @@ SILValue swift::makeNewValueAvailable(
 
   return controlEqCopy ? controlEqCopy : value;
 }
+
+bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
+    SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks) {
+  if (!OwnershipForwardingMixin::isa(forwardingInst) ||
+      isa<AllArgOwnershipForwardingSingleValueInst>(forwardingInst))
+    return false;
+
+  SmallVector<Operand *, 32> worklist(getNonDebugUses(forwardingInst));
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    auto *user = use->getUser();
+
+    if (isa<EndBorrowInst>(user) || isa<DestroyValueInst>(user) ||
+        isa<RefCountingInst>(user))
+      continue;
+
+    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
+      for (auto result : user->getResults())
+        for (auto *resultUse : getNonDebugUses(result))
+          worklist.push_back(resultUse);
+      continue;
+    }
+
+    return false;
+  }
+
+  // Now that we know we can perform our transform, set all uses of
+  // forwardingInst to be used of its operand and then delete \p forwardingInst.
+  auto newValue = forwardingInst->getOperand(0);
+  while (!forwardingInst->use_empty()) {
+    auto *use = *(forwardingInst->use_begin());
+    use->set(newValue);
+  }
+
+  callbacks.deleteInst(forwardingInst);
+  return true;
+}
