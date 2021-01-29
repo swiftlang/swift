@@ -156,8 +156,8 @@ extension MyActor {
 
     // Local functions might run concurrently.
     @concurrent func localFn1() {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
       _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
       _ = localConstant
     }

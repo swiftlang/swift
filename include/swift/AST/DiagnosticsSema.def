@@ -4257,10 +4257,6 @@ WARNING(concurrent_access_local,none,
         "local %0 %1 is unsafe to reference in code that may execute "
         "concurrently",
         (DescriptiveDeclKind, DeclName))
-ERROR(actor_isolated_concurrent_access,none,
-        "actor-isolated %0 %1 is unsafe to reference in code "
-        "that may execute concurrently",
-        (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_from_concurrent_closure,none,
         "actor-isolated %0 %1 cannot be referenced from a concurrent closure",
         (DescriptiveDeclKind, DeclName))

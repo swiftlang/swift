@@ -1372,17 +1372,6 @@ namespace {
             return true;
         }
 
-        // Check whether we are in a context that will not execute concurrently
-        // with the context of 'self'.
-        if (mayExecuteConcurrentlyWith(
-                getDeclContext(), selfVar->getDeclContext())) {
-          ctx.Diags.diagnose(
-              memberLoc, diag::actor_isolated_concurrent_access,
-              member->getDescriptiveKind(), member->getName());
-          noteIsolatedActorMember(member);
-          return true;
-        }
-
         // It's fine.
         return false;
       }
@@ -1808,6 +1797,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // Determine the default isolation for this declaration, which may still be
   // overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
+
+  // A @concurrent function is assumed to be actor-independent.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (func->isConcurrent()) {
+      defaultIsolation = ActorIsolation::forIndependent(
+          ActorIndependentKind::Safe);
+    }
+  }
 
   // Check for instance members of actor classes, which are part of
   // actor-isolated state.
