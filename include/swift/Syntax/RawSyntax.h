@@ -150,8 +150,7 @@ typedef unsigned SyntaxNodeId;
 ///
 /// This is implementation detail - do not expose it in public API.
 class RawSyntax final
-    : private llvm::TrailingObjects<RawSyntax, RC<RawSyntax>, OwnedString,
-                                    TriviaPiece> {
+    : private llvm::TrailingObjects<RawSyntax, RC<RawSyntax>, OwnedString> {
   friend TrailingObjects;
 
   /// The ID that shall be used for the next node that is created and does not
@@ -198,10 +197,8 @@ class RawSyntax final
       uint64_t : bitmax(NumRawSyntaxBits, 64); // align to 16 bits
       /// The kind of token this "token" node represents.
       unsigned TokenKind : 16;
-      /// Number of leading  trivia pieces.
-      unsigned NumLeadingTrivia : 16;
-      /// Number of trailing trivia pieces.
-      unsigned NumTrailingTrivia : 16;
+      StringRef LeadingTrivia;
+      StringRef TrailingTrivia;
     } Token;
   } Bits;
 
@@ -210,11 +207,6 @@ class RawSyntax final
   }
   size_t numTrailingObjects(OverloadToken<OwnedString>) const {
     return isToken() ? 1 : 0;
-  }
-  size_t numTrailingObjects(OverloadToken<TriviaPiece>) const {
-    return isToken()
-             ? Bits.Token.NumLeadingTrivia + Bits.Token.NumTrailingTrivia
-             : 0;
   }
 
   /// Constructor for creating layout nodes.
@@ -232,9 +224,9 @@ class RawSyntax final
   /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
   /// the caller needs to assure that the NodeId has not been used yet.
   RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
-            ArrayRef<TriviaPiece> LeadingTrivia,
-            ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
-            const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId);
+            StringRef LeadingTrivia, StringRef TrailingTrivia,
+            SourcePresence Presence, const RC<SyntaxArena> &Arena,
+            llvm::Optional<SyntaxNodeId> NodeId);
 
   /// Compute the node's text length by summing up the length of its childern
   size_t computeTextLength() {
@@ -295,27 +287,22 @@ public:
 
   /// Make a raw "token" syntax node.
   static RC<RawSyntax> make(tok TokKind, OwnedString Text, size_t TextLength,
-                            ArrayRef<TriviaPiece> LeadingTrivia,
-                            ArrayRef<TriviaPiece> TrailingTrivia,
+                            StringRef LeadingTrivia, StringRef TrailingTrivia,
                             SourcePresence Presence,
                             const RC<SyntaxArena> &Arena = SyntaxArena::make(),
                             llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
   /// Make a raw "token" syntax node that was allocated in \p Arena.
-  static RC<RawSyntax> makeAndCalcLength(
-      tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
-      ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
-      const RC<SyntaxArena> &Arena = SyntaxArena::make(),
-      llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+  static RC<RawSyntax>
+  makeAndCalcLength(tok TokKind, OwnedString Text, StringRef LeadingTrivia,
+                    StringRef TrailingTrivia, SourcePresence Presence,
+                    const RC<SyntaxArena> &Arena = SyntaxArena::make(),
+                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
     size_t TextLength = 0;
     if (Presence != SourcePresence::Missing) {
-      for (auto Trivia : LeadingTrivia) {
-        TextLength += Trivia.getTextLength();
-      }
+      TextLength += LeadingTrivia.size();
       TextLength += Text.size();
-      for (auto Trivia : TrailingTrivia) {
-        TextLength += Trivia.getTextLength();
-      }
+      TextLength += TrailingTrivia.size();
     }
     return make(TokKind, Text, TextLength, LeadingTrivia, TrailingTrivia,
                 Presence, Arena, NodeId);
@@ -414,17 +401,27 @@ public:
   /// disappear when the syntax node gets freed.
   StringRef getTokenText() const { return getOwnedTokenText().str(); }
 
-  /// Return the leading trivia list of the token.
-  ArrayRef<TriviaPiece> getLeadingTrivia() const {
+  /// Return the unparsed leading trivia of the token.
+  StringRef getLeadingTrivia() const {
     assert(isToken());
-    return {getTrailingObjects<TriviaPiece>(), Bits.Token.NumLeadingTrivia};
+    return Bits.Token.LeadingTrivia;
   }
+
+  /// Return the unparsed trailing trivia of the token.
+  StringRef getTrailingTrivia() const {
+    assert(isToken());
+    return Bits.Token.TrailingTrivia;
+  }
+
+  /// Return pieces that make up the leading trivia of the token.
+  /// Note that this triggers trivia parsing which may be expensive. If the
+  /// trivia pieces are required multiple times, consider caching them.
+  Trivia getLeadingTriviaPieces() const;
+
   /// Return the trailing trivia list of the token.
-  ArrayRef<TriviaPiece> getTrailingTrivia() const {
-    assert(isToken());
-    return {getTrailingObjects<TriviaPiece>() + Bits.Token.NumLeadingTrivia,
-            Bits.Token.NumTrailingTrivia};
-  }
+  /// Note that this triggers trivia parsing which may be expensive. If the
+  /// trivia pieces are required multiple times, consider caching them.
+  Trivia getTrailingTriviaPieces() const;
 
   /// Return \c true if this is the given kind of token.
   bool isToken(tok K) const { return isToken() && getTokenKind() == K; }
@@ -436,28 +433,18 @@ public:
 
   /// Return a new token like this one, but with the given leading
   /// trivia instead.
-  RC<RawSyntax>
-  withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
+  RC<RawSyntax> withLeadingTrivia(StringRef NewLeadingTrivia) const {
     return makeAndCalcLength(getTokenKind(), getOwnedTokenText(),
                              NewLeadingTrivia, getTrailingTrivia(),
                              getPresence());
   }
 
-  RC<RawSyntax> withLeadingTrivia(Trivia NewLeadingTrivia) const {
-    return withLeadingTrivia(NewLeadingTrivia.Pieces);
-  }
-
   /// Return a new token like this one, but with the given trailing
   /// trivia instead.
-  RC<RawSyntax>
-  withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
+  RC<RawSyntax> withTrailingTrivia(StringRef NewTrailingTrivia) const {
     return makeAndCalcLength(getTokenKind(), getOwnedTokenText(),
                              getLeadingTrivia(), NewTrailingTrivia,
                              getPresence());
-  }
-
-  RC<RawSyntax> withTrailingTrivia(Trivia NewTrailingTrivia) const {
-    return withTrailingTrivia(NewTrailingTrivia.Pieces);
   }
 
   /// @}
@@ -503,21 +490,9 @@ public:
 
   /// @}
 
-  size_t getLeadingTriviaLength() {
-    size_t Length = 0;
-    for (auto Trivia : getLeadingTrivia()) {
-      Length += Trivia.getTextLength();
-    }
-    return Length;
-  }
+  size_t getLeadingTriviaLength() const { return getLeadingTrivia().size(); }
 
-  size_t getTrailingTriviaLength() {
-    size_t Length = 0;
-    for (auto Trivia : getTrailingTrivia()) {
-      Length += Trivia.getTextLength();
-    }
-    return Length;
-  }
+  size_t getTrailingTriviaLength() const { return getTrailingTrivia().size(); }
 
   /// Print this piece of syntax recursively.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;
@@ -529,8 +504,7 @@ public:
   void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID, tok TokKind, OwnedString Text,
-                      ArrayRef<TriviaPiece> LeadingTrivia,
-                      ArrayRef<TriviaPiece> TrailingTrivia);
+                      StringRef LeadingTrivia, StringRef TrailingTrivia);
 };
 
 } // end namespace syntax

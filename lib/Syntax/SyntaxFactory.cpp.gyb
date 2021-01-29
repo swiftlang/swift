@@ -39,12 +39,12 @@ using namespace swift;
 using namespace swift::syntax;
 
 TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
-                                     const Trivia &LeadingTrivia,
-                                     const Trivia &TrailingTrivia,
+                                     StringRef LeadingTrivia,
+                                     StringRef TrailingTrivia,
                                      SourcePresence Presence,
                                      const RC<SyntaxArena> &Arena) {
   return makeRoot<TokenSyntax>(RawSyntax::makeAndCalcLength(Kind, Text, 
-    LeadingTrivia.Pieces, TrailingTrivia.Pieces, Presence, Arena));
+    LeadingTrivia, TrailingTrivia, Presence, Arena));
 }
 
 UnknownSyntax
@@ -236,8 +236,8 @@ SyntaxFactory::makeBlank${node.syntax_kind}(const RC<SyntaxArena> &Arena) {
 % for token in SYNTAX_TOKENS:
 %   if token.is_keyword:
   TokenSyntax
-  SyntaxFactory::make${token.name}Keyword(const Trivia &LeadingTrivia,
-                                          const Trivia &TrailingTrivia,
+  SyntaxFactory::make${token.name}Keyword(StringRef LeadingTrivia,
+                                          StringRef TrailingTrivia,
                                           const RC<SyntaxArena> &Arena) {
     return makeToken(tok::${token.kind},
                      OwnedString::makeUnowned("${token.text}"),
@@ -246,8 +246,8 @@ SyntaxFactory::makeBlank${node.syntax_kind}(const RC<SyntaxArena> &Arena) {
   }
 %   elif token.text:
   TokenSyntax
-  SyntaxFactory::make${token.name}Token(const Trivia &LeadingTrivia,
-                                        const Trivia &TrailingTrivia,
+  SyntaxFactory::make${token.name}Token(StringRef LeadingTrivia,
+                                        StringRef TrailingTrivia,
                                         const RC<SyntaxArena> &Arena) {
     return makeToken(tok::${token.kind},
                      OwnedString::makeUnowned("${token.text}"),
@@ -257,8 +257,8 @@ SyntaxFactory::makeBlank${node.syntax_kind}(const RC<SyntaxArena> &Arena) {
 %   else:
   TokenSyntax
   SyntaxFactory::make${token.name}(OwnedString Text,
-                                   const Trivia &LeadingTrivia,
-                                   const Trivia &TrailingTrivia,
+                                   StringRef LeadingTrivia,
+                                   StringRef TrailingTrivia,
                                    const RC<SyntaxArena> &Arena) {
     return makeToken(tok::${token.kind}, Text,
                      LeadingTrivia, TrailingTrivia,
@@ -300,44 +300,44 @@ SyntaxFactory::makeGenericParameter(TokenSyntax Name,
 }
 
 TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
-                                             const Trivia &LeadingTrivia,
-                                             const Trivia &TrailingTrivia,
+                                             StringRef LeadingTrivia,
+                                             StringRef TrailingTrivia,
                                              const RC<SyntaxArena> &Arena) {
   auto identifier =
       makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia, Arena);
   return makeSimpleTypeIdentifier(identifier, None, Arena);
 }
 
-TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(const Trivia &LeadingTrivia,
-                                                const Trivia &TrailingTrivia,
+TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(StringRef LeadingTrivia,
+                                                StringRef TrailingTrivia,
                                                 const RC<SyntaxArena> &Arena) {
   return makeTypeIdentifier(OwnedString::makeUnowned("Any"), LeadingTrivia,
                             TrailingTrivia, Arena);
 }
 
-TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(const Trivia &LeadingTrivia,
-                                                 const Trivia &TrailingTrivia,
+TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(StringRef LeadingTrivia,
+                                                 StringRef TrailingTrivia,
                                                  const RC<SyntaxArena> &Arena) {
   return makeTypeIdentifier(OwnedString::makeUnowned("Self"),
                             LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TokenSyntax SyntaxFactory::makeTypeToken(const Trivia &LeadingTrivia,
-                                         const Trivia &TrailingTrivia,
+TokenSyntax SyntaxFactory::makeTypeToken(StringRef LeadingTrivia,
+                                         StringRef TrailingTrivia,
                                          const RC<SyntaxArena> &Arena) {
   return makeIdentifier(OwnedString::makeUnowned("Type"),
                         LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TokenSyntax SyntaxFactory::makeProtocolToken(const Trivia &LeadingTrivia,
-                                             const Trivia &TrailingTrivia,
+TokenSyntax SyntaxFactory::makeProtocolToken(StringRef LeadingTrivia,
+                                             StringRef TrailingTrivia,
                                              const RC<SyntaxArena> &Arena) {
   return makeIdentifier(OwnedString::makeUnowned("Protocol"),
                         LeadingTrivia, TrailingTrivia, Arena);
 }
 
-TokenSyntax SyntaxFactory::makeEqualityOperator(const Trivia &LeadingTrivia,
-                                                const Trivia &TrailingTrivia,
+TokenSyntax SyntaxFactory::makeEqualityOperator(StringRef LeadingTrivia,
+                                                StringRef TrailingTrivia,
                                                 const RC<SyntaxArena> &Arena) {
   return makeToken(tok::oper_binary_spaced, OwnedString::makeUnowned("=="),
                    LeadingTrivia, TrailingTrivia, SourcePresence::Present,

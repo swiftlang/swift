@@ -150,9 +150,9 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
     if (description.hasValue) {
       swift::tok tokenKind = description.Kind;
       StringRef text = description.Text;
-      std::vector<swift::TriviaPiece> leadingTrivia;
+      StringRef leadingTrivia;
       in.mapRequired("leadingTrivia", leadingTrivia);
-      std::vector<swift::TriviaPiece> trailingTrivia;
+      StringRef trailingTrivia;
       in.mapRequired("trailingTrivia", trailingTrivia);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);

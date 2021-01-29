@@ -14,7 +14,6 @@
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Syntax/Trivia.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
@@ -114,26 +113,14 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
                                                 StringRef leadingTrivia,
                                                 StringRef trailingTrivia,
                                                 CharSourceRange range) {
-  auto leadingTriviaPieces = TriviaLexer::lexTrivia(leadingTrivia).Pieces;
-  auto trailingTriviaPieces = TriviaLexer::lexTrivia(trailingTrivia).Pieces;
-
   SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTrivia.size());
   unsigned tokLength =
       range.getByteLength() - leadingTrivia.size() - trailingTrivia.size();
   CharSourceRange tokRange = CharSourceRange{tokLoc, tokLength};
-  SourceLoc leadingTriviaLoc = range.getStart();
-  SourceLoc trailingTriviaLoc = tokLoc.getAdvancedLoc(tokLength);
-  Trivia syntaxLeadingTrivia =
-    ParsedTriviaPiece::convertToSyntaxTrivia(leadingTriviaPieces,
-                                             leadingTriviaLoc, SM, BufferID);
-  Trivia syntaxTrailingTrivia =
-    ParsedTriviaPiece::convertToSyntaxTrivia(trailingTriviaPieces,
-                                             trailingTriviaLoc, SM, BufferID);
   StringRef tokenText = SM.extractText(tokRange, BufferID);
   auto ownedText = OwnedString::makeRefCounted(tokenText);
   auto raw = TokenCache->getToken(Arena, tokenKind, range.getByteLength(),
-                                  ownedText, syntaxLeadingTrivia.Pieces,
-                                  syntaxTrailingTrivia.Pieces);
+                                  ownedText, leadingTrivia, trailingTrivia);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;
