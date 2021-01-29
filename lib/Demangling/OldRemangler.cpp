@@ -1271,6 +1271,8 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
+  } else if (text == "@concurrent") {
+    Buffer << "h";
   } else if (text == "@async") {
     Buffer << "H";
   } else {

@@ -1600,6 +1600,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
+                        .Case("@concurrent", 'h')
                         .Case("@async", 'H')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");

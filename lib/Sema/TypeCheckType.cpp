@@ -2292,7 +2292,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
           rep, attrs.has(TAK_pseudogeneric), attrs.has(TAK_noescape),
-          attrs.has(TAK_async), diffKind,
+          attrs.has(TAK_concurrent), attrs.has(TAK_async), diffKind,
           parsedClangFunctionType);
 
       ty =

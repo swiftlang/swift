@@ -1727,6 +1727,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     break;
   }
 
+  // Concurrent functions.
+  if (fn->isConcurrent()) {
+    OpArgs.push_back('h');
+  }
+
   // Asynchronous functions.
   if (fn->isAsync()) {
     OpArgs.push_back('H');
